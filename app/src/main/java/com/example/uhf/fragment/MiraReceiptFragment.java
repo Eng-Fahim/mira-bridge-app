@@ -299,277 +299,291 @@ public class MiraReceiptFragment extends DialogFragment {
     }
 
     private void renderHtmlReceipt() {
-    if (webReceipt == null) return;
-    
-    String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
-    String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
-    String dir = isArabic ? "rtl" : "ltr";
+        if (webReceipt == null) return;
+        
+        String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
+        String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
+        String dir = isArabic ? "rtl" : "ltr";
 
-    StringBuilder h = new StringBuilder();
-    h.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
-     .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
-     .append("<style>")
-     .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 15px; max-width: 420px; margin: auto; background: #fff; color: #1a1a1a; font-size: 11px; }")
-     .append(".header { text-align: center; border-bottom: 3px double #1A237E; padding-bottom: 12px; margin-bottom: 12px; }")
-     .append(".org-name { font-size: 22px; font-weight: bold; color: #1A237E; }")
-     .append(".org-meta { font-size: 10px; color: #555; margin-top: 3px; }")
-     .append(".invoice-title { font-size: 16px; font-weight: bold; text-align: center; background: #1A237E; color: #fff; padding: 8px; margin: 10px 0; border-radius: 4px; }")
-     .append(".info-grid { width: 100%; font-size: 10px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px; background: #FAFAFA; }")
-     .append(".info-grid td { padding: 3px 0; }")
-     .append(".label { color: #666; font-size: 9px; } .value { font-weight: bold; color: #000; font-size: 10px; }")
-     .append("table.items { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; }")
-     .append("table.items th { background: #1A237E; color: #fff; padding: 6px; text-align: center; border: 1px solid #1A237E; font-size: 9px; }")
-     .append("table.items td { padding: 6px; border: 1px solid #ddd; text-align: center; }")
-     .append(".serial-box { font-size: 8px; background: #E8EAF6; padding: 4px; margin-top: 3px; border-radius: 3px; word-break: break-all; text-align: left; direction: ltr; }")
-     .append(".totals-table { width: 100%; font-size: 11px; margin-top: 8px; }")
-     .append(".totals-table td { padding: 4px 0; }")
-     .append(".grand-total { font-size: 18px; font-weight: bold; color: #1A237E; border-top: 2px solid #1A237E; border-bottom: 3px double #1A237E; padding: 8px 0; background: #F5F5F5; }")
-     .append(".warranty-box { font-size: 10px; font-weight: bold; text-align: center; margin: 10px 0; padding: 8px; border-radius: 4px; border: 1px dashed #4CAF50; background: #E8F5E9; color: #2E7D32; }")
-     .append(".qr-container { text-align: center; margin-top: 12px; padding-top: 8px; border-top: 2px dashed #1A237E; }")
-     .append(".qr-container img { width: 120px; height: 120px; }")
-     .append(".footer { text-align: center; margin-top: 12px; font-size: 9px; color: #777; border-top: 1px solid #eee; padding-top: 8px; }")
-     .append(".signature-line { display: flex; justify-content: space-between; margin-top: 25px; font-size: 9px; }")
-     .append(".signature-box { text-align: center; width: 45%; }")
-     .append(".signature-line-box { border-top: 1px solid #333; margin-top: 30px; padding-top: 3px; }")
-     .append("</style></head><body>");
+        StringBuilder h = new StringBuilder();
+        h.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
+         .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+         .append("<style>")
+         .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 15px; max-width: 420px; margin: auto; background: #fff; color: #1a1a1a; font-size: 11px; }")
+         .append(".header { text-align: center; border-bottom: 3px double #1A237E; padding-bottom: 12px; margin-bottom: 12px; }")
+         .append(".org-name { font-size: 22px; font-weight: bold; color: #1A237E; }")
+         .append(".org-meta { font-size: 10px; color: #555; margin-top: 3px; }")
+         .append(".invoice-title { font-size: 16px; font-weight: bold; text-align: center; background: #1A237E; color: #fff; padding: 8px; margin: 10px 0; border-radius: 4px; }")
+         .append(".info-grid { width: 100%; font-size: 10px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px; background: #FAFAFA; }")
+         .append(".info-grid td { padding: 3px 0; }")
+         .append(".label { color: #666; font-size: 9px; } .value { font-weight: bold; color: #000; font-size: 10px; }")
+         .append("table.items { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; }")
+         .append("table.items th { background: #1A237E; color: #fff; padding: 6px; text-align: center; border: 1px solid #1A237E; font-size: 9px; }")
+         .append("table.items td { padding: 6px; border: 1px solid #ddd; text-align: center; }")
+         .append(".serial-box { font-size: 8px; background: #E8EAF6; padding: 4px; margin-top: 3px; border-radius: 3px; word-break: break-all; text-align: left; direction: ltr; }")
+         .append(".totals-table { width: 100%; font-size: 11px; margin-top: 8px; }")
+         .append(".totals-table td { padding: 4px 0; }")
+         .append(".grand-total { font-size: 18px; font-weight: bold; color: #1A237E; border-top: 2px solid #1A237E; border-bottom: 3px double #1A237E; padding: 8px 0; background: #F5F5F5; }")
+         .append(".warranty-box { font-size: 10px; font-weight: bold; text-align: center; margin: 10px 0; padding: 8px; border-radius: 4px; border: 1px dashed #4CAF50; background: #E8F5E9; color: #2E7D32; }")
+         .append(".qr-container { text-align: center; margin-top: 12px; padding-top: 8px; border-top: 2px dashed #1A237E; }")
+         .append(".qr-container img { width: 120px; height: 120px; }")
+         .append(".footer { text-align: center; margin-top: 12px; font-size: 9px; color: #777; border-top: 1px solid #eee; padding-top: 8px; }")
+         .append(".signature-line { display: flex; justify-content: space-between; margin-top: 25px; font-size: 9px; }")
+         .append(".signature-box { text-align: center; width: 45%; }")
+         .append(".signature-line-box { border-top: 1px solid #333; margin-top: 30px; padding-top: 3px; }")
+         .append("</style></head><body>");
 
-    h.append("<div class='header'>")
-     .append("<div class='org-name'>").append(orgName).append("</div>")
-     .append("<div class='org-meta'>").append(address).append("</div>")
-     .append("<div class='org-meta'>").append(phone).append("</div>")
-     .append("</div>");
-
-    try {
-        JSONObject root = new JSONObject(receiptJsonStr);
-        
-        JSONObject t = root.optJSONObject("transaction");
-        if (t == null) t = root.optJSONObject("data");
-        if (t == null) t = root.optJSONObject("receipt");
-        if (t == null) t = root;
-        
-        String sellerName = t.optString("seller_name", "");
-        if (sellerName.isEmpty()) sellerName = t.optString("seller", "");
-        if (sellerName.isEmpty()) sellerName = t.optString("cashier_name", "");
-        if (sellerName.isEmpty()) sellerName = t.optString("employee_name", "");
-        if (sellerName.isEmpty()) sellerName = t.optString("username", "");
-        if (sellerName.isEmpty()) sellerName = t.optString("user_name", "");
-        if (sellerName.isEmpty()) sellerName = t.optString("created_by", "");
-        if (sellerName.isEmpty()) sellerName = t.optString("user", "");
-        if (sellerName.isEmpty()) sellerName = "—";
-        
-        String branchName = t.optString("branch_name", "");
-        if (branchName.isEmpty()) branchName = t.optString("branch", "");
-        if (branchName.isEmpty() && getContext() != null) {
-            try {
-                MiraBranchesManager bm = MiraBranchesManager.getInstance(getContext());
-                if (bm != null && bm.hasActiveBranch()) {
-                    branchName = bm.getActiveBranchDisplayName();
-                }
-            } catch (Exception ignored) {}
-        }
-        if (branchName.isEmpty()) branchName = isArabic ? "الفرع الرئيسي" : "Main Branch";
-        
-        String saleNumber = t.optString("sale_number", "");
-        if (saleNumber.isEmpty()) saleNumber = t.optString("invoice_number", "");
-        if (saleNumber.isEmpty()) saleNumber = t.optString("receipt_number", "");
-        if (saleNumber.isEmpty()) saleNumber = t.optString("reference", "");
-        if (saleNumber.isEmpty()) saleNumber = t.optString("id", "—");
-        
-        String dateStr = t.optString("timestamp", "");
-        if (dateStr.isEmpty()) dateStr = t.optString("created_at", "");
-        if (dateStr.isEmpty()) dateStr = t.optString("sale_date", "");
-        if (dateStr.isEmpty()) dateStr = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date());
-        
-        String customer = t.optString("customer_name", "");
-        if (customer.isEmpty()) customer = t.optString("customer", "");
-        if (customer.isEmpty()) customer = isArabic ? "عميل نقدي" : "Cash Customer";
-        
-        String customerPhone = t.optString("customer_phone", "");
-        if (customerPhone.isEmpty()) customerPhone = t.optString("phone", "");
-        
-        String paymentMethod = t.optString("payment_method", "");
-        if (paymentMethod.isEmpty()) paymentMethod = t.optString("payment", "");
-        if (paymentMethod.isEmpty()) paymentMethod = "CASH";
-        
-        String currency = t.optString("currency", "");
-        if (currency.isEmpty()) currency = defaultCurrency;
-        
-        double exchangeRate = t.optDouble("exchange_rate", 1.0);
-        
-        h.append("<div class='invoice-title'>")
-         .append(isArabic ? "🧾 فاتورة بيع" : "🧾 INVOICE")
+        h.append("<div class='header'>")
+         .append("<div class='org-name'>").append(orgName).append("</div>")
+         .append("<div class='org-meta'>").append(address).append("</div>")
+         .append("<div class='org-meta'>").append(phone).append("</div>")
          .append("</div>");
 
-        // ✅ حالة الإرجاع
-        String refundStatus = t.optString("refund_status", "");
-        if (refundStatus.isEmpty()) {
-            refundStatus = t.optString("status", "completed");
-        }
-
-        if ("refunded".equals(refundStatus) || "fully_refunded".equals(refundStatus)) {
-            h.append("<div style='text-align:center;margin:10px 0;padding:8px;background:#FFF3E0;border:1px solid #FF9800;border-radius:4px;'>")
-             .append("<b style='color:#E65100;font-size:12px;'>🔄 ")
-             .append(isArabic ? "فاتورة مرتجعة" : "REFUNDED INVOICE")
-             .append("</b></div>");
-        } else if ("partially_refunded".equals(refundStatus)) {
-            h.append("<div style='text-align:center;margin:10px 0;padding:8px;background:#FFF3E0;border:1px solid #FF9800;border-radius:4px;'>")
-             .append("<b style='color:#E65100;font-size:12px;'>🔄 ")
-             .append(isArabic ? "فاتورة مرتجعة جزئياً" : "PARTIALLY REFUNDED")
-             .append("</b></div>");
-        }
-
-        h.append("<table class='info-grid'>")
-         .append("<tr><td class='label'>").append(isArabic ? "رقم الفاتورة:" : "Invoice #:").append("</td><td class='value'>").append(saleNumber).append("</td>")
-         .append("<td class='label'>").append(isArabic ? "التاريخ:" : "Date:").append("</td><td class='value'>").append(dateStr).append("</td></tr>")
-         .append("<tr><td class='label'>").append(isArabic ? "البائع:" : "Seller:").append("</td><td class='value'><b>").append(sellerName).append("</b></td>")
-         .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'><b>").append(branchName).append("</b></td></tr>")
-         .append("<tr><td class='label'>").append(isArabic ? "العميل:" : "Customer:").append("</td><td class='value'>").append(customer).append("</td>")
-         .append("<td class='label'>").append(isArabic ? "الهاتف:" : "Phone:").append("</td><td class='value'>").append(customerPhone.isEmpty() ? "—" : customerPhone).append("</td></tr>")
-         .append("<tr><td class='label'>").append(isArabic ? "طريقة الدفع:" : "Payment:").append("</td><td class='value' colspan='3'>").append(paymentMethod).append("</td></tr>")
-         .append("</table>");
-
-        JSONArray items = t.optJSONArray("items");
-        if (items == null) items = t.optJSONArray("sold_items");
-        if (items == null) items = t.optJSONArray("products");
-        if (items == null) items = t.optJSONArray("line_items");
-        
-        if (items != null && items.length() > 0) {
-            h.append("<table class='items'><thead><tr>")
-             .append("<th>#</th><th>").append(isArabic ? "الصنف" : "Item").append("</th>")
-             .append("<th>").append(isArabic ? "الرقم التسلسلي" : "Serial #").append("</th>")
-             .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>")
-             .append("<th>").append(isArabic ? "الوزن" : "Weight").append("</th>")
-             .append("<th>").append(isArabic ? "السعر" : "Price").append("</th>")
-             .append("</tr></thead><tbody>");
+        try {
+            JSONObject root = new JSONObject(receiptJsonStr);
             
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject it = items.optJSONObject(i);
-                if (it == null) continue;
-                
-                double weight = it.optDouble("weight", 0);
-                if (weight == 0) weight = it.optDouble("gross_weight", 0);
-                
-                double itemPriceUSD = it.optDouble("price_usd", 0);
-                if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("sale_price", 0);
-                if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("price", 0);
-                
-                String serial = it.optString("serial_number", "");
-                if (serial.isEmpty()) serial = it.optString("serial", "");
-                if (serial.isEmpty()) serial = it.optString("epc", "");
-                
-                String title = it.optString("title", "");
-                if (title.isEmpty()) title = it.optString("item_title", "—");
-                
-                String karat = it.optString("karat", "");
-                if (karat.isEmpty()) karat = it.optString("gold_karat", "—");
+            JSONObject t = root.optJSONObject("transaction");
+            if (t == null) t = root.optJSONObject("data");
+            if (t == null) t = root.optJSONObject("receipt");
+            if (t == null) t = root;
+            
+            // ✅ استخراج كائن العميل وكائن الدفع الفرعيين لضمان عدم ضياع البيانات
+            JSONObject customerObj = t.optJSONObject("customer");
+            JSONObject paymentObj = t.optJSONObject("payment");
 
-                h.append("<tr>")
-                 .append("<td>").append(i + 1).append("</td>")
-                 .append("<td style='text-align:right;'><b>").append(title).append("</b></td>")
-                 .append("<td><div class='serial-box'>").append(serial).append("</div></td>")
-                 .append("<td>").append(karat).append("</td>")
-                 .append("<td>").append(String.format(Locale.US, "%.2f g", weight)).append("</td>")
-                 .append("<td><b>").append(priceManager != null ? priceManager.formatPriceDefault(itemPriceUSD) : String.valueOf(itemPriceUSD)).append("</b></td>")
-                 .append("</tr>");
+            String sellerName = t.optString("seller_name", "");
+            if (sellerName.isEmpty()) sellerName = t.optString("seller", "");
+            if (sellerName.isEmpty()) sellerName = t.optString("cashier_name", "");
+            if (sellerName.isEmpty()) sellerName = t.optString("employee_name", "");
+            if (sellerName.isEmpty()) sellerName = t.optString("username", "");
+            if (sellerName.isEmpty()) sellerName = t.optString("user_name", "");
+            if (sellerName.isEmpty()) sellerName = t.optString("created_by", "");
+            if (sellerName.isEmpty()) sellerName = t.optString("user", "");
+            if (sellerName.isEmpty()) sellerName = "—";
+            
+            String branchName = t.optString("branch_name", "");
+            if (branchName.isEmpty()) branchName = t.optString("branch", "");
+            if (branchName.isEmpty() && getContext() != null) {
+                try {
+                    MiraBranchesManager bm = MiraBranchesManager.getInstance(getContext());
+                    if (bm != null && bm.hasActiveBranch()) {
+                        branchName = bm.getActiveBranchDisplayName();
+                    }
+                } catch (Exception ignored) {}
             }
-            h.append("</tbody></table>");
-        }
+            if (branchName.isEmpty()) branchName = isArabic ? "الفرع الرئيسي" : "Main Branch";
+            
+            String saleNumber = t.optString("sale_number", "");
+            if (saleNumber.isEmpty()) saleNumber = t.optString("invoice_number", "");
+            if (saleNumber.isEmpty()) saleNumber = t.optString("receipt_number", "");
+            if (saleNumber.isEmpty()) saleNumber = t.optString("reference", "");
+            if (saleNumber.isEmpty()) saleNumber = t.optString("id", "—");
+            
+            String dateStr = t.optString("timestamp", "");
+            if (dateStr.isEmpty()) dateStr = t.optString("created_at", "");
+            if (dateStr.isEmpty()) dateStr = t.optString("sale_date", "");
+            if (dateStr.isEmpty()) dateStr = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date());
+            
+            // ✅ قراءة بيانات العميل بالتسلسل الصحيح (الجذر ثم كائن customer)
+            String customer = t.optString("customer_name", "");
+            if (customer.isEmpty() && customerObj != null) customer = customerObj.optString("name", "");
+            if (customer.isEmpty()) customer = t.optString("customer", "");
+            if (customer.isEmpty()) customer = isArabic ? "عميل نقدي" : "Cash Customer";
+            
+            String customerPhone = t.optString("customer_phone", "");
+            if (customerPhone.isEmpty() && customerObj != null) customerPhone = customerObj.optString("phone", "");
+            if (customerPhone.isEmpty()) customerPhone = t.optString("phone", "");
+            
+            // ✅ قراءة بيانات الدفع والعملة بالتسلسل الصحيح
+            String paymentMethod = t.optString("payment_method", "");
+            if (paymentMethod.isEmpty() && paymentObj != null) paymentMethod = paymentObj.optString("payment_method", "");
+            if (paymentMethod.isEmpty()) paymentMethod = t.optString("payment", "");
+            if (paymentMethod.isEmpty()) paymentMethod = "CASH";
+            
+            String currency = t.optString("currency", "");
+            if (currency.isEmpty() && paymentObj != null) currency = paymentObj.optString("currency_code", paymentObj.optString("currency", ""));
+            if (currency.isEmpty() && priceManager != null) currency = priceManager.getCurrencySymbol();
+            if (currency.isEmpty()) currency = defaultCurrency;
+            
+            String currencyName = paymentObj != null ? paymentObj.optString("currency_name", "") : "";
+            if (currencyName.isEmpty()) {
+                currencyName = ArabicNumberToWords.getCurrencyArabicName(currency);
+            }
 
-        // ✅ 1. استخراج الإجمالي الفرعي والخصم بمرونة
-        double subtotalUSD = t.optDouble("subtotal_usd", t.optDouble("subtotal", 0));
-        double discountUSD = t.optDouble("discount_amount_usd", t.optDouble("discount_amount", t.optDouble("discount", 0)));
-        double finalUSD = t.optDouble("final_amount_usd", t.optDouble("final_amount", subtotalUSD - discountUSD));
+            double exchangeRate = t.optDouble("exchange_rate", paymentObj != null ? paymentObj.optDouble("exchange_rate", 1.0) : 1.0);
+            if (priceManager != null && exchangeRate == 1.0) {
+                exchangeRate = priceManager.getExchangeRate(currency);
+            }
+            
+            h.append("<div class='invoice-title'>")
+             .append(isArabic ? "🧾 فاتورة بيع" : "🧾 INVOICE")
+             .append("</div>");
 
-        double finalLocal = t.optDouble("final_amount_local", 0);
-        if (finalLocal == 0) {
-            finalLocal = t.optDouble("total_local", finalUSD * exchangeRate);
-        }
+            String refundStatus = t.optString("refund_status", "");
+            if (refundStatus.isEmpty()) refundStatus = t.optString("status", "completed");
 
-        h.append("<table class='totals-table'>")
-         .append("<tr><td class='label'>").append(isArabic ? "الإجمالي الفرعي:" : "Subtotal:").append("</td>")
-         .append("<td class='value' style='text-align:left;'>")
-         .append(priceManager != null ? priceManager.formatPriceDefault(subtotalUSD) : String.valueOf(subtotalUSD))
-         .append("</td></tr>");
-        
-        // ✅ 2. عرض الخصم إذا كان موجوداً
-        if (discountUSD > 0) {
-            h.append("<tr><td class='label'>").append(isArabic ? "الخصم:" : "Discount:").append("</td>")
-             .append("<td class='value' style='text-align:left; color:red;'>- ")
-             .append(priceManager != null ? priceManager.formatPriceDefault(discountUSD) : String.valueOf(discountUSD))
-             .append("</td></tr>");
-        }
+            if ("refunded".equals(refundStatus) || "fully_refunded".equals(refundStatus)) {
+                h.append("<div style='text-align:center;margin:10px 0;padding:8px;background:#FFF3E0;border:1px solid #FF9800;border-radius:4px;'>")
+                 .append("<b style='color:#E65100;font-size:12px;'>🔄 ")
+                 .append(isArabic ? "فاتورة مرتجعة" : "REFUNDED INVOICE")
+                 .append("</b></div>");
+            } else if ("partially_refunded".equals(refundStatus)) {
+                h.append("<div style='text-align:center;margin:10px 0;padding:8px;background:#FFF3E0;border:1px solid #FF9800;border-radius:4px;'>")
+                 .append("<b style='color:#E65100;font-size:12px;'>🔄 ")
+                 .append(isArabic ? "فاتورة مرتجعة جزئياً" : "PARTIALLY REFUNDED")
+                 .append("</b></div>");
+            }
 
-        h.append("<tr class='grand-total'><td class='label' style='color:#1A237E; font-size:12px;'>")
-         .append(isArabic ? "💰 الصافي الإجمالي:" : "💰 Net Total:")
-         .append("</td>")
-         .append("<td class='value' style='text-align:left; color:#1A237E; font-size:14px;'>")
-         .append(priceManager != null ? priceManager.formatPriceDefault(finalUSD) : String.valueOf(finalUSD))
-         .append("</td></tr>")
-         .append("</table>");
+            h.append("<table class='info-grid'>")
+             .append("<tr><td class='label'>").append(isArabic ? "رقم الفاتورة:" : "Invoice #:").append("</td><td class='value'>").append(saleNumber).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "التاريخ:" : "Date:").append("</td><td class='value'>").append(dateStr).append("</td></tr>")
+             .append("<tr><td class='label'>").append(isArabic ? "البائع:" : "Seller:").append("</td><td class='value'><b>").append(sellerName).append("</b></td>")
+             .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'><b>").append(branchName).append("</b></td></tr>")
+             .append("<tr><td class='label'>").append(isArabic ? "العميل:" : "Customer:").append("</td><td class='value'>").append(customer).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "الهاتف:" : "Phone:").append("</td><td class='value'>").append(customerPhone.isEmpty() ? "—" : customerPhone).append("</td></tr>")
+             .append("<tr><td class='label'>").append(isArabic ? "طريقة الدفع:" : "Payment:").append("</td><td class='value' colspan='3'>").append(paymentMethod).append("</td></tr>")
+             .append("</table>");
 
-        // ✅ 3. التفقيط الصحيح بناءً على نوع العملة وقيمتها الحقيقية المعروضة
-        if (finalLocal > 0 || finalUSD > 0) {
-            try {
-                String amountInWords;
-                boolean isLocalCurrency = "YER".equalsIgnoreCase(currency) || "SAR".equalsIgnoreCase(currency) || "AED".equalsIgnoreCase(currency);
+            JSONArray items = t.optJSONArray("items");
+            if (items == null) items = t.optJSONArray("sold_items");
+            if (items == null) items = t.optJSONArray("products");
+            if (items == null) items = t.optJSONArray("line_items");
+            
+            if (items != null && items.length() > 0) {
+                h.append("<table class='items'><thead><tr>")
+                 .append("<th>#</th><th>").append(isArabic ? "الصنف" : "Item").append("</th>")
+                 .append("<th>").append(isArabic ? "الرقم التسلسلي" : "Serial #").append("</th>")
+                 .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>")
+                 .append("<th>").append(isArabic ? "الوزن" : "Weight").append("</th>")
+                 .append("<th>").append(isArabic ? "السعر" : "Price").append("</th>")
+                 .append("</tr></thead><tbody>");
                 
-                if (isLocalCurrency) {
-                    double targetAmount = finalLocal > 0 ? finalLocal : (finalUSD * exchangeRate);
-                    amountInWords = ArabicNumberToWords.convert(targetAmount, ArabicNumberToWords.getCurrencyArabicName(currency));
-                } else {
-                    amountInWords = ArabicNumberToWords.convert(finalUSD, ArabicNumberToWords.getCurrencyArabicName("USD"));
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject it = items.optJSONObject(i);
+                    if (it == null) continue;
+                    
+                    double weight = it.optDouble("weight", 0);
+                    if (weight == 0) weight = it.optDouble("gross_weight", 0);
+                    
+                    double itemPriceUSD = it.optDouble("price_usd", 0);
+                    if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("sale_price", 0);
+                    if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("price", 0);
+                    
+                    String serial = it.optString("serial_number", "");
+                    if (serial.isEmpty()) serial = it.optString("serial_no", "");
+                    if (serial.isEmpty()) serial = it.optString("serial", "");
+                    if (serial.isEmpty()) serial = it.optString("epc", "");
+                    
+                    String title = it.optString("title", "");
+                    if (title.isEmpty()) title = it.optString("item_title", "—");
+                    
+                    String karat = it.optString("karat", "");
+                    if (karat.isEmpty()) karat = it.optString("gold_karat", "—");
+
+                    h.append("<tr>")
+                     .append("<td>").append(i + 1).append("</td>")
+                     .append("<td style='text-align:right;'><b>").append(title).append("</b></td>")
+                     .append("<td><div class='serial-box'>").append(serial).append("</div></td>")
+                     .append("<td>").append(karat).append("</td>")
+                     .append("<td>").append(String.format(Locale.US, "%.2f g", weight)).append("</td>")
+                     .append("<td><b>").append(priceManager != null ? priceManager.formatPriceDefault(itemPriceUSD) : String.valueOf(itemPriceUSD)).append("</b></td>")
+                     .append("</tr>");
                 }
-                
-                h.append("<div style='font-size:10px;font-style:italic;color:#444;text-align:center;margin-top:6px;padding:6px;background:#fafafa;border-radius:4px;border:1px dashed #ccc;'>")
-                 .append("<b>").append(isArabic ? "المبلغ كتابةً: " : "Amount in words: ").append("</b>")
-                 .append(amountInWords)
-                 .append("</div>");
-            } catch (Exception e) {
-                Log.e(TAG, "Tafweet error: " + e.getMessage());
+                h.append("</tbody></table>");
             }
+
+            // ✅ استخراج الإجمالي والمبالغ بدقة من الجذر أو من paymentObj
+            double subtotalUSD = t.optDouble("subtotal_usd", paymentObj != null ? paymentObj.optDouble("subtotal_usd", 0) : t.optDouble("subtotal", 0));
+            double discountUSD = t.optDouble("discount_amount_usd", paymentObj != null ? paymentObj.optDouble("discount_amount_usd", 0) : t.optDouble("discount", 0));
+            double finalUSD = t.optDouble("final_amount_usd", paymentObj != null ? paymentObj.optDouble("final_amount_usd", subtotalUSD - discountUSD) : (subtotalUSD - discountUSD));
+
+            double finalLocal = t.optDouble("final_amount_local", paymentObj != null ? paymentObj.optDouble("final_amount_local", 0) : 0);
+            if (finalLocal == 0) {
+                finalLocal = finalUSD * exchangeRate;
+            }
+
+            h.append("<table class='totals-table'>")
+             .append("<tr><td class='label'>").append(isArabic ? "الإجمالي الفرعي:" : "Subtotal:").append("</td>")
+             .append("<td class='value' style='text-align:left;'>")
+             .append(priceManager != null ? priceManager.formatPriceDefault(subtotalUSD) : String.valueOf(subtotalUSD))
+             .append("</td></tr>");
+            
+            if (discountUSD > 0) {
+                h.append("<tr><td class='label'>").append(isArabic ? "الخصم:" : "Discount:").append("</td>")
+                 .append("<td class='value' style='text-align:left; color:red;'>- ")
+                 .append(priceManager != null ? priceManager.formatPriceDefault(discountUSD) : String.valueOf(discountUSD))
+                 .append("</td></tr>");
+            }
+
+            h.append("<tr class='grand-total'><td class='label' style='color:#1A237E; font-size:12px;'>")
+             .append(isArabic ? "💰 الصافي الإجمالي:" : "💰 Net Total:")
+             .append("</td>")
+             .append("<td class='value' style='text-align:left; color:#1A237E; font-size:14px;'>")
+             .append(priceManager != null ? priceManager.formatPriceDefault(finalUSD) : String.valueOf(finalUSD))
+             .append("</td></tr>")
+             .append("</table>");
+
+            // ✅ التفقيط المحدث الدقيق
+            if (finalUSD > 0 || finalLocal > 0) {
+                try {
+                    String amountInWords;
+                    boolean isLocal = "YER".equalsIgnoreCase(currency) || "SAR".equalsIgnoreCase(currency) || "AED".equalsIgnoreCase(currency);
+                    
+                    if (isLocal) {
+                        amountInWords = ArabicNumberToWords.convert(finalLocal, currencyName);
+                    } else {
+                        amountInWords = ArabicNumberToWords.convert(finalUSD, currencyName);
+                    }
+                    
+                    h.append("<div style='font-size:10px;font-style:italic;color:#444;text-align:center;margin-top:6px;padding:6px;background:#fafafa;border-radius:4px;border:1px dashed #ccc;'>")
+                     .append("<b>").append(isArabic ? "المبلغ كتابةً: " : "Amount in words: ").append("</b>")
+                     .append(amountInWords)
+                     .append("</div>");
+                } catch (Exception e) {
+                    Log.e(TAG, "Tafqeet error: " + e.getMessage());
+                }
+            }
+
+            h.append("<div class='warranty-box'>")
+             .append(isArabic ? "🔒 ضمان لمدة سنة واحدة من تاريخ الشراء ضد عيوب التصنيع" : "🔒 1 Year Warranty against manufacturing defects")
+             .append("</div>");
+
+            String qrData = Uri.encode("Org:" + orgName + "|Invoice:" + saleNumber + "|Total:" + finalUSD + "|Date:" + dateStr);
+            String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
+            
+            h.append("<div class='qr-container'>")
+             .append("<img src='").append(qrApiUrl).append("' alt='QR Verify'/><br>")
+             .append("<span style='font-size:8px;color:#888;'>")
+             .append(isArabic ? "📱 مسح للتحقق" : "📱 Scan to verify")
+             .append("</span>")
+             .append("</div>");
+
+            h.append("<div class='signature-line'>")
+             .append("<div class='signature-box'><div class='signature-line-box'>")
+             .append(isArabic ? "توقيع البائع" : "Seller Signature")
+             .append("</div></div>")
+             .append("<div class='signature-box'><div class='signature-line-box'>")
+             .append(isArabic ? "توقيع العميل" : "Customer Signature")
+             .append("</div></div>")
+             .append("</div>");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error rendering receipt: " + e.getMessage(), e);
+            h.append("<p style='color:red;text-align:center'>")
+             .append(isArabic ? "خطأ في معالجة البيانات" : "Error processing data")
+             .append("</p>")
+             .append("<pre style='font-size:8px;word-wrap:break-word;white-space:pre-wrap;'>")
+             .append(receiptJsonStr)
+             .append("</pre>");
         }
 
-        h.append("<div class='warranty-box'>")
-         .append(isArabic ? "🔒 ضمان لمدة سنة واحدة من تاريخ الشراء ضد عيوب التصنيع" : "🔒 1 Year Warranty against manufacturing defects")
-         .append("</div>");
+        h.append("<div class='footer'>")
+         .append(isArabic ? "شكرًا لتعاملكم معنا" : "Thank you").append("<br>")
+         .append(orgName).append(" © 2026")
+         .append("</div></body></html>");
 
-        String qrData = Uri.encode("Org:" + orgName + "|Invoice:" + saleNumber + "|Total:" + finalUSD + "|Date:" + dateStr);
-        String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
-        
-        h.append("<div class='qr-container'>")
-         .append("<img src='").append(qrApiUrl).append("' alt='QR Verify'/><br>")
-         .append("<span style='font-size:8px;color:#888;'>")
-         .append(isArabic ? "📱 مسح للتحقق" : "📱 Scan to verify")
-         .append("</span>")
-         .append("</div>");
-
-        h.append("<div class='signature-line'>")
-         .append("<div class='signature-box'><div class='signature-line-box'>")
-         .append(isArabic ? "توقيع البائع" : "Seller Signature")
-         .append("</div></div>")
-         .append("<div class='signature-box'><div class='signature-line-box'>")
-         .append(isArabic ? "توقيع العميل" : "Customer Signature")
-         .append("</div></div>")
-         .append("</div>");
-
-    } catch (Exception e) {
-        Log.e(TAG, "Error rendering receipt: " + e.getMessage(), e);
-        h.append("<p style='color:red;text-align:center'>")
-         .append(isArabic ? "خطأ في معالجة البيانات" : "Error processing data")
-         .append("</p>")
-         .append("<pre style='font-size:8px;word-wrap:break-word;white-space:pre-wrap;'>")
-         .append(receiptJsonStr)
-         .append("</pre>");
+        webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
     }
-
-    h.append("<div class='footer'>")
-     .append(isArabic ? "شكرًا لتعاملكم معنا" : "Thank you").append("<br>")
-     .append(orgName).append(" © 2026")
-     .append("</div></body></html>");
-
-    webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
-}
-
 
     private void closeFragment() {
         if (!isAdded()) return;
