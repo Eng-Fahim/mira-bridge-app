@@ -84,7 +84,6 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
     
     private boolean isSyncing = false;
-    private UserSession userSession; 
     private boolean isCheckoutDialogShowing = false; 
     private AlertDialog searchLoadingDialog;
     private SessionManager sessionManager;  // ✅ أضف هذا السطر
@@ -813,48 +812,16 @@ private void showPendingSalesDetailsBeforeSync() {
         Context ctx = getContext();
         if (ctx == null) return;
         
-        int currentBranchId = getActiveBranchId();
-        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
-        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
-        String existingJson = prefs.getString("pending_sales", "[]");
-        JSONArray arr = new JSONArray(existingJson);
+        JSONArray arr = getPendingSalesArray();
         
         if (arr.length() == 0) {
             showToast(isArabic ? "📋 لا توجد عمليات معلقة" : "📋 No pending sales");
             return;
         }
         
-        StringBuilder details = new StringBuilder();
-        details.append(isArabic ? "📋 العمليات المعلقة:\n\n" : "📋 Pending Sales:\n\n");
+        // ✅ عرض قائمة تفاعلية مع إمكانية التعديل والحذف
+        showPendingSalesWithActions();
         
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject sale = arr.optJSONObject(i);
-            if (sale == null) continue;
-            
-            String saleId = sale.optString("sale_id", "");
-            String customerName = sale.optString("customer_name", "");
-            String username = sale.optString("username", "");
-            double amount = sale.optDouble("final_amount", 0);
-            int itemCount = sale.optInt("item_count", 0);
-            long createdAt = sale.optLong("created_at", 0);
-            
-            details.append(i + 1).append(". ")
-                .append(saleId).append("\n")
-                .append("   👤 العميل: ").append(customerName).append("\n")
-                .append("   🧑‍💼 البائع: ").append(username).append("\n")
-                .append("   💰 المبلغ: ").append(priceManager.formatPriceDefault(amount)).append("\n")
-                .append("   📦 القطع: ").append(itemCount).append("\n\n");
-        }
-        
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "📋 تفاصيل العمليات قبل المزامنة" : "📋 Pending Sales Details")
-            .setMessage(details.toString())
-            .setPositiveButton(isArabic ? "✅ مزامنة الآن" : "✅ Sync Now", (dialog, which) -> {
-                dialog.dismiss();
-                syncPendingSales();
-            })
-            .setNegativeButton(isArabic ? "⏳ لاحقاً" : "⏳ Later", null)
-            .show();
     } catch (Exception e) {
         Log.e(TAG, "showPendingSalesDetailsBeforeSync error: " + e.getMessage());
     }
@@ -1240,6 +1207,9 @@ private void parseItemResponse(String code, JSONObject data) {
     /**
  * ✅✅✅ تنفيذ البيع - مع دعم كامل للأوفلاين
  */
+/**
+ * ✅✅✅ تنفيذ البيع - مع دعم كامل للأوفلاين وتحديث الداشبورد
+ */
 private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
     try {
         if (!isAdded()) return;
@@ -1330,11 +1300,19 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                         playAlertSound(1);
                         clearCart();
                         showReceipt(finalResponse);
+                        
+                        // ✅✅✅ تحديث الداشبورد والمخزون بعد البيع الناجح
+                        notifyDashboardAndInventoryUpdate("sale");
+                        
                     } else if (finalIsNetworkError || finalResponse == null) {
                         removeSoldItemsFromCache();
                         playAlertSound(1);
                         clearCart();
                         showOfflineSaleSuccess(localSaleId, data);
+                        
+                        // ✅✅✅ تحديث الداشبورد حتى في حالة الأوفلاين (تحديث محلي)
+                        notifyDashboardAndInventoryUpdate("offline_sale");
+                        
                     } else {
                         showRetryDialog(
                             isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
@@ -2068,6 +2046,9 @@ private void showSyncPromptDialog(int pendingCount) {
 /**
  * ✅✅✅ مزامنة المبيعات المعلقة - الفرع الحالي فقط مع تفاصيل كاملة
  */
+/**
+ * ✅✅✅ مزامنة المبيعات المعلقة - الفرع الحالي فقط مع تفاصيل كاملة وتحديث الداشبورد
+ */
 public void syncPendingSales() {
     if (isSyncing) return;
     isSyncing = true;
@@ -2089,7 +2070,9 @@ public void syncPendingSales() {
             return;
         }
 
-        int currentBranchId = UserSession.getInstance(ctx).getBranchId();
+        // ✅ استخدام sessionManager بدلاً من UserSession
+        int currentBranchId = sessionManager != null ? sessionManager.getBranchId() : getActiveBranchId();
+        
         int synced = 0;
         int failed = 0;
         JSONArray remaining = new JSONArray();
@@ -2189,12 +2172,17 @@ public void syncPendingSales() {
             updateSyncUI();
 
             String summaryMessage = (isArabic ? "تمت المزامنة: " : "Synced: ") + finalSynced + 
-                                   (isArabic ? " | فشل: " : " | Failed: ") + finalFailed;
+                                   (isArabic ? " | فشل: " : "Failed: ") + finalFailed;
             
             Toast.makeText(ctx, summaryMessage, Toast.LENGTH_LONG).show();
 
             if (finalSynced > 0 || finalFailed > 0) {
                 showSyncSummaryDialog(finalSynced, finalFailed, details);
+            }
+            
+            // ✅✅✅ تحديث الداشبورد بعد المزامنة إذا تمت مزامنة أي عملية
+            if (finalSynced > 0) {
+                notifyDashboardAndInventoryUpdate("sync");
             }
         });
     });
@@ -2329,6 +2317,9 @@ private void showRefundItemError(String message) {
     isRefundable = false;
 }
 
+/**
+ * ✅✅✅ معالجة الإرجاع مع تحديث الداشبورد
+ */
 private void processRefund(String code, String reason) {
     final AlertDialog loadingDialog = showProfessionalLoadingDialog();
     
@@ -2356,7 +2347,10 @@ private void processRefund(String code, String reason) {
                         isArabic ? "تم إرجاع القطعة بنجاح إلى المخزون" : "Item successfully returned to inventory",
                         true
                     );
-                    refreshData(); // تحديث الواجهات والداشبورد
+                    
+                    // ✅✅✅ تحديث الداشبورد والمخزون بعد الإرجاع
+                    notifyDashboardAndInventoryUpdate("refund");
+                    
                 } else {
                     String err = response != null && response.error != null ? response.error : "Unknown error";
                     showSuccessMessage(
@@ -2374,6 +2368,529 @@ private void processRefund(String code, String reason) {
             });
         }
     });
+}
+/**
+ * ✅✅✅ إرسال إشارات تحديث الداشبورد والمخزون
+ */
+private void notifyDashboardAndInventoryUpdate(String source) {
+    try {
+        if (!isAdded() || getContext() == null) return;
+        
+        Context ctx = getContext();
+        int branchId = getActiveBranchId();
+        long timestamp = System.currentTimeMillis();
+        
+        Log.d(TAG, "📡 Sending dashboard update signal - Source: " + source + ", Branch: " + branchId);
+        
+        // ✅ 1. إرسال Broadcast عام لتحديث المبيعات
+        Intent salesIntent = new Intent("com.example.uhf.REFRESH_SALES");
+        salesIntent.putExtra("source", source);
+        salesIntent.putExtra("branch_id", branchId);
+        salesIntent.putExtra("timestamp", timestamp);
+        ctx.sendBroadcast(salesIntent);
+        
+        // ✅ 2. إرسال Broadcast لتحديث المخزون
+        Intent inventoryIntent = new Intent("com.example.uhf.REFRESH_INVENTORY");
+        inventoryIntent.putExtra("source", source);
+        inventoryIntent.putExtra("branch_id", branchId);
+        inventoryIntent.putExtra("timestamp", timestamp);
+        ctx.sendBroadcast(inventoryIntent);
+        
+        // ✅ 3. إرسال Broadcast لتحديث الداشبورد بالكامل
+        Intent dashboardIntent = new Intent("com.example.uhf.REFRESH_DASHBOARD");
+        dashboardIntent.putExtra("source", source);
+        dashboardIntent.putExtra("branch_id", branchId);
+        dashboardIntent.putExtra("timestamp", timestamp);
+        ctx.sendBroadcast(dashboardIntent);
+        
+        // ✅ 4. تحديث SharedPreferences كإشارة احتياطية
+        SharedPreferences prefs = ctx.getSharedPreferences("app_refresh_flags", Context.MODE_PRIVATE);
+        prefs.edit()
+            .putLong("last_data_change", timestamp)
+            .putString("last_change_type", source)
+            .putInt("last_change_branch_id", branchId)
+            .putBoolean("needs_refresh", true)
+            .apply();
+        
+        Log.d(TAG, "✅ Dashboard update signals sent successfully");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "notifyDashboardAndInventoryUpdate error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ الحصول على مصفوفة المبيعات المعلقة
+ */
+private JSONArray getPendingSalesArray() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return new JSONArray();
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        return new JSONArray(existingJson);
+    } catch (Exception e) {
+        Log.e(TAG, "getPendingSalesArray error: " + e.getMessage());
+        return new JSONArray();
+    }
+}
+
+/**
+ * ✅✅✅ حفظ مصفوفة المبيعات المعلقة
+ */
+private void savePendingSalesArray(JSONArray salesArray) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        prefs.edit().putString("pending_sales", salesArray.toString()).apply();
+        
+        // ✅ تحديث العداد
+        updatePendingSalesBadge(salesArray.length());
+        
+    } catch (Exception e) {
+        Log.e(TAG, "savePendingSalesArray error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ تحديث واجهة المزامنة
+ */
+private void updateSyncUI() {
+    try {
+        safeRun(() -> {
+            // ✅ تحديث العداد
+            int pendingCount = getPendingSalesArray().length();
+            updatePendingSalesBadge(pendingCount);
+            
+            // ✅ تحديث حالة السلة
+            if (tvCartStatus != null) {
+                if (isSyncing) {
+                    tvCartStatus.setText(isArabic ? "⏳ جاري المزامنة..." : "⏳ Syncing...");
+                    tvCartStatus.setTextColor(Color.parseColor("#F39C12"));
+                } else if (pendingCount > 0) {
+                    tvCartStatus.setText(isArabic ? "⚠️ " + pendingCount + " عملية معلقة" : "⚠️ " + pendingCount + " pending");
+                    tvCartStatus.setTextColor(Color.parseColor("#F39C12"));
+                } else if (cartList.isEmpty()) {
+                    tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
+                    tvCartStatus.setTextColor(Color.parseColor("#2ECC71"));
+                }
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "updateSyncUI error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ عرض ملخص المزامنة
+ */
+private void showSyncSummaryDialog(int syncedCount, int failedCount, String details) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        String title = isArabic ? "📊 ملخص المزامنة" : "📊 Sync Summary";
+        String message = (isArabic ? "✅ تمت المزامنة: " : "✅ Synced: ") + syncedCount + "\n" +
+                        (isArabic ? "❌ فشل: " : "❌ Failed: ") + failedCount;
+        
+        if (details != null && !details.isEmpty()) {
+            message += "\n\n" + (isArabic ? "التفاصيل:\n" : "Details:\n") + details;
+        }
+        
+        new MaterialAlertDialogBuilder(ctx)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+            .show();
+            
+    } catch (Exception e) {
+        Log.e(TAG, "showSyncSummaryDialog error: " + e.getMessage());
+    }
+}
+/**
+ * ✅✅✅ عرض قائمة السجلات المعلقة مع إمكانية التعديل أو الحذف
+ */
+private void showPendingSalesWithActions() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        JSONArray arr = getPendingSalesArray();
+        
+        if (arr.length() == 0) {
+            showToast(isArabic ? "📋 لا توجد عمليات معلقة" : "📋 No pending sales");
+            return;
+        }
+        
+        // ✅ إنشاء قائمة بأسماء العمليات
+        String[] saleTitles = new String[arr.length()];
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject sale = arr.optJSONObject(i);
+            if (sale != null) {
+                String saleId = sale.optString("sale_id", "Unknown");
+                String customerName = sale.optString("customer_name", "");
+                double amount = sale.optDouble("final_amount", 0);
+                String syncStatus = sale.optString("sync_status", "pending");
+                
+                String statusEmoji = "📦";
+                switch (syncStatus) {
+                    case "synced": statusEmoji = "✅"; break;
+                    case "syncing": statusEmoji = "⏳"; break;
+                    case "failed": statusEmoji = "❌"; break;
+                }
+                
+                saleTitles[i] = statusEmoji + " " + 
+                    (isArabic ? "عميل: " : "Customer: ") + customerName + 
+                    " | " + priceManager.formatPriceDefault(amount);
+            }
+        }
+        
+        new MaterialAlertDialogBuilder(ctx)
+            .setTitle(isArabic ? "📋 العمليات المعلقة (" + arr.length() + ")" : "📋 Pending Sales (" + arr.length() + ")")
+            .setItems(saleTitles, (dialog, which) -> {
+                try {
+                    JSONObject selectedSale = arr.optJSONObject(which);
+                    if (selectedSale != null) {
+                        showPendingSaleDetails(selectedSale, which);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "showPendingSalesWithActions.onClick error: " + e.getMessage());
+                }
+            })
+            .setPositiveButton(isArabic ? "✅ مزامنة الكل" : "✅ Sync All", (dialog, which) -> {
+                dialog.dismiss();
+                syncPendingSales();
+            })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+            
+    } catch (Exception e) {
+        Log.e(TAG, "showPendingSalesWithActions error: " + e.getMessage());
+    }
+}
+/**
+ * ✅✅✅ عرض تفاصيل سجل معلق محدد مع إمكانية التعديل أو الحذف
+ */
+private void showPendingSaleDetails(JSONObject sale, int position) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        String saleId = sale.optString("sale_id", "Unknown");
+        String customerName = sale.optString("customer_name", "");
+        String paymentMethod = sale.optString("payment_method", "");
+        double amount = sale.optDouble("final_amount", 0);
+        int itemCount = sale.optInt("item_count", 0);
+        long createdAt = sale.optLong("created_at", 0);
+        
+        // ✅ تنسيق التاريخ
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        String dateStr = sdf.format(new Date(createdAt));
+        
+        // ✅ عرض تفاصيل القطع
+        StringBuilder itemsDetails = new StringBuilder();
+        JSONArray items = sale.optJSONArray("items");
+        if (items != null) {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item != null) {
+                    itemsDetails.append("  • ")
+                        .append(item.optString("title", "Unknown"))
+                        .append(" - ")
+                        .append(item.optString("epc", ""))
+                        .append("\n");
+                }
+            }
+        }
+        
+        String message = (isArabic ? 
+            "🔑 رقم العملية: " : "🔑 Sale ID: ") + saleId + "\n" +
+            (isArabic ? "👤 العميل: " : "👤 Customer: ") + customerName + "\n" +
+            (isArabic ? "💳 الدفع: " : "💳 Payment: ") + paymentMethod + "\n" +
+            (isArabic ? "💰 المبلغ: " : "💰 Amount: ") + priceManager.formatPriceDefault(amount) + "\n" +
+            (isArabic ? "📦 عدد القطع: " : "📦 Items: ") + itemCount + "\n" +
+            (isArabic ? "🕐 التاريخ: " : "🕐 Date: ") + dateStr + "\n\n" +
+            (isArabic ? "القطع:\n" : "Items:\n") + itemsDetails.toString();
+        
+        new MaterialAlertDialogBuilder(ctx)
+            .setTitle(isArabic ? "📋 تفاصيل العملية المعلقة" : "📋 Pending Sale Details")
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "✏️ تعديل" : "✏️ Edit", (dialog, which) -> {
+                dialog.dismiss();
+                showEditPendingSaleDialog(sale, position);
+            })
+            .setNegativeButton(isArabic ? "🗑️ حذف" : "🗑️ Delete", (dialog, which) -> {
+                dialog.dismiss();
+                confirmDeletePendingSale(saleId, position);
+            })
+            .setNeutralButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+            
+    } catch (Exception e) {
+        Log.e(TAG, "showPendingSaleDetails error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ عرض نافذة تعديل العملية المعلقة
+ */
+private void showEditPendingSaleDialog(JSONObject sale, int position) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        final String saleId = sale.optString("sale_id", "");
+        
+        // ✅ إنشاء نافذة التعديل
+        MaterialCardView cardView = new MaterialCardView(ctx);
+        cardView.setRadius(24);
+        cardView.setCardElevation(10);
+        
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 30, 40, 30);
+        
+        // ✅ حقل اسم العميل
+        TextView tvCustomerLabel = new TextView(ctx);
+        tvCustomerLabel.setText(isArabic ? "👤 اسم العميل:" : "👤 Customer Name:");
+        tvCustomerLabel.setTextSize(14);
+        tvCustomerLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        layout.addView(tvCustomerLabel);
+        
+        EditText etCustomerName = new EditText(ctx);
+        etCustomerName.setText(sale.optString("customer_name", ""));
+        etCustomerName.setSingleLine(true);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        nameParams.bottomMargin = 16;
+        etCustomerName.setLayoutParams(nameParams);
+        layout.addView(etCustomerName);
+        
+        // ✅ حقل المبلغ
+        TextView tvAmountLabel = new TextView(ctx);
+        tvAmountLabel.setText(isArabic ? "💰 المبلغ:" : "💰 Amount:");
+        tvAmountLabel.setTextSize(14);
+        tvAmountLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        layout.addView(tvAmountLabel);
+        
+        EditText etAmount = new EditText(ctx);
+        etAmount.setText(String.valueOf(sale.optDouble("final_amount", 0)));
+        etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etAmount.setSingleLine(true);
+        LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        amountParams.bottomMargin = 16;
+        etAmount.setLayoutParams(amountParams);
+        layout.addView(etAmount);
+        
+        // ✅ حقل طريقة الدفع
+        TextView tvPaymentLabel = new TextView(ctx);
+        tvPaymentLabel.setText(isArabic ? "💳 طريقة الدفع:" : "💳 Payment Method:");
+        tvPaymentLabel.setTextSize(14);
+        tvPaymentLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        layout.addView(tvPaymentLabel);
+        
+        EditText etPaymentMethod = new EditText(ctx);
+        etPaymentMethod.setText(sale.optString("payment_method", "cash"));
+        etPaymentMethod.setSingleLine(true);
+        layout.addView(etPaymentMethod);
+        
+        cardView.addView(layout);
+        
+        new MaterialAlertDialogBuilder(ctx)
+            .setTitle(isArabic ? "✏️ تعديل العملية المعلقة" : "✏️ Edit Pending Sale")
+            .setView(cardView)
+            .setPositiveButton(isArabic ? "💾 حفظ" : "💾 Save", (dialog, which) -> {
+                String newCustomerName = etCustomerName.getText().toString().trim();
+                String newAmountStr = etAmount.getText().toString().trim();
+                String newPaymentMethod = etPaymentMethod.getText().toString().trim();
+                
+                if (newCustomerName.isEmpty()) {
+                    showToast(isArabic ? "⚠️ اسم العميل مطلوب" : "⚠️ Customer name required");
+                    return;
+                }
+                
+                double newAmount = 0;
+                try {
+                    newAmount = Double.parseDouble(newAmountStr);
+                } catch (NumberFormatException e) {
+                    showToast(isArabic ? "⚠️ مبلغ غير صحيح" : "⚠️ Invalid amount");
+                    return;
+                }
+                
+                if (newAmount <= 0) {
+                    showToast(isArabic ? "⚠️ المبلغ يجب أن يكون أكبر من صفر" : "⚠️ Amount must be greater than zero");
+                    return;
+                }
+                
+                // ✅ حفظ التعديلات
+                updatePendingSale(saleId, newCustomerName, newAmount, newPaymentMethod, position);
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+            
+    } catch (Exception e) {
+        Log.e(TAG, "showEditPendingSaleDialog error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ تأكيد حذف العملية المعلقة
+ */
+private void confirmDeletePendingSale(String saleId, int position) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        new MaterialAlertDialogBuilder(ctx)
+            .setTitle(isArabic ? "🗑️ تأكيد الحذف" : "🗑️ Confirm Delete")
+            .setMessage(isArabic ? 
+                "هل أنت متأكد من حذف هذه العملية المعلقة؟\n\n" +
+                "🔑 رقم العملية: " + saleId + "\n\n" +
+                "لا يمكن التراجع عن هذا الإجراء!"
+                :
+                "Are you sure you want to delete this pending sale?\n\n" +
+                "🔑 Sale ID: " + saleId + "\n\n" +
+                "This action cannot be undone!")
+            .setPositiveButton(isArabic ? "🗑️ حذف" : "🗑️ Delete", (dialog, which) -> {
+                dialog.dismiss();
+                deletePendingSale(saleId);
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+            
+    } catch (Exception e) {
+        Log.e(TAG, "confirmDeletePendingSale error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ تحديث العملية المعلقة بعد التعديل
+ */
+private void updatePendingSale(String saleId, String newCustomerName, double newAmount, 
+                               String newPaymentMethod, int position) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        // ✅ البحث عن العملية وتحديثها
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject sale = arr.optJSONObject(i);
+            if (sale != null && sale.optString("sale_id").equals(saleId)) {
+                // ✅ تحديث البيانات الأساسية
+                sale.put("customer_name", newCustomerName);
+                sale.put("final_amount", newAmount);
+                sale.put("payment_method", newPaymentMethod);
+                
+                // ✅ تحديث payload إذا كان موجوداً
+                JSONObject payload = sale.optJSONObject("payload");
+                if (payload != null) {
+                    payload.put("customer_name", newCustomerName);
+                    
+                    // ✅ تحديث كائن العميل
+                    JSONObject customer = payload.optJSONObject("customer");
+                    if (customer == null) {
+                        customer = new JSONObject();
+                        payload.put("customer", customer);
+                    }
+                    customer.put("name", newCustomerName);
+                    customer.put("payment_method", newPaymentMethod);
+                    
+                    // ✅ تحديث كائن الدفع
+                    JSONObject payment = payload.optJSONObject("payment");
+                    if (payment == null) {
+                        payment = new JSONObject();
+                        payload.put("payment", payment);
+                    }
+                    payment.put("final_amount_usd", newAmount);
+                    payment.put("payment_method", newPaymentMethod);
+                    
+                    payload.put("payment", payment);
+                    sale.put("payload", payload);
+                }
+                
+                // ✅ تحديث السجل
+                saveToSyncLog(saleId, currentBranchId, 
+                    sale.optInt("user_id", 0), 
+                    sale.optString("username", ""),
+                    newAmount, 
+                    sale.optInt("item_count", 0),
+                    "pending", 
+                    isArabic ? "تم التعديل" : "Edited");
+                
+                break;
+            }
+        }
+        
+        // ✅ حفظ التعديلات
+        prefs.edit().putString("pending_sales", arr.toString()).apply();
+        
+        // ✅ تحديث الواجهة
+        updatePendingSalesBadge(arr.length());
+        
+        showToast(isArabic ? "✅ تم حفظ التعديلات" : "✅ Changes saved");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "updatePendingSale error: " + e.getMessage());
+        showToast(isArabic ? "❌ فشل حفظ التعديلات" : "❌ Failed to save changes");
+    }
+}
+
+/**
+ * ✅✅✅ حذف العملية المعلقة
+ */
+private void deletePendingSale(String saleId) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        JSONArray newArr = new JSONArray();
+        
+        // ✅ إزالة العملية المحددة
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject sale = arr.optJSONObject(i);
+            if (sale != null && !sale.optString("sale_id").equals(saleId)) {
+                newArr.put(sale);
+            }
+        }
+        
+        // ✅ حفظ القائمة الجديدة
+        prefs.edit().putString("pending_sales", newArr.toString()).apply();
+        
+        // ✅ تحديث السجل
+        saveToSyncLog(saleId, currentBranchId, 0, "", 0, 0, 
+            "deleted", isArabic ? "تم الحذف" : "Deleted");
+        
+        // ✅ تحديث الواجهة
+        updatePendingSalesBadge(newArr.length());
+        
+        showToast(isArabic ? "🗑️ تم حذف العملية" : "🗑️ Sale deleted");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "deletePendingSale error: " + e.getMessage());
+        showToast(isArabic ? "❌ فشل الحذف" : "❌ Failed to delete");
+    }
 }
 
 // ✅ دالة تحديث كاش القطع المباعة محلياً
