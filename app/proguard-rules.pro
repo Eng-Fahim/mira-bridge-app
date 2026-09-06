@@ -1,11 +1,11 @@
 # ==================== إعدادات ProGuard الأساسية ====================
-# الاحتفاظ بمعلومات التصحيح للتتبع
 -keepattributes SourceFile,LineNumberTable
 -keepattributes *Annotation*
 -keepattributes Signature
 -keepattributes Exceptions
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
+-keepattributes Services
 
 # ==================== مكتبات الجهاز RFID/UHF ====================
 -dontwarn com.imagealgorithmlab.**
@@ -17,8 +17,6 @@
 
 # ==================== ملفات البيانات والتصدير ====================
 -keep class common.** { *; }
-# ❌ تم حذف jxl نهائياً
-# -keep class jxl.** { *; }
 -keep class aavax.** { *; }
 -keep class schemaorg_apache_xmlbeans.system.** { *; }
 -keep interface org.** { *; }
@@ -38,12 +36,17 @@
 -keep class org.openxmlformats.** { *; }
 -keep class org.w3.x2000.** { *; }
 -keep class schemaorg_apache_xmlbeans.** { *; }
+-keep class org.apache.xmlbeans.impl.values.** { *; }
+-keep class org.apache.xmlbeans.XmlObject { *; }
 
 # ==================== Apache POI 5.2.5 ====================
 -keep class org.apache.poi.** { *; }
 -keep class org.apache.poi.ss.usermodel.** { *; }
 -keep class org.apache.poi.xssf.usermodel.** { *; }
 -keep class org.apache.poi.hssf.usermodel.** { *; }
+-keep class org.apache.poi.ss.SpreadsheetVersion { *; }
+-keep class org.apache.poi.ooxml.** { *; }
+-keep class org.apache.poi.ss.usermodel.WorkbookFactory { *; }
 -dontwarn org.apache.poi.**
 
 # ==================== Firebase ====================
@@ -142,39 +145,26 @@
 }
 -dontwarn kotlinx.coroutines.**
 
-# ==================== حماية البيانات الحساسة ====================
-# حذف جميع السجلات في الإصدار النهائي
+# ==================== حماية البيانات الحساسة (Logs) ====================
 -assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
-    public static *** w(...);
-    public static *** e(...);
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
 }
 
 # ==================== نماذج البيانات الخاصة بالتطبيق ====================
-# حماية نماذج البيانات من التشويش إذا كانت تستخدم مع Gson/Retrofit
 -keep class com.mira.jewelry.enterprise.models.** { *; }
 -keep class com.mira.jewelry.enterprise.data.** { *; }
 -keep class com.mira.jewelry.enterprise.api.** { *; }
 
 # ==================== معالجة الأخطاء ====================
-# تجاهل التحذيرات الخاصة بالمكتبات القديمة
 -dontwarn java.lang.invoke.**
 -dontwarn java.nio.file.**
 -dontwarn sun.misc.**
 -dontwarn javax.annotation.**
-
-# ==================== حل مشكلة R8 ====================
-# ❌ احذف هذا السطر: -dontcompress
-
--dontwarn org.apache.poi.**
--dontwarn org.openxmlformats.**
--dontwarn org.apache.xmlbeans.**
-
--keep class org.apache.poi.** { *; }
--keep class org.openxmlformats.** { *; }
--keep class org.apache.xmlbeans.** { *; }
 
 # تجاهل أخطاء الموارد
 -keepclassmembers class * {
