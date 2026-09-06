@@ -664,40 +664,49 @@ protected void onCreate(Bundle savedInstanceState) {
                 Toast.LENGTH_SHORT).show();
     }
 
-    private void showQuickActionMenu() {
-        try {
-            BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
-            View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
-            dialog.setContentView(view);
+   private void showQuickActionMenu() {
+    try {
+        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
+        dialog.setContentView(view);
 
-            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
-            List<String> allowedActions = pm.getAllowedQuickActions();
+        List<String> allowedActions = pm.getAllowedQuickActions();
 
-            View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
-            if (btnRfidWrite != null) {
-                boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
-                btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
-                if (allowed) {
-                    btnRfidWrite.setOnClickListener(v -> {
-                        dialog.dismiss();
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
-                    });
-                }
+        View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
+        if (btnRfidWrite != null) {
+            boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
+            btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
+            if (allowed) {
+                btnRfidWrite.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
+                });
             }
+        }
 
-            applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
-                    allowedActions.contains("rfid") && quickAccess.isActionEnabled("rfid"),
-                    new MiraRfidBindingsFragment(), "RfidBindings");
+        applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
+                allowedActions.contains("rfid") && quickAccess.isActionEnabled("rfid"),
+                new MiraRfidBindingsFragment(), "RfidBindings");
 
-            applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
-                    allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
-                    new MiraIdentityStudioFragment(), "IdentityStudio");
+        // ❌ تم تعطيل Identity Studio مؤقتاً
+        // applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
+        //         allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
+        //         new MiraIdentityStudioFragment(), "IdentityStudio");
+        
+        // ✅ إخفاء الزر نهائياً
+        View btnIdentityStudio = view.findViewById(R.id.btnIdentityStudio);
+        if (btnIdentityStudio != null) {
+            btnIdentityStudio.setVisibility(View.GONE);
+            btnIdentityStudio.setEnabled(false);
+            btnIdentityStudio.setClickable(false);
+        }
 
-            applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
-                    allowedActions.contains("radar") && quickAccess.isActionEnabled("radar"),
-                    new MiraUHFRadarLocationFragment(), "Radar");
+        applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
+                allowedActions.contains("radar") && quickAccess.isActionEnabled("radar"),
+                new MiraUHFRadarLocationFragment(), "Radar");
 
             applyQuickActionButton(view, R.id.btnSecureGate, dialog,
                     allowedActions.contains("gate") && quickAccess.isActionEnabled("gate"),
@@ -758,6 +767,17 @@ protected void onCreate(Bundle savedInstanceState) {
 
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
     if (isFinishing() || isDestroyed() || fragment == null) return;
+    
+    // ✅ حماية إضافية - منع تحميل IdentityStudio نهائياً
+    if (fragment instanceof MiraIdentityStudioFragment) {
+        Log.w(TAG, "⚠️ MiraIdentityStudioFragment is temporarily disabled");
+        Toast.makeText(this, 
+            isArabic ? "هذه الواجهة قيد الصيانة حالياً" : "This feature is under maintenance", 
+            Toast.LENGTH_SHORT).show();
+        loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+        return;
+    }
+
     
     try {
         Log.d(TAG, "=== loadFragment called ===");
@@ -846,34 +866,38 @@ private void loadFragmentDirectly(Fragment fragment, String tag) {
     }
 
     public Fragment createFragmentByTag(String tag) {
-        if (tag == null) return new MiraDashboardFragment();
+    if (tag == null) return new MiraDashboardFragment();
 
-        switch (tag) {
-            case "Dashboard": return new MiraDashboardFragment();
-            case "Branches": return new MiraBranchesManagementFragment();
-            case "RfidBindings": return new MiraRfidBindingsFragment();
-            case "Scan": return new MiraInventoryProFragment();
-            case "POS": return new MiraPosFragment();
-            case "Transfers": return new MiraTransferFragment();
-            case "IdentityStudio": return new MiraIdentityStudioFragment();
-            case "Radar": return new MiraUHFRadarLocationFragment();
-            case "SecureGate": return new MiraSecureGateFragment();
-            case "Reports": return new MiraReportsProFragment();
-            case "Accounting": return new MiraAccountingFragment();
-            case "AdminHub": return new MiraAdminHubFragment();
-            case "SalesHistory": return new MiraSalesHistoryFragment();
-            case "ServerConfig": return new MiraServerConfigFragment();
-            case "GoldRates": return new MiraGoldCurrencyFragment();
-            case "Profile": return new MiraProfileFragment();
-            case "UsersManagement": return new UsersManagementFragment();
-            case "RFIDWrite": return new MiraUHFReadWriteFragment();
-            case "ReaderSetup": return new MiraReaderSetupFragment();
-            case "GateSettings": return new MiraGateSettingsFragment();
-            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
-            default: return new MiraDashboardFragment();
-        }
+    switch (tag) {
+        case "Dashboard": return new MiraDashboardFragment();
+        case "Branches": return new MiraBranchesManagementFragment();
+        case "RfidBindings": return new MiraRfidBindingsFragment();
+        case "Scan": return new MiraInventoryProFragment();
+        case "POS": return new MiraPosFragment();
+        case "Transfers": return new MiraTransferFragment();
+        
+        // ❌ تم تعطيل Identity Studio مؤقتاً - إرجاع Dashboard بدلاً منها
+        case "IdentityStudio": 
+            Log.w(TAG, "⚠️ IdentityStudio is temporarily disabled");
+            return new MiraDashboardFragment();
+        
+        case "Radar": return new MiraUHFRadarLocationFragment();
+        case "SecureGate": return new MiraSecureGateFragment();
+        case "Reports": return new MiraReportsProFragment();
+        case "Accounting": return new MiraAccountingFragment();
+        case "AdminHub": return new MiraAdminHubFragment();
+        case "SalesHistory": return new MiraSalesHistoryFragment();
+        case "ServerConfig": return new MiraServerConfigFragment();
+        case "GoldRates": return new MiraGoldCurrencyFragment();
+        case "Profile": return new MiraProfileFragment();
+        case "UsersManagement": return new UsersManagementFragment();
+        case "RFIDWrite": return new MiraUHFReadWriteFragment();
+        case "ReaderSetup": return new MiraReaderSetupFragment();
+        case "GateSettings": return new MiraGateSettingsFragment();
+        case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+        default: return new MiraDashboardFragment();
     }
-
+}
     private void showUHFVersionDialog() {
         String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
         String swVer = miraSystemVersion;
