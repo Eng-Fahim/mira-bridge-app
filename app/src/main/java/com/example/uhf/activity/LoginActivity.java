@@ -1,6 +1,5 @@
 package com.example.uhf.activity;
 
-import com.example.uhf.tools.FirebaseDiagnostics;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
@@ -103,80 +102,79 @@ public class LoginActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Created", "onCreate started");
+        super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate started");
 
-    // 1. منع التقاط الشاشة
-    getWindow().setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-    );
+        // 1. منع التقاط الشاشة
+        getWindow().setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
+        );
 
-    isDestroyed.set(false);
-    initExecutor();
+        isDestroyed.set(false);
+        initExecutor();
 
-    MemoryManager.getInstance().registerActivity(this);
-    registerComponentCallbacks(MemoryManager.getInstance());
+        MemoryManager.getInstance().registerActivity(this);
+        registerComponentCallbacks(MemoryManager.getInstance());
 
-    setContentView(R.layout.activity_login);
-    
-    // ✅ فحص session_expired
-    if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
-        Toast.makeText(this, 
-            isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
-            Toast.LENGTH_LONG).show();
+        setContentView(R.layout.activity_login);
+        
+        // ✅ فحص session_expired
+        if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
+            Toast.makeText(this, 
+                isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
+                Toast.LENGTH_LONG).show();
+        }
+
+        sessionManager = new SessionManager(getApplicationContext());
+
+        // ✅ التحقق من الجلسة - بدون انتظار
+        if (sessionManager.isLoggedIn()) {
+            if (sessionManager.hasValidToken()) {
+                navigateToMain();
+                return;
+            } else {
+                sessionManager.logoutUser();
+            }
+        }
+
+        // ✅ ضبط اللغة - قبل أي شيء آخر
+        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
+
+        // ✅ تهيئة التشفير في الخلفية - لا تنتظر
+        mainHandler.postDelayed(this::initializeEncryption, 100);
+
+        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+
+        // ✅ تهيئة الواجهة أولاً - لا تنتظر التشفير
+        initViews();
+        disableAutofill();
+        
+        // ✅ تأجيل العمليات الثقيلة
+        mainHandler.postDelayed(() -> {
+            if (!isDestroyed.get()) {
+                setupBiometric();
+                animateEntrance();
+                setupTextWatchers();
+                updateUiLanguage(isArabic);
+                setupProfileListener();
+                updateBiometricButtonState();
+                restoreLastUsername();
+                checkLockoutStatus();
+            }
+        }, 200);
+
+        // ✅ تحميل ملف المنظمة في الخلفية
+        mainHandler.postDelayed(() -> {
+            if (!isDestroyed.get()) {
+                loadOrgProfileFromCloud();
+            }
+        }, 500);
+
+        setupServerConfigToggle();
+        Log.d(TAG, "onCreate completed");
     }
-
-    sessionManager = new SessionManager(getApplicationContext());
-
-    // ✅ التحقق من الجلسة - بدون انتظار
-    if (sessionManager.isLoggedIn()) {
-        if (sessionManager.hasValidToken()) {
-            navigateToMain();
-            return;
-        } else {
-            sessionManager.logoutUser();
-        }
-    }
-
-    // ✅ ضبط اللغة - قبل أي شيء آخر
-    String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
-    isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
-
-    // ✅ تهيئة التشفير في الخلفية - لا تنتظر
-    mainHandler.postDelayed(this::initializeEncryption, 100);
-
-    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-
-    // ✅ تهيئة الواجهة أولاً - لا تنتظر التشفير
-    initViews();
-    disableAutofill();
-    
-    // ✅ تأجيل العمليات الثقيلة
-    mainHandler.postDelayed(() -> {
-        if (!isDestroyed.get()) {
-            setupBiometric();
-            animateEntrance();
-            setupTextWatchers();
-            updateUiLanguage(isArabic);
-            setupProfileListener();
-            updateBiometricButtonState();
-            restoreLastUsername();
-            checkLockoutStatus();
-        }
-    }, 200);
-
-    // ✅ تحميل ملف المنظمة في الخلفية
-    mainHandler.postDelayed(() -> {
-        if (!isDestroyed.get()) {
-            loadOrgProfileFromCloud();
-        }
-    }, 500);
-
-    setupServerConfigToggle();
-    
-    FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Created", "onCreate completed");
-}
 
     private synchronized static void initExecutor() {
         if (bgExecutor == null || bgExecutor.isShutdown() || bgExecutor.isTerminated()) {
@@ -200,34 +198,34 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void initializeEncryption() {
-    try {
-        // ✅ استخدام Executor للتشفير في الخلفية
-        executeSafeBg(() -> {
-            try {
-                MasterKey masterKey = new MasterKey.Builder(this)
-                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                        .build();
+        try {
+            // ✅ استخدام Executor للتشفير في الخلفية
+            executeSafeBg(() -> {
+                try {
+                    MasterKey masterKey = new MasterKey.Builder(this)
+                            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                            .build();
 
-                encryptedPrefs = EncryptedSharedPreferences.create(
-                        this,
-                        "secure_login_prefs_v2",
-                        masterKey,
-                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                );
-                
-                Log.d(TAG, "Encryption initialized successfully");
-                
-            } catch (GeneralSecurityException | IOException e) {
-                Log.e(TAG, "EncryptedSharedPreferences initialization failed", e);
-                encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
-            }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "initializeEncryption error: " + e.getMessage());
-        encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
+                    encryptedPrefs = EncryptedSharedPreferences.create(
+                            this,
+                            "secure_login_prefs_v2",
+                            masterKey,
+                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    );
+                    
+                    Log.d(TAG, "Encryption initialized successfully");
+                    
+                } catch (GeneralSecurityException | IOException e) {
+                    Log.e(TAG, "EncryptedSharedPreferences initialization failed", e);
+                    encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "initializeEncryption error: " + e.getMessage());
+            encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
+        }
     }
-}
 
     /**
      * تشفير كلمة المرور محلياً باستخدام PBKDF2 و Salt عشوائي للحماية الأوفلاين
@@ -414,27 +412,28 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void loadOrgProfileFromCloud() {
-    if (apiClient == null) return;
+        if (apiClient == null) return;
 
-    executeSafeBg(() -> {
-        try {
-            // ✅ إضافة timeout
-            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONObject org = response.data.optJSONObject("organization");
-                if (org != null && orgProfileManager != null) {
-                    orgProfileManager.saveFromServer(org);
+        executeSafeBg(() -> {
+            try {
+                // ✅ إضافة timeout
+                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject org = response.data.optJSONObject("organization");
+                    if (org != null && orgProfileManager != null) {
+                        orgProfileManager.saveFromServer(org);
+                    }
+                    if (isActivityAlive()) {
+                        mainHandler.post(this::applyOrgProfile);
+                    }
                 }
-                if (isActivityAlive()) {
-                    mainHandler.post(this::applyOrgProfile);
-                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadOrgProfileFromCloud error: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "loadOrgProfileFromCloud error: " + e.getMessage());
-        }
-    });
-}
+        });
+    }
+
     private void updateUiLanguage(boolean arabic) {
         getWindow().getDecorView().setLayoutDirection(arabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         if (arabic) {
@@ -632,7 +631,7 @@ public class LoginActivity extends AppCompatActivity {
         String password = getText(etPassword);
         String serverUrl = getText(etServerUrl);
 
-        FirebaseDiagnostics.log("AUTH", "Login Attempt", "username=" + username);
+        Log.d(TAG, "Login Attempt username=" + username);
 
         if (System.currentTimeMillis() < lockoutUntil) {
             long remainingMinutes = (lockoutUntil - System.currentTimeMillis()) / (60 * 1000);
@@ -757,8 +756,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
-        FirebaseDiagnostics.log("AUTH", "Login Success", "username=" + username);
-        FirebaseDiagnostics.logSessionState("AFTER_LOGIN", username, true);
+        Log.d(TAG, "Login Success for user: " + username);
         playTone(true);
 
         Context appContext = getApplicationContext();
@@ -817,160 +815,134 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void setupBiometric() {
-    try {
-        boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
-        if (!biometricEnabled) {
-            if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
-            return;
-        }
+        try {
+            boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
+            if (!biometricEnabled) {
+                if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
+                return;
+            }
 
-        BiometricManager bm = BiometricManager.from(this);
-        int canAuthenticate = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+            BiometricManager bm = BiometricManager.from(this);
+            int canAuthenticate = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
 
-        if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
-            if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
-            return;
-        }
+            if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
+                if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
+                return;
+            }
 
-        Executor executor = ContextCompat.getMainExecutor(this);
-        biometricPrompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
-            @Override
-            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                String lastUser = sessionManager.getLastBiometricUser();
-                String lastRole = sessionManager.getLastBiometricRole();
-                String lastDisplayName = sessionManager.getLastBiometricDisplayName();
-                int lastUserId = sessionManager.getLastBiometricUserId();
-                String lastToken = sessionManager.getLastBiometricToken();
+            Executor executor = ContextCompat.getMainExecutor(this);
+            biometricPrompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
+                @Override
+                public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                    String lastUser = sessionManager.getLastBiometricUser();
+                    String lastRole = sessionManager.getLastBiometricRole();
+                    String lastDisplayName = sessionManager.getLastBiometricDisplayName();
+                    int lastUserId = sessionManager.getLastBiometricUserId();
+                    String lastToken = sessionManager.getLastBiometricToken();
 
-                if (!lastUser.isEmpty()) {
-                    if (!sessionManager.isLoggedIn()) {
-                        sessionManager.createLoginSession(lastUser, lastRole,
-                                lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
-                                sessionManager.getServerUrl());
-                        sessionManager.setDisplayName(lastDisplayName);
-                        sessionManager.setUserId(lastUserId);
+                    if (!lastUser.isEmpty()) {
+                        if (!sessionManager.isLoggedIn()) {
+                            sessionManager.createLoginSession(lastUser, lastRole,
+                                    lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
+                                    sessionManager.getServerUrl());
+                            sessionManager.setDisplayName(lastDisplayName);
+                            sessionManager.setUserId(lastUserId);
 
-                        int savedBranchId = sessionManager.getLastBiometricBranchId();
-                        String savedBranchName = sessionManager.getLastBiometricBranchName();
-                        if (savedBranchId > 0) {
-                            MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
-                            bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
-                            bm.setUserBranchLocked(true);
+                            int savedBranchId = sessionManager.getLastBiometricBranchId();
+                            String savedBranchName = sessionManager.getLastBiometricBranchName();
+                            if (savedBranchId > 0) {
+                                MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+                                bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+                                bm.setUserBranchLocked(true);
+                            }
                         }
-                    }
 
-                    resetFailedAttempts();
-                    playTone(true);
-                    String nameToShow = !lastDisplayName.isEmpty() ? lastDisplayName : lastUser;
-                    Toast.makeText(LoginActivity.this,
-                            (isArabic ? "أهلاً بعودتك " : "Welcome back ") + nameToShow + " 👋",
-                            Toast.LENGTH_SHORT).show();
-                    navigateToMain();
-                } else {
-                    playTone(false);
-                    Toast.makeText(LoginActivity.this,
-                            isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
-                            Toast.LENGTH_LONG).show();
-                }
-            }
-
-            @Override
-            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
-                    playTone(false);
-                    Toast.makeText(LoginActivity.this, "Error: " + errString, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onAuthenticationFailed() {
-                playTone(false);
-                Toast.makeText(LoginActivity.this,
-                        isArabic ? "لم يتم التعرف على بصمة الإصبع" : "Fingerprint not recognized",
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        // ✅ الإصلاح الأساسي: استخدام نصوص ثابتة ومضمونة
-        String biometricTitle;
-        String biometricSubtitle;
-        String negativeButtonText;
-        
-        if (isArabic) {
-            biometricTitle = "تسجيل الدخول الحيوي";
-            biometricSubtitle = "استخدم بصمة الإصبع";
-            negativeButtonText = "إلغاء";
-        } else {
-            biometricTitle = "Biometric Sign In";
-            biometricSubtitle = "Use fingerprint";
-            negativeButtonText = "Cancel";
-        }
-        
-        // ✅ فحص إضافي للتأكد من عدم وجود نصوص فارغة أو null
-        if (biometricTitle == null || biometricTitle.trim().isEmpty()) {
-            biometricTitle = "Biometric Sign In";
-        }
-        if (biometricSubtitle == null || biometricSubtitle.trim().isEmpty()) {
-            biometricSubtitle = "Use fingerprint";
-        }
-        if (negativeButtonText == null || negativeButtonText.trim().isEmpty()) {
-            negativeButtonText = "Cancel";
-        }
-
-        // ✅ بناء PromptInfo مع النصوص الصحيحة
-        BiometricPrompt.PromptInfo.Builder promptBuilder = new BiometricPrompt.PromptInfo.Builder()
-                .setTitle(biometricTitle)
-                .setSubtitle(biometricSubtitle)
-                .setNegativeButtonText(negativeButtonText);
-
-        // ✅ إضافة allowedAuthenticators فقط إذا كان مدعوماً (Android 11+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            promptBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG);
-        }
-
-        promptInfo = promptBuilder.build();
-
-        if (btnBiometric != null) {
-            btnBiometric.setVisibility(View.VISIBLE);
-            btnBiometric.setOnClickListener(v -> {
-                try {
-                    if (!sessionManager.isBiometricLoginEnabled()) {
-                        Toast.makeText(this, isArabic ? "البصمة معطلة" : "Biometric disabled", Toast.LENGTH_LONG).show();
-                        return;
-                    }
-
-                    if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
-                        if (biometricPrompt != null && promptInfo != null) {
-                            biometricPrompt.authenticate(promptInfo);
-                        } else {
-                            Toast.makeText(this, 
-                                isArabic ? "البصمة غير متاحة حالياً" : "Biometric not available", 
+                        resetFailedAttempts();
+                        playTone(true);
+                        String nameToShow = !lastDisplayName.isEmpty() ? lastDisplayName : lastUser;
+                        Toast.makeText(LoginActivity.this,
+                                (isArabic ? "أهلاً بعودتك " : "Welcome back ") + nameToShow + " 👋",
                                 Toast.LENGTH_SHORT).show();
-                        }
+                        navigateToMain();
                     } else {
                         playTone(false);
-                        Toast.makeText(this,
-                                isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
+                        Toast.makeText(LoginActivity.this,
+                                isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
                                 Toast.LENGTH_LONG).show();
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Biometric authenticate error: " + e.getMessage(), e);
-                    Toast.makeText(this, 
-                        isArabic ? "خطأ في المصادقة البيومترية" : "Biometric authentication error", 
-                        Toast.LENGTH_SHORT).show();
+                }
+
+                @Override
+                public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                    if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                        playTone(false);
+                        Toast.makeText(LoginActivity.this, "Error: " + errString, Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onAuthenticationFailed() {
+                    playTone(false);
+                    Toast.makeText(LoginActivity.this,
+                            isArabic ? "لم يتم التعرف على بصمة الإصبع" : "Fingerprint not recognized",
+                            Toast.LENGTH_SHORT).show();
                 }
             });
-        }
 
-    } catch (Exception e) {
-        Log.e(TAG, "Biometric setup error: " + e.getMessage(), e);
-        // ✅ تعطيل البصمة إذا فشلت التهيئة
-        if (btnBiometric != null) {
-            btnBiometric.setVisibility(View.GONE);
+            String biometricTitle = isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In";
+            String biometricSubtitle = isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint";
+            String negativeButtonText = isArabic ? "إلغاء" : "Cancel";
+
+            BiometricPrompt.PromptInfo.Builder promptBuilder = new BiometricPrompt.PromptInfo.Builder()
+                    .setTitle(biometricTitle)
+                    .setSubtitle(biometricSubtitle)
+                    .setNegativeButtonText(negativeButtonText);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                promptBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+            }
+
+            promptInfo = promptBuilder.build();
+
+            if (btnBiometric != null) {
+                btnBiometric.setVisibility(View.VISIBLE);
+                btnBiometric.setOnClickListener(v -> {
+                    try {
+                        if (!sessionManager.isBiometricLoginEnabled()) {
+                            Toast.makeText(this, isArabic ? "البصمة معطلة" : "Biometric disabled", Toast.LENGTH_LONG).show();
+                            return;
+                        }
+
+                        if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
+                            if (biometricPrompt != null && promptInfo != null) {
+                                biometricPrompt.authenticate(promptInfo);
+                            } else {
+                                Toast.makeText(this, 
+                                    isArabic ? "البصمة غير متاحة حالياً" : "Biometric not available", 
+                                    Toast.LENGTH_SHORT).show();
+                            }
+                        } else {
+                            playTone(false);
+                            Toast.makeText(this,
+                                    isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Biometric authenticate error: " + e.getMessage(), e);
+                        Toast.makeText(this, 
+                            isArabic ? "خطأ في المصادقة البيومترية" : "Biometric authentication error", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Biometric setup error: " + e.getMessage(), e);
+            if (btnBiometric != null) {
+                btnBiometric.setVisibility(View.GONE);
+            }
         }
     }
-}
-
 
     private boolean verifyOfflineLogin(String username, String password) {
         try {
@@ -1051,7 +1023,7 @@ public class LoginActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Destroyed", "onDestroy called");
+        Log.d(TAG, "onDestroy called");
 
         MemoryManager.getInstance().unregisterActivity(this);
         unregisterComponentCallbacks(MemoryManager.getInstance());
