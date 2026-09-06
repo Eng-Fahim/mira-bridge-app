@@ -82,6 +82,9 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
+    
+    private boolean isSyncing = false;
+    private UserSession userSession; 
     private boolean isCheckoutDialogShowing = false; 
     private AlertDialog searchLoadingDialog;
     private SessionManager sessionManager;  // ✅ أضف هذا السطر
