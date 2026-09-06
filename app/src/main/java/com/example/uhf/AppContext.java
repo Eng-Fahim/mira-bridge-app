@@ -6,7 +6,7 @@ import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
 
-import androidx.multidex.MultiDex;
+
 
 import com.example.uhf.tools.FileUtils;
 import com.example.uhf.tools.ToastUtil;
@@ -28,7 +28,7 @@ public class AppContext extends Application {
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
-        MultiDex.install(this);
+        
     }
 
     @Override
