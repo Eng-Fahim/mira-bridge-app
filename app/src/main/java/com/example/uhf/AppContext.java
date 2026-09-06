@@ -8,9 +8,6 @@ import android.util.Log;
 
 import androidx.multidex.MultiDex;
 
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.crashlytics.FirebaseCrashlytics;
-
 import com.example.uhf.tools.FileUtils;
 import com.example.uhf.tools.ToastUtil;
 
@@ -39,25 +36,10 @@ public class AppContext extends Application {
         super.onCreate();
         mApp = this;
         
-        initFirebase();
-        // ❌ تم حذف Thread.setDefaultUncaughtExceptionHandler(this);
-        // ✅ سيتم تثبيت AppCrashHandler في MiraApplication
+        // ❌ تم إزالة استدعاء initFirebase()
         ToastUtil.init(mApp);
         
         Log.d(TAG, "AppContext initialized successfully");
-    }
-
-    private void initFirebase() {
-        try {
-            FirebaseApp.initializeApp(this);
-            if (BuildConfig.DEBUG) {
-                FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(false);
-            } else {
-                FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Firebase initialization failed: " + e.getMessage());
-        }
     }
 
     public String getVerName() {
