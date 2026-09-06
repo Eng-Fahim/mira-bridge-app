@@ -122,9 +122,13 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
 
+    // ✅ تأجيل التهيئة الثقيلة لتجنب التجمد
+    view.postDelayed(() -> {
+        if (!isAdded()) return;
+        
         try {
             initializeComponents();
             initSuggestionsData();
@@ -136,16 +140,21 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             populateSuggestions("rings");
             updatePendingSyncBadge();
             restoreDraftIfExists();
+            
             if (savedInstanceState != null) {
                 currentPhotoPath = savedInstanceState.getString("camera_photo_path");
             }
+            
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
             }
+            
+            Log.d(TAG, "✅ IdentityStudio initialized successfully");
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
         }
-    }
+    }, 150); // ✅ تأخير 150ms
+}
 
     private void initializeComponents() {
         if (getContext() != null) {
@@ -283,22 +292,36 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        if (priceManager != null) {
-            priceManager.refreshNow();
-            handler.postDelayed(() -> {
-                if (isAdded() && binding != null) {
-                    calculateEstimatedGoldValue();
+public void onResume() {
+    super.onResume();
+    
+    // ✅ تأجيل العمليات لتجنب التجميد
+    if (getView() != null) {
+        getView().postDelayed(() -> {
+            if (!isAdded()) return;
+            
+            try {
+                if (priceManager != null) {
+                    priceManager.refreshNow();
+                    handler.postDelayed(() -> {
+                        if (isAdded() && binding != null) {
+                            calculateEstimatedGoldValue();
+                        }
+                    }, 500);
                 }
-            }, 500);
-        }
-        syncPendingEncodes();
-        updatePendingSyncBadge();
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-        }
+                
+                syncPendingEncodes();
+                updatePendingSyncBadge();
+                
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "onResume error: " + e.getMessage(), e);
+            }
+        }, 300); // ✅ تأخير 300ms
     }
+}
 
     @Override
     public void onPause() {
