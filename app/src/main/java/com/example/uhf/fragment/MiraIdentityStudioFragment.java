@@ -122,51 +122,50 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     @Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
-    try {
-        // ✅ تهيئة فورية (آمنة وسريعة)
-        initializeComponents();
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        
-        // ✅ تسجيل الـ Launchers فوراً (يجب أن يكون في onViewCreated)
-        setupPhotoLaunchers();
-        
-        // ✅ تهيئة الواجهة الأساسية
-        applyLanguage();
-        setupPhotosRecyclerView();
-        
-        // ✅ تأجيل فقط العمليات الثقيلة
-        view.postDelayed(() -> {
-            if (!isAdded()) return;
-            
-            try {
-                initSuggestionsData();
-                setupListeners();
-                applyPermissions();
-                populateSuggestions("rings");
-                updatePendingSyncBadge();
-                restoreDraftIfExists();
+        try {
+            initializeComponents();
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+            setupPhotoLaunchers();
+            applyLanguage();
+            setupPhotosRecyclerView();
+
+            // تأجيل وإعادة توزيع المهام الخفيفة
+            view.postDelayed(() -> {
+                if (!isAdded()) return;
                 
-                if (savedInstanceState != null) {
-                    currentPhotoPath = savedInstanceState.getString("camera_photo_path");
+                try {
+                    initSuggestionsData();
+                    setupListeners();
+                    applyPermissions();
+                    populateSuggestions("rings");
+                    
+                    if (savedInstanceState != null) {
+                        currentPhotoPath = savedInstanceState.getString("camera_photo_path");
+                    }
+                    
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+                    }
+
+                    // تنمية المهام الثقيلة في خيط الخلفية لمنع أي Lag
+                    executorService.execute(() -> {
+                        restoreDraftIfExists();
+                        safeRun(this::updatePendingSyncBadge);
+                    });
+
+                    Log.d(TAG, "✅ IdentityStudio non-blocking initialization complete");
+                } catch (Exception e) {
+                    Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
                 }
-                
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-                }
-                
-                Log.d(TAG, "✅ IdentityStudio fully initialized");
-            } catch (Exception e) {
-                Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
-            }
-        }, 200); // ✅ تأخير 200ms للعمليات الثقيلة فقط
-        
-    } catch (Exception e) {
-        Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+            }, 100);
+
+        } catch (Exception e) {
+            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+        }
     }
-}
 
     private void initializeComponents() {
         if (getContext() != null) {
@@ -182,56 +181,53 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     }
 
     private void restoreDraftIfExists() {
+        if (offlineCache == null) return;
         try {
-            if (offlineCache == null || binding == null) return;
             String draftJson = offlineCache.getString("current_draft", null);
             if (draftJson == null) return;
 
             JSONObject draft = new JSONObject(draftJson);
             
-            if (binding.etEpc != null && draft.has("epc")) {
-                binding.etEpc.setText(draft.optString("epc"));
-            }
-            if (binding.etTitle != null && draft.has("title")) {
-                binding.etTitle.setText(draft.optString("title"));
-            }
-            if (binding.etGrossWeight != null && draft.has("gross_weight")) {
-                binding.etGrossWeight.setText(draft.optString("gross_weight"));
-            }
-            
-            if (binding.switchHasStones != null && draft.has("has_stones")) {
-                boolean hasStones = draft.optBoolean("has_stones");
-                binding.switchHasStones.setChecked(hasStones);
-                if (hasStones) {
-                    if (binding.etStoneType != null && draft.has("stone_type")) {
-                        binding.etStoneType.setText(draft.optString("stone_type"));
-                    }
-                    if (binding.etStoneWeight != null && draft.has("stone_weight")) {
-                        binding.etStoneWeight.setText(draft.optString("stone_weight"));
-                    }
-                    if (binding.etStoneCount != null && draft.has("stone_count")) {
-                        binding.etStoneCount.setText(draft.optString("stone_count"));
-                    }
-                    if (binding.etStoneValue != null && draft.has("stone_value")) {
-                        binding.etStoneValue.setText(draft.optString("stone_value"));
+            safeRun(() -> {
+                if (binding == null) return;
+                if (binding.etEpc != null && draft.has("epc")) {
+                    binding.etEpc.setText(draft.optString("epc"));
+                }
+                if (binding.etTitle != null && draft.has("title")) {
+                    binding.etTitle.setText(draft.optString("title"));
+                }
+                if (binding.etGrossWeight != null && draft.has("gross_weight")) {
+                    binding.etGrossWeight.setText(draft.optString("gross_weight"));
+                }
+                
+                if (binding.switchHasStones != null && draft.has("has_stones")) {
+                    boolean hasStones = draft.optBoolean("has_stones");
+                    binding.switchHasStones.setChecked(hasStones);
+                    if (hasStones) {
+                        if (binding.etStoneType != null) binding.etStoneType.setText(draft.optString("stone_type", ""));
+                        if (binding.etStoneWeight != null) binding.etStoneWeight.setText(draft.optString("stone_weight", ""));
+                        if (binding.etStoneCount != null) binding.etStoneCount.setText(draft.optString("stone_count", ""));
+                        if (binding.etStoneValue != null) binding.etStoneValue.setText(draft.optString("stone_value", ""));
                     }
                 }
-            }
-            
-            if (draft.has("photo_paths")) {
-                JSONArray photosArray = draft.optJSONArray("photo_paths");
-                if (photosArray != null) {
-                    for (int i = 0; i < photosArray.length(); i++) {
-                        String path = photosArray.optString(i);
-                        if (path != null && !path.isEmpty() && new File(path).exists()) {
-                            photoPaths.add(path);
+                
+                if (draft.has("photo_paths")) {
+                    JSONArray photosArray = draft.optJSONArray("photo_paths");
+                    if (photosArray != null) {
+                        photoPaths.clear();
+                        for (int i = 0; i < photosArray.length(); i++) {
+                            String path = photosArray.optString(i);
+                            if (path != null && !path.isEmpty() && new File(path).exists()) {
+                                photoPaths.add(path);
+                            }
                         }
+                        onPhotosUpdated();
                     }
-                    onPhotosUpdated();
                 }
-            }
-            
-            showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
+                
+                showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
+            });
+
             offlineCache.edit().remove("current_draft").apply();
             
         } catch (Exception e) {
@@ -239,46 +235,51 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         }
     }
 
-    private void saveCurrentDraft() {
-        try {
-            if (offlineCache == null || binding == null) return;
-            
-            String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
-            String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
-            
-            if (epc.isEmpty() && title.isEmpty() && photoPaths.isEmpty()) {
-                return;
-            }
-            
-            JSONObject draft = new JSONObject();
-            draft.put("epc", epc);
-            draft.put("title", title);
-            
-            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-            draft.put("gross_weight", weightStr);
-            
-            boolean hasStones = binding.switchHasStones.isChecked();
-            draft.put("has_stones", hasStones);
-            if (hasStones) {
-                draft.put("stone_type", binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "");
-                draft.put("stone_weight", binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "");
-                draft.put("stone_count", binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "");
-                draft.put("stone_value", binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "");
-            }
-            
-            if (!photoPaths.isEmpty()) {
-                JSONArray photosArray = new JSONArray();
-                for (String path : photoPaths) {
-                    photosArray.put(path);
+    private void saveCurrentDraftAsync() {
+        if (offlineCache == null || binding == null || executorService == null || executorService.isShutdown()) return;
+
+        final String epc = binding.etEpc != null && binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
+        final String title = binding.etTitle != null && binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
+        final String weightStr = binding.etGrossWeight != null && binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+        final boolean hasStones = binding.switchHasStones != null && binding.switchHasStones.isChecked();
+        
+        final String stoneType = hasStones && binding.etStoneType != null && binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
+        final String stoneWeight = hasStones && binding.etStoneWeight != null && binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
+        final String stoneCount = hasStones && binding.etStoneCount != null && binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
+        final String stoneValue = hasStones && binding.etStoneValue != null && binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
+
+        final List<String> currentPhotos = new ArrayList<>(photoPaths);
+
+        executorService.execute(() -> {
+            try {
+                if (epc.isEmpty() && title.isEmpty() && currentPhotos.isEmpty()) return;
+
+                JSONObject draft = new JSONObject();
+                draft.put("epc", epc);
+                draft.put("title", title);
+                draft.put("gross_weight", weightStr);
+                draft.put("has_stones", hasStones);
+                
+                if (hasStones) {
+                    draft.put("stone_type", stoneType);
+                    draft.put("stone_weight", stoneWeight);
+                    draft.put("stone_count", stoneCount);
+                    draft.put("stone_value", stoneValue);
                 }
-                draft.put("photo_paths", photosArray);
+                
+                if (!currentPhotos.isEmpty()) {
+                    JSONArray photosArray = new JSONArray();
+                    for (String path : currentPhotos) {
+                        photosArray.put(path);
+                    }
+                    draft.put("photo_paths", photosArray);
+                }
+                
+                offlineCache.edit().putString("current_draft", draft.toString()).apply();
+            } catch (Exception e) {
+                Log.e(TAG, "saveCurrentDraftAsync error: " + e.getMessage());
             }
-            
-            offlineCache.edit().putString("current_draft", draft.toString()).apply();
-            
-        } catch (Exception e) {
-            Log.e(TAG, "saveCurrentDraft error: " + e.getMessage());
-        }
+        });
     }
 
     private void applyPermissions() {
@@ -290,13 +291,8 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             binding.btnSaveIdentity.setAlpha((canEdit && !isFormLocked) ? 1.0f : 0.5f);
         }
         
-        if (binding.btnScanRfid != null) {
-            binding.btnScanRfid.setEnabled(canEdit && !isFormLocked);
-        }
-        
-        if (binding.btnAddPhotos != null) {
-            binding.btnAddPhotos.setEnabled(canEdit && !isFormLocked);
-        }
+        if (binding.btnScanRfid != null) binding.btnScanRfid.setEnabled(canEdit && !isFormLocked);
+        if (binding.btnAddPhotos != null) binding.btnAddPhotos.setEnabled(canEdit && !isFormLocked);
         
         if (!canEdit) {
             showToast(isArabic ? "⛔ وضع القراءة فقط - غير مصرح بالتعديل" : "⛔ Read only mode - Access Denied");
@@ -304,42 +300,39 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     }
 
     @Override
-public void onResume() {
-    super.onResume();
-    
-    // ✅ تأجيل العمليات لتجنب التجميد
-    if (getView() != null) {
-        getView().postDelayed(() -> {
-            if (!isAdded()) return;
-            
-            try {
-                if (priceManager != null) {
-                    priceManager.refreshNow();
-                    handler.postDelayed(() -> {
-                        if (isAdded() && binding != null) {
-                            calculateEstimatedGoldValue();
-                        }
-                    }, 500);
+    public void onResume() {
+        super.onResume();
+        if (getView() != null) {
+            getView().postDelayed(() -> {
+                if (!isAdded()) return;
+                try {
+                    if (priceManager != null) {
+                        priceManager.refreshNow();
+                        handler.postDelayed(() -> {
+                            if (isAdded() && binding != null) calculateEstimatedGoldValue();
+                        }, 300);
+                    }
+                    
+                    executorService.execute(() -> {
+                        syncPendingEncodes();
+                        safeRun(this::updatePendingSyncBadge);
+                    });
+
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "onResume error: " + e.getMessage(), e);
                 }
-                
-                syncPendingEncodes();
-                updatePendingSyncBadge();
-                
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "onResume error: " + e.getMessage(), e);
-            }
-        }, 300); // ✅ تأخير 300ms
+            }, 150);
+        }
     }
-}
 
     @Override
     public void onPause() {
         super.onPause();
         stopRfidScanningMode();
-        saveCurrentDraft();
+        saveCurrentDraftAsync();
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
         }
@@ -402,7 +395,7 @@ public void onResume() {
 
     private void setupPhotosRecyclerView() {
         if (binding == null || binding.rvPhotosPreview == null) return;
-        photosAdapter = new PhotosAdapter(photoPaths, position -> {
+        photosAdapter = new PhotosAdapter(photoPaths, executorService, position -> {
             if (isFormLocked) {
                 showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
                 return;
@@ -614,7 +607,6 @@ public void onResume() {
             binding.tvSummaryPrice.setText(formattedPrice);
 
         } catch (NumberFormatException e) {
-            Log.e(TAG, "calculateEstimatedGoldValue NumberFormatException: " + e.getMessage());
             resetCalculatedDisplay();
         } catch (Exception e) {
             Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage(), e);
@@ -637,7 +629,6 @@ public void onResume() {
         double netWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
 
         MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(karat, netWeight);
-        
         double finalPrice = details.finalPrice + stoneValue;
         
         return new double[]{
@@ -666,8 +657,7 @@ public void onResume() {
             hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_SQUARE);
             hints.put(EncodeHintType.MARGIN, 0);
 
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                    gs1Data, BarcodeFormat.DATA_MATRIX, width, height, hints);
+            BitMatrix bitMatrix = new MultiFormatWriter().encode(gs1Data, BarcodeFormat.DATA_MATRIX, width, height, hints);
 
             int w = bitMatrix.getWidth();
             int h = bitMatrix.getHeight();
@@ -688,9 +678,7 @@ public void onResume() {
     }
 
     private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
-        if (qrContent == null || qrContent.trim().isEmpty()) {
-            return null;
-        }
+        if (qrContent == null || qrContent.trim().isEmpty()) return null;
         try {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
             hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
@@ -698,12 +686,7 @@ public void onResume() {
             hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
 
             int scaleFactor = 4;
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                    qrContent, 
-                    BarcodeFormat.QR_CODE, 
-                    width * scaleFactor, 
-                    height * scaleFactor, 
-                    hints);
+            BitMatrix bitMatrix = new MultiFormatWriter().encode(qrContent, BarcodeFormat.QR_CODE, width * scaleFactor, height * scaleFactor, hints);
 
             int matrixWidth = bitMatrix.getWidth();
             int matrixHeight = bitMatrix.getHeight();
@@ -719,16 +702,8 @@ public void onResume() {
             Bitmap highResBitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
             highResBitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
             
-            Bitmap finalBitmap = Bitmap.createScaledBitmap(
-                highResBitmap, 
-                width, 
-                height, 
-                true
-            );
-            
-            if (highResBitmap != finalBitmap) {
-                highResBitmap.recycle();
-            }
+            Bitmap finalBitmap = Bitmap.createScaledBitmap(highResBitmap, width, height, true);
+            if (highResBitmap != finalBitmap) highResBitmap.recycle();
             
             return finalBitmap;
         } catch (Exception e) {
@@ -770,7 +745,6 @@ public void onResume() {
             }
 
             double grossWeight = Double.parseDouble(weightStr);
-            
             String stoneType = "";
             double stoneWeightCarats = 0;
             int stoneCount = 0;
@@ -796,7 +770,6 @@ public void onResume() {
 
             double[] pricing = calculatePricingDetails(grossWeight, stoneWeightGrams, stoneValue);
             final double netGoldWeight = pricing[6];
-
             final int selectedKaratNum = getSelectedKaratNumber();
             MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(selectedKaratNum, netGoldWeight);
             
@@ -832,59 +805,52 @@ public void onResume() {
             executorService.execute(() -> {
                 try {
                     JSONObject payload = buildPayload(
-                        finalEpc,
-                        finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
+                        finalEpc, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
                         fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
                         details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
                         localCurrency, exchangeRate, selectedCategory, location,
                         branchId, currentUserId, tid, isSim, finalPhotoPaths
                     );
 
-                    final boolean[] apiSuccess = {false};
-                    final int[] serverItemId = {0};
-                    final String[] errorMessage = {null};
-                    final boolean[] isNetworkError = {false};
-                    final JSONObject[] responseDataObj = {null};
+                    boolean apiSuccess = false;
+                    int serverItemId = 0;
+                    String errorMessage = null;
+                    boolean isNetworkError = false;
+                    JSONObject responseDataObj = null;
 
                     if (apiClient != null) {
                         try {
                             MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                            
                             if (response != null) {
-                                apiSuccess[0] = response.isSuccess;
-                                responseDataObj[0] = response.data;
-                                
+                                apiSuccess = response.isSuccess;
+                                responseDataObj = response.data;
                                 if (response.isSuccess) {
-                                    if (response.data != null) {
-                                        serverItemId[0] = response.data.optInt("item_id", 0);
-                                    }
-                                    if (response.message != null && !response.message.isEmpty()) {
-                                        errorMessage[0] = response.message;
-                                    }
+                                    if (response.data != null) serverItemId = response.data.optInt("item_id", 0);
+                                    if (response.message != null && !response.message.isEmpty()) errorMessage = response.message;
                                 } else {
-                                    errorMessage[0] = extractErrorMessage(response);
-                                    isNetworkError[0] = response.isNetworkError;
+                                    errorMessage = extractErrorMessage(response);
+                                    isNetworkError = response.isNetworkError;
                                 }
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "API call exception", e);
-                            errorMessage[0] = e.getMessage();
-                            isNetworkError[0] = true;
+                            errorMessage = e.getMessage();
+                            isNetworkError = true;
                         }
                     }
 
-                    final boolean success = apiSuccess[0];
-                    final int finalServerItemId = serverItemId[0];
-                    final String finalErrorMessage = errorMessage[0];
-                    final boolean networkError = isNetworkError[0];
-                    final JSONObject finalResponseData = responseDataObj[0];
+                    final boolean success = apiSuccess;
+                    final int finalServerItemId = serverItemId;
+                    final String finalErrorMessage = errorMessage;
+                    final boolean networkError = isNetworkError;
+                    final JSONObject finalResponseData = responseDataObj;
 
                     safeRun(() -> {
                         dismissDialog(loadingDialog);
 
                         if (success) {
                             playSuccessSound();
-                            removePendingEncode(finalEpc);
+                            executorService.execute(() -> removePendingEncode(finalEpc));
                             
                             if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
                                 uploadItemImages(finalServerItemId, finalPhotoPaths);
@@ -896,21 +862,14 @@ public void onResume() {
 
                             if (finalResponseData != null) {
                                 activeEpc = finalResponseData.optString("epc", activeEpc);
-                                
                                 JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
                                 if (gs1Obj != null) {
                                     gs1Code = gs1Obj.optString("raw_fnc1", gs1Code);
                                     qrUrl = gs1Obj.optString("digital_link", qrUrl);
                                 } else {
-                                    if (finalResponseData.has("gs1_datamatrix")) {
-                                        gs1Code = finalResponseData.optString("gs1_datamatrix");
-                                    } else if (finalResponseData.has("gs1_code")) {
-                                        gs1Code = finalResponseData.optString("gs1_code");
-                                    }
-                                    
-                                    if (finalResponseData.has("qr_url")) {
-                                        qrUrl = finalResponseData.optString("qr_url");
-                                    }
+                                    if (finalResponseData.has("gs1_datamatrix")) gs1Code = finalResponseData.optString("gs1_datamatrix");
+                                    else if (finalResponseData.has("gs1_code")) gs1Code = finalResponseData.optString("gs1_code");
+                                    if (finalResponseData.has("qr_url")) qrUrl = finalResponseData.optString("qr_url");
                                 }
                             }
 
@@ -919,30 +878,22 @@ public void onResume() {
                             }
 
                             showEncodingSuccessDialogEnhanced(
-                                    finalTitle,
-                                    activeEpc,
-                                    tid,
-                                    gs1Code,
-                                    qrUrl,
-                                    String.valueOf(fGrossWeight),
-                                    selectedKarat,
-                                    finalPriceLocal,
-                                    localCurrency,
-                                    finalPhotoPaths
+                                    finalTitle, activeEpc, tid, gs1Code, qrUrl,
+                                    String.valueOf(fGrossWeight), selectedKarat,
+                                    finalPriceLocal, localCurrency, finalPhotoPaths
                             );
-                            
+
                         } else if (networkError) {
-                            saveEncodeOffline(payload);
-                            updatePendingSyncBadge();
+                            executorService.execute(() -> {
+                                saveEncodeOffline(payload);
+                                safeRun(this::updatePendingSyncBadge);
+                            });
                             showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
-                            
                             unlockFormFast();
                             setFormEnabled(true);
-                            
                         } else {
                             String errorMsg = finalErrorMessage != null ? finalErrorMessage : 
                                 (isArabic ? "❌ فشل التكويد" : "❌ Encoding failed");
-                            
                             showErrorDialog(isArabic ? "خطأ في التكويد" : "Encoding Error", errorMsg);
                             unlockFormFast();
                             setFormEnabled(true);
@@ -979,28 +930,20 @@ public void onResume() {
     }
 
     private String extractErrorMessage(MiraApiClient.ApiResponse response) {
-        if (response == null) {
-            return isArabic ? "❌ خطأ غير معروف" : "❌ Unknown error";
-        }
-        
+        if (response == null) return isArabic ? "❌ خطأ غير معروف" : "❌ Unknown error";
         if (response.data != null) {
             try {
                 JSONObject errorObj = response.data.optJSONObject("error");
                 if (errorObj != null) {
                     String message = errorObj.optString("message", "");
                     String messageEn = errorObj.optString("message_en", "");
-                    
                     String displayMessage = isArabic ? message : messageEn;
-                    if (displayMessage.isEmpty()) {
-                        displayMessage = message.isEmpty() ? messageEn : message;
-                    }
+                    if (displayMessage.isEmpty()) displayMessage = message.isEmpty() ? messageEn : message;
                     
                     JSONObject details = errorObj.optJSONObject("details");
                     if (details != null) {
                         String suggestion = details.optString("suggestion", "");
-                        if (!suggestion.isEmpty()) {
-                            displayMessage += "\n\n💡 " + suggestion;
-                        }
+                        if (!suggestion.isEmpty()) displayMessage += "\n\n💡 " + suggestion;
                     }
                     return displayMessage;
                 }
@@ -1008,13 +951,8 @@ public void onResume() {
                 Log.e(TAG, "Error extracting error message", e);
             }
         }
-        
-        if (response.message != null && !response.message.isEmpty()) {
-            return response.message;
-        }
-        if (response.error != null && !response.error.isEmpty()) {
-            return response.error;
-        }
+        if (response.message != null && !response.message.isEmpty()) return response.message;
+        if (response.error != null && !response.error.isEmpty()) return response.error;
         return isArabic ? "❌ فشل العملية" : "❌ Operation failed";
     }
 
@@ -1032,30 +970,32 @@ public void onResume() {
 
     public void validateAndProcessEpc(String scannedEpc) {
         if (scannedEpc == null || scannedEpc.trim().isEmpty()) {
-            showErrorDialog(
-                isArabic ? "خطأ" : "Error", 
-                isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag."
-            );
+            showErrorDialog(isArabic ? "خطأ" : "Error", isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag.");
             return;
         }
 
-        String normalizedEpc = scannedEpc.trim().toUpperCase(Locale.US);
+        final String normalizedEpc = scannedEpc.trim().toUpperCase(Locale.US);
 
-        if (isEpcDuplicateLocally(normalizedEpc)) {
-            playErrorSound();
-            showErrorDialog(
-                isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل في قائمة الانتظار أو الكاش المحلي." 
-                         : "This tag (" + normalizedEpc + ") is already stored in local pending items or cache."
-            );
-            return;
-        }
+        executorService.execute(() -> {
+            boolean isDuplicate = isEpcDuplicateLocally(normalizedEpc);
+            safeRun(() -> {
+                if (isDuplicate) {
+                    playErrorSound();
+                    showErrorDialog(
+                        isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                        isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل في قائمة الانتظار أو الكاش المحلي." 
+                                 : "This tag (" + normalizedEpc + ") is already stored in local pending items or cache."
+                    );
+                    return;
+                }
 
-        if (binding != null && binding.etEpc != null) {
-            binding.etEpc.setText(normalizedEpc);
-            binding.tvStatusBadge.setText("BOUND");
-            playSuccessSound();
-        }
+                if (binding != null && binding.etEpc != null) {
+                    binding.etEpc.setText(normalizedEpc);
+                    binding.tvStatusBadge.setText("BOUND");
+                    playSuccessSound();
+                }
+            });
+        });
     }
 
     private boolean validateInputData(String epc, String title, String weightStr) {
@@ -1099,10 +1039,7 @@ public void onResume() {
         List<String> photoPathsList) throws Exception {
     
         JSONObject payload = new JSONObject();
-        
-        if (epc != null && !epc.isEmpty()) {
-            payload.put("epc", epc);
-        }
+        if (epc != null && !epc.isEmpty()) payload.put("epc", epc);
         
         payload.put("title", title);
         payload.put("purity_code", karat);
@@ -1134,15 +1071,11 @@ public void onResume() {
         payload.put("branch_id", branchId);
         payload.put("user_id", userId);
         
-        if (tid != null && !tid.isEmpty()) {
-            payload.put("rfid_tid", tid);
-        }
+        if (tid != null && !tid.isEmpty()) payload.put("rfid_tid", tid);
 
         if (!photoPathsList.isEmpty()) {
             JSONArray imagesArray = new JSONArray();
-            for (String path : photoPathsList) {
-                imagesArray.put(path);
-            }
+            for (String path : photoPathsList) imagesArray.put(path);
             payload.put("image_paths", imagesArray);
         }
         
@@ -1152,37 +1085,43 @@ public void onResume() {
     private void showPendingItemsDialog() {
         if (offlineCache == null || !isAdded() || getContext() == null) return;
 
-        try {
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
+        executorService.execute(() -> {
+            try {
+                String json = offlineCache.getString("pending_encodes", "[]");
+                JSONArray arr = new JSONArray(json);
 
-            if (arr.length() == 0) {
-                showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
-                return;
+                safeRun(() -> {
+                    if (!isAdded() || getContext() == null) return;
+                    if (arr.length() == 0) {
+                        showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
+                        return;
+                    }
+
+                    StringBuilder builder = new StringBuilder();
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject item = arr.optJSONObject(i);
+                        if (item != null) {
+                            builder.append("• ")
+                                    .append(item.optString("title"))
+                                    .append(" | ")
+                                    .append(item.optString("epc"))
+                                    .append(" (")
+                                    .append(item.optDouble("gross_weight"))
+                                    .append("g)\n");
+                        }
+                    }
+
+                    new MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
+                            .setMessage(builder.toString())
+                            .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> executorService.execute(this::syncPendingEncodes))
+                            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                            .show();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
             }
-
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject item = arr.getJSONObject(i);
-                builder.append("• ")
-                        .append(item.optString("title"))
-                        .append(" | ")
-                        .append(item.optString("epc"))
-                        .append(" (")
-                        .append(item.optDouble("gross_weight"))
-                        .append("g)\n");
-            }
-
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
-                    .setMessage(builder.toString())
-                    .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> syncPendingEncodes())
-                    .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                    .show();
-
-        } catch (Exception e) {
-            Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
-        }
+        });
     }
 
     private void setupPhotoLaunchers() {
@@ -1198,11 +1137,15 @@ public void onResume() {
                 new ActivityResultContracts.TakePicture(),
                 success -> {
                     if (success && currentPhotoPath != null) {
-                        String compressedPath = compressImage(currentPhotoPath);
-                        if (compressedPath != null) {
-                            photoPaths.add(compressedPath);
-                            onPhotosUpdated();
-                        }
+                        executorService.execute(() -> {
+                            String compressedPath = compressImage(currentPhotoPath);
+                            if (compressedPath != null) {
+                                safeRun(() -> {
+                                    photoPaths.add(compressedPath);
+                                    onPhotosUpdated();
+                                });
+                            }
+                        });
                     }
                 }
         );
@@ -1211,23 +1154,32 @@ public void onResume() {
                 new ActivityResultContracts.OpenMultipleDocuments(),
                 uris -> {
                     if (uris != null && !uris.isEmpty()) {
-                        int remainingSlots = MAX_PHOTOS - photoPaths.size();
-                        int count = 0;
-                        for (Uri uri : uris) {
-                            if (count >= remainingSlots) {
-                                showToast(isArabic ? "⚠️ تم الوصول للحد الأقصى" : "⚠️ Maximum photos reached");
-                                break;
-                            }
-                            String path = copyImageToInternalStorage(uri);
-                            if (path != null) {
-                                String compressedPath = compressImage(path);
-                                if (compressedPath != null) {
-                                    photoPaths.add(compressedPath);
-                                    count++;
+                        executorService.execute(() -> {
+                            int remainingSlots = MAX_PHOTOS - photoPaths.size();
+                            int count = 0;
+                            List<String> newCompressedPaths = new ArrayList<>();
+                            
+                            for (Uri uri : uris) {
+                                if (count >= remainingSlots) break;
+                                String path = copyImageToInternalStorage(uri);
+                                if (path != null) {
+                                    String compressedPath = compressImage(path);
+                                    if (compressedPath != null) {
+                                        newCompressedPaths.add(compressedPath);
+                                        count++;
+                                    }
                                 }
                             }
-                        }
-                        onPhotosUpdated();
+                            
+                            final boolean hitLimit = uris.size() > remainingSlots;
+                            safeRun(() -> {
+                                photoPaths.addAll(newCompressedPaths);
+                                onPhotosUpdated();
+                                if (hitLimit) {
+                                    showToast(isArabic ? "⚠️ تم الوصول للحد الأقصى" : "⚠️ Maximum photos reached");
+                                }
+                            });
+                        });
                     }
                 }
         );
@@ -1237,10 +1189,7 @@ public void onResume() {
         try {
             File imageFile = new File(imagePath);
             if (!imageFile.exists()) return null;
-            
-            if (imageFile.length() < 500 * 1024) {
-                return imagePath;
-            }
+            if (imageFile.length() < 500 * 1024) return imagePath;
             
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = 2;
@@ -1257,9 +1206,7 @@ public void onResume() {
             if (!compressedPath.equals(imagePath) && imageFile.exists()) {
                 imageFile.delete();
             }
-            
             return compressedPath;
-            
         } catch (Exception e) {
             Log.e(TAG, "compressImage error: " + e.getMessage());
             return imagePath;
@@ -1344,7 +1291,6 @@ public void onResume() {
                     outputStream.write(buffer, 0, length);
                 }
             }
-            
             return destFile.getAbsolutePath();
         } catch (Exception e) {
             Log.e(TAG, "copyImageToInternalStorage error: " + e.getMessage(), e);
@@ -1415,11 +1361,12 @@ public void onResume() {
                 }
 
                 activity.setActiveRfidListener(epc -> {
-                    String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
+                    final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
                     
-                    if (isEpcDuplicateLocally(normalizedEpc)) {
-                        if (getActivity() != null) {
-                            getActivity().runOnUiThread(() -> {
+                    executorService.execute(() -> {
+                        boolean isDuplicate = isEpcDuplicateLocally(normalizedEpc);
+                        safeRun(() -> {
+                            if (isDuplicate) {
                                 playErrorSound();
                                 showErrorDialog(
                                     isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
@@ -1428,13 +1375,9 @@ public void onResume() {
                                 );
                                 if (binding != null) binding.tvStatusBadge.setText("DUPLICATE");
                                 stopRfidScanningMode();
-                            });
-                        }
-                        return;
-                    }
-                    
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> {
+                                return;
+                            }
+                            
                             if (binding != null && binding.etEpc != null) {
                                 binding.etEpc.setText(normalizedEpc);
                                 binding.tvStatusBadge.setText("BOUND");
@@ -1442,7 +1385,7 @@ public void onResume() {
                             playSuccessSound();
                             stopRfidScanningMode();
                         });
-                    }
+                    });
                 });
 
                 activity.startUHFScan();
@@ -1482,25 +1425,27 @@ public void onResume() {
 
     public void onRfidScanned(String epc) {
         if (!isAdded() || getActivity() == null) return;
-        String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
+        final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
         
-        getActivity().runOnUiThread(() -> {
-            if (!isAdded() || binding == null) return;
-            
-            if (isEpcDuplicateLocally(normalizedEpc)) {
-                playErrorSound();
-                showErrorDialog(
-                    isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                    isArabic ? "هذه الشريحة مسجلة بالفعل." : "This tag is already registered."
-                );
+        executorService.execute(() -> {
+            boolean isDuplicate = isEpcDuplicateLocally(normalizedEpc);
+            safeRun(() -> {
+                if (binding == null) return;
+                if (isDuplicate) {
+                    playErrorSound();
+                    showErrorDialog(
+                        isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                        isArabic ? "هذه الشريحة مسجلة بالفعل." : "This tag is already registered."
+                    );
+                    stopRfidScanningMode();
+                    return;
+                }
+                
+                binding.etEpc.setText(normalizedEpc);
+                binding.tvStatusBadge.setText("BOUND");
+                playSuccessSound();
                 stopRfidScanningMode();
-                return;
-            }
-            
-            binding.etEpc.setText(normalizedEpc);
-            binding.tvStatusBadge.setText("BOUND");
-            playSuccessSound();
-            stopRfidScanningMode();
+            });
         });
     }
 
@@ -1546,19 +1491,18 @@ public void onResume() {
 
         ImageView ivGs1DataMatrix = view.findViewById(R.id.ivGs1DataMatrix);
         ImageView ivQrCode = view.findViewById(R.id.ivQrCode);
-
         MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
         
         View printView = view.findViewById(R.id.btnPrintTag);
         if (printView instanceof MaterialButton) {
             MaterialButton btnPrintTag = (MaterialButton) printView;
             btnPrintTag.setVisibility(View.VISIBLE);
-            btnPrintTag.setOnClickListener(v -> {
+            btnPrintTag.setOnClickListener(v -> executorService.execute(() -> {
                 Bitmap tagToPrint = generatePhysicalTagBitmap(epc, gs1Code, qrUrl);
-                printTagDirectly(tagToPrint);
-            });
+                safeRun(() -> printTagDirectly(tagToPrint));
+            }));
         }
-        
+
         if (tvIdTitle != null) tvIdTitle.setText(title);
         if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
         if (tvIdMetalKarat != null) tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
@@ -1567,21 +1511,22 @@ public void onResume() {
             tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice) + " " + currency);
         }
 
-        if (ivGs1DataMatrix != null && gs1Code != null && !gs1Code.isEmpty()) {
-            Bitmap dmBitmap = generateGS1DataMatrix(gs1Code, 250, 250);
-            if (dmBitmap != null) {
-                ivGs1DataMatrix.setImageBitmap(dmBitmap);
-                ivGs1DataMatrix.setVisibility(View.VISIBLE);
-            }
-        }
+        // توليد باركودات التصدير أوفلاين في خيط خلفي
+        executorService.execute(() -> {
+            Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty()) ? generateGS1DataMatrix(gs1Code, 250, 250) : null;
+            Bitmap qrBitmap = (qrUrl != null && !qrUrl.isEmpty()) ? generateMicroQRCode(qrUrl, 250, 250) : null;
 
-        if (ivQrCode != null && qrUrl != null && !qrUrl.isEmpty()) {
-            Bitmap qrBitmap = generateMicroQRCode(qrUrl, 250, 250);
-            if (qrBitmap != null) {
-                ivQrCode.setImageBitmap(qrBitmap);
-                ivQrCode.setVisibility(View.VISIBLE);
-            }
-        }
+            safeRun(() -> {
+                if (ivGs1DataMatrix != null && dmBitmap != null) {
+                    ivGs1DataMatrix.setImageBitmap(dmBitmap);
+                    ivGs1DataMatrix.setVisibility(View.VISIBLE);
+                }
+                if (ivQrCode != null && qrBitmap != null) {
+                    ivQrCode.setImageBitmap(qrBitmap);
+                    ivQrCode.setVisibility(View.VISIBLE);
+                }
+            });
+        });
 
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> {
@@ -1594,12 +1539,10 @@ public void onResume() {
     }
 
     private Bitmap generatePhysicalTagBitmap(String epc, String gs1Data, String qrUrl) {
-        final float MM_TO_PX = 8.0f; // 203 DPI (8 dots per mm)
-        
-        int cardWidthPx = Math.round(30 * MM_TO_PX);   // 240 px
-        int cardHeightPx = Math.round(15 * MM_TO_PX);  // 120 px
-        
-        int barcodeSizePx = Math.round(8 * MM_TO_PX);  // 64 px
+        final float MM_TO_PX = 8.0f;
+        int cardWidthPx = Math.round(30 * MM_TO_PX);
+        int cardHeightPx = Math.round(15 * MM_TO_PX);
+        int barcodeSizePx = Math.round(8 * MM_TO_PX);
         
         Bitmap tagBitmap = Bitmap.createBitmap(cardWidthPx, cardHeightPx, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(tagBitmap);
@@ -1617,9 +1560,7 @@ public void onResume() {
         if (gs1Data != null && !gs1Data.isEmpty()) {
             Bitmap dmBitmap = generateGS1DataMatrix(gs1Data, barcodeSizePx, barcodeSizePx);
             if (dmBitmap != null) {
-                int dmX = Math.round(1 * MM_TO_PX);
-                int dmY = Math.round(4.5f * MM_TO_PX);
-                canvas.drawBitmap(dmBitmap, dmX, dmY, null);
+                canvas.drawBitmap(dmBitmap, Math.round(1 * MM_TO_PX), Math.round(4.5f * MM_TO_PX), null);
                 dmBitmap.recycle();
             }
         }
@@ -1645,8 +1586,7 @@ public void onResume() {
             Bitmap qrBitmap = generateMicroQRCode(qrUrl, barcodeSizePx, barcodeSizePx);
             if (qrBitmap != null) {
                 int qrX = cardWidthPx - barcodeSizePx - Math.round(1 * MM_TO_PX);
-                int qrY = Math.round(4.5f * MM_TO_PX);
-                canvas.drawBitmap(qrBitmap, qrX, qrY, null);
+                canvas.drawBitmap(qrBitmap, qrX, Math.round(4.5f * MM_TO_PX), null);
                 qrBitmap.recycle();
             }
         }
@@ -1789,10 +1729,7 @@ public void onResume() {
     }
 
     private boolean isEpcDuplicateLocally(String epc) {
-        if (epc == null || epc.trim().isEmpty() || offlineCache == null) {
-            return false;
-        }
-
+        if (epc == null || epc.trim().isEmpty() || offlineCache == null) return false;
         String cleanEpc = epc.trim().toUpperCase(Locale.US);
 
         try {
@@ -1803,10 +1740,7 @@ public void onResume() {
                 JSONObject item = pendingArray.optJSONObject(i);
                 if (item != null) {
                     String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
-                    if (cleanEpc.equals(storedEpc)) {
-                        Log.w(TAG, "Duplicate found in Offline Pending Sync List: " + cleanEpc);
-                        return true;
-                    }
+                    if (cleanEpc.equals(storedEpc)) return true;
                 }
             }
 
@@ -1814,10 +1748,7 @@ public void onResume() {
             if (draftJson != null) {
                 JSONObject draft = new JSONObject(draftJson);
                 String draftEpc = draft.optString("epc", "").trim().toUpperCase(Locale.US);
-                if (cleanEpc.equals(draftEpc)) {
-                    Log.w(TAG, "EPC matches current unsaved draft: " + cleanEpc);
-                    return true;
-                }
+                if (cleanEpc.equals(draftEpc)) return true;
             }
 
             String localItemsJson = offlineCache.getString("cached_master_items", "[]");
@@ -1827,17 +1758,12 @@ public void onResume() {
                 JSONObject item = localItemsArray.optJSONObject(i);
                 if (item != null) {
                     String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
-                    if (cleanEpc.equals(storedEpc)) {
-                        Log.w(TAG, "Duplicate found in Local Master Cache: " + cleanEpc);
-                        return true;
-                    }
+                    if (cleanEpc.equals(storedEpc)) return true;
                 }
             }
-
         } catch (Exception e) {
             Log.e(TAG, "Error checking duplicate EPC: " + e.getMessage(), e);
         }
-
         return false;
     }
 
@@ -1874,7 +1800,7 @@ public void onResume() {
                 if (obj != null && !epc.equals(obj.optString("epc", ""))) newArr.put(obj);
             }
             offlineCache.edit().putString("pending_encodes", newArr.toString()).apply();
-            updatePendingSyncBadge();
+            safeRun(this::updatePendingSyncBadge);
         } catch (Exception ignored) {
             Log.e(TAG, "removePendingEncode error", ignored);
         }
@@ -1906,43 +1832,41 @@ public void onResume() {
         
         final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
 
-        executorService.execute(() -> {
-            try {
-                String json = offlineCache.getString("pending_encodes", "[]");
-                JSONArray arr = new JSONArray(json);
-                if (arr.length() == 0) return;
+        try {
+            String json = offlineCache.getString("pending_encodes", "[]");
+            JSONArray arr = new JSONArray(json);
+            if (arr.length() == 0) return;
 
-                JSONArray remainingArr = new JSONArray();
-                int synced = 0;
-                for (int i = 0; i < arr.length(); i++) {
-                    try {
-                        JSONObject payload = arr.getJSONObject(i);
-                        if (!payload.has("branch_id") || payload.optInt("branch_id", 0) <= 0) {
-                            payload.put("branch_id", branchId);
-                        }
-
-                        MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                        if (response != null && response.isSuccess) {
-                            synced++;
-                        } else {
-                            remainingArr.put(payload);
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Failed to sync item", e);
-                        remainingArr.put(arr.getJSONObject(i));
+            JSONArray remainingArr = new JSONArray();
+            int synced = 0;
+            for (int i = 0; i < arr.length(); i++) {
+                try {
+                    JSONObject payload = arr.getJSONObject(i);
+                    if (!payload.has("branch_id") || payload.optInt("branch_id", 0) <= 0) {
+                        payload.put("branch_id", branchId);
                     }
-                }
-                offlineCache.edit().putString("pending_encodes", remainingArr.toString()).apply();
 
-                final int s = synced;
-                safeRun(() -> {
-                    updatePendingSyncBadge();
-                    if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Sync encodes error: " + e.getMessage(), e);
+                    MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
+                    if (response != null && response.isSuccess) {
+                        synced++;
+                    } else {
+                        remainingArr.put(payload);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to sync item", e);
+                    remainingArr.put(arr.getJSONObject(i));
+                }
             }
-        });
+            offlineCache.edit().putString("pending_encodes", remainingArr.toString()).apply();
+
+            final int s = synced;
+            safeRun(() -> {
+                updatePendingSyncBadge();
+                if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Sync encodes error: " + e.getMessage(), e);
+        }
     }
 
     private void safeRun(Runnable r) {
@@ -2027,7 +1951,7 @@ public void onResume() {
             onPhotosUpdated();
             
             if (offlineCache != null) {
-                offlineCache.edit().remove("current_draft").apply();
+                executorService.execute(() -> offlineCache.edit().remove("current_draft").apply());
             }
 
             activateRFIDModeForEncoding();
@@ -2044,7 +1968,7 @@ public void onResume() {
         if (executorService != null && !executorService.isShutdown()) {
             try {
                 executorService.shutdown();
-                if (!executorService.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+                if (!executorService.awaitTermination(300, TimeUnit.MILLISECONDS)) {
                     executorService.shutdownNow();
                 }
             } catch (InterruptedException e) {
@@ -2061,12 +1985,14 @@ public void onResume() {
         void onDelete(int position);
     }
 
-        private static class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewHolder> {
+    private static class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewHolder> {
         private final List<String> paths;
+        private final ExecutorService executor;
         private final OnPhotoDeleteListener deleteListener;
 
-        public PhotosAdapter(List<String> paths, OnPhotoDeleteListener deleteListener) {
+        public PhotosAdapter(List<String> paths, ExecutorService executor, OnPhotoDeleteListener deleteListener) {
             this.paths = paths;
+            this.executor = executor;
             this.deleteListener = deleteListener;
         }
 
@@ -2080,18 +2006,23 @@ public void onResume() {
         @Override
         public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
             String path = paths.get(position);
-            
-            Bitmap thumbnail = decodeSampledBitmapFromFile(path, 100, 100);
-            if (thumbnail != null) {
-                holder.imgThumbnail.setImageBitmap(thumbnail);
-            } else {
-                // تم تعديل المورد لتفادي خطأ ic_placeholder المفقود
-                holder.imgThumbnail.setImageResource(R.drawable.ic_photo);
-            }
+            holder.imgThumbnail.setTag(path);
+            holder.imgThumbnail.setImageResource(R.drawable.ic_photo);
+
+            // فك ضغط الصورة في خيط خلفي للـ Adapter لمنع تجمد القائمة
+            executor.execute(() -> {
+                Bitmap thumbnail = decodeSampledBitmapFromFile(path, 100, 100);
+                if (thumbnail != null) {
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (path.equals(holder.imgThumbnail.getTag())) {
+                            holder.imgThumbnail.setImageBitmap(thumbnail);
+                        }
+                    });
+                }
+            });
 
             holder.btnDelete.setOnClickListener(v -> {
                 if (deleteListener != null) {
-                    // تم تعديل الدالة إلى getAdapterPosition() لتتوافق مع الإصدار الحالي
                     int adapterPosition = holder.getAdapterPosition();
                     if (adapterPosition != RecyclerView.NO_POSITION) {
                         deleteListener.onDelete(adapterPosition);
