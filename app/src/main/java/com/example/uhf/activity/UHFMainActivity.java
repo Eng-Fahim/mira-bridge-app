@@ -224,6 +224,8 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         fragmentManager = getSupportFragmentManager();
+        
+        clearAllFragments();
 
         setupOrgProfileListener();
         updateBottomNavLanguage();
@@ -508,16 +510,18 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     }
 
     private void confirmLogout() {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
-                .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
-                .setPositiveButton(isArabic ? "تأكيد" : "Logout", (dialog, which) -> {
-                    sessionManager.logoutUser();
-                    navigateToLogin();
-                })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                .show();
-    }
+    new MaterialAlertDialogBuilder(this)
+            .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
+            .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
+            .setPositiveButton(isArabic ? "تأكيد" : "Logout", (dialog, which) -> {
+                // ✅ تنظيف قبل تسجيل الخروج
+                clearAllFragments();
+                sessionManager.logoutUser();
+                navigateToLogin();
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+}
 
     private void setupQuickNav() {
     try {
@@ -1289,28 +1293,57 @@ public void hideLoading() {
             Log.e(TAG, "Permission Error: " + e.getMessage());
         }
     }
+    
+    private void setupButton(View root, int buttonId, BottomSheetDialog dialog, String tag) {
+    View btn = root.findViewById(buttonId);
+    if (btn != null) {
+        btn.setVisibility(View.VISIBLE);
+        btn.setOnClickListener(v -> {
+            dialog.hide();
+            
+            // ✅ إظهار اسم الواجهة قبل فتحها
+            Toast.makeText(UHFMainActivity.this, 
+                "Opening: " + tag, 
+                Toast.LENGTH_SHORT).show();
+            
+            Fragment fragment = createFragmentByTag(tag);
+            if (fragment != null) {
+                getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, fragment, tag)
+                    .commitAllowingStateLoss();
+                
+                currentFragment = fragment;
+                currentFragmentTag = tag;
+            }
+        });
+    }
+}
 
     private void navigateToLogin() {
+    try {
+        hideLoading();
+        
+        // ✅ تنظيف الـ Fragments قبل تسجيل الخروج
+        clearAllFragments();
+        
         try {
-            hideLoading();
-            
-            try {
-                if (mReader != null) {
-                    mReader.free();
-                    mReader = null;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error resetting RFID services", e);
+            if (mReader != null) {
+                mReader.free();
+                mReader = null;
             }
-
-            Intent intent = new Intent(this, LoginActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
         } catch (Exception e) {
-            Log.e(TAG, "Navigation to login error: " + e.getMessage());
+            Log.e(TAG, "Error resetting RFID services", e);
         }
+
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    } catch (Exception e) {
+        Log.e(TAG, "Navigation to login error: " + e.getMessage());
     }
+}
     
     @Override
     protected void onDestroy() {
@@ -1344,7 +1377,7 @@ public void hideLoading() {
                     Log.e(TAG, "Listener removal error: " + e.getMessage());
                 }
             }
-            
+            clearAllFragments();
             try {
                 SessionMonitorManager.getInstance(this).stopMonitoring();
             } catch (Exception e) {
@@ -1366,6 +1399,30 @@ public void hideLoading() {
         
         super.onDestroy();
     }
+// ✅ دالة تنظيف جميع الـ Fragments
+private void clearAllFragments() {
+    try {
+        if (fragmentManager != null) {
+            // إزالة جميع الـ Fragments من backstack
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            
+            // إزالة جميع الـ Fragments النشطة
+            List<Fragment> fragments = fragmentManager.getFragments();
+            if (fragments != null && !fragments.isEmpty()) {
+                FragmentTransaction transaction = fragmentManager.beginTransaction();
+                for (Fragment fragment : fragments) {
+                    if (fragment != null) {
+                        transaction.remove(fragment);
+                    }
+                }
+                transaction.commitAllowingStateLoss();
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error clearing fragments: " + e.getMessage());
+    }
+}
+
 
     private void safeExecute(Runnable runnable, String errorMessage) {
         try {
