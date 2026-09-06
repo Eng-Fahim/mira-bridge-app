@@ -190,19 +190,22 @@ private static final boolean ENABLE_OTHER = true;         // ❌ معطل مؤق
         super.attachBaseContext(newBase);
     }
 
-   @Override
+  @Override
 protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-
+    
     try {
         sessionManager = new SessionManager(getApplicationContext());
         if (!sessionManager.isLoggedIn()) {
             navigateToLogin();
             return;
         }
-
+        
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         setContentView(R.layout.activity_main);
+        
+        // ✅ تنظيف شامل من أي Fragments قديمة
+        cleanupOldFragments();
 
         AppWatchdog.getInstance().startMonitoring(() -> {
             Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
@@ -229,14 +232,11 @@ protected void onCreate(Bundle savedInstanceState) {
             currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
         }
 
-        // ✅ تحميل الـ Fragment الحقيقي
-        loadFragmentDirectly(createFragmentByTag(currentFragmentTag), currentFragmentTag);
-
+        // ✅ تحميل الداشبورد بعد التنظيف
+        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+        
     } catch (Exception e) {
         Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
-        try {
-            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-        } catch (Exception ignored) {}
     }
 }
 
@@ -1391,4 +1391,27 @@ public void hideLoading() {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
+    private void cleanupOldFragments() {
+    try {
+        FragmentManager fm = getSupportFragmentManager();
+        
+        // ✅ إزالة جميع الـ Fragments القديمة
+        for (Fragment fragment : fm.getFragments()) {
+            if (fragment != null) {
+                FragmentTransaction transaction = fm.beginTransaction();
+                transaction.remove(fragment);
+                transaction.commitAllowingStateLoss();
+            }
+        }
+        fm.executePendingTransactions();
+        
+        // ✅ تنظيف الـ BackStack
+        fm.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        
+        Log.d(TAG, "✅ Old fragments cleaned up");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
+    }
+}
 }
