@@ -213,7 +213,16 @@ protected void onCreate(Bundle savedInstanceState) {
         initializeLanguageState();
 
         branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
+        
+        // ✅ إصلاح: تهيئة fragmentManager بشكل صحيح
         fragmentManager = getSupportFragmentManager();
+        
+        // ✅ إضافة: التحقق من أن fragmentManager ليس null
+        if (fragmentManager == null) {
+            Log.e(TAG, "❌ FragmentManager is null!");
+            Toast.makeText(this, "Error: FragmentManager is null", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
@@ -222,6 +231,7 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         setupQuickNav();
+        setupRestartButton(); // ✅ إضافة هذا السطر
 
         if (savedInstanceState == null) {
             currentFragmentTag = "Dashboard";
@@ -239,7 +249,6 @@ protected void onCreate(Bundle savedInstanceState) {
         } catch (Exception ignored) {}
     }
 }
-
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
@@ -604,103 +613,98 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
         private void showQuickActionMenu() {
-        try {
-            BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
-            View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
-            dialog.setContentView(view);
+    try {
+        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
+        dialog.setContentView(view);
 
-            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
-            // 1. برمجة RFID
-            View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
-            if (btnRfidWrite != null) {
-                boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
-                btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
-                if (allowed) {
-                    btnRfidWrite.setOnClickListener(v -> {
-                        dialog.dismiss();
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
-                    });
-                }
-            }
-
-            // 2. ربط الشرائح (RfidBindings)
-            applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
-                    pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
-                    new MiraRfidBindingsFragment(), "RfidBindings");
-
-            // 3. استوديو التكويد (IdentityStudio)
-            applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
-                    pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
-                    new MiraIdentityStudioFragment(), "IdentityStudio");
-
-            // 4. رادار التتبع (Radar)
-            applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
-                    pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
-                    new MiraUHFRadarLocationFragment(), "Radar");
-
-            // 5. البوابات الأمنية (SecureGate)
-            applyQuickActionButton(view, R.id.btnSecureGate, dialog,
-                    pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
-                    new MiraSecureGateFragment(), "SecureGate");
-
-            // 6. التقارير (Reports)
-            applyQuickActionButton(view, R.id.btnReports, dialog,
-                    pm.canExportReports() && quickAccess.isActionEnabled("reports"),
-                    new MiraReportsProFragment(), "Reports");
-
-            // 7. المحاسبة (Accounting)
-            applyQuickActionButton(view, R.id.btnAccounting, dialog,
-                    pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
-                    new MiraAccountingFragment(), "Accounting");
-
-            // 8. التحويلات (Transfer)
-            applyQuickActionButton(view, R.id.btnTransfer, dialog,
-                    pm.canAccessTransfers() && quickAccess.isActionEnabled("transfers"),
-                    new MiraTransferFragment(), "Transfers");
-
-            // 9. سجل المبيعات (SalesHistory)
-            applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
-                    pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
-                    new MiraSalesHistoryFragment(), "SalesHistory");
-
-            // 10. الخيارات الإدارية (AdminHub)
-            applyQuickActionButton(view, R.id.btnAdminHub, dialog,
-                    pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
-                    new MiraAdminHubFragment(), "AdminHub");
-
-            // 11. إعدادات السيرفر (ServerConfig)
-            applyQuickActionButton(view, R.id.btnServerConfig, dialog,
-                    pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
-                    new MiraServerConfigFragment(), "ServerConfig");
-
-            // زر الإغلاق السفلي
-            View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
-            if (fabCloseSheet != null) {
-                fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
-            }
-
-            dialog.show();
-        } catch (Exception e) {
-            Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
-        }
-    }
-
-
-    private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
-                                        boolean allowed, Fragment fragment, String tag) {
-        View btn = root.findViewById(viewId);
-        if (btn != null) {
-            btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
+        // ✅ برمجة RFID
+        View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
+        if (btnRfidWrite != null) {
+            boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
+            btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
             if (allowed) {
-                btn.setOnClickListener(v -> {
+                btnRfidWrite.setOnClickListener(v -> {
                     dialog.dismiss();
-                    checkInventoryLockAndExecute(() -> loadFragment(fragment, tag));
+                    loadFragment(createFragmentByTag("RFIDWrite"), "RFIDWrite");
                 });
             }
         }
+
+        // ✅ باقي الأزرار - استخدم createFragmentByTag مباشرة
+        applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
+                quickAccess.isActionEnabled("rfid"),
+                null, "RfidBindings");
+
+        applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
+                quickAccess.isActionEnabled("identity"),
+                null, "IdentityStudio");
+
+        applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
+                quickAccess.isActionEnabled("radar"),
+                null, "Radar");
+
+        applyQuickActionButton(view, R.id.btnSecureGate, dialog,
+                quickAccess.isActionEnabled("gate"),
+                null, "SecureGate");
+
+        applyQuickActionButton(view, R.id.btnReports, dialog,
+                quickAccess.isActionEnabled("reports"),
+                null, "Reports");
+
+        applyQuickActionButton(view, R.id.btnAccounting, dialog,
+                quickAccess.isActionEnabled("accounting"),
+                null, "Accounting");
+
+        applyQuickActionButton(view, R.id.btnTransfer, dialog,
+                quickAccess.isActionEnabled("transfers"),
+                null, "Transfers");
+
+        applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
+                quickAccess.isActionEnabled("sales_history"),
+                null, "SalesHistory");
+
+        applyQuickActionButton(view, R.id.btnAdminHub, dialog,
+                quickAccess.isActionEnabled("admin_hub"),
+                null, "AdminHub");
+
+        applyQuickActionButton(view, R.id.btnServerConfig, dialog,
+                quickAccess.isActionEnabled("server_config"),
+                null, "ServerConfig");
+
+        View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
+        if (fabCloseSheet != null) {
+            fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        dialog.show();
+    } catch (Exception e) {
+        Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
     }
+}
+
+// ✅ تعديل applyQuickActionButton
+private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
+                                    boolean allowed, Fragment fragment, String tag) {
+    View btn = root.findViewById(viewId);
+    if (btn != null) {
+        btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
+        if (allowed) {
+            btn.setOnClickListener(v -> {
+                dialog.dismiss();
+                // ✅ استخدم createFragmentByTag بدلاً من fragment المباشر
+                Fragment actualFragment = createFragmentByTag(tag);
+                if (actualFragment != null) {
+                    loadFragment(actualFragment, tag);
+                }
+            });
+        }
+    }
+}
+
 
     public void loadFragment(Fragment fragment, String tag) {
     loadFragment(fragment, tag, true);
@@ -738,24 +742,111 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
         hideLoading();
     }
 }
+
 private void loadFragmentDirectly(Fragment fragment, String tag) {
     try {
+        if (fragment == null) {
+            Log.e(TAG, "❌ Cannot load null fragment");
+            return;
+        }
+        
+        if (fragmentManager == null) {
+            fragmentManager = getSupportFragmentManager();
+        }
+        
+        if (fragmentManager == null) {
+            Log.e(TAG, "❌ FragmentManager is null");
+            return;
+        }
+        
+        Log.d(TAG, "🔄 Loading fragment directly: " + tag);
+        
         currentFragment = fragment;
         currentFragmentTag = tag;
         
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.replace(R.id.fragment_container, fragment, tag);
-        transaction.commitNow();
+        
+        // ✅ استخدام commitNow للحصول على نتيجة فورية
+        transaction.commitNowAllowingStateLoss();
         
         updateBottomNavSelectionByTag(tag);
         hideLoading();
         
-        Log.d(TAG, "Fragment loaded directly: " + tag);
+        Log.d(TAG, "✅ Fragment loaded directly: " + tag);
+        
+        // ✅ التحقق بعد التحميل
+        mainHandler.postDelayed(() -> verifyFragmentLoading(tag), 200);
+        
     } catch (Exception e) {
-        Log.e(TAG, "Direct load error: " + e.getMessage(), e);
+        Log.e(TAG, "❌ Direct load error for " + tag + ": " + e.getMessage(), e);
+        
+        // ✅ محاولة بديلة
+        try {
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, fragment, tag);
+            transaction.commit();
+            Log.d(TAG, "✅ Fragment loaded with commit(): " + tag);
+        } catch (Exception fallbackError) {
+            Log.e(TAG, "❌ Fallback load failed: " + fallbackError.getMessage(), fallbackError);
+            Toast.makeText(this, "Error loading screen", Toast.LENGTH_SHORT).show();
+        }
+        
         hideLoading();
     }
 }
+
+/**
+ * ✅ طريقة آمنة لتحميل الأجزاء مع تتبع الأخطاء
+ */
+private void loadFragmentSafely(Fragment fragment, String tag) {
+    try {
+        Log.d(TAG, "📦 Loading fragment: " + tag);
+        
+        // ✅ التحقق من صحة النشاط
+        if (isFinishing() || isDestroyed()) {
+            Log.e(TAG, "❌ Activity is finishing or destroyed");
+            return;
+        }
+        
+        // ✅ التحقق من صحة الجزء
+        if (fragment == null) {
+            Log.e(TAG, "❌ Fragment is null");
+            return;
+        }
+        
+        // ✅ إعادة تهيئة fragmentManager إذا كان null
+        if (fragmentManager == null) {
+            Log.w(TAG, "⚠️ FragmentManager is null, reinitializing...");
+            fragmentManager = getSupportFragmentManager();
+        }
+        
+        // ✅ التحقق من وجود مدير الأجزاء
+        if (fragmentManager == null) {
+            Log.e(TAG, "❌ FragmentManager is still null");
+            Toast.makeText(this, "Error: FragmentManager not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // ✅ التحقق من وجود الحاوية
+        View container = findViewById(R.id.fragment_container);
+        if (container == null) {
+            Log.e(TAG, "❌ Fragment container not found");
+            Toast.makeText(this, "Error: Fragment container not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // ✅ تحميل الجزء مباشرة
+        loadFragmentDirectly(fragment, tag);
+        
+        Log.d(TAG, "✅ Fragment loaded successfully: " + tag);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "❌ Error loading fragment " + tag + ": " + e.getMessage(), e);
+        Toast.makeText(this, "Error loading: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+}
+
     private void loadFragmentByTag(String tag) {
         try {
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
@@ -1320,6 +1411,28 @@ public void hideLoading() {
         }
     }
     
+    /**
+ * ✅ طريقة للتحقق من تحميل الأجزاء
+ */
+private void verifyFragmentLoading(String tag) {
+    try {
+        Fragment fragment = fragmentManager.findFragmentByTag(tag);
+        if (fragment != null && fragment.isAdded()) {
+            Log.d(TAG, "✅ Fragment verified: " + tag + " is added and visible");
+        } else {
+            Log.e(TAG, "❌ Fragment NOT found: " + tag);
+            
+            // ✅ محاولة إعادة التحميل
+            Fragment newFragment = createFragmentByTag(tag);
+            if (newFragment != null) {
+                loadFragmentDirectly(newFragment, tag);
+                Log.d(TAG, "🔄 Fragment reloaded: " + tag);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error verifying fragment: " + e.getMessage());
+    }
+}
     @Override
     protected void onDestroy() {
         try {
