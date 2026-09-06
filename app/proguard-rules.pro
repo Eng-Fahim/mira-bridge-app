@@ -2,10 +2,16 @@
 -keepattributes *Annotation*,Signature,Exception
 -dontwarn **
 
-# ==================== مكتبات الجهاز RFID/UHF ====================
+# ==================== مكتبات الجهاز RFID/UHF (Chainway & Hardware) ====================
 -keep class com.hsm.** { *; }
 -keep class com.rscja.deviceapi.** { *; }
 -keep class com.imagealgorithmlab.** { *; }
+
+# ==================== ZXing & ZXing Android Embedded (إصلاح مسح الباركود) ====================
+-keep class com.journeyapps.barcodescanner.** { *; }
+-keep class com.google.zxing.** { *; }
+-dontwarn com.journeyapps.barcodescanner.**
+-dontwarn com.google.zxing.**
 
 # ==================== Apache POI (تنظيف الحشو غير المستخدم) ====================
 -keep class org.apache.poi.ss.usermodel.** { *; }
@@ -35,24 +41,18 @@
 -keep public class * implements com.bumptech.glide.module.GlideModule
 -keep class * extends com.bumptech.glide.module.AppGlideModule
 
-# ==================== ZXing Barcode Generation ====================
--keep class com.google.zxing.** { *; }
--dontwarn com.google.zxing.**
-
 # ==================== MLKit Barcode Scanning ====================
 -keep class com.google.mlkit.vision.barcode.** { *; }
 -dontwarn com.google.mlkit.vision.**
 
-# ==================== نماذج البيانات الخاصة بالتطبيق ====================
-# تم تخصيص الإبقاء للحقول والمتغيرات فقط بدلاً من الكلاس بأكمله لتسهيل الضغط
--keepclassmembers class com.mira.jewelry.enterprise.models.** {
-    <fields>;
-}
--keepclassmembers class com.mira.jewelry.enterprise.data.** {
-    <fields>;
-}
+# ==================== نماذج البيانات والكود الخاص بالتطبيق ====================
+# حماية النماذج من الضغط لتجنب مشاكل الـ Serialization/Deserialization مع API
+-keep class com.example.uhf.model.** { *; }
+-keep class com.mira.jewelry.enterprise.models.** { *; }
+-keepclassmembers class com.mira.jewelry.enterprise.models.** { <fields>; }
+-keepclassmembers class com.mira.jewelry.enterprise.data.** { <fields>; }
 
-# ==================== حذف سجلات Log والتتبع نهائياً للتثبيط والحجم ====================
+# ==================== حذف سجلات Log والتتبع نهائياً في Release ====================
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
     public static int v(...);
