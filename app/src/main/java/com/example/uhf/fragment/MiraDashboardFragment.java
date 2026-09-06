@@ -316,62 +316,36 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("updateHeader", e);
         }
     }
-    
+
     private void setupQuickAccessGrid() {
-    try {
-        if (quickAccessSettings == null || quickAdapter == null) return;
-        
-        sharedExecutor.execute(() -> {
-            try {
-                if (!isAdded()) return;
-                
-                // ✅ الحصول على جميع الإجراءات المفعّلة
-                List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
-                List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
-                
-                // ✅ للتشخيص: تفعيل أول إجراء فقط
-                // قم بتغيير هذا الرقم لاختبار إجراء مختلف
-                final int TEST_ACTION_INDEX = 0; // 0 = identity, 1 = radar, 2 = gate, ...
-                
-                Log.d(TAG, "=== DEBUG: Testing action index: " + TEST_ACTION_INDEX + " ===");
-                
-                // ✅ إضافة الإجراء الأول فقط للاختبار
-                if (enabledActions != null && !enabledActions.isEmpty()) {
-                    if (TEST_ACTION_INDEX < enabledActions.size()) {
-                        MiraQuickAccessSettings.QuickAction testAction = enabledActions.get(TEST_ACTION_INDEX);
-                        
-                        // ✅ التحقق من الصلاحية
-                        if (permissionManager != null && permissionManager.canAccessFragment(getFragmentTagForAction(testAction.id))) {
-                            filteredActions.add(testAction);
-                            Log.d(TAG, "✅ Testing ONLY this action: " + testAction.id + " (" + testAction.titleEn + ")");
-                        } else {
-                            Log.w(TAG, "⛔ No permission for test action: " + testAction.id);
+        try {
+            if (quickAccessSettings == null || quickAdapter == null) return;
+            sharedExecutor.execute(() -> {
+                try {
+                    if (!isAdded()) return;
+                    List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+                    List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
+
+                    for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+                        if (filteredActions.size() >= MAX_QUICK_ACTIONS) break;
+                        if (permissionManager != null && permissionManager.canAccessFragment(getFragmentTagForAction(action.id))) {
+                            filteredActions.add(action);
                         }
                     }
+
+                    mainHandler.post(() -> {
+                        if (isAdded() && quickAdapter != null) {
+                            quickAdapter.submitList(filteredActions);
+                        }
+                    });
+                } catch (Exception e) {
+                    logNonFatal("setupQuickAccessGrid.inner", e);
                 }
-                
-                // ✅ عرض النتيجة
-                Log.d(TAG, "=== Actions to display: " + filteredActions.size() + " ===");
-                for (MiraQuickAccessSettings.QuickAction action : filteredActions) {
-                    Log.d(TAG, "  📱 " + action.id + " - " + action.titleEn);
-                }
-                
-                mainHandler.post(() -> {
-                    if (isAdded() && quickAdapter != null) {
-                        quickAdapter.submitList(filteredActions);
-                        Log.d(TAG, "✅ Adapter updated with " + filteredActions.size() + " action(s)");
-                    }
-                });
-                
-            } catch (Exception e) {
-                logNonFatal("setupQuickAccessGrid.inner", e);
-            }
-        });
-        
-    } catch (Exception e) {
-        logNonFatal("setupQuickAccessGrid", e);
+            });
+        } catch (Exception e) {
+            logNonFatal("setupQuickAccessGrid", e);
+        }
     }
-}
 
     private void loadDataIfNeeded() {
         try {
@@ -1110,60 +1084,20 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void handleQuickAction(String actionId) {
-    try {
-        Log.d(TAG, "=== QUICK ACTION CLICKED ===");
-        Log.d(TAG, "Action ID: " + actionId);
-        
-        if (actionId == null || actionId.isEmpty()) {
-            Log.e(TAG, "❌ Action ID is null or empty");
-            return;
-        }
-        
-        if (getActivity() == null || !(getActivity() instanceof UHFMainActivity)) {
-            Log.e(TAG, "❌ Activity is not available");
-            return;
-        }
-        
-        UHFMainActivity activity = (UHFMainActivity) getActivity();
-        String tag = getFragmentTagForAction(actionId);
-        
-        Log.d(TAG, "Target fragment tag: " + tag);
-        
-        // ✅ إنشاء الـ Fragment
-        Fragment fragment = null;
         try {
-            fragment = activity.createFragmentByTag(tag);
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                Fragment fragment = createFragmentForAction(actionId);
+                if (fragment != null) {
+                    activity.loadFragment(fragment, getFragmentTagForAction(actionId));
+                }
+            }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error creating fragment: " + e.getMessage(), e);
+            logNonFatal("handleQuickAction", e);
         }
-        
-        if (fragment == null) {
-            Log.e(TAG, "❌ Failed to create fragment for: " + tag);
-            Toast.makeText(getContext(), 
-                isArabic ? "⚠️ تعذر فتح هذه الواجهة" : "⚠️ Cannot open this screen", 
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        Log.d(TAG, "✅ Fragment created: " + fragment.getClass().getSimpleName());
-        
-        // ✅ استخدام navigateToFragment الموجود في الداشبورد
-        navigateToFragment(fragment, tag);
-        
-        Log.d(TAG, "✅ Navigation initiated to: " + tag);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "❌ handleQuickAction error: " + e.getMessage(), e);
-        logNonFatal("handleQuickAction", e);
-        
-        try {
-            Toast.makeText(getContext(), 
-                isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen", 
-                Toast.LENGTH_SHORT).show();
-        } catch (Exception ignored) {}
     }
-}
-
+    
+    
 
     private Fragment createFragmentForAction(String actionId) {
     try {
