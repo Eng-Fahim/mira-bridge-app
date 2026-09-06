@@ -701,14 +701,48 @@ public ApiResponse processRefund(JSONObject payload) {
     }
 
     public ApiResponse searchPosItem(JSONObject payload) {
-        try {
-            return postWithAuth("/pos/search-item", payload);
-        } catch (Exception e) {
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-            response.isNetworkError = true;
-            return response;
+    try {
+        // ✅ التأكد من وجود branch_id
+        if (payload == null) {
+            payload = new JSONObject();
         }
+        
+        if (!payload.has("branch_id") || payload.optInt("branch_id", 0) <= 0) {
+            MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
+            int branchId = bm.getActiveBranchId();
+            payload.put("branch_id", branchId);
+            Log.d(TAG, "✅ Added branch_id to search: " + branchId);
+        }
+        
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
+        }
+        
+        // ✅✅✅ طباعة كاملة للطلب
+        Log.e(TAG, "🔍🔍🔍 SEARCH POS ITEM START 🔍🔍🔍");
+        Log.e(TAG, "📦 Payload: " + payload.toString());
+        Log.e(TAG, "🔑 API URL: " + apiUrl + "pos/search-item");
+        Log.e(TAG, "🔑 API Key: " + (getEffectiveApiKey().isEmpty() ? "EMPTY" : "SET"));
+        Log.e(TAG, "🔑 Auth Token: " + (getAuthToken().isEmpty() ? "EMPTY" : "SET"));
+        Log.e(TAG, "🔑 Gate ID: " + getEffectiveGateId());
+        
+        ApiResponse response = postWithAuth("/pos/search-item", payload);
+        
+        // ✅✅✅ طباعة كاملة للاستجابة
+        Log.e(TAG, "📥 Response Code: " + response.code);
+        Log.e(TAG, "📥 Response Success: " + response.isSuccess);
+        Log.e(TAG, "📥 Response Error: " + response.error);
+        Log.e(TAG, "📥 Response Body: " + response.getBody());
+        Log.e(TAG, "🔍🔍🔍 SEARCH POS ITEM END 🔍🔍🔍");
+        
+        return response;
+    } catch (Exception e) {
+        Log.e(TAG, "searchPosItem error: " + e.getMessage(), e);
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
     }
+}
 
     public ApiResponse searchSalesHistory(String query, int page, int pageSize) {
         try {
