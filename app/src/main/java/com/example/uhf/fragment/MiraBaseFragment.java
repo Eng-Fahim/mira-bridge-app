@@ -203,26 +203,27 @@ public abstract class MiraBaseFragment extends Fragment {
     // ==================== إخفاء لوحة المفاتيح ====================
 
     private void setupAutoHideKeyboard(View view) {
-        if (view == null) return;
+    if (view == null) return;
 
-        if (!(view instanceof EditText)) {
-            view.setOnTouchListener((v, event) -> {
-                if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    hideKeyboard();
-                    v.performClick();
-                }
-                return false;
-            });
-        }
-
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                setupAutoHideKeyboard(group.getChildAt(i));
+    // ✅ فقط للأزرار والعناصر القابلة للنقر - ليس كل العناصر
+    if (view.isClickable() && !(view instanceof EditText)) {
+        view.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                hideKeyboard();
             }
-        }
+            return false;
+        });
     }
 
+    // ✅ تكرار فقط للمجموعات - مع حد أقصى للعمق
+    if (view instanceof ViewGroup) {
+        ViewGroup group = (ViewGroup) view;
+        int childCount = Math.min(group.getChildCount(), 20); // ✅ حد أقصى
+        for (int i = 0; i < childCount; i++) {
+            setupAutoHideKeyboard(group.getChildAt(i));
+        }
+    }
+}
     protected void hideKeyboard() {
         try {
             if (getActivity() == null) return;
