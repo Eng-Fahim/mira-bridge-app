@@ -402,7 +402,7 @@ public class MiraReceiptFragment extends DialogFragment {
             
             String currency = t.optString("currency", "");
             if (currency.isEmpty() && paymentObj != null) currency = paymentObj.optString("currency_code", paymentObj.optString("currency", ""));
-            if (currency.isEmpty() && priceManager != null) currency = priceManager.getCurrencySymbol();
+            if (currency.isEmpty() && priceManager != null) currency = priceManager.getCurrencySymbol("YER");
             if (currency.isEmpty()) currency = defaultCurrency;
             
             String currencyName = paymentObj != null ? paymentObj.optString("currency_name", "") : "";
