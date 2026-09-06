@@ -34,9 +34,10 @@ import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.tabs.TabLayout;
-
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -61,7 +62,6 @@ public class MiraAccountingFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
-    
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
 
     private RecyclerView rvAccountingData;
@@ -69,7 +69,7 @@ public class MiraAccountingFragment extends Fragment {
     private TextView tvEmptyData;
     private EditText etSearch;
     private TextView tvTodayRevenue, tvTotalGoldVolume, tvBalanceStatus;
-    private TextView tvBranchName; // ✅ جديد - عرض اسم الفرع
+    private TextView tvBranchName;
     private TabLayout tabAccounting;
     private MaterialButton btnCreateManualEntry;
     private MaterialButton btnFinancialReports;
@@ -81,7 +81,7 @@ public class MiraAccountingFragment extends Fragment {
     private AccountingAdapter adapter;
 
     private boolean isArabic = true;
-    private int currentBranchId = 0; // ✅ جديد
+    private int currentBranchId = 0;
 
     @Nullable
     @Override
@@ -95,14 +95,13 @@ public class MiraAccountingFragment extends Fragment {
         permissionManager = PermissionManager.getInstance(requireContext());
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         
-        // ✅ الحصول على الفرع الحالي
         currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
 
         initViews(view);
         setupRecyclerView();
         setupListeners();
         applyPermissions();
-        updateBranchDisplay(); // ✅ عرض اسم الفرع
+        updateBranchDisplay();
         loadData(currentTab);
 
         return view;
@@ -117,7 +116,7 @@ public class MiraAccountingFragment extends Fragment {
         tvTodayRevenue = view.findViewById(R.id.tvTodayRevenue);
         tvTotalGoldVolume = view.findViewById(R.id.tvTotalGoldVolume);
         tvBalanceStatus = view.findViewById(R.id.tvBalanceStatus);
-        tvBranchName = view.findViewById(R.id.tvBranchName); // ✅ جديد
+        tvBranchName = view.findViewById(R.id.tvBranchName);
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
         btnFinancialReports = view.findViewById(R.id.btnFinancialReports);
         tabAccounting = view.findViewById(R.id.tabAccounting);
@@ -129,7 +128,6 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-    // ✅ عرض اسم الفرع الحالي
     private void updateBranchDisplay() {
         if (tvBranchName != null && branchesManager != null) {
             String branchName = branchesManager.getActiveBranchDisplayName();
@@ -181,7 +179,7 @@ public class MiraAccountingFragment extends Fragment {
 
         if (btnRefresh != null) {
             btnRefresh.setOnClickListener(v -> {
-                refreshCurrentBranch(); // ✅ تحديث الفرع
+                refreshCurrentBranch();
                 loadData(currentTab);
             });
         }
@@ -223,7 +221,6 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-    // ✅ تحديث الفرع الحالي
     private void refreshCurrentBranch() {
         if (branchesManager != null) {
             currentBranchId = branchesManager.getActiveBranchId();
@@ -232,12 +229,12 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void loadData(String tab) {
-        if (isDestroyed.get() || !isAdded()) return;
+        if (isDestroyed.get() || !isAdded() || getContext() == null) return;
         
         if (permissionManager == null || (!permissionManager.canView("accounting") && 
             !permissionManager.isAdmin() && 
             !permissionManager.isBranchManager() && 
-            !"AUDITOR".equals(new com.example.uhf.tools.SessionManager(requireContext()).getRoleString()))) {
+            !"AUDITOR".equals(new SessionManager(requireContext()).getRoleString()))) {
             showEmptyState(true);
             if (tvEmptyData != null) {
                 tvEmptyData.setText(isArabic ? "⛔ غير مصرح لك بالوصول" : "⛔ Access Denied");
@@ -246,7 +243,6 @@ public class MiraAccountingFragment extends Fragment {
             return;
         }
         
-        // ✅ تحديث الفرع قبل التحميل
         refreshCurrentBranch();
         
         if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
@@ -254,9 +250,7 @@ public class MiraAccountingFragment extends Fragment {
         
         executeSafely(() -> {
             try {
-                // ✅ استخدام الفرع الحالي في جميع الطلبات
                 String branchIdStr = String.valueOf(currentBranchId);
-                
                 MiraApiClient.ApiResponse response = null;
                 
                 switch (tab) {
@@ -264,7 +258,6 @@ public class MiraAccountingFragment extends Fragment {
                         response = apiClient.getJournalEntries(branchIdStr);
                         break;
                     case "chart":
-                        // دليل الحسابات مشترك بين الفروع
                         response = apiClient.getChartOfAccounts();
                         break;
                     case "trial":
@@ -305,92 +298,89 @@ public class MiraAccountingFragment extends Fragment {
                 logNonFatal("executeSafely.rejected", e);
             }
         }
-        
         new Thread(task).start();
     }
 
     private void parseAndDisplay(JSONObject data, String tab) {
-    try {
-        entriesList.clear();
-        JSONArray items = data.optJSONArray("data");
-        
-        if (items == null) {
-            JSONObject dataObj = data.optJSONObject("data");
-            if (dataObj != null) {
-                items = dataObj.optJSONArray("entries");
-                if (items == null) {
-                    items = dataObj.optJSONArray("accounts");
+        try {
+            entriesList.clear();
+            JSONArray items = data.optJSONArray("data");
+            
+            if (items == null) {
+                JSONObject dataObj = data.optJSONObject("data");
+                if (dataObj != null) {
+                    items = dataObj.optJSONArray("entries");
+                    if (items == null) {
+                        items = dataObj.optJSONArray("accounts");
+                    }
                 }
             }
-        }
-        
-        if (items != null && items.length() > 0) {
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject obj = items.getJSONObject(i);
-                AccountingEntry entry = new AccountingEntry();
-                entry.id = i + 1;
-                entry.branchId = obj.optInt("branch_id", 0);
-                entry.branchName = obj.optString("branch_name", "");
-                
-                if ("journal".equals(tab)) {
-                    entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
-                    entry.description = obj.optString("description", "—");
-                    entry.debit = safeDouble(obj.optString("total_debit", "0"));
-                    entry.credit = safeDouble(obj.optString("total_credit", "0"));
-                    entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
-                    entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
+            
+            if (items != null && items.length() > 0) {
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject obj = items.getJSONObject(i);
+                    AccountingEntry entry = new AccountingEntry();
+                    entry.id = i + 1;
+                    entry.branchId = obj.optInt("branch_id", 0);
+                    entry.branchName = obj.optString("branch_name", "");
                     
-                } else if ("chart".equals(tab)) {
-                    entry.code = obj.optString("account_code", obj.optString("code", "—"));
-                    entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
-                    entry.debit = safeDouble(obj.optString("opening_balance", "0"));
-                    entry.credit = 0;
-                    entry.goldDebit = safeDouble(obj.optString("opening_gold_grams", "0"));
+                    if ("journal".equals(tab)) {
+                        entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
+                        entry.description = obj.optString("description", "—");
+                        entry.debit = safeDouble(obj.optString("total_debit", "0"));
+                        entry.credit = safeDouble(obj.optString("total_credit", "0"));
+                        entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
+                        entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
+                        
+                    } else if ("chart".equals(tab)) {
+                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
+                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
+                        entry.debit = safeDouble(obj.optString("opening_balance", "0"));
+                        entry.credit = 0;
+                        entry.goldDebit = safeDouble(obj.optString("opening_gold_grams", "0"));
+                        
+                    } else if ("trial".equals(tab)) {
+                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
+                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
+                        
+                        entry.debit = safeDouble(
+                            obj.optString("total_debit", 
+                            obj.optString("debit_total", 
+                            obj.optString("sum_debit", "0")))
+                        );
+                        entry.credit = safeDouble(
+                            obj.optString("total_credit", 
+                            obj.optString("credit_total", 
+                            obj.optString("sum_credit", "0")))
+                        );
+                        
+                        entry.goldDebit = safeDouble(
+                            obj.optString("total_gold_debit", 
+                            obj.optString("gold_debit", 
+                            obj.optString("total_gold_debit_grams", 
+                            obj.optString("sum_gold_debit", "0"))))
+                        );
+                        entry.goldCredit = safeDouble(
+                            obj.optString("total_gold_credit", 
+                            obj.optString("gold_credit", 
+                            obj.optString("total_gold_credit_grams", 
+                            obj.optString("sum_gold_credit", "0"))))
+                        );
+                    }
                     
-                } else if ("trial".equals(tab)) {
-                    entry.code = obj.optString("account_code", obj.optString("code", "—"));
-                    entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
-                    
-                    // ✅✅✅ دعم أسماء حقول متعددة للمبالغ
-                    entry.debit = safeDouble(
-                        obj.optString("total_debit", 
-                        obj.optString("debit_total", 
-                        obj.optString("sum_debit", "0")))
-                    );
-                    entry.credit = safeDouble(
-                        obj.optString("total_credit", 
-                        obj.optString("credit_total", 
-                        obj.optString("sum_credit", "0")))
-                    );
-                    
-                    // ✅✅✅ دعم أسماء حقول متعددة للذهب
-                    entry.goldDebit = safeDouble(
-                        obj.optString("total_gold_debit", 
-                        obj.optString("gold_debit", 
-                        obj.optString("total_gold_debit_grams", 
-                        obj.optString("sum_gold_debit", "0"))))
-                    );
-                    entry.goldCredit = safeDouble(
-                        obj.optString("total_gold_credit", 
-                        obj.optString("gold_credit", 
-                        obj.optString("total_gold_credit_grams", 
-                        obj.optString("sum_gold_credit", "0"))))
-                    );
+                    entriesList.add(entry);
                 }
-                
-                entriesList.add(entry);
             }
+            
+            filterData(etSearch != null ? etSearch.getText().toString() : "");
+            updateSummary();
+            showEmptyState(entriesList.isEmpty());
+            
+        } catch (Exception e) {
+            logNonFatal("parseAndDisplay", e);
+            showEmptyState(true);
         }
-        
-        filterData(etSearch != null ? etSearch.getText().toString() : "");
-        updateSummary();
-        showEmptyState(entriesList.isEmpty());
-        
-    } catch (Exception e) {
-        logNonFatal("parseAndDisplay", e);
-        showEmptyState(true);
     }
-}
 
     private double safeDouble(String value) {
         try {
@@ -401,36 +391,35 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void updateSummary() {
-    double totalDebit = 0;
-    double totalCredit = 0;
-    double totalGoldDebit = 0;
-    double totalGoldCredit = 0;
-    
-    for (AccountingEntry entry : entriesList) {
-        totalDebit += entry.debit;
-        totalCredit += entry.credit;
-        totalGoldDebit += entry.goldDebit;
-        totalGoldCredit += entry.goldCredit;
-    }
-    
-    // ✅✅✅ صافي الذهب = المدين - الدائن
-    double netGold = totalGoldDebit - totalGoldCredit;
-    
-    if (tvTodayRevenue != null) {
-        tvTodayRevenue.setText(String.format(Locale.US, "%,.2f", totalDebit));
-    }
-    
-    if (tvTotalGoldVolume != null) {
-        if (netGold != 0) {
-            tvTotalGoldVolume.setText(String.format(Locale.US, "%+.3f g", netGold));
-            tvTotalGoldVolume.setTextColor(netGold > 0 ? 
-                Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
-        } else {
-            tvTotalGoldVolume.setText("0.000 g");
-            tvTotalGoldVolume.setTextColor(Color.parseColor("#95A5A6"));
+        double totalDebit = 0;
+        double totalCredit = 0;
+        double totalGoldDebit = 0;
+        double totalGoldCredit = 0;
+        
+        for (AccountingEntry entry : entriesList) {
+            totalDebit += entry.debit;
+            totalCredit += entry.credit;
+            totalGoldDebit += entry.goldDebit;
+            totalGoldCredit += entry.goldCredit;
+        }
+        
+        double netGold = totalGoldDebit - totalGoldCredit;
+        
+        if (tvTodayRevenue != null) {
+            tvTodayRevenue.setText(String.format(Locale.US, "%,.2f", totalDebit));
+        }
+        
+        if (tvTotalGoldVolume != null) {
+            if (netGold != 0) {
+                tvTotalGoldVolume.setText(String.format(Locale.US, "%+.3f g", netGold));
+                tvTotalGoldVolume.setTextColor(netGold > 0 ? 
+                    Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
+            } else {
+                tvTotalGoldVolume.setText("0.000 g");
+                tvTotalGoldVolume.setTextColor(Color.parseColor("#95A5A6"));
+            }
         }
     }
-}
 
     private void filterData(String query) {
         filteredList.clear();
@@ -506,8 +495,16 @@ public class MiraAccountingFragment extends Fragment {
                     return;
                 }
                 
-                double grossWeight = grossStr.isEmpty() ? 0 : Double.parseDouble(grossStr);
-                double cashAmount = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
+                double grossWeight = 0;
+                double cashAmount = 0;
+                try {
+                    grossWeight = grossStr.isEmpty() ? 0 : Double.parseDouble(grossStr);
+                    cashAmount = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
+                } catch (NumberFormatException e) {
+                    showToast(isArabic ? "يرجى إدخال قيم عددية صحيحة" : "Invalid number format");
+                    return;
+                }
+
                 String karat = spKarat != null ? spKarat.getSelectedItem().toString() : "21K";
                 
                 createJournalEntry(ref, desc, grossWeight, karat, cashAmount);
@@ -521,7 +518,6 @@ public class MiraAccountingFragment extends Fragment {
     private void createJournalEntry(String ref, String desc, double grossWeight, String karat, double cashAmount) {
         executeSafely(() -> {
             try {
-                // ✅ تحديث الفرع قبل الإنشاء
                 refreshCurrentBranch();
                 
                 JSONObject payload = new JSONObject();
@@ -529,7 +525,7 @@ public class MiraAccountingFragment extends Fragment {
                 payload.put("description", desc);
                 payload.put("entry_date", new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()));
                 payload.put("source_type", "manual");
-                payload.put("branch_id", currentBranchId); // ✅ إضافة الفرع
+                payload.put("branch_id", currentBranchId);
                 
                 double karatFactor = getKaratFactor(karat);
                 double net24K = grossWeight * karatFactor;
@@ -607,7 +603,7 @@ public class MiraAccountingFragment extends Fragment {
     private void logNonFatal(String location, Throwable throwable) {
         try {
             Log.e(TAG, location + ": " + throwable.getMessage(), throwable);
-            
+            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
             crashlytics.setCustomKey("error_location", location);
             crashlytics.setCustomKey("fragment", "MiraAccountingFragment");
             crashlytics.recordException(throwable);
@@ -619,7 +615,6 @@ public class MiraAccountingFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // ✅ تحديث الفرع عند العودة
         if (branchesManager != null) {
             int newBranchId = branchesManager.getActiveBranchId();
             if (newBranchId != currentBranchId) {
@@ -645,8 +640,8 @@ public class MiraAccountingFragment extends Fragment {
         double credit;
         double goldDebit;
         double goldCredit;
-        int branchId; // ✅ جديد
-        String branchName; // ✅ جديد
+        int branchId;
+        String branchName;
     }
 
     private class AccountingAdapter extends RecyclerView.Adapter<AccountingAdapter.ViewHolder> {
@@ -667,27 +662,26 @@ public class MiraAccountingFragment extends Fragment {
         
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-    AccountingEntry entry = items.get(position);
-    holder.tvCode.setText(entry.code != null ? entry.code : "—");
-    holder.tvDescription.setText(entry.description != null ? entry.description : "—");
-    
-    // ✅✅✅ عرض صافي الذهب (مدين - دائن)
-    double netGold = entry.goldDebit - entry.goldCredit;
-    
-    if (netGold > 0) {
-        holder.tvGold.setText(String.format(Locale.US, "+%.3f g", netGold));
-        holder.tvGold.setTextColor(Color.parseColor("#2ECC71"));
-    } else if (netGold < 0) {
-        holder.tvGold.setText(String.format(Locale.US, "%.3f g", netGold));
-        holder.tvGold.setTextColor(Color.parseColor("#E74C3C"));
-    } else {
-        holder.tvGold.setText("0.000 g");
-        holder.tvGold.setTextColor(Color.parseColor("#95A5A6"));
-    }
-    
-    holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
-    holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
-}
+            AccountingEntry entry = items.get(position);
+            holder.tvCode.setText(entry.code != null ? entry.code : "—");
+            holder.tvDescription.setText(entry.description != null ? entry.description : "—");
+            
+            double netGold = entry.goldDebit - entry.goldCredit;
+            
+            if (netGold > 0) {
+                holder.tvGold.setText(String.format(Locale.US, "+%.3f g", netGold));
+                holder.tvGold.setTextColor(Color.parseColor("#2ECC71"));
+            } else if (netGold < 0) {
+                holder.tvGold.setText(String.format(Locale.US, "%.3f g", netGold));
+                holder.tvGold.setTextColor(Color.parseColor("#E74C3C"));
+            } else {
+                holder.tvGold.setText("0.000 g");
+                holder.tvGold.setTextColor(Color.parseColor("#95A5A6"));
+            }
+            
+            holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
+            holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
+        }
         
         @Override
         public int getItemCount() {
