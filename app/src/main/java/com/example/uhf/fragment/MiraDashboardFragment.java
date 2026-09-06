@@ -1096,23 +1096,24 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("handleQuickAction", e);
         }
     }
+    
+    
 
     private Fragment createFragmentForAction(String actionId) {
-        switch (actionId) {
-            case "identity": return new MiraIdentityStudioFragment();
-            case "radar": return new MiraUHFRadarLocationFragment();
-            case "gate": return new MiraSecureGateFragment();
-            case "reports": return new MiraReportsProFragment();
-            case "accounting": return new MiraAccountingFragment();
-            case "transfers": return new MiraTransferFragment();
-            case "admin_hub": return new MiraAdminHubFragment();
-            case "sales_history": return new MiraSalesHistoryFragment();
-            case "server_config": return new MiraServerConfigFragment();
-            case "gold_rates": return new MiraGoldCurrencyFragment();
-            case "users": return new UsersManagementFragment();
-            default: return null;
+    try {
+        // ✅ استخدم createFragmentByTag من UHFMainActivity
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            String tag = getFragmentTagForAction(actionId);
+            return activity.createFragmentByTag(tag);
         }
+    } catch (Exception e) {
+        Log.e(TAG, "createFragmentForAction error: " + e.getMessage());
     }
+    
+    // ✅ Fallback - Dashboard
+    return new MiraDashboardFragment();
+}
 
     private String getSourceDisplayName(String source) {
         if (source == null) return isArabic ? "غير معروف" : "Unknown";
