@@ -1084,18 +1084,59 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void handleQuickAction(String actionId) {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity activity = (UHFMainActivity) getActivity();
-                Fragment fragment = createFragmentForAction(actionId);
-                if (fragment != null) {
-                    activity.loadFragment(fragment, getFragmentTagForAction(actionId));
-                }
-            }
-        } catch (Exception e) {
-            logNonFatal("handleQuickAction", e);
+    try {
+        Log.d(TAG, "=== QUICK ACTION CLICKED ===");
+        Log.d(TAG, "Action ID: " + actionId);
+        
+        if (actionId == null || actionId.isEmpty()) {
+            Log.e(TAG, "❌ Action ID is null or empty");
+            return;
         }
+        
+        if (getActivity() == null || !(getActivity() instanceof UHFMainActivity)) {
+            Log.e(TAG, "❌ Activity is not available");
+            return;
+        }
+        
+        UHFMainActivity activity = (UHFMainActivity) getActivity();
+        String tag = getFragmentTagForAction(actionId);
+        
+        Log.d(TAG, "Target fragment tag: " + tag);
+        
+        // ✅ إنشاء الـ Fragment
+        Fragment fragment = null;
+        try {
+            fragment = activity.createFragmentByTag(tag);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error creating fragment: " + e.getMessage(), e);
+        }
+        
+        if (fragment == null) {
+            Log.e(TAG, "❌ Failed to create fragment for: " + tag);
+            Toast.makeText(getContext(), 
+                isArabic ? "⚠️ تعذر فتح هذه الواجهة" : "⚠️ Cannot open this screen", 
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        Log.d(TAG, "✅ Fragment created: " + fragment.getClass().getSimpleName());
+        
+        // ✅ استخدام navigateToFragment الموجود في الداشبورد
+        navigateToFragment(fragment, tag);
+        
+        Log.d(TAG, "✅ Navigation initiated to: " + tag);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "❌ handleQuickAction error: " + e.getMessage(), e);
+        logNonFatal("handleQuickAction", e);
+        
+        try {
+            Toast.makeText(getContext(), 
+                isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen", 
+                Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) {}
     }
+}
     
     
 
@@ -1263,4 +1304,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("cancelFuture", e);
         }
     }
-}
+            }
