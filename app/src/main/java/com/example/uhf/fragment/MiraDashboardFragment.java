@@ -329,23 +329,22 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
                 List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
                 
-                // ✅ للتشخيص: تفعيل أول إجراء فقط
-                // قم بتغيير هذا الرقم لاختبار إجراء مختلف
-                final int TEST_ACTION_INDEX = 0; // 0 = identity, 1 = radar, 2 = gate, ...
+                Log.d(TAG, "=== DEBUG: Total enabled actions: " + 
+                    (enabledActions != null ? enabledActions.size() : 0) + " ===");
                 
-                Log.d(TAG, "=== DEBUG: Testing action index: " + TEST_ACTION_INDEX + " ===");
-                
-                // ✅ إضافة الإجراء الأول فقط للاختبار
+                // ✅ عرض جميع الإجراءات المفعّلة
                 if (enabledActions != null && !enabledActions.isEmpty()) {
-                    if (TEST_ACTION_INDEX < enabledActions.size()) {
-                        MiraQuickAccessSettings.QuickAction testAction = enabledActions.get(TEST_ACTION_INDEX);
-                        
+                    for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
                         // ✅ التحقق من الصلاحية
-                        if (permissionManager != null && permissionManager.canAccessFragment(getFragmentTagForAction(testAction.id))) {
-                            filteredActions.add(testAction);
-                            Log.d(TAG, "✅ Testing ONLY this action: " + testAction.id + " (" + testAction.titleEn + ")");
+                        String fragmentTag = getFragmentTagForAction(action.id);
+                        boolean hasPermission = permissionManager == null || 
+                            permissionManager.canAccessFragment(fragmentTag);
+                        
+                        if (hasPermission) {
+                            filteredActions.add(action);
+                            Log.d(TAG, "✅ Allowed: " + action.id + " (" + action.titleEn + ")");
                         } else {
-                            Log.w(TAG, "⛔ No permission for test action: " + testAction.id);
+                            Log.w(TAG, "⛔ Denied: " + action.id + " - no permission for " + fragmentTag);
                         }
                     }
                 }
@@ -1341,4 +1340,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("cancelFuture", e);
         }
     }
-                }
+                    }
