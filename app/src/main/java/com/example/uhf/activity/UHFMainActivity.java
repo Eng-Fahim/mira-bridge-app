@@ -635,50 +635,63 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     }
 
     private void showQuickActionMenu() {
-    BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
-    View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
-    dialog.setContentView(view);
+    try {
+        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
+        dialog.setContentView(view);
 
-    // كل الأزرار بنفس الطريقة
-    setupButton(view, R.id.btnIdentityStudio, dialog, "IdentityStudio");
-    setupButton(view, R.id.btnRadarLocation, dialog, "Radar");
-    setupButton(view, R.id.btnSecureGate, dialog, "SecureGate");
-    setupButton(view, R.id.btnReports, dialog, "Reports");
-    setupButton(view, R.id.btnAccounting, dialog, "Accounting");
-    setupButton(view, R.id.btnTransfer, dialog, "Transfers");
-    setupButton(view, R.id.btnSalesHistory, dialog, "SalesHistory");
-    setupButton(view, R.id.btnAdminHub, dialog, "AdminHub");
-    setupButton(view, R.id.btnServerConfig, dialog, "ServerConfig");
-    setupButton(view, R.id.btnRfidBindings, dialog, "RfidBindings");
-    setupButton(view, R.id.btnRfidWrite, dialog, "RFIDWrite");
+        // 1. برمجة RFID
+        View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
+        if (btnRfidWrite != null) {
+            btnRfidWrite.setVisibility(View.VISIBLE);
+            btnRfidWrite.setOnClickListener(v -> {
+                dialog.dismiss();
+                mainHandler.postDelayed(() -> {
+                    loadFragmentDirectly(new MiraUHFReadWriteFragment(), "RFIDWrite");
+                }, 100);
+            });
+        }
 
-    View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
-    if (fabCloseSheet != null) {
-        fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
-    }
+        // 2. باقي الأزرار - بدون checkInventoryLockAndExecute
+        applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
+                new MiraRfidBindingsFragment(), "RfidBindings");
+        
+        applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
+                new MiraIdentityStudioFragment(), "IdentityStudio");
+        
+        applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
+                new MiraUHFRadarLocationFragment(), "Radar");
+        
+        applyQuickActionButton(view, R.id.btnSecureGate, dialog,
+                new MiraSecureGateFragment(), "SecureGate");
+        
+        applyQuickActionButton(view, R.id.btnReports, dialog,
+                new MiraReportsProFragment(), "Reports");
+        
+        applyQuickActionButton(view, R.id.btnAccounting, dialog,
+                new MiraAccountingFragment(), "Accounting");
+        
+        applyQuickActionButton(view, R.id.btnTransfer, dialog,
+                new MiraTransferFragment(), "Transfers");
+        
+        applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
+                new MiraSalesHistoryFragment(), "SalesHistory");
+        
+        applyQuickActionButton(view, R.id.btnAdminHub, dialog,
+                new MiraAdminHubFragment(), "AdminHub");
+        
+        applyQuickActionButton(view, R.id.btnServerConfig, dialog,
+                new MiraServerConfigFragment(), "ServerConfig");
 
-    dialog.show();
-}
+        // زر الإغلاق
+        View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
+        if (fabCloseSheet != null) {
+            fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
+        }
 
-private void setupButton(View root, int buttonId, BottomSheetDialog dialog, String tag) {
-    View btn = root.findViewById(buttonId);
-    if (btn != null) {
-        btn.setVisibility(View.VISIBLE);
-        btn.setOnClickListener(v -> {
-            dialog.hide(); // ✅ استخدم hide بدلاً من dismiss
-            
-            Fragment fragment = createFragmentByTag(tag);
-            if (fragment != null) {
-                // ✅ تحميل مباشر بدون تأخير
-                getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, fragment, tag)
-                    .commitAllowingStateLoss();
-                
-                currentFragment = fragment;
-                currentFragmentTag = tag;
-            }
-        });
+        dialog.show();
+    } catch (Exception e) {
+        Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
     }
 }
 
@@ -772,7 +785,7 @@ private void loadFragmentDirectly(Fragment fragment, String tag) {
         }
     }
 
-    private Fragment createFragmentByTag(String tag) {
+    public Fragment createFragmentByTag(String tag) {
         if (tag == null) return new MiraDashboardFragment();
 
         switch (tag) {
