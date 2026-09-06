@@ -603,7 +603,7 @@ protected void onCreate(Bundle savedInstanceState) {
                 Toast.LENGTH_SHORT).show();
     }
 
-    private void showQuickActionMenu() {
+        private void showQuickActionMenu() {
         try {
             BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
             View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
@@ -612,8 +612,7 @@ protected void onCreate(Bundle savedInstanceState) {
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
             MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
-            List<String> allowedActions = pm.getAllowedQuickActions();
-
+            // 1. برمجة RFID
             View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
             if (btnRfidWrite != null) {
                 boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
@@ -626,46 +625,57 @@ protected void onCreate(Bundle savedInstanceState) {
                 }
             }
 
+            // 2. ربط الشرائح (RfidBindings)
             applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
-                    allowedActions.contains("rfid") && quickAccess.isActionEnabled("rfid"),
+                    pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
                     new MiraRfidBindingsFragment(), "RfidBindings");
 
+            // 3. استوديو التكويد (IdentityStudio)
             applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
-                    allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
+                    pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
                     new MiraIdentityStudioFragment(), "IdentityStudio");
 
+            // 4. رادار التتبع (Radar)
             applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
-                    allowedActions.contains("radar") && quickAccess.isActionEnabled("radar"),
+                    pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
                     new MiraUHFRadarLocationFragment(), "Radar");
 
+            // 5. البوابات الأمنية (SecureGate)
             applyQuickActionButton(view, R.id.btnSecureGate, dialog,
-                    allowedActions.contains("gate") && quickAccess.isActionEnabled("gate"),
+                    pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
                     new MiraSecureGateFragment(), "SecureGate");
 
+            // 6. التقارير (Reports)
             applyQuickActionButton(view, R.id.btnReports, dialog,
-                    allowedActions.contains("reports") && quickAccess.isActionEnabled("reports"),
+                    pm.canExportReports() && quickAccess.isActionEnabled("reports"),
                     new MiraReportsProFragment(), "Reports");
 
+            // 7. المحاسبة (Accounting)
             applyQuickActionButton(view, R.id.btnAccounting, dialog,
-                    allowedActions.contains("accounting") && quickAccess.isActionEnabled("accounting"),
+                    pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
                     new MiraAccountingFragment(), "Accounting");
 
+            // 8. التحويلات (Transfer)
             applyQuickActionButton(view, R.id.btnTransfer, dialog,
-                    allowedActions.contains("transfers") && quickAccess.isActionEnabled("transfers"),
+                    pm.canAccessTransfers() && quickAccess.isActionEnabled("transfers"),
                     new MiraTransferFragment(), "Transfers");
 
+            // 9. سجل المبيعات (SalesHistory)
             applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
-                    allowedActions.contains("sales_history") && quickAccess.isActionEnabled("sales_history"),
+                    pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
                     new MiraSalesHistoryFragment(), "SalesHistory");
 
+            // 10. الخيارات الإدارية (AdminHub)
             applyQuickActionButton(view, R.id.btnAdminHub, dialog,
-                    allowedActions.contains("admin_hub") && quickAccess.isActionEnabled("admin_hub"),
+                    pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
                     new MiraAdminHubFragment(), "AdminHub");
 
+            // 11. إعدادات السيرفر (ServerConfig)
             applyQuickActionButton(view, R.id.btnServerConfig, dialog,
-                    allowedActions.contains("server_config") && quickAccess.isActionEnabled("server_config"),
+                    pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
                     new MiraServerConfigFragment(), "ServerConfig");
 
+            // زر الإغلاق السفلي
             View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
             if (fabCloseSheet != null) {
                 fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
@@ -676,6 +686,7 @@ protected void onCreate(Bundle savedInstanceState) {
             Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
         }
     }
+
 
     private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
                                         boolean allowed, Fragment fragment, String tag) {
