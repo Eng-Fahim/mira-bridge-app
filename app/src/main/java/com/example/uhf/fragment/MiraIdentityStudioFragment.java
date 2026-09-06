@@ -125,35 +125,47 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
 
-    // ✅ تأجيل التهيئة الثقيلة لتجنب التجمد
-    view.postDelayed(() -> {
-        if (!isAdded()) return;
+    try {
+        // ✅ تهيئة فورية (آمنة وسريعة)
+        initializeComponents();
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
         
-        try {
-            initializeComponents();
-            initSuggestionsData();
-            setupPhotoLaunchers();
-            setupPhotosRecyclerView();
-            applyLanguage();
-            setupListeners();
-            applyPermissions();
-            populateSuggestions("rings");
-            updatePendingSyncBadge();
-            restoreDraftIfExists();
+        // ✅ تسجيل الـ Launchers فوراً (يجب أن يكون في onViewCreated)
+        setupPhotoLaunchers();
+        
+        // ✅ تهيئة الواجهة الأساسية
+        applyLanguage();
+        setupPhotosRecyclerView();
+        
+        // ✅ تأجيل فقط العمليات الثقيلة
+        view.postDelayed(() -> {
+            if (!isAdded()) return;
             
-            if (savedInstanceState != null) {
-                currentPhotoPath = savedInstanceState.getString("camera_photo_path");
+            try {
+                initSuggestionsData();
+                setupListeners();
+                applyPermissions();
+                populateSuggestions("rings");
+                updatePendingSyncBadge();
+                restoreDraftIfExists();
+                
+                if (savedInstanceState != null) {
+                    currentPhotoPath = savedInstanceState.getString("camera_photo_path");
+                }
+                
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+                }
+                
+                Log.d(TAG, "✅ IdentityStudio fully initialized");
+            } catch (Exception e) {
+                Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
             }
-            
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-            }
-            
-            Log.d(TAG, "✅ IdentityStudio initialized successfully");
-        } catch (Exception e) {
-            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
-        }
-    }, 150); // ✅ تأخير 150ms
+        }, 200); // ✅ تأخير 200ms للعمليات الثقيلة فقط
+        
+    } catch (Exception e) {
+        Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+    }
 }
 
     private void initializeComponents() {
