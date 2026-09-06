@@ -148,7 +148,10 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
     
-    // Barcode Scanning (تمت إزالة zxing لتجنب التكرار والاعتماد على MLKit الخفيف)
+    // Barcode Generation (نواة ZXing المصغرة لتوليد GS1 DataMatrix و Micro QR Code)
+    implementation 'com.google.zxing:core:3.5.3'
+    
+    // Barcode Scanning (MLKit الخفيف لمسح الأكواد عبر الكاميرا)
     implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     
     // Charts
