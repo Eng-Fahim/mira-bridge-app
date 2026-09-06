@@ -654,16 +654,6 @@ public class MiraApiClient {
         return postWithAuth("/pos/checkout", payload);
     }
 
-    public ApiResponse processRefund(String epc, String serialNo, String reason) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("epc", epc != null ? epc : "");
-            payload.put("serial_no", serialNo != null ? serialNo : "");
-            payload.put("reason", reason != null ? reason : "مرتجع مبيعات");
-            payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception ignored) {}
-        return postWithAuth("/pos/refund", payload);
-    }
     
     
 
@@ -680,16 +670,68 @@ public ApiResponse checkRefundEligibility(JSONObject payload) {
     }
 }
 
+/**
+ * ✅ معالجة الإرجاع - تدعم كلا الطريقتين
+ */
 public ApiResponse processRefund(JSONObject payload) {
     try {
+        // ✅ إضافة gate_id إذا لم يكن موجوداً
+        if (payload == null) {
+            payload = new JSONObject();
+        }
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
+        }
+        
         return postWithAuth("/pos/refund", payload);
     } catch (Exception e) {
         Log.e(TAG, "processRefund error: " + e.getMessage());
-        return new ApiResponse(-1, null, e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
     }
 }
 
+/**
+ * ✅ معالجة الإرجاع - طريقة مبسطة
+ */
+public ApiResponse processRefund(String epc, String serialNo, String reason) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("epc", epc != null ? epc : "");
+        payload.put("serial_no", serialNo != null ? serialNo : "");
+        payload.put("reason", reason != null ? reason : "مرتجع مبيعات");
+        payload.put("gate_id", getEffectiveGateId());
+    } catch (Exception ignored) {}
+    return processRefund(payload); // ✅ استدعاء الدالة الرئيسية
+}
 
+/**
+ * ✅ البحث عن قطعة في POS
+ */
+public ApiResponse searchItem(JSONObject payload) {
+    try {
+        // ✅ إضافة branch_id إذا لم يكن موجوداً
+        if (payload == null) {
+            payload = new JSONObject();
+        }
+        if (!payload.has("branch_id") || payload.optInt("branch_id", 0) <= 0) {
+            MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
+            int branchId = bm.getActiveBranchId();
+            payload.put("branch_id", branchId);
+        }
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
+        }
+        
+        return postWithAuth("/pos/search-item", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "searchItem error: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    }
+}
 
     public ApiResponse getSalesHistory() {
         return getWithAuth("/pos/sales");
