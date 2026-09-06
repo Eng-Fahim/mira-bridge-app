@@ -1289,7 +1289,7 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                 payment.put("subtotal_usd", data.originalTotal);
                 payment.put("discount_amount_usd", data.discountAmount);
                 payment.put("final_amount_usd", data.finalAmount);
-                payment.put("currency_code", priceManager != null ? priceManager.getCurrencySymbol() : "YER");
+                payment.put("currency_code", priceManager != null ? priceManager.getCurrencySymbol("YER") : "YER");
                 payment.put("currency_name", isArabic ? "ريال يمني" : "Yemeni Rial");
                 payment.put("payment_method", data.paymentMethod);
                 payload.put("payment", payment);
@@ -2065,157 +2065,136 @@ private void showSyncPromptDialog(int pendingCount) {
 /**
  * ✅✅✅ مزامنة المبيعات المعلقة - الفرع الحالي فقط مع تفاصيل كاملة
  */
-private void syncPendingSales() {
-    try {
-        Context ctx = getContext();
-        if (ctx == null) return;
-        
-        int currentBranchId = getActiveBranchId();
-        int currentUserId = sessionManager != null ? sessionManager.getUserId() : 0;
-        
-        // ✅✅✅ استخدام ملف الفرع الحالي فقط
-        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
-        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
-        String existingJson = prefs.getString("pending_sales", "[]");
-        JSONArray arr = new JSONArray(existingJson);
-        
+public void syncPendingSales() {
+    if (isSyncing) return;
+    isSyncing = true;
+
+    Context ctx = getContext();
+    if (ctx == null) {
+        isSyncing = false;
+        return;
+    }
+
+    executor.execute(() -> {
+        JSONArray arr = getPendingSalesArray();
         if (arr.length() == 0) {
-            updatePendingSalesBadge(0);
-            showToast(isArabic ? "✅ لا توجد مبيعات معلقة لهذا الفرع" : "✅ No pending sales for this branch");
+            safeRun(() -> {
+                isSyncing = false;
+                updateSyncUI();
+                Toast.makeText(ctx, isArabic ? "لا توجد مبيعات معلقة للمزامنة" : "No pending sales to sync", Toast.LENGTH_SHORT).show();
+            });
             return;
         }
-        
-        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
-        
-        new Thread(() -> {
-            int synced = 0;
-            int failed = 0;
-            JSONArray remaining = new JSONArray();
-            
-            // ✅✅✅ تفاصيل المزامنة
-            StringBuilder syncDetails = new StringBuilder();
-            syncDetails.append(isArabic ? "📋 تفاصيل المزامنة:\n\n" : "📋 Sync Details:\n\n");
-            
-            for (int i = 0; i < arr.length(); i++) {
-                try {
-                    JSONObject sale = arr.optJSONObject(i);
-                    if (sale == null) continue;
-                    
-                    String saleId = sale.optString("sale_id", "Unknown");
-                    int saleBranchId = sale.optInt("branch_id", -1);
-                    int saleUserId = sale.optInt("user_id", -1);
-                    String username = sale.optString("username", "Unknown");
-                    double amount = sale.optDouble("final_amount", 0);
-                    int itemCount = sale.optInt("item_count", 0);
-                    
-                    // ✅✅✅ التحقق من أن البيع يخص الفرع الحالي
-                    if (saleBranchId != currentBranchId) {
-                        // تخطي - ليس لهذا الفرع
-                        continue;
-                    }
-                    
-                    // ✅✅✅ تحديث حالة المزامنة
-                    sale.put("sync_status", "syncing");
-                    sale.put("sync_attempts", sale.optInt("sync_attempts", 0) + 1);
-                    sale.put("last_sync_attempt", System.currentTimeMillis());
-                    
+
+        int currentBranchId = UserSession.getInstance(ctx).getBranchId();
+        int synced = 0;
+        int failed = 0;
+        JSONArray remaining = new JSONArray();
+        StringBuilder syncDetails = new StringBuilder();
+
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject sale = arr.optJSONObject(i);
+            if (sale == null) continue;
+
+            try {
+                String saleId = sale.optString("sale_id", "Unknown");
+                int saleBranchId = sale.optInt("branch_id", -1);
+                int saleUserId = sale.optInt("user_id", -1);
+                String username = sale.optString("username", "Unknown");
+                double amount = sale.optDouble("final_amount", 0);
+                int itemCount = sale.optInt("item_count", 0);
+
+                if (saleBranchId != currentBranchId) {
+                    continue;
+                }
+
+                sale.put("sync_status", "syncing");
+                sale.put("sync_attempts", sale.optInt("sync_attempts", 0) + 1);
+                sale.put("last_sync_attempt", System.currentTimeMillis());
+
+                saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
+                              "syncing", isArabic ? "جاري المزامنة..." : "Syncing...");
+
+                JSONObject payload = sale.optJSONObject("payload");
+                if (payload == null) {
+                    failed++;
+                    sale.put("sync_status", "failed");
+                    sale.put("last_error", "Payload missing");
+                    remaining.put(sale);
                     saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
-                                  "syncing", isArabic ? "جاري المزامنة..." : "Syncing...");
-                    
-                    JSONObject payload = sale.optJSONObject("payload");
-                    if (payload == null) {
-                        failed++;
-                        sale.put("sync_status", "failed");
-                        sale.put("last_error", "Payload missing");
-                        remaining.put(sale);
-                        saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
-                                      "failed", isArabic ? "فشل - Payload مفقود" : "Failed - Payload missing");
-                        continue;
-                    }
-                    
-                    // ✅✅✅ إضافة branch_id و user_id للـ payload
-                    payload.put("branch_id", currentBranchId);
-                    payload.put("user_id", saleUserId);
-                    
-                    MiraApiClient client = MiraApiClient.getInstance(ctx);
-                    MiraApiClient.ApiResponse response = client.checkout(payload);
-                    
-                    if (response != null && response.isSuccess) {
-                        synced++;
-                        sale.put("sync_status", "synced");
-                        sale.put("last_error", "");
-                        
-                        syncDetails.append("✅ ").append(saleId)
-                            .append(" | 💰 ").append(priceManager.formatPriceDefault(amount))
-                            .append(" | 👤 ").append(username)
-                            .append("\n");
-                        
-                        saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
-                                      "synced", isArabic ? "تمت المزامنة بنجاح" : "Synced successfully");
-                    } else {
-                        failed++;
-                        String errorMsg = response != null ? (response.error != null ? response.error : "Unknown error") : "Network error";
-                        sale.put("sync_status", "failed");
-                        sale.put("last_error", errorMsg);
-                        remaining.put(sale);
-                        
-                        syncDetails.append("❌ ").append(saleId)
-                            .append(" | ").append(errorMsg)
-                            .append("\n");
-                        
-                        saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
-                                      "failed", errorMsg);
-                    }
-                } catch (Exception e) {
-    failed++;
-    JSONObject sale = arr.optJSONObject(i);
-    if (sale != null) {
-        try {
-            sale.put("sync_status", "failed");
-            sale.put("last_error", e.getMessage());
-        } catch (org.json.JSONException jsonException) {
-            Log.e(TAG, "JSON error: " + jsonException.getMessage());
-        }
-        remaining.put(sale);
-        
-        saveToSyncLog(sale.optString("sale_id", "Unknown"), currentBranchId, 
-                      sale.optInt("user_id", -1), sale.optString("username", "Unknown"),
-                      sale.optDouble("final_amount", 0), sale.optInt("item_count", 0),
-                      "failed", e.getMessage());
-    }
-}
+                                  "failed", isArabic ? "فشل - Payload مفقود" : "Failed - Payload missing");
+                    continue;
+                }
+
+                payload.put("branch_id", currentBranchId);
+                payload.put("user_id", saleUserId);
+
+                MiraApiClient client = MiraApiClient.getInstance(ctx);
+                MiraApiClient.ApiResponse response = client.checkout(payload);
+
+                if (response != null && response.isSuccess) {
+                    synced++;
+                    sale.put("sync_status", "synced");
+                    sale.put("last_error", "");
+
+                    syncDetails.append("✅ ").append(saleId)
+                        .append(" | 💰 ").append(priceManager.formatPriceDefault(amount))
+                        .append(" | 👤 ").append(username)
+                        .append("\n");
+
+                    saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
+                                  "synced", isArabic ? "تمت المزامنة بنجاح" : "Synced successfully");
+                } else {
+                    failed++;
+                    String errorMsg = response != null ? (response.error != null ? response.error : "Unknown error") : "Network error";
+                    sale.put("sync_status", "failed");
+                    sale.put("last_error", errorMsg);
+                    remaining.put(sale);
+
+                    syncDetails.append("❌ ").append(saleId)
+                        .append(" | ").append(errorMsg)
+                        .append("\n");
+
+                    saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
+                                  "failed", errorMsg);
+                }
+            } catch (Exception e) {
+                failed++;
+                try {
+                    sale.put("sync_status", "failed");
+                    sale.put("last_error", e.getMessage());
+                } catch (org.json.JSONException jsonException) {
+                    Log.e(TAG, "JSON error while handling sync exception: " + jsonException.getMessage());
+                }
+                remaining.put(sale);
+
+                saveToSyncLog(sale.optString("sale_id", "Unknown"), currentBranchId, 
+                              sale.optInt("user_id", -1), sale.optString("username", "Unknown"),
+                              sale.optDouble("final_amount", 0), sale.optInt("item_count", 0),
+                              "failed", e.getMessage());
             }
+        }
+
+        savePendingSalesArray(remaining);
+
+        final int finalSynced = synced;
+        final int finalFailed = failed;
+        final String details = syncDetails.toString();
+
+        safeRun(() -> {
+            isSyncing = false;
+            updateSyncUI();
+
+            String summaryMessage = (isArabic ? "تمت المزامنة: " : "Synced: ") + finalSynced + 
+                                   (isArabic ? " | فشل: " : " | Failed: ") + finalFailed;
             
-            // ✅✅✅ حفظ المتبقي
-            prefs.edit().putString("pending_sales", remaining.toString()).apply();
-            
-            // ✅✅✅ إضافة ملخص
-            syncDetails.append("\n").append(isArabic ? "📊 الملخص:\n" : "📊 Summary:\n")
-                .append(isArabic ? "✅ ناجح: " : "✅ Success: ").append(synced).append("\n")
-                .append(isArabic ? "❌ فشل: " : "❌ Failed: ").append(failed).append("\n")
-                .append(isArabic ? "📦 متبقي: " : "📦 Remaining: ").append(remaining.length()).append("\n");
-            
-            final int finalSynced = synced;
-            final int finalFailed = failed;
-            final int finalRemaining = remaining.length();
-            final String finalDetails = syncDetails.toString();
-            
-            safeRun(() -> {
-                if (loadingDialog != null) dismissDialog(loadingDialog);
-                updatePendingSalesBadge(finalRemaining);
-                
-                // ✅✅✅ عرض النتيجة المفصلة
-                showSuccessMessage(
-                    finalSynced > 0 ? "✅ المزامنة" : "❌ المزامنة",
-                    finalDetails,
-                    finalSynced > 0
-                );
-            });
-        }).start();
-        
-    } catch (Exception e) {
-        Log.e(TAG, "syncPendingSales error: " + e.getMessage());
-    }
+            Toast.makeText(ctx, summaryMessage, Toast.LENGTH_LONG).show();
+
+            if (finalSynced > 0 || finalFailed > 0) {
+                showSyncSummaryDialog(finalSynced, finalFailed, details);
+            }
+        });
+    });
 }
 
 /**
