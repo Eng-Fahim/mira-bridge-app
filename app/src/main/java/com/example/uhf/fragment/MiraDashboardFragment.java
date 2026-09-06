@@ -1129,10 +1129,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         
         Log.d(TAG, "Target fragment tag: " + tag);
         
-        // ✅ تسجيل في Firebase للتشخيص
-        FirebaseDiagnostics.log("QUICK_ACTION_TEST", "Testing action", 
-            "actionId=" + actionId + ", tag=" + tag);
-        
         // ✅ إنشاء الـ Fragment
         Fragment fragment = null;
         try {
@@ -1151,17 +1147,10 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         
         Log.d(TAG, "✅ Fragment created: " + fragment.getClass().getSimpleName());
         
-        // ✅ تحميل الـ Fragment مع قياس الوقت
-        long startTime = System.currentTimeMillis();
-        activity.loadFragment(fragment, tag);
-        long loadTime = System.currentTimeMillis() - startTime;
+        // ✅ استخدام navigateToFragment الموجود في الداشبورد
+        navigateToFragment(fragment, tag);
         
-        Log.d(TAG, "✅ Fragment loaded in " + loadTime + "ms");
-        
-        // ✅ رسالة نجاح للتشخيص
-        Toast.makeText(getContext(), 
-            "✅ تم فتح: " + tag + " (" + loadTime + "ms)", 
-            Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "✅ Navigation initiated to: " + tag);
         
     } catch (Exception e) {
         Log.e(TAG, "❌ handleQuickAction error: " + e.getMessage(), e);
@@ -1174,8 +1163,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         } catch (Exception ignored) {}
     }
 }
-    
-    
+
 
     private Fragment createFragmentForAction(String actionId) {
     try {
