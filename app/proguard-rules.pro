@@ -170,3 +170,13 @@
 -keepclassmembers class * {
     *** *();
 }
+
+# ==================== تجاهل الكلاسات الناقصة لـ Apache POI / Log4j / Commons ====================
+-dontwarn aQute.bnd.annotation.**
+-dontwarn org.osgi.**
+-dontwarn org.objectweb.asm.**
+-dontwarn java.awt.**
+-dontwarn com.graphbuilder.**
+-dontwarn org.apache.logging.log4j.**
+-dontwarn org.apache.commons.compress.**
+
