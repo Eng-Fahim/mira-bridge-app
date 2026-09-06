@@ -708,33 +708,42 @@ protected void onCreate(Bundle savedInstanceState) {
 
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
     if (isFinishing() || isDestroyed() || fragment == null) return;
-
+    
     try {
-        // ❌ لا showLoading إطلاقاً
         currentFragment = fragment;
         currentFragmentTag = tag;
-
+        
         if (!addToBackStack) {
             clearBackStack();
         }
-
+        
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.setCustomAnimations(0, 0, 0, 0);
         transaction.replace(R.id.fragment_container, fragment, tag);
-
+        
         if (addToBackStack) {
             transaction.addToBackStack(tag);
         }
-
-        transaction.commitNowAllowingStateLoss();
+        
+        // ✅ استخدام commit() مع executePendingTransactions للتأكيد الفوري
+        transaction.commit();
+        fragmentManager.executePendingTransactions();
         
         updateBottomNavSelectionByTag(tag);
-        
-        // ✅ إخفاء loading فوراً
         hideLoading();
-
+        
     } catch (Exception e) {
         Log.e(TAG, "Error switching fragment: " + e.getMessage(), e);
+        
+        // ✅ محاولة أخيرة
+        try {
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, fragment, tag);
+            transaction.commitNowAllowingStateLoss();
+            updateBottomNavSelectionByTag(tag);
+        } catch (Exception e2) {
+            Log.e(TAG, "Final fallback failed: " + e2.getMessage(), e2);
+        }
         hideLoading();
     }
 }
