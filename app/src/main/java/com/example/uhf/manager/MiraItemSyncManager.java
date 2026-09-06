@@ -51,9 +51,6 @@ public class MiraItemSyncManager {
         this.itemCache = MiraLocalItemCache.getInstance(context);
     }
     
-    /**
-     * ✅ مزامنة جميع القطع من السيرفر
-     */
     public void syncAllItems(SyncCallback callback) {
         this.callback = callback;
         
@@ -121,38 +118,37 @@ public class MiraItemSyncManager {
         });
     }
     
-    /**
-     * ✅ البحث عن قطعة - مع دعم branch_id صراحة
-     */
     public void findItem(String code, ItemLookupCallback callback) {
         findItem(code, getActiveBranchId(), callback);
     }
     
-    /**
-     * ✅✅✅ البحث عن قطعة مع تحديد الفرع
-     */
     public void findItem(String code, int branchId, ItemLookupCallback callback) {
         executor.execute(() -> {
             try {
-                // 1️⃣ البحث في السيرفر مع branch_id
+                Log.e(TAG, "🔍 findItem called: code=" + code + ", branchId=" + branchId);
+                
                 JSONObject payload = new JSONObject();
                 payload.put("epc", code);
                 payload.put("serial_no", code);
                 payload.put("branch_id", branchId);
                 payload.put("context", "pos_sale");
                 
+                Log.e(TAG, "📦 findItem payload: " + payload.toString());
+                
                 MiraApiClient.ApiResponse response = apiClient.searchPosItem(payload);
+                
+                Log.e(TAG, "📥 findItem response: code=" + response.code + ", success=" + response.isSuccess);
+                Log.e(TAG, "📥 findItem error: " + response.error);
+                Log.e(TAG, "📥 findItem body: " + response.getBody());
                 
                 // ✅ التحقق من أن القطعة في الفرع الصحيح
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject item = response.data.optJSONObject("item");
                     
                     if (item != null) {
-                        // ✅✅✅ التحقق من branch_id
                         int itemBranchId = item.optInt("branch_id", -1);
                         
                         if (itemBranchId <= 0 || itemBranchId == branchId) {
-                            // ✅ القطعة في الفرع الصحيح
                             itemCache.cacheItem(code, item);
                             
                             if (callback != null) {
@@ -160,7 +156,6 @@ public class MiraItemSyncManager {
                             }
                             return;
                         } else {
-                            // ❌ القطعة في فرع آخر
                             Log.w(TAG, "Item branch_id=" + itemBranchId + " != current branch=" + branchId);
                             if (callback != null) {
                                 callback.onItemNotFound();
@@ -171,9 +166,8 @@ public class MiraItemSyncManager {
                 }
                 
                 // 2️⃣ البحث في الكاش المحلي
-                JSONObject cachedItem = itemCache.findItem(code);
+                JSONObject cachedItem = itemCache.findItemComprehensive(code);
                 if (cachedItem != null) {
-                    // ✅ التحقق من branch_id في الكاش أيضاً
                     int cachedBranchId = cachedItem.optInt("branch_id", -1);
                     if (cachedBranchId <= 0 || cachedBranchId == branchId) {
                         if (callback != null) {
@@ -192,7 +186,7 @@ public class MiraItemSyncManager {
                 Log.e(TAG, "findItem error: " + e.getMessage(), e);
                 
                 // 4️⃣ خطأ اتصال - جرب الكاش
-                JSONObject cachedItem = itemCache.findItem(code);
+                JSONObject cachedItem = itemCache.findItemComprehensive(code);
                 if (cachedItem != null) {
                     int cachedBranchId = cachedItem.optInt("branch_id", -1);
                     if (cachedBranchId <= 0 || cachedBranchId == branchId) {
