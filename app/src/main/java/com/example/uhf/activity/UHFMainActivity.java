@@ -499,39 +499,65 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
 
-            if (fabActionCenter != null) {
-                boolean hasQuickActions = pm.getAllowedQuickActions().size() > 0;
-                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-                fabActionCenter.setEnabled(hasQuickActions);
-                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-            }
-
-            if (quickNav != null) {
-                applyBottomNavPermissions(quickNav, pm);
-
-                quickNav.setOnItemSelectedListener(item -> {
-    int id = item.getItemId();
-    
-    String tag = getFragmentTagForNavItem(id);
-    Fragment fragment = createFragmentByTag(tag);
-    
-    if (fragment != null) {
-        loadFragment(fragment, tag, false);
-        return true;
-    }
-    return false;
-});
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+        if (fabActionCenter != null) {
+            boolean hasQuickActions = pm.getAllowedQuickActions().size() > 0;
+            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+            fabActionCenter.setEnabled(hasQuickActions);
+            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
         }
+
+        if (quickNav != null) {
+            applyBottomNavPermissions(quickNav, pm);
+
+            quickNav.setOnItemSelectedListener(item -> {
+                int id = item.getItemId();
+                String fragmentTag = getFragmentTagForNavItem(id);
+                
+                if (fragmentTag.isEmpty()) {
+                    Toast.makeText(this, "⚠️ عنصر غير معروف", Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+
+                if (!pm.canAccessFragment(fragmentTag)) {
+                    showPermissionDenied();
+                    return false;
+                }
+
+                if (id == R.id.nav_home) {
+                    checkInventoryLockAndExecute(() -> {
+                        clearBackStack();
+                        loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+                    });
+                    return true;
+                } else if (id == R.id.nav_inventory) {
+                    checkInventoryLockAndExecute(() -> {
+                        loadFragment(new MiraInventoryProFragment(), "Scan");
+                    });
+                    return true;
+                } else if (id == R.id.nav_sales) {
+                    checkInventoryLockAndExecute(() -> {
+                        loadFragment(new MiraPosFragment(), "POS");
+                    });
+                    return true;
+                } else if (id == R.id.nav_transfers) {
+                    checkInventoryLockAndExecute(() -> {
+                        loadFragment(new MiraTransferFragment(), "Transfers");
+                    });
+                    return true;
+                }
+                return false;
+            });
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
 
     private void setupRestartButton() {
         try {
@@ -621,7 +647,9 @@ protected void onCreate(Bundle savedInstanceState) {
         PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
         MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
-        // ✅ برمجة RFID
+        List<String> allowedActions = pm.getAllowedQuickActions();
+
+        // 1. برمجة RFID
         View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
         if (btnRfidWrite != null) {
             boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
@@ -629,51 +657,51 @@ protected void onCreate(Bundle savedInstanceState) {
             if (allowed) {
                 btnRfidWrite.setOnClickListener(v -> {
                     dialog.dismiss();
-                    loadFragment(createFragmentByTag("RFIDWrite"), "RFIDWrite");
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
                 });
             }
         }
 
-        // ✅ باقي الأزرار - استخدم createFragmentByTag مباشرة
+        // 2. باقي الأزرار - استخدم نفس النمط القديم
         applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
-                quickAccess.isActionEnabled("rfid"),
-                null, "RfidBindings");
+                allowedActions.contains("rfid") && quickAccess.isActionEnabled("rfid"),
+                new MiraRfidBindingsFragment(), "RfidBindings");
 
         applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
-                quickAccess.isActionEnabled("identity"),
-                null, "IdentityStudio");
+                allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
+                new MiraIdentityStudioFragment(), "IdentityStudio");
 
         applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
-                quickAccess.isActionEnabled("radar"),
-                null, "Radar");
+                allowedActions.contains("radar") && quickAccess.isActionEnabled("radar"),
+                new MiraUHFRadarLocationFragment(), "Radar");
 
         applyQuickActionButton(view, R.id.btnSecureGate, dialog,
-                quickAccess.isActionEnabled("gate"),
-                null, "SecureGate");
+                allowedActions.contains("gate") && quickAccess.isActionEnabled("gate"),
+                new MiraSecureGateFragment(), "SecureGate");
 
         applyQuickActionButton(view, R.id.btnReports, dialog,
-                quickAccess.isActionEnabled("reports"),
-                null, "Reports");
+                allowedActions.contains("reports") && quickAccess.isActionEnabled("reports"),
+                new MiraReportsProFragment(), "Reports");
 
         applyQuickActionButton(view, R.id.btnAccounting, dialog,
-                quickAccess.isActionEnabled("accounting"),
-                null, "Accounting");
+                allowedActions.contains("accounting") && quickAccess.isActionEnabled("accounting"),
+                new MiraAccountingFragment(), "Accounting");
 
         applyQuickActionButton(view, R.id.btnTransfer, dialog,
-                quickAccess.isActionEnabled("transfers"),
-                null, "Transfers");
+                allowedActions.contains("transfers") && quickAccess.isActionEnabled("transfers"),
+                new MiraTransferFragment(), "Transfers");
 
         applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
-                quickAccess.isActionEnabled("sales_history"),
-                null, "SalesHistory");
+                allowedActions.contains("sales_history") && quickAccess.isActionEnabled("sales_history"),
+                new MiraSalesHistoryFragment(), "SalesHistory");
 
         applyQuickActionButton(view, R.id.btnAdminHub, dialog,
-                quickAccess.isActionEnabled("admin_hub"),
-                null, "AdminHub");
+                allowedActions.contains("admin_hub") && quickAccess.isActionEnabled("admin_hub"),
+                new MiraAdminHubFragment(), "AdminHub");
 
         applyQuickActionButton(view, R.id.btnServerConfig, dialog,
-                quickAccess.isActionEnabled("server_config"),
-                null, "ServerConfig");
+                allowedActions.contains("server_config") && quickAccess.isActionEnabled("server_config"),
+                new MiraServerConfigFragment(), "ServerConfig");
 
         View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
         if (fabCloseSheet != null) {
@@ -686,7 +714,7 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 }
 
-// ✅ تعديل applyQuickActionButton
+// ✅ هذا هو الكود الصحيح - استخدمه كما هو
 private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
                                     boolean allowed, Fragment fragment, String tag) {
     View btn = root.findViewById(viewId);
@@ -695,11 +723,7 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
         if (allowed) {
             btn.setOnClickListener(v -> {
                 dialog.dismiss();
-                // ✅ استخدم createFragmentByTag بدلاً من fragment المباشر
-                Fragment actualFragment = createFragmentByTag(tag);
-                if (actualFragment != null) {
-                    loadFragment(actualFragment, tag);
-                }
+                checkInventoryLockAndExecute(() -> loadFragment(fragment, tag));
             });
         }
     }
@@ -714,7 +738,6 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
     if (isFinishing() || isDestroyed() || fragment == null) return;
 
     try {
-        // ❌ لا showLoading إطلاقاً
         currentFragment = fragment;
         currentFragmentTag = tag;
 
@@ -733,8 +756,6 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
         transaction.commitNowAllowingStateLoss();
         
         updateBottomNavSelectionByTag(tag);
-        
-        // ✅ إخفاء loading فوراً
         hideLoading();
 
     } catch (Exception e) {
