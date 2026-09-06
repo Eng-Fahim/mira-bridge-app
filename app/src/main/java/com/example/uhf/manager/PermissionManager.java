@@ -307,6 +307,31 @@ public class PermissionManager {
     public boolean canManageQuickAccess() {
         return isAdmin() || isBranchManager();
     }
+    
+    public boolean canViewRfidBindings() {
+    return isAdmin() || isInventoryManager() || isManager();
+}
+
+public boolean canAccessIdentityStudio() {
+    return isAdmin() || isInventoryManager() || isManager();
+}
+
+public boolean canAccessRadar() {
+    return isAdmin() || isSecurity() || isInventoryManager() || isManager();
+}
+
+public boolean canAccessGate() {
+    return isAdmin() || isSecurity() || isGateSecurity();
+}
+
+public boolean canAccessAccounting() {
+    return isAdmin() || isManager() || isAuditor();
+}
+
+public boolean canAccessTransfers() {
+    return isAdmin() || isManager() || isInventoryManager();
+}
+
 
     // ==================== فحص الوصول للواجهات (محدث وآمن مرن) ====================
 
