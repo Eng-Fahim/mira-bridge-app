@@ -35,6 +35,14 @@
 -keep public class * implements com.bumptech.glide.module.GlideModule
 -keep class * extends com.bumptech.glide.module.AppGlideModule
 
+# ==================== ZXing Barcode Generation ====================
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+
+# ==================== MLKit Barcode Scanning ====================
+-keep class com.google.mlkit.vision.barcode.** { *; }
+-dontwarn com.google.mlkit.vision.**
+
 # ==================== نماذج البيانات الخاصة بالتطبيق ====================
 # تم تخصيص الإبقاء للحقول والمتغيرات فقط بدلاً من الكلاس بأكمله لتسهيل الضغط
 -keepclassmembers class com.mira.jewelry.enterprise.models.** {
@@ -57,10 +65,3 @@
 -assumenosideeffects class okhttp3.internal.concurrent.TaskRunner {
     public static void logger(...);
 }
-# ==================== ZXing Barcode Generation ====================
--keep class com.google.zxing.** { *; }
--dontwarn com.google.zxing.**
-
-# ==================== MLKit Barcode Scanning ====================
--keep class com.google.mlkit.vision.barcode.** { *; }
--dontwarn com.google.mlkit.vision.**
