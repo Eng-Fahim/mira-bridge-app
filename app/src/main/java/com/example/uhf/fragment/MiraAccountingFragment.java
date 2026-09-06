@@ -36,7 +36,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.tabs.TabLayout;
-import com.google.firebase.crashlytics.FirebaseCrashlytics;
+
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -607,7 +607,7 @@ public class MiraAccountingFragment extends Fragment {
     private void logNonFatal(String location, Throwable throwable) {
         try {
             Log.e(TAG, location + ": " + throwable.getMessage(), throwable);
-            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+            
             crashlytics.setCustomKey("error_location", location);
             crashlytics.setCustomKey("fragment", "MiraAccountingFragment");
             crashlytics.recordException(throwable);
@@ -707,4 +707,4 @@ public class MiraAccountingFragment extends Fragment {
             }
         }
     }
-    }
+}
