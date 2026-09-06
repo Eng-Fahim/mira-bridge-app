@@ -3,8 +3,6 @@ package com.example.uhf.tools;
 import android.content.Context;
 import android.util.Log;
 
-import com.example.uhf.tools.FirebaseDiagnostics;
-
 /**
  * SessionManager - كلاس التوافق الوسيط
  * 
@@ -60,33 +58,19 @@ public class SessionManager {
     }
 
     public String getAuthToken() {
-        String token = secureManager.getAuthToken();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Get Auth Token", 
-            "result=" + (token != null && !token.isEmpty() ? "PRESENT" : "EMPTY"));
-        
-        return token;
+        return secureManager.getAuthToken();
     }
 
-    // ✅ فحص صلاحية التوكن مع التتبع المطور
+    // ✅ فحص صلاحية التوكن
     public boolean hasValidToken() {
-        boolean valid = secureManager.hasValidToken();
-        
-        // ✅ تتبع تفصيلي
-        FirebaseDiagnostics.log("SESSION", "Check Valid Token", "result=" + valid);
-        
-        return valid;
+        return secureManager.hasValidToken();
     }
 
     // ✅ فحص وجود جلسة محلية قابلة للاستخدام في الأوفلاين
     public boolean hasOfflineSession() {
         String lastUser = getLastBiometricUser();
         String lastToken = getLastBiometricToken();
-        boolean hasOffline = (lastUser != null && !lastUser.isEmpty()) || (lastToken != null && !lastToken.isEmpty());
-        
-        FirebaseDiagnostics.log("SESSION", "Check Offline Session", "hasOffline=" + hasOffline);
-        return hasOffline;
+        return (lastUser != null && !lastUser.isEmpty()) || (lastToken != null && !lastToken.isEmpty());
     }
 
     // ✅ فحص الحاجة للتجديد
@@ -97,12 +81,7 @@ public class SessionManager {
     // ==================== الأدوار ====================
     
     public SecureSessionManager.Role getUserRole() {
-        SecureSessionManager.Role role = secureManager.getUserRole();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Get User Role", "role=" + (role != null ? role.name() : "null"));
-        
-        return role;
+        return secureManager.getUserRole();
     }
 
     public String getRoleString() {
@@ -114,9 +93,6 @@ public class SessionManager {
     }
 
     public void setRole(String role) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Set Role", "role=" + role);
-        
         secureManager.setRole(role);
     }
 
@@ -139,35 +115,18 @@ public class SessionManager {
     // ==================== بيانات المستخدم ====================
     
     public String getDisplayName() {
-        String displayName = secureManager.getDisplayName();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Get Display Name", 
-            "result=" + (displayName != null && !displayName.isEmpty() ? displayName : "EMPTY"));
-        
-        return displayName;
+        return secureManager.getDisplayName();
     }
 
     public void setDisplayName(String displayName) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Set Display Name", "name=" + displayName);
-        
         secureManager.setDisplayName(displayName);
     }
 
     public int getUserId() {
-        int userId = secureManager.getUserId();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Get User ID", "result=" + userId);
-        
-        return userId;
+        return secureManager.getUserId();
     }
 
     public void setUserId(int userId) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Set User ID", "userId=" + userId);
-        
         secureManager.setUserId(userId);
     }
 
@@ -182,19 +141,10 @@ public class SessionManager {
     // ==================== عنوان الخادم ====================
     
     public String getServerUrl() {
-        String serverUrl = secureManager.getServerUrl();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Get Server URL", 
-            "result=" + (serverUrl != null && !serverUrl.isEmpty() ? serverUrl : "EMPTY"));
-        
-        return serverUrl;
+        return secureManager.getServerUrl();
     }
 
     public void setServerUrl(String url) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Set Server URL", "url=" + url);
-        
         secureManager.setServerUrl(url);
     }
 
@@ -205,39 +155,19 @@ public class SessionManager {
     // ==================== API Key ====================
     
     public void saveApiKey(String apiKey) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Save API Key", 
-            "key=" + (apiKey != null && !apiKey.isEmpty() ? "PRESENT" : "EMPTY"));
-        
         secureManager.saveApiKey(apiKey);
     }
 
     public String getApiKey() {
-        String apiKey = secureManager.getApiKey();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Get API Key", 
-            "result=" + (apiKey != null && !apiKey.isEmpty() ? "PRESENT" : "EMPTY"));
-        
-        return apiKey;
+        return secureManager.getApiKey();
     }
 
     public boolean hasApiKey() {
-        boolean hasKey = secureManager.hasApiKey();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Check API Key", "result=" + hasKey);
-        
-        return hasKey;
+        return secureManager.hasApiKey();
     }
 
     public void clearApiKey() {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Clear API Key", "Clearing...");
-        
         secureManager.clearApiKey();
-        
-        FirebaseDiagnostics.log("SESSION", "API Key Cleared", "Done");
     }
 
     public void saveApiKeyInfo(String apiKey, String keyId, String keyPrefix, String createdAt) {
@@ -255,9 +185,6 @@ public class SessionManager {
     // ==================== Gate ID ====================
     
     public void saveGateId(String gateId) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Save Gate ID", "gateId=" + gateId);
-        
         secureManager.saveGateId(gateId);
     }
 
@@ -268,9 +195,6 @@ public class SessionManager {
     // ==================== تذكر اسم المستخدم ====================
     
     public void saveLastUsername(String username) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Save Last Username", "username=" + username);
-        
         secureManager.saveLastUsername(username);
     }
 
@@ -309,9 +233,6 @@ public class SessionManager {
     }
 
     public void saveBiometricUser(String username, String role, String displayName, int userId, String token) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Save Biometric User", "user=" + username);
-        
         secureManager.saveBiometricUser(username, role, displayName, userId, token);
     }
 
@@ -350,68 +271,42 @@ public class SessionManager {
     // ==================== تسجيل الخروج ====================
     
     public void logoutUser() {
-        // ✅ تتبع - مهم جداً
-        String username = secureManager.getUsername();
-        FirebaseDiagnostics.log("SESSION", "Logout Started", "user=" + (username != null ? username : "null"));
-        FirebaseDiagnostics.logSessionState("BEFORE_LOGOUT", username, true);
-        
         secureManager.logoutUser();
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Logout Completed", "All session data cleared");
-        FirebaseDiagnostics.logSessionState("AFTER_LOGOUT", null, false);
+        Log.d(TAG, "User logged out successfully");
     }
 
     public void logout() {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Logout Called", "Calling logoutUser()");
-        
         logoutUser();
     }
 
-    // ==================== وظائف مساعدة جديدة لحماية الأوفلاين ====================
+    // ==================== وظائف مساعدة لحماية الأوفلاين ====================
     
     public void refreshProfileData() {
         // يمكن إضافة منطق إضافي هنا إذا لزم
     }
 
     public void clearAll() {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Clear All", "Clearing all data...");
-        
         secureManager.clearAll();
-        
-        FirebaseDiagnostics.log("SESSION", "Clear All Completed", "Done");
     }
     
     /**
      * مسح التوكن نهائياً
      */
     public void clearAuthToken() {
-        FirebaseDiagnostics.log("SESSION", "Clear Auth Token", "Clearing permanently...");
         secureManager.clearAuthToken();
-        FirebaseDiagnostics.log("SESSION", "Auth Token Cleared", "Done");
     }
     
     /**
      * مسح الجلسة بالكامل
      */
     public void clearSessionCompletely() {
-        FirebaseDiagnostics.log("SESSION", "Clear Session", "Clearing completely...");
         secureManager.clearSessionCompletely();
-        FirebaseDiagnostics.log("SESSION", "Session Cleared", "Done");
     }
-// ==================== إنشاء جلسة دخول ====================
 
-public void createLoginSession(String username, String role, String token, String serverUrl) {
-    FirebaseDiagnostics.log("SESSION", "Creating Login Session", 
-        "user=" + username + ", role=" + role + ", token=" + (token != null && !token.isEmpty() ? "PRESENT" : "EMPTY"));
-    
-    secureManager.createLoginSession(username, role, token, serverUrl);
-    
-    FirebaseDiagnostics.logSessionState("AFTER_CREATE", username, true);
-    Log.d(TAG, "Login session created for user: " + username);
+    // ==================== إنشاء جلسة دخول ====================
+
+    public void createLoginSession(String username, String role, String token, String serverUrl) {
+        secureManager.createLoginSession(username, role, token, serverUrl);
+        Log.d(TAG, "Login session created for user: " + username);
+    }
 }
-    
-
-}  // ✅ قوس واحد فقط
