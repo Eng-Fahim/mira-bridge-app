@@ -37,7 +37,6 @@ import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
-import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.json.JSONObject;
 
@@ -51,7 +50,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
-import com.example.uhf.tools.FirebaseDiagnostics;
 
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -106,7 +104,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private long lastDataFetchTime = 0, lastGoldFetchTime = 0, lastPingTime = 0;
     private int consecutiveFailures = 0;
 
-    // Safe Non-Leaking Formatters (Instantiated per call or safely cached locally without ThreadLocal static leaks)
     private SimpleDateFormat getDateFormatter() {
         return isArabic ? new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")) : new SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US);
     }
@@ -205,8 +202,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     private void initializeManagers() {
         try {
-            FirebaseDiagnostics.log("MANAGER", "Dashboard Initialize Managers", "Starting");
-            
             if (!isAdded()) return;
             Context context = requireContext();
             apiClient = MiraApiClient.getInstance(context);
@@ -220,18 +215,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             branchPrefs = context.getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
-        
-            FirebaseDiagnostics.logManagerState("MiraApiClient", apiClient != null ? "NOT_NULL" : "NULL");
-            FirebaseDiagnostics.logManagerState("SessionManager", sessionManager != null ? "NOT_NULL" : "NULL");
-            FirebaseDiagnostics.logManagerState("PermissionManager", permissionManager != null ? "NOT_NULL" : "NULL");
             
             boolean isLoggedIn = sessionManager != null && sessionManager.isLoggedIn();
-            FirebaseDiagnostics.logSessionState("DASHBOARD_INIT", 
-                sessionManager != null ? sessionManager.getUsername() : null, 
-                isLoggedIn);
-            
+            Log.d(TAG, "Dashboard Initialized. Logged in: " + isLoggedIn);
         } catch (Exception e) {
-            FirebaseDiagnostics.logError("MiraDashboardFragment.initializeManagers", e);
+            logNonFatal("MiraDashboardFragment.initializeManagers", e);
         }
     }
 
@@ -318,59 +306,42 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
     
     private void setupQuickAccessGrid() {
-    try {
-        if (quickAccessSettings == null || quickAdapter == null) return;
-        
-        sharedExecutor.execute(() -> {
-            try {
-                if (!isAdded()) return;
-                
-                // ✅ الحصول على جميع الإجراءات المفعّلة
-                List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
-                List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
-                
-                Log.d(TAG, "=== DEBUG: Total enabled actions: " + 
-                    (enabledActions != null ? enabledActions.size() : 0) + " ===");
-                
-                // ✅ عرض جميع الإجراءات المفعّلة
-                if (enabledActions != null && !enabledActions.isEmpty()) {
-                    for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
-                        // ✅ التحقق من الصلاحية
-                        String fragmentTag = getFragmentTagForAction(action.id);
-                        boolean hasPermission = permissionManager == null || 
-                            permissionManager.canAccessFragment(fragmentTag);
-                        
-                        if (hasPermission) {
-                            filteredActions.add(action);
-                            Log.d(TAG, "✅ Allowed: " + action.id + " (" + action.titleEn + ")");
-                        } else {
-                            Log.w(TAG, "⛔ Denied: " + action.id + " - no permission for " + fragmentTag);
+        try {
+            if (quickAccessSettings == null || quickAdapter == null) return;
+            
+            sharedExecutor.execute(() -> {
+                try {
+                    if (!isAdded()) return;
+                    
+                    List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+                    List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
+                    
+                    if (enabledActions != null && !enabledActions.isEmpty()) {
+                        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+                            String fragmentTag = getFragmentTagForAction(action.id);
+                            boolean hasPermission = permissionManager == null || permissionManager.canAccessFragment(fragmentTag);
+                            
+                            if (hasPermission) {
+                                filteredActions.add(action);
+                            }
                         }
                     }
+                    
+                    mainHandler.post(() -> {
+                        if (isAdded() && quickAdapter != null) {
+                            quickAdapter.submitList(filteredActions);
+                        }
+                    });
+                    
+                } catch (Exception e) {
+                    logNonFatal("setupQuickAccessGrid.inner", e);
                 }
-                
-                // ✅ عرض النتيجة
-                Log.d(TAG, "=== Actions to display: " + filteredActions.size() + " ===");
-                for (MiraQuickAccessSettings.QuickAction action : filteredActions) {
-                    Log.d(TAG, "  📱 " + action.id + " - " + action.titleEn);
-                }
-                
-                mainHandler.post(() -> {
-                    if (isAdded() && quickAdapter != null) {
-                        quickAdapter.submitList(filteredActions);
-                        Log.d(TAG, "✅ Adapter updated with " + filteredActions.size() + " action(s)");
-                    }
-                });
-                
-            } catch (Exception e) {
-                logNonFatal("setupQuickAccessGrid.inner", e);
-            }
-        });
-        
-    } catch (Exception e) {
-        logNonFatal("setupQuickAccessGrid", e);
+            });
+            
+        } catch (Exception e) {
+            logNonFatal("setupQuickAccessGrid", e);
+        }
     }
-}
 
     private void loadDataIfNeeded() {
         try {
@@ -698,9 +669,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     private void fetchData() {
         try {
-            FirebaseDiagnostics.log("API", "Dashboard fetchData started", 
-                "branchId=" + (branchesManager != null ? branchesManager.getActiveBranchId() : -1));
-            
             if (isLoading.get() || apiClient == null || !isAdded()) return;
 
             if (sessionManager == null || !sessionManager.isLoggedIn() || !sessionManager.hasValidToken()) {
@@ -732,29 +700,20 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                         if (!isAdded()) return;
 
                         if (response != null && response.code == 401) {
-                            FirebaseDiagnostics.logApiCall("getDashboardFull", 401, false, "Token expired");
                             handleTokenExpired();
                             return;
                         }
 
                         if (response != null && response.isSuccess && response.data != null) {
-                            FirebaseDiagnostics.logApiCall("getDashboardFull", response.code, true, "Success");
-                            
                             saveOfflineData(response.data);
                             processData(response.data);
                             isDataLoaded = true;
                             consecutiveFailures = 0;
                             updateLiveStatusText(true);
-                            clearCrashlyticsCustomKeys();
                             
                             showShimmer(false);
                             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         } else {
-                            FirebaseDiagnostics.logApiCall("getDashboardFull", 
-                                response != null ? response.code : -1, 
-                                false, 
-                                "Failed");
-                            
                             if (response == null || response.code != 401) {
                                 logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
                             }
@@ -767,7 +726,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
                 } catch (Exception e) {
-                    FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData.thread", e);
                     logNonFatal("fetchData.thread", e);
                     
                     mainHandler.post(() -> {
@@ -788,7 +746,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 }
             });
         } catch (Exception e) {
-            FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData", e);
             logNonFatal("fetchData", e);
             isLoading.set(false);
         }
@@ -872,7 +829,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                             }
 
                             updateLiveStatusText(true);
-                            clearCrashlyticsCustomKeys();
                         } else {
                             updateLiveStatusText(false);
                             loadOfflineData();
@@ -900,27 +856,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    private void clearCrashlyticsCustomKeys() {
-        try {
-            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
-            crashlytics.setCustomKey("api_response_code", 0);
-            crashlytics.setCustomKey("active_branch_id", 0);
-            crashlytics.setCustomKey("api_endpoint", "");
-            crashlytics.setCustomKey("error_type", "");
-            crashlytics.setCustomKey("api_error_message", "");
-            crashlytics.setCustomKey("exception_class", "");
-        } catch (Exception e) {
-            Log.e(TAG, "clearCrashlyticsCustomKeys error: " + e.getMessage());
-        }
-    }
-
     private void logNonFatal(String location, Throwable throwable) {
         try {
-            Log.e(TAG, location + ": " + throwable.getMessage(), throwable);
-            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
-            crashlytics.setCustomKey("error_location", location);
-            crashlytics.setCustomKey("fragment", "MiraDashboardFragment");
-            crashlytics.recordException(throwable);
+            Log.e(TAG, "Error at " + location + ": " + throwable.getMessage(), throwable);
         } catch (Exception e) {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
@@ -1109,88 +1047,51 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void handleQuickAction(String actionId) {
-    try {
-        Log.d(TAG, "=== QUICK ACTION CLICKED ===");
-        Log.d(TAG, "Action ID: " + actionId);
-        
-        if (actionId == null || actionId.isEmpty()) {
-            Log.e(TAG, "❌ Action ID is null or empty");
-            return;
-        }
-        
-        if (getActivity() == null || !(getActivity() instanceof UHFMainActivity)) {
-            Log.e(TAG, "❌ Activity is not available");
-            return;
-        }
-        
-        UHFMainActivity activity = (UHFMainActivity) getActivity();
-        String tag = getFragmentTagForAction(actionId);
-        
-        Log.d(TAG, "Target fragment tag: " + tag);
-        
-        // ✅ تسجيل في Firebase للتشخيص
-        FirebaseDiagnostics.log("QUICK_ACTION_TEST", "Testing action", 
-            "actionId=" + actionId + ", tag=" + tag);
-        
-        // ✅ إنشاء الـ Fragment
-        Fragment fragment = null;
         try {
-            fragment = activity.createFragmentByTag(tag);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error creating fragment: " + e.getMessage(), e);
-        }
-        
-        if (fragment == null) {
-            Log.e(TAG, "❌ Failed to create fragment for: " + tag);
-            Toast.makeText(getContext(), 
-                isArabic ? "⚠️ تعذر فتح هذه الواجهة" : "⚠️ Cannot open this screen", 
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        Log.d(TAG, "✅ Fragment created: " + fragment.getClass().getSimpleName());
-        
-        // ✅ تحميل الـ Fragment مع قياس الوقت
-        long startTime = System.currentTimeMillis();
-        activity.loadFragment(fragment, tag);
-        long loadTime = System.currentTimeMillis() - startTime;
-        
-        Log.d(TAG, "✅ Fragment loaded in " + loadTime + "ms");
-        
-        // ✅ رسالة نجاح للتشخيص
-        Toast.makeText(getContext(), 
-            "✅ تم فتح: " + tag + " (" + loadTime + "ms)", 
-            Toast.LENGTH_SHORT).show();
-        
-    } catch (Exception e) {
-        Log.e(TAG, "❌ handleQuickAction error: " + e.getMessage(), e);
-        logNonFatal("handleQuickAction", e);
-        
-        try {
-            Toast.makeText(getContext(), 
-                isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen", 
-                Toast.LENGTH_SHORT).show();
-        } catch (Exception ignored) {}
-    }
-}
-    
-    
-
-    private Fragment createFragmentForAction(String actionId) {
-    try {
-        // ✅ استخدم createFragmentByTag من UHFMainActivity
-        if (getActivity() instanceof UHFMainActivity) {
+            if (actionId == null || actionId.isEmpty()) return;
+            if (getActivity() == null || !(getActivity() instanceof UHFMainActivity)) return;
+            
             UHFMainActivity activity = (UHFMainActivity) getActivity();
             String tag = getFragmentTagForAction(actionId);
-            return activity.createFragmentByTag(tag);
+            
+            Fragment fragment = null;
+            try {
+                fragment = activity.createFragmentByTag(tag);
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating fragment: " + e.getMessage(), e);
+            }
+            
+            if (fragment == null) {
+                Toast.makeText(getContext(), 
+                    isArabic ? "⚠️ تعذر فتح هذه الواجهة" : "⚠️ Cannot open this screen", 
+                    Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            activity.loadFragment(fragment, tag);
+            
+        } catch (Exception e) {
+            logNonFatal("handleQuickAction", e);
+            try {
+                Toast.makeText(getContext(), 
+                    isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen", 
+                    Toast.LENGTH_SHORT).show();
+            } catch (Exception ignored) {}
         }
-    } catch (Exception e) {
-        Log.e(TAG, "createFragmentForAction error: " + e.getMessage());
     }
-    
-    // ✅ Fallback - Dashboard
-    return new MiraDashboardFragment();
-}
+
+    private Fragment createFragmentForAction(String actionId) {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                String tag = getFragmentTagForAction(actionId);
+                return activity.createFragmentByTag(tag);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "createFragmentForAction error: " + e.getMessage());
+        }
+        return new MiraDashboardFragment();
+    }
 
     private String getSourceDisplayName(String source) {
         if (source == null) return isArabic ? "غير معروف" : "Unknown";
@@ -1340,4 +1241,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("cancelFuture", e);
         }
     }
-                    }
+}
