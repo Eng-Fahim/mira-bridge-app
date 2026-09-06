@@ -31,7 +31,6 @@ public class SessionManager {
     }
 
     public boolean isLoggedIn() {
-        // ✅ تخزين مؤقت
         long now = System.currentTimeMillis();
         if (cachedLoggedIn != null && (now - lastCheckTime) < CACHE_VALIDITY) {
             return cachedLoggedIn;
@@ -43,7 +42,6 @@ public class SessionManager {
     }
 
     public String getUsername() {
-        // ✅ تخزين مؤقت
         long now = System.currentTimeMillis();
         if (cachedUsername != null && (now - lastCheckTime) < CACHE_VALIDITY) {
             return cachedUsername;
@@ -61,19 +59,16 @@ public class SessionManager {
         return secureManager.getAuthToken();
     }
 
-    // ✅ فحص صلاحية التوكن
     public boolean hasValidToken() {
         return secureManager.hasValidToken();
     }
 
-    // ✅ فحص وجود جلسة محلية قابلة للاستخدام في الأوفلاين
     public boolean hasOfflineSession() {
         String lastUser = getLastBiometricUser();
         String lastToken = getLastBiometricToken();
         return (lastUser != null && !lastUser.isEmpty()) || (lastToken != null && !lastToken.isEmpty());
     }
 
-    // ✅ فحص الحاجة للتجديد
     public boolean needsTokenRefresh() {
         return secureManager.needsTokenRefresh();
     }
@@ -268,6 +263,40 @@ public class SessionManager {
         return secureManager.getLastBiometricBranchName();
     }
 
+    // ==================== معرف الفرع ====================
+    
+    /**
+     * ✅ الحصول على معرف الفرع الحالي
+     */
+    public int getBranchId() {
+        try {
+            // ✅ الطريقة 1: من SharedPreferences مباشرة
+            android.content.SharedPreferences prefs = context.getSharedPreferences(
+                "mira_secure_session", 
+                Context.MODE_PRIVATE
+            );
+            return prefs.getInt("branch_id", -1);
+        } catch (Exception e) {
+            Log.e(TAG, "getBranchId error: " + e.getMessage());
+            return -1;
+        }
+    }
+
+    /**
+     * ✅ حفظ معرف الفرع الحالي
+     */
+    public void setBranchId(int branchId) {
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences(
+                "mira_secure_session", 
+                Context.MODE_PRIVATE
+            );
+            prefs.edit().putInt("branch_id", branchId).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "setBranchId error: " + e.getMessage());
+        }
+    }
+
     // ==================== تسجيل الخروج ====================
     
     public void logoutUser() {
@@ -295,7 +324,7 @@ public class SessionManager {
     public void clearAuthToken() {
         secureManager.clearAuthToken();
     }
-    
+
     /**
      * مسح الجلسة بالكامل
      */
