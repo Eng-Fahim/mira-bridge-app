@@ -84,12 +84,6 @@ import java.util.List;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
-private static final boolean ENABLE_DASHBOARD = true;      // ✅ مفعل
-private static final boolean ENABLE_INVENTORY = true;      // ✅ مفعل
-private static final boolean ENABLE_POS = true;           // ❌ معطل مؤقتاً
-private static final boolean ENABLE_TRANSFERS = true;     // ❌ معطل مؤقتاً
-private static final boolean ENABLE_OTHER = true;         // ❌ معطل مؤقتاً
-
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
     private static final String PREFS_NAVIGATION = "app_navigation";
@@ -190,7 +184,7 @@ private static final boolean ENABLE_OTHER = true;         // ❌ معطل مؤق
         super.attachBaseContext(newBase);
     }
 
-   @Override
+    @Override
 protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
 
@@ -202,8 +196,19 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+
         setContentView(R.layout.activity_main);
 
+        // ✅ إخفاء loading_overlay فوراً بعد setContentView
+        //loadingOverlay = findViewById(R.id.loading_overlay);
+        if (loadingOverlay != null) {
+            loadingOverlay.setVisibility(View.GONE);
+            loadingOverlay.setAlpha(0.0f);
+            loadingOverlay.setClickable(false);
+            loadingOverlay.setFocusable(false);
+        }
+
+        // بدء مراقبة التجمد
         AppWatchdog.getInstance().startMonitoring(() -> {
             Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
             MiraApplication.getInstance().restartApp();
@@ -212,17 +217,16 @@ protected void onCreate(Bundle savedInstanceState) {
         ToastUtil.init(getApplicationContext());
         initializeLanguageState();
 
+        SessionMonitorManager.getInstance(this).startMonitoring(this);
         branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
-        
-        // ✅ إصلاح: تهيئة fragmentManager بشكل صحيح
-        fragmentManager = getSupportFragmentManager();
-        
-        // ✅ إضافة: التحقق من أن fragmentManager ليس null
-        if (fragmentManager == null) {
-            Log.e(TAG, "❌ FragmentManager is null!");
-            Toast.makeText(this, "Error: FragmentManager is null", Toast.LENGTH_SHORT).show();
-            return;
+        if (branchesManager != null) {
+            lastActiveBranchId = branchesManager.getActiveBranchId();
         }
+
+        fragmentManager = getSupportFragmentManager();
+
+        setupOrgProfileListener();
+        updateBottomNavLanguage();
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
@@ -230,8 +234,27 @@ protected void onCreate(Bundle savedInstanceState) {
             updateToolbarTitle();
         }
 
+        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+        if (btnHardwareStatus != null) {
+            btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+        }
+
+        checkReadWritePermission();
+        mainHandler.postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                safeExecute(this::initSound, "Sound Init Error");
+                if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+                    safeExecute(this::initUHF, "UHF Hardware Init Error");
+                    safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+                }
+            }
+        }, 500);
+
+        PermissionManager.resetInstance();
         setupQuickNav();
-        setupRestartButton(); // ✅ إضافة هذا السطر
+        setupRestartButton();
+
+        loadEssentialData();
 
         if (savedInstanceState == null) {
             currentFragmentTag = "Dashboard";
@@ -239,16 +262,18 @@ protected void onCreate(Bundle savedInstanceState) {
             currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
         }
 
-        // ✅ تحميل الـ Fragment الحقيقي
+        // ✅ تحميل الـ Fragment مباشرة
         loadFragmentDirectly(createFragmentByTag(currentFragmentTag), currentFragmentTag);
 
     } catch (Exception e) {
         Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+        // ✅ محاولة أخيرة
         try {
             loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
         } catch (Exception ignored) {}
     }
 }
+
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
@@ -435,41 +460,37 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
 
-        if (id == R.id.action_dashboard) {
-            checkInventoryLockAndExecute(() -> {
-                clearBackStack();
-                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            });
-            return true;
-        } else if (id == R.id.action_branches) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesManagementFragment(), "Branches"));
-            return true;
-        } else if (id == R.id.action_gold_rates) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
-            return true;
-        } else if (id == R.id.action_quick_access_settings) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
-            return true;
-        } else if (id == R.id.action_toggle_language) {
-            toggleLanguage();
-            return true;
-        } else if (id == R.id.UHF_ver) {
-            showUHFVersionDialog();
-            return true;
-        } else if (id == R.id.action_profile) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
-            return true;
-        } else if (id == R.id.action_logout) {
-            confirmLogout();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+    if (id == R.id.action_dashboard) {
+        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+        return true;
+    } else if (id == R.id.action_branches) {
+        loadFragmentDirectly(new MiraBranchesManagementFragment(), "Branches");
+        return true;
+    } else if (id == R.id.action_gold_rates) {
+        loadFragmentDirectly(new MiraGoldCurrencyFragment(), "GoldRates");
+        return true;
+    } else if (id == R.id.action_quick_access_settings) {
+        loadFragmentDirectly(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+        return true;
+    } else if (id == R.id.action_toggle_language) {
+        toggleLanguage();
+        return true;
+    } else if (id == R.id.UHF_ver) {
+        showUHFVersionDialog();
+        return true;
+    } else if (id == R.id.action_profile) {
+        loadFragmentDirectly(new MiraProfileFragment(), "Profile");
+        return true;
+    } else if (id == R.id.action_logout) {
+        confirmLogout();
+        return true;
     }
 
+    return super.onOptionsItemSelected(item);
+}
     private void toggleLanguage() {
         try {
             String newLang = isArabic ? "en" : "ar";
@@ -517,38 +538,12 @@ protected void onCreate(Bundle savedInstanceState) {
 
             quickNav.setOnItemSelectedListener(item -> {
                 int id = item.getItemId();
-                String fragmentTag = getFragmentTagForNavItem(id);
                 
-                if (fragmentTag.isEmpty()) {
-                    Toast.makeText(this, "⚠️ عنصر غير معروف", Toast.LENGTH_SHORT).show();
-                    return false;
-                }
-
-                if (!pm.canAccessFragment(fragmentTag)) {
-                    showPermissionDenied();
-                    return false;
-                }
-
-                if (id == R.id.nav_home) {
-                    checkInventoryLockAndExecute(() -> {
-                        clearBackStack();
-                        loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-                    });
-                    return true;
-                } else if (id == R.id.nav_inventory) {
-                    checkInventoryLockAndExecute(() -> {
-                        loadFragment(new MiraInventoryProFragment(), "Scan");
-                    });
-                    return true;
-                } else if (id == R.id.nav_sales) {
-                    checkInventoryLockAndExecute(() -> {
-                        loadFragment(new MiraPosFragment(), "POS");
-                    });
-                    return true;
-                } else if (id == R.id.nav_transfers) {
-                    checkInventoryLockAndExecute(() -> {
-                        loadFragment(new MiraTransferFragment(), "Transfers");
-                    });
+                String tag = getFragmentTagForNavItem(id);
+                Fragment fragment = createFragmentByTag(tag);
+                
+                if (fragment != null) {
+                    loadFragmentDirectly(fragment, tag);
                     return true;
                 }
                 return false;
@@ -610,20 +605,21 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
-    Menu menu = quickNav.getMenu();
+        Menu menu = quickNav.getMenu();
 
-    MenuItem navHome = menu.findItem(R.id.nav_home);
-    if (navHome != null) navHome.setVisible(true);
+        MenuItem navHome = menu.findItem(R.id.nav_home);
+        if (navHome != null) navHome.setVisible(pm.canViewDashboard());
 
-    MenuItem navInventory = menu.findItem(R.id.nav_inventory);
-    if (navInventory != null) navInventory.setVisible(true);
+        MenuItem navInventory = menu.findItem(R.id.nav_inventory);
+        if (navInventory != null) navInventory.setVisible(pm.canViewInventory());
 
-    MenuItem navSales = menu.findItem(R.id.nav_sales);
-    if (navSales != null) navSales.setVisible(true);
+        MenuItem navSales = menu.findItem(R.id.nav_sales);
+        if (navSales != null) navSales.setVisible(pm.canUsePos() || pm.canViewSalesHistory());
 
-    MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
-    if (navTransfers != null) navTransfers.setVisible(true);
-}
+        MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
+        if (navTransfers != null) navTransfers.setVisible(pm.canViewTransfers());
+    }
+
     private String getFragmentTagForNavItem(int itemId) {
         if (itemId == R.id.nav_home) return "Dashboard";
         if (itemId == R.id.nav_inventory) return "Scan";
@@ -638,71 +634,56 @@ protected void onCreate(Bundle savedInstanceState) {
                 Toast.LENGTH_SHORT).show();
     }
 
-        private void showQuickActionMenu() {
+    private void showQuickActionMenu() {
     try {
         BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
         View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
         dialog.setContentView(view);
 
-        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
-
-        List<String> allowedActions = pm.getAllowedQuickActions();
-
         // 1. برمجة RFID
         View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
         if (btnRfidWrite != null) {
-            boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
-            btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
-            if (allowed) {
-                btnRfidWrite.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
-                });
-            }
+            btnRfidWrite.setVisibility(View.VISIBLE);
+            btnRfidWrite.setOnClickListener(v -> {
+                dialog.dismiss();
+                mainHandler.postDelayed(() -> {
+                    loadFragmentDirectly(new MiraUHFReadWriteFragment(), "RFIDWrite");
+                }, 100);
+            });
         }
 
-        // 2. باقي الأزرار - استخدم نفس النمط القديم
+        // 2. باقي الأزرار - بدون checkInventoryLockAndExecute
         applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
-                allowedActions.contains("rfid") && quickAccess.isActionEnabled("rfid"),
                 new MiraRfidBindingsFragment(), "RfidBindings");
-
+        
         applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
-                allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
                 new MiraIdentityStudioFragment(), "IdentityStudio");
-
+        
         applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
-                allowedActions.contains("radar") && quickAccess.isActionEnabled("radar"),
                 new MiraUHFRadarLocationFragment(), "Radar");
-
+        
         applyQuickActionButton(view, R.id.btnSecureGate, dialog,
-                allowedActions.contains("gate") && quickAccess.isActionEnabled("gate"),
                 new MiraSecureGateFragment(), "SecureGate");
-
+        
         applyQuickActionButton(view, R.id.btnReports, dialog,
-                allowedActions.contains("reports") && quickAccess.isActionEnabled("reports"),
                 new MiraReportsProFragment(), "Reports");
-
+        
         applyQuickActionButton(view, R.id.btnAccounting, dialog,
-                allowedActions.contains("accounting") && quickAccess.isActionEnabled("accounting"),
                 new MiraAccountingFragment(), "Accounting");
-
+        
         applyQuickActionButton(view, R.id.btnTransfer, dialog,
-                allowedActions.contains("transfers") && quickAccess.isActionEnabled("transfers"),
                 new MiraTransferFragment(), "Transfers");
-
+        
         applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
-                allowedActions.contains("sales_history") && quickAccess.isActionEnabled("sales_history"),
                 new MiraSalesHistoryFragment(), "SalesHistory");
-
+        
         applyQuickActionButton(view, R.id.btnAdminHub, dialog,
-                allowedActions.contains("admin_hub") && quickAccess.isActionEnabled("admin_hub"),
                 new MiraAdminHubFragment(), "AdminHub");
-
+        
         applyQuickActionButton(view, R.id.btnServerConfig, dialog,
-                allowedActions.contains("server_config") && quickAccess.isActionEnabled("server_config"),
                 new MiraServerConfigFragment(), "ServerConfig");
 
+        // زر الإغلاق
         View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
         if (fabCloseSheet != null) {
             fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
@@ -714,21 +695,22 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 }
 
-// ✅ هذا هو الكود الصحيح - استخدمه كما هو
+// ✅ بدون checkInventoryLockAndExecute
 private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
-                                    boolean allowed, Fragment fragment, String tag) {
+                                    Fragment fragment, String tag) {
     View btn = root.findViewById(viewId);
     if (btn != null) {
-        btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
-        if (allowed) {
-            btn.setOnClickListener(v -> {
-                dialog.dismiss();
-                checkInventoryLockAndExecute(() -> loadFragment(fragment, tag));
-            });
-        }
+        btn.setVisibility(View.VISIBLE);
+        btn.setOnClickListener(v -> {
+            dialog.dismiss();
+            mainHandler.postDelayed(() -> {
+                loadFragmentDirectly(fragment, tag);
+            }, 100);
+        });
     }
 }
 
+    
 
     public void loadFragment(Fragment fragment, String tag) {
     loadFragment(fragment, tag, true);
@@ -738,6 +720,7 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
     if (isFinishing() || isDestroyed() || fragment == null) return;
 
     try {
+        // ❌ لا showLoading إطلاقاً
         currentFragment = fragment;
         currentFragmentTag = tag;
 
@@ -756,6 +739,8 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
         transaction.commitNowAllowingStateLoss();
         
         updateBottomNavSelectionByTag(tag);
+        
+        // ✅ إخفاء loading فوراً
         hideLoading();
 
     } catch (Exception e) {
@@ -763,111 +748,24 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
         hideLoading();
     }
 }
-
 private void loadFragmentDirectly(Fragment fragment, String tag) {
     try {
-        if (fragment == null) {
-            Log.e(TAG, "❌ Cannot load null fragment");
-            return;
-        }
-        
-        if (fragmentManager == null) {
-            fragmentManager = getSupportFragmentManager();
-        }
-        
-        if (fragmentManager == null) {
-            Log.e(TAG, "❌ FragmentManager is null");
-            return;
-        }
-        
-        Log.d(TAG, "🔄 Loading fragment directly: " + tag);
-        
         currentFragment = fragment;
         currentFragmentTag = tag;
         
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.replace(R.id.fragment_container, fragment, tag);
-        
-        // ✅ استخدام commitNow للحصول على نتيجة فورية
-        transaction.commitNowAllowingStateLoss();
+        transaction.commitNow();
         
         updateBottomNavSelectionByTag(tag);
         hideLoading();
         
-        Log.d(TAG, "✅ Fragment loaded directly: " + tag);
-        
-        // ✅ التحقق بعد التحميل
-        mainHandler.postDelayed(() -> verifyFragmentLoading(tag), 200);
-        
+        Log.d(TAG, "Fragment loaded directly: " + tag);
     } catch (Exception e) {
-        Log.e(TAG, "❌ Direct load error for " + tag + ": " + e.getMessage(), e);
-        
-        // ✅ محاولة بديلة
-        try {
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.replace(R.id.fragment_container, fragment, tag);
-            transaction.commit();
-            Log.d(TAG, "✅ Fragment loaded with commit(): " + tag);
-        } catch (Exception fallbackError) {
-            Log.e(TAG, "❌ Fallback load failed: " + fallbackError.getMessage(), fallbackError);
-            Toast.makeText(this, "Error loading screen", Toast.LENGTH_SHORT).show();
-        }
-        
+        Log.e(TAG, "Direct load error: " + e.getMessage(), e);
         hideLoading();
     }
 }
-
-/**
- * ✅ طريقة آمنة لتحميل الأجزاء مع تتبع الأخطاء
- */
-private void loadFragmentSafely(Fragment fragment, String tag) {
-    try {
-        Log.d(TAG, "📦 Loading fragment: " + tag);
-        
-        // ✅ التحقق من صحة النشاط
-        if (isFinishing() || isDestroyed()) {
-            Log.e(TAG, "❌ Activity is finishing or destroyed");
-            return;
-        }
-        
-        // ✅ التحقق من صحة الجزء
-        if (fragment == null) {
-            Log.e(TAG, "❌ Fragment is null");
-            return;
-        }
-        
-        // ✅ إعادة تهيئة fragmentManager إذا كان null
-        if (fragmentManager == null) {
-            Log.w(TAG, "⚠️ FragmentManager is null, reinitializing...");
-            fragmentManager = getSupportFragmentManager();
-        }
-        
-        // ✅ التحقق من وجود مدير الأجزاء
-        if (fragmentManager == null) {
-            Log.e(TAG, "❌ FragmentManager is still null");
-            Toast.makeText(this, "Error: FragmentManager not available", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        // ✅ التحقق من وجود الحاوية
-        View container = findViewById(R.id.fragment_container);
-        if (container == null) {
-            Log.e(TAG, "❌ Fragment container not found");
-            Toast.makeText(this, "Error: Fragment container not found", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        // ✅ تحميل الجزء مباشرة
-        loadFragmentDirectly(fragment, tag);
-        
-        Log.d(TAG, "✅ Fragment loaded successfully: " + tag);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "❌ Error loading fragment " + tag + ": " + e.getMessage(), e);
-        Toast.makeText(this, "Error loading: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-    }
-}
-
     private void loadFragmentByTag(String tag) {
         try {
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
@@ -887,52 +785,34 @@ private void loadFragmentSafely(Fragment fragment, String tag) {
         }
     }
 
-    public Fragment createFragmentByTag(String tag) {
-    if (tag == null) return new MiraDashboardFragment();
+    private Fragment createFragmentByTag(String tag) {
+        if (tag == null) return new MiraDashboardFragment();
 
-    switch (tag) {
-        case "Dashboard":
-            if (ENABLE_DASHBOARD) return new MiraDashboardFragment();
-            return new MiraDashboardFragment(); // ✅ دائماً يعمل
-
-        case "Scan":
-            if (ENABLE_INVENTORY) return new MiraInventoryProFragment();
-            return new MiraDashboardFragment(); // ✅ بديل مؤقت
-
-        case "POS":
-            if (ENABLE_POS) return new MiraPosFragment();
-            return new MiraDashboardFragment();
-
-        case "Transfers":
-            if (ENABLE_TRANSFERS) return new MiraTransferFragment();
-            return new MiraDashboardFragment();
-
-        default:
-            if (ENABLE_OTHER) {
-                // ✅ تفعيل الكل
-                switch (tag) {
-                    case "IdentityStudio": return new MiraIdentityStudioFragment();
-                    case "Radar": return new MiraUHFRadarLocationFragment();
-                    case "SecureGate": return new MiraSecureGateFragment();
-                    case "Reports": return new MiraReportsProFragment();
-                    case "Accounting": return new MiraAccountingFragment();
-                    case "AdminHub": return new MiraAdminHubFragment();
-                    case "SalesHistory": return new MiraSalesHistoryFragment();
-                    case "ServerConfig": return new MiraServerConfigFragment();
-                    case "GoldRates": return new MiraGoldCurrencyFragment();
-                    case "Profile": return new MiraProfileFragment();
-                    case "UsersManagement": return new UsersManagementFragment();
-                    case "RFIDWrite": return new MiraUHFReadWriteFragment();
-                    case "ReaderSetup": return new MiraReaderSetupFragment();
-                    case "GateSettings": return new MiraGateSettingsFragment();
-                    case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
-                    case "Branches": return new MiraBranchesManagementFragment();
-                    case "RfidBindings": return new MiraRfidBindingsFragment();
-                }
-            }
-            return new MiraDashboardFragment();
+        switch (tag) {
+            case "Dashboard": return new MiraDashboardFragment();
+            case "Branches": return new MiraBranchesManagementFragment();
+            case "RfidBindings": return new MiraRfidBindingsFragment();
+            case "Scan": return new MiraInventoryProFragment();
+            case "POS": return new MiraPosFragment();
+            case "Transfers": return new MiraTransferFragment();
+            case "IdentityStudio": return new MiraIdentityStudioFragment();
+            case "Radar": return new MiraUHFRadarLocationFragment();
+            case "SecureGate": return new MiraSecureGateFragment();
+            case "Reports": return new MiraReportsProFragment();
+            case "Accounting": return new MiraAccountingFragment();
+            case "AdminHub": return new MiraAdminHubFragment();
+            case "SalesHistory": return new MiraSalesHistoryFragment();
+            case "ServerConfig": return new MiraServerConfigFragment();
+            case "GoldRates": return new MiraGoldCurrencyFragment();
+            case "Profile": return new MiraProfileFragment();
+            case "UsersManagement": return new UsersManagementFragment();
+            case "RFIDWrite": return new MiraUHFReadWriteFragment();
+            case "ReaderSetup": return new MiraReaderSetupFragment();
+            case "GateSettings": return new MiraGateSettingsFragment();
+            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+            default: return new MiraDashboardFragment();
+        }
     }
-}
 
     private void showUHFVersionDialog() {
         String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
@@ -1432,28 +1312,6 @@ public void hideLoading() {
         }
     }
     
-    /**
- * ✅ طريقة للتحقق من تحميل الأجزاء
- */
-private void verifyFragmentLoading(String tag) {
-    try {
-        Fragment fragment = fragmentManager.findFragmentByTag(tag);
-        if (fragment != null && fragment.isAdded()) {
-            Log.d(TAG, "✅ Fragment verified: " + tag + " is added and visible");
-        } else {
-            Log.e(TAG, "❌ Fragment NOT found: " + tag);
-            
-            // ✅ محاولة إعادة التحميل
-            Fragment newFragment = createFragmentByTag(tag);
-            if (newFragment != null) {
-                loadFragmentDirectly(newFragment, tag);
-                Log.d(TAG, "🔄 Fragment reloaded: " + tag);
-            }
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Error verifying fragment: " + e.getMessage());
-    }
-}
     @Override
     protected void onDestroy() {
         try {
