@@ -702,9 +702,18 @@ private void refreshData() {
     /**
  * ✅ البحث عن قطعة - يدعم الأوفلاين
  */
+ 
 private void processRingEpc(final String code, final String source) {
     if (code == null || code.trim().isEmpty() || !isAdded()) return;
     final String cleanCode = code.trim();
+    
+    // ✅✅✅ طباعة بداية البحث
+    Log.e(TAG, "🔍🔍🔍 PROCESS RING EPC START 🔍🔍🔍");
+    Log.e(TAG, "📦 Code: " + cleanCode);
+    Log.e(TAG, "📦 Source: " + source);
+    Log.e(TAG, "📦 Branch ID: " + getActiveBranchId());
+    Log.e(TAG, "📦 Session Valid: " + (sessionManager != null && sessionManager.isLoggedIn()));
+    Log.e(TAG, "📦 Auth Token: " + (sessionManager != null && sessionManager.getAuthToken() != null && !sessionManager.getAuthToken().isEmpty() ? "SET" : "EMPTY"));
      // ✅✅✅ فحص إضافي: القطعة مباعة محلياً؟
     if (isItemSoldLocally(cleanCode)) {
         safeRun(() -> {
