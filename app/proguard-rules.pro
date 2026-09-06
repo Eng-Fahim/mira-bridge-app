@@ -57,3 +57,10 @@
 -assumenosideeffects class okhttp3.internal.concurrent.TaskRunner {
     public static void logger(...);
 }
+# ==================== ZXing Barcode Generation ====================
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+
+# ==================== MLKit Barcode Scanning ====================
+-keep class com.google.mlkit.vision.barcode.** { *; }
+-dontwarn com.google.mlkit.vision.**
