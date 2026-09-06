@@ -35,17 +35,17 @@
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:layout_marginEnd="8dp"
-                    android:background="@drawable/bg_restart_badge"
+                    android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
-                    android:paddingHorizontal="10dp">
+                    android:paddingHorizontal="8dp">
 
                     <ImageView
                         android:layout_width="16dp"
                         android:layout_height="16dp"
                         android:src="@drawable/ic_restart"
-                        android:tint="?attr/colorOnPrimary" />
+                        app:tint="?attr/colorOnPrimary" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -63,11 +63,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:layout_marginEnd="12dp"
-                    android:background="@drawable/bg_hardware_badge"
+                    android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
-                    android:paddingHorizontal="10dp">
+                    android:paddingHorizontal="8dp">
 
                     <View
                         android:layout_width="8dp"
@@ -86,7 +86,7 @@
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-                <!-- حاوية المحتوى -->
+        <!-- حاوية المحتوى - تم تعديل الخلفية لتتوافق تلقائياً مع الوضع الداكن -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="match_parent"
@@ -94,8 +94,7 @@
             android:layout_weight="1"
             android:clipToPadding="false"
             android:paddingBottom="85dp"
-            android:background="@android:color/white" />
-
+            android:background="?attr/colorSurface" />
 
     </LinearLayout>
 
