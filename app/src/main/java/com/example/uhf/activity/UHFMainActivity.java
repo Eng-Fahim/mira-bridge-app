@@ -825,7 +825,7 @@ private void loadFragmentDirectly(Fragment fragment, String tag) {
         }
     }
 
-    private Fragment createFragmentByTag(String tag) {
+    public Fragment createFragmentByTag(String tag) {
         if (tag == null) return new MiraDashboardFragment();
 
         switch (tag) {
