@@ -1253,7 +1253,6 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                 MiraApiClient client = MiraApiClient.getInstance(ctx);
                 SessionManager sessionManager = new SessionManager(ctx);
                 
-                // ✅ بناء payload
                 JSONObject payload = new JSONObject();
                 payload.put("action", "COMPLETE_POS_SALE");
                 payload.put("gate_id", client.getGateId());
@@ -1261,9 +1260,13 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                 payload.put("user_id", sessionManager.getUserId());
                 payload.put("username", sessionManager.getUsername());
                 
+                // ✅ إصلاح بيانات العميل (إرسال مباشر + داخل كائن)
+                payload.put("customer_name", data.customerName != null && !data.customerName.isEmpty() ? data.customerName : "عميل نقدي");
+                payload.put("customer_phone", data.customerPhone != null ? data.customerPhone : "-");
+                
                 JSONObject customer = new JSONObject();
-                customer.put("name", data.customerName);
-                customer.put("phone", data.customerPhone);
+                customer.put("name", payload.getString("customer_name"));
+                customer.put("phone", payload.getString("customer_phone"));
                 customer.put("payment_method", data.paymentMethod);
                 payload.put("customer", customer);
                 
@@ -1281,31 +1284,30 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                 }
                 payload.put("items", itemsArr);
                 
+                // ✅ إصلاح تفاصيل الدفع والعملة والتفقيط
                 JSONObject payment = new JSONObject();
                 payment.put("subtotal_usd", data.originalTotal);
                 payment.put("discount_amount_usd", data.discountAmount);
                 payment.put("final_amount_usd", data.finalAmount);
+                payment.put("currency_code", priceManager != null ? priceManager.getCurrencySymbol() : "YER");
+                payment.put("currency_name", isArabic ? "ريال يمني" : "Yemeni Rial");
                 payment.put("payment_method", data.paymentMethod);
                 payload.put("payment", payment);
                 
-                // ✅✅✅ حفظ البيع محلياً أولاً
                 final String localSaleId = saveSaleLocally(payload, data);
                 
-                // ✅ محاولة الإرسال للسيرفر
                 MiraApiClient.ApiResponse response = null;
                 boolean isNetworkError = false;
                 String errorMsg = "";
                 
                 try {
                     response = client.checkout(payload);
-                    
                     if (response != null) {
                         isNetworkError = response.isNetworkError;
                         errorMsg = response.error != null ? response.error : 
                                   (response.message != null ? response.message : "Unknown error");
                     }
                 } catch (Exception e) {
-                    // ✅ فشل الاتصال
                     isNetworkError = true;
                     errorMsg = e.getMessage();
                 }
@@ -1320,24 +1322,17 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                     setButtonsEnabled(true);
                     
                     if (finalIsSuccess) {
-    // ✅ نجاح البيع أونلاين
-    removeSaleFromLocal(localSaleId);
-    removeSoldItemsFromCache(); // 👈 أضف هذا السطر هنا لتحديث الكاش محلياً
-    
-    playAlertSound(1);
-    clearCart();
-    showReceipt(finalResponse);
-    
-} else if (finalIsNetworkError || finalResponse == null) {
-    // ✅ حفظ البيع أوفلاين
-    removeSoldItemsFromCache(); // 👈 وأضف هذا السطر هنا أيضاً
-    
-    playAlertSound(1);
-    clearCart();
-    showOfflineSaleSuccess(localSaleId, data);
-}
- else {
-                        // ❌ خطأ من السيرفر (ليس أوفلاين) - إعادة محاولة
+                        removeSaleFromLocal(localSaleId);
+                        removeSoldItemsFromCache();
+                        playAlertSound(1);
+                        clearCart();
+                        showReceipt(finalResponse);
+                    } else if (finalIsNetworkError || finalResponse == null) {
+                        removeSoldItemsFromCache();
+                        playAlertSound(1);
+                        clearCart();
+                        showOfflineSaleSuccess(localSaleId, data);
+                    } else {
                         showRetryDialog(
                             isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
                             finalErrorMsg,
@@ -1362,6 +1357,7 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
         Log.e(TAG, "executeCheckout error: " + e.getMessage());
     }
 }
+
 
 // ==================== الدوال المساعدة ====================
 
