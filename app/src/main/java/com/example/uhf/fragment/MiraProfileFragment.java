@@ -42,7 +42,6 @@ import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.imageview.ShapeableImageView;
-import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.json.JSONObject;
 
@@ -79,7 +78,7 @@ public class MiraProfileFragment extends Fragment {
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
-    private boolean isBindingTheme = false; // 🟢 لمنع إعادة التكرار عند تغيير المظهر برمجيًا
+    private boolean isBindingTheme = false; // لمنع إعادة التكرار عند تغيير المظهر برمجيًا
     
     private boolean isArabic = true;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
@@ -222,7 +221,6 @@ public class MiraProfileFragment extends Fragment {
             });
         }
         
-        // 🟢 مستمع المظهر محمي من التكرار الدائري
         if (radioThemeGroup != null) {
             radioThemeGroup.setOnCheckedChangeListener((group, checkedId) -> {
                 if (isDestroyed.get() || isBindingTheme) return;
@@ -308,7 +306,7 @@ public class MiraProfileFragment extends Fragment {
             SharedPreferences prefs = requireContext().getSharedPreferences("app_theme", Context.MODE_PRIVATE);
             int mode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
             
-            isBindingTheme = true; // تفعيل الحماية من الاحداث
+            isBindingTheme = true;
             if (mode == AppCompatDelegate.MODE_NIGHT_NO && radioThemeLight != null) {
                 radioThemeLight.setChecked(true);
             } else if (mode == AppCompatDelegate.MODE_NIGHT_YES && radioThemeDark != null) {
@@ -333,7 +331,6 @@ public class MiraProfileFragment extends Fragment {
         }
     }
 
-    // 🟢 قراءة الصورة خلف الكواليس لتفادي التوقف اللحظي في الواجهة
     private void loadUserAvatar() {
         executeSafely(() -> {
             try {
@@ -360,7 +357,6 @@ public class MiraProfileFragment extends Fragment {
         });
     }
 
-    // 🟢 ضغط حجم الصورة وتصغير أبعادها لتفادي نفاد الذاكرة
     private void uploadProfileImage(Uri imageUri) {
         showLoading(true);
         
@@ -380,7 +376,6 @@ public class MiraProfileFragment extends Fragment {
                     return;
                 }
 
-                // تصغير أبعاد الصورة إذا كانت كبيرة جداً (أقصى عرض 512px)
                 int maxDimension = 512;
                 if (bitmap.getWidth() > maxDimension || bitmap.getHeight() > maxDimension) {
                     float ratio = Math.min((float) maxDimension / bitmap.getWidth(), (float) maxDimension / bitmap.getHeight());
@@ -802,15 +797,7 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void logNonFatal(String location, Throwable throwable) {
-        try {
-            Log.e(TAG, location + ": " + throwable.getMessage(), throwable);
-            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
-            crashlytics.setCustomKey("error_location", location);
-            crashlytics.setCustomKey("fragment", "MiraProfileFragment");
-            crashlytics.recordException(throwable);
-        } catch (Exception e) {
-            Log.e(TAG, "logNonFatal error: " + e.getMessage());
-        }
+        Log.e(TAG, "Location: " + location + " | Error: " + throwable.getMessage(), throwable);
     }
 
     @Override
