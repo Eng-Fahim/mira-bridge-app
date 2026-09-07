@@ -106,6 +106,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private boolean isArabic = true;
 
     private String currentFragmentTag = "Dashboard";
+    private Fragment currentFragment;
 
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
@@ -578,44 +579,52 @@ if (btnHardwareStatus != null) {
         loadFragment(fragment, tag, true);
     }
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed() || fragment == null) return;
+    /**
+ * تعديل دالة loadFragment لتعرض السنابر أثناء الانتقال بين الـ Fragments
+ */
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-        try {
-            currentFragment = fragment;
-            currentFragmentTag = tag;
+    try {
+        // 1. إظهار السنابر فور بدء التنقل
+        showLoading();
 
-            if (!addToBackStack) {
-                clearBackStack();
-            }
+        currentFragment = fragment;
+        currentFragmentTag = tag;
 
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.setCustomAnimations(0, 0, 0, 0);
-            transaction.replace(R.id.fragment_container, fragment, tag);
-
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-
-            transaction.commit();
-            fragmentManager.executePendingTransactions();
-
-            updateBottomNavSelectionByTag(tag);
-            hideLoading();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error switching fragment: " + e.getMessage(), e);
-            try {
-                FragmentTransaction transaction = fragmentManager.beginTransaction();
-                transaction.replace(R.id.fragment_container, fragment, tag);
-                transaction.commitNowAllowingStateLoss();
-                updateBottomNavSelectionByTag(tag);
-            } catch (Exception e2) {
-                Log.e(TAG, "Final fallback failed: " + e2.getMessage(), e2);
-            }
-            hideLoading();
+        if (!addToBackStack) {
+            clearBackStack();
         }
+
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.setCustomAnimations(0, 0, 0, 0);
+        transaction.replace(R.id.fragment_container, fragment, tag);
+
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
+        }
+
+        transaction.commit();
+
+        // 2. إخفاء السنابر بعد اكتمال رسم الواجهة الجديدة بـ 250ms لضمان سلاسة التنقل
+        mainHandler.postDelayed(this::hideLoading, 250);
+
+        updateBottomNavSelectionByTag(tag);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error switching fragment: " + e.getMessage(), e);
+        try {
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, fragment, tag);
+            transaction.commitNowAllowingStateLoss();
+            updateBottomNavSelectionByTag(tag);
+        } catch (Exception e2) {
+            Log.e(TAG, "Final fallback failed: " + e2.getMessage(), e2);
+        }
+        hideLoading();
     }
+}
+
 
     private void loadFragmentDirectly(Fragment fragment, String tag) {
         try {
@@ -1002,9 +1011,48 @@ public void playSoundDelayed(int value) {
         }
     }
 
-    public void showLoading() {}
+    // ==========================================
+// 🔄 التحكم بسنابر / مؤشر التحميل (Loading Indicator)
+// ==========================================
 
-    public void hideLoading() {}
+/**
+ * إظهار سنابر التحميل عند بدء أي عملية أو تنقل
+ */
+public void showLoading() {
+    mainHandler.post(() -> {
+        try {
+            View loadingOverlay = findViewById(R.id.successOverlayMain);
+            if (loadingOverlay != null) {
+                // إظهار المؤشر الدوار الموجود داخل successOverlayMain أو تخصيصه
+                loadingOverlay.setVisibility(View.VISIBLE);
+                loadingOverlay.setAlpha(1.0f);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing loading: " + e.getMessage());
+        }
+    });
+}
+
+/**
+ * إخفاء سنابر التحميل بسلاسة بعد اكتمال التحميل
+ */
+public void hideLoading() {
+    mainHandler.post(() -> {
+        try {
+            View loadingOverlay = findViewById(R.id.successOverlayMain);
+            if (loadingOverlay != null && loadingOverlay.getVisibility() == View.VISIBLE) {
+                loadingOverlay.animate()
+                        .alpha(0.0f)
+                        .setDuration(200)
+                        .withEndAction(() -> loadingOverlay.setVisibility(View.GONE))
+                        .start();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error hiding loading: " + e.getMessage());
+        }
+    });
+}
+
 
     public void setActivePOSFragment(MiraPosFragment fragment) {
         this.activePOSFragment = fragment;
