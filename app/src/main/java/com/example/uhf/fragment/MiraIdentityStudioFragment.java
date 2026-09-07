@@ -851,6 +851,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         if (success) {
                             playSuccessSound();
                             executorService.execute(() -> removePendingEncode(finalEpc));
+                            notifyDashboardUpdate("encode_success");
                             
                             if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
                                 uploadItemImages(finalServerItemId, finalPhotoPaths);
@@ -1860,10 +1861,15 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             offlineCache.edit().putString("pending_encodes", remainingArr.toString()).apply();
 
             final int s = synced;
-            safeRun(() -> {
-                updatePendingSyncBadge();
-                if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
-            });
+safeRun(() -> {
+    updatePendingSyncBadge();
+    if (s > 0) {
+        showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
+        
+        // ✅✅✅ أضف هذا - تحديث الداشبورد
+        notifyDashboardUpdate("encode_sync");
+    }
+});
         } catch (Exception e) {
             Log.e(TAG, "Sync encodes error: " + e.getMessage(), e);
         }
@@ -1891,6 +1897,50 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
+/**
+ * ✅ إرسال إشارة تحديث الداشبورد بعد التكويد
+ */
+private void notifyDashboardUpdate(String source) {
+    try {
+        if (!isAdded() || getContext() == null) return;
+        
+        Context ctx = getContext();
+        int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 0;
+        long timestamp = System.currentTimeMillis();
+        
+        Log.e(TAG, "🔔 NOTIFY UPDATE - Source: " + source + ", Branch: " + branchId);
+        
+        // ✅ إشارة تحديث المخزون
+        Intent inventoryIntent = new Intent("com.example.uhf.REFRESH_INVENTORY");
+        inventoryIntent.setPackage(ctx.getPackageName());
+        inventoryIntent.putExtra("source", source);
+        inventoryIntent.putExtra("branch_id", branchId);
+        inventoryIntent.putExtra("timestamp", timestamp);
+        ctx.sendBroadcast(inventoryIntent);
+        
+        // ✅ إشارة تحديث الداشبورد
+        Intent dashboardIntent = new Intent("com.example.uhf.REFRESH_DASHBOARD");
+        dashboardIntent.setPackage(ctx.getPackageName());
+        dashboardIntent.putExtra("source", source);
+        dashboardIntent.putExtra("branch_id", branchId);
+        dashboardIntent.putExtra("timestamp", timestamp);
+        ctx.sendBroadcast(dashboardIntent);
+        
+        // ✅ تحديث SharedPreferences
+        SharedPreferences prefs = ctx.getSharedPreferences("app_refresh_flags", Context.MODE_PRIVATE);
+        prefs.edit()
+            .putLong("last_data_change", timestamp)
+            .putString("last_change_type", source)
+            .putInt("last_change_branch_id", branchId)
+            .putBoolean("needs_refresh", true)
+            .apply();
+        
+        Log.e(TAG, "✅ Dashboard update signals sent");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "notifyDashboardUpdate error: " + e.getMessage());
+    }
+}
     private void playErrorSound() {
         try {
             if (getActivity() instanceof UHFMainActivity) {
@@ -2077,4 +2127,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
         }
     }
-}
+                            }
