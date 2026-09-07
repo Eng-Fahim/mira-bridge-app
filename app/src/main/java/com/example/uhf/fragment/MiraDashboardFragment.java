@@ -180,30 +180,35 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        try {
-            initializeManagers();
-            initViews(view);
-            setupProfileListener();
-            setupQuickAccessGrid();
-            setupListeners();
+   @Override
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
+    try {
+        initializeManagers();
+        initViews(view);
+        setupProfileListener();
+        setupQuickAccessGrid();
+        setupListeners();
 
-            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            initBranchCache(currentBranchId);
+        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        initBranchCache(currentBranchId);
 
-            loadOfflineData();
-            updateHeader();
-            showShimmer(false);
-            
-            isViewInitialized = true;
-            loadDataIfNeeded();
-            startAutoRefresh();
-        } catch (Throwable e) {
-            logNonFatal("onViewCreated", e);
-        }
+        // ❌ احذف هذا - لا تعرض الكاش المحلي أولاً
+        // loadOfflineData();
+        
+        updateHeader();
+        showShimmer(false);
+        
+        isViewInitialized = true;
+        
+        // ✅ جلب البيانات من السيرفر مباشرة
+        fetchData();
+        
+        startAutoRefresh();
+    } catch (Throwable e) {
+        logNonFatal("onViewCreated", e);
     }
+}
 
     private void initializeManagers() {
         try {
@@ -673,85 +678,55 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void fetchData() {
-        try {
-            if (isLoading.get() || apiClient == null || !isAdded()) return;
+    try {
+        if (apiClient == null || !isAdded()) return;
 
-            if (sessionManager == null || !sessionManager.isLoggedIn() || !sessionManager.hasValidToken()) {
-                Log.w(TAG, "Token invalid, redirecting to login");
-                redirectToLogin();
-                return;
-            }
+        isLoading.set(true);
 
-            isLoading.set(true);
+        // ✅✅✅ استخدم SessionManager - القيمة الثابتة من تسجيل الدخول
+        final int branchIdFromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
+        final int branchIdFromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+        final int finalBranchId = branchIdFromSession > 0 ? branchIdFromSession : 
+                                   (branchIdFromManager > 0 ? branchIdFromManager : 1);
 
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-                tvLiveStatus.setTextColor(0xFFF59E0B);
-            }
+        cancelFuture(dataFuture);
 
-            cancelFuture(dataFuture);
-            final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        dataFuture = sharedExecutor.submit(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
+                
+                mainHandler.post(() -> {
+                    isLoading.set(false);
+                    lastDataFetchTime = System.currentTimeMillis();
+                    if (!isAdded()) return;
 
-            dataFuture = sharedExecutor.submit(() -> {
-                try {
-                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
-                    
-                    mainHandler.post(() -> {
-                        isLoading.set(false);
-                        lastDataFetchTime = System.currentTimeMillis();
-                        if (!isAdded()) return;
-
-                        if (response != null && response.code == 401) {
-                            handleTokenExpired();
-                            return;
-                        }
-
-                        if (response != null && response.isSuccess && response.data != null) {
-                            saveOfflineData(response.data);
-                            processData(response.data);
-                            isDataLoaded = true;
-                            consecutiveFailures = 0;
-                            updateLiveStatusText(true);
-                            
-                            showShimmer(false);
-                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                        } else {
-                            if (response == null || response.code != 401) {
-                                logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
-                            }
-                            
-                            updateLiveStatusText(false);
-                            fetchInventoryDataDirectly(activeBranchId);
-                        }
-
+                    if (response != null && response.isSuccess && response.data != null) {
+                        saveOfflineData(response.data);
+                        processData(response.data);
+                        isDataLoaded = true;
+                        updateLiveStatusText(true);
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    });
-                } catch (Exception e) {
-                    logNonFatal("fetchData.thread", e);
-                    
-                    mainHandler.post(() -> {
-                        isLoading.set(false);
-                        if (!isAdded()) return;
-
-                        consecutiveFailures++;
+                    } else {
                         updateLiveStatusText(false);
-                        loadOfflineData();
+                        loadOfflineData(); // ✅ فقط عند فشل السيرفر
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-
-                        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                            Toast.makeText(getContext(), isArabic ? "تعذر تحديث البيانات من السيرفر" : "Could not update data from server", Toast.LENGTH_SHORT).show();
-                            consecutiveFailures = 0;
-                        }
-                    });
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("fetchData", e);
-            isLoading.set(false);
-        }
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    isLoading.set(false);
+                    loadOfflineData(); // ✅ فقط عند الخطأ
+                    showShimmer(false);
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                });
+            }
+        });
+    } catch (Exception e) {
+        isLoading.set(false);
     }
+}
 
     private void handleTokenExpired() {
         try {
