@@ -208,6 +208,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 setSupportActionBar(toolbar);
                 updateToolbarTitle();
             }
+            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+if (btnHardwareStatus != null) {
+    btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+}
+
 
             setupQuickNav();
             setupOrgProfileListener();
