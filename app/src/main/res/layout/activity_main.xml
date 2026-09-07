@@ -60,12 +60,14 @@
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- حاوية المحتوى الرئيسية للـ Fragments -->
+        <!-- حاوية المحتوى الرئيسية للـ Fragments مع حماية الفوتر من التداخل -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
+            android:paddingBottom="68dp"
+            android:clipToPadding="false"
             android:background="?attr/colorSurface" />
 
     </LinearLayout>
