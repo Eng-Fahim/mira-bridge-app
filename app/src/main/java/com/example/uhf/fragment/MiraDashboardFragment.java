@@ -682,8 +682,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             redirectToLogin();
             return;
         }
-            long now = System.currentTimeMillis();
-            if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
+            //long now = System.currentTimeMillis();
+           // if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
 
             isLoading.set(true);
 
