@@ -765,7 +765,7 @@
                                 android:textSize="11sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
-                    </com.google.android.material.card.MessageCardView>
+                    </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
             </LinearLayout>
