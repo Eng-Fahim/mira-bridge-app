@@ -24,11 +24,13 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
+import androidx.core.os.LocaleListCompat;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKey;
 
@@ -38,8 +40,8 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.MemoryManager;
+import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -55,8 +57,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -77,12 +79,11 @@ public class LoginActivity extends AppCompatActivity {
     private TextInputLayout tilServerUrl, tilUsername, tilPassword;
     private MaterialButton btnLogin, btnBiometric, btnSaveServer, btnToggleLanguage;
     private MaterialTextView tvServerSettings, tvAppVersion, tvBrandName, tvBrandSubtitle, tvBrandDescription;
-    private MaterialTextView tvSignInTitle, tvSignInSubtitle;
+    private MaterialTextView tvSignInTitle, tvSignInSubtitle, tvSuccessMessage, tvLockStatus;
     private ImageView ivAppLogo;
     private MaterialCardView serverConfigCard;
     private ProgressBar pbLoading;
-    private View loadingContainer, loginCard, logoContainer;
-    private MaterialTextView tvLockStatus;
+    private View loadingContainer, loginCard, logoContainer, successOverlay;
 
     private SessionManager sessionManager;
     private MiraApiClient apiClient;
@@ -105,7 +106,7 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate started");
 
-        // 1. منع التقاط الشاشة
+        // 1. حماية الشاشة من الالتقاط
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_SECURE,
                 WindowManager.LayoutParams.FLAG_SECURE
@@ -118,61 +119,52 @@ public class LoginActivity extends AppCompatActivity {
         registerComponentCallbacks(MemoryManager.getInstance());
 
         setContentView(R.layout.activity_login);
-        
-        // ✅ فحص session_expired
-        if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
-            Toast.makeText(this, 
-                isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
-                Toast.LENGTH_LONG).show();
-        }
+
+        // 2. تحديث اللغة الحالية
+        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
 
         sessionManager = new SessionManager(getApplicationContext());
 
-        // ✅ التحقق من الجلسة - بدون انتظار
+        // 3. التحقق المباشر من الجلسة
         if (sessionManager.isLoggedIn()) {
             if (sessionManager.hasValidToken()) {
-                navigateToMain();
+                navigateToMainDirect();
                 return;
             } else {
                 sessionManager.logoutUser();
             }
         }
 
-        // ✅ ضبط اللغة - قبل أي شيء آخر
-        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
-        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
-
-        // ✅ تهيئة التشفير في الخلفية - لا تنتظر
-        mainHandler.postDelayed(this::initializeEncryption, 100);
+        // 4. معالجة انتهاء الجلسة إن وجدت
+        if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
+            Toast.makeText(this,
+                    isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again",
+                    Toast.LENGTH_LONG).show();
+        }
 
         orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
 
-        // ✅ تهيئة الواجهة أولاً - لا تنتظر التشفير
+        // 5. تهيئة عناصر الواجهة والأحداث
         initViews();
-        disableAutofill();
-        
-        // ✅ تأجيل العمليات الثقيلة
-        mainHandler.postDelayed(() -> {
-            if (!isDestroyed.get()) {
-                setupBiometric();
-                animateEntrance();
-                setupTextWatchers();
-                updateUiLanguage(isArabic);
-                setupProfileListener();
-                updateBiometricButtonState();
-                restoreLastUsername();
-                checkLockoutStatus();
-            }
-        }, 200);
+        setupTextWatchers();
+        setupServerConfigToggle();
+        setupLanguageToggle();
 
-        // ✅ تحميل ملف المنظمة في الخلفية
+        // 6. تهيئة التشفير في الخلفية، ثم تشغيل الميزات التراكمية عند الانتهاء
+        initializeEncryption();
+
+        // 7. تحريك الواجهة وتحميل البيانات الأوفلاين والسحابية
+        animateEntrance();
+        setupProfileListener();
+
         mainHandler.postDelayed(() -> {
-            if (!isDestroyed.get()) {
+            if (isActivityAlive()) {
+                restoreLastUsername();
                 loadOrgProfileFromCloud();
             }
-        }, 500);
+        }, 300);
 
-        setupServerConfigToggle();
         Log.d(TAG, "onCreate completed");
     }
 
@@ -182,71 +174,282 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private boolean isDeviceRooted() {
-        String[] rootPaths = {
-                "/system/app/Superuser.apk", "/sbin/su", "/system/bin/su",
-                "/system/xbin/su", "/data/local/xbin/su", "/data/local/bin/su",
-                "/system/sd/xbin/su", "/system/bin/failsafe/su", "/data/local/su", "/su/bin/su"
-        };
-
-        for (String path : rootPaths) {
-            if (new File(path).exists()) return true;
+    private void executeSafeBg(Runnable runnable) {
+        initExecutor();
+        try {
+            bgExecutor.execute(runnable);
+        } catch (RejectedExecutionException e) {
+            Log.e(TAG, "Task rejected, using fallback thread", e);
+            new Thread(runnable).start();
         }
+    }
 
-        String buildTags = Build.TAGS;
-        return buildTags != null && buildTags.contains("test-keys");
+    private boolean isActivityAlive() {
+        return !isFinishing() && !isDestroyed() && !isDestroyed.get();
     }
 
     private void initializeEncryption() {
-        try {
-            // ✅ استخدام Executor للتشفير في الخلفية
-            executeSafeBg(() -> {
-                try {
-                    MasterKey masterKey = new MasterKey.Builder(this)
-                            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                            .build();
+        executeSafeBg(() -> {
+            try {
+                MasterKey masterKey = new MasterKey.Builder(this)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
 
-                    encryptedPrefs = EncryptedSharedPreferences.create(
-                            this,
-                            "secure_login_prefs_v2",
-                            masterKey,
-                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    );
-                    
-                    Log.d(TAG, "Encryption initialized successfully");
-                    
-                } catch (GeneralSecurityException | IOException e) {
-                    Log.e(TAG, "EncryptedSharedPreferences initialization failed", e);
-                    encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
+                encryptedPrefs = EncryptedSharedPreferences.create(
+                        this,
+                        "secure_login_prefs_v2",
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                Log.d(TAG, "Encryption initialized successfully");
+            } catch (GeneralSecurityException | IOException e) {
+                Log.e(TAG, "EncryptedSharedPreferences failed, using private fallback", e);
+                encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
+            }
+
+            // تحديث حالة الحظر والبصمة بأمان بعد اكتمال تهيئة التشفير
+            mainHandler.post(() -> {
+                if (isActivityAlive()) {
+                    checkLockoutStatus();
+                    setupBiometric();
+                    updateBiometricButtonState();
                 }
             });
-        } catch (Exception e) {
-            Log.e(TAG, "initializeEncryption error: " + e.getMessage());
-            encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
-        }
+        });
     }
 
-    /**
-     * تشفير كلمة المرور محلياً باستخدام PBKDF2 و Salt عشوائي للحماية الأوفلاين
-     */
-    private String hashPasswordWithSalt(String password, byte[] salt) {
+    private void initViews() {
+        etServerUrl = findViewById(R.id.etServerUrl);
+        etUsername = findViewById(R.id.etUsername);
+        etPassword = findViewById(R.id.etPassword);
+        tilServerUrl = findViewById(R.id.tilServerUrl);
+        tilUsername = findViewById(R.id.tilUsername);
+        tilPassword = findViewById(R.id.tilPassword);
+        btnLogin = findViewById(R.id.btnLogin);
+        btnBiometric = findViewById(R.id.btnBiometric);
+        btnSaveServer = findViewById(R.id.btnSaveServer);
+        btnToggleLanguage = findViewById(R.id.btnToggleLanguage);
+        tvServerSettings = findViewById(R.id.tvServerSettings);
+        tvLockStatus = findViewById(R.id.tvLockStatus);
+        tvAppVersion = findViewById(R.id.tvAppVersion);
+        tvBrandName = findViewById(R.id.tvBrandName);
+        tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
+        tvBrandDescription = findViewById(R.id.tvBrandDescription);
+        tvSignInTitle = findViewById(R.id.tvSignInTitle);
+        tvSignInSubtitle = findViewById(R.id.tvSignInSubtitle);
+        tvSuccessMessage = findViewById(R.id.tvSuccessMessage);
+        ivAppLogo = findViewById(R.id.ivAppLogo);
+        serverConfigCard = findViewById(R.id.serverConfigCard);
+        pbLoading = findViewById(R.id.pbLoading);
+        loadingContainer = findViewById(R.id.loadingContainer);
+        loginCard = findViewById(R.id.loginCard);
+        logoContainer = findViewById(R.id.logoContainer);
+        successOverlay = findViewById(R.id.successOverlay);
+
+        String savedUrl = sessionManager.getServerUrl();
+        if (savedUrl != null && !savedUrl.isEmpty()) {
+            etServerUrl.setText(savedUrl);
+        } else {
+            etServerUrl.setText(DEFAULT_SERVER_URL);
+            sessionManager.setServerUrl(DEFAULT_SERVER_URL);
+            MiraServerConfig.getInstance(this).setBaseUrl(DEFAULT_SERVER_URL);
+        }
+
+        hideServerConfigFields();
+
         try {
-            PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, PBKDF2_ITERATIONS, HASH_KEY_LENGTH);
-            SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            byte[] hash = skf.generateSecret(spec).getEncoded();
-            return Base64.encodeToString(hash, Base64.NO_WRAP);
-        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-            Log.e(TAG, "Password hashing error", e);
-            return null;
+            tvAppVersion.setText("v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName + " Enterprise");
+        } catch (Exception e) {
+            tvAppVersion.setText("v1.0.0 Enterprise");
+        }
+
+        apiClient = MiraApiClient.getInstance(getApplicationContext());
+
+        btnLogin.setOnClickListener(v -> attemptApiLogin());
+
+        btnSaveServer.setOnClickListener(v -> {
+            String url = getText(etServerUrl);
+            if (isValidServerUrl(url)) {
+                if (!url.endsWith("/")) url += "/";
+                sessionManager.setServerUrl(url);
+                MiraServerConfig.getInstance(this).setBaseUrl(url);
+                MiraApiClient.reloadInstance(getApplicationContext());
+                apiClient = MiraApiClient.getInstance(getApplicationContext());
+
+                Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
+                serverConfigCard.animate().alpha(0f).setDuration(200)
+                        .withEndAction(() -> serverConfigCard.setVisibility(View.GONE)).start();
+            } else {
+                Toast.makeText(this,
+                        isArabic ? "⚠️ يجب استخدام HTTPS للاتصال الآمن" : "⚠️ HTTPS required for secure connection",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+
+        updateUiTexts();
+        applyOrgProfile();
+    }
+
+    private void hideServerConfigFields() {
+        if (tilServerUrl != null) tilServerUrl.setVisibility(View.GONE);
+        if (etServerUrl != null) etServerUrl.setVisibility(View.GONE);
+        if (serverConfigCard != null) serverConfigCard.setVisibility(View.GONE);
+        if (btnSaveServer != null) btnSaveServer.setVisibility(View.GONE);
+        if (tvServerSettings != null) tvServerSettings.setVisibility(View.VISIBLE);
+    }
+
+    private void setupServerConfigToggle() {
+        if (tvServerSettings != null) {
+            tvServerSettings.setOnClickListener(v -> {
+                if (serverConfigCard.getVisibility() == View.GONE) {
+                    if (tilServerUrl != null) tilServerUrl.setVisibility(View.VISIBLE);
+                    if (etServerUrl != null) etServerUrl.setVisibility(View.VISIBLE);
+                    if (btnSaveServer != null) btnSaveServer.setVisibility(View.VISIBLE);
+
+                    serverConfigCard.setVisibility(View.VISIBLE);
+                    serverConfigCard.setAlpha(0f);
+                    serverConfigCard.animate().alpha(1f).setDuration(300).start();
+                } else {
+                    serverConfigCard.animate().alpha(0f).setDuration(200)
+                            .withEndAction(() -> serverConfigCard.setVisibility(View.GONE)).start();
+                }
+            });
         }
     }
 
-    private byte[] generateSalt() {
-        SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[16];
-        random.nextBytes(salt);
-        return salt;
+    private void setupLanguageToggle() {
+        if (btnToggleLanguage != null) {
+            btnToggleLanguage.setOnClickListener(v -> {
+                isArabic = !isArabic;
+                String langTag = isArabic ? "ar" : "en";
+                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(langTag));
+                recreate();
+            });
+        }
+    }
+
+    private void updateUiTexts() {
+        getWindow().getDecorView().setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+
+        if (tvSignInTitle != null) tvSignInTitle.setText(isArabic ? "مرحباً بعودتك" : "Welcome Back");
+        if (tvSignInSubtitle != null) tvSignInSubtitle.setText(isArabic ? "قم بتسجيل الدخول للمتابعة" : "Sign in to continue");
+        if (tilUsername != null) tilUsername.setHint(isArabic ? "اسم المستخدم" : "Username");
+        if (tilPassword != null) tilPassword.setHint(isArabic ? "كلمة المرور" : "Password");
+        if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText(isArabic ? "تسجيل الدخول" : "Sign In");
+        if (btnToggleLanguage != null) btnToggleLanguage.setText(isArabic ? "EN / AR" : "AR / EN");
+        if (tvSuccessMessage != null) tvSuccessMessage.setText(isArabic ? "تم تسجيل الدخول بنجاح" : "Login Successful");
+    }
+
+    private void applyOrgProfile() {
+        if (!isActivityAlive()) return;
+        if (orgProfileManager == null) {
+            orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+        }
+
+        if (tvBrandName != null) {
+            String name = isArabic ? orgProfileManager.getOrgNameAr() : orgProfileManager.getOrgNameEn();
+            tvBrandName.setText((name != null && !name.isEmpty()) ? name : "MIRA Jewelry");
+        }
+
+        if (tvBrandSubtitle != null) tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+
+        if (tvBrandDescription != null) {
+            tvBrandDescription.setText(isArabic ?
+                    "منظومة التتبع والمصادقة المعتمدة للمجوهرات" :
+                    "Enterprise Jewelry Traceability & Authentication");
+        }
+
+        if (ivAppLogo != null) {
+            String logoBase64 = orgProfileManager.getOrgLogo();
+            if (logoBase64 != null && !logoBase64.isEmpty()) {
+                try {
+                    byte[] bytes = Base64.decode(logoBase64, Base64.DEFAULT);
+                    android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    ivAppLogo.setImageBitmap(bitmap);
+                } catch (Exception e) {
+                    ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+                }
+            } else {
+                ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+            }
+        }
+    }
+
+    private void setupProfileListener() {
+        if (orgProfileManager == null) return;
+        profileListener = () -> {
+            if (isActivityAlive()) mainHandler.post(this::applyOrgProfile);
+        };
+        orgProfileManager.addListener(profileListener);
+    }
+
+    private void loadOrgProfileFromCloud() {
+        if (apiClient == null) return;
+
+        executeSafeBg(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject org = response.data.optJSONObject("organization");
+                    if (org != null && orgProfileManager != null) {
+                        orgProfileManager.saveFromServer(org);
+                    }
+                    if (isActivityAlive()) {
+                        mainHandler.post(this::applyOrgProfile);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadOrgProfileFromCloud error: " + e.getMessage());
+            }
+        });
+    }
+
+    private void animateEntrance() {
+        if (loginCard == null) return;
+        loginCard.setAlpha(0f);
+        loginCard.setTranslationY(60f);
+        loginCard.animate().alpha(1f).translationY(0f).setDuration(600)
+                .setInterpolator(new AccelerateDecelerateInterpolator()).setStartDelay(150).start();
+        if (logoContainer != null) {
+            logoContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in_up));
+        }
+    }
+
+    private void setupTextWatchers() {
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                updateLoginButtonState();
+                clearFieldError(s);
+            }
+        };
+        if (etUsername != null) etUsername.addTextChangedListener(watcher);
+        if (etPassword != null) etPassword.addTextChangedListener(watcher);
+        if (etServerUrl != null) etServerUrl.addTextChangedListener(watcher);
+    }
+
+    private void clearFieldError(Editable s) {
+        if (etUsername != null && s == etUsername.getText() && tilUsername != null) tilUsername.setError(null);
+        else if (etPassword != null && s == etPassword.getText() && tilPassword != null) tilPassword.setError(null);
+        else if (etServerUrl != null && s == etServerUrl.getText() && tilServerUrl != null) tilServerUrl.setError(null);
+    }
+
+    private void updateLoginButtonState() {
+        String username = getText(etUsername);
+        String password = getText(etPassword);
+        boolean valid = !username.isEmpty() && password.length() >= 4;
+        boolean isLocked = System.currentTimeMillis() < lockoutUntil;
+
+        if (btnLogin != null) {
+            btnLogin.setEnabled(valid && !isLocked);
+            btnLogin.setAlpha(valid && !isLocked ? 1f : 0.5f);
+        }
+    }
+
+    private String getText(TextInputEditText editText) {
+        return (editText != null && editText.getText() != null) ? editText.getText().toString().trim() : "";
     }
 
     private boolean isValidServerUrl(String url) {
@@ -290,288 +493,7 @@ public class LoginActivity extends AppCompatActivity {
             }
         } else if (tvLockStatus != null) {
             tvLockStatus.setVisibility(View.GONE);
-        }
-    }
-
-    private void executeSafeBg(Runnable runnable) {
-        initExecutor();
-        try {
-            bgExecutor.execute(runnable);
-        } catch (RejectedExecutionException e) {
-            Log.e(TAG, "Task rejected from executor, spinning fallback thread", e);
-            new Thread(runnable).start();
-        }
-    }
-
-    private boolean isActivityAlive() {
-        return !isFinishing() && !isDestroyed() && !isDestroyed.get();
-    }
-
-    private void initViews() {
-        etServerUrl = findViewById(R.id.etServerUrl);
-        etUsername = findViewById(R.id.etUsername);
-        etPassword = findViewById(R.id.etPassword);
-        tilServerUrl = findViewById(R.id.tilServerUrl);
-        tilUsername = findViewById(R.id.tilUsername);
-        tilPassword = findViewById(R.id.tilPassword);
-        btnLogin = findViewById(R.id.btnLogin);
-        btnBiometric = findViewById(R.id.btnBiometric);
-        btnSaveServer = findViewById(R.id.btnSaveServer);
-        btnToggleLanguage = findViewById(R.id.btnToggleLanguage);
-        tvServerSettings = findViewById(R.id.tvServerSettings);
-        tvLockStatus = findViewById(R.id.tvLockStatus);
-        tvAppVersion = findViewById(R.id.tvAppVersion);
-        tvBrandName = findViewById(R.id.tvBrandName);
-        tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
-        tvBrandDescription = findViewById(R.id.tvBrandDescription);
-        tvSignInTitle = findViewById(R.id.tvSignInTitle);
-        tvSignInSubtitle = findViewById(R.id.tvSignInSubtitle);
-        ivAppLogo = findViewById(R.id.ivAppLogo);
-        serverConfigCard = findViewById(R.id.serverConfigCard);
-        pbLoading = findViewById(R.id.pbLoading);
-        loadingContainer = findViewById(R.id.loadingContainer);
-        loginCard = findViewById(R.id.loginCard);
-        logoContainer = findViewById(R.id.logoContainer);
-
-        String savedUrl = sessionManager.getServerUrl();
-        if (savedUrl != null && !savedUrl.isEmpty()) {
-            etServerUrl.setText(savedUrl);
-        } else {
-            etServerUrl.setText(DEFAULT_SERVER_URL);
-            sessionManager.setServerUrl(DEFAULT_SERVER_URL);
-            MiraServerConfig.getInstance(this).setBaseUrl(DEFAULT_SERVER_URL);
-        }
-
-        hideServerConfigFields();
-
-        try {
-            tvAppVersion.setText("v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName + " Enterprise");
-        } catch (Exception e) {
-            tvAppVersion.setText("v1.0.0 Enterprise");
-        }
-
-        apiClient = MiraApiClient.getInstance(getApplicationContext());
-
-        btnLogin.setOnClickListener(v -> attemptApiLogin());
-
-        btnSaveServer.setOnClickListener(v -> {
-            String url = getText(etServerUrl);
-            if (isValidServerUrl(url)) {
-                if (!url.endsWith("/")) url += "/";
-                sessionManager.setServerUrl(url);
-                MiraServerConfig.getInstance(this).setBaseUrl(url);
-                MiraApiClient.reloadInstance(getApplicationContext());
-                apiClient = MiraApiClient.getInstance(getApplicationContext());
-
-                Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this,
-                        isArabic ? "⚠️ يجب استخدام HTTPS للاتصال الآمن" : "⚠️ HTTPS required for secure connection",
-                        Toast.LENGTH_LONG).show();
-            }
-        });
-
-        if (btnToggleLanguage != null) {
-            btnToggleLanguage.setOnClickListener(v -> {
-                isArabic = !isArabic;
-                String langTag = isArabic ? "ar" : "en";
-                AppCompatDelegate.setApplicationLocales(
-                        androidx.core.os.LocaleListCompat.forLanguageTags(langTag));
-
-                finish();
-                startActivity(getIntent());
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-            });
-        }
-
-        applyOrgProfile();
-    }
-
-    private void hideServerConfigFields() {
-        if (tilServerUrl != null) tilServerUrl.setVisibility(View.GONE);
-        if (etServerUrl != null) etServerUrl.setVisibility(View.GONE);
-        if (tvServerSettings != null) tvServerSettings.setVisibility(View.GONE);
-        if (serverConfigCard != null) serverConfigCard.setVisibility(View.GONE);
-        if (btnSaveServer != null) btnSaveServer.setVisibility(View.GONE);
-    }
-
-    private void disableAutofill() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (etUsername != null) etUsername.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-            if (etPassword != null) etPassword.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-            if (etServerUrl != null) etServerUrl.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-        }
-    }
-
-    private void setupProfileListener() {
-        if (orgProfileManager == null) return;
-        profileListener = () -> {
-            if (isActivityAlive()) mainHandler.post(this::applyOrgProfile);
-        };
-        orgProfileManager.addListener(profileListener);
-    }
-
-    private void loadOrgProfileFromCloud() {
-        if (apiClient == null) return;
-
-        executeSafeBg(() -> {
-            try {
-                // ✅ إضافة timeout
-                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject org = response.data.optJSONObject("organization");
-                    if (org != null && orgProfileManager != null) {
-                        orgProfileManager.saveFromServer(org);
-                    }
-                    if (isActivityAlive()) {
-                        mainHandler.post(this::applyOrgProfile);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "loadOrgProfileFromCloud error: " + e.getMessage());
-            }
-        });
-    }
-
-    private void updateUiLanguage(boolean arabic) {
-        getWindow().getDecorView().setLayoutDirection(arabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        if (arabic) {
-            if (tvSignInTitle != null) tvSignInTitle.setText("تسجيل الدخول");
-            if (tvSignInSubtitle != null) tvSignInSubtitle.setText("أدخل بيانات الاعتماد الخاصة بك للمتابعة");
-            if (tilUsername != null) tilUsername.setHint("اسم المستخدم");
-            if (tilPassword != null) tilPassword.setHint("كلمة المرور");
-            if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("دخول النظام");
-            if (btnToggleLanguage != null) btnToggleLanguage.setText("EN / AR");
-        } else {
-            if (tvSignInTitle != null) tvSignInTitle.setText("Sign In");
-            if (tvSignInSubtitle != null) tvSignInSubtitle.setText("Enter your credentials to continue");
-            if (tilUsername != null) tilUsername.setHint("Username");
-            if (tilPassword != null) tilPassword.setHint("Password");
-            if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("Sign In");
-            if (btnToggleLanguage != null) btnToggleLanguage.setText("AR / EN");
-        }
-        applyOrgProfile();
-    }
-
-    private void applyOrgProfile() {
-        if (!isActivityAlive()) return;
-        if (orgProfileManager == null) {
-            orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-        }
-
-        if (tvBrandName != null) {
-            String name = isArabic ? orgProfileManager.getOrgNameAr() : orgProfileManager.getOrgNameEn();
-            tvBrandName.setText((name != null && !name.isEmpty()) ? name : "MIRA Jewelry");
-        }
-
-        if (tvBrandSubtitle != null) tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
-
-        if (tvBrandDescription != null) {
-            tvBrandDescription.setText(isArabic ?
-                    "منظومة التتبع والمصادقة المعتمدة للمجوهرات" :
-                    "Enterprise Jewelry Traceability & Authentication");
-        }
-
-        if (ivAppLogo != null) {
-            String logoBase64 = orgProfileManager.getOrgLogo();
-            if (logoBase64 != null && !logoBase64.isEmpty()) {
-                try {
-                    byte[] bytes = Base64.decode(logoBase64, Base64.DEFAULT);
-                    android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    ivAppLogo.setImageBitmap(bitmap);
-                } catch (Exception e) {
-                    ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
-                }
-            } else {
-                ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
-            }
-        }
-    }
-
-    private void setupServerConfigToggle() {
-        if (tvServerSettings != null) {
-            tvServerSettings.setOnClickListener(v -> {
-                if (serverConfigCard.getVisibility() == View.GONE) {
-                    serverConfigCard.setVisibility(View.VISIBLE);
-                    serverConfigCard.setAlpha(0f);
-                    serverConfigCard.animate().alpha(1f).setDuration(300).start();
-                } else {
-                    serverConfigCard.animate().alpha(0f).setDuration(200)
-                            .withEndAction(() -> serverConfigCard.setVisibility(View.GONE)).start();
-                }
-            });
-        }
-    }
-
-    private void animateEntrance() {
-        if (loginCard == null) return;
-        loginCard.setAlpha(0f);
-        loginCard.setTranslationY(60f);
-        loginCard.animate().alpha(1f).translationY(0f).setDuration(600)
-                .setInterpolator(new AccelerateDecelerateInterpolator()).setStartDelay(150).start();
-        if (logoContainer != null) {
-            logoContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in_up));
-        }
-    }
-
-    private void setupTextWatchers() {
-        TextWatcher watcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
-                updateLoginButtonState();
-                clearFieldError(s);
-            }
-        };
-        if (etUsername != null) etUsername.addTextChangedListener(watcher);
-        if (etPassword != null) etPassword.addTextChangedListener(watcher);
-        if (etServerUrl != null) etServerUrl.addTextChangedListener(watcher);
-    }
-
-    private void clearFieldError(Editable s) {
-        if (s == etUsername.getText() && tilUsername != null) tilUsername.setError(null);
-        else if (s == etPassword.getText() && tilPassword != null) tilPassword.setError(null);
-        else if (s == etServerUrl.getText() && tilServerUrl != null) tilServerUrl.setError(null);
-    }
-
-    private void updateLoginButtonState() {
-        String username = getText(etUsername);
-        String password = getText(etPassword);
-        boolean valid = !username.isEmpty() && password.length() >= 4;
-        boolean isLocked = System.currentTimeMillis() < lockoutUntil;
-
-        if (btnLogin != null) {
-            btnLogin.setEnabled(valid && !isLocked);
-            btnLogin.setAlpha(valid && !isLocked ? 1f : 0.5f);
-        }
-    }
-
-    private String getText(TextInputEditText editText) {
-        return (editText != null && editText.getText() != null) ? editText.getText().toString().trim() : "";
-    }
-
-    private void playTone(boolean isSuccess) {
-        try {
-            ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
-            toneGen.startTone(isSuccess ? ToneGenerator.TONE_PROP_ACK : ToneGenerator.TONE_SUP_ERROR, 150);
-        } catch (Exception e) {
-            Log.e(TAG, "Tone error: " + e.getMessage());
-        }
-    }
-
-    private String getErrorMessage(int errorCode, String fallbackMessage) {
-        switch (errorCode) {
-            case 400: return isArabic ? "بيانات غير صالحة - تحقق من المدخلات" : "Invalid data - Check inputs";
-            case 401: return isArabic ? "بيانات الدخول غير صحيحة" : "Invalid credentials";
-            case 403: return isArabic ? "ليس لديك صلاحية للدخول" : "Access denied";
-            case 404: return isArabic ? "الخادم غير موجود - تحقق من الرابط" : "Server not found";
-            case 408:
-            case 504: return isArabic ? "انتهت مهلة الاتصال - حاول مرة أخرى" : "Connection timeout";
-            case 429: return isArabic ? "محاولات كثيرة - انتظر قليلاً" : "Too many attempts";
-            case 500: return isArabic ? "خطأ في الخادم - حاول لاحقاً" : "Server error";
-            case 503: return isArabic ? "الخدمة غير متاحة حالياً" : "Service unavailable";
-            default: return fallbackMessage != null ? fallbackMessage : (isArabic ? "خطأ في الاتصال" : "Connection error");
+            updateLoginButtonState();
         }
     }
 
@@ -592,19 +514,15 @@ public class LoginActivity extends AppCompatActivity {
             failedAttempts.set(0);
 
             mainHandler.post(() -> {
-                if (btnLogin != null) {
-                    btnLogin.setEnabled(false);
-                    btnLogin.setText(isArabic ? "محظور لمدة 5 دقائق" : "Locked for 5 min");
-                }
+                checkLockoutStatus();
                 Toast.makeText(this,
                         isArabic ? "⛔ تم قفل تسجيل الدخول لمدة 5 دقائق بسبب محاولات كثيرة" :
                                 "⛔ Login locked for 5 minutes due to too many attempts",
                         Toast.LENGTH_LONG).show();
 
                 mainHandler.postDelayed(() -> {
-                    if (isActivityAlive() && btnLogin != null) {
-                        btnLogin.setEnabled(true);
-                        updateLoginButtonState();
+                    if (isActivityAlive()) {
+                        checkLockoutStatus();
                         Toast.makeText(this,
                                 isArabic ? "✓ تم فتح تسجيل الدخول - يمكنك المحاولة الآن" :
                                         "✓ Login unlocked - You can try now",
@@ -624,6 +542,7 @@ public class LoginActivity extends AppCompatActivity {
                     .putLong("lockout_until", 0)
                     .apply();
         }
+        if (tvLockStatus != null) tvLockStatus.setVisibility(View.GONE);
     }
 
     private void attemptApiLogin() {
@@ -702,7 +621,6 @@ public class LoginActivity extends AppCompatActivity {
                     resetFailedAttempts();
                     sessionManager.saveLastUsername(username);
 
-                    // حفظ الـ Salt والـ Hash لأغراض الأوفلاين الآمن
                     if (encryptedPrefs != null) {
                         byte[] salt = generateSalt();
                         String passwordHash = hashPasswordWithSalt(password, salt);
@@ -718,7 +636,7 @@ public class LoginActivity extends AppCompatActivity {
 
                 } else if (finalIsNetworkError || finalResponse == null) {
                     if (verifyOfflineLogin(username, password)) {
-                        new androidx.appcompat.app.AlertDialog.Builder(LoginActivity.this)
+                        new AlertDialog.Builder(LoginActivity.this)
                                 .setTitle(isArabic ? "📡 وضع الأوفلاين" : "📡 Offline Mode")
                                 .setMessage(isArabic ?
                                         "أنت غير متصل بالإنترنت.\n\nسيتم تسجيل الدخول باستخدام البيانات المحلية.\nهل تريد المتابعة؟" :
@@ -727,10 +645,7 @@ public class LoginActivity extends AppCompatActivity {
                                     dialog.dismiss();
                                     resetFailedAttempts();
                                     playTone(true);
-                                    Toast.makeText(LoginActivity.this,
-                                            isArabic ? "✅ تم الدخول (وضع الأوفلاين)" : "✅ Offline login successful",
-                                            Toast.LENGTH_SHORT).show();
-                                    navigateToMain();
+                                    showSuccessOverlayAndNavigate();
                                 })
                                 .setNegativeButton(isArabic ? "❌ إلغاء" : "❌ Cancel", (dialog, which) -> dialog.dismiss())
                                 .setCancelable(false)
@@ -756,71 +671,65 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
-    Log.d(TAG, "Login Success for user: " + username);
-    playTone(true);
+        Log.d(TAG, "Login Success for user: " + username);
+        playTone(true);
 
-    Context appContext = getApplicationContext();
+        Context appContext = getApplicationContext();
 
-    String token = response.optString("token", "");
-    String roleStr = response.optString("role", "ADMIN");
-    String displayName = response.optString("display_name", username);
-    int userId = response.optInt("user_id", 0);
-    int branchId = response.optInt("branch_id", 1);
-    String branchName = response.optString("branch_name", "");
-    String branchCode = response.optString("branch_code", "");
-    String serverUrl = getText(etServerUrl);
+        String token = response.optString("token", "");
+        String roleStr = response.optString("role", "ADMIN");
+        String displayName = response.optString("display_name", username);
+        int userId = response.optInt("user_id", 0);
+        int branchId = response.optInt("branch_id", 1);
+        String branchName = response.optString("branch_name", "");
+        String branchCode = response.optString("branch_code", "");
+        String serverUrl = getText(etServerUrl);
 
-    // ✅✅✅ أضف هذا السطر للحفظ
-    Log.d(TAG, "🔍 Branch ID from login: " + branchId);
+        if (serverUrl.isEmpty()) serverUrl = sessionManager.getServerUrl();
 
-    if (serverUrl.isEmpty()) serverUrl = sessionManager.getServerUrl();
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        String apiKey = response.optString("api_key", "");
+        String gateId = response.optString("gate_id", "");
 
-    String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-    String apiKey = response.optString("api_key", "");
-    String gateId = response.optString("gate_id", "");
+        if (!apiKey.isEmpty()) {
+            String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
+            sessionManager.saveApiKey(apiKey);
+            sessionManager.saveGateId(effectiveGateId);
+        }
 
-    if (!apiKey.isEmpty()) {
-        String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
-        sessionManager.saveApiKey(apiKey);
-        sessionManager.saveGateId(effectiveGateId);
+        if (!serverUrl.isEmpty()) {
+            sessionManager.setServerUrl(serverUrl);
+            MiraServerConfig.getInstance(appContext).setBaseUrl(serverUrl);
+        }
+
+        String permissionsJson = response.optString("permissions", "");
+        if (!permissionsJson.isEmpty()) {
+            PermissionManager.resetInstance();
+            PermissionManager pm = PermissionManager.getInstance(appContext);
+            pm.savePermissions(permissionsJson);
+        }
+
+        sessionManager.createLoginSession(username, roleStr, token, serverUrl);
+        sessionManager.setDisplayName(displayName);
+        sessionManager.setUserId(userId);
+        sessionManager.setBranchId(branchId);
+
+        sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
+        sessionManager.saveBiometricBranch(branchId, branchName);
+
+        boolean biometricEnabled = true;
+        if (response.data != null) {
+            biometricEnabled = response.data.optBoolean("biometric_enabled", true);
+        }
+        sessionManager.setBiometricLoginEnabled(biometricEnabled);
+
+        MiraBranchesManager bm = MiraBranchesManager.getInstance(appContext);
+        bm.setActiveBranch(branchId, branchName, branchCode, "", "");
+        bm.setUserBranchLocked(true);
+
+        MiraApiClient.reloadInstance(appContext);
+        showSuccessOverlayAndNavigate();
     }
-
-    if (!serverUrl.isEmpty()) {
-        sessionManager.setServerUrl(serverUrl);
-        MiraServerConfig.getInstance(appContext).setBaseUrl(serverUrl);
-    }
-
-    String permissionsJson = response.optString("permissions", "");
-    if (!permissionsJson.isEmpty()) {
-        PermissionManager.resetInstance();
-        PermissionManager pm = PermissionManager.getInstance(appContext);
-        pm.savePermissions(permissionsJson);
-    }
-
-    sessionManager.createLoginSession(username, roleStr, token, serverUrl);
-    sessionManager.setDisplayName(displayName);
-    sessionManager.setUserId(userId);
-    
-    // ✅✅✅ حفظ branch_id في الموقع الصحيح
-    sessionManager.setBranchId(branchId);
-    Log.d(TAG, "✅ Branch ID saved via setBranchId: " + branchId);
-    
-    sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
-    sessionManager.saveBiometricBranch(branchId, branchName);
-
-    boolean biometricEnabled = true;
-    if (response.data != null) {
-        biometricEnabled = response.data.optBoolean("biometric_enabled", true);
-    }
-    sessionManager.setBiometricLoginEnabled(biometricEnabled);
-
-    MiraBranchesManager bm = MiraBranchesManager.getInstance(appContext);
-    bm.setActiveBranch(branchId, branchName, branchCode, "", "");
-    bm.setUserBranchLocked(true);
-
-    MiraApiClient.reloadInstance(appContext);
-    navigateToMain();
-}
 
     private void setupBiometric() {
         try {
@@ -867,11 +776,7 @@ public class LoginActivity extends AppCompatActivity {
 
                         resetFailedAttempts();
                         playTone(true);
-                        String nameToShow = !lastDisplayName.isEmpty() ? lastDisplayName : lastUser;
-                        Toast.makeText(LoginActivity.this,
-                                (isArabic ? "أهلاً بعودتك " : "Welcome back ") + nameToShow + " 👋",
-                                Toast.LENGTH_SHORT).show();
-                        navigateToMain();
+                        showSuccessOverlayAndNavigate();
                     } else {
                         playTone(false);
                         Toast.makeText(LoginActivity.this,
@@ -884,7 +789,7 @@ public class LoginActivity extends AppCompatActivity {
                 public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
                     if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
                         playTone(false);
-                        Toast.makeText(LoginActivity.this, "Error: " + errString, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginActivity.this, errString, Toast.LENGTH_SHORT).show();
                     }
                 }
 
@@ -897,14 +802,10 @@ public class LoginActivity extends AppCompatActivity {
                 }
             });
 
-            String biometricTitle = isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In";
-            String biometricSubtitle = isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint";
-            String negativeButtonText = isArabic ? "إلغاء" : "Cancel";
-
             BiometricPrompt.PromptInfo.Builder promptBuilder = new BiometricPrompt.PromptInfo.Builder()
-                    .setTitle(biometricTitle)
-                    .setSubtitle(biometricSubtitle)
-                    .setNegativeButtonText(negativeButtonText);
+                    .setTitle(isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In")
+                    .setSubtitle(isArabic ? "استخدم بصمة الإصبع للمتابعة" : "Use fingerprint to continue")
+                    .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel");
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 promptBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG);
@@ -913,42 +814,36 @@ public class LoginActivity extends AppCompatActivity {
             promptInfo = promptBuilder.build();
 
             if (btnBiometric != null) {
-                btnBiometric.setVisibility(View.VISIBLE);
                 btnBiometric.setOnClickListener(v -> {
-                    try {
-                        if (!sessionManager.isBiometricLoginEnabled()) {
-                            Toast.makeText(this, isArabic ? "البصمة معطلة" : "Biometric disabled", Toast.LENGTH_LONG).show();
-                            return;
-                        }
+                    if (!sessionManager.isBiometricLoginEnabled()) {
+                        Toast.makeText(this, isArabic ? "البصمة معطلة" : "Biometric disabled", Toast.LENGTH_LONG).show();
+                        return;
+                    }
 
-                        if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
-                            if (biometricPrompt != null && promptInfo != null) {
-                                biometricPrompt.authenticate(promptInfo);
-                            } else {
-                                Toast.makeText(this, 
-                                    isArabic ? "البصمة غير متاحة حالياً" : "Biometric not available", 
-                                    Toast.LENGTH_SHORT).show();
-                            }
-                        } else {
-                            playTone(false);
-                            Toast.makeText(this,
-                                    isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
-                                    Toast.LENGTH_LONG).show();
+                    if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
+                        if (biometricPrompt != null && promptInfo != null) {
+                            biometricPrompt.authenticate(promptInfo);
                         }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Biometric authenticate error: " + e.getMessage(), e);
-                        Toast.makeText(this, 
-                            isArabic ? "خطأ في المصادقة البيومترية" : "Biometric authentication error", 
-                            Toast.LENGTH_SHORT).show();
+                    } else {
+                        playTone(false);
+                        Toast.makeText(this,
+                                isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
+                                Toast.LENGTH_LONG).show();
                     }
                 });
             }
 
         } catch (Exception e) {
             Log.e(TAG, "Biometric setup error: " + e.getMessage(), e);
-            if (btnBiometric != null) {
-                btnBiometric.setVisibility(View.GONE);
-            }
+            if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
+        }
+    }
+
+    private void updateBiometricButtonState() {
+        if (btnBiometric != null) {
+            boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
+            boolean hasBiometricUser = !sessionManager.getLastBiometricUser().isEmpty();
+            btnBiometric.setVisibility(biometricEnabled && hasBiometricUser ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -988,11 +883,46 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void updateBiometricButtonState() {
-        if (btnBiometric != null) {
-            boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
-            boolean hasBiometricUser = !sessionManager.getLastBiometricUser().isEmpty();
-            btnBiometric.setVisibility(biometricEnabled && hasBiometricUser ? View.VISIBLE : View.GONE);
+    private String hashPasswordWithSalt(String password, byte[] salt) {
+        try {
+            PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, PBKDF2_ITERATIONS, HASH_KEY_LENGTH);
+            SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            byte[] hash = skf.generateSecret(spec).getEncoded();
+            return Base64.encodeToString(hash, Base64.NO_WRAP);
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            Log.e(TAG, "Password hashing error", e);
+            return null;
+        }
+    }
+
+    private byte[] generateSalt() {
+        SecureRandom random = new SecureRandom();
+        byte[] salt = new byte[16];
+        random.nextBytes(salt);
+        return salt;
+    }
+
+    private void playTone(boolean isSuccess) {
+        try {
+            ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
+            toneGen.startTone(isSuccess ? ToneGenerator.TONE_PROP_ACK : ToneGenerator.TONE_SUP_ERROR, 150);
+        } catch (Exception e) {
+            Log.e(TAG, "Tone error: " + e.getMessage());
+        }
+    }
+
+    private String getErrorMessage(int errorCode, String fallbackMessage) {
+        switch (errorCode) {
+            case 400: return isArabic ? "بيانات غير صالحة - تحقق من المدخلات" : "Invalid data - Check inputs";
+            case 401: return isArabic ? "بيانات الدخول غير صحيحة" : "Invalid credentials";
+            case 403: return isArabic ? "ليس لديك صلاحية للدخول" : "Access denied";
+            case 404: return isArabic ? "الخادم غير موجود - تحقق من الرابط" : "Server not found";
+            case 408:
+            case 504: return isArabic ? "انتهت مهلة الاتصال - حاول مرة أخرى" : "Connection timeout";
+            case 429: return isArabic ? "محاولات كثيرة - انتظر قليلاً" : "Too many attempts";
+            case 500: return isArabic ? "خطأ في الخادم - حاول لاحقاً" : "Server error";
+            case 503: return isArabic ? "الخدمة غير متاحة حالياً" : "Service unavailable";
+            default: return fallbackMessage != null ? fallbackMessage : (isArabic ? "خطأ في الاتصال" : "Connection error");
         }
     }
 
@@ -1000,7 +930,7 @@ public class LoginActivity extends AppCompatActivity {
         if (loadingContainer != null) loadingContainer.setVisibility(loading ? View.VISIBLE : View.GONE);
         if (btnLogin != null) {
             btnLogin.setEnabled(!loading);
-            btnLogin.setText(loading ? "" : (isArabic ? "دخول النظام" : "Sign In"));
+            btnLogin.setText(loading ? "" : (isArabic ? "تسجيل الدخول" : "Sign In"));
         }
         if (btnBiometric != null) btnBiometric.setEnabled(!loading);
         if (etUsername != null) etUsername.setEnabled(!loading);
@@ -1012,7 +942,18 @@ public class LoginActivity extends AppCompatActivity {
         ObjectAnimator.ofFloat(view, "translationX", 0, 20, -20, 20, -20, 10, -10, 5, -5, 0).setDuration(500).start();
     }
 
-    private void navigateToMain() {
+    private void showSuccessOverlayAndNavigate() {
+        if (successOverlay != null) {
+            successOverlay.setVisibility(View.VISIBLE);
+            successOverlay.animate().alpha(1.0f).setDuration(350).withEndAction(() -> {
+                mainHandler.postDelayed(this::navigateToMainDirect, 400);
+            }).start();
+        } else {
+            navigateToMainDirect();
+        }
+    }
+
+    private void navigateToMainDirect() {
         Intent intent = new Intent(this, UHFMainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         intent.putExtra("fresh_start", true);
@@ -1032,10 +973,8 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         Log.d(TAG, "onDestroy called");
-
         MemoryManager.getInstance().unregisterActivity(this);
         unregisterComponentCallbacks(MemoryManager.getInstance());
-
         isDestroyed.set(true);
 
         if (orgProfileManager != null && profileListener != null) {
