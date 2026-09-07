@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardGate"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="6dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="3dp"
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:strokeWidth="1dp"
+    app:strokeColor="?attr/colorOutline">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- رأس الكارت: حالة البوابة -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <View
+                android:id="@+id/vGateStatusDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/circle_indicator_green"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/tvGateName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="بوابة 1"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvGateStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟢 نشطة"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- اسم الفرع -->
+        <TextView
+            android:id="@+id/tvBranchName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="🏢 الفرع الرئيسي"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <!-- الموقع -->
+        <TextView
+            android:id="@+id/tvGateLocation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="📍 المدخل الرئيسي"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="9sp" />
+
+        <!-- الإحصائيات -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tvPassCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="مسموح"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="8sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tvDenyCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="?attr/colorError"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="مرفوض"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="8sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- آخر حدث -->
+        <TextView
+            android:id="@+id/tvGateLastEvent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="لا أحداث"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="8sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- زر تحكم سريع -->
+        <Button
+            android:id="@+id/btnToggleSingleGate"
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:layout_marginTop="6dp"
+            android:text="🔒 إغلاق"
+            android:textSize="9sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
