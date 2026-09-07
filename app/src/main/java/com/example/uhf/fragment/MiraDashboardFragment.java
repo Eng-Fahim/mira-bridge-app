@@ -685,23 +685,20 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
         // ✅ التحقق من صلاحيات المدير (هل هو SYSTEM_ADMIN أو ORG_ADMIN؟)
         // يمكنك فحص الدور من الـ SessionManager أو الصلاحيات المحفوظة لديك
-        boolean isGlobalAdmin = false;
-        if (sessionManager != null) {
-            String roleName = sessionManager.getUserRole(); // أو الطريقة المعتمدة لديك لجلب اسم الدور
-            isGlobalAdmin = "SYSTEM_ADMIN".equals(roleName) || "ORG_ADMIN".equals(roleName) || "ADMIN".equals(roleName);
-        }
+       // ✅ تحقق مباشر وبسيط باستخدام الدوال الجاهزة في SessionManager
+boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
 
-        final int finalBranchId;
-        if (isGlobalAdmin) {
-            // ✅ إذا كان مديراً، نرسل 0 افتراضياً ليجلب كل الفروع، إلا إذا اختار فرعاً معيناً من الواجهة
-            finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
-        } else {
-            // للمستخدم العادي، نأخذ فرعه النشط حصراً
-            final int branchIdFromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
-            final int branchIdFromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            finalBranchId = branchIdFromSession > 0 ? branchIdFromSession : 
-                           (branchIdFromManager > 0 ? branchIdFromManager : 1);
-        }
+final int finalBranchId;
+if (isGlobalAdmin) {
+    // إذا كان مديراً، نرسل 0 افتراضياً لجلب كل الفروع، إلا إذا اختار المستخدم فرعاً محدداً
+    finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
+} else {
+    // للمستخدم العادي، نأخذ فرعه النشط حصراً
+    final int branchIdFromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
+    final int branchIdFromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+    finalBranchId = branchIdFromSession > 0 ? branchIdFromSession : 
+                   (branchIdFromManager > 0 ? branchIdFromManager : 1);
+}
 
         cancelFuture(dataFuture);
 
