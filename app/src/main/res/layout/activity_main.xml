@@ -77,7 +77,6 @@
         android:layout_height="68dp"
         android:layout_gravity="bottom"
         android:background="?attr/colorSurface"
-        app:itemBackgroundColor="@android:color/transparent"
         app:elevation="8dp"
         app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
         app:itemIconSize="22dp"
