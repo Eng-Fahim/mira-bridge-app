@@ -819,22 +819,23 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void playSound(int id) {
-        try {
-            if (soundUtils != null) {
-                soundUtils.play(id);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "playSound Error: " + e.getMessage());
-        }
+    try {
+        // تحويل الرقم (1 للنجاح، أي رقم آخر للخطأ) إلى الاسم المطلوب في SoundGenerator
+        String soundName = (id == 1) ? "beep_success" : "beep_error";
+        com.example.uhf.tools.SoundGenerator.playSound(soundName);
+    } catch (Exception e) {
+        Log.e(TAG, "playSound Error: " + e.getMessage());
     }
+}
 
-    public void playSoundDelayed(int value) {
-        try {
-            mainHandler.postDelayed(() -> playSound(1), Math.max(10, 1000 - (value * 10)));
-        } catch (Exception e) {
-            Log.e(TAG, "playSoundDelayed Error: " + e.getMessage());
-        }
+public void playSoundDelayed(int value) {
+    try {
+        mainHandler.postDelayed(() -> playSound(1), Math.max(10, 1000 - (value * 10)));
+    } catch (Exception e) {
+        Log.e(TAG, "playSoundDelayed Error: " + e.getMessage());
     }
+}
+
 
     // -------------------------------------------------------------
 
