@@ -1,7 +1,10 @@
 package com.example.uhf.fragment;
 
 import androidx.appcompat.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -24,6 +27,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -56,6 +60,7 @@ public class MiraTransferFragment extends Fragment {
     private SessionManager sessionManager;
     private static final String TAG = "MiraTransfer";
     private static final String OFFLINE_PREFS = "transfers_cache";
+    public static final String ACTION_REFRESH_TRANSFERS = "com.example.uhf.REFRESH_TRANSFERS";
 
     private RecyclerView rvTransfers;
     private TextView tvEmpty, tvActiveBranch;
@@ -80,6 +85,15 @@ public class MiraTransferFragment extends Fragment {
     private TextView tvScanCounter;
     private AlertDialog loadingDialog;
     private ToneGenerator toneGenerator;
+
+    private final BroadcastReceiver refreshReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent != null && ACTION_REFRESH_TRANSFERS.equals(intent.getAction())) {
+                loadTransfers();
+            }
+        }
+    };
 
     @Nullable
     @Override
@@ -119,6 +133,9 @@ public class MiraTransferFragment extends Fragment {
         }, isArabic);
         rvTransfers.setAdapter(adapter);
 
+        LocalBroadcastManager.getInstance(context).registerReceiver(
+                refreshReceiver, new IntentFilter(ACTION_REFRESH_TRANSFERS));
+
         loadTransfers();
     }
 
@@ -126,6 +143,9 @@ public class MiraTransferFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         dismissLoadingDialog();
+        if (getContext() != null) {
+            LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(refreshReceiver);
+        }
         if (mainHandler != null) {
             mainHandler.removeCallbacksAndMessages(null);
         }
@@ -191,6 +211,7 @@ public class MiraTransferFragment extends Fragment {
         if (t == null) return false;
         int userBranchId = branchesManager.getActiveBranchId();
         
+        // لا يجوز للفرع المرسل استلام الشحنة
         if (t.fromBranchId == userBranchId) {
             return false;
         }
@@ -199,10 +220,6 @@ public class MiraTransferFragment extends Fragment {
         
         return (userRole == SecureSessionManager.Role.SYSTEM_ADMIN || userRole == SecureSessionManager.Role.ORG_ADMIN) 
                 || (t.toBranchId == userBranchId);
-    }
-
-    private boolean canDeleteTransfer() {
-        return permissionManager.isManager() || permissionManager.canDelete("transfers");
     }
 
     private void initViews(View view) {
@@ -747,14 +764,12 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void notifyDashboardUpdate() {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                Fragment dashboardFragment = ((UHFMainActivity) getActivity()).getSupportFragmentManager().findFragmentByTag("Dashboard");
-                if (dashboardFragment instanceof MiraDashboardFragment) {
-                    ((MiraDashboardFragment) dashboardFragment).refreshInternalData();
-                }
-            }
-        } catch (Exception ignored) {}
+        if (getContext() == null) return;
+        Intent intent = new Intent("com.example.uhf.REFRESH_DASHBOARD");
+        LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent);
+        
+        Intent invIntent = new Intent("com.example.uhf.REFRESH_INVENTORY");
+        LocalBroadcastManager.getInstance(getContext()).sendBroadcast(invIntent);
     }
 
     private void showNewTransferDialog() {
@@ -801,7 +816,7 @@ public class MiraTransferFragment extends Fragment {
         AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext()).setView(dv).create();
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         
-                btnCreate.setOnClickListener(v -> {
+        btnCreate.setOnClickListener(v -> {
             int pos = spTo.getSelectedItemPosition();
             if (pos < 0 || pos >= branchIds.size() || branchIds.get(pos) == 0) {
                 showUserMessage(isArabic ? "⚠️ خطأ" : "⚠️ Error", isArabic ? "يرجى اختيار فرع وجهة صحيح." : "Please select a valid destination branch.");
@@ -809,7 +824,7 @@ public class MiraTransferFragment extends Fragment {
             }
             
             int targetBranchId = branchIds.get(pos);
-            String targetBranchName = branchNames.get(pos); // اسم الفرع الوجهة للعرض
+            String targetBranchName = branchNames.get(pos);
             String notes = etNotes.getText().toString().trim();
             dialog.dismiss();
 
@@ -818,28 +833,71 @@ public class MiraTransferFragment extends Fragment {
             pendingTransfer.fromBranchId = fromBranchId;
             pendingTransfer.toBranchId = targetBranchId;
             pendingTransfer.fromBranch = branchesManager.getActiveBranchDisplayName();
-            pendingTransfer.toBranch = targetBranchName; // تعيين اسم الفرع الوجهة بوضوح
+            pendingTransfer.toBranch = targetBranchName;
             pendingTransfer.notes = notes;
             pendingTransfer.status = "draft";
             pendingTransfer.transferNumber = "TR-NEW";
 
             showScanItemsDialogForTransfer(pendingTransfer);
-
         });
 
         dialog.show();
     }
 
+    /**
+     * ✅ استدعاء هذا الميثود مباشرة من أجهزة RFID Hardware عند القراءة عبر الشاشة.
+     */
     public void onRfidTagScanned(String epc) {
         if (epc == null || epc.trim().isEmpty()) return;
         final String cleanEpc = epc.trim().toUpperCase();
+        
         mainHandler.post(() -> {
             if (!isAdded()) return;
             if (activeScanEpcSet.contains(cleanEpc)) return;
-            activeScanEpcSet.add(cleanEpc);
-            playScanBeepSound();
-            if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✔ " + cleanEpc);
-            if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
+            
+            // تحقق من الصلاحيات والوجود من API إن لزم
+            verifyAndAddEpcToTransfer(cleanEpc);
+        });
+    }
+
+    private void verifyAndAddEpcToTransfer(String epc) {
+        executor.execute(() -> {
+            try {
+                JSONObject params = new JSONObject();
+                params.put("branch_id", branchesManager.getActiveBranchId());
+                MiraApiClient.ApiResponse response = apiClient.authorize(epc, "transfer", params);
+                
+                mainHandler.post(() -> {
+                    if (!isAdded() || getContext() == null) return;
+                    if (response != null && response.isSuccess && response.data != null) {
+                        boolean allowed = response.data.optBoolean("allowed", false);
+                        JSONObject itemObj = response.data.optJSONObject("item");
+                        
+                        if (allowed || itemObj != null) {
+                            String title = itemObj != null ? itemObj.optString("title", epc) : epc;
+                            activeScanEpcSet.add(epc);
+                            playScanBeepSound();
+                            if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✅ " + title);
+                            if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
+                        } else {
+                            if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❌ " + epc + " (غير مسموح)");
+                        }
+                    } else {
+                        // إضافة الـ EPC مباشرة إذا كُنا في وضع 오프라인 أوفلاين
+                        activeScanEpcSet.add(epc);
+                        playScanBeepSound();
+                        if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✔ " + epc);
+                        if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    activeScanEpcSet.add(epc);
+                    playScanBeepSound();
+                    if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✔ " + epc);
+                    if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
+                });
+            }
         });
     }
 
@@ -882,35 +940,8 @@ public class MiraTransferFragment extends Fragment {
                 etEpc.setText("");
                 return;
             }
-            executor.execute(() -> {
-                try {
-                    JSONObject params = new JSONObject();
-                    params.put("branch_id", branchesManager.getActiveBranchId());
-                    MiraApiClient.ApiResponse response = apiClient.authorize(epc, "transfer", params);
-                    mainHandler.post(() -> {
-                        if (!isAdded() || getContext() == null) return;
-                        if (response != null && response.isSuccess && response.data != null) {
-                            boolean allowed = response.data.optBoolean("allowed", false);
-                            JSONObject itemObj = response.data.optJSONObject("item");
-                            
-                            if (allowed || (itemObj != null)) {
-                                String title = itemObj != null ? itemObj.optString("title", epc) : epc;
-                                activeScanEpcSet.add(epc);
-                                playScanBeepSound();
-                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✅ " + title);
-                                if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
-                            } else {
-                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❌ " + epc + " (غير مسموح)");
-                            }
-                        } else {
-                            Toast.makeText(getContext(), isArabic ? "القطعة غير مسجلة" : "Item not found", Toast.LENGTH_SHORT).show();
-                        }
-                        etEpc.setText("");
-                    });
-                } catch (Exception e) {
-                    mainHandler.post(() -> Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_SHORT).show());
-                }
-            });
+            verifyAndAddEpcToTransfer(epc);
+            etEpc.setText("");
         });
 
         btnClear.setOnClickListener(v -> {
