@@ -10,6 +10,12 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/action_hardware_setup"
+        android:icon="@android:drawable/ic_menu_compass"
+        android:title="الأجهزة المتصلة"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/action_gold_rates"
         android:icon="@drawable/ic_gold_rate"
         android:title="@string/menu_gold_rates"
