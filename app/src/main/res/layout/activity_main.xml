@@ -60,14 +60,12 @@
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- حاوية المحتوى الرئيسية للـ Fragments مع مسافة أمان السفلية لمنع التداخل -->
+        <!-- حاوية المحتوى الرئيسية للـ Fragments -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingBottom="85dp"
             android:background="?attr/colorSurface" />
 
     </LinearLayout>
@@ -106,12 +104,12 @@
         app:srcCompat="@drawable/ic_gold_gem"
         app:tint="?attr/colorOnPrimary" />
 
-    <!-- شاشة النجاح المجهزة للإنعكاس -->
+    <!-- طبقة السنابر والتحميل التفاعلية أثناء التنقل -->
     <LinearLayout
         android:id="@+id/successOverlayMain"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface"
+        android:background="#33000000"
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone"
@@ -120,27 +118,11 @@
         android:clickable="true"
         android:focusable="true">
 
-        <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:src="@drawable/ic_check_circle"
-            app:tint="?attr/colorPrimary" />
-
-        <TextView
-            android:id="@+id/tvSuccessMessageMain"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="تم تسجيل الدخول بنجاح"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
         <ProgressBar
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginTop="24dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:indeterminateTint="?attr/colorPrimary" />
+
     </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
