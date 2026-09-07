@@ -2,7 +2,6 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.Intent;
-import android.util.TypedValue;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -10,6 +9,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Vibrator;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -34,8 +34,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-import com.example.uhf.tools.RfidHardwareHelper;
-
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
@@ -43,11 +41,10 @@ import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.service.MiraGateMonitorService;
+import com.example.uhf.tools.RfidHardwareHelper;
 import com.example.uhf.tools.SoundGenerator;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
-import com.rscja.deviceapi.entity.UHFTAGInfo;
-import com.rscja.deviceapi.interfaces.IUHFInventoryCallback;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -89,7 +86,7 @@ public class MiraSecureGateFragment extends Fragment {
     private ScheduledExecutorService monitorScheduler;
     private ScheduledExecutorService pingScheduler;
     
-    // ✅ إدارة الفروع
+    // إدارة الفروع
     private int currentBranchId = 0;
     private boolean isGlobalAdmin = false;
     private Spinner spBranchSelector;
@@ -128,10 +125,9 @@ public class MiraSecureGateFragment extends Fragment {
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
         new ScanContract(),
         result -> {
-            // معالجة نتيجة الكاميرا في خلفية آمنة لمنع تعليق الواجهة
             gateExecutor.execute(() -> {
                 try {
-                    Thread.sleep(300); // إعطاء مجال لنظام الكاميرا لإغلاق الـ Activity بالكامل
+                    Thread.sleep(300);
                 } catch (InterruptedException ignored) {}
 
                 mainHandler.post(() -> {
@@ -141,7 +137,6 @@ public class MiraSecureGateFragment extends Fragment {
                         processInputEpc(result.getContents().trim(), "CAMERA");
                     }
                     
-                    // إعادة تشغيل الـ RFID بعد التأكد من تحرير الموارد
                     if (!isLockdown && !isDestroyed) {
                         autoStartScanning();
                     }
@@ -170,7 +165,7 @@ public class MiraSecureGateFragment extends Fragment {
     }
     
     private int getSuccessColor() {
-        return getColorFromTheme(com.google.android.material.R.attr.colorPrimary, Color.parseColor("#4CAF50"));
+        return getColorFromTheme(com.google.android.material.R.attr.colorPrimary, Color.parseColor("#10B981"));
     }
     
     private int getDangerColor() {
@@ -178,7 +173,7 @@ public class MiraSecureGateFragment extends Fragment {
     }
     
     private int getWarningColor() {
-        return getColorFromTheme(com.google.android.material.R.attr.colorSecondary, Color.parseColor("#FBBF24"));
+        return getColorFromTheme(com.google.android.material.R.attr.colorSecondary, Color.parseColor("#F59E0B"));
     }
     
     private int getTextColor() {
@@ -286,27 +281,26 @@ public class MiraSecureGateFragment extends Fragment {
             });
         }
         if (btnScanBarcode != null) {
-    btnScanBarcode.setOnClickListener(v -> {
-        isCameraOpen = true;
-        
-        if (mContext != null) {
-            RfidHardwareHelper.getInstance().prepareForCamera(mContext.mReader, () -> {
-                ScanOptions options = new ScanOptions();
-                options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
-                options.setBeepEnabled(false);
-                options.setOrientationLocked(true);
-                
-                try {
-                    barcodeLauncher.launch(options);
-                } catch (Exception e) {
-                    isCameraOpen = false;
-                    logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", "⚠️ Camera error: ") + e.getMessage());
-                    autoStartScanning();
+            btnScanBarcode.setOnClickListener(v -> {
+                isCameraOpen = true;
+                if (mContext != null) {
+                    RfidHardwareHelper.getInstance().prepareForCamera(mContext.mReader, () -> {
+                        ScanOptions options = new ScanOptions();
+                        options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
+                        options.setBeepEnabled(false);
+                        options.setOrientationLocked(true);
+                        
+                        try {
+                            barcodeLauncher.launch(options);
+                        } catch (Exception e) {
+                            isCameraOpen = false;
+                            logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", "⚠️ Camera error: ") + e.getMessage());
+                            autoStartScanning();
+                        }
+                    });
                 }
             });
         }
-    });
-}
 
         if (btnEmergencyLockdown != null) btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
         
@@ -336,9 +330,7 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    // ============================================
-    // ✅ إدارة الفروع
-    // ============================================
+    // ==================== إدارة الفروع ====================
     
     private void loadCurrentBranchInfo() {
         try {
@@ -522,9 +514,7 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    // ============================================
-    // ✅ خدمة الخلفية
-    // ============================================
+    // ==================== خدمة الخلفية ====================
     private void startBackgroundService() {
         try {
             Context context = getContext();
@@ -538,9 +528,7 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    // ============================================
-    // 🔴 Lockdown
-    // ============================================
+    // ==================== Lockdown ====================
     private void toggleLockdown() {
         isLockdown = !isLockdown;
         if (isLockdown) {
@@ -596,9 +584,7 @@ public class MiraSecureGateFragment extends Fragment {
         });
     }
 
-    // ============================================
-    // 📡 Ping
-    // ============================================
+    // ==================== Ping Monitor ====================
     private void startPingMonitor() {
         pingScheduler = Executors.newSingleThreadScheduledExecutor();
         pingScheduler.scheduleAtFixedRate(() -> {
@@ -662,15 +648,13 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    // ============================================
-    // ✅ المسح المعدل (حل مشكلة التجميد النهائي)
-    // ============================================
+    // ==================== RFID Scanning ====================
     private void autoStartScanning() {
         mainHandler.postDelayed(() -> {
             if (!isDestroyed && isAdded() && !isLockdown && !isCameraOpen) {
                 startScanning();
             }
-        }, 1200); // زيادة أمان المهلة الزمنية لضمان إغلاق الكاميرا بالكامل
+        }, 1200);
     }
 
     private void toggleScanning() {
@@ -678,35 +662,33 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void startScanning() {
-    if (isDestroyed || mContext == null || mContext.mReader == null || isCameraOpen) return;
+        if (isDestroyed || mContext == null || mContext.mReader == null || isCameraOpen) return;
 
-    RfidHardwareHelper.getInstance().startAsync(
-        mContext.mReader,
-        miraGatesSettings.getRfidPower(),
-        info -> {
-            if (!isDestroyed && info != null && info.getEPC() != null) {
-                processInputEpc(info.getEPC(), "RFID");
+        RfidHardwareHelper.getInstance().startAsync(
+            mContext.mReader,
+            miraGatesSettings.getRfidPower(),
+            info -> {
+                if (!isDestroyed && info != null && info.getEPC() != null) {
+                    processInputEpc(info.getEPC(), "RFID");
+                }
+            },
+            () -> {
+                isScanning = true;
+                if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🔴 إيقاف المسح", "🔴 Stop Scan"));
+                logConsole(getLocalizedText("🛡️ قارئ RFID يعمل", "🛡️ RFID reader active"));
             }
-        },
-        () -> {
-            isScanning = true;
-            if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🔴 إيقاف المسح", "🔴 Stop Scan"));
-            logConsole(getLocalizedText("🛡️ قارئ RFID يعمل", "🛡️ RFID reader active"));
-        }
-    );
-}
-
-private void stopScanning() {
-    if (mContext != null) {
-        RfidHardwareHelper.getInstance().stopAsync(mContext.mReader, () -> {
-            isScanning = false;
-            if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
-        });
+        );
     }
-}
 
+    private void stopScanning() {
+        if (mContext != null) {
+            RfidHardwareHelper.getInstance().stopAsync(mContext.mReader, () -> {
+                isScanning = false;
+                if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
+            });
+        }
+    }
 
-    // دالة إيقاف متزامنة وتعمل بأمان داخل الخيط الخلفي
     private void stopScanningSync() {
         if (mContext != null && mContext.mReader != null) {
             try { 
@@ -722,9 +704,7 @@ private void stopScanning() {
         });
     }
 
-    // ============================================
-    // 📡 المراقبة
-    // ============================================
+    // ==================== المراقبة والتحديثات ====================
     private void startMonitoring() {
         monitorScheduler = Executors.newSingleThreadScheduledExecutor();
         monitorScheduler.scheduleAtFixedRate(() -> {
@@ -822,9 +802,6 @@ private void stopScanning() {
         }
     }
 
-    // ============================================
-    // ✅ EPCs
-    // ============================================
     private void loadTestEpcs() {
         if (gateExecutor == null || getContext() == null) return;
         gateExecutor.execute(() -> {
@@ -844,9 +821,7 @@ private void stopScanning() {
         });
     }
 
-    // ============================================
-    // 📡 فحص القطع
-    // ============================================
+    // ==================== فحص التوافقية والأذونات ====================
     private void processInputEpc(String epc, String sourceType) {
         if (isDestroyed || !isAdded()) return;
         if (epc == null || epc.trim().isEmpty()) return;
@@ -1019,9 +994,7 @@ private void stopScanning() {
         }
     }
 
-    // ============================================
-    // 🚨 الإنذار
-    // ============================================
+    // ==================== الإنذار والملاحظات ====================
     private void triggerAlarm(String itemTitle, String serial) {
         mainHandler.post(() -> {
             if (overlayAlarm != null) {
@@ -1048,9 +1021,7 @@ private void stopScanning() {
         if (vibrator != null) vibrator.cancel();
     }
 
-    // ============================================
-    // 📝 السجل
-    // ============================================
+    // ==================== السجل الخطي ====================
     private void logConsole(String message) {
         mainHandler.post(() -> {
             if (isDestroyed || !isAdded()) return;
@@ -1063,9 +1034,7 @@ private void stopScanning() {
         });
     }
 
-    // ============================================
-    // 📦 Adapter
-    // ============================================
+    // ==================== Adapters ====================
     private static class GateMonitorItem {
         String gateId, gateName, location, status, lastEvent;
         String branchName;
@@ -1096,7 +1065,7 @@ private void stopScanning() {
             h.tvGateName.setTextColor(getTextColor());
             
             if (h.tvBranchName != null) {
-                if (currentBranchId == 0 && !item.branchName.isEmpty()) {
+                if (currentBranchId == 0 && item.branchName != null && !item.branchName.isEmpty()) {
                     h.tvBranchName.setText("📍 " + item.branchName);
                     h.tvBranchName.setVisibility(View.VISIBLE);
                 } else {
@@ -1113,15 +1082,15 @@ private void stopScanning() {
             if ("alert".equals(item.status)) {
                 h.tvGateStatus.setText(getLocalizedText("🔴 إنذار", "🔴 Alert"));
                 h.tvGateStatus.setTextColor(getDangerColor());
-                h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+                if (h.vStatusDot != null) h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
             } else if ("online".equals(item.status) || "armed".equals(item.status)) {
                 h.tvGateStatus.setText(getLocalizedText("🟢 نشطة", "🟢 Active"));
                 h.tvGateStatus.setTextColor(getSuccessColor());
-                h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
+                if (h.vStatusDot != null) h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
             } else {
                 h.tvGateStatus.setText(getLocalizedText("⚪ غير نشطة", "⚪ Inactive"));
                 h.tvGateStatus.setTextColor(getSecondaryTextColor());
-                h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+                if (h.vStatusDot != null) h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
             }
         }
         
@@ -1142,26 +1111,22 @@ private void stopScanning() {
         }
     }
 
-    // ============================================
-    // 🔄 دورة الحياة
-    // ============================================
-   @Override
-public void onPause() {
-    super.onPause();
-    stopScanning();
-}
+    // ==================== دورة الحياة ====================
+    @Override
+    public void onPause() {
+        super.onPause();
+        stopScanning();
+    }
 
-@Override
-public void onResume() {
-    super.onResume();
-    // مهلة أمان 600ms للعودة الهادئة وتفريغ موارد الكاميرا بالكامل
-    mainHandler.postDelayed(() -> {
-        if (!isScanning && isAdded() && !isLockdown && !isCameraOpen) {
-            startScanning();
-        }
-    }, 600);
-}
-
+    @Override
+    public void onResume() {
+        super.onResume();
+        mainHandler.postDelayed(() -> {
+            if (!isScanning && isAdded() && !isLockdown && !isCameraOpen) {
+                startScanning();
+            }
+        }, 600);
+    }
 
     @Override
     public void onDestroyView() {
@@ -1174,4 +1139,4 @@ public void onResume() {
         if (gateExecutor != null) gateExecutor.shutdownNow();
         mainHandler.removeCallbacksAndMessages(null);
     }
-            }
+}
