@@ -42,6 +42,9 @@ public class SecureSessionManager {
     private static final String KEY_API_KEY_CREATED_AT = "api_key_created_at";
     private static final String KEY_LAST_BIOMETRIC_TOKEN = "last_biometric_token";
     
+    // أضف مع المفاتيح الأخرى
+    private static final String KEY_BRANCH_ID = "branch_id";
+    private static final String KEY_BRANCH_NAME = "branch_name";
     // مفاتيح التخزين العادي
     private static final String KEY_IS_LOGGED_IN = "is_logged_in";
     private static final String KEY_USERNAME = "username";
@@ -761,6 +764,53 @@ public void setBiometricConfirmEnabled(boolean enabled) {
 public boolean isBiometricConfirmEnabled() {
     return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
 }
+// ==================== معرف الفرع ====================
 
+/**
+ * ✅ حفظ معرف الفرع الحالي
+ */
+public void setBranchId(int branchId) {
+    try {
+        userPrefs.edit().putInt(KEY_BRANCH_ID, branchId).apply();
+        Log.d(TAG, "Branch ID saved: " + branchId);
+    } catch (Exception e) {
+        Log.e(TAG, "setBranchId error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ الحصول على معرف الفرع الحالي
+ */
+public int getBranchId() {
+    try {
+        int branchId = userPrefs.getInt(KEY_BRANCH_ID, -1);
+        if (branchId <= 0) {
+            // ✅ محاولة من البيانات البيومترية
+            branchId = getLastBiometricBranchId();
+        }
+        return branchId;
+    } catch (Exception e) {
+        Log.e(TAG, "getBranchId error: " + e.getMessage());
+        return -1;
+    }
+}
+
+/**
+ * ✅ حفظ اسم الفرع الحالي
+ */
+public void setBranchName(String branchName) {
+    try {
+        userPrefs.edit().putString(KEY_BRANCH_NAME, branchName).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "setBranchName error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ الحصول على اسم الفرع الحالي
+ */
+public String getBranchName() {
+    return userPrefs.getString(KEY_BRANCH_NAME, "");
+}
 
 }
