@@ -53,12 +53,20 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 
+
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
+import androidx.core.content.ContextCompat;
+
 public class MiraSalesHistoryFragment extends Fragment {
 
     private static final String TAG = "MiraSalesHistory";
     private static final int PAGE_SIZE = 50;
     private static final int VISIBLE_THRESHOLD = 10;
-
+    
+    private boolean isReceiverRegistered = false;
+    private android.content.BroadcastReceiver dataRefreshReceiver;
     private RecyclerView rvSales;
     private View layoutEmptyState;
     private TextView tvEmpty;
@@ -105,6 +113,106 @@ public class MiraSalesHistoryFragment extends Fragment {
         return AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
                 getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
     }
+    
+    
+    
+/**
+ * ✅ تسجيل مستقبل إشارات التحديث
+ */
+private void registerDataRefreshReceiver() {
+    try {
+        if (getContext() == null || isReceiverRegistered) return;
+        
+        dataRefreshReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null || !isAdded()) return;
+                
+                String action = intent.getAction();
+                Log.d(TAG, "Received broadcast: " + action);
+                
+                if ("com.example.uhf.REFRESH_SALES".equals(action) || 
+                    "com.example.uhf.REFRESH_DASHBOARD".equals(action) || 
+                    "com.example.uhf.REFRESH_INVENTORY".equals(action)) {
+                    
+                    mainHandler.post(() -> {
+                        if (isAdded() && isResumed()) {
+                            Log.d(TAG, "Refreshing sales history from broadcast");
+                            // ✅ إعادة تحميل البيانات فوراً
+                            refreshSales(true);
+                        }
+                    });
+                }
+            }
+        };
+        
+        android.content.IntentFilter filter = new android.content.IntentFilter();
+        filter.addAction("com.example.uhf.REFRESH_SALES");
+        filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
+        filter.addAction("com.example.uhf.REFRESH_INVENTORY");
+        
+        ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, 
+                                      ContextCompat.RECEIVER_NOT_EXPORTED);
+        isReceiverRegistered = true;
+        Log.d(TAG, "DataRefreshReceiver registered");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
+    }
+}
+
+@Override
+public void onResume() {
+    super.onResume();
+    try {
+        // ✅ تسجيل المستقبل
+        registerDataRefreshReceiver();
+        
+        // ✅ إعادة تحميل البيانات عند العودة
+        if (isAdded() && saleList.isEmpty()) {
+            refreshSales(true);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage());
+    }
+}
+
+@Override
+public void onPause() {
+    super.onPause();
+    try {
+        // ✅ إلغاء تسجيل المستقبل
+        unregisterDataRefreshReceiver();
+    } catch (Exception e) {
+        Log.e(TAG, "onPause error: " + e.getMessage());
+    }
+}
+
+@Override
+public void onDestroyView() {
+    super.onDestroyView();
+    try {
+        // ✅ إلغاء تسجيل المستقبل
+        unregisterDataRefreshReceiver();
+    } catch (Exception e) {
+        Log.e(TAG, "onDestroyView error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ إلغاء تسجيل المستقبل
+ */
+private void unregisterDataRefreshReceiver() {
+    try {
+        if (getContext() != null && isReceiverRegistered && dataRefreshReceiver != null) {
+            requireContext().unregisterReceiver(dataRefreshReceiver);
+            isReceiverRegistered = false;
+            Log.d(TAG, "DataRefreshReceiver unregistered");
+        }
+    } catch (Exception e) {
+        Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
+    }
+}
 
     @Nullable
     @Override
@@ -860,7 +968,7 @@ public int hashCode() {
         }
 
         @Override
-public void onBindViewHolder(@NonNull VH h, int pos) {
+    public void onBindViewHolder(@NonNull VH h, int pos) {
     MiraSaleItem s = items.get(pos);
 
     if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
@@ -922,6 +1030,7 @@ public void onBindViewHolder(@NonNull VH h, int pos) {
         tvStatus = v.findViewById(R.id.tvMiraSaleStatus);  // ✅ أضف هذا
     }
 }
+
     }
 
     private interface OnMiraSaleClickListener {
