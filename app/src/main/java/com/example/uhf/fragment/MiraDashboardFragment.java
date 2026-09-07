@@ -2461,7 +2461,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    private void cancelFuture(Future<?> future) {
+        private void cancelFuture(Future<?> future) {
         try {
             if (future != null && !future.isDone()) {
                 future.cancel(true);
@@ -2471,3 +2471,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 }
+// ✅ نهاية الملف - لا يوجد أي كود بعد هذا
