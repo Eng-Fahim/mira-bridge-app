@@ -65,11 +65,6 @@
         <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
-    <!-- ✅ CustomActiveIndicator - مهم جداً -->
-    <style name="CustomActiveIndicator">
-        <item name="android:color">#1A9E8033</item>
-        <item name="cornerSize">14dp</item>
-    </style>
 
     <!-- ==================== SplashTheme ==================== -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
