@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- العنصر المحدد: يقرأ لون الثيم الذهبي الرئيسي -->
     <item android:color="?attr/colorPrimary" android:state_checked="true" />
+    
+    <!-- العناصر غير المحددة: تقرأ لون النص الثانوي المتجاوب -->
     <item android:color="?attr/colorOnSurfaceVariant" />
 </selector>
+
