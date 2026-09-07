@@ -1295,25 +1295,56 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                     setButtonsEnabled(true);
                     
                     if (finalIsSuccess) {
+                        // ✅ نجاح البيع أونلاين
                         removeSaleFromLocal(localSaleId);
                         removeSoldItemsFromCache();
                         playAlertSound(1);
                         clearCart();
+                        
+                        lastSaleResponse = finalResponse;
                         showReceipt(finalResponse);
                         
-                        // ✅✅✅ تحديث الداشبورد والمخزون بعد البيع الناجح
                         notifyDashboardAndInventoryUpdate("sale");
-                        
+
                     } else if (finalIsNetworkError || finalResponse == null) {
+                        // ✅ البيع أوفلاين عند انقطاع الشبكة
                         removeSoldItemsFromCache();
                         playAlertSound(1);
                         clearCart();
-                        showOfflineSaleSuccess(localSaleId, data);
                         
-                        // ✅✅✅ تحديث الداشبورد حتى في حالة الأوفلاين (تحديث محلي)
+                        try {
+                            JSONObject offlineReceiptJson = new JSONObject();
+                            offlineReceiptJson.put("success", true);
+                            offlineReceiptJson.put("sale_id", localSaleId);
+                            offlineReceiptJson.put("customer_name", data.customerName != null ? data.customerName : "عميل نقدي");
+                            offlineReceiptJson.put("customer_phone", data.customerPhone != null ? data.customerPhone : "-");
+                            offlineReceiptJson.put("payment_method", data.paymentMethod);
+                            offlineReceiptJson.put("final_amount", data.finalAmount);
+                            offlineReceiptJson.put("discount_amount", data.discountAmount);
+                            offlineReceiptJson.put("original_total", data.originalTotal);
+                            offlineReceiptJson.put("is_offline", true);
+                            offlineReceiptJson.put("date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+                            
+                            // تفاصيل الأصناف
+                            offlineReceiptJson.put("items", payload.getJSONArray("items"));
+
+                            // إنشاء ApiResponse محلي وتمريره لعرض السند مباشرة
+                            MiraApiClient.ApiResponse localResponse = new MiraApiClient.ApiResponse();
+                            localResponse.isSuccess = true;
+                            localResponse.data = offlineReceiptJson;
+                            
+                            lastSaleResponse = localResponse;
+                            showReceipt(localResponse);
+                            
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error generating offline receipt: " + e.getMessage());
+                            showOfflineSaleSuccess(localSaleId, data);
+                        }
+                        
                         notifyDashboardAndInventoryUpdate("offline_sale");
-                        
+
                     } else {
+                        // ❌ فشل البيع من جانب السيرفر (مثلاً الاستجابة وصلت ولكن success = false)
                         showRetryDialog(
                             isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
                             finalErrorMsg,
@@ -1338,6 +1369,7 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
         Log.e(TAG, "executeCheckout error: " + e.getMessage());
     }
 }
+
 
 
 // ==================== الدوال المساعدة ====================
@@ -1699,7 +1731,6 @@ private void showReceipt(MiraApiClient.ApiResponse response) {
     try {
         if (!isAdded() || getActivity() == null) return;
         
-        // ✅ تحويل الاستجابة إلى JSON string
         String receiptJson = "{}";
         if (response != null && response.data != null) {
             receiptJson = response.data.toString();
@@ -1707,7 +1738,7 @@ private void showReceipt(MiraApiClient.ApiResponse response) {
             receiptJson = response.getBody();
         }
         
-        // ✅ فتح MiraReceiptFragment
+        // فتح واجهة الفاتورة/السند بنجاح
         MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(receiptJson);
         FragmentManager fm = getParentFragmentManager();
         if (!fm.isStateSaved()) {
@@ -1715,11 +1746,14 @@ private void showReceipt(MiraApiClient.ApiResponse response) {
         }
     } catch (Exception e) {
         Log.e(TAG, "showReceipt error: " + e.getMessage());
-        // ✅ إذا فشل عرض الفاتورة، عرض رسالة نجاح عادية
-        showSuccessMessage(isArabic ? "تم البيع بنجاح" : "Sale Completed", 
-            isArabic ? "تمت عملية البيع بنجاح" : "Sale completed successfully", true);
+        showSuccessMessage(
+            isArabic ? "تم البيع بنجاح" : "Sale Completed", 
+            isArabic ? "تمت عملية البيع بنجاح" : "Sale completed successfully", 
+            true
+        );
     }
 }
+
 
 private void checkPendingSales() {
     try {
