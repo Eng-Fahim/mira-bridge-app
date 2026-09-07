@@ -2,21 +2,13 @@ package com.example.uhf.activity;
 
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.AppWatchdog;
-import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.media.AudioAttributes;
-import android.media.AudioManager;
-import android.media.SoundPool;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -27,12 +19,10 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TabHost;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -91,7 +81,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final boolean ENABLE_OTHER = true;
 
     private static final String TAG = "UHFMainActivity";
-    private static final int PERMISSION_REQUEST_CODE = 1001;
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
 
@@ -101,7 +90,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraOrgProfileManager orgProfileManager;
     private MiraOrgProfileManager.OnProfileChangedListener profileListener;
 
-    private FrameLayout loadingOverlay;
     private FragmentManager fragmentManager;
 
     private MiraPosFragment activePOSFragment = null;
@@ -121,10 +109,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
-
-    private SoundPool soundPool;
-    private AudioManager audioManager;
-    private final HashMap<Integer, Integer> soundMap = new HashMap<>();
 
     public interface OnRfidScannedListener {
         void onRfidScanned(String epc);
@@ -207,6 +191,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             cleanupOldFragments();
 
+            // الحارس التلقائي الذكي لمنع التجمد وإلغاء الحاجة لزر إعادة التشغيل اليدوي
             AppWatchdog.getInstance().startMonitoring(() -> {
                 Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
                 MiraApplication.getInstance().restartApp();
@@ -271,12 +256,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.onPause();
         hideLoading();
         AppWatchdog.getInstance().stopMonitoring();
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        hideLoading();
     }
 
     private void initializeLanguageState() {
@@ -360,6 +339,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             actionHardware.setVisible(true);
         }
 
+        MenuItem actionExport = menu.findItem(R.id.export);
+        if (actionExport != null) {
+            actionExport.setVisible(pm.canExportReports());
+        }
+
         MenuItem actionLogout = menu.findItem(R.id.action_logout);
         if (actionLogout != null) {
             actionLogout.setVisible(true);
@@ -392,6 +376,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             return true;
         } else if (id == R.id.action_quick_access_settings) {
             checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+            return true;
+        } else if (id == R.id.export) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraReportsProFragment(), "Reports"));
             return true;
         } else if (id == R.id.action_toggle_language) {
             toggleLanguage();
@@ -820,10 +807,36 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
+    // --- 🛠️ دوال المساعدة للرسائل والأصوات (حل أخطاء الـ Compile) ---
+
+    public void showToast(int resId) {
+        showToast(getString(resId));
+    }
+
     public void showToast(String text) {
         if (text == null) return;
         mainHandler.post(() -> Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show());
     }
+
+    public void playSound(int id) {
+        try {
+            if (soundUtils != null) {
+                soundUtils.play(id);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "playSound Error: " + e.getMessage());
+        }
+    }
+
+    public void playSoundDelayed(int value) {
+        try {
+            mainHandler.postDelayed(() -> playSound(1), Math.max(10, 1000 - (value * 10)));
+        } catch (Exception e) {
+            Log.e(TAG, "playSoundDelayed Error: " + e.getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------
 
     public boolean isInventoryActive() {
         if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
@@ -1038,12 +1051,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             AppWatchdog.getInstance().stopMonitoring();
             hideLoading();
             stopActiveInventory();
-
-            if (soundPool != null) {
-                soundPool.release();
-                soundPool = null;
-            }
-            audioManager = null;
 
             if (fragmentManager != null) {
                 clearBackStack();
