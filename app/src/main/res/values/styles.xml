@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:android="http://schemas.android.com/apk/res/android">
+<resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- ==================== أشكال الحواف الفاخرة ==================== -->
     <style name="CircleImageView">
         <item name="cornerSize">50%</item>
     </style>
 
-    <!-- Circular Image Shape Style -->
     <style name="CircularImageView">
         <item name="cornerSize">50%</item>
     </style>
 
-    <!-- Style الحواف الدائرية الفاخرة للبطاقات والقوائم -->
+    <style name="CircleImageStyle">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
     <style name="ShapeAppearance.TopRounded" parent="ShapeAppearance.Material3.Corner.None">
         <item name="cornerSizeTopLeft">24dp</item>
         <item name="cornerSizeTopRight">24dp</item>
@@ -18,7 +22,7 @@
         <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
-    <!-- ستايل القائمة المنسدلة العلوية -->
+    <!-- ==================== ستايلات القوائم المنسدلة ==================== -->
     <style name="CustomOverflowMenu" parent="Widget.AppCompat.PopupMenu.Overflow">
         <item name="overlapAnchor">false</item>
         <item name="android:dropDownVerticalOffset">8dp</item>
@@ -31,10 +35,9 @@
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
-    <!-- توحيد الثيمات لضمان عمل كافة النشاطات بالهوية الجديدة -->
+    <!-- ==================== ربط الثيمات الرئيسية متجاوبة مع الماتيريال 3 ==================== -->
     <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
         
-    <!-- الثيم الرئيسي للتطبيق شامل الربط مع تصميم الديالوج والقائمة المنسدلة -->
     <style name="AppTheme" parent="Theme.Uhfuartdemo">
         <item name="android:alertDialogTheme">@style/MiraCustomDialogTheme</item>
         <item name="alertDialogTheme">@style/MiraCustomDialogTheme</item>
@@ -45,7 +48,17 @@
     <style name="ActionBarBaseTheme" parent="Theme.Uhfuartdemo" />
     <style name="ActionBarBaseTheme1" parent="Theme.Uhfuartdemo" />
 
-    <!-- Tab options text style -->  
+    <!-- ==================== مؤشر الفوتر النشط (اصلاح مشكلة الشريط السفلي) ==================== -->
+    <style name="CustomActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <!-- لون ذهبي شفاف متجاوب بنسبة 15% يمنع الصدام مع الخلفيات الفاتحة والداكنة -->
+        <item name="android:color">#26D4AF37</item>
+        <item name="android:width">54dp</item>
+        <item name="android:height">32dp</item>
+        <item name="marginHorizontal">4dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+    </style>
+
+    <!-- ==================== ستايلات التبويبات والقوائم السريعة ==================== -->
     <style name="MyActionBarTabTextStyle" parent="TextAppearance.Material3.TitleMedium">          
         <item name="android:textColor">@drawable/check_text_color</item>
         <item name="android:textSize">16sp</item>  
@@ -72,7 +85,6 @@
         <item name="android:textStyle">bold</item>
     </style>
 
-    <!-- نمط التبويبات -->
     <style name="TabTextStyle" parent="TextAppearance.Design.Tab">
         <item name="android:textSize">13sp</item>
         <item name="android:textStyle">bold</item>
@@ -82,32 +94,22 @@
         <item name="android:textAllCaps">false</item>
     </style>
     
-    <!-- 1. ثيم الموديل المدمج (الشكل الهيكلي + الألوان الداكنة والذهبية) -->
-    <style name="MiraCustomDialogTheme" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
-        <!-- الخصائص الهيكلية للانحناءات (Material 3) -->
+    <!-- ==================== ثيم النوافذ الحوارية المصحح والمتجاوب ==================== -->
+    <style name="MiraCustomDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="shapeAppearanceOverlay">@style/MiraDialogCorners</item>
-        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button.UnelevatedButton</item>
-        
-        <!-- الألوان والخلفية -->
         <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
-        <item name="android:textColorPrimary">#FFFFFF</item>
-        <item name="android:textColorSecondary">#AAAAAA</item>
-        <item name="android:titleTextColor">#D4AF37</item>
+        <!-- الاعتماد على متغيرا الثيم الديناميكية بدلاً من ألوان شاذة ثابتة -->
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:titleTextColor">?attr/colorPrimary</item>
         <item name="android:fontFamily">@font/cairo</item>
-        <item name="colorAccent">#D4AF37</item>
-        
-        <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="colorAccent">?attr/colorPrimary</item>
+        <item name="colorPrimary">?attr/colorPrimary</item>
     </style>
 
-    <!-- تحديد درجة انحناء حواف الهيكل العصري -->
     <style name="MiraDialogCorners" parent="">
         <item name="cornerSize">24dp</item>
-    </style>
-
-    <!-- Circle Image Style -->
-    <style name="CircleImageStyle">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">50%</item>
     </style>
 
     <style name="DialogAnimation" parent="android:Animation">
