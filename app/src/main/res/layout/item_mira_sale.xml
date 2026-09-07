@@ -1,146 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
-    android:clickable="true"
-    android:focusable="true"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="14dp"
+    android:layout_marginBottom="8dp"
+    app:cardCornerRadius="12dp"
     app:cardElevation="1dp"
-    app:rippleColor="?attr/colorControlHighlight"
-    app:strokeColor="?attr/colorOutline"
-    app:strokeWidth="0.5dp">
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="14dp">
+        android:padding="12dp">
 
-        <!-- Header of Card: Customer & Status / Amount -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/tvMiraSaleId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:background="?attr/colorSurfaceVariant"
+                android:fontFamily="monospace"
+                android:paddingStart="6dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="2dp"
+                android:text="#INV-0000"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvMiraSaleStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:text="✅ مكتمل"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </RelativeLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!-- Icon & Title -->
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvMiraSaleCustomer"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:text="اسم العميل"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
-                <ImageView
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:background="@drawable/bg_badge_online"
-                    android:padding="8dp"
-                    android:src="@android:drawable/ic_menu_agenda"
-                    app:tint="?attr/colorPrimary" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:orientation="vertical">
-
-                    <!-- رقم الفاتورة -->
-                    <TextView
-                        android:id="@+id/tvMiraSaleId"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        tools:text="#INV-001" />
-
-                    <!-- اسم العميل -->
-                    <TextView
-                        android:id="@+id/tvMiraSaleCustomer"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        tools:text="اسم العميل" />
-
-                    <!-- ✅✅✅ حالة الإرجاع - جديدة -->
-                    <TextView
-                        android:id="@+id/tvMiraSaleStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:textSize="10sp"
-                        android:textStyle="bold"
-                        android:visibility="gone"
-                        tools:text="✅ مكتمل"
-                        tools:visibility="visible" />
-
-                    <!-- طريقة الدفع -->
-                    <TextView
-                        android:id="@+id/tvMiraSalePayment"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:background="@drawable/bg_status_badge"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="2dp"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp"
-                        tools:text="نقداً" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Amount -->
             <TextView
                 android:id="@+id/tvMiraSaleAmount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:text="$0.00"
                 android:textColor="?attr/colorPrimary"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                tools:text="0 YER" />
+                android:textSize="15sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Divider -->
         <View
             android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginVertical="10dp"
-            android:background="?attr/colorOutline" />
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="?attr/colorOutlineVariant" />
 
-        <!-- Footer of Card: Items & Date -->
-        <LinearLayout
+        <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_height="wrap_content">
 
             <TextView
                 android:id="@+id/tvMiraSaleItems"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_alignParentStart="true"
+                android:text="1 قطع"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                tools:text="0 قطعة" />
+                android:textSize="11sp" />
 
             <TextView
                 android:id="@+id/tvMiraSaleDate"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:text="00/00/0000"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp"
-                tools:text="0000-00-00 00:00" />
-        </LinearLayout>
-
+                android:textSize="11sp" />
+        </RelativeLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
