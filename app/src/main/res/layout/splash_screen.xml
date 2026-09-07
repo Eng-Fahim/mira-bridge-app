@@ -2,112 +2,155 @@
 <androidx.constraintlayout.widget.ConstraintLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/splash_background_gradient">
+    android:background="?android:attr/colorBackground"
+    android:clipChildren="false">
 
-    <!-- حاوية المركز (الشعار + العناوين) -->
+    <!-- ==================== الخلفية والتوهجات السينمائية ==================== -->
+    <View
+        android:id="@+id/vGlow"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:alpha="0"
+        android:background="@drawable/radial_glow_gold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.4" />
+
+    <View
+        android:id="@+id/vLightPulse"
+        android:layout_width="180dp"
+        android:layout_height="180dp"
+        android:alpha="0"
+        android:background="@drawable/bg_logo_glow"
+        app:layout_constraintBottom_toBottomOf="@+id/logoContainer"
+        app:layout_constraintEnd_toEndOf="@+id/logoContainer"
+        app:layout_constraintStart_toStartOf="@+id/logoContainer"
+        app:layout_constraintTop_toTopOf="@+id/logoContainer" />
+
+    <!-- ==================== زر أو نص الإصدار في الأعلى ==================== -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:letterSpacing="0.08"
+        android:text="v1.0.0 Enterprise"
+        android:textColor="?attr/colorOutline"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ==================== التجميعة المركزية (الشعار والنصوص) ==================== -->
     <LinearLayout
-        android:id="@+id/llBrandContainer"
+        android:id="@+id/centerLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="24dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        android:paddingHorizontal="32dp"
+        app:layout_constraintBottom_toTopOf="@+id/footerLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvVersion"
+        app:layout_constraintVertical_bias="0.45">
 
-        <!-- هالة التوهج الذهبي خلف اللوجو -->
+        <!-- إطار الشعار الفخم -->
         <FrameLayout
-            android:layout_width="140dp"
-            android:layout_height="140dp"
-            android:layout_marginBottom="20dp">
-
-            <View
-                android:id="@+id/vGlow"
-                android:layout_width="120dp"
-                android:layout_height="120dp"
-                android:layout_gravity="center"
-                android:alpha="0"
-                android:background="@drawable/bg_gold_glow" />
+            android:id="@+id/logoContainer"
+            android:layout_width="110dp"
+            android:layout_height="110dp"
+            android:background="@drawable/bg_logo_glow"
+            android:padding="16dp">
 
             <ImageView
                 android:id="@+id/ivLogo"
-                android:layout_width="96dp"
-                android:layout_height="96dp"
-                android:layout_gravity="center"
-                android:alpha="0"
-                android:contentDescription="MIRA ID Logo"
-                android:elevation="12dp"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="Brand Logo"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_mira_logo" />
+                android:src="@drawable/ic_luxury_mira_logo" />
         </FrameLayout>
 
-        <!-- العنوان الرئيسي -->
-        <TextView
+        <!-- اسم التطبيق والمنظومة -->
+        <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tvAppName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:alpha="0"
-            android:fontFamily="sans-serif-black"
-            android:letterSpacing="0.25"
-            android:text="MIRA ID™"
-            android:textColor="#FFFFFF"
-            android:textSize="38sp" />
+            android:layout_marginTop="20dp"
+            android:letterSpacing="0.02"
+            android:text="MIRA JEWELRY"
+            android:textAlignment="center"
+            android:textColor="?attr/colorOnBackground"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvSubTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:letterSpacing="0.12"
+            android:text="MIRA ID™ SMART JEWELRY TAG"
+            android:textAllCaps="true"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
 
         <!-- الخط الفاصل الذهبي -->
         <View
             android:id="@+id/divider"
-            android:layout_width="40dp"
+            android:layout_width="120dp"
             android:layout_height="2dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="12dp"
-            android:alpha="0"
-            android:background="#D4AF37" />
+            android:layout_marginVertical="16dp"
+            android:background="?attr/colorPrimary" />
 
-        <!-- الوصف الفرعي -->
-        <TextView
+        <!-- السلوجان والتوصيف -->
+        <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tvTagline"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:alpha="0"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.15"
-            android:text="SMART JEWELRY TAGGING PLATFORM"
-            android:textColor="#D4AF37"
-            android:textSize="11sp" />
+            android:gravity="center"
+            android:letterSpacing="0.03"
+            android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="13sp" />
+
     </LinearLayout>
 
-    <!-- المؤشر السفلي والإصدار -->
+    <!-- ==================== التذييل والتوقيع المؤسسي ==================== -->
     <LinearLayout
+        android:id="@+id/footerLayout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="36dp"
         android:gravity="center"
         android:orientation="vertical"
-        android:layout_marginBottom="40dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
         <ProgressBar
-            android:id="@+id/pbLoading"
-            style="?android:attr/progressBarStyleSmall"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:alpha="0.8"
-            android:indeterminateTint="#D4AF37" />
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginBottom="16dp"
+            android:indeterminateTint="?attr/colorPrimary" />
 
-        <TextView
-            android:id="@+id/tvVersion"
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvFooterBrand"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:fontFamily="sans-serif-light"
-            android:letterSpacing="0.1"
-            android:text="Enterprise v4.1.0"
-            android:textColor="#66FFFFFF"
-            android:textSize="10sp" />
+            android:gravity="center"
+            android:letterSpacing="0.06"
+            android:text="MIRA Trust Architecture™\nGlobal Standards &amp; RFID Solutions"
+            android:textColor="?attr/colorOutline"
+            android:textSize="10sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
