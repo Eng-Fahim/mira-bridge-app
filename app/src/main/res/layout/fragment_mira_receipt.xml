@@ -87,7 +87,7 @@
             android:text="طباعة"
             android:textSize="13sp"
             android:textStyle="bold"
-            app:icon="@android:drawable/ic_menu_print"
+            app:icon="@drawable/ic_menu_print"
             app:cornerRadius="10dp"
             app:backgroundTint="?attr/colorPrimary" />
 
@@ -101,7 +101,7 @@
             android:text="مشاركة"
             android:textSize="13sp"
             android:textStyle="bold"
-            app:icon="@android:drawable/ic_menu_share"
+            app:icon="@drawable/ic_menu_share"
             app:cornerRadius="10dp"
             app:backgroundTint="?attr/colorPrimary" />
 
@@ -114,7 +114,7 @@
             android:text="حفظ PDF"
             android:textSize="13sp"
             android:textStyle="bold"
-            app:icon="@android:drawable/ic_menu_save"
+            app:icon="@drawable/ic_menu_save"
             app:cornerRadius="10dp"
             app:backgroundTint="?attr/colorPrimary" />
     </LinearLayout>
