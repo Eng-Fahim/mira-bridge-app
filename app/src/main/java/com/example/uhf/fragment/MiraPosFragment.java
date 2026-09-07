@@ -1328,10 +1328,10 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                             // تفاصيل الأصناف
                             offlineReceiptJson.put("items", payload.getJSONArray("items"));
 
-                            // إنشاء ApiResponse محلي وتمريره لعرض السند مباشرة
-                            MiraApiClient.ApiResponse localResponse = new MiraApiClient.ApiResponse();
-                            localResponse.isSuccess = true;
-                            localResponse.data = offlineReceiptJson;
+                            // إنشاء ApiResponse محلي وتمر
+                            
+                            MiraApiClient.ApiResponse localResponse = new MiraApiClient.ApiResponse(200, offlineReceiptJson, "Success");
+
                             
                             lastSaleResponse = localResponse;
                             showReceipt(localResponse);
