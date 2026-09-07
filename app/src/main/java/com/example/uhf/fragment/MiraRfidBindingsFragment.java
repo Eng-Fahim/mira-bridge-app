@@ -18,7 +18,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
@@ -39,10 +41,7 @@ import java.util.Locale;
 import java.util.concurrent.Executors;
 
 /**
- * ✅ إدارة الشرائح المبرمجة والمتاحة
- * - تحترم الثيمات من MiraBaseFragment
- * - تدعم العربية والإنجليزية
- * - مع Logging شامل للتشخيص
+ * ✅ إدارة الشرائح المبرمجة والمتاحة (محدثة لدعم الأداء العالي والثيمات الموحدة)
  */
 public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
@@ -50,10 +49,9 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
     private RecyclerView rvBindings;
     private BindingsAdapter adapter;
+    private AvailableTagsAdapter availableAdapter;
     private MiraApiClient apiClient;
     private PermissionManager permissionManager;
-    private final List<JSONObject> bindingList = new ArrayList<>();
-    private final List<JSONObject> availableTagList = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     private TextView tvCount;
@@ -63,59 +61,18 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     private String currentSearch = "";
     private boolean showingAvailableTags = false;
     
+    // Pagination variables
+    private int currentPage = 1;
+    private boolean isLoading = false;
+    private boolean isLastPage = false;
+    
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_mira_rfid_bindings, container, false);
     }
-    /**
- * ✅ تطبيق الثيم الشامل على كل العناصر
- */
-private void applyTheme(View view) {
-    try {
-        Context context = getContext();
-        if (context == null) return;
-       
-        
-        // ✅ SwipeRefresh
-        SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefresh);
-        if (swipeRefresh != null) {
-            swipeRefresh.setBackgroundColor(context.getColor(R.color.report_background));
-        }
-        
-        // ✅ TabLayout
-        TabLayout tabFilter = view.findViewById(R.id.tabFilter);
-        if (tabFilter != null) {
-            tabFilter.setBackgroundColor(context.getColor(R.color.report_surface));
-            tabFilter.setTabTextColors(
-                context.getColor(R.color.report_text_secondary),
-                context.getColor(R.color.report_text_primary)
-            );
-            tabFilter.setSelectedTabIndicatorColor(context.getColor(R.color.report_accent));
-        }
-        
-        // ✅ RecyclerView
-        if (rvBindings != null) {
-            rvBindings.setBackgroundColor(context.getColor(R.color.report_background));
-        }
-        
-        // ✅ النصوص
-        if (tvTitle != null) {
-            tvTitle.setTextColor(context.getColor(R.color.report_text_primary));
-        }
-        if (tvCount != null) {
-            tvCount.setTextColor(context.getColor(R.color.report_text_secondary));
-        }
-        if (tvAvailableCount != null) {
-            tvAvailableCount.setTextColor(context.getColor(R.color.report_accent));
-        }
-        
-        Log.d(TAG, "🎨 Theme applied successfully");
-    } catch (Exception e) {
-        Log.e(TAG, "applyTheme error: " + e.getMessage());
-    }
-}
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
@@ -123,74 +80,65 @@ private void applyTheme(View view) {
         Context context = getContext();
         if (context == null) return;
         
-        Log.d(TAG, "🟢 onViewCreated started");
-        
         apiClient = MiraApiClient.getInstance(context);
         permissionManager = PermissionManager.getInstance(context);
         
-        // ✅ تهيئة العناصر
         tvCount = view.findViewById(R.id.tvCount);
         tvTitle = view.findViewById(R.id.tvTitle);
         tvAvailableCount = view.findViewById(R.id.tvAvailableCount);
         rvBindings = view.findViewById(R.id.rvBindings);
-        rvBindings.setLayoutManager(new LinearLayoutManager(context));
         
-        adapter = new BindingsAdapter(bindingList, this::showBindingDetails);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(context);
+        rvBindings.setLayoutManager(layoutManager);
+        
+        adapter = new BindingsAdapter(this::showBindingDetails);
+        availableAdapter = new AvailableTagsAdapter();
         rvBindings.setAdapter(adapter);
         
-        // ✅ تطبيق الثيم
-        applyTheme(view);
+        // ✅ مراقبة التمرير لتطبيق الـ Pagination الحقيقي ومنع التحميل الزائد للذاكرة
+        rvBindings.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                int visibleItemCount = layoutManager.getChildCount();
+                int totalItemCount = layoutManager.getItemCount();
+                int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
+
+                if (!isLoading && !isLastPage && !showingAvailableTags) {
+                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
+                            && firstVisibleItemPosition >= 0 && totalItemCount >= 50) {
+                        loadMoreBindings();
+                    }
+                }
+            }
+        });
         
-        // ✅ SwipeRefresh
         SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefresh);
         if (swipeRefresh != null) {
-            swipeRefresh.setColorSchemeResources(R.color.report_primary, R.color.report_accent);
             swipeRefresh.setOnRefreshListener(() -> {
-                Log.d(TAG, "🔄 Swipe refresh triggered");
-                loadBindings();
-                loadAvailableTags();
+                currentPage = 1;
+                isLastPage = false;
+                if (showingAvailableTags) {
+                    loadAvailableTags();
+                } else {
+                    loadBindings(true);
+                }
                 swipeRefresh.setRefreshing(false);
             });
         }
         
-        // ✅ التبويبات
         TabLayout tabFilter = view.findViewById(R.id.tabFilter);
         if (tabFilter != null) {
-            tabFilter.setTabTextColors(
-                getResources().getColor(R.color.report_text_secondary),
-                getResources().getColor(R.color.report_text_primary)
-            );
-            tabFilter.setSelectedTabIndicatorColor(getResources().getColor(R.color.report_accent));
-            
             tabFilter.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
                 @Override public void onTabSelected(TabLayout.Tab tab) {
-                    Log.d(TAG, "Tab selected: " + tab.getPosition());
-                    
+                    currentPage = 1;
+                    isLastPage = false;
                     switch (tab.getPosition()) {
-                        case 0: 
-                            currentFilter = ""; 
-                            showingAvailableTags = false;
-                            loadBindings();
-                            break;
-                        case 1: 
-                            currentFilter = "active"; 
-                            showingAvailableTags = false;
-                            loadBindings();
-                            break;
-                        case 2: 
-                            currentFilter = "locked"; 
-                            showingAvailableTags = false;
-                            loadBindings();
-                            break;
-                        case 3: 
-                            currentFilter = "inactive"; 
-                            showingAvailableTags = false;
-                            loadBindings();
-                            break;
-                        case 4:
-                            showingAvailableTags = true;
-                            loadAvailableTags();
-                            break;
+                        case 0: currentFilter = ""; showingAvailableTags = false; loadBindings(true); break;
+                        case 1: currentFilter = "active"; showingAvailableTags = false; loadBindings(true); break;
+                        case 2: currentFilter = "locked"; showingAvailableTags = false; loadBindings(true); break;
+                        case 3: currentFilter = "inactive"; showingAvailableTags = false; loadBindings(true); break;
+                        case 4: showingAvailableTags = true; loadAvailableTags(); break;
                     }
                 }
                 @Override public void onTabUnselected(TabLayout.Tab tab) {}
@@ -198,23 +146,11 @@ private void applyTheme(View view) {
             });
         }
         
-        // ✅ زر عرض الشرائح المتاحة
-        View btnAvailableTags = view.findViewById(R.id.btnAvailableTags);
-        if (btnAvailableTags != null) {
-            btnAvailableTags.setOnClickListener(v -> {
-                Log.d(TAG, "🟡 btnAvailableTags clicked");
-                showingAvailableTags = true;
-                loadAvailableTags();
-            });
-        }
-        
-        // ✅ زر البحث
         View btnSearch = view.findViewById(R.id.btnSearch);
         if (btnSearch != null) {
             btnSearch.setOnClickListener(v -> showSearchDialog());
         }
         
-        // ✅ زر التصدير
         ExtendedFloatingActionButton fabExport = view.findViewById(R.id.fabExport);
         if (fabExport != null) {
             boolean canExport = permissionManager != null && 
@@ -223,177 +159,118 @@ private void applyTheme(View view) {
             fabExport.setOnClickListener(v -> exportToCSV());
         }
         
-        // ✅ تحميل البيانات
-        loadBindings();
+        loadBindings(true);
         loadAvailableTags();
-        
-        Log.d(TAG, "🟢 onViewCreated completed");
     }
     
-    /**
-     * ✅ تحميل الشرائح المتاحة مع Logging
-     */
     private void loadAvailableTags() {
-        Log.d(TAG, "🔄 === loadAvailableTags START ===");
-        
+        showingAvailableTags = true;
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid/available");
-                
-                Log.d(TAG, "📊 Response: " + (response != null ? "NOT NULL" : "NULL"));
-                
-                if (response != null) {
-                    Log.d(TAG, "📊 Code: " + response.code);
-                    Log.d(TAG, "📊 isSuccess: " + response.isSuccess);
-                    Log.d(TAG, "📊 Body: " + response.getBody());
-                }
-                
                 mainHandler.post(() -> {
-                    if (!isAdded() || getContext() == null) {
-                        Log.w(TAG, "⚠️ Fragment detached - skipping UI update");
-                        return;
-                    }
-                    
+                    if (!isAdded() || getContext() == null) return;
                     if (response != null && response.isSuccess && response.data != null) {
                         int totalAvailable = response.data.optInt("total_available", 0);
-                        int count = response.data.optInt("count", 0);
-                        
-                        Log.d(TAG, "📊 total_available: " + totalAvailable);
-                        Log.d(TAG, "📊 count: " + count);
-                        
                         JSONArray availableTags = response.data.optJSONArray("available_tags");
                         
-                        availableTagList.clear();
-                        if (availableTags != null && availableTags.length() > 0) {
+                        List<JSONObject> list = new ArrayList<>();
+                        if (availableTags != null) {
                             for (int i = 0; i < availableTags.length(); i++) {
-                                JSONObject tag = availableTags.optJSONObject(i);
-                                if (tag != null) {
-                                    availableTagList.add(tag);
-                                }
+                                list.add(availableTags.optJSONObject(i));
                             }
-                            Log.d(TAG, "📊 Loaded " + availableTagList.size() + " available tags");
-                        } else {
-                            Log.w(TAG, "⚠️ available_tags is null or empty");
                         }
                         
-                        // ✅ تحديث العداد
+                        rvBindings.setAdapter(availableAdapter);
+                        availableAdapter.submitList(list);
+                        
                         if (tvAvailableCount != null) {
-                            String text = isArabic() ? 
-                                "📦 الشرائح المتاحة: " + totalAvailable : 
-                                "📦 Available Tags: " + totalAvailable;
-                            tvAvailableCount.setText(text);
+                            tvAvailableCount.setText((isArabic() ? "📦 المتاحة: " : "📦 Available: ") + totalAvailable);
                             tvAvailableCount.setVisibility(View.VISIBLE);
-                            Log.d(TAG, "📊 Updated tvAvailableCount: " + text);
                         }
-                        
-                        // ✅ عرض إذا كنا في وضع المتاحة
-                        if (showingAvailableTags) {
-                            showAvailableTags();
+                        if (tvCount != null) {
+                            tvCount.setText((isArabic() ? "الإجمالي: " : "Total: ") + list.size());
                         }
-                    } else {
-                        Log.e(TAG, "❌ Failed to load available tags");
-                        Log.e(TAG, "❌ isSuccess: " + (response != null ? response.isSuccess : "null"));
-                        Log.e(TAG, "❌ error: " + (response != null && response.error != null ? response.error : "null"));
+                        if (tvTitle != null) {
+                            tvTitle.setText(isArabic() ? "الشرائح المتاحة" : "Available Tags");
+                        }
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "❌ loadAvailableTags exception: " + e.getMessage(), e);
+                Log.e(TAG, "loadAvailableTags error: " + e.getMessage());
             }
         });
-        
-        Log.d(TAG, "🔄 === loadAvailableTags END ===");
     }
     
-    /**
-     * ✅ عرض الشرائح المتاحة
-     */
-    private void showAvailableTags() {
-        Log.d(TAG, "📦 showAvailableTags - count: " + availableTagList.size());
-        
-        if (tvCount != null) {
-            tvCount.setText(
-                isArabic() ? 
-                "إجمالي الشرائح المتاحة: " + availableTagList.size() : 
-                "Total Available: " + availableTagList.size()
-            );
-        }
-        
-        if (tvTitle != null) {
-            tvTitle.setText(isArabic() ? "الشرائح المتاحة" : "Available Tags");
-        }
-        
-        AvailableTagsAdapter availableAdapter = new AvailableTagsAdapter(availableTagList);
-        rvBindings.setAdapter(availableAdapter);
-    }
-    
-    /**
-     * ✅ تحميل قائمة الشرائح المبرمجة
-     */
-    private void loadBindings() {
+    private void loadBindings(boolean isRefresh) {
+        if (isLoading) return;
+        isLoading = true;
         showingAvailableTags = false;
-        Log.d(TAG, "🔄 === loadBindings START ===");
+        
+        if (isRefresh) {
+            currentPage = 1;
+            isLastPage = false;
+        }
         
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                StringBuilder endpoint = new StringBuilder("/rfid-bindings-list?page=1&per_page=100");
-                
-                if (!currentFilter.isEmpty()) {
-                    endpoint.append("&status=").append(currentFilter);
-                }
-                if (!currentSearch.isEmpty()) {
-                    endpoint.append("&search=").append(currentSearch);
-                }
-                
-                Log.d(TAG, "📡 Endpoint: " + endpoint.toString());
+                StringBuilder endpoint = new StringBuilder("/rfid-bindings-list?page=" + currentPage + "&per_page=50");
+                if (!currentFilter.isEmpty()) endpoint.append("&status=").append(currentFilter);
+                if (!currentSearch.isEmpty()) endpoint.append("&search=").append(currentSearch);
                 
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
                 
                 mainHandler.post(() -> {
-                    if (!isAdded() || getContext() == null) {
-                        return;
-                    }
+                    isLoading = false;
+                    if (!isAdded() || getContext() == null) return;
                     
                     if (response != null && response.isSuccess && response.data != null) {
                         JSONArray bindings = response.data.optJSONArray("bindings");
                         int total = response.data.optInt("total", 0);
                         
-                        bindingList.clear();
+                        List<JSONObject> fetchedList = new ArrayList<>();
                         if (bindings != null) {
                             for (int i = 0; i < bindings.length(); i++) {
-                                bindingList.add(bindings.optJSONObject(i));
+                                fetchedList.add(bindings.optJSONObject(i));
                             }
                         }
                         
-                        Log.d(TAG, "📊 Loaded " + bindingList.size() + " bindings, total: " + total);
-                        
-                        adapter = new BindingsAdapter(bindingList, this::showBindingDetails);
-                        rvBindings.setAdapter(adapter);
-                        
-                        if (tvCount != null) {
-                            tvCount.setText(
-                                isArabic() ? 
-                                "إجمالي الشرائح المبرمجة: " + total : 
-                                "Total Programmed: " + total
-                            );
+                        if (fetchedList.isEmpty()) {
+                            isLastPage = true;
                         }
                         
+                        if (rvBindings.getAdapter() != adapter) {
+                            rvBindings.setAdapter(adapter);
+                        }
+                        
+                        if (isRefresh) {
+                            adapter.submitList(fetchedList);
+                        } else {
+                            List<JSONObject> currentList = new ArrayList<>(adapter.getCurrentList());
+                            currentList.addAll(fetchedList);
+                            adapter.submitList(currentList);
+                        }
+                        
+                        if (tvCount != null) {
+                            tvCount.setText(isArabic() ? "إجمالي المبرمجة: " + total : "Total Programmed: " + total);
+                        }
                         if (tvTitle != null) {
                             tvTitle.setText(isArabic() ? "الشرائح المبرمجة" : "Programmed Tags");
                         }
-                    } else {
-                        Log.e(TAG, "❌ Failed to load bindings");
-                        showToast(getString(R.string.rfid_load_failed));
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "loadBindings error: " + e.getMessage(), e);
+                isLoading = false;
+                Log.e(TAG, "loadBindings error: " + e.getMessage());
             }
         });
     }
     
-    /**
-     * ✅ حوار البحث
-     */
+    private void loadMoreBindings() {
+        currentPage++;
+        loadBindings(false);
+    }
+    
     private void showSearchDialog() {
         Context context = getContext();
         if (!isAdded() || context == null) return;
@@ -408,15 +285,12 @@ private void applyTheme(View view) {
         
         builder.setPositiveButton(android.R.string.search_go, (dialog, which) -> {
             currentSearch = etSearch.getText().toString().trim();
-            loadBindings();
+            loadBindings(true);
         });
         builder.setNegativeButton(android.R.string.cancel, null);
         builder.show();
     }
     
-    /**
-     * ✅ عرض تفاصيل الشريحة
-     */
     private void showBindingDetails(JSONObject binding) {
         Context context = getContext();
         if (binding == null || !isAdded() || context == null) return;
@@ -430,8 +304,6 @@ private void applyTheme(View view) {
         String status = binding.optString("status", "active");
         String deviceType = binding.optString("device_type", "-");
         String date = binding.optString("registered_at", "-");
-        
-        String statusLabel = getStatusLabel(status);
         
         boolean canManage = permissionManager != null && 
             (permissionManager.isManager() || permissionManager.canEdit("rfid"));
@@ -447,27 +319,19 @@ private void applyTheme(View view) {
         message.append("⚖️ ").append(getString(R.string.weight)).append(": ").append(String.format(Locale.US, "%.2fg", weight)).append("\n");
         message.append("📱 ").append(getString(R.string.device)).append(": ").append(deviceType).append("\n");
         message.append("📅 ").append(getString(R.string.date)).append(": ").append(date).append("\n");
-        message.append("📊 ").append(getString(R.string.status)).append(": ").append(statusLabel);
+        message.append("📊 ").append(getString(R.string.status)).append(": ").append(getStatusLabel(status));
         
         builder.setMessage(message.toString());
-        
         if (canManage) {
-            builder.setPositiveButton(R.string.rfid_manage, (dialog, which) -> {
-                showManageOptions(binding);
-            });
+            builder.setPositiveButton(R.string.rfid_manage, (dialog, which) -> showManageOptions(binding));
         }
-        
         builder.setNegativeButton(android.R.string.cancel, null);
         builder.show();
     }
     
-    /**
-     * ✅ خيارات الإدارة
-     */
     private void showManageOptions(JSONObject binding) {
         Context context = getContext();
         if (!isAdded() || context == null) return;
-        
         int bindingId = binding.optInt("id", 0);
         
         String[] options = new String[]{
@@ -490,9 +354,6 @@ private void applyTheme(View view) {
             .show();
     }
     
-    /**
-     * ✅ تأكيد الحذف
-     */
     private void confirmDelete(int bindingId) {
         Context context = getContext();
         if (!isAdded() || context == null) return;
@@ -500,63 +361,50 @@ private void applyTheme(View view) {
         new AlertDialog.Builder(context)
             .setTitle(android.R.string.dialog_alert_title)
             .setMessage(R.string.rfid_confirm_delete)
-            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
-                updateBindingStatus(bindingId, "deleted");
-            })
+            .setPositiveButton(android.R.string.ok, (dialog, which) -> updateBindingStatus(bindingId, "deleted"))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
     }
     
-    /**
-     * ✅ تحديث حالة الشريحة
-     */
     private void updateBindingStatus(int bindingId, String status) {
-    // ✅ تحقق من الصلاحية
-    if (permissionManager == null || 
-        !(permissionManager.isManager() || permissionManager.canEdit("rfid"))) {
-        showToast(isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied");
-        return;
+        if (permissionManager == null || !(permissionManager.isManager() || permissionManager.canEdit("rfid"))) {
+            showToast(isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
+        
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("binding_id", bindingId);
+                payload.put("status", status);
+                
+                MiraApiClient.ApiResponse response = apiClient.postWithAuth("/update-binding-status", payload);
+                mainHandler.post(() -> {
+                    if (!isAdded() || getContext() == null) return;
+                    if (response != null && response.isSuccess) {
+                        showToast(getString(R.string.rfid_updated));
+                        loadBindings(true);
+                    } else {
+                        showToast("❌ " + (response != null && response.error != null ? response.error : getString(R.string.rfid_load_failed)));
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "updateBindingStatus error: " + e.getMessage());
+            }
+        });
     }
     
-    Executors.newSingleThreadExecutor().execute(() -> {
-        try {
-            JSONObject payload = new JSONObject();
-            payload.put("binding_id", bindingId);
-            payload.put("status", status);
-            
-            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/update-binding-status", payload);
-            
-            mainHandler.post(() -> {
-                if (!isAdded() || getContext() == null) return;
-                
-                if (response != null && response.isSuccess) {
-                    showToast(getString(R.string.rfid_updated));
-                    loadBindings();
-                } else {
-                    String errorMsg = response != null && response.error != null ? 
-                        response.error : getString(R.string.rfid_load_failed);
-                    showToast("❌ " + errorMsg);
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "updateBindingStatus error: " + e.getMessage());
-        }
-    });
-}
-    
-    /**
-     * ✅ تصدير CSV
-     */
     private void exportToCSV() {
         Context context = getContext();
-        if (bindingList.isEmpty() || !isAdded() || context == null) return;
+        List<JSONObject> currentList = adapter.getCurrentList();
+        if (currentList.isEmpty() || !isAdded() || context == null) return;
         
         try {
             StringBuilder csv = new StringBuilder();
             csv.append('\uFEFF');
             csv.append("MIRA ID,Title,EPC,TID,Karat,Weight,Status,Device,Date\n");
             
-            for (JSONObject binding : bindingList) {
+            for (JSONObject binding : currentList) {
                 csv.append(binding.optString("mira_id", "")).append(",");
                 csv.append("\"").append(binding.optString("item_title", "")).append("\",");
                 csv.append(binding.optString("epc", "")).append(",");
@@ -576,8 +424,7 @@ private void applyTheme(View view) {
             fos.write(csv.toString().getBytes("UTF-8"));
             fos.close();
             
-            Uri uri = FileProvider.getUriForFile(context,
-                context.getPackageName() + ".fileprovider", file);
+            Uri uri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/csv");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
@@ -589,12 +436,8 @@ private void applyTheme(View view) {
         }
     }
     
-    /**
-     * ✅ ترجمة الحالة
-     */
     private String getStatusLabel(String status) {
         if (!isAdded()) return status;
-
         switch (status) {
             case "active": return getString(R.string.rfid_status_active);
             case "locked": return getString(R.string.rfid_status_locked);
@@ -609,55 +452,49 @@ private void applyTheme(View view) {
         }
     }
     
-    // ==================== Adapters ====================
+    // ==================== Optimized Adapters using ListAdapter & DiffUtil ====================
     
-    private class BindingsAdapter extends RecyclerView.Adapter<BindingsAdapter.VH> {
-        private final List<JSONObject> items;
+    private static final DiffUtil.ItemCallback<JSONObject> DIFF_CALLBACK = new DiffUtil.ItemCallback<JSONObject>() {
+        @Override
+        public boolean areItemsTheSame(@NonNull JSONObject oldItem, @NonNull JSONObject newItem) {
+            return oldItem.optInt("id", 0) == newItem.optInt("id", 0);
+        }
+
+        @Override
+        public boolean areContentsTheSame(@NonNull JSONObject oldItem, @NonNull JSONObject newItem) {
+            return oldItem.toString().equals(newItem.toString());
+        }
+    };
+    
+    private static class BindingsAdapter extends ListAdapter<JSONObject, BindingsAdapter.VH> {
         private final OnBindingClickListener listener;
         
-        BindingsAdapter(List<JSONObject> items, OnBindingClickListener listener) {
-            this.items = items;
+        BindingsAdapter(OnBindingClickListener listener) {
+            super(DIFF_CALLBACK);
             this.listener = listener;
         }
         
         @NonNull
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_binding_card, parent, false);
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_binding_card, parent, false);
             return new VH(view);
         }
         
         @Override
         public void onBindViewHolder(@NonNull VH h, int pos) {
-            JSONObject binding = items.get(pos);
+            JSONObject binding = getItem(pos);
+            h.tvItemTitle.setText(binding.optString("item_title", "-"));
+            h.tvDetails.setText(binding.optString("mira_id", "-") + " | " + binding.optString("gold_karat", "-") + " | " + String.format(Locale.US, "%.2fg", binding.optDouble("gross_weight_grams", 0)));
+            h.tvEpcTid.setText("EPC: " + binding.optString("epc", "-") + "\nTID: " + binding.optString("tid", "-"));
+            h.tvDate.setText(binding.optString("registered_at", "-"));
             
-            String title = binding.optString("item_title", "-");
-            String miraId = binding.optString("mira_id", "-");
-            String epc = binding.optString("epc", "-");
-            String tid = binding.optString("tid", "-");
-            String karat = binding.optString("gold_karat", "-");
-            double weight = binding.optDouble("gross_weight_grams", 0);
-            String status = binding.optString("status", "active");
-            String date = binding.optString("registered_at", "-");
-            
-            h.tvItemTitle.setText(title);
-            h.tvDetails.setText(miraId + " | " + karat + " | " + String.format(Locale.US, "%.2fg", weight));
-            h.tvEpcTid.setText("EPC: " + epc + "\nTID: " + tid);
-            h.tvDate.setText(date);
-            h.tvStatus.setText(getStatusLabel(status));
-            
+            // اعتماد الألوان المتوافقة مع الثيمات العامة عبر السمات الافتراضية للبطاقات
             h.itemView.setOnClickListener(v -> listener.onClick(binding));
         }
         
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-        
-        class VH extends RecyclerView.ViewHolder {
+        static class VH extends RecyclerView.ViewHolder {
             TextView tvItemTitle, tvStatus, tvDetails, tvEpcTid, tvDate;
-            
             VH(View v) {
                 super(v);
                 tvItemTitle = v.findViewById(R.id.tvItemTitle);
@@ -669,29 +506,19 @@ private void applyTheme(View view) {
         }
     }
     
-    interface OnBindingClickListener {
-        void onClick(JSONObject binding);
-    }
-    
-    private class AvailableTagsAdapter extends RecyclerView.Adapter<AvailableTagsAdapter.VH> {
-        private final List<JSONObject> items;
-        
-        AvailableTagsAdapter(List<JSONObject> items) {
-            this.items = items;
-        }
+    private static class AvailableTagsAdapter extends ListAdapter<JSONObject, AvailableTagsAdapter.VH> {
+        AvailableTagsAdapter() { super(DIFF_CALLBACK); }
         
         @NonNull
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_available_tag_card, parent, false);
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_available_tag_card, parent, false);
             return new VH(view);
         }
         
         @Override
         public void onBindViewHolder(@NonNull VH h, int pos) {
-            JSONObject tag = items.get(pos);
-            
+            JSONObject tag = getItem(pos);
             h.tvTid.setText(tag.optString("tid", "-"));
             h.tvGtin.setText("GTIN: " + tag.optString("gtin13", "-"));
             h.tvSerial.setText("Serial: " + tag.optString("serial_number", "-"));
@@ -699,14 +526,8 @@ private void applyTheme(View view) {
             h.tvImportedAt.setText("Imported: " + tag.optString("imported_at", "-"));
         }
         
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-        
-        class VH extends RecyclerView.ViewHolder {
+        static class VH extends RecyclerView.ViewHolder {
             TextView tvTid, tvGtin, tvSerial, tvBatch, tvImportedAt;
-            
             VH(View v) {
                 super(v);
                 tvTid = v.findViewById(R.id.tvTid);
@@ -716,6 +537,10 @@ private void applyTheme(View view) {
                 tvImportedAt = v.findViewById(R.id.tvImportedAt);
             }
         }
+    }
+    
+    interface OnBindingClickListener {
+        void onClick(JSONObject binding);
     }
     
     private boolean isArabic() {
