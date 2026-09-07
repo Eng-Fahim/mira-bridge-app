@@ -22,7 +22,7 @@
 
     <!-- Menu -->
  
-  
+
 
     <!-- Bottom Navigation -->
     <string name="nav_dashboard">Dashboard</string>
@@ -1750,7 +1750,12 @@
 
 <!-- Additional Dashboard Titles -->
 <string name="gold_prices_global">🥇 Global Gold Prices</string>
-<string name="ounce_price_label">Ounce Price</string>
+  <string name="loading_data">⏳ Loading data...</string>
+<string name="live_gold_prices">🥇 Live Gold Prices</string>
+<string name="refresh_gold_prices">Refresh gold prices</string>
+<string name="ounce_price">Ounce Price (31.10g)</string>
+<string name="quick_access">⚡ Quick Access</string>
+
 <string name="price_source">📡 Source</string>
 <string name="last_update">⏰ Last Update</string>
 <string name="quick_access_title">⚡ Quick Access</string>
