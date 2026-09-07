@@ -2394,30 +2394,36 @@ private void notifyDashboardAndInventoryUpdate(String source) {
         int branchId = getActiveBranchId();
         long timestamp = System.currentTimeMillis();
         
-        Log.d(TAG, "📡 Sending dashboard update signal - Source: " + source + ", Branch: " + branchId);
+        Log.e(TAG, "🔔🔔🔔 NOTIFY UPDATE - Source: " + source + ", Branch: " + branchId);
         
-        // ✅ 1. إرسال Broadcast عام لتحديث المبيعات
+        // ✅ 1. إرسال REFRESH_SALES
         Intent salesIntent = new Intent("com.example.uhf.REFRESH_SALES");
+        salesIntent.setPackage(ctx.getPackageName());
         salesIntent.putExtra("source", source);
         salesIntent.putExtra("branch_id", branchId);
         salesIntent.putExtra("timestamp", timestamp);
         ctx.sendBroadcast(salesIntent);
+        Log.e(TAG, "✅ Broadcast REFRESH_SALES sent");
         
-        // ✅ 2. إرسال Broadcast لتحديث المخزون
+        // ✅✅✅ 2. إرسال REFRESH_INVENTORY
         Intent inventoryIntent = new Intent("com.example.uhf.REFRESH_INVENTORY");
+        inventoryIntent.setPackage(ctx.getPackageName());
         inventoryIntent.putExtra("source", source);
         inventoryIntent.putExtra("branch_id", branchId);
         inventoryIntent.putExtra("timestamp", timestamp);
         ctx.sendBroadcast(inventoryIntent);
+        Log.e(TAG, "✅ Broadcast REFRESH_INVENTORY sent");
         
-        // ✅ 3. إرسال Broadcast لتحديث الداشبورد بالكامل
+        // ✅✅✅ 3. إرسال REFRESH_DASHBOARD
         Intent dashboardIntent = new Intent("com.example.uhf.REFRESH_DASHBOARD");
+        dashboardIntent.setPackage(ctx.getPackageName());
         dashboardIntent.putExtra("source", source);
         dashboardIntent.putExtra("branch_id", branchId);
         dashboardIntent.putExtra("timestamp", timestamp);
         ctx.sendBroadcast(dashboardIntent);
+        Log.e(TAG, "✅ Broadcast REFRESH_DASHBOARD sent");
         
-        // ✅ 4. تحديث SharedPreferences كإشارة احتياطية
+        // ✅ 4. تحديث SharedPreferences
         SharedPreferences prefs = ctx.getSharedPreferences("app_refresh_flags", Context.MODE_PRIVATE);
         prefs.edit()
             .putLong("last_data_change", timestamp)
@@ -2426,7 +2432,7 @@ private void notifyDashboardAndInventoryUpdate(String source) {
             .putBoolean("needs_refresh", true)
             .apply();
         
-        Log.d(TAG, "✅ Dashboard update signals sent successfully");
+        Log.e(TAG, "✅ All dashboard update signals sent successfully");
         
     } catch (Exception e) {
         Log.e(TAG, "notifyDashboardAndInventoryUpdate error: " + e.getMessage());
