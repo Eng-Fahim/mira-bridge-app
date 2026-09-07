@@ -18,6 +18,7 @@ import android.view.ViewGroup;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,6 +55,7 @@ public class MiraReceiptFragment extends DialogFragment {
     private String defaultCurrency = "YER";
 
     private WebView webReceipt;
+    private ProgressBar progressLoading;
     private TextView btnCloseReceipt;
     private Button btnPrintReceipt, btnShareReceipt, btnSaveReceipt;
 
@@ -102,21 +104,27 @@ public class MiraReceiptFragment extends DialogFragment {
 
     private void bindViews(View view) {
         webReceipt = view.findViewById(R.id.webMiraReceipt);
+        progressLoading = view.findViewById(R.id.progressReceiptLoading);
         btnCloseReceipt = view.findViewById(R.id.btnMiraCloseReceipt);
-        btnPrintReceipt = view.findViewById(R.id.btnMiraPrintReceipt);
-        btnShareReceipt = view.findViewById(R.id.btnMiraShareReceipt);
-        btnSaveReceipt = view.findViewById(R.id.btnMiraSaveReceipt);
+        btnPrintReceipt = view.findViewById(R.id.btnPrintReceipt);
+        btnShareReceipt = view.findViewById(R.id.btnShareReceipt);
+        btnSaveReceipt = view.findViewById(R.id.btnSaveReceipt);
         
         if (webReceipt != null) {
             webReceipt.getSettings().setJavaScriptEnabled(true);
-            webReceipt.setWebViewClient(new WebViewClient());
+            webReceipt.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    if (progressLoading != null) progressLoading.setVisibility(View.GONE);
+                }
+            });
         }
     }
 
     private void applyLanguage() {
-        if (btnPrintReceipt != null) btnPrintReceipt.setText(isArabic ? "🖨️ طباعة" : "🖨️ Print");
-        if (btnShareReceipt != null) btnShareReceipt.setText(isArabic ? "📤 مشاركة" : "📤 Share");
-        if (btnSaveReceipt != null) btnSaveReceipt.setText(isArabic ? "💾 حفظ PDF" : "💾 Save PDF");
+        if (btnPrintReceipt != null) btnPrintReceipt.setText(isArabic ? "طباعة" : "Print");
+        if (btnShareReceipt != null) btnShareReceipt.setText(isArabic ? "مشاركة" : "Share");
+        if (btnSaveReceipt != null) btnSaveReceipt.setText(isArabic ? "حفظ PDF" : "Save PDF");
     }
 
     private void setupListeners() {
@@ -248,6 +256,7 @@ public class MiraReceiptFragment extends DialogFragment {
 
     private void renderHtmlReceipt() {
         if (webReceipt == null) return;
+        if (progressLoading != null) progressLoading.setVisibility(View.VISIBLE);
         
         String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
         String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
