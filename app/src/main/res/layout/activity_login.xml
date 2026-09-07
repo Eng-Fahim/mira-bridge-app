@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground">
 
-    <!-- المحتوى الرئيسي مُثبت بدون سحب وهمي -->
     <androidx.core.widget.NestedScrollView 
         android:id="@+id/mainScrollView"
         android:layout_width="match_parent"
@@ -243,7 +242,7 @@
                             android:textStyle="bold"
                             android:visibility="gone" />
 
-                        <!-- تجميعة الأزرار والتحميل متناسقة الزوايا -->
+                        <!-- تجميعة الأزرار والتحميل -->
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content">
@@ -283,7 +282,7 @@
                                     app:strokeWidth="1.5dp" />
                             </LinearLayout>
 
-                            <!-- تحميل الدخول منحني الزوايا متطابق للزر -->
+                            <!-- تحميل الدخول -->
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/loadingContainer"
                                 android:layout_width="match_parent"
@@ -383,7 +382,7 @@
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- ✅ successOverlay كامل الشاشة مع Elevation مرتفع -->
+    <!-- successOverlay كامل الشاشة مع Elevation مرتفع -->
     <LinearLayout
         android:id="@+id/successOverlay"
         android:layout_width="match_parent"
