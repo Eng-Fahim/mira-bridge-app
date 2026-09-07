@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/android:colorBackground">
+    android:background="?attr/colorSurface">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -60,7 +60,7 @@
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- حاوية المحتوى الرئيسية للـ Fragments -->
+        <!-- حاوية المحتوى الرئيسية للـ Fragments مع مسافة أمان السفلية لمنع التداخل -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="match_parent"
@@ -72,15 +72,15 @@
 
     </LinearLayout>
 
-    <!-- شريط التنقل السفلي -->
+    <!-- شريط التنقل السفلي المتوافق تماماً مع الثيم -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigationView"
         android:layout_width="match_parent"
         android:layout_height="68dp"
         android:layout_gravity="bottom"
         android:background="?attr/colorSurface"
-        android:elevation="12dp"
-        app:elevation="12dp"
+        app:itemBackgroundColor="@android:color/transparent"
+        app:elevation="8dp"
         app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
         app:itemIconSize="22dp"
         app:itemIconTint="@color/nav_item_color_selector"
