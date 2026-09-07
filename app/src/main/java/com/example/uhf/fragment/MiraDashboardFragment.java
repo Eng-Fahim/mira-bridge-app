@@ -142,27 +142,34 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private final BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent == null || !isAdded() || !isViewInitialized) return;
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent == null || !isAdded() || !isViewInitialized) return;
+        
+        String action = intent.getAction();
+        Log.d(TAG, "Received broadcast: " + action);
+        
+        if ("com.example.uhf.REFRESH_DASHBOARD".equals(action) || 
+            "com.example.uhf.REFRESH_INVENTORY".equals(action) || 
+            "com.example.uhf.REFRESH_SALES".equals(action)) {
             
-            String action = intent.getAction();
-            Log.d(TAG, "Received broadcast: " + action);
-            
-            if ("com.example.uhf.REFRESH_DASHBOARD".equals(action) || 
-                "com.example.uhf.REFRESH_INVENTORY".equals(action) || 
-                "com.example.uhf.REFRESH_SALES".equals(action)) {
-                mainHandler.post(() -> {
-                    if (isAdded() && isResumed() && isViewInitialized) {
-                        Log.d(TAG, "Refreshing dashboard from broadcast");
-                        isDataLoaded = false;
-                        lastDataFetchTime = 0;
+            mainHandler.post(() -> {
+                if (isAdded() && isViewInitialized) {
+                    Log.d(TAG, "Refreshing dashboard from broadcast");
+                    // ✅ إجبار التحديث
+                    isDataLoaded = false;
+                    lastDataFetchTime = 0;
+                    isLoading.set(false);
+                    
+                    // ✅ تحديث إذا كانت مرئية
+                    if (isResumed()) {
                         fetchData();
                     }
-                });
-            }
+                }
+            });
         }
-    };
+    }
+};
 
     @Nullable
     @Override
@@ -666,17 +673,15 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("saveOfflineData", e);
         }
     }
-
     private void fetchData() {
-        try {
-            if (isLoading.get() || apiClient == null || !isAdded()) return;
+    try {
+        if (isLoading.get() || apiClient == null || !isAdded()) return;
 
-            if (sessionManager == null || !sessionManager.isLoggedIn() || !sessionManager.hasValidToken()) {
-                Log.w(TAG, "Token invalid, redirecting to login");
-                redirectToLogin();
-                return;
-            }
-
+        if (sessionManager == null || !sessionManager.isLoggedIn() || !sessionManager.hasValidToken()) {
+            Log.w(TAG, "Token invalid, redirecting to login");
+            redirectToLogin();
+            return;
+        }
             long now = System.currentTimeMillis();
             if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
 
@@ -945,18 +950,19 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    public void refreshInternalData() {
-        try {
-            if (!isAdded()) return;
-            isDataLoaded = false;
-            lastDataFetchTime = 0;
-            fetchData();
-            displayGoldPricesFromCache();
-        } catch (Exception e) {
-            logNonFatal("refreshInternalData", e);
-        }
+   public void refreshInternalData() {
+    try {
+        if (!isAdded()) return;
+        // ✅ إجبار التحديث - تجاهل الكاش
+        isDataLoaded = false;
+        lastDataFetchTime = 0;
+        isLoading.set(false); // ✅ إعادة تعيين
+        fetchData();
+        displayGoldPricesFromCache();
+    } catch (Exception e) {
+        logNonFatal("refreshInternalData", e);
     }
-
+}
     private void refreshAllData() {
         try {
             if (tvLiveStatus != null) {
@@ -1150,35 +1156,31 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     @Override
     public void onResume() {
-        super.onResume();
-        try {
-            registerDataRefreshReceiver();
-            
-            if (branchPrefs != null) {
-                branchPrefs.registerOnSharedPreferenceChangeListener(this);
-            }
-
-            int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            if (latestBranchId != currentBranchId) {
-                onBranchChanged();
-            } else if (isViewInitialized) {
-                setupQuickAccessGrid();
-                updateHeader();
-                refreshInternalData();
-
-                long now = System.currentTimeMillis();
-                if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")
-                        && (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                    fetchLiveGoldPrices(false);
-                } else {
-                    displayGoldPricesFromCache();
-                }
-            }
-            startAutoRefresh();
-        } catch (Exception e) {
-            logNonFatal("onResume", e);
+    super.onResume();
+    try {
+        registerDataRefreshReceiver();
+        
+        if (branchPrefs != null) {
+            branchPrefs.registerOnSharedPreferenceChangeListener(this);
         }
+
+        // ✅ إجبار التحديث دائماً عند العودة
+        isDataLoaded = false;
+        lastDataFetchTime = 0;
+        
+        int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        if (latestBranchId != currentBranchId) {
+            onBranchChanged();
+        } else if (isViewInitialized) {
+            setupQuickAccessGrid();
+            updateHeader();
+            refreshInternalData();
+        }
+        startAutoRefresh();
+    } catch (Exception e) {
+        logNonFatal("onResume", e);
     }
+}
 
     @Override
     public void onPause() {
