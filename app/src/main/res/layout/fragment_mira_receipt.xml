@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
     android:background="?attr/colorSurface"
@@ -20,7 +20,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
-            android:text="@string/invoice_title"
+            android:text="معاينة سند الذهب والذهب المرتجع"
             android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -46,11 +46,13 @@
         android:background="?attr/colorOutlineVariant"
         android:layout_marginBottom="12dp" />
 
-    <!-- WebView Container -->
+    <!-- Dynamic WebView Container -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="450dp"
-        android:background="?attr/colorSurfaceVariant">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@android:color/white"
+        android:elevation="2dp">
 
         <WebView
             android:id="@+id/webMiraReceipt"
@@ -67,7 +69,7 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <!-- Buttons -->
+    <!-- Action Buttons Row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -76,37 +78,43 @@
         android:weightSum="3">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnMiraPrintReceipt"
+            android:id="@+id/btnPrintReceipt"
+            style="@style/Widget.Material3.Button.Icon"
             android:layout_width="0dp"
             android:layout_height="52dp"
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
-            android:text="@string/print_btn"
-            android:textSize="14sp"
+            android:text="طباعة"
+            android:textSize="13sp"
             android:textStyle="bold"
+            app:icon="@android:drawable/ic_menu_print"
             app:cornerRadius="10dp"
             app:backgroundTint="?attr/colorPrimary" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnMiraShareReceipt"
+            android:id="@+id/btnShareReceipt"
+            style="@style/Widget.Material3.Button.Icon"
             android:layout_width="0dp"
             android:layout_height="52dp"
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
-            android:text="@string/share_btn"
-            android:textSize="14sp"
+            android:text="مشاركة"
+            android:textSize="13sp"
             android:textStyle="bold"
+            app:icon="@android:drawable/ic_menu_share"
             app:cornerRadius="10dp"
             app:backgroundTint="?attr/colorPrimary" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnMiraSaveReceipt"
+            android:id="@+id/btnSaveReceipt"
+            style="@style/Widget.Material3.Button.Icon"
             android:layout_width="0dp"
             android:layout_height="52dp"
             android:layout_weight="1"
-            android:text="@string/save_pdf_btn"
-            android:textSize="14sp"
+            android:text="حفظ PDF"
+            android:textSize="13sp"
             android:textStyle="bold"
+            app:icon="@android:drawable/ic_menu_save"
             app:cornerRadius="10dp"
             app:backgroundTint="?attr/colorPrimary" />
     </LinearLayout>
@@ -117,9 +125,9 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:gravity="center"
-        android:text="MIRA Trust Platform"
+        android:text="MIRA Trust Platform • Jewelry Verification System"
         android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="10sp"
-        android:alpha="0.6" />
+        android:alpha="0.7" />
 
 </LinearLayout>
