@@ -1995,11 +1995,12 @@
 <string name="btn_archive_reports">📂 الأرشيف</string>
 
 <!-- عناوين الداشبورد الإضافية -->
-<string name="gold_prices_global">🥇 أسعار الذهب العالمية</string>
-<string name="ounce_price_label">سعر الأوقية</string>
-<string name="price_source">📡 المصدر</string>
-<string name="last_update">⏰ آخر تحديث</string>
-<string name="quick_access_title">⚡ الوصول السريع</string>
+<string name="loading_data">⏳ جاري تحميل البيانات...</string>
+<string name="live_gold_prices">🥇 أسعار الذهب المباشرة</string>
+<string name="refresh_gold_prices">تحديث أسعار الذهب</string>
+<string name="ounce_price">سعر الأوقية (31.10g)</string>
+<string name="quick_access">⚡ الوصول السريع</string>
+
 <string name="customize_quick_access">⚙️ تخصيص</string>
 
 <!-- حالة الجرد -->
