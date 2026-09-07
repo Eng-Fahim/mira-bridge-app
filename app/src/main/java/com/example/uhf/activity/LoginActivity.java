@@ -756,63 +756,71 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
-        Log.d(TAG, "Login Success for user: " + username);
-        playTone(true);
+    Log.d(TAG, "Login Success for user: " + username);
+    playTone(true);
 
-        Context appContext = getApplicationContext();
+    Context appContext = getApplicationContext();
 
-        String token = response.optString("token", "");
-        String roleStr = response.optString("role", "ADMIN");
-        String displayName = response.optString("display_name", username);
-        int userId = response.optInt("user_id", 0);
-        int branchId = response.optInt("branch_id", 1);
-        String branchName = response.optString("branch_name", "");
-        String branchCode = response.optString("branch_code", "");
-        String serverUrl = getText(etServerUrl);
+    String token = response.optString("token", "");
+    String roleStr = response.optString("role", "ADMIN");
+    String displayName = response.optString("display_name", username);
+    int userId = response.optInt("user_id", 0);
+    int branchId = response.optInt("branch_id", 1);
+    String branchName = response.optString("branch_name", "");
+    String branchCode = response.optString("branch_code", "");
+    String serverUrl = getText(etServerUrl);
 
-        if (serverUrl.isEmpty()) serverUrl = sessionManager.getServerUrl();
+    // ✅✅✅ أضف هذا السطر للحفظ
+    Log.d(TAG, "🔍 Branch ID from login: " + branchId);
 
-        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-        String apiKey = response.optString("api_key", "");
-        String gateId = response.optString("gate_id", "");
+    if (serverUrl.isEmpty()) serverUrl = sessionManager.getServerUrl();
 
-        if (!apiKey.isEmpty()) {
-            String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
-            sessionManager.saveApiKey(apiKey);
-            sessionManager.saveGateId(effectiveGateId);
-        }
+    String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+    String apiKey = response.optString("api_key", "");
+    String gateId = response.optString("gate_id", "");
 
-        if (!serverUrl.isEmpty()) {
-            sessionManager.setServerUrl(serverUrl);
-            MiraServerConfig.getInstance(appContext).setBaseUrl(serverUrl);
-        }
-
-        String permissionsJson = response.optString("permissions", "");
-        if (!permissionsJson.isEmpty()) {
-            PermissionManager.resetInstance();
-            PermissionManager pm = PermissionManager.getInstance(appContext);
-            pm.savePermissions(permissionsJson);
-        }
-
-        sessionManager.createLoginSession(username, roleStr, token, serverUrl);
-        sessionManager.setDisplayName(displayName);
-        sessionManager.setUserId(userId);
-        sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
-        sessionManager.saveBiometricBranch(branchId, branchName);
-
-        boolean biometricEnabled = true;
-        if (response.data != null) {
-            biometricEnabled = response.data.optBoolean("biometric_enabled", true);
-        }
-        sessionManager.setBiometricLoginEnabled(biometricEnabled);
-
-        MiraBranchesManager bm = MiraBranchesManager.getInstance(appContext);
-        bm.setActiveBranch(branchId, branchName, branchCode, "", "");
-        bm.setUserBranchLocked(true);
-
-        MiraApiClient.reloadInstance(appContext);
-        navigateToMain();
+    if (!apiKey.isEmpty()) {
+        String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
+        sessionManager.saveApiKey(apiKey);
+        sessionManager.saveGateId(effectiveGateId);
     }
+
+    if (!serverUrl.isEmpty()) {
+        sessionManager.setServerUrl(serverUrl);
+        MiraServerConfig.getInstance(appContext).setBaseUrl(serverUrl);
+    }
+
+    String permissionsJson = response.optString("permissions", "");
+    if (!permissionsJson.isEmpty()) {
+        PermissionManager.resetInstance();
+        PermissionManager pm = PermissionManager.getInstance(appContext);
+        pm.savePermissions(permissionsJson);
+    }
+
+    sessionManager.createLoginSession(username, roleStr, token, serverUrl);
+    sessionManager.setDisplayName(displayName);
+    sessionManager.setUserId(userId);
+    
+    // ✅✅✅ حفظ branch_id في الموقع الصحيح
+    sessionManager.setBranchId(branchId);
+    Log.d(TAG, "✅ Branch ID saved via setBranchId: " + branchId);
+    
+    sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
+    sessionManager.saveBiometricBranch(branchId, branchName);
+
+    boolean biometricEnabled = true;
+    if (response.data != null) {
+        biometricEnabled = response.data.optBoolean("biometric_enabled", true);
+    }
+    sessionManager.setBiometricLoginEnabled(biometricEnabled);
+
+    MiraBranchesManager bm = MiraBranchesManager.getInstance(appContext);
+    bm.setActiveBranch(branchId, branchName, branchCode, "", "");
+    bm.setUserBranchLocked(true);
+
+    MiraApiClient.reloadInstance(appContext);
+    navigateToMain();
+}
 
     private void setupBiometric() {
         try {
