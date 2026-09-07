@@ -139,7 +139,7 @@
             android:singleLine="true"
             android:ellipsize="end"/>
 
-        <!-- زر التحكم السريع بالبوابة -->
+                <!-- زر التحكم السريع بالبوابة -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnToggleSingleGate"
             android:layout_width="match_parent"
@@ -148,8 +148,9 @@
             android:text="إغلاق"
             android:textSize="11sp"
             app:cornerRadius="8dp"
-            app:iconGravity="text_start"
+            app:iconGravity="textStart"
             app:iconSize="14dp"/>
+
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
