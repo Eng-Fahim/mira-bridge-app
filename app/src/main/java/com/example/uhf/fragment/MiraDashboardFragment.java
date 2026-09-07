@@ -683,16 +683,31 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
         isLoading.set(true);
 
-        // ✅✅✅ استخدم SessionManager - القيمة الثابتة من تسجيل الدخول
-        final int branchIdFromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
-        final int branchIdFromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-        final int finalBranchId = branchIdFromSession > 0 ? branchIdFromSession : 
-                                   (branchIdFromManager > 0 ? branchIdFromManager : 1);
+        // ✅ التحقق من صلاحيات المدير (هل هو SYSTEM_ADMIN أو ORG_ADMIN؟)
+        // يمكنك فحص الدور من الـ SessionManager أو الصلاحيات المحفوظة لديك
+        boolean isGlobalAdmin = false;
+        if (sessionManager != null) {
+            String roleName = sessionManager.getUserRole(); // أو الطريقة المعتمدة لديك لجلب اسم الدور
+            isGlobalAdmin = "SYSTEM_ADMIN".equals(roleName) || "ORG_ADMIN".equals(roleName) || "ADMIN".equals(roleName);
+        }
+
+        final int finalBranchId;
+        if (isGlobalAdmin) {
+            // ✅ إذا كان مديراً، نرسل 0 افتراضياً ليجلب كل الفروع، إلا إذا اختار فرعاً معيناً من الواجهة
+            finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
+        } else {
+            // للمستخدم العادي، نأخذ فرعه النشط حصراً
+            final int branchIdFromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
+            final int branchIdFromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            finalBranchId = branchIdFromSession > 0 ? branchIdFromSession : 
+                           (branchIdFromManager > 0 ? branchIdFromManager : 1);
+        }
 
         cancelFuture(dataFuture);
 
         dataFuture = sharedExecutor.submit(() -> {
             try {
+                // ✅ الآن سيرسل للسيرفر 0 إذا كان مديراً، فيقوم الـ Backend بإرجاع إحصائيات كل الفروع!
                 MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
                 
                 mainHandler.post(() -> {
@@ -703,13 +718,19 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                     if (response != null && response.isSuccess && response.data != null) {
                         saveOfflineData(response.data);
                         processData(response.data);
+                        
+                        // ✅ تحديث اسم الفرع في أعلى الشاشة بناءً على استجابة السيرفر
+                        if (isGlobalAdmin && finalBranchId == 0) {
+                            if (tvLocation != null) tvLocation.setText("📍 جميع الفروع");
+                        }
+                        
                         isDataLoaded = true;
                         updateLiveStatusText(true);
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     } else {
                         updateLiveStatusText(false);
-                        loadOfflineData(); // ✅ فقط عند فشل السيرفر
+                        loadOfflineData();
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     }
@@ -717,7 +738,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             } catch (Exception e) {
                 mainHandler.post(() -> {
                     isLoading.set(false);
-                    loadOfflineData(); // ✅ فقط عند الخطأ
+                    loadOfflineData();
                     showShimmer(false);
                     if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                 });
