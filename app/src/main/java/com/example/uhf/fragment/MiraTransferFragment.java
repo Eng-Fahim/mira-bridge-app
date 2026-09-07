@@ -951,72 +951,98 @@ public class MiraTransferFragment extends Fragment {
         });
 
         btnSave.setOnClickListener(v -> {
-            if (activeScanEpcSet.isEmpty()) {
-                Toast.makeText(getContext(), isArabic ? "⚠️ لا توجد أي قطع صالحة أو متاحة لتحويل ضمن القائمة المحددة" : "⚠️ No valid items selected for transfer", Toast.LENGTH_SHORT).show();
-                return;
+    if (activeScanEpcSet.isEmpty()) {
+        Toast.makeText(getContext(), isArabic ? "⚠️ لا توجد أي قطع صالحة أو متاحة لتحويل ضمن القائمة المحددة" : "⚠️ No valid items selected for transfer", Toast.LENGTH_SHORT).show();
+        return;
+    }
+    
+    showLoadingDialog(isArabic ? "جاري إنشاء الشحنة وحفظ القطع..." : "Creating transfer and saving items...");
+    executor.execute(() -> {
+        try {
+            JSONArray itemsArray = new JSONArray();
+            for (String epc : activeScanEpcSet) {
+                itemsArray.put(epc);
             }
             
-            showLoadingDialog(isArabic ? "جاري إنشاء الشحنة وحفظ القطع..." : "Creating transfer and saving items...");
-            executor.execute(() -> {
-                try {
-                    JSONArray itemsArray = new JSONArray();
-                    for (String epc : activeScanEpcSet) {
-                        itemsArray.put(epc);
-                    }
-                    
-                    int targetTransferId = t.id;
-                    
-                    if (targetTransferId == 0) {
-                        JSONObject createPayload = new JSONObject();
-                        createPayload.put("from_branch_id", t.fromBranchId);
-                        createPayload.put("to_branch_id", t.toBranchId);
-                        createPayload.put("notes", t.notes != null ? t.notes : "");
-                        createPayload.put("items", itemsArray);
+            int targetTransferId = t.id;
+            
+            if (targetTransferId == 0) {
+                JSONObject createPayload = new JSONObject();
+                createPayload.put("from_branch_id", t.fromBranchId);
+                createPayload.put("to_branch_id", t.toBranchId);
+                createPayload.put("notes", t.notes != null ? t.notes : "");
+                createPayload.put("items", itemsArray);
 
-                        MiraApiClient.ApiResponse createResponse = apiClient.createTransfer(createPayload);
-                        if (createResponse != null && createResponse.isSuccess && createResponse.data != null) {
-                            JSONObject transferObj = createResponse.data.optJSONObject("transfer");
-                            if (transferObj != null) {
-                                targetTransferId = transferObj.optInt("id", 0);
-                            } else {
-                                targetTransferId = createResponse.data.optInt("id", 0);
-                            }
-                        } else {
-                            mainHandler.post(() -> {
-                                dismissLoadingDialog();
-                                showErrorMessage(isArabic ? "فشل الإنشاء" : "Create Failed", getErrorMessage(createResponse));
-                            });
-                            return;
+                MiraApiClient.ApiResponse createResponse = apiClient.createTransfer(createPayload);
+                
+                if (createResponse != null && createResponse.isSuccess) {
+                    // فحص مرن لجميع الاحتمالات الممكنة للـ ID القادم من السيرفر
+                    if (createResponse.data != null) {
+                        JSONObject transferObj = createResponse.data.optJSONObject("transfer");
+                        if (transferObj != null) {
+                            targetTransferId = transferObj.optInt("id", 0);
                         }
-                    } else {
-                        MiraApiClient.ApiResponse addResponse = apiClient.addItemsToTransfer(targetTransferId, itemsArray);
-                        if (addResponse == null || !addResponse.isSuccess) {
-                            mainHandler.post(() -> {
-                                dismissLoadingDialog();
-                                showErrorMessage(isArabic ? "فشل الحفظ" : "Save Failed", getErrorMessage(addResponse));
-                            });
-                            return;
+                        if (targetTransferId == 0) {
+                            targetTransferId = createResponse.data.optInt("id", 0);
+                        }
+                        if (targetTransferId == 0) {
+                            targetTransferId = createResponse.data.optInt("transfer_id", 0);
                         }
                     }
-
+                    
+                    // إذا نجح الإنشاء ولكن السيرفر أضاف القطع تلقائياً من الـ payload الأول
+                    final int finalId = targetTransferId;
                     mainHandler.post(() -> {
                         dismissLoadingDialog();
                         if (!isAdded() || getContext() == null) return;
                         
-                        showSuccessMessage(isArabic ? "تمت العملية بنجاح" : "Success", isArabic ? "تم إنشاء التحويل وحفظ القطع بنجاح." : "Transfer created and items saved successfully.");
+                        showSuccessMessage(
+                            isArabic ? "تمت العملية بنجاح" : "Success", 
+                            isArabic ? "تم إنشاء أمر التحويل والحفظ بنجاح." : "Transfer created successfully."
+                        );
                         loadTransfers();
                         notifyDashboardUpdate();
                         dialog.dismiss();
                     });
+                    return;
 
-                } catch (Exception e) {
+                } else {
                     mainHandler.post(() -> {
                         dismissLoadingDialog();
-                        showErrorMessage(isArabic ? "خطأ" : "Error", e.getMessage());
+                        showErrorMessage(isArabic ? "فشل الإنشاء" : "Create Failed", getErrorMessage(createResponse));
+                    });
+                    return;
+                }
+            } else {
+                // إلحاق قطع لتحويل قائم مسبقاً
+                MiraApiClient.ApiResponse addResponse = apiClient.addItemsToTransfer(targetTransferId, itemsArray);
+                if (addResponse != null && addResponse.isSuccess) {
+                    mainHandler.post(() -> {
+                        dismissLoadingDialog();
+                        if (!isAdded() || getContext() == null) return;
+                        
+                        showSuccessMessage(isArabic ? "تمت الإضافة بنجاح" : "Success", isArabic ? "تم إضافة القطع للتحويل بنجاح." : "Items added successfully.");
+                        loadTransfers();
+                        notifyDashboardUpdate();
+                        dialog.dismiss();
+                    });
+                } else {
+                    mainHandler.post(() -> {
+                        dismissLoadingDialog();
+                        showErrorMessage(isArabic ? "فشل الحفظ" : "Save Failed", getErrorMessage(addResponse));
                     });
                 }
+            }
+
+        } catch (Exception e) {
+            mainHandler.post(() -> {
+                dismissLoadingDialog();
+                showErrorMessage(isArabic ? "خطأ" : "Error", e.getMessage());
             });
-        });
+        }
+    });
+});
+
 
         dialog.show();
     }
