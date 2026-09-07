@@ -1,6 +1,9 @@
 package com.example.uhf.fragment;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
@@ -12,7 +15,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,6 +22,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -34,11 +37,9 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.SecureSessionManager;
+import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -46,27 +47,19 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executors;
-
-
-import android.content.BroadcastReceiver;
-import android.content.Intent;
-import android.content.IntentFilter;
-import androidx.core.content.ContextCompat;
 
 public class MiraSalesHistoryFragment extends Fragment {
 
     private static final String TAG = "MiraSalesHistory";
     private static final int PAGE_SIZE = 50;
     private static final int VISIBLE_THRESHOLD = 10;
-    
+
     private boolean isReceiverRegistered = false;
-    private android.content.BroadcastReceiver dataRefreshReceiver;
+    private BroadcastReceiver dataRefreshReceiver;
     private RecyclerView rvSales;
     private View layoutEmptyState;
     private TextView tvEmpty;
@@ -75,10 +68,9 @@ public class MiraSalesHistoryFragment extends Fragment {
     private EditText etSearch;
     private View btnRefresh;
     private SwipeRefreshLayout swipeRefresh;
-    private ChipGroup chipGroupFilters;
     private MaterialButton btnFilterPayment;
     private MaterialButton btnFilterBranch;
-    
+
     private View loadingMoreContainer;
     private TextView tvEndOfList;
     private TextView tvTotalRevenue;
@@ -95,8 +87,8 @@ public class MiraSalesHistoryFragment extends Fragment {
     private boolean hasMoreData = true;
     private int totalItems = 0;
     private String searchQuery = "";
-    private String currentFilter = "ALL"; // ALL, CASH, CARD, TRANSFER, CREDIT
-    private int selectedBranchId = 0; // 0 = الكل، >0 = فرع محدد
+    private String currentFilter = "ALL";
+    private int selectedBranchId = 0;
 
     private static final String OFFLINE_PREFS = "sales_history_cache";
     private SharedPreferences offlineCache;
@@ -113,106 +105,71 @@ public class MiraSalesHistoryFragment extends Fragment {
         return AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
                 getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
     }
-    
-    
-    
-/**
- * ✅ تسجيل مستقبل إشارات التحديث
- */
-private void registerDataRefreshReceiver() {
-    try {
-        if (getContext() == null || isReceiverRegistered) return;
-        
-        dataRefreshReceiver = new android.content.BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (intent == null || !isAdded()) return;
-                
-                String action = intent.getAction();
-                Log.d(TAG, "Received broadcast: " + action);
-                
-                if ("com.example.uhf.REFRESH_SALES".equals(action) || 
-                    "com.example.uhf.REFRESH_DASHBOARD".equals(action) || 
-                    "com.example.uhf.REFRESH_INVENTORY".equals(action)) {
-                    
-                    mainHandler.post(() -> {
-                        if (isAdded() && isResumed()) {
-                            Log.d(TAG, "Refreshing sales history from broadcast");
-                            // ✅ إعادة تحميل البيانات فوراً
-                            refreshSales(true);
-                        }
-                    });
-                }
-            }
-        };
-        
-        android.content.IntentFilter filter = new android.content.IntentFilter();
-        filter.addAction("com.example.uhf.REFRESH_SALES");
-        filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
-        filter.addAction("com.example.uhf.REFRESH_INVENTORY");
-        
-        ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, 
-                                      ContextCompat.RECEIVER_NOT_EXPORTED);
-        isReceiverRegistered = true;
-        Log.d(TAG, "DataRefreshReceiver registered");
-        
-    } catch (Exception e) {
-        Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
-    }
-}
 
-@Override
-public void onResume() {
-    super.onResume();
-    try {
-        // ✅ تسجيل المستقبل
+    private void registerDataRefreshReceiver() {
+        try {
+            if (getContext() == null || isReceiverRegistered) return;
+
+            dataRefreshReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (intent == null || !isAdded()) return;
+                    String action = intent.getAction();
+                    if ("com.example.uhf.REFRESH_SALES".equals(action) ||
+                        "com.example.uhf.REFRESH_DASHBOARD".equals(action) ||
+                        "com.example.uhf.REFRESH_INVENTORY".equals(action)) {
+                        mainHandler.post(() -> {
+                            if (isAdded() && isResumed()) {
+                                refreshSales(true);
+                            }
+                        });
+                    }
+                }
+            };
+
+            IntentFilter filter = new IntentFilter();
+            filter.addAction("com.example.uhf.REFRESH_SALES");
+            filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
+            filter.addAction("com.example.uhf.REFRESH_INVENTORY");
+
+            ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+            isReceiverRegistered = true;
+        } catch (Exception e) {
+            Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
         registerDataRefreshReceiver();
-        
-        // ✅ إعادة تحميل البيانات عند العودة
         if (isAdded() && saleList.isEmpty()) {
             refreshSales(true);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "onResume error: " + e.getMessage());
     }
-}
 
-@Override
-public void onPause() {
-    super.onPause();
-    try {
-        // ✅ إلغاء تسجيل المستقبل
+    @Override
+    public void onPause() {
+        super.onPause();
         unregisterDataRefreshReceiver();
-    } catch (Exception e) {
-        Log.e(TAG, "onPause error: " + e.getMessage());
     }
-}
 
-@Override
-public void onDestroyView() {
-    super.onDestroyView();
-    try {
-        // ✅ إلغاء تسجيل المستقبل
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
         unregisterDataRefreshReceiver();
-    } catch (Exception e) {
-        Log.e(TAG, "onDestroyView error: " + e.getMessage());
     }
-}
 
-/**
- * ✅ إلغاء تسجيل المستقبل
- */
-private void unregisterDataRefreshReceiver() {
-    try {
-        if (getContext() != null && isReceiverRegistered && dataRefreshReceiver != null) {
-            requireContext().unregisterReceiver(dataRefreshReceiver);
-            isReceiverRegistered = false;
-            Log.d(TAG, "DataRefreshReceiver unregistered");
+    private void unregisterDataRefreshReceiver() {
+        try {
+            if (getContext() != null && isReceiverRegistered && dataRefreshReceiver != null) {
+                requireContext().unregisterReceiver(dataRefreshReceiver);
+                isReceiverRegistered = false;
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
     }
-}
 
     @Nullable
     @Override
@@ -247,139 +204,106 @@ private void unregisterDataRefreshReceiver() {
         refreshSales(true);
     }
 
+    private void loadSalesOffline() {
+        try {
+            if (offlineCache == null) return;
+            String cachedJson = offlineCache.getString("sales_cache", "");
+            if (cachedJson.isEmpty()) return;
 
-private void loadSalesOffline() {
-    try {
-        if (offlineCache == null) return;
-        
-        String cachedJson = offlineCache.getString("sales_cache", "");
-        if (cachedJson.isEmpty()) return;
-        
-        JSONArray sales = new JSONArray(cachedJson);
-        saleList.clear();
-        saleList.addAll(parseSalesJson(sales));
-        
-        filterSales(searchQuery);
-    } catch (Exception e) {
-        Log.e(TAG, "Error loading offline sales: " + e.getMessage());
+            JSONArray sales = new JSONArray(cachedJson);
+            saleList.clear();
+            saleList.addAll(parseSalesJson(sales));
+            filterSales(searchQuery);
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading offline sales: " + e.getMessage());
+        }
     }
-}
-    // ==================== الصلاحيات والفروع ====================
-    
+
     private void applyPermissions() {
-        boolean canView = permissionManager.canView("sales_history") || 
-                         permissionManager.isPosOperator() || 
+        boolean canView = permissionManager.canView("sales_history") ||
+                         permissionManager.isPosOperator() ||
                          permissionManager.isManager();
-        
+
         if (!canView) {
             showEmptyState(isArabic ? "⛔ غير مصرح لك بالوصول لسجل المبيعات" : "⛔ Access Denied");
             if (pbLoading != null) pbLoading.setVisibility(View.GONE);
-            
-            // تعطيل جميع العناصر
             if (etSearch != null) etSearch.setEnabled(false);
             if (btnRefresh != null) btnRefresh.setEnabled(false);
             if (swipeRefresh != null) swipeRefresh.setEnabled(false);
             if (rvSales != null) rvSales.setVisibility(View.GONE);
-            if (chipGroupFilters != null) chipGroupFilters.setVisibility(View.GONE);
             if (btnFilterPayment != null) btnFilterPayment.setEnabled(false);
             if (btnFilterBranch != null) btnFilterBranch.setEnabled(false);
-            return;
         }
     }
 
-    /**
-     * ✅ إعداد فلترة الفروع
-     * - SYSTEM_ADMIN و ORG_ADMIN: يمكنهم رؤية جميع الفروع
-     * - BRANCH_MANAGER وما دون: يرون فرعهم فقط
-     */
     private void setupBranchFilter() {
-        
         SecureSessionManager.Role userRole = sessionManager.getUserRole();
         int userBranchId = branchesManager.getActiveBranchId();
-        
-        // ✅ تحديد الصلاحيات حسب الدور
-        boolean canViewAllBranches = userRole == SecureSessionManager.Role.SYSTEM_ADMIN || 
+
+        boolean canViewAllBranches = userRole == SecureSessionManager.Role.SYSTEM_ADMIN ||
                                      userRole == SecureSessionManager.Role.ORG_ADMIN;
-        
+
         if (canViewAllBranches) {
-            // ✅ الإدارة العليا - يمكنهم اختيار الفرع أو الكل
-            selectedBranchId = 0; // الكل افتراضياً
-            
+            selectedBranchId = 0;
             if (btnFilterBranch != null) {
                 btnFilterBranch.setVisibility(View.VISIBLE);
                 btnFilterBranch.setText(isArabic ? "🏢 جميع الفروع" : "🏢 All Branches");
                 btnFilterBranch.setOnClickListener(v -> showBranchSelectionDialog());
             }
         } else {
-            // ✅ الفروع - يرون فرعهم فقط
             selectedBranchId = userBranchId;
-            
             if (btnFilterBranch != null) {
-                btnFilterBranch.setVisibility(View.GONE); // إخفاء زر اختيار الفرع
+                btnFilterBranch.setVisibility(View.GONE);
             }
         }
     }
 
-    /**
-     * ✅ عرض قائمة الفروع للاختيار (للإدارة العليا فقط)
-     */
     private void showBranchSelectionDialog() {
         List<BranchOption> branches = new ArrayList<>();
-branches.add(new BranchOption(0, isArabic ? "🏢 جميع الفروع" : "🏢 All Branches"));
+        branches.add(new BranchOption(0, isArabic ? "🏢 جميع الفروع" : "🏢 All Branches"));
 
-List<MiraBranchesManager.BranchItem> branchList = branchesManager.getAllBranches();
-for (MiraBranchesManager.BranchItem branch : branchList) {
-    branches.add(new BranchOption(branch.id, branch.name));
-}
-        
+        List<MiraBranchesManager.BranchItem> branchList = branchesManager.getAllBranches();
+        for (MiraBranchesManager.BranchItem branch : branchList) {
+            branches.add(new BranchOption(branch.id, branch.name));
+        }
+
         String[] branchNames = new String[branches.size()];
         for (int i = 0; i < branches.size(); i++) {
             branchNames[i] = branches.get(i).name;
         }
-        
+
         new androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle(isArabic ? "🏢 اختر الفرع" : "🏢 Select Branch")
             .setItems(branchNames, (dialog, which) -> {
                 BranchOption selected = branches.get(which);
                 selectedBranchId = selected.id;
-                
                 if (btnFilterBranch != null) {
                     btnFilterBranch.setText(selected.name);
                 }
-                
-                // إعادة تحميل البيانات مع الفرع الجديد
                 refreshSales(true);
             })
             .show();
     }
 
-    /**
-     * ✅ عرض قائمة فلاتر طريقة الدفع
-     */
     private void showPaymentFilterDialog() {
-        String[] filterNames = isArabic ? 
+        String[] filterNames = isArabic ?
             new String[]{"💰 الكل", "💵 نقداً", "💳 بطاقة", "🏦 تحويل", "📝 آجل"} :
             new String[]{"💰 All", "💵 Cash", "💳 Card", "🏦 Transfer", "📝 Credit"};
-        
+
         String[] filterValues = {"ALL", "CASH", "CARD", "TRANSFER", "CREDIT"};
-        
+
         new androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle(isArabic ? "💰 فلترة حسب طريقة الدفع" : "💰 Filter by Payment Method")
             .setItems(filterNames, (dialog, which) -> {
                 currentFilter = filterValues[which];
-                
                 if (btnFilterPayment != null) {
                     btnFilterPayment.setText(filterNames[which]);
                 }
-                
-                // إعادة تحميل مع الفلتر الجديد
                 refreshSales(true);
             })
             .show();
     }
 
-    // ==================== تهيئة الواجهة ====================
-    
     private void initViews(View view) {
         rvSales = view.findViewById(R.id.rvMiraSalesHistory);
         layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
@@ -394,16 +318,13 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
         tvShowingCount = view.findViewById(R.id.tvShowingCount);
         loadingMoreContainer = view.findViewById(R.id.loadingMoreContainer);
         tvEndOfList = view.findViewById(R.id.tvEndOfList);
-        
-        // ✅ عناصر الفلاتر
-        chipGroupFilters = view.findViewById(R.id.chipGroupFilters);
         btnFilterPayment = view.findViewById(R.id.btnFilterPayment);
         btnFilterBranch = view.findViewById(R.id.btnFilterBranch);
     }
 
     private void applyLanguage() {
         if (etSearch != null) {
-            etSearch.setHint(isArabic ? "🔍 بحث في المبيعات..." : "🔍 Search sales...");
+            etSearch.setHint(isArabic ? "بحث في المبيعات..." : "Search sales...");
         }
         if (tvEmpty != null) {
             tvEmpty.setText(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
@@ -419,21 +340,18 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
             rvSales.setLayoutManager(layoutManager);
             rvSales.setHasFixedSize(true);
             rvSales.setItemViewCacheSize(20);
-            
+
             adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic, priceManager);
             rvSales.setAdapter(adapter);
-            
+
             rvSales.addOnScrollListener(new RecyclerView.OnScrollListener() {
                 @Override
                 public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                     super.onScrolled(recyclerView, dx, dy);
-                    
                     if (dy > 0) {
                         int totalItemCount = layoutManager.getItemCount();
                         int lastVisibleItem = layoutManager.findLastVisibleItemPosition();
-                        
-                        if (!isLoading && hasMoreData && 
-                            totalItemCount <= (lastVisibleItem + VISIBLE_THRESHOLD)) {
+                        if (!isLoading && hasMoreData && totalItemCount <= (lastVisibleItem + VISIBLE_THRESHOLD)) {
                             loadMoreSales();
                         }
                     }
@@ -443,13 +361,8 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
     }
 
     private void setupListeners() {
-        if (btnRefresh != null) {
-            btnRefresh.setOnClickListener(v -> refreshSales(true));
-        }
-
-        if (swipeRefresh != null) {
-            swipeRefresh.setOnRefreshListener(() -> refreshSales(false));
-        }
+        if (btnRefresh != null) btnRefresh.setOnClickListener(v -> refreshSales(true));
+        if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(() -> refreshSales(false));
 
         if (etSearch != null) {
             etSearch.addTextChangedListener(new TextWatcher() {
@@ -462,30 +375,17 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
                 @Override public void afterTextChanged(Editable s) {}
             });
         }
-        
-        // ✅ زر فلترة الدفع
-        if (btnFilterPayment != null) {
-            btnFilterPayment.setOnClickListener(v -> showPaymentFilterDialog());
-        }
-        
-        // ✅ زر فلترة الفرع (للإدارة العليا فقط)
-        if (btnFilterBranch != null) {
-            btnFilterBranch.setOnClickListener(v -> showBranchSelectionDialog());
-        }
-    }
-    
-    private final Runnable searchRunnable = () -> {
-        // البحث محلياً بدون إعادة تحميل
-        filterSales(searchQuery);
-    };
 
-    // ==================== تحميل البيانات ====================
-    
+        if (btnFilterPayment != null) btnFilterPayment.setOnClickListener(v -> showPaymentFilterDialog());
+        if (btnFilterBranch != null) btnFilterBranch.setOnClickListener(v -> showBranchSelectionDialog());
+    }
+
+    private final Runnable searchRunnable = () -> filterSales(searchQuery);
+
     private void refreshSales(boolean showProgress) {
         if (!isAdded()) return;
-        
-        if (!permissionManager.canView("sales_history") && 
-            !permissionManager.isPosOperator() && 
+        if (!permissionManager.canView("sales_history") &&
+            !permissionManager.isPosOperator() &&
             !permissionManager.isManager()) {
             return;
         }
@@ -494,85 +394,53 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
         isLastPage = false;
         hasMoreData = true;
         isLoading = false;
-        
-        if (showProgress) {
-            showLoadingState();
-        }
 
+        if (showProgress) showLoadingState();
         loadSalesPage(0, true);
     }
-    
+
     private void loadMoreSales() {
         if (isLoading || !hasMoreData || isLastPage) {
-            if (isLastPage && tvEndOfList != null) {
-                tvEndOfList.setVisibility(View.VISIBLE);
-            }
+            if (isLastPage && tvEndOfList != null) tvEndOfList.setVisibility(View.VISIBLE);
             return;
         }
-        
+
         isLoading = true;
-        if (loadingMoreContainer != null) {
-            loadingMoreContainer.setVisibility(View.VISIBLE);
-        }
-        if (tvEndOfList != null) {
-            tvEndOfList.setVisibility(View.GONE);
-        }
-        
+        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.VISIBLE);
+        if (tvEndOfList != null) tvEndOfList.setVisibility(View.GONE);
+
         loadSalesPage(currentPage + 1, false);
     }
-    
-   private void loadSalesPage(int page, boolean isRefresh) {
-    if (isLoading && !isRefresh) return;
-    
-    isLoading = true;
-    
-    Executors.newSingleThreadExecutor().execute(() -> {
-        try {
-            if (apiClient == null && getContext() != null) {
-                apiClient = MiraApiClient.getInstance(getContext());
-            }
 
-            if (apiClient == null) {
-                mainHandler.post(() -> {
-                    hideLoadingState();
-                    isLoading = false;
-                    if (saleList.isEmpty()) {
-                        showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error");
-                    }
-                });
-                return;
-            }
+    private void loadSalesPage(int page, boolean isRefresh) {
+        if (isLoading && !isRefresh) return;
+        isLoading = true;
 
-            MiraApiClient.ApiResponse response;
-            
-            // ✅✅✅ الحل: إرسال branch_id في جميع الحالات
-            if (!searchQuery.isEmpty() || !currentFilter.equals("ALL") || selectedBranchId > 0) {
-                // ✅ فلترة متقدمة مع branch_id
-                response = apiClient.getSalesHistoryAdvanced(
-                    searchQuery, 
-                    currentFilter, 
-                    null, // fromDate
-                    null, // toDate
-                    page, 
-                    PAGE_SIZE,
-                    selectedBranchId // ✅ إرسال الفرع
-                );
-            } else {
-                // ✅ بدون فلترة - لكن نرسل branch_id إذا كان محدداً
-                if (selectedBranchId > 0) {
-                    response = apiClient.getSalesHistoryAdvanced(
-                        "", // بحث فارغ
-                        "ALL", // كل طرق الدفع
-                        null,
-                        null,
-                        page,
-                        PAGE_SIZE,
-                        selectedBranchId // ✅ إرسال الفرع
-                    );
-                } else {
-                    response = apiClient.getSalesHistoryPaginated(page, PAGE_SIZE);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                if (apiClient == null && getContext() != null) {
+                    apiClient = MiraApiClient.getInstance(getContext());
                 }
-            }
+
+                if (apiClient == null) {
+                    mainHandler.post(() -> {
+                        hideLoadingState();
+                        isLoading = false;
+                        if (saleList.isEmpty()) {
+                            showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error");
+                        }
+                    });
+                    return;
+                }
+
+                MiraApiClient.ApiResponse response;
+                if (!searchQuery.isEmpty() || !currentFilter.equals("ALL") || selectedBranchId > 0) {
+                    response = apiClient.getSalesHistoryAdvanced(searchQuery, currentFilter, null, null, page, PAGE_SIZE, selectedBranchId);
+                } else {
+                    response = (selectedBranchId > 0) ?
+                        apiClient.getSalesHistoryAdvanced("", "ALL", null, null, page, PAGE_SIZE, selectedBranchId) :
+                        apiClient.getSalesHistoryPaginated(page, PAGE_SIZE);
+                }
 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray sales = null;
@@ -588,55 +456,43 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
                         } else if (dataObj instanceof JSONObject) {
                             JSONObject dataJson = (JSONObject) dataObj;
                             sales = dataJson.optJSONArray("sales");
-                            if (sales == null) {
-                                sales = dataJson.optJSONArray("items");
-                            }
+                            if (sales == null) sales = dataJson.optJSONArray("items");
                             totalCount = dataJson.optInt("total", dataJson.optInt("total_count", 0));
                             hasMore = dataJson.optBoolean("has_more", false);
                         }
                     }
 
-                    if (totalCount == 0) {
-                        totalCount = response.data.optInt("total", response.data.optInt("total_count", 0));
-                    }
-                    
-                    if (!hasMore) {
-                        hasMore = response.data.optBoolean("has_more", false);
-                    }
+                    if (totalCount == 0) totalCount = response.data.optInt("total", response.data.optInt("total_count", 0));
+                    if (!hasMore) hasMore = response.data.optBoolean("has_more", false);
 
                     List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
-                    
-                    // ✅ فلترة حسب الفرع إذا كان محدداً
+
                     if (selectedBranchId > 0) {
                         List<MiraSaleItem> filteredByBranch = new ArrayList<>();
                         for (MiraSaleItem item : items) {
-                            if (item.branchId == selectedBranchId) {
-                                filteredByBranch.add(item);
-                            }
+                            if (item.branchId == selectedBranchId) filteredByBranch.add(item);
                         }
                         items = filteredByBranch;
                     }
-                    
+
                     final List<MiraSaleItem> finalItems = items;
                     final int finalTotalCount = totalCount;
                     final boolean finalHasMore = hasMore;
-                    
-                    if (sales != null && sales.length() > 0) {
-                        saveSalesOffline(sales, page);
-                    }
-                    
-                    boolean isLast = finalItems.size() < PAGE_SIZE || 
+
+                    if (sales != null && sales.length() > 0) saveSalesOffline(sales, page);
+
+                    boolean isLast = finalItems.size() < PAGE_SIZE ||
                                    (finalTotalCount > 0 && (page + 1) * PAGE_SIZE >= finalTotalCount) ||
                                    !finalHasMore;
 
                     mainHandler.post(() -> {
                         if (!isAdded()) return;
-                        
+
                         isLoading = false;
                         hideLoadingState();
                         if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
                         if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
-                        
+
                         if (isRefresh) {
                             saleList.clear();
                             saleList.addAll(finalItems);
@@ -650,30 +506,17 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
                             hasMoreData = !isLast && finalItems.size() == PAGE_SIZE;
                             isLastPage = isLast;
                         }
-                        
+
                         filterSales(searchQuery);
-                        
-                        if (saleList.isEmpty()) {
-                            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-                        }
-                        
-                        if (isLastPage && tvEndOfList != null) {
-                            tvEndOfList.setVisibility(View.VISIBLE);
-                        } else if (tvEndOfList != null) {
-                            tvEndOfList.setVisibility(View.GONE);
-                        }
+                        if (saleList.isEmpty()) showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                        if (isLastPage && tvEndOfList != null) tvEndOfList.setVisibility(View.VISIBLE);
                     });
                 } else {
                     mainHandler.post(() -> {
                         if (!isAdded()) return;
                         hideLoadingState();
                         isLoading = false;
-                        if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
-                        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
-                        
-                        if (saleList.isEmpty()) {
-                            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-                        }
+                        if (saleList.isEmpty()) showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
                     });
                 }
             } catch (Exception e) {
@@ -682,102 +525,70 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
                     if (!isAdded()) return;
                     hideLoadingState();
                     isLoading = false;
-                    if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
-                    if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
-                    
-                    if (saleList.isEmpty()) {
-                        showEmptyState(isArabic ? "⚠️ خطأ في تحميل البيانات" : "⚠️ Error loading data");
-                    }
+                    if (saleList.isEmpty()) showEmptyState(isArabic ? "⚠️ خطأ في تحميل البيانات" : "⚠️ Error loading data");
                 });
             }
         });
     }
 
-private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
-    List<MiraSaleItem> items = new ArrayList<>();
-    for (int i = 0; i < sales.length(); i++) {
-        JSONObject sale = sales.optJSONObject(i);
-        if (sale == null) continue;
+    private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
+        List<MiraSaleItem> items = new ArrayList<>();
+        for (int i = 0; i < sales.length(); i++) {
+            JSONObject sale = sales.optJSONObject(i);
+            if (sale == null) continue;
 
-        MiraSaleItem item = new MiraSaleItem();
-        item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
-        item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
-        item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
-        item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
-        item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
-        item.date = sale.optString("created_at", sale.optString("date", ""));
-        item.branchId = sale.optInt("branch_id", 0);
-        
-        // ✅✅✅ معلومات الإرجاع
-        item.refundStatus = sale.optString("refund_status", sale.optString("status", "completed"));
-        item.refundReason = sale.optString("refund_reason", "");
-        item.refundedAt = sale.optString("refunded_at", "");
-        
-        item.rawJson = sale.toString();
-        items.add(item);
+            MiraSaleItem item = new MiraSaleItem();
+            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
+            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
+            item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
+            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
+            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
+            item.date = sale.optString("created_at", sale.optString("date", ""));
+            item.branchId = sale.optInt("branch_id", 0);
+            item.refundStatus = sale.optString("refund_status", sale.optString("status", "completed"));
+            item.refundReason = sale.optString("refund_reason", "");
+            item.refundedAt = sale.optString("refunded_at", "");
+            item.rawJson = sale.toString();
+            items.add(item);
+        }
+        return items;
     }
-    return items;
-}
 
-private void saveSalesOffline(JSONArray sales, int page) {
-    try {
-        if (offlineCache == null) return;
-        offlineCache.edit().putString("sales_cache", sales.toString()).apply();
-    } catch (Exception ignored) {}
-}
+    private void saveSalesOffline(JSONArray sales, int page) {
+        try {
+            if (offlineCache == null) return;
+            offlineCache.edit().putString("sales_cache", sales.toString()).apply();
+        } catch (Exception ignored) {}
+    }
 
-    // ==================== الفلترة المحلية ====================
-    
     private void filterSales(String query) {
         List<MiraSaleItem> newFiltered = new ArrayList<>();
-        
+
         if ((query == null || query.trim().isEmpty()) && currentFilter.equals("ALL") && selectedBranchId == 0) {
             newFiltered.addAll(saleList);
         } else {
             String q = (query != null) ? query.toLowerCase(Locale.ROOT) : "";
-            
+
             for (MiraSaleItem item : saleList) {
-                // ✅ فلترة حسب الفرع
-                if (selectedBranchId > 0 && item.branchId != selectedBranchId) {
-                    continue;
-                }
-                
-                // ✅ فلترة حسب طريقة الدفع
+                if (selectedBranchId > 0 && item.branchId != selectedBranchId) continue;
                 if (!currentFilter.equals("ALL")) {
                     String paymentMethod = item.paymentMethod != null ? item.paymentMethod.toUpperCase(Locale.ROOT) : "";
-                    if (!paymentMethod.equals(currentFilter)) {
-                        continue;
-                    }
+                    if (!paymentMethod.equals(currentFilter)) continue;
                 }
-                
-                // ✅ فلترة حسب البحث
                 if (!q.isEmpty()) {
-                    boolean matchesCustomer = item.customerName != null && 
-                        item.customerName.toLowerCase(Locale.ROOT).contains(q);
-                    boolean matchesSaleId = item.saleId != null && 
-                        item.saleId.toLowerCase(Locale.ROOT).contains(q);
-                    
-                    if (!matchesCustomer && !matchesSaleId) {
-                        continue;
-                    }
+                    boolean matchesCustomer = item.customerName != null && item.customerName.toLowerCase(Locale.ROOT).contains(q);
+                    boolean matchesSaleId = item.saleId != null && item.saleId.toLowerCase(Locale.ROOT).contains(q);
+                    if (!matchesCustomer && !matchesSaleId) continue;
                 }
-                
                 newFiltered.add(item);
             }
         }
 
-        if (adapter != null) {
-            adapter.updateData(newFiltered);
-        }
-
+        if (adapter != null) adapter.updateData(newFiltered);
         updateSummaryCards(newFiltered);
 
         if (newFiltered.isEmpty()) {
-            if (!saleList.isEmpty()) {
-                showEmptyState(isArabic ? "📭 لا توجد نتائج مطابقة" : "📭 No matching results");
-            } else {
-                showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-            }
+            showEmptyState(isArabic ? "📭 لا توجد نتائج مطابقة" : "📭 No matching results");
         } else {
             hideEmptyState();
         }
@@ -792,11 +603,9 @@ private void saveSalesOffline(JSONArray sales, int page) {
         if (tvTotalRevenue != null) {
             tvTotalRevenue.setText(priceManager.formatPriceDefault(totalRevenue));
         }
-        
         if (tvInvoicesCount != null) {
             tvInvoicesCount.setText(String.format(Locale.US, "%,d", totalItems > 0 ? totalItems : list.size()));
         }
-        
         if (tvShowingCount != null) {
             tvShowingCount.setText(String.format(Locale.US, "%,d", list.size()));
         }
@@ -838,9 +647,7 @@ private void saveSalesOffline(JSONArray sales, int page) {
         } catch (Exception e) {
             Log.e(TAG, "Error opening receipt", e);
             if (getContext() != null) {
-                Toast.makeText(getContext(), 
-                    isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", 
-                    Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -848,15 +655,13 @@ private void saveSalesOffline(JSONArray sales, int page) {
     private void openReceiptWithAdd(String receiptJson) {
         try {
             MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(receiptJson);
-            
             FragmentManager fm = getParentFragmentManager();
             FragmentTransaction ft = fm.beginTransaction();
-            
             ft.hide(this);
             ft.add(android.R.id.content, receipt, "mira_receipt");
             ft.addToBackStack("mira_receipt");
             ft.commit();
-            
+
             fm.addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
                 @Override
                 public void onBackStackChanged() {
@@ -868,18 +673,8 @@ private void saveSalesOffline(JSONArray sales, int page) {
                     }
                 }
             });
-            
         } catch (Exception e) {
             Log.e(TAG, "Error in openReceiptWithAdd", e);
-            try {
-                MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(receiptJson);
-                getParentFragmentManager().beginTransaction()
-                        .replace(android.R.id.content, receipt)
-                        .addToBackStack("mira_receipt")
-                        .commit();
-            } catch (Exception ex) {
-                Log.e(TAG, "Fallback also failed", ex);
-            }
         }
     }
 
@@ -887,42 +682,40 @@ private void saveSalesOffline(JSONArray sales, int page) {
         String saleId, customerName, paymentMethod, date, rawJson;
         double amount;
         int itemCount;
-        int branchId; // ✅ إضافة معرف الفرع
-        String refundStatus;  // ✅ أضف هذا
-        String refundReason;  // ✅ أضف هذا
-        String refundedAt;    // ✅ أضف هذا
-        @Override
-public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    MiraSaleItem item = (MiraSaleItem) o;
-    return Double.compare(item.amount, amount) == 0 &&
-            itemCount == item.itemCount &&
-            branchId == item.branchId &&
-            Objects.equals(saleId, item.saleId) &&
-            Objects.equals(customerName, item.customerName) &&
-            Objects.equals(paymentMethod, item.paymentMethod) &&
-            Objects.equals(date, item.date) &&
-            Objects.equals(refundStatus, item.refundStatus);  // ✅ أضف هذا
-}
+        int branchId;
+        String refundStatus;
+        String refundReason;
+        String refundedAt;
 
-@Override
-public int hashCode() {
-    return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount, branchId, refundStatus);
-}
-}
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            MiraSaleItem item = (MiraSaleItem) o;
+            return Double.compare(item.amount, amount) == 0 &&
+                    itemCount == item.itemCount &&
+                    branchId == item.branchId &&
+                    Objects.equals(saleId, item.saleId) &&
+                    Objects.equals(customerName, item.customerName) &&
+                    Objects.equals(paymentMethod, item.paymentMethod) &&
+                    Objects.equals(date, item.date) &&
+                    Objects.equals(refundStatus, item.refundStatus);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount, branchId, refundStatus);
+        }
+    }
 
     static class BranchOption {
         int id;
         String name;
-        
         BranchOption(int id, String name) {
             this.id = id;
             this.name = name;
         }
     }
-    
-    
 
     static class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
         private final List<MiraSaleItem> items;
@@ -941,18 +734,15 @@ public int hashCode() {
             DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
                 @Override
                 public int getOldListSize() { return items.size(); }
-
                 @Override
                 public int getNewListSize() { return newItems.size(); }
-
                 @Override
-                public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-                    return Objects.equals(items.get(oldItemPosition).saleId, newItems.get(newItemPosition).saleId);
+                public boolean areItemsTheSame(int oldPos, int newPos) {
+                    return Objects.equals(items.get(oldPos).saleId, newItems.get(newPos).saleId);
                 }
-
                 @Override
-                public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-                    return items.get(oldItemPosition).equals(newItems.get(newItemPosition));
+                public boolean areContentsTheSame(int oldPos, int newPos) {
+                    return items.get(oldPos).equals(newItems.get(newPos));
                 }
             });
 
@@ -968,36 +758,34 @@ public int hashCode() {
         }
 
         @Override
-    public void onBindViewHolder(@NonNull VH h, int pos) {
-    MiraSaleItem s = items.get(pos);
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            MiraSaleItem s = items.get(pos);
 
-    if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
-    if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
-    if (h.tvAmount != null) h.tvAmount.setText(priceManager.formatPriceDefault(s.amount));
-    if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
+            if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
+            if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
+            if (h.tvAmount != null) h.tvAmount.setText(priceManager.formatPriceDefault(s.amount));
+            if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
 
-    // ✅✅✅ عرض حالة الإرجاع
-    if (h.tvStatus != null) {
-        String status = s.refundStatus != null ? s.refundStatus : "completed";
-        
-        switch (status) {
-            case "refunded":
-            case "fully_refunded":
-                h.tvStatus.setText(isArabic ? "🔄 مرتجع" : "🔄 Refunded");
-                h.tvStatus.setTextColor(0xFFEF4444); // أحمر
-                break;
-            case "partially_refunded":
-                h.tvStatus.setText(isArabic ? "🔄 مرتجع جزئياً" : "🔄 Partially Refunded");
-                h.tvStatus.setTextColor(0xFFF59E0B); // برتقالي
-                break;
-            case "completed":
-            default:
-                h.tvStatus.setText(isArabic ? "✅ مكتمل" : "✅ Completed");
-                h.tvStatus.setTextColor(0xFF22C55E); // أخضر
-                break;
-        }
-        h.tvStatus.setVisibility(View.VISIBLE);
-    }
+            if (h.tvStatus != null) {
+                String status = s.refundStatus != null ? s.refundStatus : "completed";
+                switch (status) {
+                    case "refunded":
+                    case "fully_refunded":
+                        h.tvStatus.setText(isArabic ? "🔄 مرتجع" : "🔄 Refunded");
+                        h.tvStatus.setTextColor(0xFFEF4444);
+                        break;
+                    case "partially_refunded":
+                        h.tvStatus.setText(isArabic ? "🔄 مرتجع جزئياً" : "🔄 Partially Refunded");
+                        h.tvStatus.setTextColor(0xFFF59E0B);
+                        break;
+                    case "completed":
+                    default:
+                        h.tvStatus.setText(isArabic ? "✅ مكتمل" : "✅ Completed");
+                        h.tvStatus.setTextColor(0xFF22C55E);
+                        break;
+                }
+                h.tvStatus.setVisibility(View.VISIBLE);
+            }
 
             if (h.tvDate != null) {
                 try {
@@ -1017,23 +805,21 @@ public int hashCode() {
         public int getItemCount() { return items.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
-    TextView tvSaleId, tvCustomer, tvAmount, tvItems, tvPayment, tvDate, tvStatus;  // ✅ أضف tvStatus
+            TextView tvSaleId, tvCustomer, tvAmount, tvItems, tvDate, tvStatus;
 
-    VH(View v) {
-        super(v);
-        tvSaleId = v.findViewById(R.id.tvMiraSaleId);
-        tvCustomer = v.findViewById(R.id.tvMiraSaleCustomer);
-        tvAmount = v.findViewById(R.id.tvMiraSaleAmount);
-        tvItems = v.findViewById(R.id.tvMiraSaleItems);
-        tvPayment = v.findViewById(R.id.tvMiraSalePayment);
-        tvDate = v.findViewById(R.id.tvMiraSaleDate);
-        tvStatus = v.findViewById(R.id.tvMiraSaleStatus);  // ✅ أضف هذا
-    }
-}
-
+            VH(View v) {
+                super(v);
+                tvSaleId = v.findViewById(R.id.tvMiraSaleId);
+                tvCustomer = v.findViewById(R.id.tvMiraSaleCustomer);
+                tvAmount = v.findViewById(R.id.tvMiraSaleAmount);
+                tvItems = v.findViewById(R.id.tvMiraSaleItems);
+                tvDate = v.findViewById(R.id.tvMiraSaleDate);
+                tvStatus = v.findViewById(R.id.tvMiraSaleStatus);
+            }
+        }
     }
 
     private interface OnMiraSaleClickListener {
         void onClick(MiraSaleItem sale);
     }
-            }
+}
