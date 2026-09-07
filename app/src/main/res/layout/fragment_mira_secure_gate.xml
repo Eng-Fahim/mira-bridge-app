@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- 1. Header -->
+        <!-- 1. Header Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -67,7 +67,7 @@
             </RelativeLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ✅✅✅ جديد: محدد الفرع -->
+        <!-- 2. Branch Selector / Info Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -83,7 +83,6 @@
                 android:orientation="vertical"
                 android:padding="12dp">
 
-                <!-- عنوان الفرع -->
                 <TextView
                     android:id="@+id/tvCurrentBranch"
                     android:layout_width="match_parent"
@@ -92,10 +91,8 @@
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="13sp"
                     android:textStyle="bold"
-                    android:layout_marginBottom="8dp"
                     android:visibility="gone" />
 
-                <!-- Spinner لاختيار الفرع (للمدير العام فقط) -->
                 <Spinner
                     android:id="@+id/spBranchSelector"
                     android:layout_width="match_parent"
@@ -108,12 +105,12 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 2. Live Ticker -->
+        <!-- 3. Live Ticker Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardLiveTicker"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="8dp"
             app:cardBackgroundColor="?attr/colorSurfaceVariant"
             app:cardCornerRadius="8dp"
             app:strokeColor="?attr/colorOutline"
@@ -148,11 +145,11 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 3. KPI Cards -->
+        <!-- 4. KPI Summary Cards -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="8dp"
             android:baselineAligned="false"
             android:orientation="horizontal">
 
@@ -262,11 +259,11 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <!-- 4. Control Buttons -->
+        <!-- 5. Main Action Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
@@ -305,7 +302,7 @@
                 app:cornerRadius="8dp" />
         </LinearLayout>
 
-        <!-- Risk Meter -->
+        <!-- 6. Risk Meter Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -324,11 +321,11 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
                     android:text="@string/gate_risk_meter"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="6dp" />
+                    android:textStyle="bold" />
 
                 <ProgressBar
                     android:id="@+id/pbRiskMeter"
@@ -343,19 +340,19 @@
                     android:id="@+id/tvRiskPercentage"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
                     android:text="@string/gate_risk_percentage"
                     android:textColor="?attr/colorError"
-                    android:textSize="10sp"
-                    android:layout_marginTop="4dp" />
+                    android:textSize="10sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Filter Buttons -->
+        <!-- 7. Filter Buttons Bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
+            android:layout_marginBottom="4dp"
+            android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterAll"
@@ -364,8 +361,8 @@
                 android:layout_height="32dp"
                 android:layout_weight="1"
                 android:text="@string/gate_filter_all"
-                android:textSize="10sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterAlerts"
@@ -374,8 +371,8 @@
                 android:layout_height="32dp"
                 android:layout_weight="1"
                 android:text="@string/gate_filter_alerts"
-                android:textSize="10sp"
-                android:textColor="?attr/colorError" />
+                android:textColor="?attr/colorError"
+                android:textSize="10sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterPass"
@@ -384,11 +381,11 @@
                 android:layout_height="32dp"
                 android:layout_weight="1"
                 android:text="@string/gate_filter_pass"
-                android:textSize="10sp"
-                android:textColor="?attr/colorPrimary" />
+                android:textColor="?attr/colorPrimary"
+                android:textSize="10sp" />
         </LinearLayout>
 
-        <!-- Gate Network -->
+        <!-- 8. Network Section Label & RecyclerView -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -402,10 +399,10 @@
             android:id="@+id/rvGatesMonitor"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="8dp"
+            android:layout_weight="1" />
 
-        <!-- Simulation Buttons -->
+        <!-- 9. Tools & Simulation Actions Bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -446,7 +443,7 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <!-- Console Log -->
+        <!-- 10. Console Output Log -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="100dp"
@@ -474,7 +471,7 @@
 
     </LinearLayout>
 
-    <!-- Alarm Overlay -->
+    <!-- 11. Fullscreen Alarm Overlay -->
     <FrameLayout
         android:id="@+id/overlayAlarm"
         android:layout_width="match_parent"
