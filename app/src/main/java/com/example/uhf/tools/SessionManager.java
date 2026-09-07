@@ -268,34 +268,42 @@ public class SessionManager {
     /**
      * ✅ الحصول على معرف الفرع الحالي
      */
-    public int getBranchId() {
-        try {
-            // ✅ الطريقة 1: من SharedPreferences مباشرة
-            android.content.SharedPreferences prefs = context.getSharedPreferences(
-                "mira_secure_session", 
-                Context.MODE_PRIVATE
-            );
-            return prefs.getInt("branch_id", -1);
-        } catch (Exception e) {
-            Log.e(TAG, "getBranchId error: " + e.getMessage());
-            return -1;
-        }
-    }
+    // ==================== معرف الفرع ====================
 
-    /**
-     * ✅ حفظ معرف الفرع الحالي
-     */
-    public void setBranchId(int branchId) {
-        try {
-            android.content.SharedPreferences prefs = context.getSharedPreferences(
-                "mira_secure_session", 
-                Context.MODE_PRIVATE
-            );
-            prefs.edit().putInt("branch_id", branchId).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "setBranchId error: " + e.getMessage());
+/**
+ * ✅ الحصول على معرف الفرع الحالي
+ */
+public int getBranchId() {
+    try {
+        // ✅ الطريقة 1: من SecureSessionManager (الملف العادي userPrefs)
+        int branchId = secureManager.getBranchId();
+        if (branchId > 0) {
+            return branchId;
         }
+        
+        // ✅ الطريقة 2: من البيانات البيومترية
+        branchId = secureManager.getLastBiometricBranchId();
+        if (branchId > 0) {
+            return branchId;
+        }
+        
+        return -1;
+    } catch (Exception e) {
+        Log.e(TAG, "getBranchId error: " + e.getMessage());
+        return -1;
     }
+}
+
+/**
+ * ✅ حفظ معرف الفرع الحالي
+ */
+public void setBranchId(int branchId) {
+    try {
+        secureManager.setBranchId(branchId);
+    } catch (Exception e) {
+        Log.e(TAG, "setBranchId error: " + e.getMessage());
+    }
+}
 
     // ==================== تسجيل الخروج ====================
     
