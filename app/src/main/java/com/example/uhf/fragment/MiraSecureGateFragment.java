@@ -1,5 +1,6 @@
 package com.example.uhf.fragment;
 
+import androidx.recyclerview.widget.GridLayoutManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -229,40 +230,41 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void initViews(View view) {
-        rvGatesMonitor = view.findViewById(R.id.rvGatesMonitor);
-        tvPassCount = view.findViewById(R.id.tvPassCount);
-        tvDenyCount = view.findViewById(R.id.tvDenyCount);
-        tvTotalCount = view.findViewById(R.id.tvTotalCount);
-        tvDebugConsole = view.findViewById(R.id.tvDebugConsole);
-        scrollDebugLog = view.findViewById(R.id.scrollDebugLog);
-        overlayAlarm = view.findViewById(R.id.overlayAlarm);
-        tvOverlayTitle = view.findViewById(R.id.tvOverlayTitle);
-        tvOverlayDetails = view.findViewById(R.id.tvOverlayDetails);
-        tvPingLatency = view.findViewById(R.id.tvPingLatency);
-        tvSystemStatus = view.findViewById(R.id.tvSystemStatus);
-        tvLiveTickerText = view.findViewById(R.id.tvLiveTickerText);
-        pbRiskMeter = view.findViewById(R.id.pbRiskMeter);
-        tvRiskPercentage = view.findViewById(R.id.tvRiskPercentage);
-        btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
-        btnToggleScan = view.findViewById(R.id.btnToggleScan);
-        btnSimulateAllowed = view.findViewById(R.id.btnSimulateAllowed);
-        btnSimulateDenied = view.findViewById(R.id.btnSimulateDenied);
-        btnScanBarcode = view.findViewById(R.id.btnScanBarcode);
-        btnEmergencyLockdown = view.findViewById(R.id.btnEmergencyLockdown);
-        btnClearConsole = view.findViewById(R.id.btnClearConsole);
-        btnFilterAll = view.findViewById(R.id.btnFilterAll);
-        btnFilterAlerts = view.findViewById(R.id.btnFilterAlerts);
-        btnFilterPass = view.findViewById(R.id.btnFilterPass);
-        
-        spBranchSelector = view.findViewById(R.id.spBranchSelector);
-        tvCurrentBranch = view.findViewById(R.id.tvCurrentBranch);
-        
-        if (rvGatesMonitor != null) {
-            rvGatesMonitor.setLayoutManager(new LinearLayoutManager(getContext()));
-            monitorAdapter = new GateMonitorAdapter(monitorList);
-            rvGatesMonitor.setAdapter(monitorAdapter);
-        }
+    rvGatesMonitor = view.findViewById(R.id.rvGatesMonitor);
+    tvPassCount = view.findViewById(R.id.tvPassCount);
+    tvDenyCount = view.findViewById(R.id.tvDenyCount);
+    tvTotalCount = view.findViewById(R.id.tvTotalCount);
+    tvDebugConsole = view.findViewById(R.id.tvDebugConsole);
+    scrollDebugLog = view.findViewById(R.id.scrollDebugLog);
+    overlayAlarm = view.findViewById(R.id.overlayAlarm);
+    tvOverlayTitle = view.findViewById(R.id.tvOverlayTitle);
+    tvOverlayDetails = view.findViewById(R.id.tvOverlayDetails);
+    tvPingLatency = view.findViewById(R.id.tvPingLatency);
+    tvSystemStatus = view.findViewById(R.id.tvSystemStatus);
+    tvLiveTickerText = view.findViewById(R.id.tvLiveTickerText);
+    pbRiskMeter = view.findViewById(R.id.pbRiskMeter);
+    tvRiskPercentage = view.findViewById(R.id.tvRiskPercentage);
+    btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
+    btnToggleScan = view.findViewById(R.id.btnToggleScan);
+    btnSimulateAllowed = view.findViewById(R.id.btnSimulateAllowed);
+    btnSimulateDenied = view.findViewById(R.id.btnSimulateDenied);
+    btnScanBarcode = view.findViewById(R.id.btnScanBarcode);
+    btnEmergencyLockdown = view.findViewById(R.id.btnEmergencyLockdown);
+    btnClearConsole = view.findViewById(R.id.btnClearConsole);
+    btnFilterAll = view.findViewById(R.id.btnFilterAll);
+    btnFilterAlerts = view.findViewById(R.id.btnFilterAlerts);
+    btnFilterPass = view.findViewById(R.id.btnFilterPass);
+    
+    spBranchSelector = view.findViewById(R.id.spBranchSelector);
+    tvCurrentBranch = view.findViewById(R.id.tvCurrentBranch);
+    
+    if (rvGatesMonitor != null) {
+        // ✅ استخدام GridLayoutManager لعرض البوابات في شبكة (عمودين)
+        rvGatesMonitor.setLayoutManager(new GridLayoutManager(getContext(), 2));
+        monitorAdapter = new GateMonitorAdapter(monitorList);
+        rvGatesMonitor.setAdapter(monitorAdapter);
     }
+}
 
     private void setupListeners() {
         if (btnStopAlarm != null) btnStopAlarm.setOnClickListener(v -> stopAlarm());
@@ -583,6 +585,67 @@ public class MiraSecureGateFragment extends Fragment {
             }
         });
     }
+
+/**
+ * ✅ تأثير النبض البصري للإنذار
+ */
+private void startPulseAnimation(View view) {
+    Animation anim = new AlphaAnimation(0.3f, 1.0f);
+    anim.setDuration(400);
+    anim.setRepeatMode(Animation.REVERSE);
+    anim.setRepeatCount(Animation.INFINITE);
+    view.startAnimation(anim);
+}
+
+/**
+ * ✅ التحكم في بوابة واحدة (قفل/فتح/إعادة تعيين)
+ */
+private void toggleGateState(String gateId, String currentStatus) {
+    if (gateExecutor == null || gateId == null || gateId.isEmpty()) return;
+    
+    gateExecutor.execute(() -> {
+        try {
+            Context context = getContext();
+            if (context == null) return;
+            
+            MiraApiClient client = MiraApiClient.getInstance(context);
+            JSONObject payload = new JSONObject();
+            payload.put("gate_id", gateId);
+            
+            // تحديد الأمر المناسب حسب الحالة
+            String command;
+            if ("offline".equals(currentStatus) || currentStatus == null) {
+                command = "RECONNECT";
+            } else if ("alert".equals(currentStatus) || "breach".equals(currentStatus)) {
+                command = "RESET_ALARM";
+            } else {
+                command = "TOGGLE_LOCK";
+            }
+            
+            payload.put("command", command);
+            payload.put("branch_id", getCurrentBranchId());
+            
+            MiraApiClient.ApiResponse response = client.postWithAuth("/gate-command", payload);
+            
+            if (response != null && response.isSuccess) {
+                mainHandler.post(() -> {
+                    logConsole(getLocalizedText("✅ تم إرسال أمر للبوابة: ", "✅ Command sent to gate: ") + gateId);
+                    // تحديث فوري لحالة البوابات
+                    loadAllGatesStatus();
+                });
+            } else {
+                mainHandler.post(() -> {
+                    logConsole(getLocalizedText("❌ فشل إرسال الأمر للبوابة: ", "❌ Failed to send command to gate: ") + gateId);
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "toggleGateState: " + e.getMessage());
+            mainHandler.post(() -> {
+                logConsole(getLocalizedText("❌ خطأ في التحكم بالبوابة: ", "❌ Gate control error: ") + e.getMessage());
+            });
+        }
+    });
+}
 
     // ==================== Ping Monitor ====================
     private void startPingMonitor() {
@@ -1048,68 +1111,134 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private class GateMonitorAdapter extends RecyclerView.Adapter<GateMonitorAdapter.VH> {
-        private final List<GateMonitorItem> items;
-        GateMonitorAdapter(List<GateMonitorItem> items) { this.items = items; }
+    private final List<GateMonitorItem> items;
+    GateMonitorAdapter(List<GateMonitorItem> items) { this.items = items; }
+    
+    @NonNull @Override
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_gate_monitor_card, parent, false);
+        return new VH(view);
+    }
+    
+    @Override
+    public void onBindViewHolder(@NonNull VH h, int position) {
+        GateMonitorItem item = items.get(position);
         
-        @NonNull @Override
-        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_gate_monitor, parent, false);
-            return new VH(view);
-        }
+        // اسم البوابة
+        h.tvGateName.setText(item.gateName);
+        h.tvGateName.setTextColor(getTextColor());
         
-        @Override
-        public void onBindViewHolder(@NonNull VH h, int position) {
-            GateMonitorItem item = items.get(position);
-            
-            h.tvGateName.setText(item.gateName);
-            h.tvGateName.setTextColor(getTextColor());
-            
-            if (h.tvBranchName != null) {
-                if (currentBranchId == 0 && item.branchName != null && !item.branchName.isEmpty()) {
-                    h.tvBranchName.setText("📍 " + item.branchName);
-                    h.tvBranchName.setVisibility(View.VISIBLE);
-                } else {
-                    h.tvBranchName.setVisibility(View.GONE);
-                }
-            }
-            
-            h.tvGateStats.setText("✅ " + item.passCount + " | ❌ " + item.denyCount);
-            h.tvGateStats.setTextColor(getSecondaryTextColor());
-            
-            h.tvGateLastEvent.setText(item.lastEvent.isEmpty() ? getLocalizedText("لا أحداث", "No events") : item.lastEvent);
-            h.tvGateLastEvent.setTextColor(getSecondaryTextColor());
-            
-            if ("alert".equals(item.status)) {
-                h.tvGateStatus.setText(getLocalizedText("🔴 إنذار", "🔴 Alert"));
-                h.tvGateStatus.setTextColor(getDangerColor());
-                if (h.vStatusDot != null) h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
-            } else if ("online".equals(item.status) || "armed".equals(item.status)) {
-                h.tvGateStatus.setText(getLocalizedText("🟢 نشطة", "🟢 Active"));
-                h.tvGateStatus.setTextColor(getSuccessColor());
-                if (h.vStatusDot != null) h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
+        // اسم الفرع (يظهر فقط عند عرض كل الفروع)
+        if (h.tvBranchName != null) {
+            if (currentBranchId == 0 && item.branchName != null && !item.branchName.isEmpty()) {
+                h.tvBranchName.setText("🏢 " + item.branchName);
+                h.tvBranchName.setVisibility(View.VISIBLE);
             } else {
-                h.tvGateStatus.setText(getLocalizedText("⚪ غير نشطة", "⚪ Inactive"));
-                h.tvGateStatus.setTextColor(getSecondaryTextColor());
-                if (h.vStatusDot != null) h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+                h.tvBranchName.setVisibility(View.GONE);
             }
         }
         
-        @Override public int getItemCount() { return items.size(); }
+        // الموقع
+        if (h.tvGateLocation != null) {
+            h.tvGateLocation.setText("📍 " + (item.location != null && !item.location.isEmpty() ? 
+                item.location : getLocalizedText("غير محدد", "Not specified")));
+        }
         
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvGateName, tvGateStatus, tvGateStats, tvGateLastEvent, tvBranchName;
-            View vStatusDot;
-            VH(@NonNull View itemView) {
-                super(itemView);
-                tvGateName = itemView.findViewById(R.id.tvGateName);
-                tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
-                tvGateStats = itemView.findViewById(R.id.tvGateStats);
-                tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
-                tvBranchName = itemView.findViewById(R.id.tvBranchName);
-                vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
-            }
+        // الإحصائيات
+        if (h.tvPassCount != null) h.tvPassCount.setText(String.valueOf(item.passCount));
+        if (h.tvDenyCount != null) h.tvDenyCount.setText(String.valueOf(item.denyCount));
+        
+        // آخر حدث
+        h.tvGateLastEvent.setText(item.lastEvent != null && !item.lastEvent.isEmpty() ? 
+            item.lastEvent : getLocalizedText("لا أحداث", "No events"));
+        h.tvGateLastEvent.setTextColor(getSecondaryTextColor());
+        
+        // تحديد حالة البوابة
+        switch (item.status != null ? item.status.toLowerCase() : "offline") {
+            case "alert":
+            case "breach":
+                h.cardGate.setCardBackgroundColor(Color.parseColor("#33EF4444"));
+                h.cardGate.setStrokeColor(getDangerColor());
+                h.tvGateStatus.setText(getLocalizedText("🚨 إنذار", "🚨 BREACH"));
+                h.tvGateStatus.setTextColor(getDangerColor());
+                if (h.vStatusDot != null) {
+                    h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+                }
+                if (h.btnToggleSingleGate != null) {
+                    h.btnToggleSingleGate.setText(getLocalizedText("🔓 إعادة تعيين", "🔓 Reset"));
+                    h.btnToggleSingleGate.setBackgroundColor(getDangerColor());
+                }
+                // تأثير نبض للإنذار
+                startPulseAnimation(h.itemView);
+                break;
+                
+            case "online":
+            case "armed":
+            case "active":
+                h.cardGate.setCardBackgroundColor(getColorFromTheme(
+                    com.google.android.material.R.attr.colorSurface, Color.parseColor("#1E1E1E")));
+                h.cardGate.setStrokeColor(getSuccessColor());
+                h.tvGateStatus.setText(getLocalizedText("🟢 مسلحة", "🟢 ARMED"));
+                h.tvGateStatus.setTextColor(getSuccessColor());
+                if (h.vStatusDot != null) {
+                    h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
+                }
+                if (h.btnToggleSingleGate != null) {
+                    h.btnToggleSingleGate.setText(getLocalizedText("🔒 إغلاق", "🔒 Lock"));
+                    h.btnToggleSingleGate.setBackgroundColor(getSecondaryTextColor());
+                }
+                h.itemView.clearAnimation();
+                break;
+                
+            default: // offline
+                h.cardGate.setCardBackgroundColor(getColorFromTheme(
+                    com.google.android.material.R.attr.colorSurfaceVariant, Color.parseColor("#2A2A2A")));
+                h.cardGate.setStrokeColor(getSecondaryTextColor());
+                h.tvGateStatus.setText(getLocalizedText("⚪ غير متصلة", "⚪ OFFLINE"));
+                h.tvGateStatus.setTextColor(getSecondaryTextColor());
+                if (h.vStatusDot != null) {
+                    h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_gray);
+                }
+                if (h.btnToggleSingleGate != null) {
+                    h.btnToggleSingleGate.setText(getLocalizedText("🔄 إعادة اتصال", "🔄 Reconnect"));
+                    h.btnToggleSingleGate.setBackgroundColor(getWarningColor());
+                }
+                h.itemView.clearAnimation();
+                break;
+        }
+        
+        // زر التحكم السريع بالبوابة
+        if (h.btnToggleSingleGate != null) {
+            h.btnToggleSingleGate.setOnClickListener(v -> {
+                toggleGateState(item.gateId, item.status);
+            });
         }
     }
+    
+    @Override 
+    public int getItemCount() { return items.size(); }
+    
+    class VH extends RecyclerView.ViewHolder {
+        com.google.android.material.card.MaterialCardView cardGate;
+        TextView tvGateName, tvGateStatus, tvGateLocation, tvPassCount, tvDenyCount, tvGateLastEvent, tvBranchName;
+        View vStatusDot;
+        Button btnToggleSingleGate;
+        
+        VH(@NonNull View itemView) {
+            super(itemView);
+            cardGate = itemView.findViewById(R.id.cardGate);
+            tvGateName = itemView.findViewById(R.id.tvGateName);
+            tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+            tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
+            tvPassCount = itemView.findViewById(R.id.tvPassCount);
+            tvDenyCount = itemView.findViewById(R.id.tvDenyCount);
+            tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+            tvBranchName = itemView.findViewById(R.id.tvBranchName);
+            vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
+            btnToggleSingleGate = itemView.findViewById(R.id.btnToggleSingleGate);
+        }
+    }
+}
 
     // ==================== دورة الحياة ====================
     @Override
