@@ -10,19 +10,18 @@
     app:layoutDescription="@xml/dashboard_scene">
 
    <!-- ==================== SHIMMER LOADING ==================== -->
-<LinearLayout
-    android:id="@+id/shimmerLayout"
-    android:layout_width="0dp"
-    android:layout_height="0dp"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:visibility="gone"
-    app:layout_constraintBottom_toBottomOf="parent"
-    app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintTop_toTopOf="parent"
-    tools:visibility="visible">
-
+    <LinearLayout
+        android:id="@+id/shimmerLayout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible">
 
         <View
             android:layout_width="match_parent"
@@ -70,7 +69,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="⏳ جاري تحميل البيانات..."
+            android:text="@string/loading_data"
             android:textColor="?attr/colorOnSurface"
             android:textSize="14sp"
             android:layout_marginTop="12dp" />
@@ -395,7 +394,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentStart="true"
                                 android:layout_centerVertical="true"
-                                android:text="🥇 أسعار الذهب المباشرة"
+                                android:text="@string/live_gold_prices"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
@@ -411,7 +410,7 @@
                                     android:layout_width="36dp"
                                     android:layout_height="36dp"
                                     android:background="?attr/selectableItemBackgroundBorderless"
-                                    android:contentDescription="تحديث أسعار الذهب"
+                                    android:contentDescription="@string/refresh_gold_prices"
                                     android:src="@android:drawable/ic_popup_sync"
                                     app:tint="?attr/colorPrimary" />
 
@@ -462,7 +461,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="سعر الأوقية (31.10g)"
+                                android:text="@string/ounce_price"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
 
@@ -550,7 +549,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="6dp"
-                    android:text="⚡ الوصول السريع"
+                    android:text="@string/quick_access"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -766,7 +765,7 @@
                                 android:textSize="11sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
+                    </com.google.android.material.card.MessageCardView>
                 </LinearLayout>
 
             </LinearLayout>
