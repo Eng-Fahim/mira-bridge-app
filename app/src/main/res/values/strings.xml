@@ -2017,6 +2017,10 @@
 <string name="report_gold_movement">حركة الذهب والمخزون</string>
 <string name="report_financial_summary">الخلاصة المالية والميزانية</string>
 <string name="report_inventory_audit">تقرير مطابقة الجرد</string>
+<string name="gold_prices_global">أسعار الذهب العالمية</string>
+<string name="last_update">آخر تحديث</string>
+<string name="price_source">مصدر الأسعار</string>
+<string name="quick_access_title">وصول سريع</string>
 
 <!-- حالات تحميل وجلب البيانات -->
 <string name="loading_reports">جاري تحميل البيانات من السيرفر...</string>
