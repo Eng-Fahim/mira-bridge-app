@@ -170,11 +170,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     }
                 }
                 getSupportActionBar().setTitle(orgName);
-
+                
+                // تم إزالة تكرار النص في الهيدر والاعتماد فقط على اسم الفرع لترك مساحة أكبر لعنوان المؤسسة
                 if (branchesManager != null && branchesManager.hasActiveBranch()) {
                     getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
                 } else {
-                    getSupportActionBar().setSubtitle(isArabic ? "النظام الرئيسي" : "Main Hub");
+                    getSupportActionBar().setSubtitle(null);
                 }
             }
         } catch (Exception e) {
@@ -384,6 +385,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (uhfVer != null) {
             uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
         }
+
+        MenuItem soundSettings = menu.findItem(R.id.nav_sound_settings);
+        if (soundSettings != null) {
+            soundSettings.setVisible(true);
+        }
     }
 
     @Override
@@ -415,7 +421,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             toggleLanguage();
             return true;
         } else if (id == R.id.UHF_ver) {
-            showUHFVersionDialog();
+            showSystemVersionDialog(); // تم تغييرها لتصبح حول النظام
             return true;
         } else if (id == R.id.action_profile) {
             checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
@@ -423,12 +429,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         } else if (id == R.id.action_logout) {
             confirmLogout();
             return true;
-        }
-        else if (id == R.id.nav_sound_settings) {
+        } else if (id == R.id.nav_sound_settings) {
             checkInventoryLockAndExecute(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
             return true;
         }
-
 
         return super.onOptionsItemSelected(item);
     }
@@ -700,6 +704,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                         case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
                         case "Branches": return new MiraBranchesManagementFragment();
                         case "RfidBindings": return new MiraRfidBindingsFragment();
+                        case "SoundSettings": return new MiraSoundSettingsFragment();
                     }
                 }
                 return new MiraDashboardFragment();
@@ -747,7 +752,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
-    private void showUHFVersionDialog() {
+    private void showSystemVersionDialog() {
         String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
         String hwVer = null;
         String modelName = Build.MODEL;
@@ -763,8 +768,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         StringBuilder message = new StringBuilder();
         message.append("MIRA Trust Architecture™\n");
         message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
-        message.append(isArabic ? "📱 الموديل: " : "📱 Model: ").append(modelName).append("\n");
-        message.append(isArabic ? "📦 المنظومة: " : "📦 System: ").append(miraSystemVersion).append("\n");
+        message.append(isArabic ? "📱 الجهاز: " : "📱 Device: ").append(modelName).append("\n");
+        message.append(isArabic ? "📦 النسخة: " : "📦 Version: ").append(miraSystemVersion).append("\n");
 
         if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
             message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected");
@@ -776,7 +781,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic ? "عن المنظومة | MIRA ID™" : "About System | MIRA ID™")
+                .setTitle(isArabic ? "حول النظام | System Info" : "About System")
                 .setMessage(message.toString())
                 .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
                 .show();
@@ -1156,4 +1161,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-                    }
+}
