@@ -1,7 +1,6 @@
 package com.example.uhf.fragment;
 
-import com.example.uhf.api.MiraApiClient.ApiResponse;
-
+import com.example.uhf.api.ApiResponse;
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
