@@ -1,3 +1,4 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
  <string name="menu_dashboard">الرئيسية</string>
@@ -1982,6 +1983,13 @@
 <string name="inventory_saved_locally">● محفوظ محلياً</string>
 <string name="inventory_pending_sync">جرد معلق للمزامنة</string>
 <string name="inventory_synced_success">تمت مزامنة الجرد بنجاح</string>
+
+
+    <string name="status_connected">متصل</string>
+    <string name="action_quick_search">البحث السريع</string>
+    <string name="action_sync_data">مزامنة البيانات</string>
+    <string name="action_notifications">الإشعارات</string>
+    
 
 <!-- رسائل التأكيد -->
 <string name="confirm_stop_inventory">هل أنت متأكد من إيقاف الجرد؟</string>
