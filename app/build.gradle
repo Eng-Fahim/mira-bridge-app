@@ -13,9 +13,6 @@ android {
         versionCode 4
         versionName "1.4.8"
         
-        // MultiDex غير مطلوب لأن minSdk 26 يدعمه افتراضياً بالنظام
-        // multiDexEnabled false
-        
         buildConfigField "boolean", "Test", "false"
         buildConfigField "boolean", "ENABLE_LOGGING", "false"
         buildConfigField "String", "DEFAULT_SERVER_URL", '"https://sa.mirabarcode.com/wp-json"'
@@ -26,10 +23,8 @@ android {
             useSupportLibrary true
         }
         
-        // الاحتفاظ باللغات المستخدمة فقط لإزالة باقي ملفات الترجمة الزائدة
         resConfigs "en", "ar"
         
-        // حصري لمعمارية المعالجات الحديثة 64-bit لتقليل حجم المكتبات الأصلية (.so)
         ndk {
             abiFilters "arm64-v8a"
         }
@@ -54,11 +49,9 @@ android {
         release {
             signingConfig signingConfigs.release
             
-            // تفعيل الضغط واستئصال الموارد والأكواد غير المستخدمة
             minifyEnabled true
             shrinkResources true
             
-            // استخدام قواعد الضغط المحسّنة (Optimize)
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             
             buildConfigField "boolean", "ENABLE_LOGGING", "false"
@@ -138,7 +131,6 @@ dependencies {
     implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.11.0'
-    // تم استبعاد logging-interceptor من التضمين في الـ Release لتخفيف الحجم
     debugImplementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     
     // CameraX
@@ -148,8 +140,8 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
     
-    // Barcode Generation (نواة ZXing المصغرة لتوليد GS1 DataMatrix و Micro QR Code)
-    implementation 'com.google.zxing:core:3.5.3'
+    // Barcode Scanning & Embedded (تم إزالة التكرار لـ zxing:core وتضمينه ضمن zxing-android-embedded)
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     
     // Barcode Scanning (MLKit الخفيف لمسح الأكواد عبر الكاميرا)
     implementation 'com.google.mlkit:barcode-scanning:17.3.0'
@@ -178,11 +170,8 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
-    androidTestImplementation 'androidx.test:runner:1.6.2'
-    androidTestImplementation 'androidx.test:rules:1.6.1'
-    
-      // ZXing Android Embedded for Barcode Scanning
-    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    androidTestImplementation 'androidx.test.runner:1.6.2'
+    androidTestImplementation 'androidx.test.rules:1.6.1'
 }
 
 // ==================== تخصيص اسم ملف APK ====================
