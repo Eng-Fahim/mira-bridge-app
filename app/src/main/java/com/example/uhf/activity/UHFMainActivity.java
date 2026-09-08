@@ -52,6 +52,15 @@ import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraServerConfigFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
+
+
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.graphics.Typeface;
+import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.model.MessageModel;
+import com.example.uhf.model.NotificationModel;
+
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
 import com.example.uhf.fragment.MiraUHFReadWriteFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
@@ -484,7 +493,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
 
+        // في onCreate بعد تهيئة sessionManager
         messagingManager = MiraMessagingManager.getInstance(this);
+        // تعيين معرف المستخدم الحالي
+        String userId = sessionManager.getUserId(); // أو أي طريقة للحصول على معرف المستخدم
+        if (userId != null && !userId.isEmpty()) {
+        messagingManager.setCurrentUserId(userId);
+        }
         messagingManager.addListener(this::updateNotificationBadge);
         updateNotificationBadge(messagingManager.getUnreadCount());
 
@@ -582,51 +597,192 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
-    private void showChatWindowDialog() {
-        BottomSheetDialog chatDialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+    
 
-        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
-        root.setOrientation(android.widget.LinearLayout.VERTICAL);
-        root.setPadding(32, 32, 32, 32);
-
-        TextView title = new TextView(this);
-        title.setText(isArabic ? "💬 مراسلة اعضاء المنظومة" : "💬 Internal Team Chat");
-        title.setTextSize(18);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        root.addView(title);
-
-        final EditText etMessage = new EditText(this);
-        etMessage.setHint(isArabic ? "اكتب رسالتك للفرع/المستخدم..." : "Type message...");
-        etMessage.setPadding(24, 24, 24, 24);
-        root.addView(etMessage);
-
-        MaterialButton btnSend = new MaterialButton(this);
-        btnSend.setText(isArabic ? "إرسال" : "Send");
-        root.addView(btnSend);
-
-        btnSend.setOnClickListener(v -> {
-            String msg = etMessage.getText().toString().trim();
-            if (!msg.isEmpty()) {
-                Toast.makeText(this, isArabic ? "تم إرسال الرسالة بنجاح" : "Message Sent", Toast.LENGTH_SHORT).show();
-                chatDialog.dismiss();
-            }
-        });
-
-        chatDialog.setContentView(root);
-        chatDialog.show();
-    }
-
-    private void startNotificationPolling() {
-        notificationPollRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isFinishing() && !isDestroyed()) {
-                    notificationPollHandler.postDelayed(this, 15000);
+    // تحديث دالة startNotificationPolling للربط الفعلي
+private void startNotificationPolling() {
+    notificationPollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isFinishing() && !isDestroyed()) {
+                // جلب العداد الفعلي من السيرفر
+                if (messagingManager != null) {
+                    messagingManager.fetchUnreadCountFromServer();
                 }
+                
+                // إعادة جدولة الفحص
+                notificationPollHandler.postDelayed(this, 30000); // فحص كل 30 ثانية
             }
-        };
-        notificationPollHandler.postDelayed(notificationPollRunnable, 10000);
+        }
+    };
+    notificationPollHandler.postDelayed(notificationPollRunnable, 5000); // أول فحص بعد 5 ثواني
+}
+private void showChatWindowDialog() {
+    BottomSheetDialog chatDialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+    
+    LinearLayout root = new LinearLayout(this);
+    root.setOrientation(LinearLayout.VERTICAL);
+    root.setPadding(32, 32, 32, 32);
+
+    TextView title = new TextView(this);
+    title.setText(isArabic ? "💬 مراسلة اعضاء المنظومة" : "💬 Internal Team Chat");
+    title.setTextSize(18);
+    title.setTypeface(null, Typeface.BOLD);
+    root.addView(title);
+
+    // عرض الرسائل السابقة
+    ScrollView scrollView = new ScrollView(this);
+    scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0,
+        1f // يأخذ المساحة المتاحة
+    ));
+    
+    LinearLayout messagesContainer = new LinearLayout(this);
+    messagesContainer.setOrientation(LinearLayout.VERTICAL);
+    
+    // عرض رسالة تحميل
+    TextView loadingText = new TextView(this);
+    loadingText.setText(isArabic ? "جاري تحميل الرسائل..." : "Loading messages...");
+    loadingText.setGravity(android.view.Gravity.CENTER);
+    messagesContainer.addView(loadingText);
+    
+    scrollView.addView(messagesContainer);
+    root.addView(scrollView);
+    
+    // جلب الرسائل من السيرفر
+    messagingManager.fetchMessagesFromServer(new MiraMessagingManager.OnMessagesLoadedListener() {
+        @Override
+        public void onMessagesLoaded(List<MessageModel> messages) {
+            runOnUiThread(() -> {
+                messagesContainer.removeAllViews();
+                
+                if (messages.isEmpty()) {
+                    TextView emptyText = new TextView(UHFMainActivity.this);
+                    emptyText.setText(isArabic ? "لا توجد رسائل بعد" : "No messages yet");
+                    emptyText.setGravity(android.view.Gravity.CENTER);
+                    emptyText.setPadding(16, 32, 16, 32);
+                    messagesContainer.addView(emptyText);
+                } else {
+                    for (MessageModel message : messages) {
+                        TextView messageView = new TextView(UHFMainActivity.this);
+                        String sender = message.getSenderName() != null && !message.getSenderName().isEmpty() 
+                            ? message.getSenderName() 
+                            : (isArabic ? "مستخدم" : "User");
+                        
+                        String time = formatTimestamp(message.getTimestamp());
+                        String messageText = sender + " (" + time + "):\n" + message.getContent();
+                        
+                        messageView.setText(messageText);
+                        messageView.setPadding(16, 12, 16, 12);
+                        messageView.setBackgroundResource(R.drawable.bg_message_bubble);
+                        
+                        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        );
+                        params.setMargins(0, 0, 0, 8);
+                        messageView.setLayoutParams(params);
+                        
+                        messagesContainer.addView(messageView);
+                    }
+                }
+                
+                // التمرير لأسفل لعرض أحدث رسالة
+                scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+            });
+        }
+
+        @Override
+        public void onError(String error) {
+            runOnUiThread(() -> {
+                messagesContainer.removeAllViews();
+                TextView errorText = new TextView(UHFMainActivity.this);
+                errorText.setText(isArabic ? "فشل تحميل الرسائل: " + error : "Failed to load messages: " + error);
+                errorText.setGravity(android.view.Gravity.CENTER);
+                errorText.setPadding(16, 32, 16, 32);
+                messagesContainer.addView(errorText);
+            });
+        }
+    });
+
+    // حقل الإدخال
+    EditText etMessage = new EditText(this);
+    etMessage.setHint(isArabic ? "اكتب رسالتك..." : "Type message...");
+    etMessage.setPadding(24, 24, 24, 24);
+    LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+    );
+    inputParams.setMargins(0, 16, 0, 8);
+    etMessage.setLayoutParams(inputParams);
+    root.addView(etMessage);
+
+    // زر الإرسال
+    MaterialButton btnSend = new MaterialButton(this);
+    btnSend.setText(isArabic ? "إرسال" : "Send");
+    btnSend.setLayoutParams(new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+    ));
+    root.addView(btnSend);
+
+    btnSend.setOnClickListener(v -> {
+        String msg = etMessage.getText().toString().trim();
+        if (!msg.isEmpty()) {
+            btnSend.setEnabled(false);
+            btnSend.setText(isArabic ? "جاري الإرسال..." : "Sending...");
+            
+            // إرسال الرسالة عبر السيرفر
+            String receiverId = "all"; // أو معرف مستخدم محدد
+            messagingManager.sendMessage(receiverId, msg, new MiraApiClient.SendMessageCallback() {
+                @Override
+                public void onSuccess(MessageModel message) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(UHFMainActivity.this, 
+                            isArabic ? "تم إرسال الرسالة بنجاح" : "Message Sent", 
+                            Toast.LENGTH_SHORT).show();
+                        etMessage.setText("");
+                        btnSend.setEnabled(true);
+                        btnSend.setText(isArabic ? "إرسال" : "Send");
+                        chatDialog.dismiss();
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(UHFMainActivity.this, 
+                            isArabic ? "فشل إرسال الرسالة: " + error : "Failed to send message: " + error, 
+                            Toast.LENGTH_SHORT).show();
+                        btnSend.setEnabled(true);
+                        btnSend.setText(isArabic ? "إرسال" : "Send");
+                    });
+                }
+            });
+        } else {
+            etMessage.setError(isArabic ? "الرجاء كتابة رسالة" : "Please type a message");
+        }
+    });
+
+    chatDialog.setContentView(root);
+    chatDialog.show();
+}
+
+
+
+// دالة مساعدة لتنسيق الوقت
+private String formatTimestamp(long timestamp) {
+    try {
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
+            isArabic ? "HH:mm dd/MM/yyyy" : "HH:mm MM/dd/yyyy",
+            java.util.Locale.getDefault()
+        );
+        return sdf.format(new java.util.Date(timestamp));
+    } catch (Exception e) {
+        return "";
     }
+}
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
@@ -1429,6 +1585,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Navigation to login error: " + e.getMessage());
         }
     }
+    
+
 
     @Override
     protected void onDestroy() {
@@ -1442,9 +1600,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 rfidManager.unregisterTriggerKeyReceiver();
             }
 
-            if (notificationPollHandler != null && notificationPollRunnable != null) {
-                notificationPollHandler.removeCallbacks(notificationPollRunnable);
-            }
+            // إزالة مستمع الإشعارات
+        if (messagingManager != null) {
+            messagingManager.removeListener(this::updateNotificationBadge);
+        }
+        
+        // إيقاف الفحص الدوري
+        if (notificationPollHandler != null && notificationPollRunnable != null) {
+            notificationPollHandler.removeCallbacks(notificationPollRunnable);
+        }
+        
 
             AppWatchdog.getInstance().stopMonitoring();
             hideLoading();
