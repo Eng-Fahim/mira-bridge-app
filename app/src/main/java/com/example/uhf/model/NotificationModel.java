@@ -1,4 +1,4 @@
-package com.example.uhf.models;
+package com.example.uhf.model;
 
 public class NotificationModel {
     private String id;
