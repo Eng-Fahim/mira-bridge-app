@@ -45,6 +45,13 @@
             android:icon="@drawable/ic_file_download"
             app:showAsAction="never" />
 
+        <!-- 🔊 تخصيص الأصوات والتنبيهات -->
+        <item
+            android:id="@+id/nav_sound_settings"
+            android:title="Sound Settings"
+            android:icon="@drawable/ic_volume_up"
+            app:showAsAction="never" />
+
         <!-- ℹ️ إصدار الجهاز -->
         <item
             android:id="@+id/UHF_ver"
