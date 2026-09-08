@@ -22,7 +22,7 @@
             app:menu="@menu/main_menu"
             app:popupTheme="@style/CustomOverflowMenu" />
 
-        <!-- 📌 الشريط الفرعي الأفقي للإجراءات السريعة والأدوات الذكية -->
+        <!-- الشريط الفرعي الأفقي للإجراءات السريعة والأدوات الذكية -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="48dp"
@@ -52,7 +52,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="متصل"
+                    android:text="@string/status_connected"
                     android:textSize="12sp"
                     android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
@@ -77,7 +77,7 @@
                 android:layout_height="36dp"
                 android:layout_marginHorizontal="4dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="البحث السريع"
+                android:contentDescription="@string/action_quick_search"
                 android:src="@drawable/ic_search"
                 app:tint="?attr/colorOnSurfaceVariant" />
 
@@ -88,7 +88,7 @@
                 android:layout_height="36dp"
                 android:layout_marginHorizontal="4dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="مزامنة البيانات"
+                android:contentDescription="@string/action_sync_data"
                 app:srcCompat="@drawable/ic_sync"
                 app:tint="?attr/colorOnSurfaceVariant" />
 
@@ -157,14 +157,14 @@
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="44dp"
         android:contentDescription="@string/nav_actions"
-        app:backgroundTint="?attr/colorPrimary"
+        app:backgroundTint="?attr=colorPrimary"
         app:strokeColor="?attr/colorSurface"
         app:strokeWidth="3dp"
         app:elevation="14dp"
         app:fabSize="normal"
         app:maxImageSize="28dp"
         app:srcCompat="@drawable/ic_gold_gem"
-        app:tint="?attr/colorOnPrimary" />
+        app:tint="?attr=colorOnPrimary" />
 
     <!-- طبقة السنابر والتحميل التفاعلية أثناء التنقل -->
     <LinearLayout
@@ -183,7 +183,7 @@
         <ProgressBar
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:indeterminateTint="?attr/colorPrimary" />
+            android:indeterminateTint="?attr=colorPrimary" />
 
     </LinearLayout>
 
