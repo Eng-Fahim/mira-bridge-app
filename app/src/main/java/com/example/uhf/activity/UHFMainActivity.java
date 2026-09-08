@@ -422,6 +422,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             confirmLogout();
             return true;
         }
+        else if (id == R.id.nav_sound_settings) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
+            return true;
+        }
+
 
         return super.onOptionsItemSelected(item);
     }
