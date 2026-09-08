@@ -11,11 +11,9 @@ import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.CertificatePinningManager;  
 import com.example.uhf.tools.SessionManager;
 
-
 import com.example.uhf.model.MessageModel;
 import com.example.uhf.model.NotificationModel;
 import com.example.uhf.model.ItemModel;
-
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -46,10 +44,6 @@ public class MiraApiClient {
     
     private static final String API_PREFIX = "mira-gate/v1";
     private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json";
-    
-    // في بداية الكلاس بعد المتغيرات الموجودة
-    private final ExecutorService executorService = Executors.newFixedThreadPool(4);
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private final Context context;
     private final MiraServerConfig serverConfig;
@@ -60,7 +54,8 @@ public class MiraApiClient {
     private String apiKey;
     private String gateId;
 
-    // ✅ إدارة الخيوط البرمجية بشكل فعال لمنع تسريب الذاكرة أثناء المسح المتكرر
+    // ✅ إدارة الخيوط البرمجية بشكل فعال
+    private final ExecutorService executorService = Executors.newFixedThreadPool(4);
     private final ExecutorService networkExecutor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -72,6 +67,7 @@ public class MiraApiClient {
         }
         return instance;
     }
+
 
     private MiraApiClient(Context context) {
         this.context = context;
