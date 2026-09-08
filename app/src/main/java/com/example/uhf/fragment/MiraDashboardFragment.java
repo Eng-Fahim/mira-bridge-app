@@ -30,6 +30,7 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.QuickActionsAdapter;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.api.ApiResponse;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
@@ -447,7 +448,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                         return;
                     }
 
-                    MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
+                    ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
                     GoldPriceData priceData = parseGoldPriceData(response);
 
                     mainHandler.post(() -> {
@@ -492,8 +493,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             logNonFatal("showGoldLoadingState", e);
         }
     }
-
-    private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
+    private GoldPriceData parseGoldPriceData(ApiResponse response) {
         try {
             if (response == null || !response.isSuccess || response.data == null) return null;
             JSONObject data = response.data.optJSONObject("data");
@@ -705,7 +705,7 @@ if (isGlobalAdmin) {
         dataFuture = sharedExecutor.submit(() -> {
             try {
                 // ✅ الآن سيرسل للسيرفر 0 إذا كان مديراً، فيقوم الـ Backend بإرجاع إحصائيات كل الفروع!
-                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
+                ApiResponse response = apiClient.getDashboardFull(finalBranchId);
                 
                 mainHandler.post(() -> {
                     isLoading.set(false);
@@ -795,7 +795,7 @@ if (isGlobalAdmin) {
 
             sharedExecutor.execute(() -> {
                 try {
-                    MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
+                    ApiResponse response = apiClient.getBranchInventory(branchId);
                     mainHandler.post(() -> {
                         if (!isAdded()) return;
                         if (response != null && response.isSuccess && response.data != null) {
