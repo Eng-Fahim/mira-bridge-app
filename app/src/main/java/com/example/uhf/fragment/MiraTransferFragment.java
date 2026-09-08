@@ -36,7 +36,7 @@ import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.SecureSessionManager;
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.api.ApiResponse;
+
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.chip.Chip;
@@ -368,7 +368,7 @@ public class MiraTransferFragment extends Fragment {
             SecureSessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SecureSessionManager.Role.BRANCH_MANAGER;
             boolean isTopLevel = userRole == SecureSessionManager.Role.SYSTEM_ADMIN || userRole == SecureSessionManager.Role.ORG_ADMIN;
             
-            ApiResponse response = apiClient.getTransfers(branchId, "");
+            MiraApiClient.ApiResponse response = apiClient.getTransfers(branchId, "");
             
             mainHandler.post(() -> {
                 if (!isAdded() || getContext() == null) return;
@@ -545,7 +545,7 @@ public class MiraTransferFragment extends Fragment {
                         JSONObject payload = new JSONObject();
                         payload.put("status", "cancelled");
                         
-                        ApiResponse response = apiClient.updateTransfer(t.id, payload);
+                        MiraApiClient.ApiResponse response = apiClient.updateTransfer(t.id, payload);
                         mainHandler.post(() -> {
                             dismissLoadingDialog();
                             if (!isAdded() || getContext() == null) return;
@@ -578,7 +578,7 @@ public class MiraTransferFragment extends Fragment {
         showLoadingDialog(isArabic ? "جاري تحميل القطع..." : "Loading items...");
         
         executor.execute(() -> {
-            ApiResponse response = apiClient.getTransfer(t.id);
+            MiraApiClient.ApiResponse response = apiClient.getTransfer(t.id);
             mainHandler.post(() -> {
                 dismissLoadingDialog();
                 if (!isAdded() || getContext() == null) return;
@@ -698,7 +698,7 @@ public class MiraTransferFragment extends Fragment {
             .setMessage(isArabic ? "هل أنت متأكد من اعتماد الشحنة " + t.transferNumber + "؟" : "Are you sure you want to approve shipment " + t.transferNumber + "?")
             .setPositiveButton(isArabic ? "✅ اعتماد" : "✅ Approve", (d, w) -> {
                 executor.execute(() -> {
-                    ApiResponse response = apiClient.approveTransfer(t.id);
+                    MiraApiClient.ApiResponse response = apiClient.approveTransfer(t.id);
                     mainHandler.post(() -> {
                         if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess) {
@@ -725,7 +725,7 @@ public class MiraTransferFragment extends Fragment {
             .setMessage(isArabic ? "هل تأكدت من استلام جميع القطع في الشحنة " + t.transferNumber + "؟" : "Have you verified all items in shipment " + t.transferNumber + "?")
             .setPositiveButton(isArabic ? "📥 تأكيد الاستلام" : "📥 Confirm Receive", (d, w) -> {
                 executor.execute(() -> {
-                    ApiResponse response = apiClient.receiveTransfer(t.id);
+                    MiraApiClient.ApiResponse response = apiClient.receiveTransfer(t.id);
                     mainHandler.post(() -> {
                         if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess) {
@@ -742,7 +742,7 @@ public class MiraTransferFragment extends Fragment {
             .show();
     }
 
-    private String getErrorMessage(ApiResponse response) {
+    private String getErrorMessage(MiraApiClient.ApiResponse response) {
         if (response == null) return isArabic ? "تعذر الاتصال بالسيرفر." : "Could not connect to server.";
         if (response.error != null && !response.error.isEmpty()) return response.error;
         if (response.message != null && !response.message.isEmpty()) return response.message;
@@ -788,7 +788,7 @@ public class MiraTransferFragment extends Fragment {
         List<Integer> branchIds = new ArrayList<>();
 
         executor.execute(() -> {
-            ApiResponse response = apiClient.getBranches();
+            MiraApiClient.ApiResponse response = apiClient.getBranches();
             mainHandler.post(() -> {
                 if (!isAdded() || getContext() == null) return;
                 
@@ -866,7 +866,7 @@ public class MiraTransferFragment extends Fragment {
             try {
                 JSONObject params = new JSONObject();
                 params.put("branch_id", branchesManager.getActiveBranchId());
-                ApiResponse response = apiClient.authorize(epc, "transfer", params);
+                MiraApiClient.ApiResponse response = apiClient.authorize(epc, "transfer", params);
                 
                 mainHandler.post(() -> {
                     if (!isAdded() || getContext() == null) return;
@@ -974,7 +974,7 @@ public class MiraTransferFragment extends Fragment {
                 createPayload.put("notes", t.notes != null ? t.notes : "");
                 createPayload.put("items", itemsArray);
 
-                ApiResponse createResponse = apiClient.createTransfer(createPayload);
+                MiraApiClient.ApiResponse createResponse = apiClient.createTransfer(createPayload);
                 
                 if (createResponse != null && createResponse.isSuccess) {
                     // فحص مرن لجميع الاحتمالات الممكنة للـ ID القادم من السيرفر
@@ -1016,7 +1016,7 @@ public class MiraTransferFragment extends Fragment {
                 }
             } else {
                 // إلحاق قطع لتحويل قائم مسبقاً
-                ApiResponse addResponse = apiClient.addItemsToTransfer(targetTransferId, itemsArray);
+                MiraApiClient.ApiResponse addResponse = apiClient.addItemsToTransfer(targetTransferId, itemsArray);
                 if (addResponse != null && addResponse.isSuccess) {
                     mainHandler.post(() -> {
                         dismissLoadingDialog();
