@@ -361,6 +361,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 updateToolbarTitle();
             }
             
+            // أضف هذا داخل دالة onCreate في UHFMainActivity.java بجانب ربط الـ Toolbar:
+            findViewById(R.id.btnSubSearch).setOnClickListener(v -> showGlobalSearchDialog());
+            findViewById(R.id.btnSubSync).setOnClickListener(v -> performDataSync());
+            findViewById(R.id.btnSubNotifications).setOnClickListener(v -> showNotificationsDialog());
+
              
         // ✅ أعد هذا الجزء - ربط زر حالة الأجهزة بفتح قائمة الإعدادات
         View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
@@ -1428,4 +1433,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-            }
+                                                                                }
