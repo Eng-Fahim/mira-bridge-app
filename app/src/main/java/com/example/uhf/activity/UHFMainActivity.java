@@ -19,6 +19,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TabHost;
+import android.widget.TextView; // ✅ إضافة هذا import
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -32,7 +33,6 @@ import android.annotation.SuppressLint;
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraAccountingFragment;
 import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
-
 import com.example.uhf.fragment.MiraAdminHubFragment;
 import com.example.uhf.fragment.MiraBranchesManagementFragment;
 import com.example.uhf.fragment.MiraDashboardFragment;
@@ -102,6 +102,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraBranchesManager branchesManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    // ✅ متغيرات مؤشر حالة الأجهزة - داخل الكلاس
+    private View statusDot;
+    private TextView statusText;
+    private Handler pulseHandler;
+    private Runnable pulseRunnable;
+    private boolean isPulseRunning = false;
+
     public int selectIndex = -1;
     public ArrayList<UHFTAGInfo> tagList = new ArrayList<>();
     public boolean loopFlag = false;
@@ -113,6 +120,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
+
+    // ✅ enum داخل الكلاس
+    private enum HardwareStatus {
+        CONNECTED,
+        CONNECTING,
+        DISCONNECTED
+    }
 
     public interface OnRfidScannedListener {
         void onRfidScanned(String epc);
@@ -158,6 +172,133 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Error updating app title: " + e.getMessage());
         }
     }
+    
+    // ✅ دالة تحديث مؤشر حالة الأجهزة
+    private void updateHardwareStatusIndicator() {
+        statusDot = findViewById(R.id.statusDot);
+        statusText = findViewById(R.id.statusText);
+        
+        if (statusDot == null || statusText == null) return;
+        
+        // تحديد حالة الأجهزة
+        HardwareStatus status = checkHardwareStatus();
+        
+        // تحديث المظهر حسب الحالة
+        switch (status) {
+            case CONNECTED:
+                statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
+                statusText.setText(R.string.status_connected);
+                startPulseAnimation(1.0f, 1.15f); // نبض خفيف
+                break;
+                
+            case CONNECTING:
+                statusDot.setBackgroundResource(R.drawable.bg_status_dot_orange);
+                statusText.setText(R.string.status_connecting);
+                startPulseAnimation(0.7f, 1.3f); // نبض أقوى
+                break;
+                
+            case DISCONNECTED:
+                statusDot.setBackgroundResource(R.drawable.bg_status_dot_red);
+                statusText.setText(R.string.status_disconnected);
+                stopPulseAnimation();
+                statusDot.animate().alpha(0.5f).setDuration(300).start();
+                break;
+        }
+    }
+
+    // ✅ فحص حالة الأجهزة
+    private HardwareStatus checkHardwareStatus() {
+        try {
+            // فحص حالة قارئ RFID
+            if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT && mReader != null) {
+                return HardwareStatus.CONNECTED;
+            }
+            
+            // فحص محاولة الاتصال
+            com.example.uhf.MiraRfid.RFIDManager rfidManager = 
+                com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
+            
+            if (rfidManager != null && rfidManager.isConnecting()) {
+                return HardwareStatus.CONNECTING;
+            }
+            
+            return HardwareStatus.DISCONNECTED;
+        } catch (Exception e) {
+            Log.e(TAG, "Hardware status check error: " + e.getMessage());
+            return HardwareStatus.DISCONNECTED;
+        }
+    }
+
+    // ✅ بدء حركة النبض
+    private void startPulseAnimation(float minScale, float maxScale) {
+        stopPulseAnimation();
+        
+        isPulseRunning = true;
+        pulseHandler = new Handler(Looper.getMainLooper());
+        pulseRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isPulseRunning || statusDot == null) return;
+                
+                statusDot.animate()
+                    .scaleX(maxScale)
+                    .scaleY(maxScale)
+                    .setDuration(600)
+                    .withEndAction(() -> {
+                        if (!isPulseRunning || statusDot == null) return;
+                        
+                        statusDot.animate()
+                            .scaleX(minScale)
+                            .scaleY(minScale)
+                            .setDuration(600)
+                            .withEndAction(() -> {
+                                if (isPulseRunning && pulseHandler != null) {
+                                    pulseHandler.postDelayed(pulseRunnable, 200);
+                                }
+                            })
+                            .start();
+                    })
+                    .start();
+            }
+        };
+        
+        pulseHandler.post(pulseRunnable);
+    }
+
+    // ✅ إيقاف حركة النبض
+    private void stopPulseAnimation() {
+        isPulseRunning = false;
+        if (pulseHandler != null && pulseRunnable != null) {
+            pulseHandler.removeCallbacks(pulseRunnable);
+        }
+        if (statusDot != null) {
+            statusDot.animate().cancel();
+            statusDot.setScaleX(1.0f);
+            statusDot.setScaleY(1.0f);
+            statusDot.setAlpha(1.0f);
+        }
+    }
+
+    // ✅ جدولة تحديث دوري لحالة الأجهزة
+    private void scheduleHardwareStatusUpdates() {
+        mainHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!isFinishing() && !isDestroyed()) {
+                    updateHardwareStatusIndicator();
+                    mainHandler.postDelayed(this, 5000);
+                }
+            }
+        }, 5000);
+    }
+
+    // ✅ تأثير التوهج (اختياري)
+    private void addGlowEffect(View dot, int color) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            float elevation = 4f * getResources().getDisplayMetrics().density;
+            dot.setElevation(elevation);
+        }
+    }
 
     private void updateToolbarTitle() {
         try {
@@ -171,7 +312,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 }
                 getSupportActionBar().setTitle(orgName);
                 
-                // تم إزالة تكرار النص في الهيدر والاعتماد فقط على اسم الفرع لترك مساحة أكبر لعنوان المؤسسة
                 if (branchesManager != null && branchesManager.hasActiveBranch()) {
                     getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
                 } else {
@@ -193,51 +333,53 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        
         try {
             sessionManager = new SessionManager(getApplicationContext());
             if (!sessionManager.isLoggedIn()) {
                 navigateToLogin();
                 return;
             }
-
+            
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
             setContentView(R.layout.activity_main);
-
+            
             cleanupOldFragments();
-
+            
             AppWatchdog.getInstance().startMonitoring(() -> {
                 Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
                 MiraApplication.getInstance().restartApp();
             });
-
+            
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
-
+            
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             fragmentManager = getSupportFragmentManager();
-
+            
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
             if (toolbar != null) {
                 setSupportActionBar(toolbar);
                 updateToolbarTitle();
             }
-            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-            if (btnHardwareStatus != null) {
-                btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
-            }
-
+            
+            // ✅ تحديث مؤشر حالة الأجهزة
+            updateHardwareStatusIndicator();
+            
+            // ✅ جدولة تحديث دوري لحالة الأجهزة
+            scheduleHardwareStatusUpdates();
+            
             setupQuickNav();
             setupOrgProfileListener();
-
+            
             if (savedInstanceState == null) {
                 currentFragmentTag = "Dashboard";
             } else {
                 currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
             }
-
+            
             loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-
+            
         } catch (Exception e) {
             Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
@@ -246,17 +388,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-
+        
         try {
             isArabic = newConfig.locale.getLanguage().equals("ar");
-
+            
             getWindow().getDecorView().setLayoutDirection(
                     isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
             );
-
+            
             updateBottomNavLanguage();
             updateToolbarTitle();
-
+            
         } catch (Exception e) {
             Log.e(TAG, "Configuration change error: " + e.getMessage());
         }
@@ -266,8 +408,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void onResume() {
         super.onResume();
         updateToolbarTitle();
+        updateHardwareStatusIndicator(); // ✅ تحديث فوري عند العودة
         mainHandler.postDelayed(this::hideLoading, 100);
-
+        
         try {
             com.example.uhf.MiraRfid.RFIDManager.getInstance(this).autoConnectAndBind(this);
         } catch (Exception e) {
@@ -280,9 +423,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.onPause();
         hideLoading();
         AppWatchdog.getInstance().stopMonitoring();
+        stopPulseAnimation(); // ✅ إيقاف النبض عند الخروج
         
         try {
-            com.example.uhf.MiraRfid.RFIDManager rfidManager = com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
+            com.example.uhf.MiraRfid.RFIDManager rfidManager = 
+                com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
             rfidManager.stopScan();
             rfidManager.unregisterTriggerKeyReceiver();
         } catch (Exception e) {
@@ -323,11 +468,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
-
+        
         if (menu instanceof MenuBuilder) {
             ((MenuBuilder) menu).setOptionalIconsVisible(true);
         }
-
+        
         PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
         applyToolbarMenuPermissions(menu, pm);
         return true;
@@ -335,57 +480,57 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
         if (pm == null) return;
-
+        
         MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
         if (toggleLanguage != null) {
             toggleLanguage.setTitle(isArabic ? "English" : "العربية");
         }
-
+        
         MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
         if (actionGoldRates != null) {
             actionGoldRates.setVisible(pm.canViewGoldRates());
         }
-
+        
         MenuItem actionQuickAccess = menu.findItem(R.id.action_quick_access_settings);
         if (actionQuickAccess != null) {
             actionQuickAccess.setVisible(pm.canManageQuickAccess());
         }
-
+        
         MenuItem actionDashboard = menu.findItem(R.id.action_dashboard);
         if (actionDashboard != null) {
             actionDashboard.setVisible(pm.canViewDashboard());
         }
-
+        
         MenuItem actionBranches = menu.findItem(R.id.action_branches);
         if (actionBranches != null) {
             actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
         }
-
+        
         MenuItem actionProfile = menu.findItem(R.id.action_profile);
         if (actionProfile != null) {
             actionProfile.setVisible(pm.canViewProfile());
         }
-
+        
         MenuItem actionHardware = menu.findItem(R.id.action_hardware_setup);
         if (actionHardware != null) {
             actionHardware.setVisible(true);
         }
-
+        
         MenuItem actionExport = menu.findItem(R.id.export);
         if (actionExport != null) {
             actionExport.setVisible(pm.canExportReports());
         }
-
+        
         MenuItem actionLogout = menu.findItem(R.id.action_logout);
         if (actionLogout != null) {
             actionLogout.setVisible(true);
         }
-
+        
         MenuItem uhfVer = menu.findItem(R.id.UHF_ver);
         if (uhfVer != null) {
             uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
         }
-
+        
         MenuItem soundSettings = menu.findItem(R.id.nav_sound_settings);
         if (soundSettings != null) {
             soundSettings.setVisible(true);
@@ -395,7 +540,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-
+        
         if (id == R.id.action_hardware_setup) {
             showHardwareOptionsDialog();
             return true;
@@ -421,7 +566,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             toggleLanguage();
             return true;
         } else if (id == R.id.UHF_ver) {
-            showSystemVersionDialog(); // تم تغييرها لتصبح حول النظام
+            showSystemVersionDialog();
             return true;
         } else if (id == R.id.action_profile) {
             checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
@@ -433,7 +578,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             checkInventoryLockAndExecute(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
             return true;
         }
-
+        
         return super.onOptionsItemSelected(item);
     }
 
@@ -442,7 +587,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             String newLang = isArabic ? "en" : "ar";
             saveFragmentTagToPrefs(currentFragmentTag);
             MiraLanguageHelper.applyLanguage(this, newLang);
-
+            
             Intent intent = new Intent(this, UHFMainActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
@@ -469,24 +614,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         try {
             BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
             FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
-
+            
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-
+            
             if (fabActionCenter != null) {
                 boolean hasQuickActions = pm.getAllowedQuickActions().size() > 0;
                 fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
                 fabActionCenter.setEnabled(hasQuickActions);
                 fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
             }
-
+            
             if (quickNav != null) {
                 applyBottomNavPermissions(quickNav, pm);
-
+                
                 quickNav.setOnItemSelectedListener(item -> {
                     int id = item.getItemId();
                     String tag = getFragmentTagForNavItem(id);
                     Fragment fragment = createFragmentByTag(tag);
-
+                    
                     if (fragment != null) {
                         loadFragment(fragment, tag, false);
                         return true;
@@ -501,16 +646,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
         Menu menu = quickNav.getMenu();
-
+        
         MenuItem navHome = menu.findItem(R.id.nav_home);
         if (navHome != null) navHome.setVisible(true);
-
+        
         MenuItem navInventory = menu.findItem(R.id.nav_inventory);
         if (navInventory != null) navInventory.setVisible(true);
-
+        
         MenuItem navSales = menu.findItem(R.id.nav_sales);
         if (navSales != null) navSales.setVisible(true);
-
+        
         MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
         if (navTransfers != null) navTransfers.setVisible(true);
     }
@@ -528,10 +673,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
             View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
             dialog.setContentView(view);
-
+            
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
             MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
-
+            
             View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
             if (btnRfidWrite != null) {
                 boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
@@ -543,52 +688,52 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     });
                 }
             }
-
+            
             applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
                     pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
                     new MiraRfidBindingsFragment(), "RfidBindings");
-
+            
             applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
                     pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
                     new MiraIdentityStudioFragment(), "IdentityStudio");
-
+            
             applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
                     pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
                     new MiraUHFRadarLocationFragment(), "Radar");
-
+            
             applyQuickActionButton(view, R.id.btnSecureGate, dialog,
                     pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
                     new MiraSecureGateFragment(), "SecureGate");
-
+            
             applyQuickActionButton(view, R.id.btnReports, dialog,
                     pm.canExportReports() && quickAccess.isActionEnabled("reports"),
                     new MiraReportsProFragment(), "Reports");
-
+            
             applyQuickActionButton(view, R.id.btnAccounting, dialog,
                     pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
                     new MiraAccountingFragment(), "Accounting");
-
+            
             applyQuickActionButton(view, R.id.btnTransfer, dialog,
                     pm.canAccessTransfers() && quickAccess.isActionEnabled("transfers"),
                     new MiraTransferFragment(), "Transfers");
-
+            
             applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
                     pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
                     new MiraSalesHistoryFragment(), "SalesHistory");
-
+            
             applyQuickActionButton(view, R.id.btnAdminHub, dialog,
                     pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
                     new MiraAdminHubFragment(), "AdminHub");
-
+            
             applyQuickActionButton(view, R.id.btnServerConfig, dialog,
                     pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
                     new MiraServerConfigFragment(), "ServerConfig");
-
+            
             View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
             if (fabCloseSheet != null) {
                 fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
             }
-
+            
             dialog.show();
         } catch (Exception e) {
             Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
@@ -615,31 +760,31 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
         if (isFinishing() || isDestroyed() || fragment == null) return;
-
+        
         try {
             showLoading();
             clearActiveListeners();
-
+            
             currentFragment = fragment;
             currentFragmentTag = tag;
-
+            
             if (!addToBackStack) {
                 clearBackStack();
             }
-
+            
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             transaction.setCustomAnimations(0, 0, 0, 0);
             transaction.replace(R.id.fragment_container, fragment, tag);
-
+            
             if (addToBackStack) {
                 transaction.addToBackStack(tag);
             }
-
+            
             transaction.commit();
-
+            
             mainHandler.postDelayed(this::hideLoading, 250);
             updateBottomNavSelectionByTag(tag);
-
+            
         } catch (Exception e) {
             Log.e(TAG, "Error switching fragment: " + e.getMessage(), e);
             try {
@@ -659,11 +804,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             clearActiveListeners();
             currentFragment = fragment;
             currentFragmentTag = tag;
-
+            
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             transaction.replace(R.id.fragment_container, fragment, tag);
             transaction.commitNow();
-
+            
             updateBottomNavSelectionByTag(tag);
             hideLoading();
         } catch (Exception e) {
@@ -674,7 +819,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public Fragment createFragmentByTag(String tag) {
         if (tag == null) return new MiraDashboardFragment();
-
+        
         switch (tag) {
             case "Dashboard":
                 return new MiraDashboardFragment();
@@ -714,7 +859,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private void showHardwareOptionsDialog() {
         PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
         List<String> optionsList = new ArrayList<>();
-
+        
         if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
             optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
         }
@@ -727,16 +872,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
             optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
         }
-
+        
         optionsList.add(isArabic ? "🔄 اختبار التوصيل والربط" : "🔄 Connection Test");
-
+        
         String[] options = optionsList.toArray(new String[0]);
-
+        
         new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "أجهزة ومستشعرات المنظومة" : "Hardware & Sensors")
                 .setItems(options, (dialog, which) -> {
                     String selected = options[which];
-
+                    
                     if (selected.contains("RFID") || selected.contains("قارئ")) {
                         loadFragment(new MiraReaderSetupFragment(), "ReaderSetup");
                     } else if (selected.contains("Gate") || selected.contains("بوابات")) {
@@ -756,7 +901,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
         String hwVer = null;
         String modelName = Build.MODEL;
-
+        
         if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT && mReader != null) {
             try {
                 hwVer = mReader.getHardwareVersion();
@@ -764,13 +909,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
             }
         }
-
+        
         StringBuilder message = new StringBuilder();
         message.append("MIRA Trust Architecture™\n");
         message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
         message.append(isArabic ? "📱 الجهاز: " : "📱 Device: ").append(modelName).append("\n");
         message.append(isArabic ? "📦 النسخة: " : "📦 Version: ").append(miraSystemVersion).append("\n");
-
+        
         if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
             message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected");
         } else if (hwVer == null || hwVer.trim().isEmpty()) {
@@ -779,7 +924,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
             message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
         }
-
+        
         new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "حول النظام | System Info" : "About System")
                 .setMessage(message.toString())
@@ -791,7 +936,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         try {
             BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
             if (quickNav == null || tag == null) return;
-
+            
             Menu menu = quickNav.getMenu();
             if (tag.equals("Dashboard")) {
                 menu.findItem(R.id.nav_home).setChecked(true);
@@ -939,7 +1084,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     }
                 }
             }
-
+            
             if (fragmentManager.getBackStackEntryCount() > 0) {
                 fragmentManager.popBackStackImmediate();
                 Fragment topFragment = getTopFragment();
@@ -960,13 +1105,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 return;
             }
         }
-
+        
         if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
             clearBackStack();
             loadFragment(new MiraDashboardFragment(), "Dashboard", false);
             return;
         }
-
+        
         handleDoubleBackToExit();
     }
 
@@ -1018,16 +1163,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
             if (nav != null && nav.getMenu() != null) {
                 Menu menu = nav.getMenu();
-
+                
                 MenuItem home = menu.findItem(R.id.nav_home);
                 if (home != null) home.setTitle(isArabic ? "الرئيسية" : "Home");
-
+                
                 MenuItem inventory = menu.findItem(R.id.nav_inventory);
                 if (inventory != null) inventory.setTitle(isArabic ? "الجرد" : "Inventory");
-
+                
                 MenuItem sales = menu.findItem(R.id.nav_sales);
                 if (sales != null) sales.setTitle(isArabic ? "البيع" : "Sales");
-
+                
                 MenuItem transfers = menu.findItem(R.id.nav_transfers);
                 if (transfers != null) transfers.setTitle(isArabic ? "التحويلات" : "Transfers");
             }
@@ -1076,7 +1221,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 view.getLocationOnScreen(location);
                 float x = ev.getRawX() + view.getLeft() - location[0];
                 float y = ev.getRawY() + view.getTop() - location[1];
-
+                
                 if (x < view.getLeft() || x > view.getRight() || y < view.getTop() || y > view.getBottom()) {
                     hideKeyboard(view);
                     view.clearFocus();
@@ -1098,7 +1243,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 mReader.free();
                 mReader = null;
             }
-
+            
             Intent intent = new Intent(this, LoginActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
@@ -1111,37 +1256,40 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     protected void onDestroy() {
         try {
-            com.example.uhf.MiraRfid.RFIDManager rfidManager = com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
+            stopPulseAnimation(); // ✅ إيقاف النبض
+            
+            com.example.uhf.MiraRfid.RFIDManager rfidManager = 
+                com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
             if (rfidManager != null) {
                 rfidManager.stopScan();
                 rfidManager.unregisterTriggerKeyReceiver();
             }
-
+            
             AppWatchdog.getInstance().stopMonitoring();
             hideLoading();
             stopActiveInventory();
-
+            
             if (fragmentManager != null) {
                 clearBackStack();
             }
-
+            
             if (orgProfileManager != null && profileListener != null) {
                 orgProfileManager.removeListener(profileListener);
             }
-
+            
             SessionMonitorManager.getInstance(this).stopMonitoring();
-
+            
             clearActiveListeners();
-
+            
             if (tagList != null) {
                 tagList.clear();
                 tagList = null;
             }
-
+            
         } catch (Exception e) {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
         }
-
+        
         super.onDestroy();
     }
 
