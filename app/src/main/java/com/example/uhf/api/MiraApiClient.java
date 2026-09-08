@@ -737,11 +737,6 @@ public interface NotificationCallback {
     void onError(String error);
 }
 
-// البحث العام
-public interface ApiCallback<T> {
-    void onSuccess(T result);
-    void onError(String error);
-}
 
 public void searchGlobal(String query, ApiCallback<List<ItemModel>> callback) {
     executorService.execute(() -> {
