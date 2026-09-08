@@ -208,27 +208,25 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ✅ فحص حالة الأجهزة
     private HardwareStatus checkHardwareStatus() {
-        try {
-            // فحص حالة قارئ RFID
-            if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT && mReader != null) {
-                return HardwareStatus.CONNECTED;
-            }
-            
-            // فحص محاولة الاتصال
-            com.example.uhf.MiraRfid.RFIDManager rfidManager = 
-                com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
-            
-            if (rfidManager != null && rfidManager.isConnecting()) {
-                return HardwareStatus.CONNECTING;
-            }
-            
-            return HardwareStatus.DISCONNECTED;
-        } catch (Exception e) {
-            Log.e(TAG, "Hardware status check error: " + e.getMessage());
+    try {
+        // 1. إذا كان الجهاز لا يدعم RFID
+        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
             return HardwareStatus.DISCONNECTED;
         }
+        
+        // 2. إذا كان القارئ موجوداً وجاهزاً
+        if (mReader != null && isReaderReady()) {
+            return HardwareStatus.CONNECTED;
+        }
+        
+        // 3. الجهاز يدعم RFID لكن القارئ غير جاهز
+        return HardwareStatus.CONNECTING;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Hardware status check error: " + e.getMessage());
+        return HardwareStatus.DISCONNECTED;
     }
-
+}
     // ✅ بدء حركة النبض
     private void startPulseAnimation(float minScale, float maxScale) {
         stopPulseAnimation();
