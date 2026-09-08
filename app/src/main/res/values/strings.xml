@@ -2145,4 +2145,8 @@
 <string name="rfid_total_available">إجمالي المتاحة: %d</string>
 <string name="rfid_total_programmed">إجمالي المبرمجة: %d</string>
 <string name="rfid_tab_available">📦 المتاحة</string>
+
+
+<!-- اعدادات الصوت -->
+<string name="menu_sounds_setting">📦 اعدادات الصوت </string>
 </resources>
