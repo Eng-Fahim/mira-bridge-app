@@ -5,95 +5,96 @@ import android.util.Log;
 
 import com.example.uhf.MiraRfid.readers.ChainwayReader;
 import com.example.uhf.MiraRfid.readers.SimulatorReader;
-import com.example.uhf.manager.MiraSettingsManager;
-
-import org.json.JSONArray;   // ✅ هذا مفقود
-import org.json.JSONObject;
 import com.example.uhf.api.MiraApiClient;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * خدمة RFID موحدة لربط القارئات وواجهات التطبيق
  */
 public class MiraRfidService {
     private static final String TAG = "MiraRfidService";
-    private static MiraRfidService instance;
+    private static volatile MiraRfidService instance;
     
-    private Context context;
+    private final Context context;
     private MiraIRFIDReader activeReader;
-    private boolean isSimulationMode = false;
-    private String lastReadEpc = "";
-    private String lastReadTid = "";
+    private volatile boolean isSimulationMode = false;
+    private volatile String lastReadEpc = "";
+    private volatile String lastReadTid = "";
     
-    private OperationState currentState = OperationState.IDLE;
+    private volatile OperationState currentState = OperationState.IDLE;
     
     public enum OperationState {
         IDLE, READING, WRITING, VERIFYING, REGISTERING, COMPLETED, FAILED
     }
     
     private MiraRfidService(Context context) {
-        this.context = context;
+        // ✅ حماية الـ Memory Leak باستخدام ApplicationContext
+        this.context = context.getApplicationContext();
         detectAndInitializeReader();
     }
     
-    public static synchronized MiraRfidService getInstance(Context context) {
+    public static MiraRfidService getInstance(Context context) {
         if (instance == null) {
-            instance = new MiraRfidService(context);
+            synchronized (MiraRfidService.class) {
+                if (instance == null) {
+                    instance = new MiraRfidService(context);
+                }
+            }
         }
         return instance;
     }
-private void detectAndInitializeReader() {
-    // ✅ استخدام خيط منفصل للاتصال
-    Thread detectThread = new Thread(() -> {
-        ChainwayReader chainwayReader = null;
-        try {
-            chainwayReader = new ChainwayReader(context);
-            if (chainwayReader.initialize() && chainwayReader.connect()) {
-                activeReader = chainwayReader;
-                isSimulationMode = false;
-                Log.i(TAG, "✅ تم الاتصال بالقارئ الحقيقي: Chainway");
-                return;
-            } else {
-                if (chainwayReader != null) {
+
+    private void detectAndInitializeReader() {
+        // ✅ استخدام خيط منفصل للاتصال مع التحكم بالأولوية
+        Thread detectThread = new Thread(() -> {
+            ChainwayReader chainwayReader = null;
+            try {
+                chainwayReader = new ChainwayReader(context);
+                if (chainwayReader.initialize() && chainwayReader.connect()) {
+                    activeReader = chainwayReader;
+                    isSimulationMode = false;
+                    Log.i(TAG, "✅ تم الاتصال بالقارئ الحقيقي: Chainway");
+                    return;
+                } else {
                     chainwayReader.release();
                     chainwayReader = null;
                 }
+            } catch (Exception e) {
+                Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
+                if (chainwayReader != null) {
+                    try { chainwayReader.release(); } catch (Exception ignored) {}
+                }
             }
-        } catch (Exception e) {
-            Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
-            if (chainwayReader != null) {
-                try { chainwayReader.release(); } catch (Exception ignored) {}
-            }
-        }
+            
+            // ✅ التوجه للمحاكاة
+            SimulatorReader simulatorReader = new SimulatorReader(context);
+            simulatorReader.initialize();
+            simulatorReader.connect();
+            activeReader = simulatorReader;
+            isSimulationMode = true;
+            Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
+        });
         
-        // ✅ التوجه للمحاكاة
-        SimulatorReader simulatorReader = new SimulatorReader(context);
-        simulatorReader.initialize();
-        simulatorReader.connect();
-        activeReader = simulatorReader;
-        isSimulationMode = true;
-        Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
-    });
-    
-    detectThread.setName("RFID-Detector");
-    detectThread.setDaemon(true);
-    detectThread.start();
-}
-
-public void release() {
-    if (activeReader != null) {
-        try {
-            activeReader.disconnect();
-            activeReader.release();
-        } catch (Exception e) {
-            Log.e(TAG, "Error releasing active reader: " + e.getMessage());
-        }
-        activeReader = null;
+        detectThread.setName("MiraRFID-Detector");
+        detectThread.setDaemon(true);
+        detectThread.start();
     }
-    instance = null; // 👈 تفريغ الـ Singleton عند الخروج
-}
 
+    public synchronized void release() {
+        if (activeReader != null) {
+            try {
+                activeReader.disconnect();
+                activeReader.release();
+            } catch (Exception e) {
+                Log.e(TAG, "Error releasing active reader: " + e.getMessage());
+            }
+            activeReader = null;
+        }
+        instance = null; // 👈 تفريغ الـ Singleton عند الخروج بنجاح
+    }
 
-    
     public boolean isSimulationMode() { return isSimulationMode; }
     public MiraIRFIDReader getActiveReader() { return activeReader; }
     public OperationState getCurrentState() { return currentState; }
@@ -129,16 +130,16 @@ public void release() {
             activeReader.clearFilter();
         }
     }
+
     /**
- * ✅ إعادة تهيئة المحاكي لشريحة جديدة
- */
-public void resetForNewTag() {
-    if (activeReader instanceof SimulatorReader) {
-        ((SimulatorReader) activeReader).resetForNewTag();
-        Log.d(TAG, "✅ تم إعادة تهيئة المحاكي لشريحة جديدة");
+     * ✅ إعادة تهيئة المحاكي لشريحة جديدة
+     */
+    public void resetForNewTag() {
+        if (activeReader instanceof SimulatorReader) {
+            ((SimulatorReader) activeReader).resetForNewTag();
+            Log.d(TAG, "✅ تم إعادة تهيئة المحاكي لشريحة جديدة");
+        }
     }
-}
-    
 
     // =========================================================================
     // 🟢 العمليات المتقدمة
@@ -212,12 +213,6 @@ public void resetForNewTag() {
             
             MiraApiClient.ApiResponse response = apiClient.postWithAuth("/register_rfid", payload);
             
-            if (response != null) {
-                Log.d(TAG, "Response Code: " + response.code);
-                Log.d(TAG, "Response Success: " + response.isSuccess);
-                Log.d(TAG, "Response Body: " + response.getBody());
-            }
-            
             if (response != null && response.isSuccess) {
                 currentState = OperationState.COMPLETED;
                 Log.d(TAG, "✅ تم التسجيل في قاعدة البيانات بنجاح");
@@ -257,11 +252,6 @@ public void resetForNewTag() {
             searchPayload.put("gate_id", "handheld_c72");
             
             MiraApiClient.ApiResponse response = apiClient.postWithAuth("/authorize", searchPayload);
-            
-            if (response != null) {
-                Log.d(TAG, "Response Code: " + response.code);
-                Log.d(TAG, "Response Body: " + response.getBody());
-            }
             
             if (response != null && response.isSuccess && response.data != null) {
                 JSONObject item = response.data.optJSONObject("item");
@@ -303,19 +293,18 @@ public void resetForNewTag() {
             JSONObject result = new JSONObject();
             JSONObject item = new JSONObject();
             
-            // ✅ استخدام identifier الفعلي
             item.put("title", "قطعة تجريبية - " + identifier);
             item.put("serial", identifier);
             item.put("karat", "21K");
             item.put("weight", "5.24");
             item.put("category", "Rings");
             item.put("status", "available");
-            item.put("mira_id", identifier);  // ✅ المعرف الفعلي
+            item.put("mira_id", identifier);
             
             JSONObject barcode = new JSONObject();
             String gtin = generateGtinFromIdentifier(identifier);
             barcode.put("gtin", gtin);
-            barcode.put("serial_no", identifier);  // ✅ المعرف الفعلي
+            barcode.put("serial_no", identifier);
             
             JSONObject stock = new JSONObject();
             stock.put("status", "متوفر");
@@ -338,9 +327,6 @@ public void resetForNewTag() {
         }
     }
     
-    /**
-     * ✅ توليد GTIN فريد من المعرف
-     */
     private String generateGtinFromIdentifier(String identifier) {
         String numbers = identifier.replaceAll("[^0-9]", "");
         
@@ -356,9 +342,6 @@ public void resetForNewTag() {
         return numbers;
     }
     
-    /**
-     * ✅ توليد EPC فريد من معرف القطعة
-     */
     public String generateEpcFromMiraId(String miraId) {
         StringBuilder epc = new StringBuilder("3008");
         String cleanId = miraId.replaceAll("[^0-9A-Fa-f]", "");
@@ -392,127 +375,78 @@ public void resetForNewTag() {
             default: return "";
         }
     }
-    
+
     // =========================================================================
-// 🟢 إدارة مخزون الشرائح من SunlandRFID
-// =========================================================================
+    // 🟢 إدارة مخزون الشرائح من SunlandRFID
+    // =========================================================================
 
-/**
- * ✅ التحقق من أن الشريحة معتمدة (في القائمة البيضاء)
- */
-public boolean verifyTagAllowed(String tid) {
-    try {
-        Log.d(TAG, "🔍 التحقق من الشريحة: " + tid);
-        
-        MiraApiClient apiClient = MiraApiClient.getInstance(context);
-        MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/verify?tid=" + tid);
-        
-        if (response != null && response.isSuccess && response.data != null) {
-            boolean approved = response.data.optBoolean("approved", false);
-            Log.d(TAG, "Tag approved: " + approved);
-            return approved;
+    public boolean verifyTagAllowed(String tid) {
+        try {
+            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/verify?tid=" + tid);
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                return response.data.optBoolean("approved", false);
+            }
+            return isSimulationMode;
+        } catch (Exception e) {
+            Log.e(TAG, "verifyTagAllowed error: " + e.getMessage());
+            return isSimulationMode;
         }
-        
-        // ✅ في وضع المحاكاة - السماح للاختبار
-        if (isSimulationMode) {
-            Log.w(TAG, "⚠️ وضع المحاكاة - السماح بالشريحة");
-            return true;
-        }
-        
-        return false;
-    } catch (Exception e) {
-        Log.e(TAG, "verifyTagAllowed error: " + e.getMessage());
-        return isSimulationMode;
     }
-}
 
-/**
- * ✅ تحديث حالة الشريحة بعد البرمجة
- */
-public boolean markTagProgrammed(String tid, String miraId, String epc) {
-    try {
-        Log.d(TAG, "📝 تحديث حالة الشريحة: " + tid + " → " + miraId);
-        
-        MiraApiClient apiClient = MiraApiClient.getInstance(context);
-        
-        JSONObject payload = new JSONObject();
-        payload.put("tid", tid);
-        payload.put("mira_id", miraId);
-        payload.put("epc", epc);
-        
-        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/programmed", payload);
-        
-        if (response != null && response.isSuccess) {
-            Log.d(TAG, "✅ تم تحديث حالة الشريحة");
-            return true;
+    public boolean markTagProgrammed(String tid, String miraId, String epc) {
+        try {
+            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            JSONObject payload = new JSONObject();
+            payload.put("tid", tid);
+            payload.put("mira_id", miraId);
+            payload.put("epc", epc);
+            
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/programmed", payload);
+            return (response != null && response.isSuccess) || isSimulationMode;
+        } catch (Exception e) {
+            Log.e(TAG, "markTagProgrammed error: " + e.getMessage());
+            return isSimulationMode;
         }
-        
-        if (isSimulationMode) {
-            return true;
-        }
-        
-        return false;
-    } catch (Exception e) {
-        Log.e(TAG, "markTagProgrammed error: " + e.getMessage());
-        return isSimulationMode;
     }
-}
 
-/**
- * ✅ استيراد دفعة شرائح من SunlandRFID
- */
-public boolean importBatch(String batchNumber, JSONArray tags) {
-    try {
-        Log.d(TAG, "📦 استيراد دفعة: " + batchNumber + " (" + tags.length() + " شريحة)");
-        
-        MiraApiClient apiClient = MiraApiClient.getInstance(context);
-        
-        JSONObject payload = new JSONObject();
-        payload.put("batch_number", batchNumber);
-        payload.put("tags", tags);
-        
-        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/import", payload);
-        
-        if (response != null && response.isSuccess) {
-            int imported = response.data != null ? response.data.optInt("imported", 0) : 0;
-            Log.d(TAG, "✅ تم استيراد " + imported + " شريحة");
-            return true;
+    public boolean importBatch(String batchNumber, JSONArray tags) {
+        try {
+            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            JSONObject payload = new JSONObject();
+            payload.put("batch_number", batchNumber);
+            payload.put("tags", tags);
+            
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/import", payload);
+            return response != null && response.isSuccess;
+        } catch (Exception e) {
+            Log.e(TAG, "importBatch error: " + e.getMessage());
+            return false;
         }
-        
-        return false;
-    } catch (Exception e) {
-        Log.e(TAG, "importBatch error: " + e.getMessage());
-        return false;
     }
-}
 
-/**
- * ✅ جلب إحصائيات مخزون الشرائح
- */
-public JSONObject getRfidInventoryStats() {
-    try {
-        MiraApiClient apiClient = MiraApiClient.getInstance(context);
-        MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/stats");
-        
-        if (response != null && response.isSuccess && response.data != null) {
-            return response.data;
+    public JSONObject getRfidInventoryStats() {
+        try {
+            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/stats");
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                return response.data;
+            }
+            if (isSimulationMode) {
+                JSONObject stats = new JSONObject();
+                stats.put("total", 100);
+                stats.put("available", 80);
+                stats.put("programmed", 15);
+                stats.put("defective", 3);
+                stats.put("lost", 2);
+                return stats;
+            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "getRfidInventoryStats error: " + e.getMessage());
+            return null;
         }
-        
-        // ✅ إحصائيات محاكاة
-        if (isSimulationMode) {
-            JSONObject stats = new JSONObject();
-            stats.put("total", 100);
-            stats.put("available", 80);
-            stats.put("programmed", 15);
-            stats.put("defective", 3);
-            stats.put("lost", 2);
-            return stats;
-        }
-        
-        return null;
-    } catch (Exception e) {
-        Log.e(TAG, "getRfidInventoryStats error: " + e.getMessage());
-        return null;
     }
-}
 }
