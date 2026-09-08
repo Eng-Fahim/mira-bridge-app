@@ -31,7 +31,7 @@ import android.annotation.SuppressLint;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraAccountingFragment;
-import com.example.uhf.fragment.MiraSoundSettingsFragment;
+import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 
 import com.example.uhf.fragment.MiraAdminHubFragment;
 import com.example.uhf.fragment.MiraBranchesManagementFragment;
@@ -1156,4 +1156,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-                }
+                    }
