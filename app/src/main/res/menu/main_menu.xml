@@ -10,10 +10,11 @@
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_notifications"
-        android:icon="@drawable/ic_notifications"
-        android:title="@string/action_notifications"
-        app:showAsAction="always" />
+    android:id="@+id/action_notifications"
+    android:title="@string/action_notifications"
+    android:icon="@drawable/ic_notifications"
+    app:actionLayout="@layout/action_item_notification_badge"
+    app:showAsAction="always" />
 
     <item
         android:id="@+id/action_sync"
