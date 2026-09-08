@@ -44,7 +44,7 @@ public class MiraSoundManager {
         TAG_READ_NEW("rfid_tag_new", "قراءة عنصر جديد (RFID)", ToneGenerator.TONE_PROP_BEEP, 80, new long[]{0, 30}),
         TAG_READ_DUPLICATE("rfid_tag_dup", "قراءة عنصر مكرر", ToneGenerator.TONE_CDMA_KEYPAD_VOLUME_KEY_LITE, 40, new long[]{}),
         SCAN_STARTED("rfid_scan_start", "بدء مسح الجرد", ToneGenerator.TONE_CDMA_PIP, 100, new long[]{0, 40}),
-        SCAN_STOPPED("rfid_scan_stop", "إيقاف مسح الجرد", ToneGenerator.TONE_CDMA_ALERT_CALL_WAITING, 150, new long[]{0, 80}),
+        SCAN_STOPPED("rfid_scan_stop", "إيقاف مسح الجرد", ToneGenerator.TONE_PROP_BEEP, 150, new long[]{0, 80}),
 
         // عمليات المبيعات (Mira Lite)
         SALE_SUCCESS("sale_success", "إتمام عملية بيع بنجاح", ToneGenerator.TONE_PROP_ACK, 250, new long[]{0, 60, 40, 60}),
