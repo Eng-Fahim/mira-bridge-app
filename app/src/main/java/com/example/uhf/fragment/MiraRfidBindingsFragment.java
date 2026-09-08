@@ -27,6 +27,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.PermissionManager;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
 
@@ -41,7 +42,7 @@ import java.util.Locale;
 import java.util.concurrent.Executors;
 
 /**
- * ✅ إدارة الشرائح المبرمجة والمتاحة (محدثة لدعم الأداء العالي والثيمات الموحدة)
+ * ✅ إدارة الشرائح المبرمجة والمتاحة (مع تحسين استهلاك الثيمات الرسمية والأداء العالي)
  */
 public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
@@ -57,6 +58,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     private TextView tvCount;
     private TextView tvTitle;
     private TextView tvAvailableCount;
+    private MaterialButton btnAvailableTags;
     private String currentFilter = "";
     private String currentSearch = "";
     private boolean showingAvailableTags = false;
@@ -86,6 +88,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         tvCount = view.findViewById(R.id.tvCount);
         tvTitle = view.findViewById(R.id.tvTitle);
         tvAvailableCount = view.findViewById(R.id.tvAvailableCount);
+        btnAvailableTags = view.findViewById(R.id.btnAvailableTags);
         rvBindings = view.findViewById(R.id.rvBindings);
         
         LinearLayoutManager layoutManager = new LinearLayoutManager(context);
@@ -95,7 +98,14 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         availableAdapter = new AvailableTagsAdapter();
         rvBindings.setAdapter(adapter);
         
-        // ✅ مراقبة التمرير لتطبيق الـ Pagination الحقيقي ومنع التحميل الزائد للذاكرة
+        if (btnAvailableTags != null) {
+            btnAvailableTags.setOnClickListener(v -> {
+                showingAvailableTags = true;
+                loadAvailableTags();
+            });
+        }
+        
+        // مراقبة التمرير للـ Pagination
         rvBindings.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -466,7 +476,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         }
     };
     
-    private static class BindingsAdapter extends ListAdapter<JSONObject, BindingsAdapter.VH> {
+    private class BindingsAdapter extends ListAdapter<JSONObject, BindingsAdapter.VH> {
         private final OnBindingClickListener listener;
         
         BindingsAdapter(OnBindingClickListener listener) {
@@ -489,11 +499,15 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             h.tvEpcTid.setText("EPC: " + binding.optString("epc", "-") + "\nTID: " + binding.optString("tid", "-"));
             h.tvDate.setText(binding.optString("registered_at", "-"));
             
-            // اعتماد الألوان المتوافقة مع الثيمات العامة عبر السمات الافتراضية للبطاقات
+            String status = binding.optString("status", "active");
+            if (h.tvStatus != null) {
+                h.tvStatus.setText(getStatusLabel(status));
+            }
+
             h.itemView.setOnClickListener(v -> listener.onClick(binding));
         }
         
-        static class VH extends RecyclerView.ViewHolder {
+        class VH extends RecyclerView.ViewHolder {
             TextView tvItemTitle, tvStatus, tvDetails, tvEpcTid, tvDate;
             VH(View v) {
                 super(v);
