@@ -1720,6 +1720,10 @@
 <!-- ==================== Missing Variables ==================== -->
 
 <!-- Toolbar -->
+<string name="action_notifications">Notifications</string>
+<string name="menu_notifications">Notifications</string>
+
+
 <string name="action_dashboard">Dashboard</string>
 <string name="action_gold_rates">Gold &amp; Stock Market Prices</string>
 <string name="action_quick_access_settings">Customize Quick Access</string>
