@@ -166,50 +166,48 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-public boolean startScan() {
-    // ✅ فحص سريع - إذا لم يكن الجهاز موجوداً
-    if (!com.example.uhf.activity.BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-        Log.d(TAG, "RFID device not present - cannot start real scan");
-        return false;
-    }
-    
-    if (reader == null && !connect()) return false;
-    if (isScanning) return true;
-    
-    try {
-        applySupportedSettings();
-        
-        // ✅ استخدام timeout للبدء
-        final boolean[] result = new boolean[1];
-        Thread scanThread = new Thread(() -> {
-            try {
-                result[0] = reader.startInventoryTag();
-            } catch (Exception e) {
-                result[0] = false;
-            }
-        });
-        scanThread.start();
-        scanThread.join(3000); // ✅ 3 ثواني timeout
-        
-        if (scanThread.isAlive()) {
-            Log.e(TAG, "startInventoryTag timeout - device not responding");
+    public boolean startScan() {
+        if (!com.example.uhf.activity.BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+            Log.d(TAG, "RFID device not present - cannot start real scan");
             return false;
         }
         
-        boolean success = result[0];
+        if (reader == null && !connect()) return false;
+        if (isScanning) return true;
         
-        if (success) {
-            isScanning = true;
-            if (listener != null) listener.onScanStarted();
-            ensureExecutor();
-            scanExecutor.execute(this::scanLoop);
+        try {
+            applySupportedSettings();
+            
+            final boolean[] result = new boolean[1];
+            Thread scanThread = new Thread(() -> {
+                try {
+                    result[0] = reader.startInventoryTag();
+                } catch (Exception e) {
+                    result[0] = false;
+                }
+            });
+            scanThread.start();
+            scanThread.join(3000); // 3 ثواني timeout
+            
+            if (scanThread.isAlive()) {
+                Log.e(TAG, "startInventoryTag timeout - device not responding");
+                return false;
+            }
+            
+            boolean success = result[0];
+            
+            if (success) {
+                isScanning = true;
+                if (listener != null) listener.onScanStarted();
+                ensureExecutor();
+                scanExecutor.execute(this::scanLoop);
+            }
+            return success;
+        } catch (Exception e) {
+            Log.e(TAG, "startScan error", e);
+            return false;
         }
-        return success;
-    } catch (Exception e) {
-        Log.e(TAG, "startScan error", e);
-        return false;
     }
-}
     
     private void scanLoop() {
         while (isScanning && !Thread.currentThread().isInterrupted()) {
@@ -275,6 +273,11 @@ public boolean startScan() {
         } catch (Exception e) {
             Log.e(TAG, "Stop scan error", e);
         }
+        
+        if (scanExecutor != null && !scanExecutor.isShutdown()) {
+            scanExecutor.shutdownNow();
+        }
+        
         if (listener != null) listener.onScanStopped();
     }
     
@@ -346,10 +349,15 @@ public boolean startScan() {
 
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
-        if (reader == null) return false;
+        if (reader == null || data == null || data.isEmpty()) return false;
         try {
+            // ✅ ضمان تكافؤ الطول مع Hex Word (كل كلمة = 4 حروف Hex)
             int writeLen = (int) Math.ceil(data.length() / 4.0);
-            return reader.writeData(pwdStr, bank, ptr, writeLen, data);
+            StringBuilder paddedData = new StringBuilder(data);
+            while (paddedData.length() < writeLen * 4) {
+                paddedData.append("0");
+            }
+            return reader.writeData(pwdStr, bank, ptr, writeLen, paddedData.toString());
         } catch (Exception e) {
             Log.e(TAG, "writeData error", e);
             return false;
@@ -371,6 +379,7 @@ public boolean startScan() {
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         if (reader == null) return false;
         try {
+            // ✅ استخدام القفل المعتمد لبنوك EPC و USER
             String lockCode = shouldLock ? "0002" : "0001";
             return reader.lockMem(pwdStr, lockCode);
         } catch (Exception e) {
@@ -404,7 +413,8 @@ public boolean startScan() {
 
     @Override
     public boolean writeEpc(String newEpc, String accessPassword) {
-        return writeData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, newEpc);
+        // ✅ استخدام كتابة EPC عبر البنك الأول بداية من Word 2 (Bit 32)
+        return writeData(accessPassword, RFIDWithUHFUART.Bank_EPC, 2, newEpc);
     }
     
     @Override
