@@ -361,8 +361,21 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 updateToolbarTitle();
             }
             
-            // ✅ تحديث مؤشر حالة الأجهزة
-            updateHardwareStatusIndicator();
+             
+        // ✅ أعد هذا الجزء - ربط زر حالة الأجهزة بفتح قائمة الإعدادات
+        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+        if (btnHardwareStatus != null) {
+            btnHardwareStatus.setOnClickListener(v -> {
+                // فتح قائمة إعدادات الأجهزة
+                showHardwareOptionsDialog();
+                
+                // تحديث المؤشر بعد إغلاق القائمة
+                mainHandler.postDelayed(this::updateHardwareStatusIndicator, 500);
+            });
+        }
+        
+        // تحديث مؤشر حالة الأجهزة
+        updateHardwareStatusIndicator();
             
             // ✅ جدولة تحديث دوري لحالة الأجهزة
             scheduleHardwareStatusUpdates();
@@ -1319,4 +1332,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-}
+                        }
