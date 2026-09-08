@@ -77,7 +77,7 @@
     *** *put*(...);
 }
 
-# ==================== حماية النماذج ====================
+# ==================== حماية النماذج (Models) ====================
 -keep class com.example.uhf.model.** { *; }
 -keepclassmembers class com.example.uhf.model.** { <fields>; }
 -keep class com.mira.jewelry.enterprise.models.** { *; }
@@ -163,13 +163,13 @@
 -keep class j$.time.** { *; }
 -dontwarn j$.time.**
 
-# ==================== حماية عامة للحقول ====================
+# ==================== حماية عامة للحقول getters و setters ====================
 -keepclassmembers class * {
     *** get*();
     *** set*(***);
 }
 
-# ==================== حذف سجلات Log في Release ====================
+# ==================== إزالة سجلات Log في نسخة Release ====================
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
     public static int v(...);
