@@ -1986,6 +1986,10 @@
 
 
     <string name="status_connected">متصل</string>
+    
+    <string name="status_connecting">جارِ الاتصال...</string>
+    <string name="status_disconnected">غير متصل</string>
+    
     <string name="action_quick_search">البحث السريع</string>
     <string name="action_sync_data">مزامنة البيانات</string>
     <string name="action_notifications">الإشعارات</string>
@@ -2010,6 +2014,9 @@
 <string name="quick_access">⚡ الوصول السريع</string>
 
 <string name="customize_quick_access">⚙️ تخصيص</string>
+
+
+
 
 <!-- حالة الجرد -->
 <string name="inventory_in_progress">⚠️ الجرد قيد التشغيل</string>
