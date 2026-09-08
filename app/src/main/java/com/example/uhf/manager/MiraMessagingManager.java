@@ -5,12 +5,13 @@ import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.example.uhf.api.ApiClient;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.model.MessageModel;
 import com.example.uhf.model.NotificationModel;
 
 import java.util.ArrayList;
 import java.util.List;
+
 
 public class MiraMessagingManager {
 
@@ -21,7 +22,7 @@ public class MiraMessagingManager {
     private static MiraMessagingManager instance;
     private final Context context;
     private final SharedPreferences prefs;
-    private final ApiClient apiClient;
+    private final MiraApiClient apiClient; 
     private final List<OnNotificationChangeListener> listeners = new ArrayList<>();
     private final List<MessageModel> messageCache = new ArrayList<>();
     private final List<NotificationModel> notificationCache = new ArrayList<>();
@@ -43,7 +44,7 @@ public class MiraMessagingManager {
     private MiraMessagingManager(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        this.apiClient = ApiClient.getInstance(context);
+        this.apiClient = MiraApiClient.getInstance(context);  // ✅ تم التصحيح
     }
 
     public static synchronized MiraMessagingManager getInstance(Context context) {
@@ -91,7 +92,7 @@ public class MiraMessagingManager {
         String userId = getCurrentUserId();
         if (userId == null) return;
 
-        apiClient.getUnreadCount(userId, new ApiClient.UnreadCountCallback() {
+        apiClient.getUnreadCount(userId, new MiraApiClient.UnreadCountCallback() {  // ✅ تم التصحيح
             @Override
             public void onSuccess(int unreadCount) {
                 setUnreadCount(unreadCount);
@@ -111,7 +112,7 @@ public class MiraMessagingManager {
             return;
         }
 
-        apiClient.getAllMessages(userId, new ApiClient.MessageCallback() {
+        apiClient.getAllMessages(userId, new MiraApiClient.MessageCallback() {  // ✅ تم التصحيح
             @Override
             public void onSuccess(List<MessageModel> messages) {
                 messageCache.clear();
@@ -143,7 +144,7 @@ public class MiraMessagingManager {
             return;
         }
 
-        apiClient.getNotifications(userId, new ApiClient.NotificationCallback() {
+        apiClient.getNotifications(userId, new MiraApiClient.NotificationCallback() {  // ✅ تم التصحيح
             @Override
             public void onSuccess(List<NotificationModel> notifications) {
                 notificationCache.clear();
@@ -158,7 +159,7 @@ public class MiraMessagingManager {
         });
     }
 
-    public void sendMessage(String receiverId, String content, ApiClient.SendMessageCallback callback) {
+    public void sendMessage(String receiverId, String content, MiraApiClient.SendMessageCallback callback) {  
         String userId = getCurrentUserId();
         if (userId == null) {
             callback.onError("User ID not found");
@@ -167,7 +168,7 @@ public class MiraMessagingManager {
 
         MessageModel message = new MessageModel(userId, receiverId, content);
         
-        apiClient.sendMessage(message, new ApiClient.SendMessageCallback() {
+        apiClient.sendMessage(message, new MiraApiClient.SendMessageCallback() {  // ✅ تم التصحيح
             @Override
             public void onSuccess(MessageModel sentMessage) {
                 messageCache.add(sentMessage);
