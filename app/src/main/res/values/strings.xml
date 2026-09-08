@@ -8,7 +8,7 @@
     <string name="menu_profile">الملف الشخصي</string>
     <string name="menu_logout">تسجيل الخروج</string>
     <string name="menu_export_data">تصدير البيانات</string>
-    <string name="menu_device_version">إصدار الجهاز</string>
+    <string name="menu_device_version">حول المنظومة</string>
     
     
     <!-- أضف هذه الأسطر المفقودة -->
