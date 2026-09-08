@@ -32,33 +32,32 @@
             android:paddingHorizontal="12dp"
             app:elevation="2dp">
             
-            
             <!-- 1. مؤشر حالة الأجهزة والعتاد -->
-<LinearLayout
-    android:id="@+id/btnHardwareStatus"
-    android:layout_width="wrap_content"
-    android:layout_height="36dp"
-    android:background="?attr/selectableItemBackgroundBorderless"
-    android:clickable="true"          <!-- ✅ أعد هذه -->
-    android:focusable="true"           <!-- ✅ وأعد هذه -->
-    android:gravity="center"
-    android:paddingHorizontal="8dp">
+            <LinearLayout
+                android:id="@+id/btnHardwareStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingHorizontal="8dp">
 
-    <View
-        android:id="@+id/statusDot"
-        android:layout_width="10dp"
-        android:layout_height="10dp"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/bg_status_dot_green" />
+                <View
+                    android:id="@+id/statusDot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_status_dot_green" />
 
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/status_connected"
-        android:textSize="12sp"
-        android:textColor="?attr/colorOnSurfaceVariant" />
-</LinearLayout>
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/status_connected"
+                    android:textSize="12sp"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
 
             <!-- فاصل عمودي خفيف -->
             <View
