@@ -110,7 +110,7 @@ public class MiraSoundSettingsFragment extends Fragment {
     // Adapter لتوليد كروت التحكم بالحدث ودعم المعاينة والتجربة المباشرة
     // =========================================================================
 
-    private static class SoundEventAdapter extends RecyclerView.Adapter<SoundEventAdapter.EventViewHolder> {
+        private static class SoundEventAdapter extends RecyclerView.Adapter<SoundEventAdapter.EventViewHolder> {
 
         private final Context context;
         private final List<MiraSoundManager.SoundEvent> eventList;
@@ -125,7 +125,6 @@ public class MiraSoundSettingsFragment extends Fragment {
         @NonNull
         @Override
         public EventViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            // إنشاء كارت أوتوماتيكي متوافق مع Design Material 3 بدون الحاجة لملف XML خارجي
             MaterialCardView card = new MaterialCardView(context);
             ViewGroup.MarginLayoutParams cardParams = new ViewGroup.MarginLayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -146,7 +145,6 @@ public class MiraSoundSettingsFragment extends Fragment {
             container.setOrientation(android.widget.LinearLayout.VERTICAL);
             container.setPadding(32, 24, 32, 24);
 
-            // Row 1: العنوان ومفتاح التفعيل
             android.widget.LinearLayout row1 = new android.widget.LinearLayout(context);
             row1.setOrientation(android.widget.LinearLayout.HORIZONTAL);
             row1.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -165,7 +163,6 @@ public class MiraSoundSettingsFragment extends Fragment {
             row1.addView(tvName);
             row1.addView(switchSound);
 
-            // Row 2: الاهتزاز وقائمة النغمات وزر التجربة
             android.widget.LinearLayout row2 = new android.widget.LinearLayout(context);
             row2.setOrientation(android.widget.LinearLayout.HORIZONTAL);
             row2.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -201,18 +198,29 @@ public class MiraSoundSettingsFragment extends Fragment {
 
             holder.tvName.setText(event.displayName);
 
-            // 1. حالة الصوت
+            // ✅ 1. إزالة المستمعين مؤقتاً لتجنب التفعيل الخاطئ أثناء التمرير (Scrolling Loop)
+            holder.switchSound.setOnCheckedChangeListener(null);
+            holder.switchVibe.setOnCheckedChangeListener(null);
+            holder.spinnerTone.setOnItemSelectedListener(null);
+
+            // 2. تعيين الحالة للـ Sound Switch
             holder.switchSound.setChecked(soundManager.isEventSoundEnabled(event));
             holder.switchSound.setOnCheckedChangeListener((btn, isChecked) -> {
-                soundManager.setEventSoundEnabled(event, isChecked);
-                if (isChecked) soundManager.play(event);
+                if (btn.isPressed()) { // التأكد أن التغيير تم بضغطة مستخدم حقيقية وليس إعادة تدوير
+                    soundManager.setEventSoundEnabled(event, isChecked);
+                    if (isChecked) soundManager.play(event);
+                }
             });
 
-            // 2. حالة الاهتزاز
+            // 3. تعيين الحالة للـ Vibration Switch
             holder.switchVibe.setChecked(soundManager.isEventVibrationEnabled(event));
-            holder.switchVibe.setOnCheckedChangeListener((btn, isChecked) -> soundManager.setEventVibrationEnabled(event, isChecked));
+            holder.switchVibe.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (btn.isPressed()) {
+                    soundManager.setEventVibrationEnabled(event, isChecked);
+                }
+            });
 
-            // 3. خيارات النغمات المتاحة للحدث
+            // 4. خيارات النغمات
             String[] tones = new String[]{"نغمة افتراضية", "تنبيه تأكيد", "تنبيه خطأ", "نغمة قصيرة", "تنبيه مرتفع"};
             Integer[] toneValues = new Integer[]{
                     event.defaultTone,
@@ -225,26 +233,30 @@ public class MiraSoundSettingsFragment extends Fragment {
             ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, tones);
             holder.spinnerTone.setAdapter(spinnerAdapter);
 
-            // اختيار النغمة المخزنة
             int currentTone = soundManager.getEventTone(event);
+            int selectedIndex = 0;
             for (int i = 0; i < toneValues.length; i++) {
                 if (toneValues[i] == currentTone) {
-                    holder.spinnerTone.setSelection(i);
+                    selectedIndex = i;
                     break;
                 }
             }
+            holder.spinnerTone.setSelection(selectedIndex, false);
 
             holder.spinnerTone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                    soundManager.setEventTone(event, toneValues[pos]);
+                    // حفظ القيمة فقط إذا تغيرت بوعي
+                    if (toneValues[pos] != soundManager.getEventTone(event)) {
+                        soundManager.setEventTone(event, toneValues[pos]);
+                    }
                 }
 
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {}
             });
 
-            // 4. زر الاختبار والمعاينة المباشرة
+            // 5. زر المعاينة
             holder.btnTest.setOnClickListener(v -> {
                 int toneToPlay = soundManager.getEventTone(event);
                 soundManager.playPreview(toneToPlay, event.defaultDuration);
