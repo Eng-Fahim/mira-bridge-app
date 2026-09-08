@@ -500,9 +500,21 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             h.tvDate.setText(binding.optString("registered_at", "-"));
             
             String status = binding.optString("status", "active");
-            if (h.tvStatus != null) {
-                h.tvStatus.setText(getStatusLabel(status));
-            }
+if (h.tvStatus != null) {
+    h.tvStatus.setText(getStatusLabel(status));
+    
+    Context context = h.itemView.getContext();
+    
+    // استخدام ContextCompat لمنع الأخطاء على الإصدارات القديمة (API < 23)
+    if ("active".equals(status)) {
+        h.tvStatus.setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_green_dark));
+    } else if ("locked".equals(status)) {
+        h.tvStatus.setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_orange_dark));
+    } else {
+        h.tvStatus.setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_red_dark));
+    }
+}
+
 
             h.itemView.setOnClickListener(v -> listener.onClick(binding));
         }
