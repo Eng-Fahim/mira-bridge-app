@@ -10,23 +10,41 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/action_notifications"
+        android:icon="@drawable/ic_notifications"
+        android:title="@string/action_notifications"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_sync"
+        android:icon="@drawable/ic_sync"
+        android:title="@string/action_sync_data"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/action_quick_search"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_quick_access_settings"
         android:icon="@drawable/ic_settings"
         android:title="@string/menu_quick_access"
-        app:showAsAction="always" />
+        app:showAsAction="never" />
 
     <!-- نقل البقية لتعمل عند الحاجة لتخفيف زحمة الـ Toolbar -->
     <item
         android:id="@+id/action_hardware_setup"
         android:icon="@android:drawable/ic_menu_compass"
         android:title="الأجهزة المتصلة"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/action_gold_rates"
         android:icon="@drawable/ic_gold_rate"
         android:title="@string/menu_gold_rates"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
 
 
     <!-- 📌 2. القائمة المنسدلة المتقدمة (مرتبة حسب الأولوية وتجربة المستخدم) -->
