@@ -20,35 +20,106 @@
             app:title="@string/app_name"
             app:titleTextColor="?attr/colorOnPrimary"
             app:menu="@menu/main_menu"
-            app:popupTheme="@style/CustomOverflowMenu">
+            app:popupTheme="@style/CustomOverflowMenu" />
 
+        <!-- 📌 الشريط الفرعي الأفقي للإجراءات السريعة والأدوات الذكية -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="?attr/colorSurfaceVariant"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            app:elevation="2dp">
+
+            <!-- 1. مؤشر/زر حالة الأجهزة والعتاد -->
             <LinearLayout
+                android:id="@+id/btnHardwareStatus"
                 android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:layout_gravity="end"
-                android:orientation="horizontal"
-                android:gravity="center">
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingHorizontal="8dp">
 
-                <!-- زر حالة العتاد والأجهزة المتصلة (أيقونة نقطة الحالة فقط) -->
-                <LinearLayout
-                    android:id="@+id/btnHardwareStatus"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_marginEnd="8dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center">
+                <View
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_status_dot_green" />
 
-                    <View
-                        android:layout_width="10dp"
-                        android:layout_height="10dp"
-                        android:background="@drawable/bg_status_dot_green" />
-
-                </LinearLayout>
-
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="متصل"
+                    android:textSize="12sp"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
-        </com.google.android.material.appbar.MaterialToolbar>
+
+            <!-- فاصل عمودي خفيف -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="20dp"
+                android:layout_marginHorizontal="8dp"
+                android:background="?attr/colorOutlineVariant" />
+
+            <!-- مساحة مرنة لدفع أزرار الإجراءات إلى اليمين/اليسار -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- 2. زر البحث السريع -->
+            <ImageButton
+                android:id="@+id/btnSubSearch"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginHorizontal="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="البحث السريع"
+                android:src="@drawable/ic_search"
+                app:tint="?attr/colorOnSurfaceVariant" />
+
+            <!-- 3. زر المزامنة -->
+            <ImageButton
+                android:id="@+id/btnSubSync"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginHorizontal="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="مزامنة البيانات"
+                app:srcCompat="@drawable/ic_sync"
+                app:tint="?attr/colorOnSurfaceVariant" />
+
+            <!-- 4. زر الإشعارات مع شارة التنبيه -->
+            <FrameLayout
+                android:id="@+id/btnSubNotifications"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    app:srcCompat="@drawable/ic_notifications"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <!-- نقطة التنبيه الحمراء -->
+                <View
+                    android:layout_width="7dp"
+                    android:layout_height="7dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_status_dot_red" />
+            </FrameLayout>
+
+        </LinearLayout>
 
         <!-- حاوية المحتوى الرئيسية للـ Fragments مع حماية الفوتر من التداخل -->
         <FrameLayout
