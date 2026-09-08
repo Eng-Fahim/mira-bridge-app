@@ -1992,6 +1992,7 @@
     <string name="action_quick_search">البحث السريع</string>
     <string name="action_sync_data">مزامنة البيانات</string>
     <string name="action_notifications">الإشعارات</string>
+    <string name="menu_notifications">الإشعارات</string>
     
 
 <!-- رسائل التأكيد -->
