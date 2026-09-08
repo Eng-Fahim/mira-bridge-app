@@ -42,7 +42,7 @@ import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.model.InventoryItem;
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.api.ApiResponse;
+
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.button.MaterialButton;
@@ -855,7 +855,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
                 }
                 
                 if (transactionsArray.length() > 0) {
-                    ApiResponse response = 
+                    MiraApiClient.ApiResponse response = 
                         apiClient.syncOfflineTransactions(transactionsArray);
                     
                     if (response != null && response.isSuccess) {
@@ -1521,7 +1521,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             }
             
             int branchId = branchesManager.getActiveBranchId();
-            ApiResponse response = apiClient.getBranchItemsList(branchId);
+            MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
             
             if (response != null && response.isSuccess && response.data != null) {
                 JSONArray items = response.data.optJSONArray("items");
@@ -1799,7 +1799,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
                 payload.put("items", itemsArray);
                 payload.put("scanned_epcs", epcsArray);
                 
-                ApiResponse response = apiClient.closeInventorySession(payload);
+                MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
                 
                 mainThreadHandler.post(() -> {
                     if (!isAdded() || isFragmentDestroyed) {
@@ -1839,7 +1839,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     /**
      * عرض نجاح الالتزام
      */
-    private void showCommitSuccessDialog(ApiResponse response) {
+    private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
         if (!isAdded() || isFragmentDestroyed || response.data == null) return;
         
         try {
@@ -1933,7 +1933,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         try {
             if (apiClient != null && branchesManager != null) {
                 int branchId = branchesManager.getActiveBranchId();
-                ApiResponse response = 
+                MiraApiClient.ApiResponse response = 
                     apiClient.getInventoryReports(branchId, 1, 50);
                 
                 if (response != null && response.isSuccess && response.data != null) {
@@ -2386,7 +2386,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         
         try {
             if (apiClient != null) {
-                ApiResponse response = 
+                MiraApiClient.ApiResponse response = 
                     apiClient.getLastSnapshot("Main Showroom");
                 
                 if (response != null && response.isSuccess && response.data != null) {
@@ -2408,7 +2408,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
                     }
                 }
                 
-                ApiResponse historyResponse = 
+                MiraApiClient.ApiResponse historyResponse = 
                     apiClient.getInventoryHistory("Main Showroom", 10);
                 if (historyResponse != null && historyResponse.isSuccess && 
                     historyResponse.data != null) {
@@ -2569,7 +2569,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         
         backgroundExecutor.execute(() -> {
             try {
-                ApiResponse response = 
+                MiraApiClient.ApiResponse response = 
                     apiClient.compareInventorySessions(sessionId1, sessionId2);
                 
                 mainThreadHandler.post(() -> {
@@ -2849,4 +2849,4 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             this.status = status;
         }
     }
-                }
+                                     }
