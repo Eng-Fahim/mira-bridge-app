@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
+<color name="fab_background">#FF6200EE</color>
+    <color name="fab_icon_color">#FFFFFFFF</color>
+    <color name="progress_indicator_color">#FF6200EE</color>
     <color name="brand_primary">#9E8033</color>
     <color name="brand_primary_dark">#7A6123</color>
      <!-- ألوان الحالة المتصلة والمنفصلة -->
