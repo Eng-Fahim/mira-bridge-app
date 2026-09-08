@@ -11,6 +11,12 @@ import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.CertificatePinningManager;  
 import com.example.uhf.tools.SessionManager;
 
+
+import com.example.uhf.model.MessageModel;
+import com.example.uhf.model.NotificationModel;
+import com.example.uhf.model.ItemModel;
+
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -40,6 +46,10 @@ public class MiraApiClient {
     
     private static final String API_PREFIX = "mira-gate/v1";
     private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json";
+    
+    // في بداية الكلاس بعد المتغيرات الموجودة
+    private final ExecutorService executorService = Executors.newFixedThreadPool(4);
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private final Context context;
     private final MiraServerConfig serverConfig;
@@ -548,6 +558,268 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
         return post("/auth/verify-biometric", payload);
     }
+    
+    // ==================== دوال المراسلات والإشعارات ====================
+    
+public interface MessageCallback {
+    void onSuccess(List<MessageModel> messages);
+    void onError(String error);
+}
+
+public interface SendMessageCallback {
+    void onSuccess(MessageModel message);
+    void onError(String error);
+}
+
+public interface UnreadCountCallback {
+    void onSuccess(int unreadCount);
+    void onError(String error);
+}
+
+// جلب الرسائل غير المقروءة
+public void getUnreadMessages(String userId, MessageCallback callback) {
+    executorService.execute(() -> {
+        try {
+            String endpoint = "/messages/unread?user_id=" + userId;
+            ApiResponse response = getWithAuth(endpoint);
+            
+            if (response.isSuccess && response.data != null) {
+                List<MessageModel> messages = new ArrayList<>();
+                JSONArray messagesArray = response.data.optJSONArray("messages");
+                
+                if (messagesArray != null) {
+                    for (int i = 0; i < messagesArray.length(); i++) {
+                        JSONObject msgJson = messagesArray.getJSONObject(i);
+                        MessageModel message = parseMessageFromJson(msgJson);
+                        if (message != null) {
+                            messages.add(message);
+                        }
+                    }
+                }
+                
+                mainHandler.post(() -> callback.onSuccess(messages));
+            } else {
+                String error = response.error != null ? response.error : "Failed to fetch messages";
+                mainHandler.post(() -> callback.onError(error));
+            }
+        } catch (Exception e) {
+            mainHandler.post(() -> callback.onError(e.getMessage()));
+        }
+    });
+}
+
+// جلب كل الرسائل
+public void getAllMessages(String userId, MessageCallback callback) {
+    executorService.execute(() -> {
+        try {
+            String endpoint = "/messages?user_id=" + userId;
+            ApiResponse response = getWithAuth(endpoint);
+            
+            if (response.isSuccess && response.data != null) {
+                List<MessageModel> messages = new ArrayList<>();
+                JSONArray messagesArray = response.data.optJSONArray("messages");
+                
+                if (messagesArray == null) {
+                    messagesArray = response.data.optJSONArray("data");
+                }
+                
+                if (messagesArray != null) {
+                    for (int i = 0; i < messagesArray.length(); i++) {
+                        JSONObject msgJson = messagesArray.getJSONObject(i);
+                        MessageModel message = parseMessageFromJson(msgJson);
+                        if (message != null) {
+                            messages.add(message);
+                        }
+                    }
+                }
+                
+                mainHandler.post(() -> callback.onSuccess(messages));
+            } else {
+                String error = response.error != null ? response.error : "Failed to fetch messages";
+                mainHandler.post(() -> callback.onError(error));
+            }
+        } catch (Exception e) {
+            mainHandler.post(() -> callback.onError(e.getMessage()));
+        }
+    });
+}
+
+// إرسال رسالة جديدة
+public void sendMessage(MessageModel message, SendMessageCallback callback) {
+    executorService.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("sender_id", message.getSenderId());
+            payload.put("receiver_id", message.getReceiverId());
+            payload.put("content", message.getContent());
+            payload.put("message_type", message.getMessageType());
+            payload.put("timestamp", message.getTimestamp());
+            
+            ApiResponse response = postWithAuth("/messages/send", payload);
+            
+            if (response.isSuccess) {
+                // تحديث بيانات الرسالة من الاستجابة
+                if (response.data != null) {
+                    JSONObject msgJson = response.data.optJSONObject("message");
+                    if (msgJson != null) {
+                        MessageModel sentMessage = parseMessageFromJson(msgJson);
+                        if (sentMessage != null) {
+                            mainHandler.post(() -> callback.onSuccess(sentMessage));
+                            return;
+                        }
+                    }
+                }
+                mainHandler.post(() -> callback.onSuccess(message));
+            } else {
+                String error = response.error != null ? response.error : "Failed to send message";
+                mainHandler.post(() -> callback.onError(error));
+            }
+        } catch (Exception e) {
+            mainHandler.post(() -> callback.onError(e.getMessage()));
+        }
+    });
+}
+
+// جلب عدد الرسائل غير المقروءة
+public void getUnreadCount(String userId, UnreadCountCallback callback) {
+    executorService.execute(() -> {
+        try {
+            String endpoint = "/messages/unread-count?user_id=" + userId;
+            ApiResponse response = getWithAuth(endpoint);
+            
+            if (response.isSuccess && response.data != null) {
+                int unreadCount = response.data.optInt("unread_count", 0);
+                mainHandler.post(() -> callback.onSuccess(unreadCount));
+            } else {
+                String error = response.error != null ? response.error : "Failed to fetch unread count";
+                mainHandler.post(() -> callback.onError(error));
+            }
+        } catch (Exception e) {
+            mainHandler.post(() -> callback.onError(e.getMessage()));
+        }
+    });
+}
+
+// جلب الإشعارات
+public void getNotifications(String userId, NotificationCallback callback) {
+    executorService.execute(() -> {
+        try {
+            String endpoint = "/notifications?user_id=" + userId;
+            ApiResponse response = getWithAuth(endpoint);
+            
+            if (response.isSuccess && response.data != null) {
+                List<NotificationModel> notifications = new ArrayList<>();
+                JSONArray notificationsArray = response.data.optJSONArray("notifications");
+                
+                if (notificationsArray == null) {
+                    notificationsArray = response.data.optJSONArray("data");
+                }
+                
+                if (notificationsArray != null) {
+                    for (int i = 0; i < notificationsArray.length(); i++) {
+                        JSONObject notifJson = notificationsArray.getJSONObject(i);
+                        NotificationModel notification = parseNotificationFromJson(notifJson);
+                        if (notification != null) {
+                            notifications.add(notification);
+                        }
+                    }
+                }
+                
+                mainHandler.post(() -> callback.onSuccess(notifications));
+            } else {
+                String error = response.error != null ? response.error : "Failed to fetch notifications";
+                mainHandler.post(() -> callback.onError(error));
+            }
+        } catch (Exception e) {
+            mainHandler.post(() -> callback.onError(e.getMessage()));
+        }
+    });
+}
+
+public interface NotificationCallback {
+    void onSuccess(List<NotificationModel> notifications);
+    void onError(String error);
+}
+
+// البحث العام
+public interface ApiCallback<T> {
+    void onSuccess(T result);
+    void onError(String error);
+}
+
+public void searchGlobal(String query, ApiCallback<List<ItemModel>> callback) {
+    executorService.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("query", query);
+            payload.put("gate_id", getEffectiveGateId());
+            
+            ApiResponse response = postWithAuth("/search/global", payload);
+            
+            if (response.isSuccess && response.data != null) {
+                List<ItemModel> results = new ArrayList<>();
+                JSONArray itemsArray = response.data.optJSONArray("items");
+                
+                if (itemsArray != null) {
+                    for (int i = 0; i < itemsArray.length(); i++) {
+                        JSONObject itemJson = itemsArray.getJSONObject(i);
+                        ItemModel item = new ItemModel();
+                        item.setEpc(itemJson.optString("epc", ""));
+                        item.setBarcode(itemJson.optString("barcode", ""));
+                        item.setTitle(itemJson.optString("title", ""));
+                        item.setCategory(itemJson.optString("category", ""));
+                        item.setLocation(itemJson.optString("location", ""));
+                        results.add(item);
+                    }
+                }
+                
+                mainHandler.post(() -> callback.onSuccess(results));
+            } else {
+                String error = response.error != null ? response.error : "Search failed";
+                mainHandler.post(() -> callback.onError(error));
+            }
+        } catch (Exception e) {
+            mainHandler.post(() -> callback.onError(e.getMessage()));
+        }
+    });
+}
+
+// دوال مساعدة لتحليل JSON
+private MessageModel parseMessageFromJson(JSONObject json) {
+    try {
+        MessageModel message = new MessageModel();
+        message.setId(json.optString("id", ""));
+        message.setSenderId(json.optString("sender_id", ""));
+        message.setSenderName(json.optString("sender_name", ""));
+        message.setReceiverId(json.optString("receiver_id", ""));
+        message.setReceiverName(json.optString("receiver_name", ""));
+        message.setContent(json.optString("content", ""));
+        message.setTimestamp(json.optLong("timestamp", System.currentTimeMillis()));
+        message.setRead(json.optBoolean("is_read", false));
+        message.setMessageType(json.optString("message_type", "TEXT"));
+        return message;
+    } catch (Exception e) {
+        Log.e(TAG, "Error parsing message: " + e.getMessage());
+        return null;
+    }
+}
+
+private NotificationModel parseNotificationFromJson(JSONObject json) {
+    try {
+        NotificationModel notification = new NotificationModel();
+        notification.setId(json.optString("id", ""));
+        notification.setTitle(json.optString("title", ""));
+        notification.setContent(json.optString("content", ""));
+        notification.setTimestamp(json.optLong("timestamp", System.currentTimeMillis()));
+        notification.setNotificationType(json.optString("notification_type", "SYSTEM"));
+        notification.setRead(json.optBoolean("is_read", false));
+        notification.setPriority(json.optString("priority", "MEDIUM"));
+        return notification;
+    } catch (Exception e) {
+        Log.e(TAG, "Error parsing notification: " + e.getMessage());
+        return null;
+    }
+}
 
     public ApiResponse getOrgProfile() {
         return getWithAuth("/profile/get");
