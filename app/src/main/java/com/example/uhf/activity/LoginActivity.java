@@ -36,6 +36,7 @@ import androidx.security.crypto.MasterKey;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.api.ApiResponse;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
@@ -389,7 +390,7 @@ public class LoginActivity extends AppCompatActivity {
 
         executeSafeBg(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+                ApiResponse response = apiClient.getOrgProfile();
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject org = response.data.optJSONObject("organization");
                     if (org != null && orgProfileManager != null) {
@@ -600,7 +601,7 @@ public class LoginActivity extends AppCompatActivity {
 
         executeSafeBg(() -> {
             String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            MiraApiClient.ApiResponse response = null;
+            ApiResponse response = null;
             boolean isNetworkError = false;
 
             try {
@@ -611,7 +612,7 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             final boolean finalIsNetworkError = isNetworkError;
-            final MiraApiClient.ApiResponse finalResponse = response;
+            final ApiResponse finalResponse = response;
 
             mainHandler.post(() -> {
                 if (!isActivityAlive()) return;
@@ -670,7 +671,7 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
-    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
+    private void handleLoginSuccess(ApiResponse response, String username, String password) {
         Log.d(TAG, "Login Success for user: " + username);
         playTone(true);
 
