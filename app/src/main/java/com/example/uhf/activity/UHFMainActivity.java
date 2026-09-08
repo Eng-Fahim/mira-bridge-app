@@ -93,8 +93,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private FragmentManager fragmentManager;
 
     private MiraPosFragment activePOSFragment = null;
-    private MiraIdentityStudioFragment activeEncodingFragment;
-    private OnRfidScannedListener activeRfidListener;
+    private MiraIdentityStudioFragment activeEncodingFragment = null;
+    private OnRfidScannedListener activeRfidListener = null;
 
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
@@ -122,6 +122,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public void setActiveRfidListener(OnRfidScannedListener listener) {
         this.activeRfidListener = listener;
+    }
+
+    public void setActivePOSFragment(MiraPosFragment fragment) {
+        this.activePOSFragment = fragment;
+    }
+
+    private void clearActiveListeners() {
+        this.activePOSFragment = null;
+        this.activeEncodingFragment = null;
+        this.activeRfidListener = null;
     }
 
     private void setupOrgProfileListener() {
@@ -193,7 +203,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             cleanupOldFragments();
 
-            // الحارس التلقائي الذكي لمنع التجمد وإلغاء الحاجة لزر إعادة التشغيل اليدوي
             AppWatchdog.getInstance().startMonitoring(() -> {
                 Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
                 MiraApplication.getInstance().restartApp();
@@ -211,10 +220,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 updateToolbarTitle();
             }
             View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-if (btnHardwareStatus != null) {
-    btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
-}
-
+            if (btnHardwareStatus != null) {
+                btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+            }
 
             setupQuickNav();
             setupOrgProfileListener();
@@ -256,6 +264,12 @@ if (btnHardwareStatus != null) {
         super.onResume();
         updateToolbarTitle();
         mainHandler.postDelayed(this::hideLoading, 100);
+
+        try {
+            com.example.uhf.MiraRfid.RFIDManager.getInstance(this).autoConnectAndBind(this);
+        } catch (Exception e) {
+            Log.e(TAG, "Error connecting RFID in onResume: " + e.getMessage());
+        }
     }
 
     @Override
@@ -263,6 +277,14 @@ if (btnHardwareStatus != null) {
         super.onPause();
         hideLoading();
         AppWatchdog.getInstance().stopMonitoring();
+        
+        try {
+            com.example.uhf.MiraRfid.RFIDManager rfidManager = com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
+            rfidManager.stopScan();
+            rfidManager.unregisterTriggerKeyReceiver();
+        } catch (Exception e) {
+            Log.w(TAG, "Unregister trigger in onPause warning: " + e.getMessage());
+        }
     }
 
     private void initializeLanguageState() {
@@ -580,55 +602,50 @@ if (btnHardwareStatus != null) {
         loadFragment(fragment, tag, true);
     }
 
-    /**
- * تعديل دالة loadFragment لتعرض السنابر أثناء الانتقال بين الـ Fragments
- */
-public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (isFinishing() || isDestroyed() || fragment == null) return;
+    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+        if (isFinishing() || isDestroyed() || fragment == null) return;
 
-    try {
-        // 1. إظهار السنابر فور بدء التنقل
-        showLoading();
-
-        currentFragment = fragment;
-        currentFragmentTag = tag;
-
-        if (!addToBackStack) {
-            clearBackStack();
-        }
-
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.setCustomAnimations(0, 0, 0, 0);
-        transaction.replace(R.id.fragment_container, fragment, tag);
-
-        if (addToBackStack) {
-            transaction.addToBackStack(tag);
-        }
-
-        transaction.commit();
-
-        // 2. إخفاء السنابر بعد اكتمال رسم الواجهة الجديدة بـ 250ms لضمان سلاسة التنقل
-        mainHandler.postDelayed(this::hideLoading, 250);
-
-        updateBottomNavSelectionByTag(tag);
-
-    } catch (Exception e) {
-        Log.e(TAG, "Error switching fragment: " + e.getMessage(), e);
         try {
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.replace(R.id.fragment_container, fragment, tag);
-            transaction.commitNowAllowingStateLoss();
-            updateBottomNavSelectionByTag(tag);
-        } catch (Exception e2) {
-            Log.e(TAG, "Final fallback failed: " + e2.getMessage(), e2);
-        }
-        hideLoading();
-    }
-}
+            showLoading();
+            clearActiveListeners();
 
+            currentFragment = fragment;
+            currentFragmentTag = tag;
+
+            if (!addToBackStack) {
+                clearBackStack();
+            }
+
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.setCustomAnimations(0, 0, 0, 0);
+            transaction.replace(R.id.fragment_container, fragment, tag);
+
+            if (addToBackStack) {
+                transaction.addToBackStack(tag);
+            }
+
+            transaction.commit();
+
+            mainHandler.postDelayed(this::hideLoading, 250);
+            updateBottomNavSelectionByTag(tag);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error switching fragment: " + e.getMessage(), e);
+            try {
+                FragmentTransaction transaction = fragmentManager.beginTransaction();
+                transaction.replace(R.id.fragment_container, fragment, tag);
+                transaction.commitNowAllowingStateLoss();
+                updateBottomNavSelectionByTag(tag);
+            } catch (Exception e2) {
+                Log.e(TAG, "Final fallback failed: " + e2.getMessage(), e2);
+            }
+            hideLoading();
+        }
+    }
 
     private void loadFragmentDirectly(Fragment fragment, String tag) {
         try {
+            clearActiveListeners();
             currentFragment = fragment;
             currentFragmentTag = tag;
 
@@ -822,8 +839,6 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
         }
     }
 
-    // --- 🛠️ دوال المساعدة للرسائل والأصوات (حل أخطاء الـ Compile) ---
-
     public void showToast(int resId) {
         showToast(getString(resId));
     }
@@ -834,25 +849,21 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
     }
 
     public void playSound(int id) {
-    try {
-        // تحويل الرقم (1 للنجاح، أي رقم آخر للخطأ) إلى الاسم المطلوب في SoundGenerator
-        String soundName = (id == 1) ? "beep_success" : "beep_error";
-        com.example.uhf.tools.SoundGenerator.playSound(soundName);
-    } catch (Exception e) {
-        Log.e(TAG, "playSound Error: " + e.getMessage());
+        try {
+            String soundName = (id == 1) ? "beep_success" : "beep_error";
+            com.example.uhf.tools.SoundGenerator.playSound(soundName);
+        } catch (Exception e) {
+            Log.e(TAG, "playSound Error: " + e.getMessage());
+        }
     }
-}
 
-public void playSoundDelayed(int value) {
-    try {
-        mainHandler.postDelayed(() -> playSound(1), Math.max(10, 1000 - (value * 10)));
-    } catch (Exception e) {
-        Log.e(TAG, "playSoundDelayed Error: " + e.getMessage());
+    public void playSoundDelayed(int value) {
+        try {
+            mainHandler.postDelayed(() -> playSound(1), Math.max(10, 1000 - (value * 10)));
+        } catch (Exception e) {
+            Log.e(TAG, "playSoundDelayed Error: " + e.getMessage());
+        }
     }
-}
-
-
-    // -------------------------------------------------------------
 
     public boolean isInventoryActive() {
         if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
@@ -905,6 +916,7 @@ public void playSoundDelayed(int value) {
     }
 
     private void handleBackNavigation() {
+        clearActiveListeners();
         if (fragmentManager != null) {
             for (Fragment fragment : fragmentManager.getFragments()) {
                 if (fragment instanceof androidx.fragment.app.DialogFragment) {
@@ -969,7 +981,7 @@ public void playSoundDelayed(int value) {
 
     public void onTagRead(String epc) {
         try {
-            if (activeEncodingFragment != null && activeEncodingFragment.isAdded()) {
+            if (activeEncodingFragment != null && activeEncodingFragment.isAdded() && activeEncodingFragment.isResumed()) {
                 activeEncodingFragment.onRfidScanned(epc);
                 return;
             }
@@ -977,11 +989,11 @@ public void playSoundDelayed(int value) {
                 activeRfidListener.onRfidScanned(epc);
                 return;
             }
-            if (activePOSFragment != null && activePOSFragment.isVisible()) {
+            if (activePOSFragment != null && activePOSFragment.isAdded() && activePOSFragment.isVisible()) {
                 activePOSFragment.onRingScanned(epc);
                 return;
             }
-            if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
+            if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isAdded() && currentFragment.isVisible()) {
                 ((MiraUHFReadTagFragment) currentFragment).onTagScanned(epc, -50.0);
             }
         } catch (Exception e) {
@@ -1012,51 +1024,35 @@ public void playSoundDelayed(int value) {
         }
     }
 
-    // ==========================================
-// 🔄 التحكم بسنابر / مؤشر التحميل (Loading Indicator)
-// ==========================================
-
-/**
- * إظهار سنابر التحميل عند بدء أي عملية أو تنقل
- */
-public void showLoading() {
-    mainHandler.post(() -> {
-        try {
-            View loadingOverlay = findViewById(R.id.successOverlayMain);
-            if (loadingOverlay != null) {
-                // إظهار المؤشر الدوار الموجود داخل successOverlayMain أو تخصيصه
-                loadingOverlay.setVisibility(View.VISIBLE);
-                loadingOverlay.setAlpha(1.0f);
+    public void showLoading() {
+        mainHandler.post(() -> {
+            try {
+                View loadingOverlay = findViewById(R.id.successOverlayMain);
+                if (loadingOverlay != null) {
+                    loadingOverlay.setVisibility(View.VISIBLE);
+                    loadingOverlay.setAlpha(1.0f);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error showing loading: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing loading: " + e.getMessage());
-        }
-    });
-}
+        });
+    }
 
-/**
- * إخفاء سنابر التحميل بسلاسة بعد اكتمال التحميل
- */
-public void hideLoading() {
-    mainHandler.post(() -> {
-        try {
-            View loadingOverlay = findViewById(R.id.successOverlayMain);
-            if (loadingOverlay != null && loadingOverlay.getVisibility() == View.VISIBLE) {
-                loadingOverlay.animate()
-                        .alpha(0.0f)
-                        .setDuration(200)
-                        .withEndAction(() -> loadingOverlay.setVisibility(View.GONE))
-                        .start();
+    public void hideLoading() {
+        mainHandler.post(() -> {
+            try {
+                View loadingOverlay = findViewById(R.id.successOverlayMain);
+                if (loadingOverlay != null && loadingOverlay.getVisibility() == View.VISIBLE) {
+                    loadingOverlay.animate()
+                            .alpha(0.0f)
+                            .setDuration(200)
+                            .withEndAction(() -> loadingOverlay.setVisibility(View.GONE))
+                            .start();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error hiding loading: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error hiding loading: " + e.getMessage());
-        }
-    });
-}
-
-
-    public void setActivePOSFragment(MiraPosFragment fragment) {
-        this.activePOSFragment = fragment;
+        });
     }
 
     @Override
@@ -1103,6 +1099,12 @@ public void hideLoading() {
     @Override
     protected void onDestroy() {
         try {
+            com.example.uhf.MiraRfid.RFIDManager rfidManager = com.example.uhf.MiraRfid.RFIDManager.getInstance(this);
+            if (rfidManager != null) {
+                rfidManager.stopScan();
+                rfidManager.unregisterTriggerKeyReceiver();
+            }
+
             AppWatchdog.getInstance().stopMonitoring();
             hideLoading();
             stopActiveInventory();
@@ -1117,9 +1119,7 @@ public void hideLoading() {
 
             SessionMonitorManager.getInstance(this).stopMonitoring();
 
-            activePOSFragment = null;
-            activeEncodingFragment = null;
-            activeRfidListener = null;
+            clearActiveListeners();
 
             if (tagList != null) {
                 tagList.clear();
