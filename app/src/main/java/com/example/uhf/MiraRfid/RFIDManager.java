@@ -1,6 +1,9 @@
 package com.example.uhf.MiraRfid;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
@@ -28,6 +31,10 @@ public class RFIDManager {
     private RFIDDevice activeDevice;
     private MiraIRFIDReader.OnTagReadListener listener;
     
+    // ⚡ التعديل 1: إضافة مستقبل بث الزناد لجهاز Chainway
+    private BroadcastReceiver keyReceiver;
+    private boolean isReceiverRegistered = false;
+    
     private RFIDManager(Context context) {
         this.context = context.getApplicationContext();
     }
@@ -38,6 +45,59 @@ public class RFIDManager {
             RFIDReaderFactory.init(context);
         }
         return instance;
+    }
+
+    // ⚡ التعديل 2: إضافة التوصيل التلقائي والربط بمفاتيح القارئ
+    public synchronized void autoConnectAndBind(Context hostContext) {
+        getActiveReader();
+        
+        if (activeReader != null && !activeReader.isConnected()) {
+            activeReader.connect();
+        }
+        
+        registerTriggerKeyReceiver();
+    }
+
+    // ⚡ التعديل 3: تسجيل مستقبل إشارات زر الزناد (Trigger) لـ Chainway C72
+    public void registerTriggerKeyReceiver() {
+        if (isReceiverRegistered) return;
+        
+        try {
+            keyReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context ctx, Intent intent) {
+                    if ("android.intent.action.FUN_KEY".equals(intent.getAction())) {
+                        int keyCode = intent.getIntExtra("keyCode", 0);
+                        boolean keyDown = intent.getBooleanExtra("keydown", false);
+
+                        // أزرار زناد المسح في Chainway C72 (139, 280, 293)
+                        if (keyCode == 139 || keyCode == 280 || keyCode == 293) {
+                            if (keyDown) {
+                                startScan();
+                            } else {
+                                stopScan();
+                            }
+                        }
+                    }
+                }
+            };
+
+            IntentFilter filter = new IntentFilter("android.intent.action.FUN_KEY");
+            context.registerReceiver(keyReceiver, filter);
+            isReceiverRegistered = true;
+            Log.i(TAG, "🔑 Chainway hardware trigger receiver registered successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to register trigger receiver: " + e.getMessage());
+        }
+    }
+
+    public void unregisterTriggerKeyReceiver() {
+        if (isReceiverRegistered && keyReceiver != null) {
+            try {
+                context.unregisterReceiver(keyReceiver);
+            } catch (Exception ignored) {}
+            isReceiverRegistered = false;
+        }
     }
     
     public MiraIRFIDReader.ReaderType detectDeviceType() {
@@ -53,7 +113,7 @@ public class RFIDManager {
         return MiraIRFIDReader.ReaderType.SIMULATOR;
     }
     
-        /**
+    /**
      * حفظ جهاز جديد
      */
     public boolean saveDevice(RFIDDevice device) {
@@ -211,7 +271,6 @@ public class RFIDManager {
     }
     
     public boolean startScan() {
-        // ✅ فحص سريع
         if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
             Log.d(TAG, "RFID device not present - using simulator");
             if (activeReader == null) {
@@ -236,6 +295,7 @@ public class RFIDManager {
     }
     
     public void release() {
+        unregisterTriggerKeyReceiver(); // ⚡ تحرير المستمع عند التدمير
         if (activeReader != null) {
             try {
                 activeReader.stopScan();
