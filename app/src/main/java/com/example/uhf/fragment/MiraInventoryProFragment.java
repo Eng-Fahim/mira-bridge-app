@@ -232,6 +232,31 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
         }
     };
+        // ==================== Factory Methods ====================
+    
+    /**
+     * Creates a new instance of MiraInventoryProFragment.
+     */
+    public static MiraInventoryProFragment newInstance() {
+        MiraInventoryProFragment fragment = new MiraInventoryProFragment();
+        Bundle args = new Bundle();
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    /**
+     * Creates a new instance of MiraInventoryProFragment with optional parameters.
+     */
+    public static MiraInventoryProFragment newInstance(String mode) {
+        MiraInventoryProFragment fragment = new MiraInventoryProFragment();
+        Bundle args = new Bundle();
+        args.putString("INVENTORY_MODE", mode);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    
+    
     /**
  * التحقق من حالة الجرد
  */
