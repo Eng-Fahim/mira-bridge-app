@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 📌 1. الإجراءات السريعة (شريط العنوان العلوي) -->
+    <!-- 📌 1. الإجراءات السريعة في الشريط العلوي (الأكثر استخداماً فقط) -->
     <item
         android:id="@+id/action_dashboard"
         android:icon="@drawable/ic_dashboard"
@@ -10,10 +10,17 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/action_quick_access_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/menu_quick_access"
+        app:showAsAction="always" />
+
+    <!-- نقل البقية لتعمل عند الحاجة لتخفيف زحمة الـ Toolbar -->
+    <item
         android:id="@+id/action_hardware_setup"
         android:icon="@android:drawable/ic_menu_compass"
         android:title="الأجهزة المتصلة"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_gold_rates"
@@ -21,39 +28,10 @@
         android:title="@string/menu_gold_rates"
         app:showAsAction="ifRoom" />
 
-    <item
-        android:id="@+id/action_quick_access_settings"
-        android:icon="@drawable/ic_settings"
-        android:title="@string/menu_quick_access"
-        app:showAsAction="ifRoom" />
 
-    <!-- 📌 2. العناصر داخل القائمة المنسدلة المتقدمة -->
+    <!-- 📌 2. القائمة المنسدلة المتقدمة (مرتبة حسب الأولوية وتجربة المستخدم) -->
 
-    <!-- مجموعة إدارة الفروع -->
-    <group android:id="@+id/group_management">
-        <item
-            android:id="@+id/action_branches"
-            android:icon="@drawable/ic_branch"
-            android:title="@string/menu_branches"
-            app:showAsAction="never" />
-    </group>
-
-    <!-- مجموعة أدوات البيانات والنظام -->
-    <group android:id="@+id/group_advanced">
-        <item
-            android:id="@+id/export"
-            android:icon="@drawable/ic_export"
-            android:title="@string/menu_export_data"
-            app:showAsAction="never" />
-
-        <item
-            android:id="@+id/UHF_ver"
-            android:icon="@drawable/ic_info"
-            android:title="@string/menu_device_version"
-            app:showAsAction="never" />
-    </group>
-
-        <!-- مجموعة الحساب والتفضيلات -->
+    <!-- مجموعة الحساب والتفضيلات (توضع أولاً لأن المستخدم يلجأ إليها غالباً) -->
     <group android:id="@+id/group_user_account">
         <item
             android:id="@+id/action_profile"
@@ -61,11 +39,10 @@
             android:title="@string/menu_profile"
             app:showAsAction="never" />
 
-        <!-- 🔊 أضف هذا السطر هنا -->
         <item
             android:id="@+id/nav_sound_settings"
             android:icon="@drawable/ic_volume_up"
-           android:title="@string/menu_sounds_setting"
+            android:title="@string/menu_sounds_setting"
             app:showAsAction="never" />
 
         <item
@@ -73,13 +50,39 @@
             android:icon="@drawable/ic_language"
             android:title="@string/menu_toggle_language"
             app:showAsAction="never" />
+    </group>
 
+    <!-- مجموعة إدارة الفروع والنظام -->
+    <group android:id="@+id/group_management">
+        <item
+            android:id="@+id/action_branches"
+            android:icon="@drawable/ic_branch"
+            android:title="@string/menu_branches"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/export"
+            android:icon="@drawable/ic_export"
+            android:title="@string/menu_export_data"
+            app:showAsAction="never" />
+    </group>
+
+    <!-- معلومات النظام -->
+    <group android:id="@+id/group_advanced">
+        <item
+            android:id="@+id/UHF_ver"
+            android:icon="@drawable/ic_info"
+            android:title="@string/menu_device_version"
+            app:showAsAction="never" />
+    </group>
+
+    <!-- تسجيل الخروج دائماً في الأسفل لوحده لتمييزه -->
+    <group android:id="@+id/group_logout">
         <item
             android:id="@+id/action_logout"
             android:icon="@drawable/ic_logout"
             android:title="@string/menu_logout"
             app:showAsAction="never" />
     </group>
-
 
 </menu>
