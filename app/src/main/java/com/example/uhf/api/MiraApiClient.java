@@ -1782,10 +1782,10 @@ private NotificationModel parseNotificationFromJson(JSONObject json) {
     }
 
     public interface ApiCallback {
-        void onSuccess(ApiResponse response);
-        void onFailure(String errorMessage);
-        void onError(String errorMessage);
-    }
+    void onSuccess(ApiResponse response);
+    void onFailure(String errorMessage);  // ✅ تأكد من وجود هذا
+    void onError(String errorMessage);
+}
 
     // ✅ استدعاء تجاوبي ممتاز باستخدام ExecutorService و Handler لمنع تسريب الذاكرة
     public void get(final String endpoint, final ApiCallback callback) {
