@@ -53,12 +53,19 @@
             app:showAsAction="never" />
     </group>
 
-    <!-- مجموعة الحساب والتفضيلات -->
+        <!-- مجموعة الحساب والتفضيلات -->
     <group android:id="@+id/group_user_account">
         <item
             android:id="@+id/action_profile"
             android:icon="@drawable/ic_profile"
             android:title="@string/menu_profile"
+            app:showAsAction="never" />
+
+        <!-- 🔊 أضف هذا السطر هنا -->
+        <item
+            android:id="@+id/nav_sound_settings"
+            android:icon="@drawable/ic_volume_up"
+           android:title="@string/menu_sounds_setting"
             app:showAsAction="never" />
 
         <item
@@ -73,5 +80,6 @@
             android:title="@string/menu_logout"
             app:showAsAction="never" />
     </group>
+
 
 </menu>
