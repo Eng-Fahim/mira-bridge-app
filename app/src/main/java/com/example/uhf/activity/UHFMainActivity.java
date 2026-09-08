@@ -535,7 +535,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    @Override
+        @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
         
@@ -574,6 +574,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             return true;
         } else if (id == R.id.nav_sound_settings) {
             checkInventoryLockAndExecute(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
+            return true;
+        } 
+        // ✅ إضافة تفعيل أزرار البحث والمزامنة والإشعارات لتجنب تعطيلها:
+        else if (id == R.id.action_search) {
+            Toast.makeText(this, isArabic ? "بحث المنظومة قيد التفعيل" : "Search feature", Toast.LENGTH_SHORT).show();
+            return true;
+        } else if (id == R.id.action_sync) {
+            Toast.makeText(this, isArabic ? "جاري مزامنة البيانات..." : "Syncing data...", Toast.LENGTH_SHORT).show();
+            // أضف دالة المزامنة الخاصة بك هنا
+            return true;
+        } else if (id == R.id.action_notifications) {
+            Toast.makeText(this, isArabic ? "لا توجد إشعارات جديدة" : "No new notifications", Toast.LENGTH_SHORT).show();
             return true;
         }
         
