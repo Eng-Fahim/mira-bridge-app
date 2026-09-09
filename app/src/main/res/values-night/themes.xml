@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- ==================== الثيم الأساسي للوضع الداكن (Material 3 Enterprise Dark) ==================== -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- داخل Base.Theme.Uhfuartdemo -->
+
+        <!-- 🔗 ربط مكونات الماتيريال 3 الرئيسية -->
+        <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
+        <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
+        <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
         <item name="textInputStyle">@style/AppTextInputStyle</item>
-        
+
         <!-- 🔤 الخطوط -->
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
-        
+
         <!-- 🔤 أوزان Typography -->
         <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
@@ -25,7 +30,7 @@
         <item name="textAppearanceLabelLarge">@style/AppTextAppearance.Medium</item>
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
-        
+
         <!-- 🔤 إجبار المكونات -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
@@ -33,54 +38,59 @@
         <item name="radioButtonStyle">@style/AppRadioButtonStyle</item>
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
-        
-        <!-- 🎨 لوحة الألوان الفاخرة للوضع الداكن -->
+
+        <!-- 🎨 لوحة الألوان الفاخرة للوضع الداكن (Enterprise Gold & Dark Slate) -->
         <item name="colorPrimary">#D4AF37</item>
         <item name="colorOnPrimary">#111827</item>
         <item name="colorPrimaryContainer">#2A2413</item>
         <item name="colorOnPrimaryContainer">#FDF8E7</item>
+
         <item name="colorSecondary">#C5A059</item>
         <item name="colorOnSecondary">#111827</item>
         <item name="colorSecondaryContainer">#1E1C14</item>
         <item name="colorOnSecondaryContainer">#F9F4E9</item>
-        
-        <!-- 🖼️ خلفية داكنة -->
+
+        <!-- 🖼️ خلفية داكنة فاخرة -->
         <item name="android:colorBackground">#0B0B0C</item>
         <item name="colorOnBackground">#F3F4F6</item>
-        
+
         <!-- 🗂️ الأسطح والبطاقات الداكنة -->
         <item name="colorSurface">#161618</item>
         <item name="colorOnSurface">#F9FAFB</item>
         <item name="colorSurfaceVariant">#1E1E22</item>
         <item name="colorOnSurfaceVariant">#9CA3AF</item>
-        
+
         <!-- 🔲 الحدود والإطارات -->
         <item name="colorOutline">#2D2D32</item>
         <item name="colorOutlineVariant">#3F3F46</item>
-        
+
         <!-- ✅ توحيد النوافذ الحوارية -->
         <item name="android:alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
-    <!-- ✅ SplashTheme للوضع الداكن (مُحدث لمنع الشاشة الافتراضية لأندرويد) -->
+    <!-- ==================== تحويل الستايلات التابعة ==================== -->
+    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
+    <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
+    <style name="AppTheme" parent="Theme.Uhfuartdemo" />
+
+    <!-- ==================== SplashTheme للوضع الداكن ==================== -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_background_gradient_dark</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">#0F0C29</item>
         <item name="android:navigationBarColor">#0F0C29</item>
-        
-        <!-- إضافات هامة لإلغاء أيقونة النظام الافتراضية في الوضع الليلي -->
+
         <item name="android:windowSplashScreenBackground" tools:targetApi="s">#0F0C29</item>
         <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@android:color/transparent</item>
-        
+
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- ✅ ثيم موحد لجميع النوافذ الحوارية في الوضع الداكن -->
+    <!-- ==================== MiraDialogTheme للوضع الداكن ==================== -->
     <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:windowBackground">@drawable/bg_mira_dialog_dark</item>
         <item name="android:backgroundDimAmount">0.7</item>
@@ -93,19 +103,17 @@
         <item name="colorPrimary">#D4AF37</item>
         <item name="colorOnPrimary">#111827</item>
         <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
-        
+
         <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
         <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
         <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
     </style>
 
-    <!-- ✅ شكل النافذة الحوارية -->
     <style name="MiraDialogShape" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">20dp</item>
     </style>
 
-    <!-- ✅ تنسيق الأزرار في الوضع الداكن -->
     <style name="MiraDialogButton.Positive" parent="Widget.Material3.Button.TextButton">
         <item name="android:textColor">#D4AF37</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -125,7 +133,7 @@
         <item name="android:textSize">14sp</item>
     </style>
 
-    <!-- ✅ ثيم الـ BottomSheet الموحد للوضع الداكن -->
+    <!-- ==================== BottomSheet للوضع الداكن ==================== -->
     <style name="MiraBottomSheetDialogTheme" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/MiraBottomSheetStyle</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -144,7 +152,7 @@
         <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
-    <!-- الأنماط المساعدة -->
+    <!-- ==================== الأنماط المساعدة للوضع الداكن ==================== -->
     <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -174,6 +182,7 @@
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
     <style name="AppRadioButtonStyle" parent="Widget.AppCompat.CompoundButton.RadioButton">
@@ -190,8 +199,6 @@
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
-
-    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
 
     <style name="ToolbarTitleStyle" parent="TextAppearance.Material3.TitleLarge">
         <item name="fontFamily">@font/cairo</item>
@@ -213,10 +220,10 @@
         <item name="hintTextColor">?attr/colorOnSurfaceVariant</item>
         <item name="boxStrokeWidth">1dp</item>
         <item name="boxStrokeWidthFocused">2dp</item>
-        <item name="boxCornerRadiusTopStart">12dp</item>
-        <item name="boxCornerRadiusTopEnd">12dp</item>
-        <item name="boxCornerRadiusBottomStart">12dp</item>
-        <item name="boxCornerRadiusBottomEnd">12dp</item>
+        <item name="boxCornerRadiusTopStart">14dp</item>
+        <item name="boxCornerRadiusTopEnd">14dp</item>
+        <item name="boxCornerRadiusBottomStart">14dp</item>
+        <item name="boxCornerRadiusBottomEnd">14dp</item>
     </style>
 
 </resources>
