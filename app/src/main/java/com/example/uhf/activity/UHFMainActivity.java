@@ -332,73 +332,77 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
 
-        try {
-            sessionManager = new SessionManager(getApplicationContext());
-            if (!sessionManager.isLoggedIn()) {
-                navigateToLogin();
-                return;
-            }
-
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-            setContentView(R.layout.activity_main);
-
-            cleanupOldFragments();
-
-            AppWatchdog.getInstance().startMonitoring(() -> {
-                Log.e(TAG, "UI Thread FROZEN! Restarting app...");
-                MiraApplication.getInstance().restartApp();
-            });
-
-            ToastUtil.init(getApplicationContext());
-            initializeLanguageState();
-
-            branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
-            fragmentManager = getSupportFragmentManager();
-
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
-
-            View btnSubSearch = findViewById(R.id.btnSubSearch);
-            if (btnSubSearch != null) btnSubSearch.setOnClickListener(v -> showGlobalSearchDialog());
-
-            View btnSubSync = findViewById(R.id.btnSubSync);
-            if (btnSubSync != null) btnSubSync.setOnClickListener(v -> performDataSync());
-
-            View btnSubNotifications = findViewById(R.id.btnSubNotifications);
-            if (btnSubNotifications != null) btnSubNotifications.setOnClickListener(v -> showNotificationsAndMessagingDialog());
-
-            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-            if (btnHardwareStatus != null) {
-                btnHardwareStatus.setOnClickListener(v -> {
-                    showHardwareOptionsDialog();
-                    mainHandler.postDelayed(this::updateHardwareStatusIndicator, 500);
-                });
-            }
-
-            updateHardwareStatusIndicator();
-            scheduleHardwareStatusUpdates();
-
-            setupQuickNav();
-            setupOrgProfileListener();
-
-            if (savedInstanceState == null) {
-                currentFragmentTag = "Dashboard";
-            } else {
-                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-            }
-
-            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+    try {
+        sessionManager = new SessionManager(getApplicationContext());
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
         }
+
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        setContentView(R.layout.activity_main);
+
+        cleanupOldFragments();
+
+        AppWatchdog.getInstance().startMonitoring(() -> {
+            Log.e(TAG, "UI Thread FROZEN! Restarting app...");
+            MiraApplication.getInstance().restartApp();
+        });
+
+        ToastUtil.init(getApplicationContext());
+        initializeLanguageState();
+
+        branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
+        fragmentManager = getSupportFragmentManager();
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
+        }
+
+        // ✅ زر البحث السريع
+        View btnSubSearch = findViewById(R.id.btnSubSearch);
+        if (btnSubSearch != null) btnSubSearch.setOnClickListener(v -> showGlobalSearchDialog());
+
+        // ✅ زر المزامنة
+        View btnSubSync = findViewById(R.id.btnSubSync);
+        if (btnSubSync != null) btnSubSync.setOnClickListener(v -> performDataSync());
+
+        // ✅ زر الإجراءات السريعة (بديل زر الإشعارات)
+        View btnSubQuickActions = findViewById(R.id.btnSubQuickActions);
+        if (btnSubQuickActions != null) btnSubQuickActions.setOnClickListener(v -> showQuickActionMenu());
+
+        // ✅ مؤشر حالة الأجهزة
+        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+        if (btnHardwareStatus != null) {
+            btnHardwareStatus.setOnClickListener(v -> {
+                showHardwareOptionsDialog();
+                mainHandler.postDelayed(this::updateHardwareStatusIndicator, 500);
+            });
+        }
+
+        updateHardwareStatusIndicator();
+        scheduleHardwareStatusUpdates();
+
+        setupQuickNav();
+        setupOrgProfileListener();
+
+        if (savedInstanceState == null) {
+            currentFragmentTag = "Dashboard";
+        } else {
+            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+        }
+
+        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+
+    } catch (Exception e) {
+        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
     }
+}
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -1854,4 +1858,4 @@ protected void onDestroy() {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-    }
+}
