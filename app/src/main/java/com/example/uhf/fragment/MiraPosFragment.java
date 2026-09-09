@@ -20,7 +20,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import android.content.Intent;
-
+import com.google.android.material.card.MaterialCardView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
