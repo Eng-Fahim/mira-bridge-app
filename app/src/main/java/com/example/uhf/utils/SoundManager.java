@@ -42,6 +42,7 @@ public class SoundManager {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService soundExecutor = Executors.newSingleThreadExecutor();
 
+
     public SoundManager(Context context) {
         initSoundPool(context);
     }
