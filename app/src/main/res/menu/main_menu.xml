@@ -2,60 +2,39 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 📌 1. الإجراءات السريعة في الشريط العلوي (الأكثر استخداماً فقط) -->
-    <item
-        android:id="@+id/action_dashboard"
-        android:icon="@drawable/ic_dashboard"
-        android:title="@string/menu_dashboard"
-        app:showAsAction="always" />
-
-    <item
-    android:id="@+id/action_notifications"
-    android:title="@string/action_notifications"
-    android:icon="@drawable/ic_notifications"
-    app:actionLayout="@layout/action_item_notification_badge"
-    app:showAsAction="always" />
-
-    <item
-        android:id="@+id/action_sync"
-        android:icon="@drawable/ic_sync"
-        android:title="@string/action_sync_data"
-        app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_search"
-        android:icon="@drawable/ic_search"
-        android:title="@string/action_quick_search"
-        app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_quick_access_settings"
-        android:icon="@drawable/ic_settings"
-        android:title="@string/menu_quick_access"
-        app:showAsAction="never" />
-
-    <!-- نقل البقية لتعمل عند الحاجة لتخفيف زحمة الـ Toolbar -->
-    <item
-        android:id="@+id/action_hardware_setup"
-        android:icon="@android:drawable/ic_menu_compass"
-        android:title="الأجهزة المتصلة"
-        app:showAsAction="never" />
-
+    <!-- 📌 أزرار التولبار الظاهرة مباشرة (Header Bar) -->
+    
+    <!-- 1. زر أسعار الذهب والبورصة (بدلاً من زر الرئيسية المتكرر) -->
     <item
         android:id="@+id/action_gold_rates"
         android:icon="@drawable/ic_gold_rate"
         android:title="@string/menu_gold_rates"
-        app:showAsAction="never" />
+        app:showAsAction="always" />
+
+    <!-- 2. زر الملف الشخصي -->
+    <item
+        android:id="@+id/action_profile"
+        android:icon="@drawable/ic_profile"
+        android:title="@string/menu_profile"
+        app:showAsAction="always" />
+
+    <!-- 3. مركز الإشعارات والرسائل (مع البادج) -->
+    <item
+        android:id="@+id/action_notifications"
+        android:title="@string/action_notifications"
+        android:icon="@drawable/ic_notifications"
+        app:actionLayout="@layout/action_item_notification_badge"
+        app:showAsAction="always" />
 
 
-    <!-- 📌 2. القائمة المنسدلة المتقدمة (مرتبة حسب الأولوية وتجربة المستخدم) -->
+    <!-- 📌 القائمة المنسدلة (Overflow Menu) - مخصصة فقط للتهيئة والإعدادات -->
 
-    <!-- مجموعة الحساب والتفضيلات (توضع أولاً لأن المستخدم يلجأ إليها غالباً) -->
-    <group android:id="@+id/group_user_account">
+    <!-- إعدادات الواجهة والتخصيص -->
+    <group android:id="@+id/group_settings">
         <item
-            android:id="@+id/action_profile"
-            android:icon="@drawable/ic_profile"
-            android:title="@string/menu_profile"
+            android:id="@+id/action_quick_access_settings"
+            android:icon="@drawable/ic_settings"
+            android:title="@string/menu_quick_access"
             app:showAsAction="never" />
 
         <item
@@ -71,7 +50,7 @@
             app:showAsAction="never" />
     </group>
 
-    <!-- مجموعة إدارة الفروع والنظام -->
+    <!-- إدارة النظام والفروع -->
     <group android:id="@+id/group_management">
         <item
             android:id="@+id/action_branches"
@@ -86,8 +65,8 @@
             app:showAsAction="never" />
     </group>
 
-    <!-- معلومات النظام -->
-    <group android:id="@+id/group_advanced">
+    <!-- حول الجهاز والنظام -->
+    <group android:id="@+id/group_info">
         <item
             android:id="@+id/UHF_ver"
             android:icon="@drawable/ic_info"
@@ -95,7 +74,7 @@
             app:showAsAction="never" />
     </group>
 
-    <!-- تسجيل الخروج دائماً في الأسفل لوحده لتمييزه -->
+    <!-- تسجيل الخروج -->
     <group android:id="@+id/group_logout">
         <item
             android:id="@+id/action_logout"
