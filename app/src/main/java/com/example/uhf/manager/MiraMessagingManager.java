@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.model.MessageModel;
@@ -11,33 +12,36 @@ import com.example.uhf.model.NotificationModel;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class MiraMessagingManager {
 
+    private static final String TAG = "MiraMessagingManager";
     private static final String PREF_NAME = "mira_messaging_prefs";
-    private static final String KEY_UNREAD_COUNT = "unread_messages_count";
+    private static final String KEY_UNREAD_MESSAGES = "unread_messages_count";
+    private static final String KEY_UNREAD_NOTIFICATIONS = "unread_notifications_count";
     private static final String KEY_USER_ID = "current_user_id";
     
     private static MiraMessagingManager instance;
     private final Context context;
     private final SharedPreferences prefs;
-    private final MiraApiClient apiClient; 
+    private final MiraApiClient apiClient;
     
-    // دعم القائمتين لمنع أي تعارض
-    private final List<OnNotificationChangeListener> oldListeners = new ArrayList<>();
-    private final List<OnUnreadCountChangedListener> unreadListeners = new ArrayList<>();
+    // ✅ فصل العدادات
+    private final List<OnMessageCountChangedListener> messageListeners = new CopyOnWriteArrayList<>();
+    private final List<OnNotificationCountChangedListener> notificationListeners = new CopyOnWriteArrayList<>();
     
-    private final List<MessageModel> messageCache = new ArrayList<>();
-    private final List<NotificationModel> notificationCache = new ArrayList<>();
+    // ✅ فصل الكاش
+    private final List<MessageModel> messageCache = new CopyOnWriteArrayList<>();
+    private final List<NotificationModel> notificationCache = new CopyOnWriteArrayList<>();
     
-    // 1. الواجهة الجديدة المطابقة لـ UHFMainActivity
-    public interface OnUnreadCountChangedListener {
-        void onUnreadCountChanged(int unreadCount);
+    // ✅ واجهات منفصلة
+    public interface OnMessageCountChangedListener {
+        void onMessageCountChanged(int unreadCount);
     }
-
-    // 2. الواجهة القديمة للحفاظ على التوافق
-    public interface OnNotificationChangeListener {
-        void OnNotificationCountChanged(int unreadCount);
+    
+    public interface OnNotificationCountChangedListener {
+        void onNotificationCountChanged(int unreadCount);
     }
 
     public interface OnMessagesLoadedListener {
@@ -63,72 +67,63 @@ public class MiraMessagingManager {
         return instance;
     }
 
-    // ==================== Listener Management ====================
+    // ==================== Message Listeners ====================
     
-    // دعم الواجهة الجديدة
-    public void addListener(OnUnreadCountChangedListener listener) {
-        if (listener != null && !unreadListeners.contains(listener)) {
-            unreadListeners.add(listener);
+    public void addMessageCountListener(OnMessageCountChangedListener listener) {
+        if (listener != null && !messageListeners.contains(listener)) {
+            messageListeners.add(listener);
         }
     }
 
-    public void removeListener(OnUnreadCountChangedListener listener) {
-        unreadListeners.remove(listener);
+    public void removeMessageCountListener(OnMessageCountChangedListener listener) {
+        messageListeners.remove(listener);
     }
-
-    // دعم الواجهة القديمة (Overloading)
-    public void addListener(OnNotificationChangeListener listener) {
-        if (listener != null && !oldListeners.contains(listener)) {
-            oldListeners.add(listener);
+    
+    // ==================== Notification Listeners ====================
+    
+    public void addNotificationCountListener(OnNotificationCountChangedListener listener) {
+        if (listener != null && !notificationListeners.contains(listener)) {
+            notificationListeners.add(listener);
         }
     }
 
-    public void removeListener(OnNotificationChangeListener listener) {
-        oldListeners.remove(listener);
+    public void removeNotificationCountListener(OnNotificationCountChangedListener listener) {
+        notificationListeners.remove(listener);
     }
 
-    // ==================== Unread Count Management ====================
+    // ==================== Message Count ====================
     
-    public int getUnreadCount() {
-        return prefs.getInt(KEY_UNREAD_COUNT, 0);
+    public int getUnreadMessageCount() {
+        return prefs.getInt(KEY_UNREAD_MESSAGES, 0);
     }
 
-    public void setUnreadCount(int count) {
-        prefs.edit().putInt(KEY_UNREAD_COUNT, count).apply();
-        notifyListeners(count);
+    public void setUnreadMessageCount(int count) {
+        prefs.edit().putInt(KEY_UNREAD_MESSAGES, Math.max(0, count)).apply();
+        notifyMessageListeners(Math.max(0, count));
     }
-
-    public void incrementUnreadCount() {
-        int newCount = getUnreadCount() + 1;
-        setUnreadCount(newCount);
-    }
-
-    public void clearUnreadCount() {
-        setUnreadCount(0);
-    }
-
-    // ==================== API Integration ====================
     
-    public void fetchUnreadCountFromServer() {
-        String userId = getCurrentUserId();
-        if (userId == null) return;
-
-        apiClient.getUnreadCount(userId, new MiraApiClient.UnreadCountCallback() {
-            @Override
-            public void onSuccess(int unreadCount) {
-                setUnreadCount(unreadCount);
-            }
-
-            @Override
-            public void onError(String error) {
-                // في حالة الخطأ، نحتفظ بالعداد الحالي
-            }
-        });
+    // ==================== Notification Count ====================
+    
+    public int getUnreadNotificationCount() {
+        return prefs.getInt(KEY_UNREAD_NOTIFICATIONS, 0);
     }
 
+    public void setUnreadNotificationCount(int count) {
+        prefs.edit().putInt(KEY_UNREAD_NOTIFICATIONS, Math.max(0, count)).apply();
+        notifyNotificationListeners(Math.max(0, count));
+    }
+    
+    // ==================== Total Badge Count ====================
+    
+    public int getTotalUnreadCount() {
+        return getUnreadMessageCount() + getUnreadNotificationCount();
+    }
+
+    // ==================== Message API ====================
+    
     public void fetchMessagesFromServer(OnMessagesLoadedListener listener) {
         String userId = getCurrentUserId();
-        if (userId == null) {
+        if (userId == null || userId.isEmpty()) {
             if (listener != null) listener.onError("User ID not found");
             return;
         }
@@ -137,17 +132,19 @@ public class MiraMessagingManager {
             @Override
             public void onSuccess(List<MessageModel> messages) {
                 messageCache.clear();
-                messageCache.addAll(messages);
+                if (messages != null) {
+                    messageCache.addAll(messages);
+                }
                 
                 int unreadCount = 0;
-                for (MessageModel message : messages) {
+                for (MessageModel message : messageCache) {
                     if (!message.isRead()) {
                         unreadCount++;
                     }
                 }
-                setUnreadCount(unreadCount);
+                setUnreadMessageCount(unreadCount);
                 
-                if (listener != null) listener.onMessagesLoaded(messages);
+                if (listener != null) listener.onMessagesLoaded(new ArrayList<>(messageCache));
             }
 
             @Override
@@ -157,9 +154,49 @@ public class MiraMessagingManager {
         });
     }
 
+    public void sendMessage(String receiverId, String content, MiraApiClient.SendMessageCallback callback) {
+        String userId = getCurrentUserId();
+        if (userId == null || userId.isEmpty()) {
+            if (callback != null) callback.onError("User ID not found");
+            return;
+        }
+        
+        if (content == null || content.trim().isEmpty()) {
+            if (callback != null) callback.onError("Message content is empty");
+            return;
+        }
+
+        MessageModel message = new MessageModel(userId, receiverId, content.trim());
+        
+        apiClient.sendMessage(message, new MiraApiClient.SendMessageCallback() {
+            @Override
+            public void onSuccess(MessageModel sentMessage) {
+                if (sentMessage != null) {
+                    messageCache.add(sentMessage);
+                }
+                if (callback != null) callback.onSuccess(sentMessage);
+            }
+
+            @Override
+            public void onError(String error) {
+                if (callback != null) callback.onError(error);
+            }
+        });
+    }
+    
+    public void markConversationAsRead(String conversationId) {
+        String userId = getCurrentUserId();
+        if (userId == null || userId.isEmpty()) return;
+        
+        // TODO: استدعاء API لتعليم الرسائل كمقروءة
+        // apiClient.markConversationAsRead(conversationId, userId, callback);
+    }
+    
+    // ==================== Notification API ====================
+    
     public void fetchNotificationsFromServer(OnNotificationsLoadedListener listener) {
         String userId = getCurrentUserId();
-        if (userId == null) {
+        if (userId == null || userId.isEmpty()) {
             if (listener != null) listener.onError("User ID not found");
             return;
         }
@@ -168,36 +205,24 @@ public class MiraMessagingManager {
             @Override
             public void onSuccess(List<NotificationModel> notifications) {
                 notificationCache.clear();
-                notificationCache.addAll(notifications);
-                if (listener != null) listener.onNotificationsLoaded(notifications);
+                if (notifications != null) {
+                    notificationCache.addAll(notifications);
+                }
+                
+                int unreadCount = 0;
+                for (NotificationModel notification : notificationCache) {
+                    if (!notification.isRead()) {
+                        unreadCount++;
+                    }
+                }
+                setUnreadNotificationCount(unreadCount);
+                
+                if (listener != null) listener.onNotificationsLoaded(new ArrayList<>(notificationCache));
             }
 
             @Override
             public void onError(String error) {
                 if (listener != null) listener.onError(error);
-            }
-        });
-    }
-
-    public void sendMessage(String receiverId, String content, MiraApiClient.SendMessageCallback callback) {  
-        String userId = getCurrentUserId();
-        if (userId == null) {
-            if (callback != null) callback.onError("User ID not found");
-            return;
-        }
-
-        MessageModel message = new MessageModel(userId, receiverId, content);
-        
-        apiClient.sendMessage(message, new MiraApiClient.SendMessageCallback() {
-            @Override
-            public void onSuccess(MessageModel sentMessage) {
-                messageCache.add(sentMessage);
-                if (callback != null) callback.onSuccess(sentMessage);
-            }
-
-            @Override
-            public void onError(String error) {
-                if (callback != null) callback.onError(error);
             }
         });
     }
@@ -219,19 +244,22 @@ public class MiraMessagingManager {
     public List<NotificationModel> getCachedNotifications() {
         return new ArrayList<>(notificationCache);
     }
-
-    private void notifyListeners(int count) {
+    
+    private void notifyMessageListeners(int count) {
         new Handler(Looper.getMainLooper()).post(() -> {
-            // إشعار المستمعين للواجهة الجديدة
-            for (OnUnreadCountChangedListener listener : new ArrayList<>(unreadListeners)) {
+            for (OnMessageCountChangedListener listener : messageListeners) {
                 if (listener != null) {
-                    listener.onUnreadCountChanged(count);
+                    listener.onMessageCountChanged(count);
                 }
             }
-            // إشعار المستمعين للواجهة القديمة
-            for (OnNotificationChangeListener listener : new ArrayList<>(oldListeners)) {
+        });
+    }
+    
+    private void notifyNotificationListeners(int count) {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            for (OnNotificationCountChangedListener listener : notificationListeners) {
                 if (listener != null) {
-                    listener.OnNotificationCountChanged(count);
+                    listener.onNotificationCountChanged(count);
                 }
             }
         });
