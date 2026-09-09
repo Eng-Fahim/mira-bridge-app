@@ -6,7 +6,7 @@
     android:id="@+id/motionLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
+    android:background="?attr/android:colorBackground"
     app:layoutDescription="@xml/dashboard_scene">
 
    <!-- ==================== SHIMMER LOADING ==================== -->
@@ -21,7 +21,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:visibility="visible">
+        tools:visibility="gone">
 
         <View
             android:layout_width="match_parent"
@@ -80,7 +80,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="?attr/colorSurface"
+        android:background="?attr/android:colorBackground"
         android:visibility="visible"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -94,20 +94,20 @@
             android:layout_height="match_parent"
             android:clipToPadding="false"
             android:fillViewport="true"
-            android:paddingBottom="24dp">
+            android:paddingBottom="32dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="12dp">
+                android:padding="16dp">
 
                 <!-- ==================== 1. HEADER ==================== -->
                 <RelativeLayout
                     android:id="@+id/headerSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="14dp">
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -126,7 +126,7 @@
                             android:textStyle="bold" />
 
                         <Space
-                            android:layout_width="4dp"
+                            android:layout_width="6dp"
                             android:layout_height="1dp" />
 
                         <TextView
@@ -135,7 +135,8 @@
                             android:text="JEWELRY ID™"
                             android:textColor="?attr/colorSecondary"
                             android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            android:letterSpacing="0.05" />
                     </LinearLayout>
 
                     <TextView
@@ -144,11 +145,11 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
-                        android:background="?attr/colorSurfaceVariant"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="4dp"
+                        android:background="@drawable/bg_luxury_card"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="5dp"
                         android:textColor="?attr/colorPrimary"
-                        android:textSize="10sp"
+                        android:textSize="11sp"
                         android:textStyle="bold"
                         tools:text="🟢 متصل" />
                 </RelativeLayout>
@@ -158,17 +159,17 @@
                     android:id="@+id/greetingCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="14dp"
                     app:cardBackgroundColor="?attr/colorSurface"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="1dp"
-                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="?attr/colorOutline"
                     app:strokeWidth="1dp">
 
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="14dp">
+                        android:padding="16dp">
 
                         <TextClock
                             android:id="@+id/tcLiveTime"
@@ -190,7 +191,7 @@
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="?attr/colorPrimary"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:textStyle="bold"
                             app:layout_constrainedWidth="true"
                             app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
@@ -207,7 +208,8 @@
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="?attr/colorOnSurface"
-                            android:textSize="14sp"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
                             app:layout_constrainedWidth="true"
                             app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
                             app:layout_constraintStart_toStartOf="parent"
@@ -218,7 +220,7 @@
                             android:id="@+id/tvLocation"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="6dp"
                             android:layout_marginEnd="8dp"
                             android:ellipsize="end"
                             android:maxLines="1"
@@ -234,7 +236,7 @@
                             android:id="@+id/tvDate"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="10sp"
                             app:layout_constraintEnd_toEndOf="parent"
@@ -249,20 +251,20 @@
                     android:id="@+id/inventoryMetrics"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="14dp"
                     android:orientation="horizontal"
                     android:baselineAligned="false"
                     android:weightSum="3">
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
-                        android:layout_height="80dp"
-                        android:layout_marginEnd="3dp"
+                        android:layout_height="88dp"
+                        android:layout_marginEnd="4dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="?attr/colorSurface"
-                        app:cardCornerRadius="12dp"
-                        app:cardElevation="1dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="2dp"
+                        app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="1dp">
 
                         <LinearLayout
@@ -270,14 +272,14 @@
                             android:layout_height="match_parent"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:padding="4dp">
+                            android:padding="6dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/total_items"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/tvTotalItems"
@@ -293,13 +295,13 @@
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
-                        android:layout_height="80dp"
-                        android:layout_marginHorizontal="1.5dp"
+                        android:layout_height="88dp"
+                        android:layout_marginHorizontal="2dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="?attr/colorSurface"
-                        app:cardCornerRadius="12dp"
-                        app:cardElevation="1dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="2dp"
+                        app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="1dp">
 
                         <LinearLayout
@@ -307,21 +309,21 @@
                             android:layout_height="match_parent"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:padding="4dp">
+                            android:padding="6dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/total_weight"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/tvTotalWeight"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:textColor="?attr/colorSecondary"
+                                android:textColor="?attr/colorPrimary"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
                                 tools:text="32.3 g" />
@@ -330,13 +332,13 @@
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
-                        android:layout_height="80dp"
-                        android:layout_marginStart="3dp"
+                        android:layout_height="88dp"
+                        android:layout_marginStart="4dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="?attr/colorSurface"
-                        app:cardCornerRadius="12dp"
-                        app:cardElevation="1dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="2dp"
+                        app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="1dp">
 
                         <LinearLayout
@@ -344,14 +346,14 @@
                             android:layout_height="match_parent"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:padding="4dp">
+                            android:padding="6dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/sold_today"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/tvSoldToday"
@@ -371,23 +373,23 @@
                     android:id="@+id/cardGoldPrices"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="14dp"
                     app:cardBackgroundColor="?attr/colorSurface"
-                    app:cardCornerRadius="14dp"
-                    app:cardElevation="2dp"
-                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="3dp"
+                    app:strokeColor="?attr/colorOutline"
                     app:strokeWidth="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="14dp">
+                        android:padding="16dp">
 
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="10dp">
+                            android:layout_marginBottom="12dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -396,7 +398,7 @@
                                 android:layout_centerVertical="true"
                                 android:text="@string/live_gold_prices"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="14sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <FrameLayout
@@ -416,8 +418,8 @@
 
                                 <ProgressBar
                                     android:id="@+id/pbGoldLoading"
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
                                     android:layout_gravity="center"
                                     android:indeterminate="true"
                                     android:indeterminateTint="?attr/colorPrimary"
@@ -428,7 +430,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginBottom="10dp"
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
 
@@ -437,33 +439,34 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="📊"
-                                android:textSize="12sp" />
+                                android:textSize="13sp" />
 
                             <TextView
                                 android:id="@+id/tvGoldChange"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
+                                android:layout_marginStart="6dp"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp"
+                                android:textSize="11sp"
                                 android:textStyle="bold"
                                 tools:text="-0.00%" />
                         </LinearLayout>
 
+                        <!-- بطاقة تبرز سعر الأونصة باللون الذهبي الفاخر -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="?attr/colorSurfaceVariant"
+                            android:background="@drawable/bg_luxury_card"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:paddingVertical="8dp">
+                            android:paddingVertical="12dp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/ounce_price"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/tvOuncePrice"
@@ -471,7 +474,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:textColor="?attr/colorPrimary"
-                                android:textSize="20sp"
+                                android:textSize="22sp"
                                 android:textStyle="bold"
                                 tools:text="💰 $4,623.83" />
                         </LinearLayout>
@@ -479,7 +482,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="12dp"
                             android:orientation="horizontal"
                             android:weightSum="3">
 
@@ -520,7 +523,7 @@
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp">
+                            android:layout_marginTop="10dp">
 
                             <TextView
                                 android:id="@+id/tvPriceSource"
@@ -528,7 +531,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentStart="true"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="9sp"
+                                android:textSize="10sp"
                                 tools:text="📡 GoldAPI" />
 
                             <TextView
@@ -537,7 +540,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentEnd="true"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="9sp"
+                                android:textSize="10sp"
                                 tools:text="⏰ آخر تحديث: 21:54:26" />
                         </RelativeLayout>
                     </LinearLayout>
@@ -548,7 +551,7 @@
                     android:id="@+id/quickAccessTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
+                    android:layout_marginBottom="8dp"
                     android:text="@string/quick_access"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp"
@@ -558,7 +561,7 @@
                     android:id="@+id/rvQuickActions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="14dp"
                     android:nestedScrollingEnabled="false"
                     app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
                     app:spanCount="3" />
@@ -568,18 +571,18 @@
                     android:id="@+id/salesSummaryCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="14dp"
                     app:cardBackgroundColor="?attr/colorSurface"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="1dp"
-                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="?attr/colorOutline"
                     app:strokeWidth="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:paddingVertical="10dp"
+                        android:paddingVertical="12dp"
                         android:baselineAligned="false"
                         android:weightSum="3">
 
@@ -601,9 +604,9 @@
                                 android:id="@+id/tvSalesToday"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="3dp"
+                                android:layout_marginTop="4dp"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="12sp"
+                                android:textSize="13sp"
                                 android:textStyle="bold"
                                 tools:text="0" />
                         </LinearLayout>
@@ -611,7 +614,7 @@
                         <View
                             android:layout_width="1dp"
                             android:layout_height="match_parent"
-                            android:background="?attr/colorOutlineVariant" />
+                            android:background="?attr/colorOutline" />
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -631,9 +634,9 @@
                                 android:id="@+id/tvSalesMonth"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="3dp"
+                                android:layout_marginTop="4dp"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="12sp"
+                                android:textSize="13sp"
                                 android:textStyle="bold"
                                 tools:text="0" />
                         </LinearLayout>
@@ -641,7 +644,7 @@
                         <View
                             android:layout_width="1dp"
                             android:layout_height="match_parent"
-                            android:background="?attr/colorOutlineVariant" />
+                            android:background="?attr/colorOutline" />
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -661,9 +664,9 @@
                                 android:id="@+id/tvSalesYear"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="3dp"
+                                android:layout_marginTop="4dp"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="12sp"
+                                android:textSize="13sp"
                                 android:textStyle="bold"
                                 tools:text="0" />
                         </LinearLayout>
@@ -675,7 +678,7 @@
                     android:id="@+id/fieldOpsTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
+                    android:layout_marginBottom="8dp"
                     android:text="@string/field_operations"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp"
@@ -692,15 +695,15 @@
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/btnGateSecurity"
                         android:layout_width="0dp"
-                        android:layout_height="80dp"
-                        android:layout_marginEnd="4dp"
+                        android:layout_height="88dp"
+                        android:layout_marginEnd="5dp"
                         android:layout_weight="1"
                         android:clickable="true"
                         android:focusable="true"
                         app:cardBackgroundColor="?attr/colorSurface"
-                        app:cardCornerRadius="12dp"
-                        app:cardElevation="1dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="2dp"
+                        app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="1dp">
 
                         <LinearLayout
@@ -711,8 +714,8 @@
                             android:padding="8dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="26dp"
+                                android:layout_height="26dp"
                                 android:importantForAccessibility="no"
                                 android:src="@drawable/ic_security"
                                 app:tint="?attr/colorPrimary" />
@@ -720,10 +723,10 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
+                                android:layout_marginTop="6dp"
                                 android:text="@string/gate_security"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="11sp"
+                                android:textSize="12sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
@@ -731,15 +734,15 @@
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/btnRfidAudit"
                         android:layout_width="0dp"
-                        android:layout_height="80dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_height="88dp"
+                        android:layout_marginStart="5dp"
                         android:layout_weight="1"
                         android:clickable="true"
                         android:focusable="true"
                         app:cardBackgroundColor="?attr/colorSurface"
-                        app:cardCornerRadius="12dp"
-                        app:cardElevation="1dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="2dp"
+                        app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="1dp">
 
                         <LinearLayout
@@ -750,8 +753,8 @@
                             android:padding="8dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="26dp"
+                                android:layout_height="26dp"
                                 android:importantForAccessibility="no"
                                 android:src="@drawable/ic_search"
                                 app:tint="?attr/colorPrimary" />
@@ -759,10 +762,10 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
+                                android:layout_marginTop="6dp"
                                 android:text="@string/rfid_audit"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="11sp"
+                                android:textSize="12sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
