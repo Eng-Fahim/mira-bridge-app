@@ -244,6 +244,10 @@ public class MiraMessagingManager {
     public List<NotificationModel> getCachedNotifications() {
         return new ArrayList<>(notificationCache);
     }
+    // ✅ أضف هذه الواجهة داخل الكلاس
+public interface OnUnreadCountChangedListener {
+    void onUnreadCountChanged(int unreadCount);
+}
     
     private void notifyMessageListeners(int count) {
         new Handler(Looper.getMainLooper()).post(() -> {
