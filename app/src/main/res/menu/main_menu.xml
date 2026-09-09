@@ -2,32 +2,27 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 📌 أزرار التولبار الظاهرة مباشرة (Header Bar) -->
-    
-    <!-- 1. زر أسعار الذهب والبورصة (بدلاً من زر الرئيسية المتكرر) -->
+    <!-- 📌 العناصر الظاهرة مباشرة في شريط العنوان (Toolbar Header) -->
     <item
         android:id="@+id/action_gold_rates"
         android:icon="@drawable/ic_gold_rate"
         android:title="@string/menu_gold_rates"
         app:showAsAction="always" />
 
-    <!-- 2. زر الملف الشخصي -->
     <item
         android:id="@+id/action_profile"
         android:icon="@drawable/ic_profile"
         android:title="@string/menu_profile"
         app:showAsAction="always" />
 
-    <!-- 3. مركز الإشعارات والرسائل (مع البادج) -->
     <item
         android:id="@+id/action_notifications"
-        android:title="@string/action_notifications"
         android:icon="@drawable/ic_notifications"
+        android:title="@string/action_notifications"
         app:actionLayout="@layout/action_item_notification_badge"
         app:showAsAction="always" />
 
-
-    <!-- 📌 القائمة المنسدلة (Overflow Menu) - مخصصة فقط للتهيئة والإعدادات -->
+    <!-- 📌 القائمة المنسدلة (Overflow Menu) -->
 
     <!-- إعدادات الواجهة والتخصيص -->
     <group android:id="@+id/group_settings">
