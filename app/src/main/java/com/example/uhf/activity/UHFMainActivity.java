@@ -664,6 +664,33 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 }
 
+private void showUserNotificationsDialog() {
+    BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+    View view = getLayoutInflater().inflate(R.layout.dialog_user_notifications, null);
+    dialog.setContentView(view);
+
+    RecyclerView recyclerView = view.findViewById(R.id.rvNotifications);
+    // ضبط RecyclerView مع Adapter احترافي يدعم:
+    // 1. إظهار شارة "جديد" للرسائل غير المقروءة.
+    // 2. عند النقر: تعليم الرسالة كمقروءة وفتح تفاصيلها.
+    // 3. إضافة زر "رد" داخل التفاصيل يفتح Input السريع لإرسال الرد للمُرسِل.
+
+    messagingManager.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
+        @Override
+        public void onNotificationsLoaded(List<NotificationModel> notifications) {
+            runOnUiThread(() -> {
+                // تحديث القائمة بالـ Adapter
+            });
+        }
+
+        @Override
+        public void onError(String error) {
+            Toast.makeText(UHFMainActivity.this, error, Toast.LENGTH_SHORT).show();
+        }
+    });
+
+    dialog.show();
+}
 
     private void showNotificationsAndChatDialog() {
         if (messagingManager != null) {
@@ -1611,6 +1638,17 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
 
         handleDoubleBackToExit();
     }
+private void handleNotificationButtonClick() {
+    PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+
+    if (pm.isAdmin() || pm.isManager()) {
+        // المدير يُخيَّر بين مركز المراسلات الإدارية أو الشات العام
+        showAdminMessagingMenu();
+    } else {
+        // المستخدم العادي يُفتح له مباشرة صندوق الإشعارات الخاص به
+        showUserNotificationsDialog();
+    }
+}
 
     private void handleDoubleBackToExit() {
         long currentTime = System.currentTimeMillis();
