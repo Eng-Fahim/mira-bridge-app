@@ -335,99 +335,96 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.attachBaseContext(newBase);
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        // 💡 ضبط الثيم بالكامل قبل stucture الـ Window و super.onCreate
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+   @Override
+protected void onCreate(Bundle savedInstanceState) {
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+    super.onCreate(savedInstanceState);
 
-        super.onCreate(savedInstanceState);
-
-        try {
-            sessionManager = new SessionManager(getApplicationContext());
-            if (!sessionManager.isLoggedIn()) {
-                navigateToLogin();
-                return;
-            }
-
-            setContentView(R.layout.activity_main);
-
-            // 💡 ضبط أبعاد أشرطة النظام (System Bars Window Insets)
-            View bottomNavView = findViewById(R.id.bottomNavigationView);
-            if (bottomNavView != null) {
-                ViewCompat.setOnApplyWindowInsetsListener(bottomNavView, (v, insets) -> {
-                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                    v.setPadding(0, 0, 0, systemBars.bottom);
-                    return insets;
-                });
-            }
-
-            View toolbarView = findViewById(R.id.toolbar);
-            if (toolbarView != null) {
-                ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
-                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                    v.setPadding(0, systemBars.top, 0, 0);
-                    return insets;
-                });
-            }
-
-            cleanupOldFragments();
-
-            AppWatchdog.getInstance().startMonitoring(() -> {
-                Log.e(TAG, "UI Thread FROZEN! Restarting app...");
-                MiraApplication.getInstance().restartApp();
-            });
-
-            ToastUtil.init(getApplicationContext());
-            initializeLanguageState();
-
-            branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
-            fragmentManager = getSupportFragmentManager();
-
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
-
-            // ✅ زر البحث السريع
-            View btnSubSearch = findViewById(R.id.btnSubSearch);
-            if (btnSubSearch != null) btnSubSearch.setOnClickListener(v -> showGlobalSearchDialog());
-
-            // ✅ زر المزامنة
-            View btnSubSync = findViewById(R.id.btnSubSync);
-            if (btnSubSync != null) btnSubSync.setOnClickListener(v -> performDataSync());
-
-            // ✅ زر الإجراءات السريعة
-            View btnSubQuickActions = findViewById(R.id.btnSubQuickActions);
-            if (btnSubQuickActions != null) btnSubQuickActions.setOnClickListener(v -> showQuickActionMenu());
-
-            // ✅ مؤشر حالة الأجهزة
-            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-            if (btnHardwareStatus != null) {
-                btnHardwareStatus.setOnClickListener(v -> {
-                    showHardwareOptionsDialog();
-                    mainHandler.postDelayed(this::updateHardwareStatusIndicator, 500);
-                });
-            }
-
-            updateHardwareStatusIndicator();
-            scheduleHardwareStatusUpdates();
-
-            setupQuickNav();
-            setupOrgProfileListener();
-
-            if (savedInstanceState == null) {
-                currentFragmentTag = "Dashboard";
-            } else {
-                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-            }
-
-            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+    try {
+        sessionManager = new SessionManager(getApplicationContext());
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
         }
+
+        setContentView(R.layout.activity_main);
+
+        // ضبط أبعاد أشرطة النظام (System Bars Window Insets)
+        View bottomNavView = findViewById(R.id.bottomNavigationView);
+        if (bottomNavView != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(bottomNavView, (v, insets) -> {
+                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                v.setPadding(0, 0, 0, systemBars.bottom);
+                return insets;
+            });
+        }
+
+        View toolbarView = findViewById(R.id.toolbar);
+        if (toolbarView != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
+                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                v.setPadding(0, systemBars.top, 0, 0);
+                return insets;
+            });
+        }
+
+        cleanupOldFragments();
+
+        AppWatchdog.getInstance().startMonitoring(() -> {
+            Log.e(TAG, "UI Thread FROZEN! Restarting app...");
+            MiraApplication.getInstance().restartApp();
+        });
+
+        ToastUtil.init(getApplicationContext());
+        initializeLanguageState();
+
+        branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
+        fragmentManager = getSupportFragmentManager();
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
+        }
+
+        // ✅ زر البحث السريع
+        View btnSubSearch = findViewById(R.id.btnSubSearch);
+        if (btnSubSearch != null) btnSubSearch.setOnClickListener(v -> showGlobalSearchDialog());
+
+        // ✅ زر المزامنة
+        View btnSubSync = findViewById(R.id.btnSubSync);
+        if (btnSubSync != null) btnSubSync.setOnClickListener(v -> performDataSync());
+
+        // 🗑️ تم إزالة Listener الخاص بـ btnSubQuickActions هنا لمنع التكرار مع fabActionCenter
+
+        // ✅ مؤشر حالة الأجهزة
+        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+        if (btnHardwareStatus != null) {
+            btnHardwareStatus.setOnClickListener(v -> {
+                showHardwareOptionsDialog();
+                mainHandler.postDelayed(this::updateHardwareStatusIndicator, 500);
+            });
+        }
+
+        updateHardwareStatusIndicator();
+        scheduleHardwareStatusUpdates();
+
+        setupQuickNav();
+        setupOrgProfileListener();
+
+        if (savedInstanceState == null) {
+            currentFragmentTag = "Dashboard";
+        } else {
+            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+        }
+
+        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+
+    } catch (Exception e) {
+        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
     }
+}
+
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -1819,4 +1816,4 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-                    }
+}
