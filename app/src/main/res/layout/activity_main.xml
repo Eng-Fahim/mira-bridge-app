@@ -94,36 +94,20 @@
                 app:srcCompat="@drawable/ic_sync"
                 app:tint="?attr/colorOnSurfaceVariant" />
 
-            <!-- 4. زر الإشعارات مع شارة التنبيه -->
-            <FrameLayout
-                android:id="@+id/btnSubNotifications"
+            <!-- 4. زر الإجراءات السريعة (Quick Actions) -->
+            <ImageButton
+                android:id="@+id/btnSubQuickActions"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
-                android:layout_marginStart="4dp"
+                android:layout_marginHorizontal="4dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_gravity="center"
-                    app:srcCompat="@drawable/ic_notifications"
-                    app:tint="?attr/colorOnSurfaceVariant" />
-
-                <!-- نقطة التنبيه الحمراء -->
-                <View
-                    android:layout_width="7dp"
-                    android:layout_height="7dp"
-                    android:layout_gravity="top|end"
-                    android:layout_marginTop="6dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_status_dot_red" />
-            </FrameLayout>
+                android:contentDescription="@string/nav_actions"
+                android:src="@drawable/ic_dashboard"
+                app:tint="?attr/colorOnSurfaceVariant" />
 
         </LinearLayout>
 
-        <!-- حاوية المحتوى الرئيسية للـ Fragments مع حماية الفوتر من التداخل -->
+        <!-- حاوية المحتوى الرئيسية للـ Fragments -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="match_parent"
@@ -135,7 +119,7 @@
 
     </LinearLayout>
 
-    <!-- شريط التنقل السفلي المتوافق تماماً مع الثيم -->
+    <!-- شريط التنقل السفلي -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigationView"
         android:layout_width="match_parent"
@@ -168,7 +152,7 @@
         app:srcCompat="@drawable/ic_gold_gem"
         app:tint="@color/fab_icon_color" />
 
-    <!-- طبقة السنابر والتحميل التفاعلية أثناء التنقل -->
+    <!-- طبقة التحميل -->
     <LinearLayout
         android:id="@+id/successOverlayMain"
         android:layout_width="match_parent"
