@@ -110,6 +110,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private ActivityResultLauncher<String[]> pickImageLauncher;
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private Uri photoUri;
+    private String currentPhotoPath;
 
     @Nullable
     @Override
