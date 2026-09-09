@@ -36,6 +36,7 @@ import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputLayout;  // ✅ أضف هذا الاستيراد
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
@@ -1335,4 +1336,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     );
-                          }
+}
