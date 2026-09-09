@@ -23,7 +23,7 @@
     </style>
 
     <!-- ==================== ستايلات القوائم المنسدلة ==================== -->
-    <style name="CustomOverflowMenu" parent="Widget.AppCompat.PopupMenu.Overflow">
+    <style name="CustomOverflowMenu" parent="Widget.Material3.PopupMenu.Overflow">
         <item name="overlapAnchor">false</item>
         <item name="android:dropDownVerticalOffset">8dp</item>
         <item name="android:popupBackground">@drawable/bg_custom_popup_menu</item>
@@ -35,27 +35,20 @@
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
-    <!-- ==================== ربط الثيمات الرئيسية متجاوبة مع الماتيريال 3 ==================== -->
-    <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
-        
-    <style name="AppTheme" parent="Theme.Uhfuartdemo">
-        <item name="android:alertDialogTheme">@style/MiraCustomDialogTheme</item>
-        <item name="alertDialogTheme">@style/MiraCustomDialogTheme</item>
-        <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
-    </style>
-
-    <style name="CustomTheme" parent="Theme.Uhfuartdemo" />
-    <style name="ActionBarBaseTheme" parent="Theme.Uhfuartdemo" />
-    <style name="ActionBarBaseTheme1" parent="Theme.Uhfuartdemo" />
-
-    <!-- ==================== مؤشر الفوتر النشط (اصلاح مشكلة الشريط السفلي) ==================== -->
+    <!-- ==================== مؤشر الفوتر النشط والـ BottomNavigationView ==================== -->
     <style name="CustomActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <!-- لون ذهبي شفاف متجاوب بنسبة 15% يمنع الصدام مع الخلفيات الفاتحة والداكنة -->
+        <!-- لون ذهبي شفاف بنسبة 15% يمنع الصدام مع الخلفيات الفاتحة والداكنة -->
         <item name="android:color">#26D4AF37</item>
         <item name="android:width">54dp</item>
         <item name="android:height">32dp</item>
         <item name="marginHorizontal">4dp</item>
         <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+    </style>
+
+    <style name="AppBottomNavigationViewStyle" parent="Widget.Material3.BottomNavigationView">
+        <item name="itemActiveIndicatorStyle">@style/CustomActiveIndicator</item>
+        <item name="itemRippleColor">#26D4AF37</item>
+        <item name="elevation">8dp</item>
     </style>
 
     <!-- ==================== ستايلات التبويبات والقوائم السريعة ==================== -->
@@ -98,7 +91,6 @@
     <style name="MiraCustomDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="shapeAppearanceOverlay">@style/MiraDialogCorners</item>
         <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
-        <!-- الاعتماد على متغيرا الثيم الديناميكية بدلاً من ألوان شاذة ثابتة -->
         <item name="android:textColorPrimary">?attr/colorOnSurface</item>
         <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
         <item name="android:titleTextColor">?attr/colorPrimary</item>
