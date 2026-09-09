@@ -1,6 +1,5 @@
 package com.example.uhf.activity;
 
-
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
@@ -25,6 +24,9 @@ public class SplashActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // تعيين الثيم البرمجي صراحةً لتأكيد القفز فوق الشاشة الافتراضية
+        setTheme(R.style.SplashTheme);
+        
         super.onCreate(savedInstanceState);
         setContentView(R.layout.splash_screen);
 
@@ -106,7 +108,6 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // إزالة الكولباك لمنع memory leaks في حال أغلق المستخدم التطبيق بسرعة
         if (navigateRunnable != null) {
             mainHandler.removeCallbacks(navigateRunnable);
         }
