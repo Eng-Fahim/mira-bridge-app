@@ -10,6 +10,8 @@ import android.util.Log;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 🟢 موصل الميزان الذكي عبر Bluetooth SPP
@@ -41,6 +43,14 @@ public class SmartScaleConnector {
         return connected;
     }
     
+    /**
+     * محاولة الاتصال التلقائي بالميزان الذكي المحفوظ مسبقاً
+     */
+    public void connect() {
+        // TODO: يمكنك لاحقاً برمجة هذه الدالة لقراءة الـ MAC Address المحفوظ في إعدادات النظام (SharedPreferences)
+        Log.i(TAG, "Auto-connect triggered. Waiting for stored device implementation.");
+    }
+
     /**
      * الاتصال بالميزان عبر MAC Address
      */
@@ -87,14 +97,6 @@ public class SmartScaleConnector {
                 });
             }
         }).start();
-    }
-
-    /**
-     * محاولة الاتصال التلقائي بالميزان الذكي المحفوظ مسبقاً
-     */
-    public void connect() {
-        // هذه الدالة يمكن تنفيذها لاحقاً
-        Log.i(TAG, "Auto-connect triggered. Use connectToDevice(String macAddress) instead.");
     }
 
     public void connect(BluetoothDevice device) {
@@ -161,11 +163,26 @@ public class SmartScaleConnector {
         }
     }
 
+    /**
+     * ✅ تحسين دالة قراءة الوزن لتدعم تنسيقات مختلفة
+     */
     private double parseWeight(String rawData) {
         try {
             if (rawData == null || rawData.trim().isEmpty()) return 0;
             
-            // تنقية وتجميع الأرقام والنقاط العشرية
+            Log.d(TAG, "Raw data received: [" + rawData + "]");
+            
+            // ✅ تنسيق 1: "ST,GS,+0015.50g" (تنسيق CAS القياسي)
+            if (rawData.contains("ST") && rawData.contains("GS")) {
+                Pattern pattern = Pattern.compile("([+-]?\\d+\\.?\\d*)");
+                Matcher matcher = pattern.matcher(rawData);
+                if (matcher.find()) {
+                    double val = Double.parseDouble(matcher.group(1));
+                    if (val > 0) return val;
+                }
+            }
+            
+            // ✅ تنسيق 2: "0015.50g" أو "12.34"
             String cleaned = rawData.replaceAll("[^0-9.]", " ").trim();
             String[] parts = cleaned.split("\\s+");
             
@@ -175,10 +192,35 @@ public class SmartScaleConnector {
                     if (val > 0) return val;
                 }
             }
+            
+            // ✅ تنسيق 3: أي رقم عشري في النص
+            Pattern decimalPattern = Pattern.compile("(\\d+\\.\\d+)");
+            Matcher decimalMatcher = decimalPattern.matcher(rawData);
+            if (decimalMatcher.find()) {
+                double val = Double.parseDouble(decimalMatcher.group(1));
+                if (val > 0) return val;
+            }
+            
         } catch (Exception e) {
             Log.e(TAG, "Parse error: " + e.getMessage());
         }
         return 0;
+    }
+
+    /**
+     * ✅ إرسال بيانات وزن تجريبية للمحاكاة
+     */
+    public void sendTestWeight(double weight) {
+        try {
+            if (outputStream != null && connected) {
+                String command = String.format("ST,GS,+%08.2fg\r\n", weight);
+                outputStream.write(command.getBytes());
+                outputStream.flush();
+                Log.d(TAG, "Test weight sent: " + weight + "g");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "sendTestWeight error: " + e.getMessage());
+        }
     }
 
     public void sendCommand(String command) {
