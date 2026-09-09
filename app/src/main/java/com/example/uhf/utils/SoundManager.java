@@ -143,4 +143,7 @@ public class SoundManager {
             }
         }
     }
+    public void cleanup() {
+    soundExecutor.shutdown();
+}
 }
