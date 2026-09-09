@@ -3,7 +3,7 @@ package com.example.uhf.navigation;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.fragment.*;
-
+import com.example.uhf.R;
 public class FragmentFactory {
 
     public static Fragment createFragmentByTag(String tag) {
