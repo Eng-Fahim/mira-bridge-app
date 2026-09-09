@@ -496,10 +496,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         // في onCreate بعد تهيئة sessionManager
         messagingManager = MiraMessagingManager.getInstance(this);
         // تعيين معرف المستخدم الحالي
-        String userId = sessionManager.getUserId(); // أو أي طريقة للحصول على معرف المستخدم
-        if (userId != null && !userId.isEmpty()) {
-        messagingManager.setCurrentUserId(userId);
+        int userId = sessionManager.getUserId();
+        if (userId > 0) {
+        messagingManager.setCurrentUserId(String.valueOf(userId));
         }
+
         messagingManager.addListener(this::updateNotificationBadge);
         updateNotificationBadge(messagingManager.getUnreadCount());
 
