@@ -2,18 +2,11 @@ package com.example.uhf.fragment;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
@@ -23,7 +16,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -36,7 +28,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
-import androidx.print.PrintHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -44,33 +35,31 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.databinding.FragmentMiraIdentityStudioBinding;
+import com.example.uhf.manager.IdentityFormManager;
+import com.example.uhf.manager.IdentityPhotoManager;
+import com.example.uhf.manager.IdentitySyncManager;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.adapter.PhotosAdapter;
+import com.example.uhf.utils.BarcodeGenerator;
+import com.example.uhf.utils.PricingCalculator;
+import com.example.uhf.utils.TagPrinter;
+import com.example.uhf.MiraRfid.MiraRfidService;
+
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.MultiFormatWriter;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.datamatrix.encoder.SymbolShapeHint;
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -79,16 +68,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import com.example.uhf.MiraRfid.MiraRfidService;
-
+/**
+ * MiraIdentityStudioFragment - نسخة نظيفة ومنظمة
+ * 
+ * ✅ الفصل بين المسؤوليات:
+ * - IdentityFormManager: إدارة النموذج والمسودة
+ * - IdentityPhotoManager: إدارة الصور
+ * - IdentitySyncManager: إدارة المزامنة
+ * - PhotosAdapter: عرض الصور
+ * - BarcodeGenerator: توليد الباركود
+ * - PricingCalculator: حساب الأسعار
+ * - TagPrinter: طباعة الملصقات
+ */
 public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraIdentityStudio";
-    private static final String OFFLINE_PREFS = "identity_studio_cache";
     private static final long RFID_TIMEOUT_MS = 30000;
-    private static final double CARAT_TO_GRAM_FACTOR = 0.20;
-    private static final int MAX_PHOTOS = 5;
-    private static final int IMAGE_COMPRESSION_QUALITY = 75;
 
     private FragmentMiraIdentityStudioBinding binding;
     private MiraApiClient apiClient;
@@ -96,27 +91,29 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private MiraOrgProfileManager orgProfile;
     private MiraPriceManager priceManager;
     private PermissionManager permissionManager;
-    private SharedPreferences offlineCache;
-    private ExecutorService executorService;
 
-    private final Map<String, String[]> typeSuggestions = new HashMap<>();
-    private String currentPhotoPath;
-    private final List<String> photoPaths = new ArrayList<>();
+    // ✅ المديرون الجدد
+    private IdentityFormManager formManager;
+    private IdentityPhotoManager photoManager;
+    private IdentitySyncManager syncManager;
     private PhotosAdapter photosAdapter;
+
+    private ExecutorService executorService;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable rfidTimeoutRunnable;
+    private boolean isRfidScanning = false;
+    private volatile boolean isFormLocked = false;
+    private boolean isArabic = true;
 
     private ActivityResultLauncher<Uri> takePhotoLauncher;
     private ActivityResultLauncher<String[]> pickImageLauncher;
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private Uri photoUri;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private Runnable rfidTimeoutRunnable;
-    private boolean isRfidScanning = false;
-    private volatile boolean isFormLocked = false;
-
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         binding = FragmentMiraIdentityStudioBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
@@ -132,31 +129,28 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             applyLanguage();
             setupPhotosRecyclerView();
 
-            // تأجيل وإعادة توزيع المهام الخفيفة
+            // تأجيل المهام الخفيفة
             view.postDelayed(() -> {
                 if (!isAdded()) return;
-                
+
                 try {
-                    initSuggestionsData();
                     setupListeners();
                     applyPermissions();
-                    populateSuggestions("rings");
-                    
+
                     if (savedInstanceState != null) {
-                        currentPhotoPath = savedInstanceState.getString("camera_photo_path");
+                        // استعادة الحالة
                     }
-                    
+
                     if (getActivity() instanceof UHFMainActivity) {
                         ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
                     }
 
-                    // تنمية المهام الثقيلة في خيط الخلفية لمنع أي Lag
                     executorService.execute(() -> {
                         restoreDraftIfExists();
                         safeRun(this::updatePendingSyncBadge);
                     });
 
-                    Log.d(TAG, "✅ IdentityStudio non-blocking initialization complete");
+                    Log.d(TAG, "✅ IdentityStudio initialization complete");
                 } catch (Exception e) {
                     Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
                 }
@@ -174,242 +168,226 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             orgProfile = MiraOrgProfileManager.getInstance(getContext());
             priceManager = MiraPriceManager.getInstance(getContext());
             permissionManager = PermissionManager.getInstance(getContext());
-            offlineCache = getContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
+
+            executorService = Executors.newSingleThreadExecutor();
+            formManager = new IdentityFormManager(getContext());
+            photoManager = new IdentityPhotoManager(getContext(), executorService);
+            syncManager = new IdentitySyncManager(getContext(), executorService);
         }
-        executorService = Executors.newSingleThreadExecutor();
         isArabic = Locale.getDefault().getLanguage().equals("ar");
     }
 
+    // ==================== إدارة النموذج ====================
+
     private void restoreDraftIfExists() {
-        if (offlineCache == null) return;
-        try {
-            String draftJson = offlineCache.getString("current_draft", null);
-            if (draftJson == null) return;
+        boolean restored = formManager.restoreDraft(new IdentityFormManager.FormData() {
+            @Override public String getEpc() { return binding.etEpc.getText().toString(); }
+            @Override public String getTitle() { return binding.etTitle.getText().toString(); }
+            @Override public String getGrossWeight() { return binding.etGrossWeight.getText().toString(); }
+            @Override public boolean isHasStones() { return binding.switchHasStones.isChecked(); }
+            @Override public String getStoneType() { return binding.etStoneType.getText().toString(); }
+            @Override public String getStoneWeight() { return binding.etStoneWeight.getText().toString(); }
+            @Override public String getStoneCount() { return binding.etStoneCount.getText().toString(); }
+            @Override public String getStoneValue() { return binding.etStoneValue.getText().toString(); }
+            @Override public void setEpc(String value) { binding.etEpc.setText(value); }
+            @Override public void setTitle(String value) { binding.etTitle.setText(value); }
+            @Override public void setGrossWeight(String value) { binding.etGrossWeight.setText(value); }
+            @Override public void setStoneType(String value) { binding.etStoneType.setText(value); }
+            @Override public void setStoneWeight(String value) { binding.etStoneWeight.setText(value); }
+            @Override public void setStoneCount(String value) { binding.etStoneCount.setText(value); }
+            @Override public void setStoneValue(String value) { binding.etStoneValue.setText(value); }
+            @Override public void setHasStones(boolean value) { binding.switchHasStones.setChecked(value); }
+        }, photoManager.getPhotoPaths());
 
-            JSONObject draft = new JSONObject(draftJson);
-            
+        if (restored) {
             safeRun(() -> {
-                if (binding == null) return;
-                if (binding.etEpc != null && draft.has("epc")) {
-                    binding.etEpc.setText(draft.optString("epc"));
-                }
-                if (binding.etTitle != null && draft.has("title")) {
-                    binding.etTitle.setText(draft.optString("title"));
-                }
-                if (binding.etGrossWeight != null && draft.has("gross_weight")) {
-                    binding.etGrossWeight.setText(draft.optString("gross_weight"));
-                }
-                
-                if (binding.switchHasStones != null && draft.has("has_stones")) {
-                    boolean hasStones = draft.optBoolean("has_stones");
-                    binding.switchHasStones.setChecked(hasStones);
-                    if (hasStones) {
-                        if (binding.etStoneType != null) binding.etStoneType.setText(draft.optString("stone_type", ""));
-                        if (binding.etStoneWeight != null) binding.etStoneWeight.setText(draft.optString("stone_weight", ""));
-                        if (binding.etStoneCount != null) binding.etStoneCount.setText(draft.optString("stone_count", ""));
-                        if (binding.etStoneValue != null) binding.etStoneValue.setText(draft.optString("stone_value", ""));
-                    }
-                }
-                
-                if (draft.has("photo_paths")) {
-                    JSONArray photosArray = draft.optJSONArray("photo_paths");
-                    if (photosArray != null) {
-                        photoPaths.clear();
-                        for (int i = 0; i < photosArray.length(); i++) {
-                            String path = photosArray.optString(i);
-                            if (path != null && !path.isEmpty() && new File(path).exists()) {
-                                photoPaths.add(path);
-                            }
-                        }
-                        onPhotosUpdated();
-                    }
-                }
-                
                 showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
+                onPhotosUpdated();
             });
-
-            offlineCache.edit().remove("current_draft").apply();
-            
-        } catch (Exception e) {
-            Log.e(TAG, "restoreDraftIfExists error: " + e.getMessage());
         }
     }
 
     private void saveCurrentDraftAsync() {
-        if (offlineCache == null || binding == null || executorService == null || executorService.isShutdown()) return;
+        if (formManager == null || binding == null) return;
 
-        final String epc = binding.etEpc != null && binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
-        final String title = binding.etTitle != null && binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
-        final String weightStr = binding.etGrossWeight != null && binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-        final boolean hasStones = binding.switchHasStones != null && binding.switchHasStones.isChecked();
-        
-        final String stoneType = hasStones && binding.etStoneType != null && binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
-        final String stoneWeight = hasStones && binding.etStoneWeight != null && binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
-        final String stoneCount = hasStones && binding.etStoneCount != null && binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
-        final String stoneValue = hasStones && binding.etStoneValue != null && binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
-
-        final List<String> currentPhotos = new ArrayList<>(photoPaths);
-
-        executorService.execute(() -> {
-            try {
-                if (epc.isEmpty() && title.isEmpty() && currentPhotos.isEmpty()) return;
-
-                JSONObject draft = new JSONObject();
-                draft.put("epc", epc);
-                draft.put("title", title);
-                draft.put("gross_weight", weightStr);
-                draft.put("has_stones", hasStones);
-                
-                if (hasStones) {
-                    draft.put("stone_type", stoneType);
-                    draft.put("stone_weight", stoneWeight);
-                    draft.put("stone_count", stoneCount);
-                    draft.put("stone_value", stoneValue);
-                }
-                
-                if (!currentPhotos.isEmpty()) {
-                    JSONArray photosArray = new JSONArray();
-                    for (String path : currentPhotos) {
-                        photosArray.put(path);
-                    }
-                    draft.put("photo_paths", photosArray);
-                }
-                
-                offlineCache.edit().putString("current_draft", draft.toString()).apply();
-            } catch (Exception e) {
-                Log.e(TAG, "saveCurrentDraftAsync error: " + e.getMessage());
-            }
-        });
+        formManager.saveDraft(new IdentityFormManager.FormData() {
+            @Override public String getEpc() { return binding.etEpc.getText().toString(); }
+            @Override public String getTitle() { return binding.etTitle.getText().toString(); }
+            @Override public String getGrossWeight() { return binding.etGrossWeight.getText().toString(); }
+            @Override public boolean isHasStones() { return binding.switchHasStones.isChecked(); }
+            @Override public String getStoneType() { return binding.etStoneType.getText().toString(); }
+            @Override public String getStoneWeight() { return binding.etStoneWeight.getText().toString(); }
+            @Override public String getStoneCount() { return binding.etStoneCount.getText().toString(); }
+            @Override public String getStoneValue() { return binding.etStoneValue.getText().toString(); }
+            @Override public void setEpc(String value) { }
+            @Override public void setTitle(String value) { }
+            @Override public void setGrossWeight(String value) { }
+            @Override public void setStoneType(String value) { }
+            @Override public void setStoneWeight(String value) { }
+            @Override public void setStoneCount(String value) { }
+            @Override public void setStoneValue(String value) { }
+            @Override public void setHasStones(boolean value) { }
+        }, photoManager.getPhotoPaths());
     }
 
-    private void applyPermissions() {
-        if (binding == null) return;
-        boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
-        
-        if (binding.btnSaveIdentity != null) {
-            binding.btnSaveIdentity.setEnabled(canEdit && !isFormLocked);
-            binding.btnSaveIdentity.setAlpha((canEdit && !isFormLocked) ? 1.0f : 0.5f);
-        }
-        
-        if (binding.btnScanRfid != null) binding.btnScanRfid.setEnabled(canEdit && !isFormLocked);
-        if (binding.btnAddPhotos != null) binding.btnAddPhotos.setEnabled(canEdit && !isFormLocked);
-        
-        if (!canEdit) {
-            showToast(isArabic ? "⛔ وضع القراءة فقط - غير مصرح بالتعديل" : "⛔ Read only mode - Access Denied");
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (getView() != null) {
-            getView().postDelayed(() -> {
-                if (!isAdded()) return;
-                try {
-                    if (priceManager != null) {
-                        priceManager.refreshNow();
-                        handler.postDelayed(() -> {
-                            if (isAdded() && binding != null) calculateEstimatedGoldValue();
-                        }, 300);
-                    }
-                    
-                    executorService.execute(() -> {
-                        syncPendingEncodes();
-                        safeRun(this::updatePendingSyncBadge);
-                    });
-
-                    if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "onResume error: " + e.getMessage(), e);
-                }
-            }, 150);
-        }
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        stopRfidScanningMode();
-        saveCurrentDraftAsync();
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
-        }
-    }
-
-    private void applyLanguage() {
-        if (binding == null) return;
-        applyLanguageDirection(binding.getRoot());
-        if (isArabic) setArabicTexts(); else setEnglishTexts();
-    }
-
-    private void setArabicTexts() {
-        try {
-            if (binding == null) return;
-            binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف وتوليد الاكواد المجهرية");
-            binding.tilEpc.setHint("رمز الشريحة (EPC / GTIN)...");
-            binding.btnScanRfid.setText(isRfidScanning ? "إيقاف المسح..." : "مسح رمز RFID");
-            binding.etTitle.setHint("عنوان ووصف القطعة");
-            binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
-            binding.btnAddPhotos.setText("📷 إرفاق صور القطعة");
-            binding.btnViewPending.setText("📦 عرض الطلبات المحفوظة محلياً");
-            updatePhotosCountText();
-            calculateEstimatedGoldValue();
-        } catch (Exception e) {
-            Log.e(TAG, "setArabicTexts error: " + e.getMessage());
-        }
-    }
-
-    private void setEnglishTexts() {
-        try {
-            if (binding == null) return;
-            binding.tvStepTitle.setText("Step 1 of 4: Bind, Classify & Generate Codes");
-            binding.tilEpc.setHint("EPC / GTIN Code...");
-            binding.btnScanRfid.setText(isRfidScanning ? "Stop Scan..." : "Scan RFID Tag");
-            binding.etTitle.setHint("Item Title & Description");
-            binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
-            binding.btnAddPhotos.setText("📷 Attach Photos");
-            binding.btnViewPending.setText("📦 View Offline Pending Items");
-            updatePhotosCountText();
-            calculateEstimatedGoldValue();
-        } catch (Exception e) {
-            Log.e(TAG, "setEnglishTexts error: " + e.getMessage());
-        }
-    }
-
-    private void initSuggestionsData() {
-        typeSuggestions.clear();
-        if (isArabic) {
-            typeSuggestions.put("rings", new String[]{"خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي", "خاتم خطوبة مميز"});
-            typeSuggestions.put("sets", new String[]{"طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس", "طقم سهرة فاخر"});
-            typeSuggestions.put("bracelets", new String[]{"بناجر / أساور خليجي", "سوار تنادي عصري", "سوار ذهبي كلاسيك"});
-            typeSuggestions.put("necklaces", new String[]{"عقد شوكر عصري", "سلسلة ذهبية ناعمة", "عقد لؤلؤ فاخر"});
-        } else {
-            typeSuggestions.put("rings", new String[]{"Diamond Solitaire Ring", "Classic Band Ring", "Twins Ring", "Engagement Ring"});
-            typeSuggestions.put("sets", new String[]{"Complete Bridal Set", "Royal Diamond Set", "Luxury Evening Set"});
-            typeSuggestions.put("bracelets", new String[]{"Khaleeji Bangle", "Modern Tennis Bracelet", "Classic Gold Bracelet"});
-            typeSuggestions.put("necklaces", new String[]{"Modern Choker", "Fine Gold Chain", "Luxury Pearl Necklace"});
-        }
-    }
+    // ==================== إدارة الصور ====================
 
     private void setupPhotosRecyclerView() {
         if (binding == null || binding.rvPhotosPreview == null) return;
-        photosAdapter = new PhotosAdapter(photoPaths, executorService, position -> {
+        photosAdapter = new PhotosAdapter(photoManager.getPhotoPaths(), executorService, position -> {
             if (isFormLocked) {
                 showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
                 return;
             }
-            if (position >= 0 && position < photoPaths.size()) {
-                photoPaths.remove(position);
-                photosAdapter.notifyItemRemoved(position);
-                photosAdapter.notifyItemRangeChanged(position, photoPaths.size());
-                updatePhotosCountText();
-            }
+            photoManager.removePhoto(position);
+            photosAdapter.notifyItemRemoved(position);
+            photosAdapter.notifyItemRangeChanged(position, photoManager.getPhotoCount());
+            updatePhotosCountText();
         });
         binding.rvPhotosPreview.setLayoutManager(new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
         binding.rvPhotosPreview.setAdapter(photosAdapter);
     }
+
+    private void setupPhotoLaunchers() {
+        requestPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) openCamera();
+                    else showToast(isArabic ? "صلاحية الكاميرا مطلوبة" : "Camera permission required");
+                }
+        );
+
+        takePhotoLauncher = registerForActivityResult(
+                new ActivityResultContracts.TakePicture(),
+                success -> {
+                    if (success) {
+                        photoManager.compressAndAddPhoto(currentPhotoPath);
+                        safeRun(this::onPhotosUpdated);
+                    }
+                }
+        );
+
+        pickImageLauncher = registerForActivityResult(
+                new ActivityResultContracts.OpenMultipleDocuments(),
+                uris -> {
+                    if (uris != null && !uris.isEmpty()) {
+                        for (Uri uri : uris) {
+                            photoManager.copyAndAddPhoto(uri);
+                        }
+                        safeRun(this::onPhotosUpdated);
+                    }
+                }
+        );
+    }
+
+    private void onPhotosUpdated() {
+        if (photosAdapter != null) photosAdapter.notifyDataSetChanged();
+        updatePhotosCountText();
+        if (binding != null && binding.rvPhotosPreview != null) {
+            binding.rvPhotosPreview.setVisibility(photoManager.getPhotoCount() == 0 ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void updatePhotosCountText() {
+        try {
+            if (binding == null || binding.tvPhotosCount == null) return;
+            int count = photoManager.getPhotoCount();
+            binding.tvPhotosCount.setText(count == 0 ?
+                    (isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet") :
+                    (isArabic ? "تم إرفاق (" + count + "/" + 5 + ") صور" : "Attached (" + count + "/" + 5 + ") photos"));
+        } catch (Exception e) {
+            Log.e(TAG, "updatePhotosCountText error: " + e.getMessage());
+        }
+    }
+
+    // ==================== الحسابات ====================
+
+    private void calculateEstimatedGoldValue() {
+        try {
+            if (binding == null || binding.etGrossWeight == null) return;
+
+            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+            if (weightStr.isEmpty()) {
+                resetCalculatedDisplay();
+                return;
+            }
+
+            double grossWeight = Double.parseDouble(weightStr);
+            if (grossWeight <= 0) {
+                resetCalculatedDisplay();
+                return;
+            }
+
+            double stoneWeightCarats = 0.0;
+            double stoneValue = 0.0;
+
+            if (binding.switchHasStones.isChecked()) {
+                String sWeight = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
+                String sValue = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
+
+                if (!sWeight.isEmpty()) stoneWeightCarats = Double.parseDouble(sWeight);
+                if (!sValue.isEmpty()) stoneValue = Double.parseDouble(sValue);
+            }
+
+            int karat = getSelectedKaratNumber();
+            double[] pricing = PricingCalculator.calculatePricingDetails(grossWeight, stoneWeightCarats, stoneValue, karat, priceManager);
+            double totalPrice = pricing[5];
+
+            String formattedPrice = priceManager.formatPriceDefault(totalPrice);
+            binding.tvEstimatedGoldValue.setText(formattedPrice);
+            binding.tvSummaryPrice.setText(formattedPrice);
+
+        } catch (NumberFormatException e) {
+            resetCalculatedDisplay();
+        } catch (Exception e) {
+            Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage(), e);
+        }
+    }
+
+    private void resetCalculatedDisplay() {
+        try {
+            if (binding == null) return;
+            String zeroText = "0.00 " + priceManager.getCurrencySymbol(priceManager.getDefaultCurrency());
+            binding.tvEstimatedGoldValue.setText(zeroText);
+            binding.tvSummaryPrice.setText(zeroText);
+        } catch (Exception e) {
+            Log.e(TAG, "resetCalculatedDisplay error: " + e.getMessage());
+        }
+    }
+
+    private int getSelectedKaratNumber() {
+        try {
+            if (binding == null) return 21;
+            int checkedId = binding.chipGroupKarat.getCheckedChipId();
+            if (checkedId == binding.chip24K.getId()) return 24;
+            if (checkedId == binding.chip21K.getId()) return 21;
+            if (checkedId == binding.chip18K.getId()) return 18;
+            if (checkedId == binding.chip14K.getId()) return 14;
+        } catch (Exception e) {
+            Log.e(TAG, "getSelectedKaratNumber error: " + e.getMessage());
+        }
+        return 21;
+    }
+
+    private String getSelectedKaratCode() {
+        return getSelectedKaratNumber() + "K";
+    }
+
+    private String getSelectedCategory() {
+        try {
+            if (binding == null) return isArabic ? "مجوهرات" : "Jewelry";
+            int checkedId = binding.chipGroupTypes.getCheckedChipId();
+            if (checkedId == binding.chipRing.getId()) return isArabic ? "خواتم" : "Rings";
+            if (checkedId == binding.chipSet.getId()) return isArabic ? "أطقم" : "Sets";
+            if (checkedId == binding.chipBracelet.getId()) return isArabic ? "أساور" : "Bracelets";
+            if (checkedId == binding.chipNecklace.getId()) return isArabic ? "عقود" : "Necklaces";
+        } catch (Exception e) {
+            Log.e(TAG, "getSelectedCategory error: " + e.getMessage());
+        }
+        return isArabic ? "مجوهرات" : "Jewelry";
+    }
+
+    // ==================== المستمعون ====================
 
     private void setupListeners() {
         try {
@@ -489,8 +467,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
                     return;
                 }
-                if (photoPaths.size() >= MAX_PHOTOS) {
-                    showToast(isArabic ? "⚠️ الحد الأقصى " + MAX_PHOTOS + " صور" : "⚠️ Maximum " + MAX_PHOTOS + " photos");
+                if (photoManager.getPhotoCount() >= 5) {
+                    showToast(isArabic ? "⚠️ الحد الأقصى 5 صور" : "⚠️ Maximum 5 photos");
                     return;
                 }
                 if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
@@ -521,7 +499,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void toggleStonesDetails(boolean show) {
         if (binding == null || binding.layoutStonesDetails == null) return;
-        
+
         if (show) {
             binding.layoutStonesDetails.setVisibility(View.VISIBLE);
             binding.layoutStonesDetails.setAlpha(0f);
@@ -530,14 +508,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 .alpha(1f)
                 .translationY(0f)
                 .setDuration(250)
-                .setInterpolator(new AccelerateDecelerateInterpolator())
                 .start();
         } else {
             binding.layoutStonesDetails.animate()
                 .alpha(0f)
                 .translationY(-10f)
                 .setDuration(200)
-                .setInterpolator(new AccelerateDecelerateInterpolator())
                 .withEndAction(() -> {
                     if (binding != null && binding.layoutStonesDetails != null) {
                         binding.layoutStonesDetails.setVisibility(View.GONE);
@@ -547,672 +523,153 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    private int getSelectedKaratNumber() {
-        try {
-            if (binding == null) return 21;
-            int checkedId = binding.chipGroupKarat.getCheckedChipId();
-            if (checkedId == binding.chip24K.getId()) return 24;
-            if (checkedId == binding.chip21K.getId()) return 21;
-            if (checkedId == binding.chip18K.getId()) return 18;
-            if (checkedId == binding.chip14K.getId()) return 14;
-        } catch (Exception e) {
-            Log.e(TAG, "getSelectedKaratNumber error: " + e.getMessage());
-        }
-        return 21;
-    }
+    // ==================== RFID ====================
 
-    private String getSelectedKaratCode() {
-        return getSelectedKaratNumber() + "K";
-    }
-
-    private void calculateEstimatedGoldValue() {
-        try {
-            if (binding == null || binding.etGrossWeight == null) return;
-
-            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-            if (weightStr.isEmpty()) {
-                resetCalculatedDisplay();
-                return;
-            }
-
-            double grossWeight = Double.parseDouble(weightStr);
-            if (grossWeight <= 0) {
-                resetCalculatedDisplay();
-                return;
-            }
-
-            double stoneWeightGrams = 0.0;
-            double stoneValue = 0.0;
-
-            if (binding.switchHasStones.isChecked()) {
-                String sWeight = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
-                String sValue = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
-
-                if (!sWeight.isEmpty()) {
-                    stoneWeightGrams = Double.parseDouble(sWeight) * CARAT_TO_GRAM_FACTOR;
-                }
-                if (!sValue.isEmpty()) {
-                    stoneValue = Double.parseDouble(sValue);
-                }
-            }
-
-            double netGoldWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
-            int karat = getSelectedKaratNumber();
-
-            MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(karat, netGoldWeight);
-            double totalPrice = details.finalPrice + stoneValue;
-
-            String formattedPrice = priceManager.formatPriceDefault(totalPrice);
-            binding.tvEstimatedGoldValue.setText(formattedPrice);
-            binding.tvSummaryPrice.setText(formattedPrice);
-
-        } catch (NumberFormatException e) {
-            resetCalculatedDisplay();
-        } catch (Exception e) {
-            Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage(), e);
-        }
-    }
-
-    private void resetCalculatedDisplay() {
-        try {
-            if (binding == null) return;
-            String zeroText = "0.00 " + priceManager.getCurrencySymbol(priceManager.getDefaultCurrency());
-            binding.tvEstimatedGoldValue.setText(zeroText);
-            binding.tvSummaryPrice.setText(zeroText);
-        } catch (Exception e) {
-            Log.e(TAG, "resetCalculatedDisplay error: " + e.getMessage());
-        }
-    }
-
-    private double[] calculatePricingDetails(double grossWeight, double stoneWeightGrams, double stoneValue) {
-        int karat = getSelectedKaratNumber();
-        double netWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
-
-        MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(karat, netWeight);
-        double finalPrice = details.finalPrice + stoneValue;
-        
-        return new double[]{
-            details.baseGoldCost,
-            details.totalMakingCost,
-            stoneValue,
-            details.baseGoldCost + details.totalMakingCost,
-            details.profitAmount,
-            finalPrice,
-            netWeight
-        };
-    }
-
-    @Override
-    public void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (currentPhotoPath != null) {
-            outState.putString("camera_photo_path", currentPhotoPath);
-        }
-    }
-
-    private Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
-        if (gs1Data == null || gs1Data.trim().isEmpty()) return null;
-        try {
-            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_SQUARE);
-            hints.put(EncodeHintType.MARGIN, 0);
-
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(gs1Data, BarcodeFormat.DATA_MATRIX, width, height, hints);
-
-            int w = bitMatrix.getWidth();
-            int h = bitMatrix.getHeight();
-            int[] pixels = new int[w * h];
-            for (int y = 0; y < h; y++) {
-                int offset = y * w;
-                for (int x = 0; x < w; x++) {
-                    pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
-                }
-            }
-            Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            bitmap.setPixels(pixels, 0, w, 0, 0, w, h);
-            return bitmap;
-        } catch (Exception e) {
-            Log.e(TAG, "Error generating GS1 DataMatrix: " + e.getMessage());
-            return null;
-        }
-    }
-
-    private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
-        if (qrContent == null || qrContent.trim().isEmpty()) return null;
-        try {
-            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
-            hints.put(EncodeHintType.MARGIN, 1);
-            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-
-            int scaleFactor = 4;
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(qrContent, BarcodeFormat.QR_CODE, width * scaleFactor, height * scaleFactor, hints);
-
-            int matrixWidth = bitMatrix.getWidth();
-            int matrixHeight = bitMatrix.getHeight();
-            int[] pixels = new int[matrixWidth * matrixHeight];
-
-            for (int y = 0; y < matrixHeight; y++) {
-                int offset = y * matrixWidth;
-                for (int x = 0; x < matrixWidth; x++) {
-                    pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
-                }
-            }
-
-            Bitmap highResBitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
-            highResBitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
-            
-            Bitmap finalBitmap = Bitmap.createScaledBitmap(highResBitmap, width, height, true);
-            if (highResBitmap != finalBitmap) highResBitmap.recycle();
-            
-            return finalBitmap;
-        } catch (Exception e) {
-            Log.e(TAG, "Error generating Micro QR Code", e);
-            return null;
-        }
-    }
-
-    private void finalizeItemIdentity() {
-        if (isFormLocked) {
-            showToast(isArabic ? "⛔ العملية قيد التنفيذ، يرجى الانتظار..." : "⛔ Operation in progress...");
-            return;
-        }
-        
+    private void activateRFIDModeForEncoding() {
         if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
 
-        isFormLocked = true;
-        if (binding != null && binding.btnSaveIdentity != null) {
-            binding.btnSaveIdentity.setEnabled(false);
-            binding.btnSaveIdentity.setAlpha(0.5f);
-        }
-        
         try {
-            if (binding == null) {
-                unlockFormFast();
-                return;
-            }
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                isRfidScanning = true;
+                if (binding != null) {
+                    binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
+                    binding.tvStatusBadge.setText("SCANNING...");
+                }
 
-            String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
-            String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
-            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+                activity.setActiveRfidListener(epc -> {
+                    final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
 
-            if (!validateInputData(epc, title, weightStr)) {
-                unlockFormFast();
-                return;
-            }
-
-            double grossWeight = Double.parseDouble(weightStr);
-            String stoneType = "";
-            double stoneWeightCarats = 0;
-            int stoneCount = 0;
-            double stoneValue = 0;
-
-            if (binding.switchHasStones.isChecked()) {
-                stoneType = binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
-                String stoneWeightStr = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
-                String stoneCountStr = binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
-                String stoneValueStr = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
-
-                if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
-                if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
-                if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
-            }
-
-            double stoneWeightGrams = stoneWeightCarats * CARAT_TO_GRAM_FACTOR;
-            if (stoneWeightGrams >= grossWeight) {
-                showValidationError(isArabic ? "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي للقطعة!" : "❌ Stone weight cannot exceed gross weight!");
-                unlockFormFast();
-                return;
-            }
-
-            double[] pricing = calculatePricingDetails(grossWeight, stoneWeightGrams, stoneValue);
-            final double netGoldWeight = pricing[6];
-            final int selectedKaratNum = getSelectedKaratNumber();
-            MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(selectedKaratNum, netGoldWeight);
-            
-            final String localCurrency = priceManager.getDefaultCurrency();
-            final double finalPriceUSD = details.finalPrice + stoneValue;
-            final double finalPriceLocal = priceManager.convertFromUSD(finalPriceUSD, localCurrency);
-            final double exchangeRate = priceManager.getExchangeRate(localCurrency);
-
-            setFormEnabled(false);
-
-            final AlertDialog loadingDialog = showProfessionalLoadingDialog(
-                    isArabic ? "🔄 جاري التكويد وإنشاء الأكواد المجهرية..." : "🔄 Encoding & Generating Micro-Codes...",
-                    isArabic ? "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات" : "Please wait - saving item in database"
-            );
-
-            final String finalEpc = epc;
-            final String finalTitle = title;
-            final double fGrossWeight = grossWeight;
-            final double fStoneWeightCarats = stoneWeightCarats;
-            final int fStoneCount = stoneCount;
-            final double fStoneValue = stoneValue;
-            final String fStoneType = stoneType;
-            final String selectedKarat = getSelectedKaratCode();
-            final String selectedCategory = getSelectedCategory();
-            final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
-            final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-            final List<String> finalPhotoPaths = new ArrayList<>(photoPaths);
-            final int currentUserId = getCurrentUserId();
-            MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
-            final String tid = rfidService.readTid("00000000");
-            final boolean isSim = rfidService.isSimulationMode();
-            
-            executorService.execute(() -> {
-                try {
-                    JSONObject payload = buildPayload(
-                        finalEpc, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
-                        fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
-                        details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
-                        localCurrency, exchangeRate, selectedCategory, location,
-                        branchId, currentUserId, tid, isSim, finalPhotoPaths
-                    );
-
-                    boolean apiSuccess = false;
-                    int serverItemId = 0;
-                    String errorMessage = null;
-                    boolean isNetworkError = false;
-                    JSONObject responseDataObj = null;
-
-                    if (apiClient != null) {
-                        try {
-                            MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                            if (response != null) {
-                                apiSuccess = response.isSuccess;
-                                responseDataObj = response.data;
-                                if (response.isSuccess) {
-                                    if (response.data != null) serverItemId = response.data.optInt("item_id", 0);
-                                    if (response.message != null && !response.message.isEmpty()) errorMessage = response.message;
-                                } else {
-                                    errorMessage = extractErrorMessage(response);
-                                    isNetworkError = response.isNetworkError;
-                                }
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "API call exception", e);
-                            errorMessage = e.getMessage();
-                            isNetworkError = true;
-                        }
-                    }
-
-                    final boolean success = apiSuccess;
-                    final int finalServerItemId = serverItemId;
-                    final String finalErrorMessage = errorMessage;
-                    final boolean networkError = isNetworkError;
-                    final JSONObject finalResponseData = responseDataObj;
-
-                    safeRun(() -> {
-                        dismissDialog(loadingDialog);
-
-                        if (success) {
-                            playSuccessSound();
-                            executorService.execute(() -> removePendingEncode(finalEpc));
-                            notifyDashboardUpdate("encode_success");
-                            
-                            if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
-                                uploadItemImages(finalServerItemId, finalPhotoPaths);
-                            }
-                            
-                            String activeEpc = finalEpc;
-                            String gs1Code = "(01)0729000000" + (finalServerItemId > 0 ? String.format(Locale.US, "%05d", finalServerItemId) : "00000") + "(21)" + activeEpc;
-                            String qrUrl = "https://ibreg.org/id/" + (finalServerItemId > 0 ? finalServerItemId : activeEpc);
-
-                            if (finalResponseData != null) {
-                                activeEpc = finalResponseData.optString("epc", activeEpc);
-                                JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
-                                if (gs1Obj != null) {
-                                    gs1Code = gs1Obj.optString("raw_fnc1", gs1Code);
-                                    qrUrl = gs1Obj.optString("digital_link", qrUrl);
-                                } else {
-                                    if (finalResponseData.has("gs1_datamatrix")) gs1Code = finalResponseData.optString("gs1_datamatrix");
-                                    else if (finalResponseData.has("gs1_code")) gs1Code = finalResponseData.optString("gs1_code");
-                                    if (finalResponseData.has("qr_url")) qrUrl = finalResponseData.optString("qr_url");
-                                }
+                    executorService.execute(() -> {
+                        boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedEpc);
+                        safeRun(() -> {
+                            if (isDuplicate) {
+                                playErrorSound();
+                                showErrorDialog(
+                                    isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag",
+                                    isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل." : "This tag (" + normalizedEpc + ") is already registered."
+                                );
+                                stopRfidScanningMode();
+                                return;
                             }
 
                             if (binding != null && binding.etEpc != null) {
-                                binding.etEpc.setText("");
+                                binding.etEpc.setText(normalizedEpc);
+                                binding.tvStatusBadge.setText("BOUND");
                             }
-
-                            showEncodingSuccessDialogEnhanced(
-                                    finalTitle, activeEpc, tid, gs1Code, qrUrl,
-                                    String.valueOf(fGrossWeight), selectedKarat,
-                                    finalPriceLocal, localCurrency, finalPhotoPaths
-                            );
-
-                        } else if (networkError) {
-                            executorService.execute(() -> {
-                                saveEncodeOffline(payload);
-                                safeRun(this::updatePendingSyncBadge);
-                            });
-                            showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
-                            unlockFormFast();
-                            setFormEnabled(true);
-                        } else {
-                            String errorMsg = finalErrorMessage != null ? finalErrorMessage : 
-                                (isArabic ? "❌ فشل التكويد" : "❌ Encoding failed");
-                            showErrorDialog(isArabic ? "خطأ في التكويد" : "Encoding Error", errorMsg);
-                            unlockFormFast();
-                            setFormEnabled(true);
-                        }
+                            playSuccessSound();
+                            stopRfidScanningMode();
+                        });
                     });
-                } catch (Exception e) {
-                    Log.e(TAG, "Background execution error: " + e.getMessage(), e);
-                    safeRun(() -> {
-                        dismissDialog(loadingDialog);
-                        unlockFormFast();
-                        setFormEnabled(true);
-                        showErrorDialog(isArabic ? "خطأ للنظام" : "System Error", e.getMessage());
-                    });
-                }
-            });
-        } catch (NumberFormatException e) {
-            showValidationError(isArabic ? "❌ خطأ في الأرقام المدخلة" : "❌ Invalid number format");
-            unlockFormFast();
-        } catch (Exception e) {
-            Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage(), e);
-            unlockFormFast();
-            setFormEnabled(true);
-            showToast("❌ " + e.getMessage());
-        }
-    }
+                });
 
-    private void unlockFormFast() {
-        isFormLocked = false;
-        if (binding != null && binding.btnSaveIdentity != null) {
-            boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
-            binding.btnSaveIdentity.setEnabled(canEdit);
-            binding.btnSaveIdentity.setAlpha(canEdit ? 1.0f : 0.5f);
-        }
-    }
+                activity.startUHFScan();
+                showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
 
-    private String extractErrorMessage(MiraApiClient.ApiResponse response) {
-        if (response == null) return isArabic ? "❌ خطأ غير معروف" : "❌ Unknown error";
-        if (response.data != null) {
-            try {
-                JSONObject errorObj = response.data.optJSONObject("error");
-                if (errorObj != null) {
-                    String message = errorObj.optString("message", "");
-                    String messageEn = errorObj.optString("message_en", "");
-                    String displayMessage = isArabic ? message : messageEn;
-                    if (displayMessage.isEmpty()) displayMessage = message.isEmpty() ? messageEn : message;
-                    
-                    JSONObject details = errorObj.optJSONObject("details");
-                    if (details != null) {
-                        String suggestion = details.optString("suggestion", "");
-                        if (!suggestion.isEmpty()) displayMessage += "\n\n💡 " + suggestion;
-                    }
-                    return displayMessage;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error extracting error message", e);
+                if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
+                rfidTimeoutRunnable = this::stopRfidScanningMode;
+                handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
             }
+        } catch (Exception e) {
+            Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
         }
-        if (response.message != null && !response.message.isEmpty()) return response.message;
-        if (response.error != null && !response.error.isEmpty()) return response.error;
-        return isArabic ? "❌ فشل العملية" : "❌ Operation failed";
     }
 
-    @Override
-    protected AlertDialog showErrorDialog(String title, String message) {
-        if (getContext() == null || !isAdded()) return null;
-        return new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(title)
-            .setMessage(message)
-            .setIcon(R.drawable.ic_error_outline)
-            .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
-            .setCancelable(false)
-            .show();
+    private void stopRfidScanningMode() {
+        try {
+            isRfidScanning = false;
+            if (rfidTimeoutRunnable != null) {
+                handler.removeCallbacks(rfidTimeoutRunnable);
+                rfidTimeoutRunnable = null;
+            }
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                activity.stopUHFScan();
+                activity.setActiveRfidListener(null);
+            }
+            if (binding != null && binding.btnScanRfid != null) {
+                binding.btnScanRfid.setText(isArabic ? "مسح رمز RFID" : "Scan RFID Tag");
+                if ("SCANNING...".equals(binding.tvStatusBadge.getText().toString())) {
+                    binding.tvStatusBadge.setText("WAITING");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "stopRfidScanningMode error: " + e.getMessage(), e);
+        }
     }
 
-    public void validateAndProcessEpc(String scannedEpc) {
-        if (scannedEpc == null || scannedEpc.trim().isEmpty()) {
-            showErrorDialog(isArabic ? "خطأ" : "Error", isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag.");
-            return;
-        }
-
-        final String normalizedEpc = scannedEpc.trim().toUpperCase(Locale.US);
+    public void onRfidScanned(String epc) {
+        if (!isAdded() || getActivity() == null) return;
+        final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
 
         executorService.execute(() -> {
-            boolean isDuplicate = isEpcDuplicateLocally(normalizedEpc);
+            boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedEpc);
             safeRun(() -> {
+                if (binding == null) return;
                 if (isDuplicate) {
                     playErrorSound();
                     showErrorDialog(
-                        isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                        isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل في قائمة الانتظار أو الكاش المحلي." 
-                                 : "This tag (" + normalizedEpc + ") is already stored in local pending items or cache."
+                        isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag",
+                        isArabic ? "هذه الشريحة مسجلة بالفعل." : "This tag is already registered."
                     );
+                    stopRfidScanningMode();
                     return;
                 }
 
-                if (binding != null && binding.etEpc != null) {
-                    binding.etEpc.setText(normalizedEpc);
-                    binding.tvStatusBadge.setText("BOUND");
-                    playSuccessSound();
-                }
+                binding.etEpc.setText(normalizedEpc);
+                binding.tvStatusBadge.setText("BOUND");
+                playSuccessSound();
+                stopRfidScanningMode();
             });
         });
     }
 
-    private boolean validateInputData(String epc, String title, String weightStr) {
-        if (title.isEmpty()) {
-            showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title");
-            return false;
-        }
-        if (title.length() < 3) {
-            showValidationError(isArabic ? "العنوان قصير جداً" : "Title is too short");
-            return false;
-        }
-        if (weightStr.isEmpty()) {
-            showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight");
-            return false;
-        }
-        
+    // ==================== الاقتراحات ====================
+
+    private void populateSuggestions(String typeKey) {
         try {
-            double weight = Double.parseDouble(weightStr);
-            if (weight <= 0) {
-                showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
-                return false;
-            }
-            if (weight > 10000) {
-                showValidationError(isArabic ? "الوزن كبير جداً" : "Weight is too large");
-                return false;
-            }
-        } catch (NumberFormatException e) {
-            showValidationError(isArabic ? "صيغة الوزن غير صحيحة" : "Invalid weight format");
-            return false;
-        }
-        
-        return true;
-    }
-
-    private JSONObject buildPayload(
-        String epc, String title, String karat, double grossWeight, double netWeight,
-        double stoneWeightCarats, int stoneCount, double stoneValue, String stoneType,
-        MiraPriceManager.PricingDetails details, int karatNum, double priceUSD,
-        double priceLocal, String currency, double exchangeRate, String category,
-        String location, int branchId, int userId, String tid, boolean isSim,
-        List<String> photoPathsList) throws Exception {
-    
-        JSONObject payload = new JSONObject();
-        if (epc != null && !epc.isEmpty()) payload.put("epc", epc);
-        
-        payload.put("title", title);
-        payload.put("purity_code", karat);
-        payload.put("gross_weight", grossWeight);
-        payload.put("net_weight", netWeight);
-        payload.put("stone_weight", stoneWeightCarats);
-        payload.put("stone_count", stoneCount);
-        payload.put("stone_value", stoneValue);
-        payload.put("stone_type", stoneType);
-        
-        payload.put("gold_price_per_gram", details.gramPrice);
-        payload.put("gold_value", details.baseGoldCost);
-        payload.put("making_per_gram", priceManager.getMakingCharge(karatNum));
-        payload.put("making_charge", details.totalMakingCost);
-        payload.put("total_cost", details.baseGoldCost + details.totalMakingCost);
-        payload.put("profit_margin", priceManager.getProfitMargin(karatNum));
-        payload.put("profit_amount", details.profitAmount);
-        
-        payload.put("retail_price_usd", priceUSD);
-        payload.put("retail_price", priceUSD);
-        payload.put("retail_price_local", priceLocal);
-        payload.put("currency", "USD");
-        payload.put("local_currency", currency);
-        payload.put("exchange_rate", exchangeRate);
-        payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
-        
-        payload.put("category", category);
-        payload.put("location", location);
-        payload.put("branch_id", branchId);
-        payload.put("user_id", userId);
-        
-        if (tid != null && !tid.isEmpty()) payload.put("rfid_tid", tid);
-
-        if (!photoPathsList.isEmpty()) {
-            JSONArray imagesArray = new JSONArray();
-            for (String path : photoPathsList) imagesArray.put(path);
-            payload.put("image_paths", imagesArray);
-        }
-        
-        return payload;
-    }
-
-    private void showPendingItemsDialog() {
-        if (offlineCache == null || !isAdded() || getContext() == null) return;
-
-        executorService.execute(() -> {
-            try {
-                String json = offlineCache.getString("pending_encodes", "[]");
-                JSONArray arr = new JSONArray(json);
-
-                safeRun(() -> {
-                    if (!isAdded() || getContext() == null) return;
-                    if (arr.length() == 0) {
-                        showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
-                        return;
-                    }
-
-                    StringBuilder builder = new StringBuilder();
-                    for (int i = 0; i < arr.length(); i++) {
-                        JSONObject item = arr.optJSONObject(i);
-                        if (item != null) {
-                            builder.append("• ")
-                                    .append(item.optString("title"))
-                                    .append(" | ")
-                                    .append(item.optString("epc"))
-                                    .append(" (")
-                                    .append(item.optDouble("gross_weight"))
-                                    .append("g)\n");
-                        }
-                    }
-
-                    new MaterialAlertDialogBuilder(requireContext())
-                            .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
-                            .setMessage(builder.toString())
-                            .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> executorService.execute(this::syncPendingEncodes))
-                            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                            .show();
+            if (binding == null) return;
+            binding.chipGroupSuggestions.removeAllViews();
+            String[] suggestions = getSuggestions(typeKey);
+            if (suggestions == null || getContext() == null) return;
+            for (String suggestion : suggestions) {
+                Chip chip = new Chip(requireContext());
+                chip.setText(suggestion);
+                chip.setClickable(true);
+                chip.setCheckable(false);
+                chip.setOnClickListener(v -> {
+                    if (binding != null) binding.etTitle.setText(suggestion);
                 });
-            } catch (Exception e) {
-                Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
+                binding.chipGroupSuggestions.addView(chip);
             }
-        });
-    }
-
-    private void setupPhotoLaunchers() {
-        requestPermissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestPermission(),
-                isGranted -> {
-                    if (isGranted) openCamera();
-                    else showToast(isArabic ? "صلاحية الكاميرا مطلوبة" : "Camera permission required");
-                }
-        );
-
-        takePhotoLauncher = registerForActivityResult(
-                new ActivityResultContracts.TakePicture(),
-                success -> {
-                    if (success && currentPhotoPath != null) {
-                        executorService.execute(() -> {
-                            String compressedPath = compressImage(currentPhotoPath);
-                            if (compressedPath != null) {
-                                safeRun(() -> {
-                                    photoPaths.add(compressedPath);
-                                    onPhotosUpdated();
-                                });
-                            }
-                        });
-                    }
-                }
-        );
-
-        pickImageLauncher = registerForActivityResult(
-                new ActivityResultContracts.OpenMultipleDocuments(),
-                uris -> {
-                    if (uris != null && !uris.isEmpty()) {
-                        executorService.execute(() -> {
-                            int remainingSlots = MAX_PHOTOS - photoPaths.size();
-                            int count = 0;
-                            List<String> newCompressedPaths = new ArrayList<>();
-                            
-                            for (Uri uri : uris) {
-                                if (count >= remainingSlots) break;
-                                String path = copyImageToInternalStorage(uri);
-                                if (path != null) {
-                                    String compressedPath = compressImage(path);
-                                    if (compressedPath != null) {
-                                        newCompressedPaths.add(compressedPath);
-                                        count++;
-                                    }
-                                }
-                            }
-                            
-                            final boolean hitLimit = uris.size() > remainingSlots;
-                            safeRun(() -> {
-                                photoPaths.addAll(newCompressedPaths);
-                                onPhotosUpdated();
-                                if (hitLimit) {
-                                    showToast(isArabic ? "⚠️ تم الوصول للحد الأقصى" : "⚠️ Maximum photos reached");
-                                }
-                            });
-                        });
-                    }
-                }
-        );
-    }
-
-    private String compressImage(String imagePath) {
-        try {
-            File imageFile = new File(imagePath);
-            if (!imageFile.exists()) return null;
-            if (imageFile.length() < 500 * 1024) return imagePath;
-            
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inSampleSize = 2;
-            
-            Bitmap bitmap = BitmapFactory.decodeFile(imagePath, options);
-            if (bitmap == null) return imagePath;
-            
-            String compressedPath = imagePath.replace(".jpg", "_compressed.jpg");
-            FileOutputStream outputStream = new FileOutputStream(compressedPath);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, IMAGE_COMPRESSION_QUALITY, outputStream);
-            outputStream.close();
-            bitmap.recycle();
-            
-            if (!compressedPath.equals(imagePath) && imageFile.exists()) {
-                imageFile.delete();
-            }
-            return compressedPath;
         } catch (Exception e) {
-            Log.e(TAG, "compressImage error: " + e.getMessage());
-            return imagePath;
+            Log.e(TAG, "populateSuggestions error: " + e.getMessage(), e);
         }
     }
+
+    private String[] getSuggestions(String typeKey) {
+        if (isArabic) {
+            switch (typeKey) {
+                case "rings": return new String[]{"خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي", "خاتم خطوبة مميز"};
+                case "sets": return new String[]{"طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس", "طقم سهرة فاخر"};
+                case "bracelets": return new String[]{"بناجر / أساور خليجي", "سوار تنادي عصري", "سوار ذهبي كلاسيك"};
+                case "necklaces": return new String[]{"عقد شوكر عصري", "سلسلة ذهبية ناعمة", "عقد لؤلؤ فاخر"};
+            }
+        } else {
+            switch (typeKey) {
+                case "rings": return new String[]{"Diamond Solitaire Ring", "Classic Band Ring", "Twins Ring", "Engagement Ring"};
+                case "sets": return new String[]{"Complete Bridal Set", "Royal Diamond Set", "Luxury Evening Set"};
+                case "bracelets": return new String[]{"Khaleeji Bangle", "Modern Tennis Bracelet", "Classic Gold Bracelet"};
+                case "necklaces": return new String[]{"Modern Choker", "Fine Gold Chain", "Luxury Pearl Necklace"};
+            }
+        }
+        return null;
+    }
+
+    // ==================== الصور ====================
 
     private void showImageSourceDialog() {
         if (getContext() == null || !isAdded()) return;
@@ -1276,48 +733,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         return image;
     }
 
-    private String copyImageToInternalStorage(Uri uri) {
-        try {
-            if (getContext() == null) return null;
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            File storageDir = getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-            File destFile = new File(storageDir, "MIRA_" + timeStamp + "_" + System.currentTimeMillis() + ".jpg");
-
-            try (InputStream inputStream = getContext().getContentResolver().openInputStream(uri);
-                 FileOutputStream outputStream = new FileOutputStream(destFile)) {
-                
-                byte[] buffer = new byte[4096];
-                int length;
-                while ((length = inputStream.read(buffer)) > 0) {
-                    outputStream.write(buffer, 0, length);
-                }
-            }
-            return destFile.getAbsolutePath();
-        } catch (Exception e) {
-            Log.e(TAG, "copyImageToInternalStorage error: " + e.getMessage(), e);
-            return null;
-        }
-    }
-
-    private void onPhotosUpdated() {
-        if (photosAdapter != null) photosAdapter.notifyDataSetChanged();
-        updatePhotosCountText();
-        if (binding != null && binding.rvPhotosPreview != null) {
-            binding.rvPhotosPreview.setVisibility(photoPaths.isEmpty() ? View.GONE : View.VISIBLE);
-        }
-    }
-
-    private void updatePhotosCountText() {
-        try {
-            if (binding == null || binding.tvPhotosCount == null) return;
-            int count = photoPaths.size();
-            binding.tvPhotosCount.setText(count == 0 ?
-                    (isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet") :
-                    (isArabic ? "تم إرفاق (" + count + "/" + MAX_PHOTOS + ") صور" : "Attached (" + count + "/" + MAX_PHOTOS + ") photos"));
-        } catch (Exception e) {
-            Log.e(TAG, "updatePhotosCountText error: " + e.getMessage());
-        }
-    }
+    // ==================== الباركود ====================
 
     private void openBarcodeScannerForEPC() {
         try {
@@ -1346,362 +762,400 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    private void activateRFIDModeForEncoding() {
+    // ==================== الحفظ والتكويد ====================
+
+    private void finalizeItemIdentity() {
+        if (isFormLocked) {
+            showToast(isArabic ? "⛔ العملية قيد التنفيذ، يرجى الانتظار..." : "⛔ Operation in progress...");
+            return;
+        }
+
         if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
-        
+
+        isFormLocked = true;
+        if (binding != null && binding.btnSaveIdentity != null) {
+            binding.btnSaveIdentity.setEnabled(false);
+            binding.btnSaveIdentity.setAlpha(0.5f);
+        }
+
         try {
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity activity = (UHFMainActivity) getActivity();
-                isRfidScanning = true;
-                if (binding != null) {
-                    binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
-                    binding.tvStatusBadge.setText("SCANNING...");
-                }
-
-                activity.setActiveRfidListener(epc -> {
-                    final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
-                    
-                    executorService.execute(() -> {
-                        boolean isDuplicate = isEpcDuplicateLocally(normalizedEpc);
-                        safeRun(() -> {
-                            if (isDuplicate) {
-                                playErrorSound();
-                                showErrorDialog(
-                                    isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                                    isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل. يرجى استخدام شريحة جديدة." 
-                                             : "This tag (" + normalizedEpc + ") is already registered. Please use a new tag."
-                                );
-                                if (binding != null) binding.tvStatusBadge.setText("DUPLICATE");
-                                stopRfidScanningMode();
-                                return;
-                            }
-                            
-                            if (binding != null && binding.etEpc != null) {
-                                binding.etEpc.setText(normalizedEpc);
-                                binding.tvStatusBadge.setText("BOUND");
-                            }
-                            playSuccessSound();
-                            stopRfidScanningMode();
-                        });
-                    });
-                });
-
-                activity.startUHFScan();
-                showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
-
-                if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
-                rfidTimeoutRunnable = this::stopRfidScanningMode;
-                handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
-        }
-    }
-
-    private void stopRfidScanningMode() {
-        try {
-            isRfidScanning = false;
-            if (rfidTimeoutRunnable != null) {
-                handler.removeCallbacks(rfidTimeoutRunnable);
-                rfidTimeoutRunnable = null;
-            }
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity activity = (UHFMainActivity) getActivity();
-                activity.stopUHFScan();
-                activity.setActiveRfidListener(null);
-            }
-            if (binding != null && binding.btnScanRfid != null) {
-                binding.btnScanRfid.setText(isArabic ? "مسح رمز RFID" : "Scan RFID Tag");
-                if ("SCANNING...".equals(binding.tvStatusBadge.getText().toString())) {
-                    binding.tvStatusBadge.setText("WAITING");
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "stopRfidScanningMode error: " + e.getMessage(), e);
-        }
-    }
-
-    public void onRfidScanned(String epc) {
-        if (!isAdded() || getActivity() == null) return;
-        final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
-        
-        executorService.execute(() -> {
-            boolean isDuplicate = isEpcDuplicateLocally(normalizedEpc);
-            safeRun(() -> {
-                if (binding == null) return;
-                if (isDuplicate) {
-                    playErrorSound();
-                    showErrorDialog(
-                        isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                        isArabic ? "هذه الشريحة مسجلة بالفعل." : "This tag is already registered."
-                    );
-                    stopRfidScanningMode();
-                    return;
-                }
-                
-                binding.etEpc.setText(normalizedEpc);
-                binding.tvStatusBadge.setText("BOUND");
-                playSuccessSound();
-                stopRfidScanningMode();
-            });
-        });
-    }
-
-    private void populateSuggestions(String typeKey) {
-        try {
-            if (binding == null) return;
-            binding.chipGroupSuggestions.removeAllViews();
-            String[] suggestions = typeSuggestions.get(typeKey);
-            if (suggestions == null || getContext() == null) return;
-            for (String suggestion : suggestions) {
-                Chip chip = new Chip(requireContext());
-                chip.setText(suggestion);
-                chip.setClickable(true);
-                chip.setCheckable(false);
-                chip.setOnClickListener(v -> {
-                    if (binding != null) binding.etTitle.setText(suggestion);
-                });
-                binding.chipGroupSuggestions.addView(chip);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "populateSuggestions error: " + e.getMessage(), e);
-        }
-    }
-
-    private void showEncodingSuccessDialogEnhanced(
-        String title, String epc, String tid, String gs1Code, String qrUrl,
-        String weight, String karat, double finalPrice, String currency, List<String> photos) {
-
-        if (!isAdded() || getContext() == null) return;
-
-        BottomSheetDialog successDialog = new BottomSheetDialog(requireContext());
-        View view = getLayoutInflater().inflate(R.layout.dialog_mira_identity_summary, null);
-        successDialog.setContentView(view);
-
-        successDialog.setCancelable(false);
-        successDialog.setCanceledOnTouchOutside(false);
-
-        TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
-        TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
-        TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
-        TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
-        TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
-
-        ImageView ivGs1DataMatrix = view.findViewById(R.id.ivGs1DataMatrix);
-        ImageView ivQrCode = view.findViewById(R.id.ivQrCode);
-        MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
-        
-        View printView = view.findViewById(R.id.btnPrintTag);
-        if (printView instanceof MaterialButton) {
-            MaterialButton btnPrintTag = (MaterialButton) printView;
-            btnPrintTag.setVisibility(View.VISIBLE);
-            btnPrintTag.setOnClickListener(v -> executorService.execute(() -> {
-                Bitmap tagToPrint = generatePhysicalTagBitmap(epc, gs1Code, qrUrl);
-                safeRun(() -> printTagDirectly(tagToPrint));
-            }));
-        }
-
-        if (tvIdTitle != null) tvIdTitle.setText(title);
-        if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
-        if (tvIdMetalKarat != null) tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
-        if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
-        if (tvIdPrice != null && priceManager != null) {
-            tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice) + " " + currency);
-        }
-
-        // توليد باركودات التصدير أوفلاين في خيط خلفي
-        executorService.execute(() -> {
-            Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty()) ? generateGS1DataMatrix(gs1Code, 250, 250) : null;
-            Bitmap qrBitmap = (qrUrl != null && !qrUrl.isEmpty()) ? generateMicroQRCode(qrUrl, 250, 250) : null;
-
-            safeRun(() -> {
-                if (ivGs1DataMatrix != null && dmBitmap != null) {
-                    ivGs1DataMatrix.setImageBitmap(dmBitmap);
-                    ivGs1DataMatrix.setVisibility(View.VISIBLE);
-                }
-                if (ivQrCode != null && qrBitmap != null) {
-                    ivQrCode.setImageBitmap(qrBitmap);
-                    ivQrCode.setVisibility(View.VISIBLE);
-                }
-            });
-        });
-
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> {
-                successDialog.dismiss();
-                resetFormForNextScan();
-            });
-        }
-
-        successDialog.show();
-    }
-
-    private Bitmap generatePhysicalTagBitmap(String epc, String gs1Data, String qrUrl) {
-        final float MM_TO_PX = 8.0f;
-        int cardWidthPx = Math.round(30 * MM_TO_PX);
-        int cardHeightPx = Math.round(15 * MM_TO_PX);
-        int barcodeSizePx = Math.round(8 * MM_TO_PX);
-        
-        Bitmap tagBitmap = Bitmap.createBitmap(cardWidthPx, cardHeightPx, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(tagBitmap);
-        canvas.drawColor(Color.WHITE);
-
-        Paint titlePaint = new Paint();
-        titlePaint.setColor(Color.BLACK);
-        titlePaint.setAntiAlias(true);
-        titlePaint.setTextSize(2.2f * MM_TO_PX);
-        titlePaint.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
-        titlePaint.setTextAlign(Paint.Align.CENTER);
-
-        canvas.drawText("MIRA JEWELRY RFID", cardWidthPx / 2f, 3 * MM_TO_PX, titlePaint);
-
-        if (gs1Data != null && !gs1Data.isEmpty()) {
-            Bitmap dmBitmap = generateGS1DataMatrix(gs1Data, barcodeSizePx, barcodeSizePx);
-            if (dmBitmap != null) {
-                canvas.drawBitmap(dmBitmap, Math.round(1 * MM_TO_PX), Math.round(4.5f * MM_TO_PX), null);
-                dmBitmap.recycle();
-            }
-        }
-
-        int rfidCenterX = Math.round(15 * MM_TO_PX);
-        int rfidCenterY = Math.round(8.5f * MM_TO_PX);
-
-        Paint rfidPaint = new Paint();
-        rfidPaint.setColor(Color.LTGRAY);
-        rfidPaint.setStyle(Paint.Style.STROKE);
-        rfidPaint.setStrokeWidth(1f);
-
-        int rfidWidth = Math.round(7 * MM_TO_PX);
-        int rfidHeight = Math.round(7 * MM_TO_PX);
-        canvas.drawRect(rfidCenterX - rfidWidth/2f, rfidCenterY - rfidHeight/2f, 
-                        rfidCenterX + rfidWidth/2f, rfidCenterY + rfidHeight/2f, rfidPaint);
-
-        Paint chipPaint = new Paint();
-        chipPaint.setColor(Color.BLACK);
-        canvas.drawCircle(rfidCenterX, rfidCenterY, 1.5f * MM_TO_PX, chipPaint);
-
-        if (qrUrl != null && !qrUrl.isEmpty()) {
-            Bitmap qrBitmap = generateMicroQRCode(qrUrl, barcodeSizePx, barcodeSizePx);
-            if (qrBitmap != null) {
-                int qrX = cardWidthPx - barcodeSizePx - Math.round(1 * MM_TO_PX);
-                canvas.drawBitmap(qrBitmap, qrX, Math.round(4.5f * MM_TO_PX), null);
-                qrBitmap.recycle();
-            }
-        }
-
-        Paint labelPaint = new Paint();
-        labelPaint.setColor(Color.BLACK);
-        labelPaint.setAntiAlias(true);
-        labelPaint.setTextSize(1.8f * MM_TO_PX);
-        labelPaint.setTextAlign(Paint.Align.CENTER);
-
-        canvas.drawText("GS1", 5 * MM_TO_PX, 14 * MM_TO_PX, labelPaint);
-        canvas.drawText("QR", cardWidthPx - (5 * MM_TO_PX), 14 * MM_TO_PX, labelPaint);
-
-        return tagBitmap;
-    }
-
-    private void printTagDirectly(Bitmap tagBitmap) {
-        if (getContext() == null || tagBitmap == null) return;
-        try {
-            if (!PrintHelper.systemSupportsPrint()) {
-                showToast(isArabic ? "⚠️ ميزة الطباعة غير مدعومة على هذا الجهاز" : "⚠️ Printing is not supported on this device");
+            if (binding == null) {
+                unlockFormFast();
                 return;
             }
 
-            PrintHelper printHelper = new PrintHelper(requireContext());
-            printHelper.setScaleMode(PrintHelper.SCALE_MODE_FILL);
-            printHelper.setColorMode(PrintHelper.COLOR_MODE_MONOCHROME);
-            printHelper.setOrientation(PrintHelper.ORIENTATION_LANDSCAPE);
-            
-            printHelper.printBitmap("MIRA_TAG_30x15mm", tagBitmap);
+            String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
+            String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
+            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+
+            if (!validateInputData(epc, title, weightStr)) {
+                unlockFormFast();
+                return;
+            }
+
+            double grossWeight = Double.parseDouble(weightStr);
+            String stoneType = "";
+            double stoneWeightCarats = 0;
+            int stoneCount = 0;
+            double stoneValue = 0;
+
+            if (binding.switchHasStones.isChecked()) {
+                stoneType = binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
+                String stoneWeightStr = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
+                String stoneCountStr = binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
+                String stoneValueStr = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
+
+                if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
+                if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
+                if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
+            }
+
+            double stoneWeightGrams = PricingCalculator.caratsToGrams(stoneWeightCarats);
+            if (stoneWeightGrams >= grossWeight) {
+                showValidationError(isArabic ? "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي للقطعة!" : "❌ Stone weight cannot exceed gross weight!");
+                unlockFormFast();
+                return;
+            }
+
+            int selectedKaratNum = getSelectedKaratNumber();
+            double[] pricing = PricingCalculator.calculatePricingDetails(grossWeight, stoneWeightCarats, stoneValue, selectedKaratNum, priceManager);
+            final double netGoldWeight = pricing[6];
+
+            MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(selectedKaratNum, netGoldWeight);
+
+            final String localCurrency = priceManager.getDefaultCurrency();
+            final double finalPriceUSD = details.finalPrice + stoneValue;
+            final double finalPriceLocal = priceManager.convertFromUSD(finalPriceUSD, localCurrency);
+            final double exchangeRate = priceManager.getExchangeRate(localCurrency);
+
+            setFormEnabled(false);
+
+            final AlertDialog loadingDialog = showProfessionalLoadingDialog(
+                    isArabic ? "🔄 جاري التكويد وإنشاء الأكواد المجهرية..." : "🔄 Encoding & Generating Micro-Codes...",
+                    isArabic ? "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات" : "Please wait - saving item in database"
+            );
+
+            final String finalEpc = epc;
+            final String finalTitle = title;
+            final double fGrossWeight = grossWeight;
+            final double fStoneWeightCarats = stoneWeightCarats;
+            final int fStoneCount = stoneCount;
+            final double fStoneValue = stoneValue;
+            final String fStoneType = stoneType;
+            final String selectedKarat = getSelectedKaratCode();
+            final String selectedCategory = getSelectedCategory();
+            final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+            final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
+            final List<String> finalPhotoPaths = new ArrayList<>(photoManager.getPhotoPaths());
+            final int currentUserId = getCurrentUserId();
+
+            MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
+            final String tid = rfidService.readTid("00000000");
+            final boolean isSim = rfidService.isSimulationMode();
+
+            executorService.execute(() -> {
+                try {
+                    JSONObject payload = buildPayload(
+                        finalEpc, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
+                        fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
+                        details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
+                        localCurrency, exchangeRate, selectedCategory, location,
+                        branchId, currentUserId, tid, isSim, finalPhotoPaths
+                    );
+
+                    boolean apiSuccess = false;
+                    int serverItemId = 0;
+                    String errorMessage = null;
+                    boolean isNetworkError = false;
+                    JSONObject responseDataObj = null;
+
+                    if (apiClient != null) {
+                        try {
+                            MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
+                            if (response != null) {
+                                apiSuccess = response.isSuccess;
+                                responseDataObj = response.data;
+                                if (response.isSuccess) {
+                                    if (response.data != null) serverItemId = response.data.optInt("item_id", 0);
+                                } else {
+                                    errorMessage = extractErrorMessage(response);
+                                    isNetworkError = response.isNetworkError;
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "API call exception", e);
+                            errorMessage = e.getMessage();
+                            isNetworkError = true;
+                        }
+                    }
+
+                    final boolean success = apiSuccess;
+                    final int finalServerItemId = serverItemId;
+                    final String finalErrorMessage = errorMessage;
+                    final boolean networkError = isNetworkError;
+                    final JSONObject finalResponseData = responseDataObj;
+
+                    safeRun(() -> {
+                        dismissDialog(loadingDialog);
+
+                        if (success) {
+                            playSuccessSound();
+                            executorService.execute(() -> syncManager.removePendingEncode(finalEpc));
+                            notifyDashboardUpdate("encode_success");
+
+                            if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
+                                uploadItemImages(finalServerItemId, finalPhotoPaths);
+                            }
+
+                            String activeEpc = finalEpc;
+                            String gs1Code = "(01)0729000000" + (finalServerItemId > 0 ? String.format(Locale.US, "%05d", finalServerItemId) : "00000") + "(21)" + activeEpc;
+                            String qrUrl = "https://ibreg.org/id/" + (finalServerItemId > 0 ? finalServerItemId : activeEpc);
+
+                            if (finalResponseData != null) {
+                                activeEpc = finalResponseData.optString("epc", activeEpc);
+                                JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
+                                if (gs1Obj != null) {
+                                    gs1Code = gs1Obj.optString("raw_fnc1", gs1Code);
+                                    qrUrl = gs1Obj.optString("digital_link", qrUrl);
+                                }
+                            }
+
+                            if (binding != null && binding.etEpc != null) {
+                                binding.etEpc.setText("");
+                            }
+
+                            showEncodingSuccessDialogEnhanced(
+                                    finalTitle, activeEpc, tid, gs1Code, qrUrl,
+                                    String.valueOf(fGrossWeight), selectedKarat,
+                                    finalPriceLocal, localCurrency, finalPhotoPaths
+                            );
+
+                        } else if (networkError) {
+                            executorService.execute(() -> {
+                                syncManager.saveEncodeOffline(payload);
+                                safeRun(this::updatePendingSyncBadge);
+                            });
+                            showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
+                            unlockFormFast();
+                            setFormEnabled(true);
+                        } else {
+                            String errorMsg = finalErrorMessage != null ? finalErrorMessage :
+                                (isArabic ? "❌ فشل التكويد" : "❌ Encoding failed");
+                            showErrorDialog(isArabic ? "خطأ في التكويد" : "Encoding Error", errorMsg);
+                            unlockFormFast();
+                            setFormEnabled(true);
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "Background execution error: " + e.getMessage(), e);
+                    safeRun(() -> {
+                        dismissDialog(loadingDialog);
+                        unlockFormFast();
+                        setFormEnabled(true);
+                        showErrorDialog(isArabic ? "خطأ للنظام" : "System Error", e.getMessage());
+                    });
+                }
+            });
+        } catch (NumberFormatException e) {
+            showValidationError(isArabic ? "❌ خطأ في الأرقام المدخلة" : "❌ Invalid number format");
+            unlockFormFast();
         } catch (Exception e) {
-            Log.e(TAG, "Print Error: " + e.getMessage(), e);
-            showToast(isArabic ? "❌ تعذر إرسال أمر الطباعة" : "❌ Print request failed");
+            Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage(), e);
+            unlockFormFast();
+            setFormEnabled(true);
+            showToast("❌ " + e.getMessage());
         }
     }
 
-    private AlertDialog showProfessionalLoadingDialog(String title, String message) {
-        if (getContext() == null || !isAdded()) return null;
-        
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
-        builder.setTitle(title);
-        builder.setMessage(message);
-        builder.setCancelable(false);
-
-        ProgressBar progressBar = new ProgressBar(requireContext());
-        progressBar.setIndeterminate(true);
-        progressBar.setPadding(40, 20, 40, 20);
-        builder.setView(progressBar);
-
-        AlertDialog dialog = builder.create();
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setCancelable(false);
-        dialog.show();
-        return dialog;
-    }
-
-    private void setFormEnabled(boolean enabled) {
-        try {
-            if (binding == null) return;
+    private void unlockFormFast() {
+        isFormLocked = false;
+        if (binding != null && binding.btnSaveIdentity != null) {
             boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
-            boolean finalEnabled = enabled && canEdit && !isFormLocked;
-            
-            binding.btnSaveIdentity.setEnabled(finalEnabled);
-            binding.btnAddPhotos.setEnabled(finalEnabled);
-            binding.etEpc.setEnabled(finalEnabled);
-            binding.etTitle.setEnabled(finalEnabled);
-            binding.etGrossWeight.setEnabled(finalEnabled);
-            binding.switchHasStones.setEnabled(finalEnabled);
-            binding.etStoneType.setEnabled(finalEnabled);
-            binding.etStoneWeight.setEnabled(finalEnabled);
-            binding.etStoneCount.setEnabled(finalEnabled);
-            binding.etStoneValue.setEnabled(finalEnabled);
-            binding.chipGroupKarat.setEnabled(finalEnabled);
-            binding.chipGroupTypes.setEnabled(finalEnabled);
-            binding.btnScanRfid.setEnabled(finalEnabled);
-
-            binding.btnSaveIdentity.setAlpha(finalEnabled ? 1.0f : 0.5f);
-        } catch (Exception e) {
-            Log.e(TAG, "setFormEnabled error: " + e.getMessage(), e);
+            binding.btnSaveIdentity.setEnabled(canEdit);
+            binding.btnSaveIdentity.setAlpha(canEdit ? 1.0f : 0.5f);
         }
     }
 
-    protected void dismissDialog(AlertDialog dialog) {
+    private String extractErrorMessage(MiraApiClient.ApiResponse response) {
+        if (response == null) return isArabic ? "❌ خطأ غير معروف" : "❌ Unknown error";
+        if (response.data != null) {
+            try {
+                JSONObject errorObj = response.data.optJSONObject("error");
+                if (errorObj != null) {
+                    String message = errorObj.optString("message", "");
+                    String messageEn = errorObj.optString("message_en", "");
+                    String displayMessage = isArabic ? message : messageEn;
+                    if (displayMessage.isEmpty()) displayMessage = message.isEmpty() ? messageEn : message;
+
+                    JSONObject details = errorObj.optJSONObject("details");
+                    if (details != null) {
+                        String suggestion = details.optString("suggestion", "");
+                        if (!suggestion.isEmpty()) displayMessage += "\n\n💡 " + suggestion;
+                    }
+                    return displayMessage;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error extracting error message", e);
+            }
+        }
+        if (response.message != null && !response.message.isEmpty()) return response.message;
+        if (response.error != null && !response.error.isEmpty()) return response.error;
+        return isArabic ? "❌ فشل العملية" : "❌ Operation failed";
+    }
+
+    private boolean validateInputData(String epc, String title, String weightStr) {
+        if (title.isEmpty()) {
+            showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title");
+            return false;
+        }
+        if (title.length() < 3) {
+            showValidationError(isArabic ? "العنوان قصير جداً" : "Title is too short");
+            return false;
+        }
+        if (weightStr.isEmpty()) {
+            showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight");
+            return false;
+        }
+
         try {
-            if (dialog != null && dialog.isShowing()) dialog.dismiss();
-        } catch (Exception e) {
-            Log.e(TAG, "dismissDialog error: " + e.getMessage());
+            double weight = Double.parseDouble(weightStr);
+            if (weight <= 0) {
+                showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
+                return false;
+            }
+            if (weight > 10000) {
+                showValidationError(isArabic ? "الوزن كبير جداً" : "Weight is too large");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            showValidationError(isArabic ? "صيغة الوزن غير صحيحة" : "Invalid weight format");
+            return false;
         }
+
+        return true;
     }
 
-    private int getCurrentUserId() {
+    private JSONObject buildPayload(
+        String epc, String title, String karat, double grossWeight, double netWeight,
+        double stoneWeightCarats, int stoneCount, double stoneValue, String stoneType,
+        MiraPriceManager.PricingDetails details, int karatNum, double priceUSD,
+        double priceLocal, String currency, double exchangeRate, String category,
+        String location, int branchId, int userId, String tid, boolean isSim,
+        List<String> photoPathsList) throws Exception {
+
+        JSONObject payload = new JSONObject();
+        if (epc != null && !epc.isEmpty()) payload.put("epc", epc);
+
+        payload.put("title", title);
+        payload.put("purity_code", karat);
+        payload.put("gross_weight", grossWeight);
+        payload.put("net_weight", netWeight);
+        payload.put("stone_weight", stoneWeightCarats);
+        payload.put("stone_count", stoneCount);
+        payload.put("stone_value", stoneValue);
+        payload.put("stone_type", stoneType);
+
+        payload.put("gold_price_per_gram", details.gramPrice);
+        payload.put("gold_value", details.baseGoldCost);
+        payload.put("making_per_gram", priceManager.getMakingCharge(karatNum));
+        payload.put("making_charge", details.totalMakingCost);
+        payload.put("total_cost", details.baseGoldCost + details.totalMakingCost);
+        payload.put("profit_margin", priceManager.getProfitMargin(karatNum));
+        payload.put("profit_amount", details.profitAmount);
+
+        payload.put("retail_price_usd", priceUSD);
+        payload.put("retail_price", priceUSD);
+        payload.put("retail_price_local", priceLocal);
+        payload.put("currency", "USD");
+        payload.put("local_currency", currency);
+        payload.put("exchange_rate", exchangeRate);
+        payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
+
+        payload.put("category", category);
+        payload.put("location", location);
+        payload.put("branch_id", branchId);
+        payload.put("user_id", userId);
+
+        if (tid != null && !tid.isEmpty()) payload.put("rfid_tid", tid);
+
+        if (!photoPathsList.isEmpty()) {
+            JSONArray imagesArray = new JSONArray();
+            for (String path : photoPathsList) imagesArray.put(path);
+            payload.put("image_paths", imagesArray);
+        }
+
+        return payload;
+    }
+
+    // ==================== المزامنة ====================
+
+    private void showPendingItemsDialog() {
+        if (syncManager == null || !isAdded() || getContext() == null) return;
+
+        executorService.execute(() -> {
+            try {
+                int pendingCount = syncManager.getPendingCount();
+
+                safeRun(() -> {
+                    if (!isAdded() || getContext() == null) return;
+                    if (pendingCount == 0) {
+                        showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
+                        return;
+                    }
+
+                    new MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
+                            .setMessage(isArabic ? "لديك " + pendingCount + " عنصر بانتظار المزامنة" : "You have " + pendingCount + " items waiting for sync")
+                            .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> executorService.execute(() -> {
+                                int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
+                                syncManager.syncPendingEncodes(branchId, new IdentitySyncManager.SyncCallback() {
+                                    @Override
+                                    public void onSyncComplete(int syncedCount) {
+                                        safeRun(() -> {
+                                            if (syncedCount > 0) {
+                                                showToast(isArabic ? "✅ تمت مزامنة " + syncedCount + " تكويد" : "✅ Synced " + syncedCount + " encodings");
+                                                updatePendingSyncBadge();
+                                            }
+                                        });
+                                    }
+
+                                    @Override
+                                    public void onSyncError(String error) {
+                                        safeRun(() -> showToast(isArabic ? "❌ فشل المزامنة" : "❌ Sync failed"));
+                                    }
+                                });
+                            }))
+                            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                            .show();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    private void updatePendingSyncBadge() {
         try {
-            if (getContext() == null) return 0;
-            SharedPreferences prefs = getContext().getSharedPreferences("session", Context.MODE_PRIVATE);
-            return prefs.getInt("user_id", 0);
+            if (syncManager == null || binding == null) return;
+            int count = syncManager.getPendingCount();
+
+            if (binding.tvPendingSyncCount != null) {
+                if (count > 0) {
+                    binding.tvPendingSyncCount.setVisibility(View.VISIBLE);
+                    binding.tvPendingSyncCount.setText(isArabic ? "انتظار المزامنة: " + count : "Pending Sync: " + count);
+                } else {
+                    binding.tvPendingSyncCount.setVisibility(View.GONE);
+                }
+            }
         } catch (Exception e) {
-            return 0;
+            Log.e(TAG, "updatePendingSyncBadge error: " + e.getMessage());
         }
     }
 
-    private void showValidationError(String message) {
-        try {
-            if (getContext() == null || !isAdded()) return;
-
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(isArabic ? "⚠️ تنبيه الحماية" : "⚠️ Validation Alert")
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "حسناً" : "OK", null)
-                    .setCancelable(false)
-                    .show();
-        } catch (Exception e) {
-            showToast(message);
-        }
-    }
+    // ==================== رفع الصور ====================
 
     private void uploadItemImages(int itemId, List<String> imagePaths) {
         if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0 || apiClient == null) return;
@@ -1729,251 +1183,78 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         });
     }
 
-    private boolean isEpcDuplicateLocally(String epc) {
-        if (epc == null || epc.trim().isEmpty() || offlineCache == null) return false;
-        String cleanEpc = epc.trim().toUpperCase(Locale.US);
+    // ==================== حوار النجاح ====================
 
-        try {
-            String pendingJson = offlineCache.getString("pending_encodes", "[]");
-            JSONArray pendingArray = new JSONArray(pendingJson);
+    private void showEncodingSuccessDialogEnhanced(
+        String title, String epc, String tid, String gs1Code, String qrUrl,
+        String weight, String karat, double finalPrice, String currency, List<String> photos) {
 
-            for (int i = 0; i < pendingArray.length(); i++) {
-                JSONObject item = pendingArray.optJSONObject(i);
-                if (item != null) {
-                    String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
-                    if (cleanEpc.equals(storedEpc)) return true;
-                }
-            }
-
-            String draftJson = offlineCache.getString("current_draft", null);
-            if (draftJson != null) {
-                JSONObject draft = new JSONObject(draftJson);
-                String draftEpc = draft.optString("epc", "").trim().toUpperCase(Locale.US);
-                if (cleanEpc.equals(draftEpc)) return true;
-            }
-
-            String localItemsJson = offlineCache.getString("cached_master_items", "[]");
-            JSONArray localItemsArray = new JSONArray(localItemsJson);
-
-            for (int i = 0; i < localItemsArray.length(); i++) {
-                JSONObject item = localItemsArray.optJSONObject(i);
-                if (item != null) {
-                    String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
-                    if (cleanEpc.equals(storedEpc)) return true;
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error checking duplicate EPC: " + e.getMessage(), e);
-        }
-        return false;
-    }
-
-    private void saveEncodeOffline(JSONObject payload) {
-        try {
-            if (offlineCache == null) return;
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
-            
-            String targetEpc = payload.optString("epc");
-            for (int i = 0; i < arr.length(); i++) {
-                if (arr.getJSONObject(i).optString("epc").equals(targetEpc)) {
-                    arr.remove(i);
-                    break;
-                }
-            }
-
-            arr.put(payload);
-            while (arr.length() > 200) arr.remove(0);
-            offlineCache.edit().putString("pending_encodes", arr.toString()).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "Save encode offline error: " + e.getMessage(), e);
-        }
-    }
-
-    private void removePendingEncode(String epc) {
-        try {
-            if (offlineCache == null) return;
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
-            JSONArray newArr = new JSONArray();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null && !epc.equals(obj.optString("epc", ""))) newArr.put(obj);
-            }
-            offlineCache.edit().putString("pending_encodes", newArr.toString()).apply();
-            safeRun(this::updatePendingSyncBadge);
-        } catch (Exception ignored) {
-            Log.e(TAG, "removePendingEncode error", ignored);
-        }
-    }
-
-    private void updatePendingSyncBadge() {
-        try {
-            if (offlineCache == null || binding == null) return;
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
-            int count = arr.length();
-
-            if (binding.tvPendingSyncCount != null) {
-                if (count > 0) {
-                    binding.tvPendingSyncCount.setVisibility(View.VISIBLE);
-                    binding.tvPendingSyncCount.setText(isArabic ? "انتظار المزامنة: " + count : "Pending Sync: " + count);
-                } else {
-                    binding.tvPendingSyncCount.setVisibility(View.GONE);
-                }
-            }
-        } catch (Exception ignored) {
-            Log.e(TAG, "updatePendingSyncBadge error", ignored);
-        }
-    }
-
-    private void syncPendingEncodes() {
-        if (apiClient == null || offlineCache == null) return;
-        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) return;
-        
-        final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-
-        try {
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
-            if (arr.length() == 0) return;
-
-            JSONArray remainingArr = new JSONArray();
-            int synced = 0;
-            for (int i = 0; i < arr.length(); i++) {
-                try {
-                    JSONObject payload = arr.getJSONObject(i);
-                    if (!payload.has("branch_id") || payload.optInt("branch_id", 0) <= 0) {
-                        payload.put("branch_id", branchId);
-                    }
-
-                    MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                    if (response != null && response.isSuccess) {
-                        synced++;
-                    } else {
-                        remainingArr.put(payload);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Failed to sync item", e);
-                    remainingArr.put(arr.getJSONObject(i));
-                }
-            }
-            offlineCache.edit().putString("pending_encodes", remainingArr.toString()).apply();
-
-            final int s = synced;
-safeRun(() -> {
-    updatePendingSyncBadge();
-    if (s > 0) {
-        showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
-        
-        // ✅✅✅ أضف هذا - تحديث الداشبورد
-        notifyDashboardUpdate("encode_sync");
-    }
-});
-        } catch (Exception e) {
-            Log.e(TAG, "Sync encodes error: " + e.getMessage(), e);
-        }
-    }
-
-    private void safeRun(Runnable r) {
-        try {
-            if (isAdded() && getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (isAdded()) r.run();
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "safeRun error: " + e.getMessage(), e);
-        }
-    }
-
-    private void playSuccessSound() {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).playSound(1);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "playSuccessSound error: " + e.getMessage());
-        }
-    }
-
-/**
- * ✅ إرسال إشارة تحديث الداشبورد بعد التكويد
- */
-private void notifyDashboardUpdate(String source) {
-    try {
         if (!isAdded() || getContext() == null) return;
-        
-        Context ctx = getContext();
-        int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 0;
-        long timestamp = System.currentTimeMillis();
-        
-        Log.e(TAG, "🔔 NOTIFY UPDATE - Source: " + source + ", Branch: " + branchId);
-        
-        // ✅ إشارة تحديث المخزون
-        Intent inventoryIntent = new Intent("com.example.uhf.REFRESH_INVENTORY");
-        inventoryIntent.setPackage(ctx.getPackageName());
-        inventoryIntent.putExtra("source", source);
-        inventoryIntent.putExtra("branch_id", branchId);
-        inventoryIntent.putExtra("timestamp", timestamp);
-        ctx.sendBroadcast(inventoryIntent);
-        
-        // ✅ إشارة تحديث الداشبورد
-        Intent dashboardIntent = new Intent("com.example.uhf.REFRESH_DASHBOARD");
-        dashboardIntent.setPackage(ctx.getPackageName());
-        dashboardIntent.putExtra("source", source);
-        dashboardIntent.putExtra("branch_id", branchId);
-        dashboardIntent.putExtra("timestamp", timestamp);
-        ctx.sendBroadcast(dashboardIntent);
-        
-        // ✅ تحديث SharedPreferences
-        SharedPreferences prefs = ctx.getSharedPreferences("app_refresh_flags", Context.MODE_PRIVATE);
-        prefs.edit()
-            .putLong("last_data_change", timestamp)
-            .putString("last_change_type", source)
-            .putInt("last_change_branch_id", branchId)
-            .putBoolean("needs_refresh", true)
-            .apply();
-        
-        Log.e(TAG, "✅ Dashboard update signals sent");
-        
-    } catch (Exception e) {
-        Log.e(TAG, "notifyDashboardUpdate error: " + e.getMessage());
-    }
-}
-    private void playErrorSound() {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).playSound(2);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "playErrorSound error: " + e.getMessage());
+
+        BottomSheetDialog successDialog = new BottomSheetDialog(requireContext());
+        View view = getLayoutInflater().inflate(R.layout.dialog_mira_identity_summary, null);
+        successDialog.setContentView(view);
+
+        successDialog.setCancelable(false);
+        successDialog.setCanceledOnTouchOutside(false);
+
+        TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
+        TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
+        TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
+        TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
+        TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
+
+        ImageView ivGs1DataMatrix = view.findViewById(R.id.ivGs1DataMatrix);
+        ImageView ivQrCode = view.findViewById(R.id.ivQrCode);
+        MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
+
+        if (tvIdTitle != null) tvIdTitle.setText(title);
+        if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
+        if (tvIdMetalKarat != null) tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
+        if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
+        if (tvIdPrice != null && priceManager != null) {
+            tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice) + " " + currency);
         }
+
+        // توليد الباركود في الخلفية
+        executorService.execute(() -> {
+            Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty()) ? BarcodeGenerator.generateGS1DataMatrix(gs1Code, 250, 250) : null;
+            Bitmap qrBitmap = (qrUrl != null && !qrUrl.isEmpty()) ? BarcodeGenerator.generateMicroQRCode(qrUrl, 250, 250) : null;
+
+            safeRun(() -> {
+                if (ivGs1DataMatrix != null && dmBitmap != null) {
+                    ivGs1DataMatrix.setImageBitmap(dmBitmap);
+                    ivGs1DataMatrix.setVisibility(View.VISIBLE);
+                }
+                if (ivQrCode != null && qrBitmap != null) {
+                    ivQrCode.setImageBitmap(qrBitmap);
+                    ivQrCode.setVisibility(View.VISIBLE);
+                }
+            });
+        });
+
+        // زر الطباعة
+        View printView = view.findViewById(R.id.btnPrintTag);
+        if (printView instanceof MaterialButton) {
+            MaterialButton btnPrintTag = (MaterialButton) printView;
+            btnPrintTag.setVisibility(View.VISIBLE);
+            btnPrintTag.setOnClickListener(v -> executorService.execute(() -> {
+                Bitmap tagToPrint = TagPrinter.generatePhysicalTagBitmap(epc, gs1Code, qrUrl);
+                safeRun(() -> TagPrinter.printTagDirectly(requireContext(), tagToPrint));
+            }));
+        }
+
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> {
+                successDialog.dismiss();
+                resetFormForNextScan();
+            });
+        }
+
+        successDialog.show();
     }
 
-    private void showToast(String msg) {
-        try {
-            if (getContext() != null && isAdded()) {
-                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "showToast error: " + e.getMessage());
-        }
-    }
-
-    private String getSelectedCategory() {
-        try {
-            if (binding == null) return isArabic ? "مجوهرات" : "Jewelry";
-            int checkedId = binding.chipGroupTypes.getCheckedChipId();
-            if (checkedId == binding.chipRing.getId()) return isArabic ? "خواتم" : "Rings";
-            if (checkedId == binding.chipSet.getId()) return isArabic ? "أطقم" : "Sets";
-            if (checkedId == binding.chipBracelet.getId()) return isArabic ? "أساور" : "Bracelets";
-            if (checkedId == binding.chipNecklace.getId()) return isArabic ? "عقود" : "Necklaces";
-        } catch (Exception e) {
-            Log.e(TAG, "getSelectedCategory error: " + e.getMessage());
-        }
-        return isArabic ? "مجوهرات" : "Jewelry";
-    }
+    // ==================== إعادة تعيين النموذج ====================
 
     private void resetFormForNextScan() {
         try {
@@ -1996,12 +1277,12 @@ private void notifyDashboardUpdate(String source) {
             binding.chipRing.setChecked(true);
             binding.chip21K.setChecked(true);
             binding.etEpc.requestFocus();
-            
-            photoPaths.clear();
+
+            photoManager.clearPhotos();
             onPhotosUpdated();
-            
-            if (offlineCache != null) {
-                executorService.execute(() -> offlineCache.edit().remove("current_draft").apply());
+
+            if (formManager != null) {
+                formManager.clearDraft();
             }
 
             activateRFIDModeForEncoding();
@@ -2010,11 +1291,283 @@ private void notifyDashboardUpdate(String source) {
         }
     }
 
+    // ==================== الصلاحيات والواجهة ====================
+
+    private void applyPermissions() {
+        if (binding == null) return;
+        boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
+
+        if (binding.btnSaveIdentity != null) {
+            binding.btnSaveIdentity.setEnabled(canEdit && !isFormLocked);
+            binding.btnSaveIdentity.setAlpha((canEdit && !isFormLocked) ? 1.0f : 0.5f);
+        }
+
+        if (binding.btnScanRfid != null) binding.btnScanRfid.setEnabled(canEdit && !isFormLocked);
+        if (binding.btnAddPhotos != null) binding.btnAddPhotos.setEnabled(canEdit && !isFormLocked);
+
+        if (!canEdit) {
+            showToast(isArabic ? "⛔ وضع القراءة فقط - غير مصرح بالتعديل" : "⛔ Read only mode - Access Denied");
+        }
+    }
+
+    private void applyLanguage() {
+        if (binding == null) return;
+        applyLanguageDirection(binding.getRoot());
+        if (isArabic) setArabicTexts(); else setEnglishTexts();
+    }
+
+    private void setArabicTexts() {
+        try {
+            if (binding == null) return;
+            binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف وتوليد الاكواد المجهرية");
+            binding.tilEpc.setHint("رمز الشريحة (EPC / GTIN)...");
+            binding.btnScanRfid.setText(isRfidScanning ? "إيقاف المسح..." : "مسح رمز RFID");
+            binding.etTitle.setHint("عنوان ووصف القطعة");
+            binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
+            binding.btnAddPhotos.setText("📷 إرفاق صور القطعة");
+            binding.btnViewPending.setText("📦 عرض الطلبات المحفوظة محلياً");
+            updatePhotosCountText();
+            calculateEstimatedGoldValue();
+        } catch (Exception e) {
+            Log.e(TAG, "setArabicTexts error: " + e.getMessage());
+        }
+    }
+
+    private void setEnglishTexts() {
+        try {
+            if (binding == null) return;
+            binding.tvStepTitle.setText("Step 1 of 4: Bind, Classify & Generate Codes");
+            binding.tilEpc.setHint("EPC / GTIN Code...");
+            binding.btnScanRfid.setText(isRfidScanning ? "Stop Scan..." : "Scan RFID Tag");
+            binding.etTitle.setHint("Item Title & Description");
+            binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
+            binding.btnAddPhotos.setText("📷 Attach Photos");
+            binding.btnViewPending.setText("📦 View Offline Pending Items");
+            updatePhotosCountText();
+            calculateEstimatedGoldValue();
+        } catch (Exception e) {
+            Log.e(TAG, "setEnglishTexts error: " + e.getMessage());
+        }
+    }
+
+    private void setFormEnabled(boolean enabled) {
+        try {
+            if (binding == null) return;
+            boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
+            boolean finalEnabled = enabled && canEdit && !isFormLocked;
+
+            binding.btnSaveIdentity.setEnabled(finalEnabled);
+            binding.btnAddPhotos.setEnabled(finalEnabled);
+            binding.etEpc.setEnabled(finalEnabled);
+            binding.etTitle.setEnabled(finalEnabled);
+            binding.etGrossWeight.setEnabled(finalEnabled);
+            binding.switchHasStones.setEnabled(finalEnabled);
+            binding.etStoneType.setEnabled(finalEnabled);
+            binding.etStoneWeight.setEnabled(finalEnabled);
+            binding.etStoneCount.setEnabled(finalEnabled);
+            binding.etStoneValue.setEnabled(finalEnabled);
+            binding.chipGroupKarat.setEnabled(finalEnabled);
+            binding.chipGroupTypes.setEnabled(finalEnabled);
+            binding.btnScanRfid.setEnabled(finalEnabled);
+
+            binding.btnSaveIdentity.setAlpha(finalEnabled ? 1.0f : 0.5f);
+        } catch (Exception e) {
+            Log.e(TAG, "setFormEnabled error: " + e.getMessage(), e);
+        }
+    }
+
+    // ==================== أدوات مساعدة ====================
+
+    private AlertDialog showProfessionalLoadingDialog(String title, String message) {
+        if (getContext() == null || !isAdded()) return null;
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
+        builder.setTitle(title);
+        builder.setMessage(message);
+        builder.setCancelable(false);
+
+        ProgressBar progressBar = new ProgressBar(requireContext());
+        progressBar.setIndeterminate(true);
+        progressBar.setPadding(40, 20, 40, 20);
+        builder.setView(progressBar);
+
+        AlertDialog dialog = builder.create();
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setCancelable(false);
+        dialog.show();
+        return dialog;
+    }
+
+    protected void dismissDialog(AlertDialog dialog) {
+        try {
+            if (dialog != null && dialog.isShowing()) dialog.dismiss();
+        } catch (Exception e) {
+            Log.e(TAG, "dismissDialog error: " + e.getMessage());
+        }
+    }
+
+    private void showValidationError(String message) {
+        try {
+            if (getContext() == null || !isAdded()) return;
+
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(isArabic ? "⚠️ تنبيه الحماية" : "⚠️ Validation Alert")
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                    .setCancelable(false)
+                    .show();
+        } catch (Exception e) {
+            showToast(message);
+        }
+    }
+
+    protected AlertDialog showErrorDialog(String title, String message) {
+        if (getContext() == null || !isAdded()) return null;
+        return new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(title)
+            .setMessage(message)
+            .setIcon(R.drawable.ic_error_outline)
+            .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
+            .setCancelable(false)
+            .show();
+    }
+
+    private void playSuccessSound() {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).playSound(1);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "playSuccessSound error: " + e.getMessage());
+        }
+    }
+
+    private void playErrorSound() {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).playSound(2);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "playErrorSound error: " + e.getMessage());
+        }
+    }
+
+    private void showToast(String msg) {
+        try {
+            if (getContext() != null && isAdded()) {
+                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "showToast error: " + e.getMessage());
+        }
+    }
+
+    private void notifyDashboardUpdate(String source) {
+        try {
+            if (!isAdded() || getContext() == null) return;
+
+            Context ctx = getContext();
+            int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 0;
+            long timestamp = System.currentTimeMillis();
+
+            Intent inventoryIntent = new Intent("com.example.uhf.REFRESH_INVENTORY");
+            inventoryIntent.setPackage(ctx.getPackageName());
+            inventoryIntent.putExtra("source", source);
+            inventoryIntent.putExtra("branch_id", branchId);
+            inventoryIntent.putExtra("timestamp", timestamp);
+            ctx.sendBroadcast(inventoryIntent);
+
+            Intent dashboardIntent = new Intent("com.example.uhf.REFRESH_DASHBOARD");
+            dashboardIntent.setPackage(ctx.getPackageName());
+            dashboardIntent.putExtra("source", source);
+            dashboardIntent.putExtra("branch_id", branchId);
+            dashboardIntent.putExtra("timestamp", timestamp);
+            ctx.sendBroadcast(dashboardIntent);
+
+            SharedPreferences prefs = ctx.getSharedPreferences("app_refresh_flags", Context.MODE_PRIVATE);
+            prefs.edit()
+                .putLong("last_data_change", timestamp)
+                .putString("last_change_type", source)
+                .putInt("last_change_branch_id", branchId)
+                .putBoolean("needs_refresh", true)
+                .apply();
+
+        } catch (Exception e) {
+            Log.e(TAG, "notifyDashboardUpdate error: " + e.getMessage());
+        }
+    }
+
+    private int getCurrentUserId() {
+        try {
+            if (getContext() == null) return 0;
+            SharedPreferences prefs = getContext().getSharedPreferences("session", Context.MODE_PRIVATE);
+            return prefs.getInt("user_id", 0);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private void safeRun(Runnable r) {
+        try {
+            if (isAdded() && getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (isAdded()) r.run();
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "safeRun error: " + e.getMessage());
+        }
+    }
+
+    // ==================== دورة الحياة ====================
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (getView() != null) {
+            getView().postDelayed(() -> {
+                if (!isAdded()) return;
+                try {
+                    if (priceManager != null) {
+                        priceManager.refreshNow();
+                        handler.postDelayed(() -> {
+                            if (isAdded() && binding != null) calculateEstimatedGoldValue();
+                        }, 300);
+                    }
+
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "onResume error: " + e.getMessage(), e);
+                }
+            }, 150);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        stopRfidScanningMode();
+        saveCurrentDraftAsync();
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
+        }
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (currentPhotoPath != null) {
+            outState.putString("camera_photo_path", currentPhotoPath);
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         stopRfidScanningMode();
-        
+
         if (executorService != null && !executorService.isShutdown()) {
             try {
                 executorService.shutdown();
@@ -2026,105 +1579,8 @@ private void notifyDashboardUpdate(String source) {
                 Thread.currentThread().interrupt();
             }
         }
-        
+
         handler.removeCallbacksAndMessages(null);
         binding = null;
     }
-
-    private interface OnPhotoDeleteListener {
-        void onDelete(int position);
-    }
-
-    private static class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewHolder> {
-        private final List<String> paths;
-        private final ExecutorService executor;
-        private final OnPhotoDeleteListener deleteListener;
-
-        public PhotosAdapter(List<String> paths, ExecutorService executor, OnPhotoDeleteListener deleteListener) {
-            this.paths = paths;
-            this.executor = executor;
-            this.deleteListener = deleteListener;
-        }
-
-        @NonNull
-        @Override
-        public PhotoViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_photo_preview, parent, false);
-            return new PhotoViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
-            String path = paths.get(position);
-            holder.imgThumbnail.setTag(path);
-            holder.imgThumbnail.setImageResource(R.drawable.ic_photo);
-
-            // فك ضغط الصورة في خيط خلفي للـ Adapter لمنع تجمد القائمة
-            executor.execute(() -> {
-                Bitmap thumbnail = decodeSampledBitmapFromFile(path, 100, 100);
-                if (thumbnail != null) {
-                    new Handler(Looper.getMainLooper()).post(() -> {
-                        if (path.equals(holder.imgThumbnail.getTag())) {
-                            holder.imgThumbnail.setImageBitmap(thumbnail);
-                        }
-                    });
-                }
-            });
-
-            holder.btnDelete.setOnClickListener(v -> {
-                if (deleteListener != null) {
-                    int adapterPosition = holder.getAdapterPosition();
-                    if (adapterPosition != RecyclerView.NO_POSITION) {
-                        deleteListener.onDelete(adapterPosition);
-                    }
-                }
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return paths.size();
-        }
-
-        private Bitmap decodeSampledBitmapFromFile(String path, int reqWidth, int reqHeight) {
-            try {
-                final BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inJustDecodeBounds = true;
-                BitmapFactory.decodeFile(path, options);
-
-                options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
-                options.inJustDecodeBounds = false;
-                return BitmapFactory.decodeFile(path, options);
-            } catch (Exception e) {
-                return null;
-            }
-        }
-
-        private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
-            final int height = options.outHeight;
-            final int width = options.outWidth;
-            int inSampleSize = 1;
-
-            if (height > reqHeight || width > reqWidth) {
-                final int halfHeight = height / 2;
-                final int halfWidth = width / 2;
-
-                while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
-                    inSampleSize *= 2;
-                }
-            }
-            return inSampleSize;
-        }
-
-        static class PhotoViewHolder extends RecyclerView.ViewHolder {
-            ImageView imgThumbnail;
-            ImageView btnDelete;
-
-            public PhotoViewHolder(@NonNull View itemView) {
-                super(itemView);
-                imgThumbnail = itemView.findViewById(R.id.imgThumbnail);
-                btnDelete = itemView.findViewById(R.id.btnDeletePhoto);
-            }
-        }
-    }
-                            }
+}
