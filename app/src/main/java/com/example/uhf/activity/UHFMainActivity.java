@@ -218,7 +218,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     showToast("RFID Error: " + error);
                 }
             });
-            soundManager = new SoundManager();
+            soundManager = new SoundManager(this);
             notificationManager = new NotificationManager(this);
             statusIndicatorManager = new StatusIndicatorManager(findViewById(android.R.id.content), hardwareManager);
 
