@@ -1,6 +1,5 @@
 package com.example.uhf.fragment;
 
-import com.example.uhf.api.ApiResponse;
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -333,11 +332,11 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
-                ApiResponse apiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
+                MiraApiClient.ApiResponse MiraApiClient.ApiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
 
                 JSONObject response = null;
-                if (apiResponse != null && apiResponse.isSuccess) {
-                    response = apiResponse.data;
+                if (MiraApiClient.ApiResponse != null && MiraApiClient.ApiResponse.isSuccess) {
+                    response = MiraApiClient.ApiResponse.data;
                 }
 
                 if (getActivity() != null) {
@@ -668,7 +667,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 JSONObject extraParams = new JSONObject();
                 extraParams.put("branch_id", branchesManager.getActiveBranchId());
 
-                MiraApiClient.ApiResponse response = client.authorize(epc, "radar_locate", extraParams);
+                MiraApiClient.MiraApiClient.ApiResponse response = client.authorize(epc, "radar_locate", extraParams);
 
                 if (getActivity() != null && response != null && response.isSuccess && response.data != null) {
                     JSONObject decision = response.data.optJSONObject("decision");
@@ -760,7 +759,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 params.put("status", "AVAILABLE");
                 params.put("branch_id", branchesManager.getActiveBranchId());
 
-                MiraApiClient.ApiResponse res = client.authorize(targetEpc, "mark_found", params);
+                MiraApiClient.MiraApiClient.ApiResponse res = client.authorize(targetEpc, "mark_found", params);
 
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
@@ -861,4 +860,4 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         ft.detach(this).attach(this).commit();
         getView().post(this::restoreState);
     }
-}
+                     }
