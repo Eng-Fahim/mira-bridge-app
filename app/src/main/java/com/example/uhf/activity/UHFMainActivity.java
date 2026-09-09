@@ -21,6 +21,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.annotation.SuppressLint;
 
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.graphics.Typeface;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
