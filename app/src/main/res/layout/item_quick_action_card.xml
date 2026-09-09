@@ -2,14 +2,18 @@
 <com.google.android.material.card.MaterialCardView 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
     android:clickable="true"
     android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
     app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="12dp"
-    app:cardElevation="2dp">
+    app:cardElevation="2dp"
+    app:strokeColor="?attr/colorOutline"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -22,8 +26,9 @@
             android:id="@+id/imgActionIcon"
             android:layout_width="32dp"
             android:layout_height="32dp"
-            android:contentDescription="Action Icon"
-            android:src="@mipmap/ic_launcher" />
+            android:importantForAccessibility="no"
+            app:tint="?attr/colorPrimary"
+            tools:src="@drawable/ic_security" />
 
         <TextView
             android:id="@+id/tvActionTitle"
@@ -35,7 +40,8 @@
             android:ellipsize="end"
             android:textColor="?attr/colorOnSurface"
             android:textSize="12sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            tools:text="عنوان إجراء سريع" />
 
     </LinearLayout>
 
