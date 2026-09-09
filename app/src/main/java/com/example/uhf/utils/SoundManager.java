@@ -8,6 +8,10 @@ import android.os.Looper;
 import android.util.Log;
 
 import com.example.uhf.R;
+import com.example.uhf.tools.SoundGenerator;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SoundManager {
 
@@ -36,6 +40,7 @@ public class SoundManager {
     private boolean soundLoaded = false;
     private long lastBeepTime = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ExecutorService soundExecutor = Executors.newSingleThreadExecutor();
 
     public SoundManager(Context context) {
         initSoundPool(context);
@@ -133,6 +138,31 @@ public class SoundManager {
         }
     }
 
+    public void playSound(Context context, int id) {
+        soundExecutor.execute(() -> {
+            try {
+                String soundName = (id == 1) ? "beep_success" : "beep_error";
+                SoundGenerator.playSound(soundName);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    public void playSuccessSound(Context context) {
+        playSound(context, 1);
+    }
+
+    public void playErrorSound(Context context) {
+        playSound(context, 2);
+    }
+
+    public void playDelayedSound(Context context, int value) {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            playSound(context, 1);
+        }, Math.max(10, 1000 - (value * 10)));
+    }
+
     public void release() {
         if (soundPool != null) {
             try {
@@ -143,7 +173,9 @@ public class SoundManager {
             }
         }
     }
+
     public void cleanup() {
-    soundExecutor.shutdown();
-}
+        soundExecutor.shutdown();
+        release();
+    }
 }
