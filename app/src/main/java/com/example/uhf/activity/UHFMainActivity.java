@@ -122,8 +122,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private boolean isArabic = true;
     
     // ✅ التنقل
-    private String currentFragmentTag = "Dashboard";
-    private Fragment currentFragment;
+    public String currentFragmentTag = "Dashboard";
+    //private String currentFragmentTag = "Dashboard";
+    public Fragment currentFragment;
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
     
