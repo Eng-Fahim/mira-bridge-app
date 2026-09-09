@@ -64,13 +64,18 @@
         <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
-    <!-- ✅ SplashTheme للوضع الداكن -->
+    <!-- ✅ SplashTheme للوضع الداكن (مُحدث لمنع الشاشة الافتراضية لأندرويد) -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_background_gradient_dark</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">#0F0C29</item>
         <item name="android:navigationBarColor">#0F0C29</item>
+        
+        <!-- إضافات هامة لإلغاء أيقونة النظام الافتراضية في الوضع الليلي -->
+        <item name="android:windowSplashScreenBackground" tools:targetApi="s">#0F0C29</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@android:color/transparent</item>
+        
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
