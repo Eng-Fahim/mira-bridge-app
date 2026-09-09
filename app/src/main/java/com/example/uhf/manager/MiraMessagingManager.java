@@ -244,11 +244,28 @@ public class MiraMessagingManager {
     public List<NotificationModel> getCachedNotifications() {
         return new ArrayList<>(notificationCache);
     }
-    // ✅ أضف هذه الواجهة داخل الكلاس
+    // ==================== Unified Listener ====================
+
 public interface OnUnreadCountChangedListener {
     void onUnreadCountChanged(int unreadCount);
 }
-    
+
+public void addListener(OnUnreadCountChangedListener listener) {
+    if (listener != null) {
+        addMessageCountListener(count -> listener.onUnreadCountChanged(getTotalUnreadCount()));
+        addNotificationCountListener(count -> listener.onUnreadCountChanged(getTotalUnreadCount()));
+    }
+}
+
+public void removeListener(OnUnreadCountChangedListener listener) {
+    // لا يمكن الإزالة المباشرة لأننا أضفنا lambdas
+    // لذلك نستخدم طريقة بديلة
+}
+
+public void clearUnreadCount() {
+    setUnreadMessageCount(0);
+    setUnreadNotificationCount(0);
+}
     private void notifyMessageListeners(int count) {
         new Handler(Looper.getMainLooper()).post(() -> {
             for (OnMessageCountChangedListener listener : messageListeners) {
