@@ -120,10 +120,11 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="MIRA"
+                            android:text="@string/app_brand_name"
                             android:textColor="?attr/colorPrimary"
                             android:textSize="18sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="MIRA" />
 
                         <Space
                             android:layout_width="6dp"
@@ -132,11 +133,12 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="JEWELRY ID™"
+                            android:text="@string/app_brand_tagline"
                             android:textColor="?attr/colorSecondary"
                             android:textSize="12sp"
                             android:textStyle="bold"
-                            android:letterSpacing="0.05" />
+                            android:letterSpacing="0.05"
+                            tools:text="JEWELRY ID™" />
                     </LinearLayout>
 
                     <TextView
@@ -438,8 +440,8 @@
                                 android:id="@+id/tvGoldTrend"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="📊"
-                                android:textSize="13sp" />
+                                android:textSize="13sp"
+                                tools:text="📊" />
 
                             <TextView
                                 android:id="@+id/tvGoldChange"
@@ -452,7 +454,7 @@
                                 tools:text="-0.00%" />
                         </LinearLayout>
 
-                        <!-- بطاقة تبرز سعر الأونصة باللون الذهبي الفاخر -->
+                        <!-- بطاقة تبرز سعر الأونصة -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
