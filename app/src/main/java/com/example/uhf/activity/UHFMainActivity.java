@@ -678,7 +678,6 @@ private void showUserNotificationsDialog() {
     RecyclerView rvNotifications = view.findViewById(R.id.rvNotifications);
     rvNotifications.setLayoutManager(new LinearLayoutManager(this));
 
-    // تعبئة البيانات وربط الـ Adapter
     MiraMessagingManager messagingManager = MiraMessagingManager.getInstance(this);
     messagingManager.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
         @Override
@@ -689,11 +688,12 @@ private void showUserNotificationsDialog() {
                     if (!notification.isRead()) {
                         messagingManager.markMessageAsRead(notification.getId(), () -> {
                             notification.setRead(true);
-                            rvNotifications.getAdapter().notifyDataSetChanged();
-                            updateBadgeCounts(); // تحديث العداد في الشاشة الرئيسية
+                            if (rvNotifications.getAdapter() != null) {
+                                rvNotifications.getAdapter().notifyDataSetChanged();
+                            }
+                            // ❌ تم إزالة updateBadgeCounts() لأن الـ Listener يتكفل بالتحديث تلقائياً
                         });
                     }
-                    // هنا يمكنك فتح نافذة "الرد" أو إظهار تفاصيل الرسالة كاملة
                 });
                 rvNotifications.setAdapter(adapter);
             });
