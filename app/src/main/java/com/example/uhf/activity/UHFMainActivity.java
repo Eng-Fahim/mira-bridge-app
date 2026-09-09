@@ -626,64 +626,47 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
-        if (pm == null) return;
+   private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
+    if (pm == null) return;
 
-        MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
-        if (toggleLanguage != null) {
-            toggleLanguage.setTitle(isArabic ? "English" : "العربية");
-        }
-
-        MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
-        if (actionGoldRates != null) {
-            actionGoldRates.setVisible(pm.canViewGoldRates());
-        }
-
-        MenuItem actionQuickAccess = menu.findItem(R.id.action_quick_access_settings);
-        if (actionQuickAccess != null) {
-            actionQuickAccess.setVisible(pm.canManageQuickAccess());
-        }
-
-        MenuItem actionDashboard = menu.findItem(R.id.action_dashboard);
-        if (actionDashboard != null) {
-            actionDashboard.setVisible(pm.canViewDashboard());
-        }
-
-        MenuItem actionBranches = menu.findItem(R.id.action_branches);
-        if (actionBranches != null) {
-            actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
-        }
-
-        MenuItem actionProfile = menu.findItem(R.id.action_profile);
-        if (actionProfile != null) {
-            actionProfile.setVisible(pm.canViewProfile());
-        }
-
-        MenuItem actionHardware = menu.findItem(R.id.action_hardware_setup);
-        if (actionHardware != null) {
-            actionHardware.setVisible(true);
-        }
-
-        MenuItem actionExport = menu.findItem(R.id.export);
-        if (actionExport != null) {
-            actionExport.setVisible(pm.canExportReports());
-        }
-
-        MenuItem actionLogout = menu.findItem(R.id.action_logout);
-        if (actionLogout != null) {
-            actionLogout.setVisible(true);
-        }
-
-        MenuItem uhfVer = menu.findItem(R.id.UHF_ver);
-        if (uhfVer != null) {
-            uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
-        }
-
-        MenuItem soundSettings = menu.findItem(R.id.nav_sound_settings);
-        if (soundSettings != null) {
-            soundSettings.setVisible(true);
-        }
+    // أزرار التولبار الظاهرة مباشرة
+    MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
+    if (actionGoldRates != null) {
+        actionGoldRates.setVisible(pm.canViewGoldRates());
     }
+
+    MenuItem actionProfile = menu.findItem(R.id.action_profile);
+    if (actionProfile != null) {
+        actionProfile.setVisible(pm.canViewProfile());
+    }
+
+    // عناصر القائمة المنسدلة
+    MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
+    if (toggleLanguage != null) {
+        toggleLanguage.setTitle(isArabic ? "English" : "العربية");
+    }
+
+    MenuItem actionQuickAccess = menu.findItem(R.id.action_quick_access_settings);
+    if (actionQuickAccess != null) {
+        actionQuickAccess.setVisible(pm.canManageQuickAccess());
+    }
+
+    MenuItem actionBranches = menu.findItem(R.id.action_branches);
+    if (actionBranches != null) {
+        actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
+    }
+
+    MenuItem actionExport = menu.findItem(R.id.export);
+    if (actionExport != null) {
+        actionExport.setVisible(pm.canExportReports());
+    }
+
+    MenuItem uhfVer = menu.findItem(R.id.UHF_ver);
+    if (uhfVer != null) {
+        uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
+    }
+}
+
 
     private void showNotificationsAndChatDialog() {
         if (messagingManager != null) {
@@ -1007,60 +990,41 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
 
-        if (id == R.id.action_hardware_setup) {
-            showHardwareOptionsDialog();
-            return true;
-        } else if (id == R.id.action_dashboard) {
-            checkInventoryLockAndExecute(() -> {
-                clearBackStack();
-                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            });
-            return true;
-        } else if (id == R.id.action_branches) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesManagementFragment(), "Branches"));
-            return true;
-        } else if (id == R.id.action_gold_rates) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
-            return true;
-        } else if (id == R.id.action_quick_access_settings) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
-            return true;
-        } else if (id == R.id.export) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraReportsProFragment(), "Reports"));
-            return true;
-        } else if (id == R.id.action_toggle_language) {
-            toggleLanguage();
-            return true;
-        } else if (id == R.id.UHF_ver) {
-            showSystemVersionDialog();
-            return true;
-        } else if (id == R.id.action_profile) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
-            return true;
-        } else if (id == R.id.action_logout) {
-            confirmLogout();
-            return true;
-        } else if (id == R.id.nav_sound_settings) {
-            checkInventoryLockAndExecute(() -> {
-                mainHandler.post(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
-            });
-            return true;
-        } else if (id == R.id.action_search) {
-            showGlobalSearchDialog();
-            return true;
-        } else if (id == R.id.action_sync) {
-            performDataSync();
-            return true;
-        } else if (id == R.id.action_notifications) {
-            showNotificationsAndMessagingDialog();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+    if (id == R.id.action_gold_rates) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
+        return true;
+    } else if (id == R.id.action_profile) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
+        return true;
+    } else if (id == R.id.action_quick_access_settings) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+        return true;
+    } else if (id == R.id.action_branches) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesManagementFragment(), "Branches"));
+        return true;
+    } else if (id == R.id.export) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraReportsProFragment(), "Reports"));
+        return true;
+    } else if (id == R.id.action_toggle_language) {
+        toggleLanguage();
+        return true;
+    } else if (id == R.id.nav_sound_settings) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
+        return true;
+    } else if (id == R.id.UHF_ver) {
+        showSystemVersionDialog();
+        return true;
+    } else if (id == R.id.action_logout) {
+        confirmLogout();
+        return true;
     }
+
+    return super.onOptionsItemSelected(item);
+}
+
 
     private void toggleLanguage() {
         try {
@@ -1855,4 +1819,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-}
+                    }
