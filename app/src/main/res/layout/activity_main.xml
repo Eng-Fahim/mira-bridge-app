@@ -6,25 +6,25 @@
     android:layout_height="match_parent"
     android:background="?attr/android:colorBackground">
 
-    <LinearLayout
+    <!-- 1. الهيدر العلوي الموحد بدون تداخل -->
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:background="transparent"
+        app:elevation="0dp">
 
-        <!-- 1. شريط علوي فاخر وهادئ بدل الذهبي الساطع الفاقع -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorSurface"
-            app:title="@string/app_name"
-            app:titleTextAppearance="@style/ToolbarTitleStyle"
-            app:titleTextColor="?attr/colorOnSurface"
+            android:background="?attr/colorPrimary"
             app:menu="@menu/main_menu"
             app:popupTheme="@style/CustomOverflowMenu"
-            app:elevation="0dp" />
+            app:title="@string/app_name"
+            app:titleTextAppearance="@style/ToolbarTitleStyle"
+            app:titleTextColor="?attr/colorOnPrimary" />
 
-        <!-- 2. شريط المؤشرات السريع بتصميم ناعم ومفصول بظلال خفيفة -->
+        <!-- شريط المؤشرات السريع -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="44dp"
@@ -32,8 +32,7 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp">
-            
-            <!-- مؤشر حالة الاتصال -->
+
             <LinearLayout
                 android:id="@+id/btnHardwareStatus"
                 android:layout_width="wrap_content"
@@ -56,9 +55,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/status_connected"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <View
@@ -66,7 +65,6 @@
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
-            <!-- أدوات التحكم والبحث -->
             <ImageButton
                 android:id="@+id/btnSubSearch"
                 android:layout_width="32dp"
@@ -88,65 +86,62 @@
                 app:tint="?attr/colorOnSurfaceVariant" />
 
         </LinearLayout>
+    </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- 3. حاوية العرض الرئيسية -->
-        <FrameLayout
-            android:id="@+id/fragment_container"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:paddingBottom="64dp"
-            android:clipToPadding="false"
-            android:background="?attr/android:colorBackground" />
+    <!-- 2. حاوية العرض الرئيسية المرتبطة بسلوك التمرير ومنع الاقتطاع -->
+    <FrameLayout
+        android:id="@+id/fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/android:colorBackground"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    </LinearLayout>
-
-    <!-- 4. شريط التنقل السفلي الفاخر (Material 3 Dock) -->
+    <!-- 3. شريط التنقل السفلي الفاخر -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigationView"
         android:layout_width="match_parent"
         android:layout_height="64dp"
         android:layout_gravity="bottom"
         android:background="?attr/colorSurface"
-        app:elevation="12dp"
+        app:elevation="8dp"
         app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
-        app:itemIconSize="20dp"
+        app:itemIconSize="22dp"
         app:itemIconTint="@color/nav_item_color_selector"
         app:itemRippleColor="@color/nav_item_color_selector"
         app:itemTextColor="@color/nav_item_color_selector"
         app:labelVisibilityMode="labeled"
         app:menu="@menu/bottom_nav_menu" />
 
-    <!-- 5. الزر الذهبي الأوسط الفاخر (Floating Action Button) -->
+    <!-- 4. الزر العائم (FAB) المربوط بمرساة فوق الشريط السفلي مباشرة -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabActionCenter"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="32dp"
         android:contentDescription="@string/nav_actions"
         app:backgroundTint="?attr/colorPrimary"
-        app:strokeColor="?attr/colorSurface"
-        app:strokeWidth="4dp"
-        app:elevation="8dp"
+        app:elevation="6dp"
         app:fabSize="normal"
+        app:layout_anchor="@id/bottomNavigationView"
+        app:layout_anchorGravity="top|center_horizontal"
         app:maxImageSize="26dp"
         app:srcCompat="@drawable/ic_gold_gem"
+        app:strokeColor="?attr/colorSurface"
+        app:strokeWidth="3dp"
         app:tint="#FFFFFF" />
 
-    <!-- 6. شاشة التحميل Overlay -->
+    <!-- 5. شاشة التحميل Overlay -->
     <LinearLayout
         android:id="@+id/successOverlayMain"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:alpha="0.0"
         android:background="#1F0F172A"
+        android:clickable="true"
+        android:elevation="20dp"
+        android:focusable="true"
         android:gravity="center"
         android:orientation="vertical"
-        android:visibility="gone"
-        android:alpha="0.0"
-        android:elevation="20dp"
-        android:clickable="true"
-        android:focusable="true">
+        android:visibility="gone">
 
         <ProgressBar
             android:layout_width="44dp"
