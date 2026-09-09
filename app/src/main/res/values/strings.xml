@@ -9,7 +9,8 @@
     <string name="menu_logout">تسجيل الخروج</string>
     <string name="menu_export_data">تصدير البيانات</string>
     <string name="menu_device_version">حول المنظومة</string>
-    
+     <string name="app_brand_name">MIRA</string>
+    <string name="app_brand_tagline">JEWELRY ID™</string>
     
     <!-- أضف هذه الأسطر المفقودة -->
     <string name="btn_view_pending">عرض القطع المعلقة</string>
