@@ -1,0 +1,152 @@
+package com.example.uhf.manager;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.util.Log;
+
+import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.dialog.POSCheckoutDialog;
+import com.example.uhf.model.CartItem;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+public class POSManager {
+
+    private static final String TAG = "POSManager";
+    private static final String PREFS_OFFLINE = "pos_offline_sales_branch_";
+    
+    public interface CheckoutCallback {
+        void onSuccess(MiraApiClient.ApiResponse response);
+        void onOfflineSuccess(String saleId);
+        void onError(String error);
+    }
+
+    private Context context;
+    private MiraApiClient apiClient;
+    private boolean isArabic;
+
+    public POSManager(Context context) {
+        this.context = context;
+        this.apiClient = MiraApiClient.getInstance(context);
+        this.isArabic = context.getResources().getConfiguration().locale.getLanguage().equals("ar");
+    }
+
+    // ✅ تنفيذ البيع
+    public void executeCheckout(List<CartItem> cartList, POSCheckoutDialog.POSCheckoutData data, 
+                                int branchId, CheckoutCallback callback) {
+        try {
+            JSONObject payload = createPayload(cartList, data, branchId);
+            String localSaleId = saveSaleLocally(payload, data, cartList.size(), branchId);
+            
+            MiraApiClient.ApiResponse response = apiClient.checkout(payload);
+            
+            if (response != null && response.isSuccess) {
+                removeSaleFromLocal(localSaleId, branchId);
+                callback.onSuccess(response);
+            } else if (response == null || response.isNetworkError) {
+                callback.onOfflineSuccess(localSaleId);
+            } else {
+                callback.onError(response != null ? response.error : "Unknown error");
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "executeCheckout error: " + e.getMessage());
+            callback.onError(e.getMessage());
+        }
+    }
+
+    private JSONObject createPayload(List<CartItem> cartList, POSCheckoutDialog.POSCheckoutData data, 
+                                     int branchId) throws Exception {
+        JSONObject payload = new JSONObject();
+        payload.put("action", "COMPLETE_POS_SALE");
+        payload.put("branch_id", branchId);
+        payload.put("customer_name", data.customerName);
+        payload.put("customer_phone", data.customerPhone);
+        
+        JSONObject customer = new JSONObject();
+        customer.put("name", data.customerName);
+        customer.put("phone", data.customerPhone);
+        customer.put("payment_method", data.paymentMethod);
+        payload.put("customer", customer);
+        
+        JSONArray itemsArr = new JSONArray();
+        for (CartItem item : cartList) {
+            JSONObject obj = new JSONObject();
+            obj.put("epc", item.epc);
+            obj.put("title", item.name);
+            obj.put("karat", item.karat);
+            obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+            obj.put("price_usd", item.price);
+            obj.put("item_id", item.itemId);
+            obj.put("serial_no", item.serialNo);
+            itemsArr.put(obj);
+        }
+        payload.put("items", itemsArr);
+        
+        JSONObject payment = new JSONObject();
+        payment.put("subtotal_usd", data.originalTotal);
+        payment.put("discount_amount_usd", data.discountAmount);
+        payment.put("final_amount_usd", data.finalAmount);
+        payment.put("payment_method", data.paymentMethod);
+        payload.put("payment", payment);
+        
+        return payload;
+    }
+
+    private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckoutData data, 
+                                   int itemCount, int branchId) {
+        try {
+            String saleId = "SALE_" + System.currentTimeMillis();
+            JSONObject localSale = new JSONObject();
+            localSale.put("sale_id", saleId);
+            localSale.put("payload", payload);
+            localSale.put("customer_name", data.customerName);
+            localSale.put("payment_method", data.paymentMethod);
+            localSale.put("final_amount", data.finalAmount);
+            localSale.put("item_count", itemCount);
+            localSale.put("created_at", System.currentTimeMillis());
+            localSale.put("branch_id", branchId);
+            localSale.put("sync_status", "pending");
+            
+            String prefsName = PREFS_OFFLINE + branchId;
+            SharedPreferences prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+            String existingJson = prefs.getString("pending_sales", "[]");
+            JSONArray arr = new JSONArray(existingJson);
+            arr.put(localSale);
+            prefs.edit().putString("pending_sales", arr.toString()).apply();
+            
+            return saleId;
+        } catch (Exception e) {
+            Log.e(TAG, "saveSaleLocally error: " + e.getMessage());
+            return "";
+        }
+    }
+
+    public void removeSaleFromLocal(String saleId, int branchId) {
+        try {
+            String prefsName = PREFS_OFFLINE + branchId;
+            SharedPreferences prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+            String existingJson = prefs.getString("pending_sales", "[]");
+            JSONArray arr = new JSONArray(existingJson);
+            JSONArray newArr = new JSONArray();
+            
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject sale = arr.optJSONObject(i);
+                if (sale != null && !sale.optString("sale_id").equals(saleId)) {
+                    newArr.put(sale);
+                }
+            }
+            
+            prefs.edit().putString("pending_sales", newArr.toString()).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "removeSaleFromLocal error: " + e.getMessage());
+        }
+    }
+}
