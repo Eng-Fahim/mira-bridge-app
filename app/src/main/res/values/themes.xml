@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ==================== الثيم الرئيسي ==================== -->
+    <!-- ==================== الثيم الأساسي الرئيسي ==================== -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- داخل Base.Theme.Uhfuartdemo -->
+        
+        <!-- 🔗 ربط مكونات الماتيريال 3 الرئيسية -->
+        <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
+        <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
+        <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
         <item name="textInputStyle">@style/AppTextInputStyle</item>
         
         <!-- 🔤 الخطوط -->
@@ -65,6 +69,13 @@
         <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
+    <!-- ==================== تحويل الستايلات التابعة لتأخذ من الثيم الرئيسي ==================== -->
+    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
+    <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
+    <style name="AppTheme" parent="Theme.Uhfuartdemo" />
+    <style name="CustomTheme" parent="Theme.Uhfuartdemo" />
+    <style name="ActionBarBaseTheme" parent="Theme.Uhfuartdemo" />
+    <style name="ActionBarBaseTheme1" parent="Theme.Uhfuartdemo" />
 
     <!-- ==================== SplashTheme ==================== -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
@@ -96,13 +107,11 @@
         <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
     </style>
 
-    <!-- ✅ شكل النافذة الحوارية -->
     <style name="MiraDialogShape" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">20dp</item>
     </style>
 
-    <!-- ✅ تنسيق الأزرار -->
     <style name="MiraDialogButton.Positive" parent="Widget.Material3.Button.TextButton">
         <item name="android:textColor">#D4AF37</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -122,7 +131,7 @@
         <item name="android:textSize">14sp</item>
     </style>
 
-    <!-- ✅ ثيم الـ BottomSheet الموحد -->
+    <!-- ==================== BottomSheet ==================== -->
     <style name="MiraBottomSheetDialogTheme" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/MiraBottomSheetStyle</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -188,20 +197,10 @@
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
-
     <style name="ToolbarTitleStyle" parent="TextAppearance.Material3.TitleLarge">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textFontWeight">700</item>
-    </style>
-
-    <style name="CustomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <item name="android:color">#1AC5A059</item>
-        <item name="android:width">48dp</item>
-        <item name="android:height">32dp</item>
-        <item name="marginHorizontal">4dp</item>
-        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
     </style>
 
     <style name="AppTextInputStyle" parent="Widget.Material3.TextInputLayout.OutlinedBox">
