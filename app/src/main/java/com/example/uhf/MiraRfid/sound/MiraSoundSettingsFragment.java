@@ -221,6 +221,7 @@ public class MiraSoundSettingsFragment extends Fragment {
             });
 
             // 4. خيارات النغمات
+                       // 4. خيارات النغمات
             String[] tones = new String[]{"نغمة افتراضية", "تنبيه تأكيد", "تنبيه خطأ", "نغمة قصيرة", "تنبيه مرتفع"};
             Integer[] toneValues = new Integer[]{
                     event.defaultTone,
@@ -241,20 +242,33 @@ public class MiraSoundSettingsFragment extends Fragment {
                     break;
                 }
             }
+            
+            // تعيين القيمة بدون إطلاق الحدث برمجياً
             holder.spinnerTone.setSelection(selectedIndex, false);
+
+            // استخدام متغير لمنع التنفيذ الوهمي عند إعادة التدوير
+            holder.spinnerTone.setTag(false);
+            
+            holder.spinnerTone.setOnTouchListener((v, eventTouch) -> {
+                v.setTag(true); // تم اللمس بوعي من المستخدم
+                return false;
+            });
 
             holder.spinnerTone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                    // حفظ القيمة فقط إذا تغيرت بوعي
-                    if (toneValues[pos] != soundManager.getEventTone(event)) {
-                        soundManager.setEventTone(event, toneValues[pos]);
+                    Boolean isUserTouched = (Boolean) holder.spinnerTone.getTag();
+                    if (isUserTouched != null && isUserTouched) {
+                        if (toneValues[pos] != soundManager.getEventTone(event)) {
+                            soundManager.setEventTone(event, toneValues[pos]);
+                        }
                     }
                 }
 
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {}
             });
+
 
             // 5. زر المعاينة
             holder.btnTest.setOnClickListener(v -> {
