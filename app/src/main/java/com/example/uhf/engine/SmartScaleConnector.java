@@ -1,5 +1,6 @@
 package com.example.uhf.engine;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.os.Handler;
@@ -40,18 +41,61 @@ public class SmartScaleConnector {
         return connected;
     }
     
-        /**
+    /**
+     * الاتصال بالميزان عبر MAC Address
+     */
+    public void connectToDevice(String macAddress) {
+        if (macAddress == null || macAddress.isEmpty()) {
+            if (listener != null) listener.onScaleError("MAC Address is empty");
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                disconnect(); // إغلاق أي اتصال قديم أولاً
+                
+                BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                if (bluetoothAdapter == null) {
+                    if (listener != null) listener.onScaleError("Bluetooth not supported");
+                    return;
+                }
+                
+                BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
+                
+                socket = device.createRfcommSocketToServiceRecord(SPP_UUID);
+                socket.connect();
+                inputStream = socket.getInputStream();
+                outputStream = socket.getOutputStream();
+                connected = true;
+
+                final String deviceName = device.getName() != null ? device.getName() : "Smart Scale";
+                handler.post(() -> {
+                    if (listener != null) {
+                        listener.onScaleConnected(deviceName);
+                    }
+                });
+
+                startReading();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Connect error: " + e.getMessage());
+                connected = false;
+                handler.post(() -> {
+                    if (listener != null) {
+                        listener.onScaleError("فشل الاتصال بالميزان: " + e.getMessage());
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
      * محاولة الاتصال التلقائي بالميزان الذكي المحفوظ مسبقاً
      */
     public void connect() {
-        // TODO: يمكنك لاحقاً برمجة هذه الدالة لقراءة الـ MAC Address المحفوظ في إعدادات النظام (SharedPreferences)
-        // ثم تمرير كائن BluetoothDevice إلى الدالة الأساسية بالأسفل.
-        
-        Log.i(TAG, "Auto-connect triggered. Waiting for stored device implementation.");
-        
-        // لتجنب أي أخطاء حالية، الدالة الآن فارغة وتسمح بتجميع (Compile) التطبيق بنجاح.
+        // هذه الدالة يمكن تنفيذها لاحقاً
+        Log.i(TAG, "Auto-connect triggered. Use connectToDevice(String macAddress) instead.");
     }
-
 
     public void connect(BluetoothDevice device) {
         if (device == null) {
@@ -122,7 +166,6 @@ public class SmartScaleConnector {
             if (rawData == null || rawData.trim().isEmpty()) return 0;
             
             // تنقية وتجميع الأرقام والنقاط العشرية
-            // أمثلة: "ST,GS, +0005.20g" أو "12.8g"
             String cleaned = rawData.replaceAll("[^0-9.]", " ").trim();
             String[] parts = cleaned.split("\\s+");
             
