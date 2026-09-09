@@ -27,8 +27,6 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
-import androidx.appcompat.view.menu.MenuBuilder;
-import android.annotation.SuppressLint;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraAccountingFragment;
@@ -71,6 +69,7 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.SessionMonitorManager;
 import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.tools.SoundGenerator;
 import com.example.uhf.tools.ToastUtil;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -82,6 +81,7 @@ import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
@@ -479,7 +479,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    @SuppressLint("RestrictedApi")
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
@@ -943,7 +942,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             confirmLogout();
             return true;
         } else if (id == R.id.nav_sound_settings) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
+            // معالجة الانتقال إلى إعدادات الصوت بسلاسة بدون تجمد للـ UI Thread
+            checkInventoryLockAndExecute(() -> {
+                mainHandler.post(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
+            });
             return true;
         } else if (id == R.id.action_search) {
             showGlobalSearchDialog();
@@ -1437,12 +1439,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void playSound(int id) {
-        try {
-            String soundName = (id == 1) ? "beep_success" : "beep_error";
-            com.example.uhf.tools.SoundGenerator.playSound(soundName);
-        } catch (Exception e) {
-            Log.e(TAG, "playSound Error: " + e.getMessage());
-        }
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                String soundName = (id == 1) ? "beep_success" : "beep_error";
+                SoundGenerator.playSound(soundName);
+            } catch (Exception e) {
+                Log.e(TAG, "playSound Error: " + e.getMessage());
+            }
+        });
     }
 
     public void playSoundDelayed(int value) {
