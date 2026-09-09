@@ -21,6 +21,7 @@ import android.widget.FrameLayout;
 import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.annotation.SuppressLint;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
