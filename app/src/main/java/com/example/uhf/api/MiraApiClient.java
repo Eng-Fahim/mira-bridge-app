@@ -737,8 +737,12 @@ public interface NotificationCallback {
     void onError(String error);
 }
 
+public interface SearchCallback {
+    void onSuccess(List<ItemModel> results);
+    void onError(String error);
+}
 
-public void searchGlobal(String query, ApiCallback<List<ItemModel>> callback) {
+public void searchGlobal(String query, SearchCallback callback) {
     executorService.execute(() -> {
         try {
             JSONObject payload = new JSONObject();
@@ -774,7 +778,6 @@ public void searchGlobal(String query, ApiCallback<List<ItemModel>> callback) {
         }
     });
 }
-
 // دوال مساعدة لتحليل JSON
 private MessageModel parseMessageFromJson(JSONObject json) {
     try {
