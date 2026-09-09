@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- العنصر المحدد: يقرأ لون الثيم الذهبي الرئيسي -->
+    <!-- العنصر المحدد (Checked) -->
     <item android:color="?attr/colorPrimary" android:state_checked="true" />
-    
-    <!-- العناصر غير المحددة: تقرأ لون النص الثانوي المتجاوب -->
+
+    <!-- العنصر المعطل (Disabled) -->
+    <item android:alpha="0.38" android:color="?attr/colorOnSurface" android:state_enabled="false" />
+
+    <!-- العنصر أثناء الضغط (Pressed) -->
+    <item android:color="?attr/colorPrimary" android:state_pressed="true" />
+
+    <!-- الحالة الافتراضية -->
     <item android:color="?attr/colorOnSurfaceVariant" />
 </selector>
-
