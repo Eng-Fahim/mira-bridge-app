@@ -332,12 +332,12 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
-                MiraApiClient.ApiResponse MiraApiClient.ApiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
+MiraApiClient.ApiResponse apiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
 
-                JSONObject response = null;
-                if (MiraApiClient.ApiResponse != null && MiraApiClient.ApiResponse.isSuccess) {
-                    response = MiraApiClient.ApiResponse.data;
-                }
+JSONObject response = null;
+if (apiResponse != null && apiResponse.isSuccess) {
+    response = apiResponse.data;
+}
 
                 if (getActivity() != null) {
                     JSONObject finalResponse = response;
@@ -667,7 +667,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 JSONObject extraParams = new JSONObject();
                 extraParams.put("branch_id", branchesManager.getActiveBranchId());
 
-                MiraApiClient.MiraApiClient.ApiResponse response = client.authorize(epc, "radar_locate", extraParams);
+               MiraApiClient.ApiResponse response = client.authorize(epc, "radar_locate", extraParams);
 
                 if (getActivity() != null && response != null && response.isSuccess && response.data != null) {
                     JSONObject decision = response.data.optJSONObject("decision");
@@ -759,7 +759,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 params.put("status", "AVAILABLE");
                 params.put("branch_id", branchesManager.getActiveBranchId());
 
-                MiraApiClient.MiraApiClient.ApiResponse res = client.authorize(targetEpc, "mark_found", params);
+                MiraApiClient.ApiResponse res = client.authorize(targetEpc, "mark_found", params);
 
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
