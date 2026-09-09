@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ==================== الثيم الأساسي الرئيسي الفاخر (Global Enterprise Theme) ==================== -->
+    <!-- ==================== الثيم الأساسي الرئيسي الفاخر (Material 3 Enterprise) ==================== -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        
+
         <!-- 🔗 ربط مكونات الماتيريال 3 الرئيسية -->
         <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
         <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
         <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
         <item name="textInputStyle">@style/AppTextInputStyle</item>
-        
+
         <!-- 🔤 الخطوط -->
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
-        
+
         <!-- 🔤 أوزان Typography معززة للوضوح -->
         <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
@@ -30,43 +30,36 @@
         <item name="textAppearanceLabelLarge">@style/AppTextAppearance.Medium</item>
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
-        
+
         <!-- 🔤 إجبار المكونات المخصصة -->
-        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
         <item name="buttonStyle">@style/AppButtonStyle</item>
         <item name="radioButtonStyle">@style/AppRadioButtonStyle</item>
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
-        
-        <!-- 🎨 لوحة الألوان الفاخرة للوضع الفاتح (Luxury Gold & Royal Charcoal) -->
-        <!-- اللون الرئيسي: ذهبي دافئ فاخر بدلاً من الأصفر الساطع -->
-        <item name="colorPrimary">#B8860B</item>
+
+        <!-- 🎨 لوحة الألوان الفاخرة للوضع الفاتح (Enterprise Gold & Royal Slate) -->
+        <item name="colorPrimary">#D9A736</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <!-- خلفية البطاقات والأزرار المحددة بتلميح ذهبي خفيف جداً -->
-        <item name="colorPrimaryContainer">#FAF6EE</item>
-        <item name="colorOnPrimaryContainer">#3D2E06</item>
-        
-        <!-- اللون الثقافي الفرعي: كحلي ملكي راقٍ لإعطاء طابع أمان وEnterprise -->
-        <item name="colorSecondary">#1F2937</item>
+        <item name="colorPrimaryContainer">#FFF9ED</item>
+        <item name="colorOnPrimaryContainer">#423100</item>
+
+        <item name="colorSecondary">#1E293B</item>
         <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="colorSecondaryContainer">#F3F4F6</item>
-        <item name="colorOnSecondaryContainer">#111827</item>
-        
-        <!-- 🖼️ خلفية شاشة عامة هادئة ومريحة للعين -->
-        <item name="android:colorBackground">#F8FAFC</item>
-        <item name="colorOnBackground">#0F172A</item>
-        
-        <!-- 🗂️ الأسطح والبطاقات الفاخرة (Clean & Premium Surfaces) -->
+        <item name="colorSecondaryContainer">#F1F5F9</item>
+        <item name="colorOnSecondaryContainer">#0F172A</item>
+
+        <item name="android:colorBackground">#FAF8F5</item>
+        <item name="colorOnBackground">#1E293B</item>
+
         <item name="colorSurface">#FFFFFF</item>
-        <item name="colorOnSurface">#0F172A</item>
-        <item name="colorSurfaceVariant">#F1F5F9</item>
-        <item name="colorOnSurfaceVariant">#475569</item>
-        
-        <!-- 🔲 الحدود والإطارات الناعمة لتخفيف التزاحم البصري -->
+        <item name="colorOnSurface">#1E293B</item>
+        <item name="colorSurfaceVariant">#F4F0E8</item>
+        <item name="colorOnSurfaceVariant">#64748B</item>
+
         <item name="colorOutline">#E2E8F0</item>
         <item name="colorOutlineVariant">#CBD5E1</item>
-        
+
         <!-- ✅ توحيد النوافذ الحوارية والـ BottomSheets -->
         <item name="android:alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="alertDialogTheme">@style/MiraDialogTheme</item>
@@ -77,9 +70,6 @@
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
     <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
     <style name="AppTheme" parent="Theme.Uhfuartdemo" />
-    <style name="CustomTheme" parent="Theme.Uhfuartdemo" />
-    <style name="ActionBarBaseTheme" parent="Theme.Uhfuartdemo" />
-    <style name="ActionBarBaseTheme1" parent="Theme.Uhfuartdemo" />
 
     <!-- ==================== SplashTheme ==================== -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
@@ -88,28 +78,28 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">@android:color/white</item>
         <item name="android:navigationBarColor">@android:color/white</item>
-        
+
         <item name="android:windowSplashScreenBackground" tools:targetApi="s">@android:color/white</item>
         <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@android:color/transparent</item>
-        
+
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- ==================== MiraDialogTheme (نوافذ حوارية أكثر نعومة) ==================== -->
+    <!-- ==================== MiraDialogTheme (نوافذ حوارية) ==================== -->
     <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
         <item name="android:backgroundDimAmount">0.5</item>
-        <item name="android:textColorPrimary">#0F172A</item>
-        <item name="android:textColorSecondary">#475569</item>
-        <item name="android:titleTextColor">#B8860B</item>
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:titleTextColor">?attr/colorPrimary</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
-        <item name="colorAccent">#B8860B</item>
-        <item name="colorPrimary">#B8860B</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorAccent">?attr/colorPrimary</item>
+        <item name="colorPrimary">?attr/colorPrimary</item>
+        <item name="colorOnPrimary">?attr/colorOnPrimary</item>
         <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
-        
+
         <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
         <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
         <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
@@ -121,20 +111,20 @@
     </style>
 
     <style name="MiraDialogButton.Positive" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">#B8860B</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <style name="MiraDialogButton.Negative" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">#64748B</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textSize">14sp</item>
     </style>
 
     <style name="MiraDialogButton.Neutral" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">#8B6508</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textSize">14sp</item>
     </style>
@@ -177,11 +167,6 @@
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textStyle">bold</item>
         <item name="android:textFontWeight">700</item>
-    </style>
-
-    <style name="AppTextViewStyle" parent="Widget.AppCompat.TextView">
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:fontFamily">@font/cairo</item>
     </style>
 
     <style name="AppButtonStyle" parent="Widget.Material3.Button">
