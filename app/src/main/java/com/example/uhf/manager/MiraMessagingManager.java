@@ -275,7 +275,40 @@ public void clearUnreadCount() {
             }
         });
     }
-    
+    // ✅ تحديث حالة الرسالة/الإشعار كـ "مقروء" لدى السيرفر
+public void markMessageAsRead(String messageId, Runnable onSuccess) {
+    String userId = getCurrentUserId();
+    if (userId == null || messageId == null) return;
+
+    apiClient.markMessageAsRead(messageId, userId, new MiraApiClient.SimpleCallback() {
+        @Override
+        public void onSuccess() {
+            // تحديث الكاش المحلي وخصم العداد
+            for (MessageModel msg : messageCache) {
+                if (msg.getId().equals(messageId)) {
+                    msg.setRead(true);
+                    break;
+                }
+            }
+            int currentUnread = getUnreadMessageCount();
+            setUnreadMessageCount(Math.max(0, currentUnread - 1));
+            if (onSuccess != null) new Handler(Looper.getMainLooper()).post(onSuccess);
+        }
+
+        @Override
+        public void onError(String error) {
+            Log.e(TAG, "Failed to mark message as read: " + error);
+        }
+    });
+}
+
+// ✅ إرسال رد على رسالة محددة (Reply)
+public void replyToMessage(String parentMessageId, String receiverId, String content, MiraApiClient.SendMessageCallback callback) {
+    MessageModel replyMsg = new MessageModel(getCurrentUserId(), receiverId, content.trim());
+    replyMsg.setParentId(parentMessageId); // تعيين معرّف الرسالة الأصلية
+    sendMessage(receiverId, content, callback);
+}
+
     private void notifyNotificationListeners(int count) {
         new Handler(Looper.getMainLooper()).post(() -> {
             for (OnNotificationCountChangedListener listener : notificationListeners) {
