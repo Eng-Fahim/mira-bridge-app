@@ -479,35 +479,143 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
+    @SuppressLint("RestrictedApi")
+@Override
+public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.main_menu, menu);
 
-        MenuItem notificationItem = menu.findItem(R.id.action_notifications);
-        if (notificationItem != null) {
-            View actionView = notificationItem.getActionView();
-            if (actionView != null) {
-                txtBadgeCount = actionView.findViewById(R.id.txtBadgeCount);
-                actionView.setOnClickListener(v -> showNotificationsAndChatDialog());
+    // ✅ تهيئة عنصر الإشعارات في الـ Toolbar
+    MenuItem notificationItem = menu.findItem(R.id.action_notifications);
+    if (notificationItem != null) {
+        View actionView = notificationItem.getActionView();
+        if (actionView != null) {
+            txtBadgeCount = actionView.findViewById(R.id.txtBadgeCount);
+            actionView.setOnClickListener(v -> showNotificationsAndChatDialog());
+        }
+    }
+
+    // ✅ تهيئة مدير المراسلات
+    messagingManager = MiraMessagingManager.getInstance(this);
+    
+    // ✅ تعيين معرف المستخدم الحالي
+    int userId = sessionManager.getUserId();
+    if (userId > 0) {
+        messagingManager.setCurrentUserId(String.valueOf(userId));
+    }
+
+    // ✅ تسجيل المستمعين المنفصلين
+    messagingManager.addMessageCountListener(this::onMessageCountChanged);
+    messagingManager.addNotificationCountListener(this::onNotificationCountChanged);
+
+    // ✅ تحديث العداد الكلي من الكاش المحلي
+    updateTotalBadgeCount();
+
+    // ✅ بدء الفحص الدوري للإشعارات والرسائل
+    startNotificationPolling();
+
+    // ✅ تطبيق صلاحيات القائمة
+    PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+    applyToolbarMenuPermissions(menu, pm);
+    
+    return true;
+}
+
+// ==================== دوال مساعدة للعداد ====================
+
+/**
+ * ✅ تحديث عداد الرسائل - يستدعى عند تغير عدد الرسائل غير المقروءة
+ */
+private void onMessageCountChanged(int unreadCount) {
+    Log.d(TAG, "Message count changed: " + unreadCount);
+    updateTotalBadgeCount();
+}
+
+/**
+ * ✅ تحديث عداد الإشعارات - يستدعى عند تغير عدد الإشعارات غير المقروءة
+ */
+private void onNotificationCountChanged(int unreadCount) {
+    Log.d(TAG, "Notification count changed: " + unreadCount);
+    updateTotalBadgeCount();
+}
+
+/**
+ * ✅ تحديث العداد الكلي في الـ Toolbar
+ * يجمع عدد الرسائل + عدد الإشعارات غير المقروءة
+ */
+private void updateTotalBadgeCount() {
+    if (txtBadgeCount == null || messagingManager == null) return;
+    
+    int totalCount = messagingManager.getTotalUnreadCount();
+    
+    if (totalCount > 0) {
+        txtBadgeCount.setText(totalCount > 99 ? "99+" : String.valueOf(totalCount));
+        txtBadgeCount.setVisibility(View.VISIBLE);
+    } else {
+        txtBadgeCount.setVisibility(View.GONE);
+    }
+}
+
+/**
+ * ✅ بدء الفحص الدوري للرسائل والإشعارات
+ * يفحص كل 30 ثانية مع إلغاء الفحص السابق عند إعادة التشغيل
+ */
+private void startNotificationPolling() {
+    // إلغاء أي فحص سابق
+    stopNotificationPolling();
+    
+    notificationPollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isFinishing() && !isDestroyed()) {
+                // جلب عدد الرسائل غير المقروءة
+                if (messagingManager != null) {
+                    messagingManager.fetchMessagesFromServer(new MiraMessagingManager.OnMessagesLoadedListener() {
+                        @Override
+                        public void onMessagesLoaded(List<MessageModel> messages) {
+                            // تم التحديث تلقائياً عبر المستمع
+                            Log.d(TAG, "Polling: Messages updated, count=" + (messages != null ? messages.size() : 0));
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            Log.w(TAG, "Polling: Failed to fetch messages: " + error);
+                        }
+                    });
+                    
+                    // جلب الإشعارات
+                    messagingManager.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
+                        @Override
+                        public void onNotificationsLoaded(List<NotificationModel> notifications) {
+                            // تم التحديث تلقائياً عبر المستمع
+                            Log.d(TAG, "Polling: Notifications updated, count=" + (notifications != null ? notifications.size() : 0));
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            Log.w(TAG, "Polling: Failed to fetch notifications: " + error);
+                        }
+                    });
+                }
+                
+                // إعادة جدولة الفحص
+                notificationPollHandler.postDelayed(this, 30000); // كل 30 ثانية
             }
         }
+    };
+    
+    // أول فحص بعد 5 ثواني
+    notificationPollHandler.postDelayed(notificationPollRunnable, 5000);
+}
 
-        messagingManager = MiraMessagingManager.getInstance(this);
-        int userId = sessionManager.getUserId();
-        if (userId > 0) {
-            messagingManager.setCurrentUserId(String.valueOf(userId));
-        }
-
-        unreadCountListener = this::updateNotificationBadge;
-        messagingManager.addListener(unreadCountListener);
-        updateNotificationBadge(messagingManager.getUnreadCount());
-
-        startNotificationPolling();
-
-        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-        applyToolbarMenuPermissions(menu, pm);
-        return true;
+/**
+ * ✅ إيقاف الفحص الدوري
+ */
+private void stopNotificationPolling() {
+    if (notificationPollHandler != null && notificationPollRunnable != null) {
+        notificationPollHandler.removeCallbacks(notificationPollRunnable);
+        notificationPollRunnable = null;
     }
+}
 
     private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
         if (pm == null) return;
@@ -596,20 +704,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
-    private void startNotificationPolling() {
-        notificationPollRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isFinishing() && !isDestroyed()) {
-                    if (messagingManager != null) {
-                        messagingManager.fetchUnreadCountFromServer();
-                    }
-                    notificationPollHandler.postDelayed(this, 30000);
-                }
-            }
-        };
-        notificationPollHandler.postDelayed(notificationPollRunnable, 5000);
-    }
+  
 
     private void showNotificationsAndMessagingDialog() {
         BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
@@ -1687,10 +1782,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Navigation to login error: " + e.getMessage());
         }
     }
-
-    @Override
-    protected void onDestroy() {
-        try {
+@Override
+protected void onDestroy() {
+    try {
+        // ✅ إيقاف الفحص الدوري أولاً
+        stopNotificationPolling();
+        
+        // ✅ إزالة المستمعين
+        if (messagingManager != null) {
+            messagingManager.removeMessageCountListener(this::onMessageCountChanged);
+            messagingManager.removeNotificationCountListener(this::onNotificationCountChanged);
+        }
             stopPulseAnimation();
 
             com.example.uhf.MiraRfid.RFIDManager rfidManager =
@@ -1752,4 +1854,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
         }
     }
-}
+    }
