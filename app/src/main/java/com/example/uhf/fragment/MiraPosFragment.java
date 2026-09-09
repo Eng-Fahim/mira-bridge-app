@@ -46,7 +46,8 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.dialog.POSCheckoutDialog;
-import com.example.uhf.engine.SmartScaleConnector;
+import com.example.uhf.manager.SmartScaleManager;
+import com.example.uhf.utils.ScaleSimulationHelper;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
@@ -79,13 +80,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.content.BroadcastReceiver;
-import android.content.IntentFilter;
-import android.Manifest;
-import android.content.pm.PackageManager;
-import android.os.Build;
 
 
 public class MiraPosFragment extends MiraBaseFragment {
@@ -93,20 +87,12 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final String TAG = "MiraPosFragment";
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
     
-    // أضف بعد المتغيرات الموجودة
-private static final String PREFS_SCALE_MAC = "scale_mac_address";
-private static final String PREFS_SCALE_NAME = "scale_name";
-private static final int REQUEST_BLUETOOTH_PERMISSION = 1001;
-private static final int REQUEST_ENABLE_BT = 1002;
-
-private ArrayList<BluetoothDevice> discoveredDevices = new ArrayList<>();
-private BroadcastReceiver bluetoothReceiver;
-    
     private boolean isSyncing = false;
     private boolean isCheckoutDialogShowing = false; 
     private AlertDialog searchLoadingDialog;
     private SessionManager sessionManager;  // ✅ أضف هذا السطر
-    
+    private SmartScaleManager scaleManager;
+    private ScaleSimulationHelper simulationHelper;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private MiraApiClient apiClient;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -166,7 +152,7 @@ private boolean isRefundable = false;
     private final List<CartItem> cartList = new ArrayList<>();
     private final Set<String> scannedEpcs = new HashSet<>();
     private CartAdapter cartAdapter;
-    private SmartScaleConnector scaleConnector;
+    
     private double liveScaleWeight = 0.0;
 
    @Nullable
@@ -298,11 +284,10 @@ private void refreshData() {
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
             }
-            if (scaleConnector != null) scaleConnector.connect();
-            autoConnectScale();
-            if (tvCartStatus != null && cartList.isEmpty()) {
-                tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
-            }
+            if (scaleManager != null) {
+    scaleManager.connect();
+}
+
             // ✅ مزامنة القطع إذا مر أكثر من ساعة
         MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(requireContext());
         long lastSync = MiraLocalItemCache.getInstance(requireContext()).getLastSyncTime();
@@ -332,19 +317,19 @@ private void refreshData() {
 
 
     @Override
-    public void onPause() {
-        super.onPause();
-        try {
-            stopRFIDScan();
-            isCheckoutDialogShowing = false;
-            if (scaleConnector != null) scaleConnector.disconnect();
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onPause error: " + e.getMessage());
+public void onPause() {
+    super.onPause();
+    try {
+        stopRFIDScan();
+        isCheckoutDialogShowing = false;
+        // ✅ لا يوجد scaleConnector هنا - استخدم scaleManager
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
         }
+    } catch (Exception e) {
+        Log.e(TAG, "onPause error: " + e.getMessage());
     }
+}
 
     @Override
 public void onDestroyView() {
@@ -354,16 +339,12 @@ public void onDestroyView() {
         isCheckoutDialogShowing = false;
         dismissSearchLoadingDialog();
         if (rfidManager != null) rfidManager.setListener(null);
-        
-        // ✅ أضف هذا الجزء
-        if (bluetoothReceiver != null) {
-            try {
-                requireContext().unregisterReceiver(bluetoothReceiver);
-            } catch (Exception e) {
-                Log.e(TAG, "Unregister receiver error: " + e.getMessage());
-            }
-            bluetoothReceiver = null;
-        }
+        if (scaleManager != null) {
+    scaleManager.cleanup();
+}
+if (simulationHelper != null) {
+    simulationHelper.cleanup();
+}
         
     } catch (Exception e) {
         Log.e(TAG, "onDestroyView error: " + e.getMessage());
@@ -371,16 +352,19 @@ public void onDestroyView() {
 }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        try {
-            stopRFIDScan();
-            if (scaleConnector != null) scaleConnector.disconnect();
-            if (rfidManager != null) rfidManager.release();
-        } catch (Exception e) {
-            Log.e(TAG, "onDestroy error: " + e.getMessage());
+public void onDestroy() {
+    super.onDestroy();
+    try {
+        stopRFIDScan();
+        // ✅ استخدم scaleManager بدلاً من scaleConnector
+        if (scaleManager != null) {
+            scaleManager.cleanup();
         }
+        if (rfidManager != null) rfidManager.release();
+    } catch (Exception e) {
+        Log.e(TAG, "onDestroy error: " + e.getMessage());
     }
+}
 
     private int getActiveBranchId() {
         try {
@@ -576,29 +560,30 @@ public void onDestroyView() {
 
     private void initSmartScale() {
     try {
-        scaleConnector = new SmartScaleConnector();
-        scaleConnector.setListener(new SmartScaleConnector.ScaleListener() {
+        scaleManager = new SmartScaleManager(requireContext(), new SmartScaleManager.ScaleCallback() {
             @Override
-            public void onWeightReceived(double w) {
-                liveScaleWeight = w;
+            public void onWeightReceived(double weight) {
+                liveScaleWeight = weight;
                 safeRun(() -> {
                     if (tvScaleStatus != null) {
-                        tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", w));
+                        tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", weight));
                         tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
                     }
-                    updateCartItemsScaleWeight(w);
+                    updateCartItemsScaleWeight(weight);
                 });
             }
+
             @Override
-            public void onScaleConnected(String n) {
+            public void onScaleConnected(String name) {
                 safeRun(() -> {
                     if (tvScaleStatus != null) {
-                        tvScaleStatus.setText("⚖️ " + n);
+                        tvScaleStatus.setText("⚖️ " + name);
                         tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
                     }
-                    saveScaleInfo(n);
+                    showToast(isArabic ? "✅ تم الاتصال: " + name : "✅ Connected: " + name);
                 });
             }
+
             @Override
             public void onScaleDisconnected() {
                 liveScaleWeight = 0.0;
@@ -609,17 +594,38 @@ public void onDestroyView() {
                     }
                 });
             }
+
             @Override
-            public void onScaleError(String e) {
-                Log.e(TAG, "Scale Error: " + e);
+            public void onScaleError(String error) {
+                Log.e(TAG, "Scale Error: " + error);
             }
         });
-        
+
         // إضافة مستمع للنقر على حالة الميزان
         if (tvScaleStatus != null) {
-            tvScaleStatus.setOnClickListener(v -> showScaleConnectionDialog());
+            tvScaleStatus.setOnClickListener(v -> {
+                if (scaleManager != null) {
+                    scaleManager.showSettingsDialog();
+                }
+            });
         }
-        
+
+        // تهيئة المحاكاة
+        simulationHelper = new ScaleSimulationHelper(requireContext(), new ScaleSimulationHelper.SimulationCallback() {
+            @Override
+            public void onWeightReceived(double weight, String label) {
+                safeRun(() -> {
+                    liveScaleWeight = weight;
+                    if (tvScaleStatus != null) {
+                        tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg (محاكاة)", weight));
+                        tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
+                    }
+                    updateCartItemsScaleWeight(weight);
+                    showToast("📦 " + label + ": " + weight + "g");
+                });
+            }
+        });
+
     } catch (Exception e) {
         Log.e(TAG, "initSmartScale error: " + e.getMessage());
     }
@@ -3004,232 +3010,6 @@ private void removeSoldItemsFromCache() {
         }
     } catch (Exception e) {
         Log.e(TAG, "removeSoldItemsFromCache error: " + e.getMessage());
-    }
-}
-// ==================== دوال الميزان الجديدة ====================
-
-private void showScaleConnectionDialog() {
-    try {
-        if (!isAdded() || getContext() == null) return;
-        
-        String[] options;
-        if (scaleConnector != null && scaleConnector.isConnected()) {
-            options = new String[]{
-                isArabic ? "🔌 قطع الاتصال" : "🔌 Disconnect"
-            };
-        } else {
-            options = new String[]{
-                isArabic ? "📡 الاتصال عبر Bluetooth" : "📡 Connect via Bluetooth",
-                isArabic ? "🔍 البحث عن ميزان جديد" : "🔍 Search for new scale"
-            };
-        }
-        
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "⚖️ إعدادات الميزان" : "⚖️ Scale Settings")
-            .setItems(options, (dialog, which) -> {
-                if (scaleConnector != null && scaleConnector.isConnected()) {
-                    scaleConnector.disconnect();
-                    deleteSavedScaleMac();
-                } else {
-                    if (which == 0) {
-                        String savedMac = getSavedScaleMac();
-                        if (savedMac != null && !savedMac.isEmpty()) {
-                            scaleConnector.connectToDevice(savedMac);
-                        } else {
-                            startBluetoothDiscovery();
-                        }
-                    } else {
-                        startBluetoothDiscovery();
-                    }
-                }
-            })
-            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-            .show();
-            
-    } catch (Exception e) {
-        Log.e(TAG, "showScaleConnectionDialog error: " + e.getMessage());
-    }
-}
-
-private void startBluetoothDiscovery() {
-    try {
-        if (!isAdded() || getContext() == null) return;
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (requireContext().checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQUEST_BLUETOOTH_PERMISSION);
-                return;
-            }
-        }
-        
-        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter == null) {
-            showToast(isArabic ? "❌ Bluetooth غير مدعوم" : "❌ Bluetooth not supported");
-            return;
-        }
-        
-        if (!bluetoothAdapter.isEnabled()) {
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-            return;
-        }
-        
-        showToast(isArabic ? "📡 جاري البحث عن الموازين..." : "📡 Scanning for scales...");
-        discoveredDevices.clear();
-        
-        bluetoothReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                String action = intent.getAction();
-                
-                if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if (device != null) {
-                        if (!discoveredDevices.contains(device)) {
-                            discoveredDevices.add(device);
-                        }
-                    }
-                } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                    showDiscoveredDevices();
-                }
-            }
-        };
-        
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(BluetoothDevice.ACTION_FOUND);
-        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        requireContext().registerReceiver(bluetoothReceiver, filter);
-        
-        bluetoothAdapter.startDiscovery();
-        
-    } catch (Exception e) {
-        Log.e(TAG, "startBluetoothDiscovery error: " + e.getMessage());
-    }
-}
-
-private void showDiscoveredDevices() {
-    try {
-        if (!isAdded() || getContext() == null) return;
-        
-        if (bluetoothReceiver != null) {
-            try {
-                requireContext().unregisterReceiver(bluetoothReceiver);
-            } catch (Exception e) {
-                Log.e(TAG, "Unregister receiver error: " + e.getMessage());
-            }
-            bluetoothReceiver = null;
-        }
-        
-        if (discoveredDevices == null || discoveredDevices.isEmpty()) {
-            showToast(isArabic ? "⚠️ لم يتم العثور على أجهزة" : "⚠️ No devices found");
-            return;
-        }
-        
-        String[] deviceNames = new String[discoveredDevices.size()];
-        for (int i = 0; i < discoveredDevices.size(); i++) {
-            BluetoothDevice device = discoveredDevices.get(i);
-            deviceNames[i] = device.getName() != null ? device.getName() : "Unknown " + device.getAddress();
-        }
-        
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "📡 اختر الميزان" : "📡 Select Scale")
-            .setItems(deviceNames, (dialog, which) -> {
-                BluetoothDevice selectedDevice = discoveredDevices.get(which);
-                connectToScale(selectedDevice);
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-            .show();
-            
-    } catch (Exception e) {
-        Log.e(TAG, "showDiscoveredDevices error: " + e.getMessage());
-    }
-}
-
-private void connectToScale(BluetoothDevice device) {
-    try {
-        showToast(isArabic ? "🔄 جاري الاتصال بـ " + device.getName() : "🔄 Connecting to " + device.getName());
-        saveScaleMac(device.getAddress());
-        scaleConnector.connectToDevice(device.getAddress());
-    } catch (Exception e) {
-        Log.e(TAG, "connectToScale error: " + e.getMessage());
-    }
-}
-
-private void autoConnectScale() {
-    try {
-        String savedMac = getSavedScaleMac();
-        if (savedMac != null && !savedMac.isEmpty()) {
-            scaleConnector.connectToDevice(savedMac);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "autoConnectScale error: " + e.getMessage());
-    }
-}
-
-private void saveScaleMac(String macAddress) {
-    try {
-        Context ctx = getContext();
-        if (ctx == null) return;
-        
-        SharedPreferences prefs = ctx.getSharedPreferences("scale_settings", Context.MODE_PRIVATE);
-        prefs.edit().putString(PREFS_SCALE_MAC, macAddress).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "saveScaleMac error: " + e.getMessage());
-    }
-}
-
-private String getSavedScaleMac() {
-    try {
-        Context ctx = getContext();
-        if (ctx == null) return null;
-        
-        SharedPreferences prefs = ctx.getSharedPreferences("scale_settings", Context.MODE_PRIVATE);
-        return prefs.getString(PREFS_SCALE_MAC, null);
-    } catch (Exception e) {
-        Log.e(TAG, "getSavedScaleMac error: " + e.getMessage());
-        return null;
-    }
-}
-
-private void deleteSavedScaleMac() {
-    try {
-        Context ctx = getContext();
-        if (ctx == null) return;
-        
-        SharedPreferences prefs = ctx.getSharedPreferences("scale_settings", Context.MODE_PRIVATE);
-        prefs.edit().remove(PREFS_SCALE_MAC).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "deleteSavedScaleMac error: " + e.getMessage());
-    }
-}
-
-private void saveScaleInfo(String deviceName) {
-    try {
-        Context ctx = getContext();
-        if (ctx == null) return;
-        
-        SharedPreferences prefs = ctx.getSharedPreferences("scale_settings", Context.MODE_PRIVATE);
-        prefs.edit().putString(PREFS_SCALE_NAME, deviceName).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "saveScaleInfo error: " + e.getMessage());
-    }
-}
-
-private void updateCartItemsScaleWeight(double currentScaleWeight) {
-    if (cartList.isEmpty() || currentScaleWeight <= 0) return;
-    
-    CartItem topItem = cartList.get(0);
-    if (topItem.scaleWeight != currentScaleWeight) {
-        topItem.scaleWeight = currentScaleWeight;
-        
-        if (priceManager != null && topItem.weight > 0) {
-            topItem.price = priceManager.calculateGoldPrice(getKaratNumber(topItem.karat), currentScaleWeight);
-        }
-        
-        if (cartAdapter != null) {
-            cartAdapter.notifyItemChanged(0);
-        }
-        updateCartSummary();
     }
 }
 
