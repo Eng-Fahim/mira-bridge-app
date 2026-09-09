@@ -1,0 +1,38 @@
+package com.example.uhf.navigation;
+
+import androidx.fragment.app.Fragment;
+
+import com.example.uhf.fragment.*;
+
+public class FragmentFactory {
+
+    public static Fragment createFragmentByTag(String tag) {
+        if (tag == null) return new MiraDashboardFragment();
+
+        switch (tag) {
+            case "Dashboard": return new MiraDashboardFragment();
+            case "Scan": return new MiraInventoryProFragment();
+            case "POS": return new MiraPosFragment();
+            case "Transfers": return new MiraTransferFragment();
+            case "IdentityStudio": return new MiraIdentityStudioFragment();
+            case "Radar": return new MiraUHFRadarLocationFragment();
+            case "SecureGate": return new MiraSecureGateFragment();
+            case "Reports": return new MiraReportsProFragment();
+            case "Accounting": return new MiraAccountingFragment();
+            case "AdminHub": return new MiraAdminHubFragment();
+            case "SalesHistory": return new MiraSalesHistoryFragment();
+            case "ServerConfig": return new MiraServerConfigFragment();
+            case "GoldRates": return new MiraGoldCurrencyFragment();
+            case "Profile": return new MiraProfileFragment();
+            case "UsersManagement": return new UsersManagementFragment();
+            case "RFIDWrite": return new MiraUHFReadWriteFragment();
+            case "ReaderSetup": return new MiraReaderSetupFragment();
+            case "GateSettings": return new MiraGateSettingsFragment();
+            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+            case "Branches": return new MiraBranchesManagementFragment();
+            case "RfidBindings": return new MiraRfidBindingsFragment();
+            case "SoundSettings": return new MiraSoundSettingsFragment();
+            default: return new MiraDashboardFragment();
+        }
+    }
+}
