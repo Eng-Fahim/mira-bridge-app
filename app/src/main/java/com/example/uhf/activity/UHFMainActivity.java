@@ -25,6 +25,9 @@ import android.annotation.SuppressLint;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -333,77 +336,98 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-
-    try {
-        sessionManager = new SessionManager(getApplicationContext());
-        if (!sessionManager.isLoggedIn()) {
-            navigateToLogin();
-            return;
-        }
-
+    protected void onCreate(Bundle savedInstanceState) {
+        // 💡 ضبط الثيم بالكامل قبل stucture الـ Window و super.onCreate
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        setContentView(R.layout.activity_main);
 
-        cleanupOldFragments();
+        super.onCreate(savedInstanceState);
 
-        AppWatchdog.getInstance().startMonitoring(() -> {
-            Log.e(TAG, "UI Thread FROZEN! Restarting app...");
-            MiraApplication.getInstance().restartApp();
-        });
+        try {
+            sessionManager = new SessionManager(getApplicationContext());
+            if (!sessionManager.isLoggedIn()) {
+                navigateToLogin();
+                return;
+            }
 
-        ToastUtil.init(getApplicationContext());
-        initializeLanguageState();
+            setContentView(R.layout.activity_main);
 
-        branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
-        fragmentManager = getSupportFragmentManager();
+            // 💡 ضبط أبعاد أشرطة النظام (System Bars Window Insets)
+            View bottomNavView = findViewById(R.id.bottomNavigationView);
+            if (bottomNavView != null) {
+                ViewCompat.setOnApplyWindowInsetsListener(bottomNavView, (v, insets) -> {
+                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    v.setPadding(0, 0, 0, systemBars.bottom);
+                    return insets;
+                });
+            }
 
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            updateToolbarTitle();
-        }
+            View toolbarView = findViewById(R.id.toolbar);
+            if (toolbarView != null) {
+                ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
+                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    v.setPadding(0, systemBars.top, 0, 0);
+                    return insets;
+                });
+            }
 
-        // ✅ زر البحث السريع
-        View btnSubSearch = findViewById(R.id.btnSubSearch);
-        if (btnSubSearch != null) btnSubSearch.setOnClickListener(v -> showGlobalSearchDialog());
+            cleanupOldFragments();
 
-        // ✅ زر المزامنة
-        View btnSubSync = findViewById(R.id.btnSubSync);
-        if (btnSubSync != null) btnSubSync.setOnClickListener(v -> performDataSync());
-
-        // ✅ زر الإجراءات السريعة (بديل زر الإشعارات)
-        View btnSubQuickActions = findViewById(R.id.btnSubQuickActions);
-        if (btnSubQuickActions != null) btnSubQuickActions.setOnClickListener(v -> showQuickActionMenu());
-
-        // ✅ مؤشر حالة الأجهزة
-        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-        if (btnHardwareStatus != null) {
-            btnHardwareStatus.setOnClickListener(v -> {
-                showHardwareOptionsDialog();
-                mainHandler.postDelayed(this::updateHardwareStatusIndicator, 500);
+            AppWatchdog.getInstance().startMonitoring(() -> {
+                Log.e(TAG, "UI Thread FROZEN! Restarting app...");
+                MiraApplication.getInstance().restartApp();
             });
+
+            ToastUtil.init(getApplicationContext());
+            initializeLanguageState();
+
+            branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
+            fragmentManager = getSupportFragmentManager();
+
+            MaterialToolbar toolbar = findViewById(R.id.toolbar);
+            if (toolbar != null) {
+                setSupportActionBar(toolbar);
+                updateToolbarTitle();
+            }
+
+            // ✅ زر البحث السريع
+            View btnSubSearch = findViewById(R.id.btnSubSearch);
+            if (btnSubSearch != null) btnSubSearch.setOnClickListener(v -> showGlobalSearchDialog());
+
+            // ✅ زر المزامنة
+            View btnSubSync = findViewById(R.id.btnSubSync);
+            if (btnSubSync != null) btnSubSync.setOnClickListener(v -> performDataSync());
+
+            // ✅ زر الإجراءات السريعة
+            View btnSubQuickActions = findViewById(R.id.btnSubQuickActions);
+            if (btnSubQuickActions != null) btnSubQuickActions.setOnClickListener(v -> showQuickActionMenu());
+
+            // ✅ مؤشر حالة الأجهزة
+            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+            if (btnHardwareStatus != null) {
+                btnHardwareStatus.setOnClickListener(v -> {
+                    showHardwareOptionsDialog();
+                    mainHandler.postDelayed(this::updateHardwareStatusIndicator, 500);
+                });
+            }
+
+            updateHardwareStatusIndicator();
+            scheduleHardwareStatusUpdates();
+
+            setupQuickNav();
+            setupOrgProfileListener();
+
+            if (savedInstanceState == null) {
+                currentFragmentTag = "Dashboard";
+            } else {
+                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+            }
+
+            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
-
-        updateHardwareStatusIndicator();
-        scheduleHardwareStatusUpdates();
-
-        setupQuickNav();
-        setupOrgProfileListener();
-
-        if (savedInstanceState == null) {
-            currentFragmentTag = "Dashboard";
-        } else {
-            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-        }
-
-        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-
-    } catch (Exception e) {
-        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
     }
-}
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -418,6 +442,12 @@ protected void onCreate(Bundle savedInstanceState) {
 
             updateBottomNavLanguage();
             updateToolbarTitle();
+
+            supportInvalidateOptionsMenu();
+            View bottomNav = findViewById(R.id.bottomNavigationView);
+            if (bottomNav != null) {
+                bottomNav.refreshDrawableState();
+            }
 
         } catch (Exception e) {
             Log.e(TAG, "Configuration change error: " + e.getMessage());
@@ -485,142 +515,116 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     @SuppressLint("RestrictedApi")
-@Override
-public boolean onCreateOptionsMenu(Menu menu) {
-    getMenuInflater().inflate(R.menu.main_menu, menu);
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
 
-    // ✅ تهيئة عنصر الإشعارات في الـ Toolbar
-    MenuItem notificationItem = menu.findItem(R.id.action_notifications);
-    if (notificationItem != null) {
-        View actionView = notificationItem.getActionView();
-        if (actionView != null) {
-            txtBadgeCount = actionView.findViewById(R.id.txtBadgeCount);
-            actionView.setOnClickListener(v -> showNotificationsAndChatDialog());
-        }
-    }
-
-    // ✅ تهيئة مدير المراسلات
-    messagingManager = MiraMessagingManager.getInstance(this);
-    
-    // ✅ تعيين معرف المستخدم الحالي
-    int userId = sessionManager.getUserId();
-    if (userId > 0) {
-        messagingManager.setCurrentUserId(String.valueOf(userId));
-    }
-
-    // ✅ تسجيل المستمعين المنفصلين
-    messagingManager.addMessageCountListener(this::onMessageCountChanged);
-    messagingManager.addNotificationCountListener(this::onNotificationCountChanged);
-
-    // ✅ تحديث العداد الكلي من الكاش المحلي
-    updateTotalBadgeCount();
-
-    // ✅ بدء الفحص الدوري للإشعارات والرسائل
-    startNotificationPolling();
-
-    // ✅ تطبيق صلاحيات القائمة
-    PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-    applyToolbarMenuPermissions(menu, pm);
-    
-    return true;
-}
-
-// ==================== دوال مساعدة للعداد ====================
-
-/**
- * ✅ تحديث عداد الرسائل - يستدعى عند تغير عدد الرسائل غير المقروءة
- */
-private void onMessageCountChanged(int unreadCount) {
-    Log.d(TAG, "Message count changed: " + unreadCount);
-    updateTotalBadgeCount();
-}
-
-/**
- * ✅ تحديث عداد الإشعارات - يستدعى عند تغير عدد الإشعارات غير المقروءة
- */
-private void onNotificationCountChanged(int unreadCount) {
-    Log.d(TAG, "Notification count changed: " + unreadCount);
-    updateTotalBadgeCount();
-}
-
-/**
- * ✅ تحديث العداد الكلي في الـ Toolbar
- * يجمع عدد الرسائل + عدد الإشعارات غير المقروءة
- */
-private void updateTotalBadgeCount() {
-    if (txtBadgeCount == null || messagingManager == null) return;
-    
-    int totalCount = messagingManager.getTotalUnreadCount();
-    
-    if (totalCount > 0) {
-        txtBadgeCount.setText(totalCount > 99 ? "99+" : String.valueOf(totalCount));
-        txtBadgeCount.setVisibility(View.VISIBLE);
-    } else {
-        txtBadgeCount.setVisibility(View.GONE);
-    }
-}
-
-/**
- * ✅ بدء الفحص الدوري للرسائل والإشعارات
- * يفحص كل 30 ثانية مع إلغاء الفحص السابق عند إعادة التشغيل
- */
-private void startNotificationPolling() {
-    // إلغاء أي فحص سابق
-    stopNotificationPolling();
-    
-    notificationPollRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (!isFinishing() && !isDestroyed()) {
-                // جلب عدد الرسائل غير المقروءة
-                if (messagingManager != null) {
-                    messagingManager.fetchMessagesFromServer(new MiraMessagingManager.OnMessagesLoadedListener() {
-                        @Override
-                        public void onMessagesLoaded(List<MessageModel> messages) {
-                            // تم التحديث تلقائياً عبر المستمع
-                            Log.d(TAG, "Polling: Messages updated, count=" + (messages != null ? messages.size() : 0));
-                        }
-
-                        @Override
-                        public void onError(String error) {
-                            Log.w(TAG, "Polling: Failed to fetch messages: " + error);
-                        }
-                    });
-                    
-                    // جلب الإشعارات
-                    messagingManager.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
-                        @Override
-                        public void onNotificationsLoaded(List<NotificationModel> notifications) {
-                            // تم التحديث تلقائياً عبر المستمع
-                            Log.d(TAG, "Polling: Notifications updated, count=" + (notifications != null ? notifications.size() : 0));
-                        }
-
-                        @Override
-                        public void onError(String error) {
-                            Log.w(TAG, "Polling: Failed to fetch notifications: " + error);
-                        }
-                    });
-                }
-                
-                // إعادة جدولة الفحص
-                notificationPollHandler.postDelayed(this, 30000); // كل 30 ثانية
+        // ✅ تهيئة عنصر الإشعارات في الـ Toolbar
+        MenuItem notificationItem = menu.findItem(R.id.action_notifications);
+        if (notificationItem != null) {
+            View actionView = notificationItem.getActionView();
+            if (actionView != null) {
+                txtBadgeCount = actionView.findViewById(R.id.txtBadgeCount);
+                actionView.setOnClickListener(v -> showNotificationsAndChatDialog());
             }
         }
-    };
-    
-    // أول فحص بعد 5 ثواني
-    notificationPollHandler.postDelayed(notificationPollRunnable, 5000);
-}
 
-/**
- * ✅ إيقاف الفحص الدوري
- */
-private void stopNotificationPolling() {
-    if (notificationPollHandler != null && notificationPollRunnable != null) {
-        notificationPollHandler.removeCallbacks(notificationPollRunnable);
-        notificationPollRunnable = null;
+        // ✅ تهيئة مدير المراسلات
+        messagingManager = MiraMessagingManager.getInstance(this);
+
+        // ✅ تعيين معرف المستخدم الحالي
+        int userId = sessionManager.getUserId();
+        if (userId > 0) {
+            messagingManager.setCurrentUserId(String.valueOf(userId));
+        }
+
+        // ✅ تسجيل المستمعين المنفصلين
+        messagingManager.addMessageCountListener(this::onMessageCountChanged);
+        messagingManager.addNotificationCountListener(this::onNotificationCountChanged);
+
+        // ✅ تحديث العداد الكلي من الكاش المحلي
+        updateTotalBadgeCount();
+
+        // ✅ بدء الفحص الدوري للإشعارات والرسائل
+        startNotificationPolling();
+
+        // ✅ تطبيق صلاحيات القائمة
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+        applyToolbarMenuPermissions(menu, pm);
+
+        return true;
     }
-}
+
+    private void onMessageCountChanged(int unreadCount) {
+        Log.d(TAG, "Message count changed: " + unreadCount);
+        updateTotalBadgeCount();
+    }
+
+    private void onNotificationCountChanged(int unreadCount) {
+        Log.d(TAG, "Notification count changed: " + unreadCount);
+        updateTotalBadgeCount();
+    }
+
+    private void updateTotalBadgeCount() {
+        if (txtBadgeCount == null || messagingManager == null) return;
+
+        int totalCount = messagingManager.getTotalUnreadCount();
+
+        if (totalCount > 0) {
+            txtBadgeCount.setText(totalCount > 99 ? "99+" : String.valueOf(totalCount));
+            txtBadgeCount.setVisibility(View.VISIBLE);
+        } else {
+            txtBadgeCount.setVisibility(View.GONE);
+        }
+    }
+
+    private void startNotificationPolling() {
+        stopNotificationPolling();
+
+        notificationPollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isFinishing() && !isDestroyed()) {
+                    if (messagingManager != null) {
+                        messagingManager.fetchMessagesFromServer(new MiraMessagingManager.OnMessagesLoadedListener() {
+                            @Override
+                            public void onMessagesLoaded(List<MessageModel> messages) {
+                                Log.d(TAG, "Polling: Messages updated, count=" + (messages != null ? messages.size() : 0));
+                            }
+
+                            @Override
+                            public void onError(String error) {
+                                Log.w(TAG, "Polling: Failed to fetch messages: " + error);
+                            }
+                        });
+
+                        messagingManager.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
+                            @Override
+                            public void onNotificationsLoaded(List<NotificationModel> notifications) {
+                                Log.d(TAG, "Polling: Notifications updated, count=" + (notifications != null ? notifications.size() : 0));
+                            }
+
+                            @Override
+                            public void onError(String error) {
+                                Log.w(TAG, "Polling: Failed to fetch notifications: " + error);
+                            }
+                        });
+                    }
+
+                    notificationPollHandler.postDelayed(this, 30000);
+                }
+            }
+        };
+
+        notificationPollHandler.postDelayed(notificationPollRunnable, 5000);
+    }
+
+    private void stopNotificationPolling() {
+        if (notificationPollHandler != null && notificationPollRunnable != null) {
+            notificationPollHandler.removeCallbacks(notificationPollRunnable);
+            notificationPollRunnable = null;
+        }
+    }
 
     private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
         if (pm == null) return;
@@ -709,8 +713,6 @@ private void stopNotificationPolling() {
                 .show();
     }
 
-  
-
     private void showNotificationsAndMessagingDialog() {
         BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
 
@@ -734,9 +736,9 @@ private void stopNotificationPolling() {
         scrollView.setLayoutParams(scrollParams);
         root.addView(scrollView);
 
-        MiraMessagingManager messagingManager = MiraMessagingManager.getInstance(this);
+        MiraMessagingManager messagingMgr = MiraMessagingManager.getInstance(this);
 
-        List<NotificationModel> cachedNotifications = messagingManager.getCachedNotifications();
+        List<NotificationModel> cachedNotifications = messagingMgr.getCachedNotifications();
         if (cachedNotifications.isEmpty()) {
             TextView emptyView = new TextView(this);
             emptyView.setText(isArabic ? "لا توجد إشعارات حالياً" : "No notifications available");
@@ -753,7 +755,7 @@ private void stopNotificationPolling() {
             }
         }
 
-        messagingManager.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
+        messagingMgr.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
             @Override
             public void onNotificationsLoaded(List<NotificationModel> notifications) {
                 runOnUiThread(() -> {
@@ -805,7 +807,7 @@ private void stopNotificationPolling() {
 
                 String receiverId = "admin";
 
-                messagingManager.sendMessage(receiverId, content, new MiraApiClient.SendMessageCallback() {
+                messagingMgr.sendMessage(receiverId, content, new MiraApiClient.SendMessageCallback() {
                     @Override
                     public void onSuccess(MessageModel sentMessage) {
                         runOnUiThread(() -> {
@@ -1042,7 +1044,6 @@ private void stopNotificationPolling() {
             confirmLogout();
             return true;
         } else if (id == R.id.nav_sound_settings) {
-            // معالجة الانتقال إلى إعدادات الصوت بسلاسة بدون تجمد للـ UI Thread
             checkInventoryLockAndExecute(() -> {
                 mainHandler.post(() -> loadFragment(new MiraSoundSettingsFragment(), "SoundSettings"));
             });
@@ -1092,14 +1093,14 @@ private void stopNotificationPolling() {
     private void showGlobalSearchDialog() {
         BottomSheetDialog searchDialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
 
-        android.widget.LinearLayout searchLayout = new android.widget.LinearLayout(this);
-        searchLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        LinearLayout searchLayout = new LinearLayout(this);
+        searchLayout.setOrientation(LinearLayout.VERTICAL);
         searchLayout.setPadding(48, 48, 48, 48);
 
         TextView title = new TextView(this);
         title.setText(isArabic ? "🔍 البحث السريع في المنظومة" : "Global System Search");
         title.setTextSize(18);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTypeface(null, Typeface.BOLD);
         title.setPadding(0, 0, 0, 24);
         searchLayout.addView(title);
 
@@ -1787,17 +1788,16 @@ private void stopNotificationPolling() {
             Log.e(TAG, "Navigation to login error: " + e.getMessage());
         }
     }
-@Override
-protected void onDestroy() {
-    try {
-        // ✅ إيقاف الفحص الدوري أولاً
-        stopNotificationPolling();
-        
-        // ✅ إزالة المستمعين
-        if (messagingManager != null) {
-            messagingManager.removeMessageCountListener(this::onMessageCountChanged);
-            messagingManager.removeNotificationCountListener(this::onNotificationCountChanged);
-        }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            stopNotificationPolling();
+
+            if (messagingManager != null) {
+                messagingManager.removeMessageCountListener(this::onMessageCountChanged);
+                messagingManager.removeNotificationCountListener(this::onNotificationCountChanged);
+            }
             stopPulseAnimation();
 
             com.example.uhf.MiraRfid.RFIDManager rfidManager =
@@ -1809,10 +1809,6 @@ protected void onDestroy() {
 
             if (messagingManager != null && unreadCountListener != null) {
                 messagingManager.removeListener(unreadCountListener);
-            }
-
-            if (notificationPollHandler != null && notificationPollRunnable != null) {
-                notificationPollHandler.removeCallbacks(notificationPollRunnable);
             }
 
             AppWatchdog.getInstance().stopMonitoring();
