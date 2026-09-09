@@ -87,6 +87,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import com.example.uhf.adapter.UserNotificationAdapter;
+
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final boolean ENABLE_DASHBOARD = true;
@@ -665,32 +669,47 @@ protected void onCreate(Bundle savedInstanceState) {
 }
 
 private void showUserNotificationsDialog() {
-    BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+    com.google.android.material.bottomsheet.BottomSheetDialog dialog = 
+        new com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+    
     View view = getLayoutInflater().inflate(R.layout.dialog_user_notifications, null);
     dialog.setContentView(view);
 
-    RecyclerView recyclerView = view.findViewById(R.id.rvNotifications);
-    // ضبط RecyclerView مع Adapter احترافي يدعم:
-    // 1. إظهار شارة "جديد" للرسائل غير المقروءة.
-    // 2. عند النقر: تعليم الرسالة كمقروءة وفتح تفاصيلها.
-    // 3. إضافة زر "رد" داخل التفاصيل يفتح Input السريع لإرسال الرد للمُرسِل.
+    RecyclerView rvNotifications = view.findViewById(R.id.rvNotifications);
+    rvNotifications.setLayoutManager(new LinearLayoutManager(this));
 
+    // تعبئة البيانات وربط الـ Adapter
+    MiraMessagingManager messagingManager = MiraMessagingManager.getInstance(this);
     messagingManager.fetchNotificationsFromServer(new MiraMessagingManager.OnNotificationsLoadedListener() {
         @Override
         public void onNotificationsLoaded(List<NotificationModel> notifications) {
             runOnUiThread(() -> {
-                // تحديث القائمة بالـ Adapter
+                UserNotificationAdapter adapter = new UserNotificationAdapter(notifications, notification -> {
+                    // عند النقر: تحديث الحالة إلى مقروء
+                    if (!notification.isRead()) {
+                        messagingManager.markMessageAsRead(notification.getId(), () -> {
+                            notification.setRead(true);
+                            rvNotifications.getAdapter().notifyDataSetChanged();
+                            updateBadgeCounts(); // تحديث العداد في الشاشة الرئيسية
+                        });
+                    }
+                    // هنا يمكنك فتح نافذة "الرد" أو إظهار تفاصيل الرسالة كاملة
+                });
+                rvNotifications.setAdapter(adapter);
             });
         }
 
         @Override
         public void onError(String error) {
-            Toast.makeText(UHFMainActivity.this, error, Toast.LENGTH_SHORT).show();
+            runOnUiThread(() -> 
+                android.widget.Toast.makeText(UHFMainActivity.this, "خطأ: " + error, android.widget.Toast.LENGTH_SHORT).show()
+            );
         }
     });
 
     dialog.show();
 }
+
 
     private void showNotificationsAndChatDialog() {
         if (messagingManager != null) {
