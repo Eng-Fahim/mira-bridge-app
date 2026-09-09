@@ -522,7 +522,7 @@ protected void onCreate(Bundle savedInstanceState) {
             View actionView = notificationItem.getActionView();
             if (actionView != null) {
                 txtBadgeCount = actionView.findViewById(R.id.txtBadgeCount);
-                actionView.setOnClickListener(v -> showNotificationsAndChatDialog());
+                actionView.setOnClickListener(v -> handleNotificationButtonClick());;
             }
         }
 
@@ -1642,13 +1642,12 @@ private void handleNotificationButtonClick() {
     PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
 
     if (pm.isAdmin() || pm.isManager()) {
-        // المدير يُخيَّر بين مركز المراسلات الإدارية أو الشات العام
-        showAdminMessagingMenu();
+        showNotificationsAndChatDialog();
     } else {
-        // المستخدم العادي يُفتح له مباشرة صندوق الإشعارات الخاص به
-        showUserNotificationsDialog();
+        showNotificationsAndMessagingDialog();
     }
 }
+
 
     private void handleDoubleBackToExit() {
         long currentTime = System.currentTimeMillis();
