@@ -77,13 +77,18 @@
     <style name="ActionBarBaseTheme" parent="Theme.Uhfuartdemo" />
     <style name="ActionBarBaseTheme1" parent="Theme.Uhfuartdemo" />
 
-    <!-- ==================== SplashTheme ==================== -->
+    <!-- ==================== SplashTheme (المُعدّل لمنع الشاشة الافتراضية) ==================== -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_background_gradient</item>
         <item name="android:windowFullscreen">true</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#0F0C29</item>
-        <item name="android:navigationBarColor">#0F0C29</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@android:color/white</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
+        
+        <!-- إضافات هامة لإلغاء أيقونة النظام الافتراضية لأندرويد الحديث -->
+        <item name="android:windowSplashScreenBackground" tools:targetApi="s">@android:color/white</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@android:color/transparent</item>
+        
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
