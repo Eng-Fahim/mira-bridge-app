@@ -86,6 +86,7 @@ public class InventoryLockManager {
             
             // 2. إخفاء FAB
             hideFab();
+            hideSecondaryToolbar();   
             
             Log.i(TAG, "🔒 Inventory Lock Mode ACTIVATED");
         } catch (Exception e) {
@@ -111,7 +112,7 @@ public class InventoryLockManager {
             
             // 2. إظهار FAB
             showFab();
-            
+            showSecondaryToolbar(); 
             Log.i(TAG, "🔓 Inventory Lock Mode DEACTIVATED");
         } catch (Exception e) {
             Log.e(TAG, "Error unlocking inventory mode", e);
@@ -166,6 +167,31 @@ public class InventoryLockManager {
                 })
                 .start();
     }
+    
+    // 🆕 إضافة جديدة
+private void hideSecondaryToolbar() {
+    View secondaryToolbar = activity.findViewById(R.id.secondaryToolbar);
+    if (secondaryToolbar == null) return;
+    
+    secondaryToolbar.animate()
+            .alpha(0f)
+            .setDuration(ANIM_DURATION)
+            .withEndAction(() -> secondaryToolbar.setVisibility(View.GONE))
+            .start();
+}
+
+private void showSecondaryToolbar() {
+    View secondaryToolbar = activity.findViewById(R.id.secondaryToolbar);
+    if (secondaryToolbar == null) return;
+    
+    secondaryToolbar.setVisibility(View.VISIBLE);
+    secondaryToolbar.setAlpha(0f);
+    secondaryToolbar.animate()
+            .alpha(1f)
+            .setDuration(ANIM_DURATION)
+            .start();
+}
+    
     
     /**
      * إظهار Bottom Navigation بحركة انسيابية
