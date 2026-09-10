@@ -87,6 +87,8 @@ import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
+import com.example.uhf.fragment.MiraReaderSetupFragment;
+import com.example.uhf.fragment.MiraGateSettingsFragment;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
