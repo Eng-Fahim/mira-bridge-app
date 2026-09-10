@@ -22,8 +22,14 @@ public class HardwareManager {
         void onError(String error);
     }
 
+    // ✅ واجهة جديدة للاستماع لتغيرات الحالة
+    public interface StatusChangeCallback {
+        void onStatusChanged(HardwareStatus status);
+    }
+
     private final RFIDManager rfidManager;
     private HardwareStatusListener listener;
+    private StatusChangeCallback statusChangeCallback;  // ✅ جديد
     private HardwareStatus currentStatus = HardwareStatus.DISCONNECTED;
     private boolean isScanning = false;
 
@@ -64,15 +70,37 @@ public class HardwareManager {
         });
     }
 
+    /**
+     * ✅ تحديث الحالة + إخطار جميع المستمعين
+     */
     public void updateStatus(HardwareStatus status) {
         if (currentStatus != status) {
             currentStatus = status;
+            
+            // إخطار المستمع الأصلي
             if (listener != null) listener.onStatusChanged(status);
+            
+            // ✅ إخطار callback الجديد
+            if (statusChangeCallback != null) statusChangeCallback.onStatusChanged(status);
         }
+    }
+
+    /**
+     * ✅ تعيين callback لتغيرات الحالة (يُستدعى من UHFMainActivity)
+     */
+    public void setStatusChangeCallback(StatusChangeCallback callback) {
+        this.statusChangeCallback = callback;
     }
 
     public HardwareStatus getCurrentStatus() {
         return currentStatus;
+    }
+
+    /**
+     * ✅ التحقق من حالة الاتصال
+     */
+    public boolean isConnected() {
+        return currentStatus == HardwareStatus.CONNECTED;
     }
 
     public boolean startScan() {
@@ -107,5 +135,7 @@ public class HardwareManager {
             rfidManager.setListener(null);
             rfidManager.stopScan();
         }
+        // ✅ تنظيف callback
+        statusChangeCallback = null;
     }
 }
