@@ -16,12 +16,15 @@
         android:background="?attr/colorPrimary"
         app:elevation="4dp">
 
+        <!-- ========== Toolbar الرئيسي ========== -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:paddingHorizontal="8dp"
-            app:contentInsetStartWithNavigation="0dp">
+            app:contentInsetStartWithNavigation="0dp"
+            app:menu="@menu/main_menu"
+            app:popupTheme="@style/CustomOverflowMenu">
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -46,45 +49,20 @@
                         android:textColor="@color/white"
                         android:textSize="15sp"
                         android:textStyle="bold"
-                        tools:text="البوعاني للذهب والمجوهرات" />
+                        tools:text="MIRA Jewelry" />
 
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/tvSubtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/tvSubtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="#E0E0E0"
-                            android:textSize="10sp"
-                            tools:text="📍 Main Branch" />
-
-                        <!-- مؤشر حالة الجهاز المطلوبة في StatusIndicatorManager -->
-                        <View
-                            android:id="@+id/statusDot"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_status_dot"
-                            android:visibility="gone" />
-
-                        <TextView
-                            android:id="@+id/statusText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:textColor="#FFFFFF"
-                            android:textSize="9sp"
-                            android:visibility="gone" />
-                    </LinearLayout>
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#E0E0E0"
+                        android:textSize="10sp"
+                        tools:text="📍 Main Branch" />
                 </LinearLayout>
 
-                <!-- أزرار الإجراءات والاستشعار -->
+                <!-- أزرار الإجراءات المخصصة في Toolbar -->
                 <LinearLayout
                     android:id="@+id/containerActions"
                     android:layout_width="wrap_content"
@@ -94,74 +72,59 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
+                    <!-- زر المزامنة -->
                     <ImageButton
                         android:id="@+id/btnSync"
                         android:layout_width="38dp"
                         android:layout_height="38dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Sync"
+                        android:contentDescription="@string/action_sync_data"
                         android:padding="8dp"
-                        android:src="@drawable/ic_export"
+                        android:src="@drawable/ic_sync"
                         app:tint="@color/white" />
 
+                    <!-- زر البحث -->
                     <ImageButton
                         android:id="@+id/btnSearch"
                         android:layout_width="38dp"
                         android:layout_height="38dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Search"
+                        android:contentDescription="@string/action_quick_search"
                         android:padding="8dp"
                         android:src="@drawable/ic_search"
                         app:tint="@color/white" />
 
+                    <!-- زر حالة الجهاز -->
                     <ImageButton
                         android:id="@+id/btnDeviceStatus"
                         android:layout_width="38dp"
                         android:layout_height="38dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Device Status"
+                        android:contentDescription="@string/menu_device_version"
                         android:padding="8dp"
-                        android:src="@drawable/ic_security"
+                        android:src="@drawable/ic_info"
                         app:tint="@color/white" />
                 </LinearLayout>
-
             </RelativeLayout>
-
         </com.google.android.material.appbar.MaterialToolbar>
-
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ==================== 2. MAIN CONTENT CONTAINER ==================== -->
+    <!-- ==================== 2. MAIN CONTENT ==================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات المطابق لـ NavigationManager -->
+        <!-- حاوي الشاشات -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
             android:layout_height="0dp"
+            android:background="?attr/colorSurface"
             app:layout_constraintBottom_toTopOf="@+id/bottomNavigationView"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
-
-        <!-- طبقة التحميل المطلوب وجودها في الكود الرئيسي -->
-        <FrameLayout
-            android:id="@+id/successOverlayMain"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#80000000"
-            android:clickable="true"
-            android:focusable="true"
-            android:visibility="gone">
-
-            <ProgressBar
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center" />
-        </FrameLayout>
 
         <!-- ==================== 3. BOTTOM NAVIGATION ==================== -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
@@ -170,13 +133,58 @@
             android:layout_height="wrap_content"
             android:background="?attr/colorSurface"
             app:elevation="8dp"
+            app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
+            app:itemIconSize="22dp"
             app:itemIconTint="@color/nav_item_color_selector"
+            app:itemRippleColor="@color/nav_item_color_selector"
             app:itemTextColor="@color/nav_item_color_selector"
             app:labelVisibilityMode="labeled"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
+
+        <!-- ==================== 4. FAB (وسط أسفل) ==================== -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabActionCenter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="@string/nav_actions"
+            app:backgroundTint="@color/fab_background"
+            app:elevation="14dp"
+            app:fabSize="normal"
+            app:layout_constraintBottom_toTopOf="@+id/bottomNavigationView"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:maxImageSize="28dp"
+            app:srcCompat="@drawable/ic_gold_gem"
+            app:strokeColor="?attr/colorSurface"
+            app:strokeWidth="3dp"
+            app:tint="@color/fab_icon_color" />
+
+        <!-- ==================== 5. LOADING OVERLAY ==================== -->
+        <FrameLayout
+            android:id="@+id/successOverlayMain"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0.0"
+            android:background="#33000000"
+            android:clickable="true"
+            android:elevation="20dp"
+            android:focusable="true"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ProgressBar
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:indeterminateTint="@color/progress_indicator_color" />
+        </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
