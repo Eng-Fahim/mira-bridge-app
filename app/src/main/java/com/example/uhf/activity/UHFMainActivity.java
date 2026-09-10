@@ -185,9 +185,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 updateToolbarTitle();
             }
 
-            // ✅ ربط أزرار التولبار المخصصة
-            setupToolbarActionButtons();
-
             // ✅ مراقبة استجابة الـ UI Thread
             AppWatchdog.getInstance().startMonitoring(() -> {
                 Log.e(TAG, "UI Thread FROZEN! Restarting app...");
@@ -430,23 +427,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    private void setupToolbarActionButtons() {
-        View btnSync = findViewById(R.id.btnSync);
-        if (btnSync != null) {
-            btnSync.setOnClickListener(v -> performDataSync());
-        }
-
-        View btnSearch = findViewById(R.id.btnSearch);
-        if (btnSearch != null) {
-            btnSearch.setOnClickListener(v -> showGlobalSearchDialog());
-        }
-
-        View btnDeviceStatus = findViewById(R.id.btnDeviceStatus);
-        if (btnDeviceStatus != null) {
-            btnDeviceStatus.setOnClickListener(v -> showSystemVersionDialog());
-        }
-    }
-
+    
     public void playSoundDelayed(int value) {
         if (soundManager != null) {
             soundManager.playDelayedSound(this, value);
@@ -1443,4 +1424,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-}
+        }
