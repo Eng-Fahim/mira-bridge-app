@@ -2,19 +2,15 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     
-    <!-- ✅ الخلفية -->
+    <!-- ✅ خلفية فاخرة شبه شفافة مع تمويه الارتفاع -->
     <solid android:color="?attr/colorSurface" />
     
-    <!-- ✅ زوايا علوية مستديرة -->
-    <corners
-        android:topLeftRadius="28dp"
-        android:topRightRadius="28dp"
-        android:bottomLeftRadius="0dp"
-        android:bottomRightRadius="0dp" />
+    <!-- ✅ انحناء دائري كامل للرصيف العائم -->
+    <corners android:radius="32dp" />
     
-    <!-- ✅ خط ذهبي علوي -->
+    <!-- ✅ إطار ذهبي مسبوك ناعم -->
     <stroke
-        android:width="1dp"
-        android:color="?attr/colorPrimary" />
+        android:width="1.5dp"
+        android:color="#40D9A736" />
     
 </shape>
