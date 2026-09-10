@@ -17,7 +17,6 @@
         android:background="?attr/colorPrimary"
         app:elevation="4dp">
 
-        <!-- ✅ الهيدر الرئيسي -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
@@ -40,7 +39,6 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:singleLine="true"
                     android:textColor="@color/white"
                     android:textSize="15sp"
                     android:textStyle="bold"
@@ -83,7 +81,6 @@
 
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- ✅ الشريط الثانوي -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
@@ -105,7 +102,7 @@
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintBottom_toTopOf="@+id/bottomNavigationView"
+            app:layout_constraintBottom_toTopOf="@+id/bottomAppBar"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -126,16 +123,32 @@
                 android:layout_gravity="center" />
         </FrameLayout>
 
-        <!-- ==================== 3. BOTTOM NAVIGATION (MD3) ==================== -->
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- ==================== 3. BOTTOM APP BAR (مع Cradle) ==================== -->
+    <com.google.android.material.bottomappbar.BottomAppBar
+        android:id="@+id/bottomAppBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_bottom_nav_rounded"
+        android:clipToOutline="true"
+        android:elevation="16dp"
+        app:fabAlignmentMode="center"
+        app:fabCradleMargin="8dp"
+        app:fabCradleRoundedCornerRadius="16dp"
+        app:fabCradleVerticalOffset="12dp"
+        app:popupTheme="@style/ThemeOverlay.Material3.Light">
+
+        <!-- ✅ BottomNavigationView مفصول لتجنب التكرار -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/colorSurface"
-            android:elevation="16dp"
-            app:elevation="16dp"
+            android:background="@android:color/transparent"
+            app:elevation="0dp"
             app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
-            app:itemIconSize="26dp"
+            app:itemIconSize="24dp"
             app:itemIconTint="@color/nav_item_color_selector"
             app:itemRippleColor="@color/nav_ripple_color"
             app:itemTextAppearanceActive="@style/NavItemTextActive"
@@ -143,12 +156,9 @@
             app:itemTextColor="@color/nav_item_color_selector"
             app:labelVisibilityMode="labeled"
             app:itemHorizontalTranslationEnabled="false"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    </com.google.android.material.bottomappbar.BottomAppBar>
 
     <!-- ==================== 4. FAB ==================== -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -161,8 +171,7 @@
         app:maxImageSize="24dp"
         app:fabSize="normal"
         app:borderWidth="0dp"
-        app:elevation="8dp"
-        app:layout_anchor="@id/bottomNavigationView"
-        app:layout_anchorGravity="center|top" />
+        app:elevation="12dp"
+        app:layout_anchor="@id/bottomAppBar" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
