@@ -48,16 +48,40 @@
                         android:textStyle="bold"
                         tools:text="البوعاني للذهب والمجوهرات" />
 
-                    <TextView
-                        android:id="@+id/tvSubtitle"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="#E0E0E0"
-                        android:textSize="10sp"
-                        tools:text="📍 Main Branch" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvSubtitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="#E0E0E0"
+                            android:textSize="10sp"
+                            tools:text="📍 Main Branch" />
+
+                        <!-- مؤشر حالة الجهاز المطلوبة في StatusIndicatorManager -->
+                        <View
+                            android:id="@+id/statusDot"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_status_dot"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/statusText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:textColor="#FFFFFF"
+                            android:textSize="9sp"
+                            android:visibility="gone" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <!-- أزرار الإجراءات والاستشعار -->
@@ -113,7 +137,7 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات المطابق لمعرف NavigationManager -->
+        <!-- حاوي الشاشات المطابق لـ NavigationManager -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
@@ -122,6 +146,22 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- طبقة التحميل المطلوب وجودها في الكود الرئيسي -->
+        <FrameLayout
+            android:id="@+id/successOverlayMain"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#80000000"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center" />
+        </FrameLayout>
 
         <!-- ==================== 3. BOTTOM NAVIGATION ==================== -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
