@@ -515,6 +515,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         
         if (rvInventoryItems != null) {
             rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
+            rvInventoryItems.setNestedScrollingEnabled(false);
             modernAdapter = new ModernScannedItemsAdapter(isArabic, item -> {
                 showItemOptionsDialog(item);
             });
@@ -2688,6 +2689,3 @@ private void showCategorySelectionDialog() {
     }
 
 } // ✅ نهاية الكلاس MiraInventoryProFragment
-
-
-    
