@@ -32,7 +32,7 @@
 
     <style name="TransparentBottomSheetDialog" parent="Theme.Design.Light.BottomSheetDialog">
         <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="androihttps://github.com/Eng-Fahim/mira-bridge-app/edit/main/app/src/main/res/values/styles.xmld:windowBackground">@android:color/transparent</item>
     </style>
 
     <!-- ==================== Bottom Navigation (MD3 Floating Luxury) ==================== -->
@@ -45,6 +45,17 @@
         <item name="marginHorizontal">4dp</item>
         <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
     </style>
+
+    <!-- ✅ نمط Bottom Navigation الرئيسي (الذي كان مفقوداً) -->
+<style name="AppBottomNavigationViewStyle" parent="Widget.Material3.BottomNavigationView">
+    <item name="itemActiveIndicatorStyle">@style/CustomActiveIndicator</item>
+    <item name="itemRippleColor">@color/nav_ripple_color</item>
+    <item name="elevation">16dp</item>
+    <item name="itemIconSize">26dp</item>
+    <item name="itemTextAppearanceActive">@style/NavItemTextActive</item>
+    <item name="itemTextAppearanceInactive">@style/NavItemTextInactive</item>
+    <item name="labelVisibilityMode">labeled</item>
+</style>
 
     <!-- ✅ نص العنصر النشط -->
     <style name="NavItemTextActive" parent="TextAppearance.Material3.LabelMedium">
