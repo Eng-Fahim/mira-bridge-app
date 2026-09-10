@@ -280,16 +280,163 @@ if (toolbar != null) {
             } else if (id == R.id.action_search) {
                 showGlobalSearchDialog();
                 return true;
+            } else if (id == R.id.action_quick_access_settings) {
+                loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+                return true;
             } else if (id == R.id.action_device_status) {
-                showSystemVersionDialog();
+                // ⚠️ لن يتم استدعاؤها لأن actionLayout يتعامل معها
                 return true;
             }
             
             return false;
         });
+        
+        // ✅ إعداد زر حالة الأجهزة (actionLayout)
+        setupDeviceStatusButton(secondaryToolbar);
     }
 }
 
+/**
+ * ✅ إعداد زر حالة الأجهزة (متصل/غير متصل)
+ */
+private void setupDeviceStatusButton(MaterialToolbar toolbar) {
+    try {
+        // البحث عن MenuItem بواسطة ID
+        Menu menu = toolbar.getMenu();
+        MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
+        
+        if (deviceStatusItem == null) return;
+        
+        View actionView = deviceStatusItem.getActionView();
+        if (actionView == null) return;
+        
+        // ✅ ربط العناصر
+        View statusDot = actionView.findViewById(R.id.deviceStatusDot);
+        TextView statusText = actionView.findViewById(R.id.deviceStatusText);
+        
+        // ✅ عند الضغط على الزر
+        actionView.setOnClickListener(v -> showHardwareOptionsDialog());
+        
+        // ✅ تحديث الحالة الأولية
+        updateDeviceStatusUI(statusDot, statusText);
+        
+        // ✅ الاستماع لتغيرات حالة الجهاز
+        if (hardwareManager != null) {
+            hardwareManager.setStatusChangeCallback(status -> {
+                mainHandler.post(() -> updateDeviceStatusUI(statusDot, statusText));
+            });
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "setupDeviceStatusButton error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ تحديث واجهة حالة الأجهزة
+ */
+private void updateDeviceStatusUI(View statusDot, TextView statusText) {
+    try {
+        if (statusDot == null || statusText == null) return;
+        
+        boolean isConnected = false;
+        
+        if (hardwareManager != null) {
+            isConnected = hardwareManager.isConnected();
+        }
+        
+        if (isConnected) {
+            statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
+            statusText.setText(isArabic ? "متصل" : "Connected");
+            statusText.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+        } else {
+            statusDot.setBackgroundResource(R.drawable.bg_status_dot_red);
+            statusText.setText(isArabic ? "غير متصل" : "Disconnected");
+            statusText.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "updateDeviceStatusUI error: " + e.getMessage());
+    }
+}
+
+
+private void showHardwareOptionsDialog() {
+    PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+    List<String> optionsList = new ArrayList<>();
+    List<Runnable> actionsList = new ArrayList<>();
+    
+    // 1. إعدادات قارئ RFID
+    if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
+        optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
+        actionsList.add(() -> loadFragment(new MiraReaderSetupFragment(), "ReaderSetup"));
+    }
+    
+    // 2. إعدادات البوابات الأمنية
+    if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
+        optionsList.add(isArabic ? "🚧 تهيئة البوابات الأمنية" : "🚧 Gate Security Setup");
+        actionsList.add(() -> loadFragment(new MiraGateSettingsFragment(), "GateSettings"));
+    }
+    
+    // 3. إعدادات السيرفر
+    if (pm.canViewServerConfig()) {
+        optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
+        actionsList.add(() -> loadFragment(new MiraServerConfigFragment(), "ServerConfig"));
+    }
+    
+    // 4. إدارة الشرائح المبرمجة
+    if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
+        optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
+        actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
+    }
+    
+    // 5. ⚙️ إعدادات تخصيص الوصول السريع (جديد!)
+    if (pm.canManageQuickAccess() || pm.isManager() || pm.isAdmin()) {
+        optionsList.add(isArabic ? "⚙️ إعدادات الوصول السريع" : "⚙️ Quick Access Settings");
+        actionsList.add(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+    }
+    
+    // 6. اختبار التوصيل
+    optionsList.add(isArabic ? "🔄 اختبار التوصيل والربط" : "🔄 Connection Test");
+    actionsList.add(this::performConnectionTest);
+    
+    String[] options = optionsList.toArray(new String[0]);
+    
+    new MaterialAlertDialogBuilder(this)
+            .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
+            .setItems(options, (dialog, which) -> {
+                if (which >= 0 && which < actionsList.size()) {
+                    actionsList.get(which).run();
+                }
+            })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+}
+
+/**
+ * ✅ اختبار التوصيل والربط
+ */
+private void performConnectionTest() {
+    showLoading();
+    
+    mainHandler.postDelayed(() -> {
+        hideLoading();
+        
+        boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
+        
+        String message = isConnected 
+            ? (isArabic ? "✅ الاتصال بالجهاز سليم\nجميع الأجهزة تعمل بشكل صحيح" 
+                        : "✅ Device connection OK\nAll devices operational")
+            : (isArabic ? "⚠️ لا يوجد اتصال بالجهاز\nيرجى التحقق من الاتصال" 
+                        : "⚠️ No device connection\nPlease check connection");
+        
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "نتيجة الاختبار" : "Test Result")
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .show();
+    }, 1500);
+}
     @Override
     public void onResume() {
         super.onResume();
@@ -1466,4 +1613,4 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-                            }
+    }
