@@ -28,11 +28,11 @@
             app:menu="@menu/main_menu">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
                 android:gravity="center_vertical"
-                android:paddingEnd="120dp">
+                android:paddingEnd="8dp">
 
                 <TextView
                     android:id="@+id/tvTitle"
@@ -40,10 +40,11 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
+                    android:singleLine="true"
                     android:textColor="@color/white"
                     android:textSize="15sp"
                     android:textStyle="bold"
-                    android:text="MIRA ID" />
+                    tools:text="البوعاني للذهب والمجوهرات" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -59,7 +60,7 @@
                         android:maxLines="1"
                         android:textColor="#E0E0E0"
                         android:textSize="10sp"
-                        android:text="📍 Main Branch" />
+                        tools:text="📍 الفرع الرئيسي" />
 
                     <View
                         android:id="@+id/statusDot"
@@ -82,13 +83,13 @@
 
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- ✅ الشريط الثانوي -->
+        <!-- ✅ الشريط الثانوي - يتبع الثيم -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:background="#FAF8F5"
-            app:elevation="2dp"
+            android:background="?attr/colorSurface"
+            app:elevation="4dp"
             app:menu="@menu/secondary_menu" />
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -99,6 +100,7 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
+        <!-- حاوي الشاشات -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
@@ -108,6 +110,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- ==================== طبقة التحميل ==================== -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
@@ -123,6 +126,7 @@
                 android:layout_gravity="center" />
         </FrameLayout>
 
+        <!-- ==================== 3. BOTTOM NAVIGATION ==================== -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
@@ -139,7 +143,7 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ==================== 3. FAB ==================== -->
+    <!-- ==================== 4. FAB ==================== -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabActionCenter"
         android:layout_width="wrap_content"
@@ -149,6 +153,8 @@
         app:tint="@color/white"
         app:maxImageSize="24dp"
         app:fabSize="normal"
+        app:borderWidth="0dp"
+        app:elevation="6dp"
         app:layout_anchor="@id/bottomNavigationView"
         app:layout_anchorGravity="center|top" />
 
