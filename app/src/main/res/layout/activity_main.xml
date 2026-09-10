@@ -60,7 +60,7 @@
                         tools:text="📍 Main Branch" />
                 </LinearLayout>
 
-                <!-- أزرار الإجراءات السريعة والاستشعار -->
+                <!-- أزرار الإجراءات والاستشعار -->
                 <LinearLayout
                     android:id="@+id/containerActions"
                     android:layout_width="wrap_content"
@@ -113,10 +113,9 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات الرئيسي (تمت إزالة defaultNavHost لمنع خطأ البناء) -->
-        <androidx.fragment.app.FragmentContainerView
-            android:id="@+id/nav_host_fragment"
-            android:name="androidx.navigation.fragment.NavHostFragment"
+        <!-- حاوي الشاشات المطابق لمعرف NavigationManager -->
+        <FrameLayout
+            android:id="@+id/fragment_container"
             android:layout_width="0dp"
             android:layout_height="0dp"
             app:layout_constraintBottom_toTopOf="@+id/bottomNavigationView"
