@@ -14,170 +14,138 @@
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#D4A338"
-        app:elevation="0dp">
+        android:background="?attr/colorPrimary"
+        app:elevation="4dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:paddingHorizontal="12dp"
-            app:contentInsetEnd="0dp"
-            app:contentInsetStart="0dp">
+            android:paddingHorizontal="8dp"
+            app:contentInsetStartWithNavigation="0dp"
+            app:menu="@menu/main_menu">
 
-            <RelativeLayout
+            <!-- ==================== اسم المؤسسة والفرع ==================== -->
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center_vertical"
+                android:paddingEnd="120dp">
 
-                <!-- جهة اليمين: العنوان والفرع -->
-                <LinearLayout
-                    android:id="@+id/layoutTitle"
+                <!-- اسم المؤسسة -->
+                <TextView
+                    android:id="@+id/tvTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:gravity="end"
-                    android:orientation="vertical">
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="البوعاني للذهب والمجوهرات" />
 
-                    <TextView
-                        android:id="@+id/tvTitle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="البوعاني للذهب والمجوهرات"
-                        android:textColor="@color/white"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <ImageView
-                            android:layout_width="12dp"
-                            android:layout_height="12dp"
-                            android:layout_marginStart="4dp"
-                            android:src="@drawable/ic_location"
-                            app:tint="#D32F2F" />
-
-                        <TextView
-                            android:id="@+id/tvSubtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Main Branch"
-                            android:textColor="#333333"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- جهة اليسار: الأيقونات (الخيارات، التنبيهات، الحساب، الأيقونة) -->
+                <!-- الفرع + مؤشر حالة الجهاز -->
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:layout_centerVertical="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <ImageButton
-                        android:id="@+id/btnMenu"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_more_vert"
-                        app:tint="#333333" />
+                    <TextView
+                        android:id="@+id/tvSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#E0E0E0"
+                        android:textSize="10sp"
+                        tools:text="📍 الفرع الرئيسي" />
 
-                    <!-- أيقونة الإشعارات مع Badge -->
-                    <FrameLayout
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_marginHorizontal="2dp">
+                    <!-- مؤشر حالة الجهاز (Dot) -->
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_status_dot"
+                        android:visibility="gone" />
 
-                        <ImageButton
-                            android:id="@+id/btnNotification"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_notifications"
-                            app:tint="#333333" />
-
-                        <TextView
-                            android:id="@+id/tvBadge"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:layout_gravity="top|end"
-                            android:layout_marginTop="2dp"
-                            android:background="@drawable/bg_notification_badge"
-                            android:gravity="center"
-                            android:text="3"
-                            android:textColor="@color/white"
-                            android:textSize="10sp"
-                            android:textStyle="bold" />
-                    </FrameLayout>
-
-                    <ImageButton
-                        android:id="@+id/btnProfile"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_person"
-                        app:tint="#333333" />
-
-                    <ImageButton
-                        android:id="@+id/btnHomeIcon"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_pentagon_home"
-                        app:tint="#333333" />
+                    <!-- نص حالة الجهاز -->
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:textColor="#FFFFFF"
+                        android:textSize="9sp"
+                        android:visibility="gone" />
                 </LinearLayout>
-
-            </RelativeLayout>
+            </LinearLayout>
 
         </com.google.android.material.appbar.MaterialToolbar>
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ==================== 2. FRAGMENT CONTAINER ==================== -->
-    <FrameLayout
-        android:id="@+id/fragment_container"
+    <!-- ==================== 2. MAIN CONTENT ==================== -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-    <!-- ==================== 3. BOTTOM NAVIGATION ==================== -->
-    <com.google.android.material.bottomappbar.BottomAppBar
-        android:id="@+id/bottomAppBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:backgroundTint="#FDFBF7"
-        app:fabAlignmentMode="center"
-        app:fabCradleMargin="8dp"
-        app:fabCradleRoundedCornerRadius="12dp">
+        <!-- حاوي الشاشات -->
+        <FrameLayout
+            android:id="@+id/fragment_container"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintBottom_toTopOf="@+id/secondaryAppBar"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- ==================== طبقة التحميل ==================== -->
+        <FrameLayout
+            android:id="@+id/successOverlayMain"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#80000000"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center" />
+        </FrameLayout>
+
+        <!-- ==================== 3. SECONDARY APP BAR (الشريط الثانوي) ==================== -->
+        <com.google.android.material.bottomappbar.BottomAppBar
+            android:id="@+id/secondaryAppBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="?attr/colorSurface"
+            app:elevation="4dp"
+            app:menu="@menu/secondary_menu"
+            app:layout_constraintBottom_toTopOf="@+id/bottomNavigationView"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <!-- ==================== 4. BOTTOM NAVIGATION ==================== -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
-            app:elevation="0dp"
+            android:background="?attr/colorSurface"
+            app:elevation="8dp"
+            app:itemIconTint="@color/nav_item_color_selector"
+            app:itemTextColor="@color/nav_item_color_selector"
             app:labelVisibilityMode="labeled"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-    </com.google.android.material.bottomappbar.BottomAppBar>
-
-    <!-- الزر الدائري البنفسجي في المنتصف -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabCenter"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_pentagon_white"
-        app:backgroundTint="#6200EE"
-        app:layout_anchor="@id/bottomAppBar"
-        app:maxImageSize="28dp"
-        app:tint="@color/white" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
