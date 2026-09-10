@@ -2,152 +2,147 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/android:colorBackground">
+    android:fitsSystemWindows="true"
+    tools:context=".MainActivity">
 
-    <!-- 1. الهيدر العلوي الموحد بدون تداخل -->
+    <!-- ==================== 1. APP BAR & TOOLBAR ==================== -->
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        app:elevation="0dp">
+        android:background="?attr/colorPrimary"
+        app:elevation="4dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:menu="@menu/main_menu"
-            app:popupTheme="@style/CustomOverflowMenu"
-            app:title="@string/app_name"
-            app:titleTextAppearance="@style/ToolbarTitleStyle"
-            app:titleTextColor="?attr/colorOnPrimary" />
+            android:paddingHorizontal="8dp"
+            app:contentInsetStartWithNavigation="0dp">
 
-        <!-- شريط المؤشرات السريع -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:background="?attr/colorSurfaceVariant"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp">
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
-            <LinearLayout
-                android:id="@+id/btnHardwareStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:background="@drawable/bg_luxury_card"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="12dp">
-
-                <View
-                    android:id="@+id/statusDot"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_status_dot_green" />
-
-                <TextView
-                    android:id="@+id/statusText"
+                <!-- اسم المؤسسة والفرع (محاذاة لليسار/البداية) -->
+                <LinearLayout
+                    android:id="@+id/containerTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/status_connected"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:layout_toStartOf="@+id/containerActions"
+                    android:orientation="vertical">
 
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
+                    <TextView
+                        android:id="@+id/tvTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/white"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        tools:text="البوعاني للذهب والمجوهرات" />
 
-            <ImageButton
-                android:id="@+id/btnSubSearch"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginHorizontal="2dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/action_quick_search"
-                android:src="@drawable/ic_search"
-                app:tint="?attr/colorOnSurfaceVariant" />
+                    <TextView
+                        android:id="@+id/tvSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#E0E0E0"
+                        android:textSize="10sp"
+                        tools:text="📍 Main Branch" />
+                </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/btnSubSync"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginHorizontal="2dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/action_sync_data"
-                app:srcCompat="@drawable/ic_sync"
-                app:tint="?attr/colorOnSurfaceVariant" />
+                <!-- أزرار الإجراءات السريعة والاستشعار في التولبار -->
+                <LinearLayout
+                    android:id="@+id/containerActions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-        </LinearLayout>
+                    <!-- زر المزامنة -->
+                    <ImageButton
+                        android:id="@+id/btnSync"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Sync"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_export"
+                        app:tint="@color/white" />
+
+                    <!-- زر البحث -->
+                    <ImageButton
+                        android:id="@+id/btnSearch"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Search"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_search"
+                        app:tint="@color/white" />
+
+                    <!-- مؤشر / زر استشعار حالة الأجهزة المرتبطة -->
+                    <ImageButton
+                        android:id="@+id/btnDeviceStatus"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Device Status"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_security"
+                        app:tint="@color/white" />
+                </LinearLayout>
+
+            </RelativeLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- 2. حاوية العرض الرئيسية المرتبطة بسلوك التمرير ومنع الاقتطاع -->
-    <FrameLayout
-        android:id="@+id/fragment_container"
+    <!-- ==================== 2. MAIN CONTENT CONTAINER ==================== -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/android:colorBackground"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-    <!-- 3. شريط التنقل السفلي الفاخر -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNavigationView"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_gravity="bottom"
-        android:background="?attr/colorSurface"
-        app:elevation="8dp"
-        app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
-        app:itemIconSize="22dp"
-        app:itemIconTint="@color/nav_item_color_selector"
-        app:itemRippleColor="@color/nav_item_color_selector"
-        app:itemTextColor="@color/nav_item_color_selector"
-        app:labelVisibilityMode="labeled"
-        app:menu="@menu/bottom_nav_menu" />
+        <!-- حاوي الشاشات الرئيسي: يتوقف دائماً فوق القائمة السفلية لحماية المحتوى -->
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/nav_host_fragment"
+            android:name="androidx.navigation.fragment.NavHostFragment"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:defaultNavHost="true"
+            app:layout_constraintBottom_toTopOf="@+id/bottomNavigationView"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 4. الزر العائم (FAB) المربوط بمرساة فوق الشريط السفلي مباشرة -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabActionCenter"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/nav_actions"
-        app:backgroundTint="?attr/colorPrimary"
-        app:elevation="6dp"
-        app:fabSize="normal"
-        app:layout_anchor="@id/bottomNavigationView"
-        app:layout_anchorGravity="top|center_horizontal"
-        app:maxImageSize="26dp"
-        app:srcCompat="@drawable/ic_gold_gem"
-        app:strokeColor="?attr/colorSurface"
-        app:strokeWidth="3dp"
-        app:tint="#FFFFFF" />
+        <!-- ==================== 3. BOTTOM NAVIGATION ==================== -->
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottomNavigationView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="?attr/colorSurface"
+            app:elevation="8dp"
+            app:itemIconTint="@color/nav_item_color_selector"
+            app:itemTextColor="@color/nav_item_color_selector"
+            app:labelVisibilityMode="labeled"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:menu="@menu/bottom_nav_menu" />
 
-    <!-- 5. شاشة التحميل Overlay -->
-    <LinearLayout
-        android:id="@+id/successOverlayMain"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0.0"
-        android:background="#1F0F172A"
-        android:clickable="true"
-        android:elevation="20dp"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ProgressBar
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:indeterminateTint="?attr/colorPrimary" />
-
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
