@@ -2162,7 +2162,12 @@
 <string name="rfid_total_programmed">إجمالي المبرمجة: %d</string>
 <string name="rfid_tab_available">📦 المتاحة</string>
 
+<string name="menu_sync">مزامنة</string>
+<string name="menu_search">بحث</string>
+<string name="menu_device_status">الأجهزة</string>
 
 <!-- اعدادات الصوت -->
 <string name="menu_sounds_setting">📦 اعدادات الصوت </string>
 </resources>
+
+
