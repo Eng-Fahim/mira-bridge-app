@@ -169,29 +169,40 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+    super.onCreate(savedInstanceState);
 
-        try {
-            sessionManager = new SessionManager(getApplicationContext());
-            if (!sessionManager.isLoggedIn()) {
-                navigateToLogin();
-                return;
-            }
+    try {
+        sessionManager = new SessionManager(getApplicationContext());
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
+        }
 
-            setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main);
 
-            // ✅ ضبط أبعاد أشرطة النظام
-            setupWindowInsets();
+        // ✅ ضبط أبعاد أشرطة النظام
+        setupWindowInsets();
 
-            cleanupOldFragments();
+        cleanupOldFragments();
 
-            // ✅ مراقبة التجميد
-            AppWatchdog.getInstance().startMonitoring(() -> {
-                Log.e(TAG, "UI Thread FROZEN! Restarting app...");
-                MiraApplication.getInstance().restartApp();
-            });
+        // ✅ إعداد القائمة والـ Toolbar
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
+        }
+
+        // 👈 اضف هذا السطر هنا لربط أزرار التولبار الجديدة
+        setupToolbarActionButtons();
+
+        // ✅ باقي المكونات
+        AppWatchdog.getInstance().startMonitoring(() -> {
+            Log.e(TAG, "UI Thread FROZEN! Restarting app...");
+            MiraApplication.getInstance().restartApp();
+        });
+
 
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
@@ -441,6 +452,27 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             soundManager.playSound(this, id);
         }
     }
+    
+    private void setupToolbarActionButtons() {
+    // 1. زر المزامنة
+    View btnSync = findViewById(R.id.btnSync);
+    if (btnSync != null) {
+        btnSync.setOnClickListener(v -> performDataSync());
+    }
+
+    // 2. زر البحث السريع
+    View btnSearch = findViewById(R.id.btnSearch);
+    if (btnSearch != null) {
+        btnSearch.setOnClickListener(v -> showGlobalSearchDialog());
+    }
+
+    // 3. زر استشعار/حالة الأجهزة والنظام
+    View btnDeviceStatus = findViewById(R.id.btnDeviceStatus);
+    if (btnDeviceStatus != null) {
+        btnDeviceStatus.setOnClickListener(v -> showSystemVersionDialog());
+    }
+}
+
 
     public void playSoundDelayed(int value) {
         if (soundManager != null) {
