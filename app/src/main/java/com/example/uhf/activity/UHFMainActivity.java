@@ -410,25 +410,31 @@ if (toolbar != null) {
     // ==================== التنقل ====================
 
     public void loadFragment(Fragment fragment, String tag) {
-        navigationManager.loadFragment(fragment, tag, true);
-        currentFragment = navigationManager.getCurrentFragment();
-        currentFragmentTag = tag;
-        updateBottomNavSelectionByTag(tag);
-    }
+    showLoading();  // ✅ عرض شاشة التحميل
+    navigationManager.loadFragment(fragment, tag, true);
+    currentFragment = navigationManager.getCurrentFragment();
+    currentFragmentTag = tag;
+    updateBottomNavSelectionByTag(tag);
+    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء بعد 250ms
+}
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        navigationManager.loadFragment(fragment, tag, addToBackStack);
-        currentFragment = navigationManager.getCurrentFragment();
-        currentFragmentTag = tag;
-        updateBottomNavSelectionByTag(tag);
-    }
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    showLoading();  // ✅ عرض شاشة التحميل
+    navigationManager.loadFragment(fragment, tag, addToBackStack);
+    currentFragment = navigationManager.getCurrentFragment();
+    currentFragmentTag = tag;
+    updateBottomNavSelectionByTag(tag);
+    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء
+}
 
-    public void loadFragmentDirectly(Fragment fragment, String tag) {
-        navigationManager.loadFragmentDirectly(fragment, tag);
-        currentFragment = navigationManager.getCurrentFragment();
-        currentFragmentTag = tag;
-        updateBottomNavSelectionByTag(tag);
-    }
+public void loadFragmentDirectly(Fragment fragment, String tag) {
+    showLoading();  // ✅ عرض شاشة التحميل
+    navigationManager.loadFragmentDirectly(fragment, tag);
+    currentFragment = navigationManager.getCurrentFragment();
+    currentFragmentTag = tag;
+    updateBottomNavSelectionByTag(tag);
+    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء
+}
 
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
