@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/quickActionSheetRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_luxury_bottom_sheet"
+    android:paddingTop="8dp"
+    android:paddingBottom="32dp"
+    android:paddingHorizontal="16dp">
+
+    <!-- ✅ مقبض السحب العلوي -->
+    <View
+        android:layout_width="48dp"
+        android:layout_height="5dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_handle_bar" />
+
+    <!-- ✅ رأس القائمة (العنوان + الأيقونة) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="20dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_icon_circle_gold"
+            android:padding="8dp"
+            android:src="@drawable/ic_flash"
+            app:tint="?attr/colorOnPrimary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvSheetTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚡ الإجراءات السريعة"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/cairo" />
+
+            <TextView
+                android:id="@+id/tvSheetSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="اختر الإجراء المناسب للبدء"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp"
+                android:fontFamily="@font/cairo" />
+        </LinearLayout>
+
+        <!-- زر الإغلاق -->
+        <ImageView
+            android:id="@+id/btnCloseSheet"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_close"
+            app:tint="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+
+    <!-- ✅ فاصل ذهبي أنيق -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/bg_gold_divider" />
+
+    <!-- ✅ الشبكة -->
+    <GridLayout
+        android:id="@+id/gridQuickActions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="4"
+        android:rowCount="3"
+        android:alignmentMode="alignMargins"
+        android:useDefaultMargins="false">
+
+        <!-- 1. كتابة RFID -->
+        <LinearLayout
+            android:id="@+id/btnRfidWrite"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_write"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="كتابة" />
+        </LinearLayout>
+
+        <!-- 2. ربط الشرائح -->
+        <LinearLayout
+            android:id="@+id/btnRfidBindings"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_rfid"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="الربط" />
+        </LinearLayout>
+
+        <!-- 3. استوديو التكويد -->
+        <LinearLayout
+            android:id="@+id/btnIdentityStudio"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_identity"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="التكويد" />
+        </LinearLayout>
+
+        <!-- 4. رادار التتبع -->
+        <LinearLayout
+            android:id="@+id/btnRadarLocation"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_radar"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="رادار" />
+        </LinearLayout>
+
+        <!-- 5. البوابات الأمنية -->
+        <LinearLayout
+            android:id="@+id/btnSecureGate"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_shield"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="بوابات" />
+        </LinearLayout>
+
+        <!-- 6. التقارير -->
+        <LinearLayout
+            android:id="@+id/btnReports"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_report"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="تقارير" />
+        </LinearLayout>
+
+        <!-- 7. المحاسبة -->
+        <LinearLayout
+            android:id="@+id/btnAccounting"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_accounting"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="محاسبة" />
+        </LinearLayout>
+
+        <!-- 8. التحويلات -->
+        <LinearLayout
+            android:id="@+id/btnTransfer"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_transfer"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="تحويل" />
+        </LinearLayout>
+
+        <!-- 9. سجل المبيعات -->
+        <LinearLayout
+            android:id="@+id/btnSalesHistory"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_history"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="مبيعات" />
+        </LinearLayout>
+
+        <!-- 10. الخيارات الإدارية -->
+        <LinearLayout
+            android:id="@+id/btnAdminHub"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_admin"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="إدارية" />
+        </LinearLayout>
+
+        <!-- 11. إعدادات السيرفر -->
+        <LinearLayout
+            android:id="@+id/btnServerConfig"
+            style="@style/LuxuryQuickActionItem">
+            <ImageView
+                style="@style/LuxuryQuickActionIcon"
+                android:src="@drawable/ic_server"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                style="@style/LuxuryQuickActionText"
+                android:text="السيرفر" />
+        </LinearLayout>
+
+        <!-- 12. حجز مساحة فارغة للتوازن -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="8dp"
+            android:visibility="invisible" />
+
+    </GridLayout>
+
+</LinearLayout>
