@@ -169,7 +169,6 @@
         app:maxImageSize="28dp"
         app:fabSize="normal"
         app:borderWidth="1.5dp"
-        app:borderColor="#40D9A736"
         app:elevation="20dp"
         app:pressedTranslationZ="6dp"
         app:layout_anchor="@id/bottomNavContainer"
