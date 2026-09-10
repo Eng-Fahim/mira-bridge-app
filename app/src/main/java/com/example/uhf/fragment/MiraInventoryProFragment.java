@@ -105,12 +105,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private TextView tvExpectedCount;
     
     // ==================== Status Header ====================
-    private View statusDot;
-    private View statusBar;
-    private TextView tvInventoryStatus;
-    private TextView tvElapsedTime;
-    private TextView tvRssi;
-    
+private View statusDot;
+private View statusBar;
+private TextView tvInventoryStatus;
+private TextView tvElapsedTime;
+private TextView tvRssi;
+private ImageView btnSettings;              // 🆕 أيقونة الإعدادات
+
+// ==================== إعدادات الجلسة ====================
+private String currentMode = "full";        // 🆕 full / category / blind
+private String currentKaratFilter = "all";  // 🆕 all / 24K / 22K / 21K / 18K / 14K
+
+
     // ==================== Segmented Control ====================
     private MaterialButtonToggleGroup segmentedModes;
     private MaterialButton btnModeFull;
@@ -436,170 +442,122 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     /**
      * تطبيق الصلاحيات
      */
-    private void applyPermissions() {
-        if (permissionManager == null) return;
-        
-        boolean canView = permissionManager.canView("inventory") || permissionManager.isManager();
-        boolean canEdit = permissionManager.canEdit("inventory") || permissionManager.isManager();
-        
-        if (btnMainToggleScan != null) btnMainToggleScan.setEnabled(canEdit);
-        if (btnGenerateReport != null) btnGenerateReport.setEnabled(canEdit);
-        if (btnCommitSession != null) btnCommitSession.setEnabled(canEdit);
-        if (btnArchiveReports != null) btnArchiveReports.setEnabled(canView);
-        
-        if (!canView && !canEdit && tvInventoryStatus != null) {
-            tvInventoryStatus.setText(isArabic ? "⛔ غير مصرح لك بالوصول" : "⛔ Access denied");
-        }
+   /**
+ * تطبيق الصلاحيات
+ */
+private void applyPermissions() {
+    if (permissionManager == null) return;
+    
+    boolean canEdit = permissionManager.canEdit("inventory") || permissionManager.isManager();
+    
+    if (btnMainToggleScan != null) btnMainToggleScan.setEnabled(canEdit);
+    if (btnCommitSession != null) btnCommitSession.setEnabled(canEdit);
+    
+    if (!canEdit && tvInventoryStatus != null) {
+        tvInventoryStatus.setText(isArabic ? "⛔ غير مصرح لك بالجرد" : "⛔ Access denied");
     }
+}
 
     /**
      * تطبيق اللغة
      */
-    private void applyLanguage() {
-        if (btnMainToggleScan != null) 
-            btnMainToggleScan.setText(isArabic ? "▶️ بدء جرد RFID" : "▶️ Start RFID Inventory");
-        if (btnGenerateReport != null) 
-            btnGenerateReport.setText(isArabic ? "📋 تقرير" : "📋 Report");
-        if (btnArchiveReports != null) 
-            btnArchiveReports.setText(isArabic ? "📂 الأرشيف" : "📂 Archive");
-        if (btnPowerControl != null) 
-            btnPowerControl.setText("⚡ " + currentPowerDbm + " dBm");
-        if (btnCommitSession != null)
-            btnCommitSession.setText(isArabic ? "اعتماد" : "Commit");
-    }
+   /**
+ * تطبيق اللغة
+ */
+private void applyLanguage() {
+    if (btnMainToggleScan != null) 
+        btnMainToggleScan.setText(isArabic ? "▶️ بدء جرد RFID" : "▶️ Start RFID Inventory");
+    if (btnCommitSession != null)
+        btnCommitSession.setText(isArabic ? "✅ اعتماد" : "✅ Commit");
+}
 
     /**
      * تهيئة عناصر الواجهة
      */
-    private void initViews(View view) {
-        // ==================== Hero Circle ====================
-        tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
-        progressScanned = view.findViewById(R.id.progressScanned);
-        tvScannedCount = view.findViewById(R.id.tvScannedCount);
-        tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
-        
-        // ==================== Status Header ====================
-        statusDot = view.findViewById(R.id.statusDot);
-        statusBar = view.findViewById(R.id.statusBar);
-        tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
-        tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
-        tvRssi = view.findViewById(R.id.tvRssi);
-        
-        // ==================== Segmented Control ====================
-        segmentedModes = view.findViewById(R.id.segmentedModes);
-        btnModeFull = view.findViewById(R.id.btnModeFull);
-        btnModeCategory = view.findViewById(R.id.btnModeCategory);
-        btnModeBlind = view.findViewById(R.id.btnModeBlind);
-        
-        // ==================== Stats Strip ====================
-        tvVariance = view.findViewById(R.id.tvVariance);
-        tvAccuracy = view.findViewById(R.id.tvAccuracy);
-        tvItemCount = view.findViewById(R.id.tvItemCount);
-        
-        // ==================== Gold Metrics ====================
-        tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
-        tvTotalValue = view.findViewById(R.id.tvTotalValue);
-        
-        // ==================== Action Dock ====================
-        btnPowerControl = view.findViewById(R.id.btnPowerControl);
-        btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
-        btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
-        
-        // ==================== Search ====================
-        etSearchItems = view.findViewById(R.id.etSearchItems);
-        btnClearSearch = view.findViewById(R.id.btnClearSearch);
-        
-        // ==================== RecyclerView ====================
-        rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
-        tvEmptyState = view.findViewById(R.id.tvEmptyState);
-        
-        if (rvInventoryItems != null) {
-            rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
-            rvInventoryItems.setNestedScrollingEnabled(false);
-            modernAdapter = new ModernScannedItemsAdapter(isArabic, item -> {
-                showItemOptionsDialog(item);
-            });
-            rvInventoryItems.setAdapter(modernAdapter);
-            rvInventoryItems.setHasFixedSize(false);
-            rvInventoryItems.setItemAnimator(null);
-        }
-        
-        // ==================== Floating Action Dock ====================
-        btnMainToggleScan = view.findViewById(R.id.btnMainToggleScan);
-        btnCommitSession = view.findViewById(R.id.btnCommitSession);
-        
-        // ==================== إعداد الأزرار ====================
-        setupButtons();
-        setupSegmentedControl();
-        setupSearchBar();
+    /**
+ * تهيئة عناصر الواجهة - الإصدار المبسّط
+ */
+private void initViews(View view) {
+    // ==================== Hero Circle ====================
+    tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
+    progressScanned = view.findViewById(R.id.progressScanned);
+    tvScannedCount = view.findViewById(R.id.tvScannedCount);
+    tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
+    
+    // ==================== Status Header ====================
+    statusDot = view.findViewById(R.id.statusDot);
+    statusBar = view.findViewById(R.id.statusBar);
+    tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
+    tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
+    tvRssi = view.findViewById(R.id.tvRssi);
+    btnSettings = view.findViewById(R.id.btnSettings);
+    
+    // ==================== Stats Strip ====================
+    tvVariance = view.findViewById(R.id.tvVariance);
+    tvAccuracy = view.findViewById(R.id.tvAccuracy);
+    tvItemCount = view.findViewById(R.id.tvItemCount);
+    
+    // ==================== Search ====================
+    etSearchItems = view.findViewById(R.id.etSearchItems);
+    btnClearSearch = view.findViewById(R.id.btnClearSearch);
+    
+    // ==================== RecyclerView ====================
+    rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
+    tvEmptyState = view.findViewById(R.id.tvEmptyState);
+    
+    if (rvInventoryItems != null) {
+        rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
+        modernAdapter = new ModernScannedItemsAdapter(isArabic, item -> {
+            showItemOptionsDialog(item);
+        });
+        rvInventoryItems.setAdapter(modernAdapter);
+        rvInventoryItems.setHasFixedSize(false);
+        rvInventoryItems.setItemAnimator(null);
     }
+    
+    // ==================== Floating Action Dock ====================
+    btnMainToggleScan = view.findViewById(R.id.btnMainToggleScan);
+    btnCommitSession = view.findViewById(R.id.btnCommitSession);
+    
+    // ==================== إعداد الأزرار ====================
+    setupButtons();
+    setupSearchBar();
+}
 
     /**
      * إعداد الأزرار الجديدة
      */
-    private void setupButtons() {
-        // زر البدء/الإيقاف الذكي
-        if (btnMainToggleScan != null) {
-            btnMainToggleScan.setOnClickListener(v -> {
-                if (isScanning) {
-                    stopScanning();
-                } else {
-                    if (permissionManager != null && 
-                        (permissionManager.canEdit("inventory") || permissionManager.isManager())) {
-                        startScanning();
-                    } else {
-                        showAccessDenied();
-                    }
-                }
-            });
-        }
-        
-        // زر الاعتماد
-        if (btnCommitSession != null) {
-            btnCommitSession.setOnClickListener(v -> showCommitConfirmationDialog());
-        }
-        
-        // زر Power Control
-        if (btnPowerControl != null) {
-            btnPowerControl.setOnClickListener(v -> showPowerControlSheet());
-        }
-        
-        // زر التقرير
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
-            btnGenerateReport.setEnabled(false);
-        }
-        
-        // زر الأرشيف
-        if (btnArchiveReports != null) {
-            btnArchiveReports.setOnClickListener(v -> showArchiveReports());
-        }
-    }
-
     /**
-     * إعداد Segmented Control
-     */
-    private void setupSegmentedControl() {
-        if (segmentedModes == null) return;
-        
-        segmentedModes.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-            if (!isChecked) return;
-            
-            if (checkedId == R.id.btnModeFull) {
-                Log.d(TAG, "Mode: Full");
-            } else if (checkedId == R.id.btnModeCategory) {
-                showCategorySelectionDialog();
-            } else if (checkedId == R.id.btnModeBlind) {
-                if (!isScanning) {
-                    startBlindInventory();
+ * إعداد الأزرار
+ */
+private void setupButtons() {
+    // ==================== زر البدء/الإيقاف الذكي ====================
+    if (btnMainToggleScan != null) {
+        btnMainToggleScan.setOnClickListener(v -> {
+            if (isScanning) {
+                stopScanning();
+            } else {
+                if (permissionManager != null && 
+                    (permissionManager.canEdit("inventory") || permissionManager.isManager())) {
+                    // 🆕 فتح Bottom Sheet الإعدادات أولاً
+                    showInventorySettingsSheet();
                 } else {
-                    Toast.makeText(requireContext(), 
-                        isArabic ? "أوقف الجرد الحالي أولاً" : "Stop current inventory first", 
-                        Toast.LENGTH_SHORT).show();
+                    showAccessDenied();
                 }
             }
         });
     }
+    
+    // ==================== زر الاعتماد (يفتح Dialog فاخر) ====================
+    if (btnCommitSession != null) {
+        btnCommitSession.setOnClickListener(v -> showCommitSummaryDialog());
+    }
+    
+    // ==================== 🆕 زر الإعدادات في Status Bar ====================
+    if (btnSettings != null) {
+        btnSettings.setOnClickListener(v -> showInventorySettingsSheet());
+    }
+}
 
     /**
      * إعداد شريط البحث
@@ -640,6 +598,130 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             Toast.LENGTH_SHORT).show();
         if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.ERROR);
     }
+    
+    // ==================== Bottom Sheet: إعدادات الجلسة ====================
+
+/**
+ * 🆕 عرض Bottom Sheet للإعدادات (النمط + القدرة + العيار)
+ */
+private void showInventorySettingsSheet() {
+    if (!isAdded() || isFragmentDestroyed) return;
+    
+    try {
+        BottomSheetDialog dialog = new BottomSheetDialog(
+            requireContext(), R.style.LuxuryBottomSheetDialog);
+        
+        View sheetView = getLayoutInflater().inflate(
+            R.layout.bottom_sheet_inventory_settings, null);
+        dialog.setContentView(sheetView);
+        
+        // ==================== 1. Segmented Control (الأنماط) ====================
+        MaterialButtonToggleGroup segmentedModes = 
+            sheetView.findViewById(R.id.bsSegmentedModes);
+        MaterialButton bsBtnModeFull = sheetView.findViewById(R.id.bsBtnModeFull);
+        MaterialButton bsBtnModeCategory = sheetView.findViewById(R.id.bsBtnModeCategory);
+        MaterialButton bsBtnModeBlind = sheetView.findViewById(R.id.bsBtnModeBlind);
+        
+        // تحديد الحالة الافتراضية
+        if (segmentedModes != null) {
+            if ("category".equals(currentMode) && bsBtnModeCategory != null) {
+                segmentedModes.check(R.id.bsBtnModeCategory);
+            } else if ("blind".equals(currentMode) && bsBtnModeBlind != null) {
+                segmentedModes.check(R.id.bsBtnModeBlind);
+            } else if (bsBtnModeFull != null) {
+                segmentedModes.check(R.id.bsBtnModeFull);
+            }
+            
+            segmentedModes.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                if (checkedId == R.id.bsBtnModeFull) {
+                    currentMode = "full";
+                } else if (checkedId == R.id.bsBtnModeCategory) {
+                    currentMode = "category";
+                } else if (checkedId == R.id.bsBtnModeBlind) {
+                    currentMode = "blind";
+                }
+            });
+        }
+        
+        // ==================== 2. Power Slider ====================
+        Slider sliderPower = sheetView.findViewById(R.id.bsSliderPower);
+        TextView tvPowerValue = sheetView.findViewById(R.id.bsTvPowerValue);
+        
+        if (sliderPower != null) {
+            sliderPower.setValue(currentPowerDbm);
+            
+            sliderPower.addOnChangeListener((slider, value, fromUser) -> {
+                currentPowerDbm = (int) value;
+                if (tvPowerValue != null) {
+                    tvPowerValue.setText(currentPowerDbm + " dBm");
+                }
+            });
+        }
+        
+        if (tvPowerValue != null) {
+            tvPowerValue.setText(currentPowerDbm + " dBm");
+        }
+        
+        // ==================== 3. Karat Filter ====================
+        com.google.android.material.chip.ChipGroup chipKarat = 
+            sheetView.findViewById(R.id.bsChipKarat);
+        
+        if (chipKarat != null) {
+            chipKarat.setOnCheckedStateChangeListener((group, checkedIds) -> {
+                if (checkedIds.isEmpty()) return;
+                int id = checkedIds.get(0);
+                if (id == R.id.bsChipAll) {
+                    currentKaratFilter = "all";
+                } else if (id == R.id.bsChip24K) {
+                    currentKaratFilter = "24K";
+                } else if (id == R.id.bsChip22K) {
+                    currentKaratFilter = "22K";
+                } else if (id == R.id.bsChip21K) {
+                    currentKaratFilter = "21K";
+                } else if (id == R.id.bsChip18K) {
+                    currentKaratFilter = "18K";
+                } else if (id == R.id.bsChip14K) {
+                    currentKaratFilter = "14K";
+                }
+            });
+        }
+        
+        // ==================== 4. الأزرار ====================
+        MaterialButton btnCancel = sheetView.findViewById(R.id.bsBtnCancel);
+        MaterialButton btnSaveAndStart = sheetView.findViewById(R.id.bsBtnSaveAndStart);
+        
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        if (btnSaveAndStart != null) {
+            btnSaveAndStart.setOnClickListener(v -> {
+                // تطبيق قدرة الهوائي
+                applyAntennaPower(currentPowerDbm);
+                
+                // إغلاق الحوار
+                dialog.dismiss();
+                
+                // بدء الجرد حسب النمط المختار
+                if ("blind".equals(currentMode)) {
+                    startBlindInventory();
+                } else if ("category".equals(currentMode)) {
+                    Toast.makeText(requireContext(), 
+                        (isArabic ? "جرد فئوي: " : "Category inventory: ") + currentKaratFilter, 
+                        Toast.LENGTH_SHORT).show();
+                    startScanning();
+                } else {
+                    startScanning();
+                }
+            });
+        }
+        
+        dialog.show();
+    } catch (Exception e) {
+        Log.e(TAG, "Error showing inventory settings sheet", e);
+    }
+}
 
     /**
      * معالجة أزرار RFID
@@ -1067,28 +1149,13 @@ private void showItemFullDetails(ScannedItemDisplay item) {
 /**
  * تحديث الوزن والقيمة الإجمالية
  */
+/**
+ * تحديث الوزن والقيمة الإجمالية (بدون UI - البيانات في Dialog)
+ */
 private void updateTotalWeightAndValue() {
-    double totalWeight = 0;
-    double totalValue = 0;
-    
-    synchronized (scannedItemsDisplayList) {
-        for (ScannedItemDisplay item : scannedItemsDisplayList) {
-            totalWeight += item.weight * item.count;
-            totalValue += item.price * item.count;
-        }
-    }
-    
-    final double finalWeight = totalWeight;
-    final double finalValue = totalValue;
-    
-    mainThreadHandler.post(() -> {
-        if (tvTotalWeight != null) {
-            tvTotalWeight.setText(String.format(Locale.US, "%.2f g", finalWeight));
-        }
-        if (tvTotalValue != null) {
-            tvTotalValue.setText(String.format(Locale.US, "$%,.2f", finalValue));
-        }
-    });
+    // لم نعد نحتاج لعرض الوزن والقيمة في الشاشة الرئيسية
+    // القيم ستظهر في Dialog الاعتماد
+    // لا شيء هنا
 }
 
 /**
@@ -1245,13 +1312,14 @@ private void updateUI() {
             tvProgressPercent.setText(progress + "%");
         }
         
-        if (tvVariance != null) {
-            tvVariance.setText(String.valueOf(Math.max(0, expectedCount - scanned)));
-        }
-        
-        if (tvAccuracy != null) {
-            tvAccuracy.setText(progress + "%");
-        }
+        // ✅ الجديد:
+if (tvVariance != null) {
+    tvVariance.setText(String.valueOf(Math.max(0, expectedCount - scanned)));
+}
+
+if (tvAccuracy != null) {
+    tvAccuracy.setText(progress + "%");
+}
 
         if (scanned >= expectedCount && isScanning) {
             stopScanning();
@@ -1514,8 +1582,7 @@ private void startReadingSource() {
     // ✅ تحديث زر البدء الذكي
     updateMainToggleButton(true);
     
-    if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-    if (btnArchiveReports != null) btnArchiveReports.setEnabled(false);
+    
     
     if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
 }
@@ -1589,8 +1656,7 @@ public void stopScanning() {
                 
                 updateMainToggleButton(false);
                 
-                if (btnGenerateReport != null) btnGenerateReport.setEnabled(true);
-                if (btnArchiveReports != null) btnArchiveReports.setEnabled(true);
+                
                 
                 updateUI();
                 syncOfflineTransactions();
@@ -1710,52 +1776,91 @@ private void showCategorySelectionDialog() {
     /**
      * عرض تأكيد الالتزام
      */
-    private void showCommitConfirmationDialog() {
-        if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
-        if (permissionManager != null && 
-            !(permissionManager.canEdit("inventory") || permissionManager.isManager())) {
-            showAccessDenied();
-            return;
+    // ==================== Dialog: اعتماد الجرد الفاخر ====================
+
+/**
+ * 🆕 عرض Dialog الاعتماد الفاخر مع كل التفاصيل
+ */
+private void showCommitSummaryDialog() {
+    if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
+    if (permissionManager != null && 
+        !(permissionManager.canEdit("inventory") || permissionManager.isManager())) {
+        showAccessDenied();
+        return;
+    }
+    
+    // حساب الإحصائيات
+    int scanned = inventoryEngine.getUniqueCount();
+    int missing = Math.max(0, expectedCount - scanned);
+    int accuracy = expectedCount > 0 ? (scanned * 100 / expectedCount) : 0;
+    
+    double totalWeight = 0;
+    double totalValue = 0;
+    synchronized (scannedItemsDisplayList) {
+        for (ScannedItemDisplay item : scannedItemsDisplayList) {
+            totalWeight += item.weight * item.count;
+            totalValue += item.price * item.count;
+        }
+    }
+    
+    final double finalWeight = totalWeight;
+    final double finalValue = totalValue;
+    
+    try {
+        BottomSheetDialog dialog = new BottomSheetDialog(
+            requireContext(), R.style.LuxuryBottomSheetDialog);
+        
+        View sheetView = getLayoutInflater().inflate(
+            R.layout.dialog_commit_summary, null);
+        dialog.setContentView(sheetView);
+        
+        // ==================== ربط القيم ====================
+        TextView dialogTvExpected = sheetView.findViewById(R.id.dialogTvExpected);
+        TextView dialogTvScanned = sheetView.findViewById(R.id.dialogTvScanned);
+        TextView dialogTvMissing = sheetView.findViewById(R.id.dialogTvMissing);
+        TextView dialogTvAccuracy = sheetView.findViewById(R.id.dialogTvAccuracy);
+        TextView dialogTvWeight = sheetView.findViewById(R.id.dialogTvWeight);
+        TextView dialogTvValue = sheetView.findViewById(R.id.dialogTvValue);
+        
+        if (dialogTvExpected != null) dialogTvExpected.setText(String.valueOf(expectedCount));
+        if (dialogTvScanned != null) dialogTvScanned.setText(String.valueOf(scanned));
+        if (dialogTvMissing != null) dialogTvMissing.setText(String.valueOf(missing));
+        if (dialogTvAccuracy != null) dialogTvAccuracy.setText(accuracy + "%");
+        if (dialogTvWeight != null) {
+            dialogTvWeight.setText(String.format(Locale.US, "%.2f g", finalWeight));
+        }
+        if (dialogTvValue != null) {
+            dialogTvValue.setText(String.format(Locale.US, "$%,.2f", finalValue));
         }
         
-        int scanned = inventoryEngine.getUniqueCount();
-        int missing = Math.max(0, expectedCount - scanned);
-
-        String message = isArabic ? 
-            String.format("📊 ملخص عمليات الجرد:\n\n• المتوقع: %d\n• الممسوح: %d\n• المفقود: %d\n\nهل تريد اعتماد العملية وإرسالها لقاعدة البيانات؟",
-                expectedCount, scanned, missing) :
-            String.format("📊 Inventory Summary:\n\n• Expected: %d\n• Scanned: %d\n• Missing: %d\n\nDo you want to commit and send to database?",
-                expectedCount, scanned, missing);
-
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "حفظ واكتمال الجرد" : "Save and Complete Inventory")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "إرسال واعتماد" : "Send and Commit", 
-                    (dialog, which) -> commitInventoryToServer())
-                .setNeutralButton(isArabic ? "🖨️ طباعة التقرير الحالي" : "🖨️ Print current report", 
-                    (dialog, which) -> {
-                        InventoryReport currentReport = new InventoryReport(
-                            0,
-                            inventoryEngine.getClientSessionId(),
-                            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                                .format(new Date()),
-                            expectedCount,
-                            scanned,
-                            missing,
-                            isArabic ? "جارية" : "In progress"
-                        );
-                        
-                        List<ScannedItemDisplay> snapshotList;
-                        synchronized (scannedItemsDisplayList) {
-                            snapshotList = new ArrayList<>(scannedItemsDisplayList);
-                        }
-                        
-                        PrintUtils.printReportWithQRCode(requireContext(), currentReport, 
-                            snapshotList, isArabic, null);
-                    })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                .show();
+        // ==================== الأزرار ====================
+        MaterialButton btnPrint = sheetView.findViewById(R.id.dialogBtnPrint);
+        MaterialButton btnCommit = sheetView.findViewById(R.id.dialogBtnCommit);
+        MaterialButton btnCancel = sheetView.findViewById(R.id.dialogBtnCancel);
+        
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        if (btnPrint != null) {
+            btnPrint.setOnClickListener(v -> {
+                dialog.dismiss();
+                printCurrentReport();
+            });
+        }
+        
+        if (btnCommit != null) {
+            btnCommit.setOnClickListener(v -> {
+                dialog.dismiss();
+                commitInventoryToServer();
+            });
+        }
+        
+        dialog.show();
+    } catch (Exception e) {
+        Log.e(TAG, "Error showing commit summary dialog", e);
     }
+}
 
     /**
      * إرسال الجرد للخادم
@@ -2109,6 +2214,35 @@ private void showCategorySelectionDialog() {
                 .show();
     }
     
+    /**
+ * طباعة التقرير الحالي
+ */
+private void printCurrentReport() {
+    try {
+        int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+        int missing = Math.max(0, expectedCount - scanned);
+        
+        InventoryReport currentReport = new InventoryReport(
+            0,
+            inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SESS-CURRENT",
+            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()),
+            expectedCount,
+            scanned,
+            missing,
+            isArabic ? "جارية" : "In progress"
+        );
+        
+        List<ScannedItemDisplay> snapshotList;
+        synchronized (scannedItemsDisplayList) {
+            snapshotList = new ArrayList<>(scannedItemsDisplayList);
+        }
+        
+        PrintUtils.printReportWithQRCode(requireContext(), currentReport, 
+            snapshotList, isArabic, null);
+    } catch (Exception e) {
+        Log.e(TAG, "Error printing current report", e);
+    }
+}
     /**
      * طباعة جميع التقارير
      */
