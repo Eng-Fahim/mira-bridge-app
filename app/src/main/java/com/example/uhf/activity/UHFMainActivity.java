@@ -180,10 +180,15 @@ cleanupOldFragments();
 // ✅ ربط الشريط الثانوي
 setupSecondaryToolbar();
 
-// ✅ إعداد القائمة والـ Toolbar
 MaterialToolbar toolbar = findViewById(R.id.toolbar);
 if (toolbar != null) {
     setSupportActionBar(toolbar);
+    
+    // ✅ إخفاء العنوان الافتراضي للـ ActionBar
+    if (getSupportActionBar() != null) {
+        getSupportActionBar().setDisplayShowTitleEnabled(false);
+    }
+    
     updateToolbarTitle();
 }
             // ✅ مراقبة استجابة الـ UI Thread
@@ -385,27 +390,34 @@ if (toolbar != null) {
     }
 
     private void updateToolbarTitle() {
-        try {
-            if (getSupportActionBar() != null) {
-                String orgName = "MIRA ID";
-                if (orgProfileManager != null) {
-                    String name = orgProfileManager.getDisplayName();
-                    if (name != null && !name.trim().isEmpty()) {
-                        orgName = name;
-                    }
-                }
-                getSupportActionBar().setTitle(orgName);
-
-                if (branchesManager != null && branchesManager.hasActiveBranch()) {
-                    getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
-                } else {
-                    getSupportActionBar().setSubtitle(null);
-                }
+    try {
+        // ✅ تحديث TextView مباشرة (وليس ActionBar)
+        TextView tvTitle = findViewById(R.id.tvTitle);
+        TextView tvSubtitle = findViewById(R.id.tvSubtitle);
+        
+        String orgName = "MIRA ID";
+        if (orgProfileManager != null) {
+            String name = orgProfileManager.getDisplayName();
+            if (name != null && !name.trim().isEmpty()) {
+                orgName = name;
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
         }
+        
+        if (tvTitle != null) {
+            tvTitle.setText(orgName);
+        }
+        
+        if (tvSubtitle != null) {
+            if (branchesManager != null && branchesManager.hasActiveBranch()) {
+                tvSubtitle.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+            } else {
+                tvSubtitle.setText(isArabic ? "📍 الفرع الرئيسي" : "📍 Main Branch");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
     }
+}
 
     // ==================== التنقل ====================
 
@@ -1454,4 +1466,4 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-            }
+                            }
