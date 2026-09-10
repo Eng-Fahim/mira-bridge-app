@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-    tools:context=".MainActivity">
+    tools:context=".activity.UHFMainActivity">
 
     <!-- ==================== 1. APP BAR & TOOLBAR ==================== -->
     <com.google.android.material.appbar.AppBarLayout
@@ -60,7 +60,7 @@
                         tools:text="📍 Main Branch" />
                 </LinearLayout>
 
-                <!-- أزرار الإجراءات والاستشعار -->
+                <!-- أزرار الإجراءات السريعة والاستشعار -->
                 <LinearLayout
                     android:id="@+id/containerActions"
                     android:layout_width="wrap_content"
@@ -113,13 +113,12 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات الرئيسي -->
+        <!-- حاوي الشاشات الرئيسي (تمت إزالة defaultNavHost لمنع خطأ البناء) -->
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/nav_host_fragment"
             android:name="androidx.navigation.fragment.NavHostFragment"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:defaultNavHost="true"
             app:layout_constraintBottom_toTopOf="@+id/bottomNavigationView"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
