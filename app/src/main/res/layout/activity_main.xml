@@ -27,7 +27,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- اسم المؤسسة والفرع (محاذاة لليسار/البداية) -->
+                <!-- اسم المؤسسة والفرع -->
                 <LinearLayout
                     android:id="@+id/containerTitle"
                     android:layout_width="wrap_content"
@@ -60,7 +60,7 @@
                         tools:text="📍 Main Branch" />
                 </LinearLayout>
 
-                <!-- أزرار الإجراءات السريعة والاستشعار في التولبار -->
+                <!-- أزرار الإجراءات والاستشعار -->
                 <LinearLayout
                     android:id="@+id/containerActions"
                     android:layout_width="wrap_content"
@@ -70,7 +70,6 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <!-- زر المزامنة -->
                     <ImageButton
                         android:id="@+id/btnSync"
                         android:layout_width="38dp"
@@ -81,7 +80,6 @@
                         android:src="@drawable/ic_export"
                         app:tint="@color/white" />
 
-                    <!-- زر البحث -->
                     <ImageButton
                         android:id="@+id/btnSearch"
                         android:layout_width="38dp"
@@ -92,7 +90,6 @@
                         android:src="@drawable/ic_search"
                         app:tint="@color/white" />
 
-                    <!-- مؤشر / زر استشعار حالة الأجهزة المرتبطة -->
                     <ImageButton
                         android:id="@+id/btnDeviceStatus"
                         android:layout_width="38dp"
@@ -116,7 +113,7 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات الرئيسي: يتوقف دائماً فوق القائمة السفلية لحماية المحتوى -->
+        <!-- حاوي الشاشات الرئيسي -->
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/nav_host_fragment"
             android:name="androidx.navigation.fragment.NavHostFragment"
