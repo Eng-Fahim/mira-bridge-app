@@ -2,22 +2,28 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- 🔄 زر المزامنة -->
     <item
         android:id="@+id/action_sync"
-        android:icon="@drawable/ic_export"
+        android:icon="@drawable/ic_sync"
         android:title="@string/menu_sync"
+        app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
 
+    <!-- 🔍 زر البحث -->
     <item
         android:id="@+id/action_search"
         android:icon="@drawable/ic_search"
         android:title="@string/menu_search"
+        app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
 
+    <!-- 📡 زر حالة الأجهزة -->
     <item
         android:id="@+id/action_device_status"
         android:icon="@drawable/ic_devices"
         android:title="@string/menu_device_status"
+        app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
 
 </menu>
