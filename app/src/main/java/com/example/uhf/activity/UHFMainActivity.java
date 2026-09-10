@@ -24,7 +24,7 @@ import android.annotation.SuppressLint;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.graphics.Typeface;
-
+import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
@@ -254,8 +254,9 @@ if (toolbar != null) {
     if (bottomNavContainer != null) {
         ViewCompat.setOnApplyWindowInsetsListener(bottomNavContainer, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            MarginLayoutParams params = (MarginLayoutParams) v.getLayoutParams();
-            params.bottomMargin = systemBars.bottom + 12; // إبقاء المسافة العائمة ثابته فوق أزرار النظام
+            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+            // مسافة أمان موحدة فوق أزرار النظام (بدون إضافة paddingBottom في XML)
+            params.bottomMargin = systemBars.bottom + 8;
             v.setLayoutParams(params);
             return insets;
         });
@@ -270,8 +271,6 @@ if (toolbar != null) {
         });
     }
 }
-
-    
     private void setupSecondaryToolbar() {
     MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
     
