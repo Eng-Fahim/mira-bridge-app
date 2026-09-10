@@ -97,12 +97,12 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات مع Padding سفلي 100dp لضمان حرية حركة الـ FAB والشريط العائم -->
+        <!-- حاوي الشاشات مع Padding سفلي 120dp لضمان حرية حركة الشريط العائم -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:paddingBottom="100dp"
+            android:paddingBottom="120dp"
             android:clipToPadding="false"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -127,28 +127,27 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ==================== 3. FLOATING BOTTOM NAVIGATION ==================== -->
+    <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
     <FrameLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="0dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="20dp"
         android:clipToPadding="false">
-        
 
         <!-- الشريط العائم -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="match_parent"
             android:layout_height="64dp"
-            android:background="@drawable/bg_floating_bottom_nav"
+            android:background="@drawable/bg_floating_bottom_nav_with_shadow"
             app:itemBackground="@null"
-            app:elevation="16dp"
+            app:elevation="0dp"
             app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
-            app:itemIconSize="24dp"
+            app:itemIconSize="26dp"
             app:itemIconTint="@color/nav_item_color_selector"
             app:itemRippleColor="@color/nav_ripple_color"
             app:itemTextAppearanceActive="@style/NavItemTextActive"
@@ -157,22 +156,21 @@
             app:labelVisibilityMode="labeled"
             app:menu="@menu/bottom_nav_menu" />
 
-    </FrameLayout>
+        <!-- ✅ الـ FAB الآن داخل نفس الحاوية، فوق الشريط مباشرة -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabActionCenter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal|top"
+            android:layout_marginTop="-32dp"
+            android:src="@drawable/ic_add"
+            app:backgroundTint="?attr/colorPrimary"
+            app:tint="@color/white"
+            app:maxImageSize="28dp"
+            app:fabSize="normal"
+            app:elevation="12dp"
+            app:pressedTranslationZ="6dp" />
 
-    <!-- ==================== 4. FAB العائم المركزي ==================== -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabActionCenter"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_add"
-        app:backgroundTint="?attr/colorPrimary"
-        app:tint="@color/white"
-        app:maxImageSize="28dp"
-        app:fabSize="normal"
-        app:borderWidth="1.5dp"
-        app:elevation="20dp"
-        app:pressedTranslationZ="6dp"
-        app:layout_anchor="@id/bottomNavContainer"
-        app:layout_anchorGravity="center_horizontal|top" />
+    </FrameLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
