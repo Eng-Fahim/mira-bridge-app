@@ -66,24 +66,17 @@ import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import com.example.uhf.adapter.UserNotificationAdapter;
 import com.example.uhf.model.MessageModel;
 import com.example.uhf.model.NotificationModel;
 import com.example.uhf.fragment.MiraUHFReadWriteFragment;
-import com.example.uhf.fragment.UsersManagementFragment;
 import com.example.uhf.fragment.MiraAccountingFragment;
 import com.example.uhf.fragment.MiraAdminHubFragment;
 import com.example.uhf.fragment.MiraBranchesManagementFragment;
-import com.example.uhf.fragment.MiraGateSettingsFragment;
 import com.example.uhf.fragment.MiraGoldCurrencyFragment;
 import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraProfileFragment;
 import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
-import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraRfidBindingsFragment;
@@ -101,7 +94,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
     
-    // ✅ استخدام الملفات الجديدة
+    // ✅ المديرين والمكونات
     private NavigationManager navigationManager;
     private HardwareManager hardwareManager;
     private SoundManager soundManager;
@@ -129,7 +122,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     
     // ✅ التنقل
     public String currentFragmentTag = "Dashboard";
-    //private String currentFragmentTag = "Dashboard";
     public Fragment currentFragment;
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
@@ -169,40 +161,38 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-protected void onCreate(Bundle savedInstanceState) {
-    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-    super.onCreate(savedInstanceState);
+    protected void onCreate(Bundle savedInstanceState) {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        super.onCreate(savedInstanceState);
 
-    try {
-        sessionManager = new SessionManager(getApplicationContext());
-        if (!sessionManager.isLoggedIn()) {
-            navigateToLogin();
-            return;
-        }
+        try {
+            sessionManager = new SessionManager(getApplicationContext());
+            if (!sessionManager.isLoggedIn()) {
+                navigateToLogin();
+                return;
+            }
 
-        setContentView(R.layout.activity_main);
+            setContentView(R.layout.activity_main);
 
-        // ✅ ضبط أبعاد أشرطة النظام
-        setupWindowInsets();
+            // ✅ ضبط أبعاد أشرطة النظام
+            setupWindowInsets();
+            cleanupOldFragments();
 
-        cleanupOldFragments();
+            // ✅ إعداد القائمة والـ Toolbar (مرة واحدة فقط)
+            MaterialToolbar toolbar = findViewById(R.id.toolbar);
+            if (toolbar != null) {
+                setSupportActionBar(toolbar);
+                updateToolbarTitle();
+            }
 
-        // ✅ إعداد القائمة والـ Toolbar
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            updateToolbarTitle();
-        }
+            // ✅ ربط أزرار التولبار المخصصة
+            setupToolbarActionButtons();
 
-        // 👈 اضف هذا السطر هنا لربط أزرار التولبار الجديدة
-        setupToolbarActionButtons();
-
-        // ✅ باقي المكونات
-        AppWatchdog.getInstance().startMonitoring(() -> {
-            Log.e(TAG, "UI Thread FROZEN! Restarting app...");
-            MiraApplication.getInstance().restartApp();
-        });
-
+            // ✅ مراقبة استجابة الـ UI Thread
+            AppWatchdog.getInstance().startMonitoring(() -> {
+                Log.e(TAG, "UI Thread FROZEN! Restarting app...");
+                MiraApplication.getInstance().restartApp();
+            });
 
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
@@ -211,6 +201,7 @@ protected void onCreate(Bundle savedInstanceState) {
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             permissionManager = PermissionManager.getInstance(getApplicationContext());
             navigationManager = new NavigationManager(getSupportFragmentManager(), permissionManager);
+            
             hardwareManager = new HardwareManager(this, new HardwareManager.HardwareStatusListener() {
                 @Override
                 public void onStatusChanged(HardwareManager.HardwareStatus status) {
@@ -221,7 +212,7 @@ protected void onCreate(Bundle savedInstanceState) {
 
                 @Override
                 public void onTagRead(String epc) {
-                    onTagRead(epc);
+                    UHFMainActivity.this.onTagRead(epc);
                 }
 
                 @Override
@@ -229,18 +220,12 @@ protected void onCreate(Bundle savedInstanceState) {
                     showToast("RFID Error: " + error);
                 }
             });
+
             soundManager = new SoundManager(this);
             notificationManager = new NotificationManager(this);
             statusIndicatorManager = new StatusIndicatorManager(findViewById(android.R.id.content), hardwareManager);
 
-            // ✅ إعداد القائمة
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
-
-            // ✅ إعداد الأزرار
+            // ✅ إعداد الأزرار والمستمعين
             setupQuickNav();
             setupOrgProfileListener();
 
@@ -285,14 +270,6 @@ protected void onCreate(Bundle savedInstanceState) {
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         mainHandler.postDelayed(this::hideLoading, 100);
-
-        try {
-            if (hardwareManager != null) {
-                // Auto-connect RFID
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error connecting RFID in onResume: " + e.getMessage());
-        }
     }
 
     @Override
@@ -452,27 +429,23 @@ protected void onCreate(Bundle savedInstanceState) {
             soundManager.playSound(this, id);
         }
     }
-    
+
     private void setupToolbarActionButtons() {
-    // 1. زر المزامنة
-    View btnSync = findViewById(R.id.btnSync);
-    if (btnSync != null) {
-        btnSync.setOnClickListener(v -> performDataSync());
-    }
+        View btnSync = findViewById(R.id.btnSync);
+        if (btnSync != null) {
+            btnSync.setOnClickListener(v -> performDataSync());
+        }
 
-    // 2. زر البحث السريع
-    View btnSearch = findViewById(R.id.btnSearch);
-    if (btnSearch != null) {
-        btnSearch.setOnClickListener(v -> showGlobalSearchDialog());
-    }
+        View btnSearch = findViewById(R.id.btnSearch);
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> showGlobalSearchDialog());
+        }
 
-    // 3. زر استشعار/حالة الأجهزة والنظام
-    View btnDeviceStatus = findViewById(R.id.btnDeviceStatus);
-    if (btnDeviceStatus != null) {
-        btnDeviceStatus.setOnClickListener(v -> showSystemVersionDialog());
+        View btnDeviceStatus = findViewById(R.id.btnDeviceStatus);
+        if (btnDeviceStatus != null) {
+            btnDeviceStatus.setOnClickListener(v -> showSystemVersionDialog());
+        }
     }
-}
-
 
     public void playSoundDelayed(int value) {
         if (soundManager != null) {
@@ -1445,7 +1418,7 @@ protected void onCreate(Bundle savedInstanceState) {
         }
     }
 
-    // ==================== إضافات ====================
+    // ==================== التفاعل مع الكيبورد ====================
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
@@ -1470,4 +1443,4 @@ protected void onCreate(Bundle savedInstanceState) {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-            }
+}
