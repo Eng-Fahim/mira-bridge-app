@@ -55,7 +55,56 @@
     <item name="itemTextAppearanceInactive">@style/NavItemTextInactive</item>
     <item name="labelVisibilityMode">labeled</item>
 </style>
+<!-- ✅ أنماط قائمة الإجراءات السريعة الفاخرة -->
+<style name="LuxuryQuickActionItem">
+    <item name="android:layout_width">0dp</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_columnWeight">1</item>
+    <item name="android:layout_margin">6dp</item>
+    <item name="android:orientation">vertical</item>
+    <item name="android:gravity">center</item>
+    <item name="android:clickable">true</item>
+    <item name="android:focusable">true</item>
+    <item name="android:paddingTop">8dp</item>
+    <item name="android:paddingBottom">8dp</item>
+    <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+</style>
 
+<style name="LuxuryQuickActionIcon">
+    <item name="android:layout_width">48dp</item>
+    <item name="android:layout_height">48dp</item>
+    <item name="android:padding">12dp</item>
+    <item name="android:background">@drawable/bg_luxury_quick_action_icon</item>
+</style>
+
+<style name="LuxuryQuickActionText">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_marginTop">6dp</item>
+    <item name="android:textSize">11sp</item>
+    <item name="android:textColor">?attr/colorOnSurface</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:fontFamily">@font/cairo</item>
+</style>
+
+<!-- ✅ نمط BottomSheet فاخر مع خلفية شفافة -->
+<style name="LuxuryBottomSheetDialog" parent="Theme.Design.Light.BottomSheetDialog">
+    <item name="android:windowIsFloating">false</item>
+    <item name="android:windowIsTranslucent">true</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
+    <item name="android:backgroundDimEnabled">true</item>
+    <item name="android:backgroundDimAmount">0.7</item>
+    <item name="bottomSheetStyle">@style/LuxuryBottomSheetStyle</item>
+    <item name="android:windowContentOverlay">@null</item>
+    <item name="android:windowNoTitle">true</item>
+</style>
+
+<style name="LuxuryBottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
+    <item name="android:background">@android:color/transparent</item>
+    <item name="behavior_peekHeight">auto</item>
+    <item name="behavior_hideable">true</item>
+    <item name="behavior_draggable">true</item>
+</style>
     <!-- ✅ نص العنصر النشط -->
     <style name="NavItemTextActive" parent="TextAppearance.Material3.LabelMedium">
         <item name="android:textSize">12sp</item>
