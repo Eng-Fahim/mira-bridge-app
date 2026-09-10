@@ -14,7 +14,6 @@
     
     <!-- ✅ خط علوي ذهبي خفيف (اختياري) -->
     <stroke
-        android:width="0.5dp"
-        android:color="#20D9A736" />
-    
+    android:width="1dp"
+    android:color="?attr/colorPrimary" />  <!-- ذهبي صلب -->
 </shape>
