@@ -174,17 +174,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setContentView(R.layout.activity_main);
 
-            // ✅ ضبط أبعاد أشرطة النظام
             setupWindowInsets();
-            cleanupOldFragments();
+cleanupOldFragments();
 
-            // ✅ إعداد القائمة والـ Toolbar (مرة واحدة فقط)
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
+// ✅ ربط الشريط الثانوي
+setupSecondaryAppBar();
 
+// ✅ إعداد القائمة والـ Toolbar
+MaterialToolbar toolbar = findViewById(R.id.toolbar);
+if (toolbar != null) {
+    setSupportActionBar(toolbar);
+    updateToolbarTitle();
+}
             // ✅ مراقبة استجابة الـ UI Thread
             AppWatchdog.getInstance().startMonitoring(() -> {
                 Log.e(TAG, "UI Thread FROZEN! Restarting app...");
@@ -260,6 +261,30 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             });
         }
     }
+    
+    private void setupSecondaryAppBar() {
+    com.google.android.material.bottomappbar.BottomAppBar secondaryAppBar = 
+        findViewById(R.id.secondaryAppBar);
+    
+    if (secondaryAppBar != null) {
+        secondaryAppBar.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            
+            if (id == R.id.action_sync) {
+                performDataSync();
+                return true;
+            } else if (id == R.id.action_search) {
+                showGlobalSearchDialog();
+                return true;
+            } else if (id == R.id.action_device_status) {
+                showSystemVersionDialog();
+                return true;
+            }
+            
+            return false;
+        });
+    }
+}
 
     @Override
     public void onResume() {
@@ -1424,4 +1449,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-        }
+            }
