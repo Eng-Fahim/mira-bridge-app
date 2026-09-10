@@ -135,8 +135,9 @@
         android:layout_gravity="bottom"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="16dp"
+        android:paddingBottom="0dp"
         android:clipToPadding="false">
+        
 
         <!-- الشريط العائم -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
