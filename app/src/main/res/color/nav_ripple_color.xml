@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- عند الضغط -->
+    <item
+        android:color="#20D9A736"
+        android:state_pressed="true" />
+    
+    <!-- عند التركيز -->
+    <item
+        android:color="#10D9A736"
+        android:state_focused="true" />
+    
+    <!-- الحالة الافتراضية -->
+    <item
+        android:color="@android:color/transparent" />
+</selector>
