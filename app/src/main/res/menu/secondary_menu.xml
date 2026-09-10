@@ -2,15 +2,18 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 🔄 زر المزامنة -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 🟢 جهة اليمين: زر حالة الأجهزة (يظهر أولاً في RTL)  -->
+    <!-- ═══════════════════════════════════════════════════════ -->
     <item
-        android:id="@+id/action_sync"
-        android:icon="@drawable/ic_sync"
-        android:title="@string/menu_sync"
-        app:iconTint="?attr/colorOnSurface"
+        android:id="@+id/action_device_status"
+        android:title="@string/menu_device_status"
+        app:actionLayout="@layout/action_device_status"
         app:showAsAction="always" />
 
-    <!-- 🔍 زر البحث -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 🔍 ⚙️ جهة اليسار: بحث، مزامنة، إعدادات الوصول السريع -->
+    <!-- ═══════════════════════════════════════════════════════ -->
     <item
         android:id="@+id/action_search"
         android:icon="@drawable/ic_search"
@@ -18,11 +21,17 @@
         app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
 
-    <!-- 📡 زر حالة الأجهزة -->
     <item
-        android:id="@+id/action_device_status"
-        android:icon="@drawable/ic_devices"
-        android:title="@string/menu_device_status"
+        android:id="@+id/action_sync"
+        android:icon="@drawable/ic_sync"
+        android:title="@string/menu_sync"
+        app:iconTint="?attr/colorOnSurface"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_quick_access_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/menu_quick_access"
         app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
 
