@@ -21,6 +21,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.annotation.SuppressLint;
 
+
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
+import android.widget.GridLayout;
+
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.graphics.Typeface;
@@ -1274,91 +1280,152 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
     // ==================== قائمة الإجراءات السريعة ====================
 
     private void showQuickActionMenu() {
-        try {
-            BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
-            View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
-            dialog.setContentView(view);
+    try {
+        // ✅ 1. إنشاء الحوار بالنمط الفاخر
+        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.LuxuryBottomSheetDialog);
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_sheet, null);
+        dialog.setContentView(view);
 
-            PermissionManager pm = permissionManager;
-            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
+        // ✅ 2. ربط العناصر
+        PermissionManager pm = permissionManager;
+        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
-            View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
-            if (btnRfidWrite != null) {
-                boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
-                btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
-                if (allowed) {
-                    btnRfidWrite.setOnClickListener(v -> {
-                        dialog.dismiss();
-                        loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite");
-                    });
+        // ✅ 3. ربط جميع الأزرار
+        bindQuickAction(view, R.id.btnRfidWrite, dialog,
+                pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write"),
+                new MiraUHFReadWriteFragment(), "RFIDWrite");
+
+        bindQuickAction(view, R.id.btnRfidBindings, dialog,
+                pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
+                new MiraRfidBindingsFragment(), "RfidBindings");
+
+        bindQuickAction(view, R.id.btnIdentityStudio, dialog,
+                pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
+                new MiraIdentityStudioFragment(), "IdentityStudio");
+
+        bindQuickAction(view, R.id.btnRadarLocation, dialog,
+                pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
+                new MiraUHFRadarLocationFragment(), "Radar");
+
+        bindQuickAction(view, R.id.btnSecureGate, dialog,
+                pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
+                new MiraSecureGateFragment(), "SecureGate");
+
+        bindQuickAction(view, R.id.btnReports, dialog,
+                pm.canExportReports() && quickAccess.isActionEnabled("reports"),
+                new MiraReportsProFragment(), "Reports");
+
+        bindQuickAction(view, R.id.btnAccounting, dialog,
+                pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
+                new MiraAccountingFragment(), "Accounting");
+
+        bindQuickAction(view, R.id.btnTransfer, dialog,
+                pm.canAccessTransfers() && quickAccess.isActionEnabled("transfer"),
+                new MiraTransferFragment(), "Transfers");
+
+        bindQuickAction(view, R.id.btnSalesHistory, dialog,
+                pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
+                new MiraSalesHistoryFragment(), "SalesHistory");
+
+        bindQuickAction(view, R.id.btnAdminHub, dialog,
+                pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
+                new MiraAdminHubFragment(), "AdminHub");
+
+        bindQuickAction(view, R.id.btnServerConfig, dialog,
+                pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
+                new MiraServerConfigFragment(), "ServerConfig");
+
+        // ✅ 4. زر الإغلاق
+        View btnClose = view.findViewById(R.id.btnCloseSheet);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        // ✅ 5. 🎬 حركات الفتح الانسيابية
+        GridLayout grid = view.findViewById(R.id.gridQuickActions);
+        LinearLayout root = view.findViewById(R.id.quickActionSheetRoot);
+
+        if (root != null) {
+            root.setAlpha(0f);
+            root.setTranslationY(80f);
+        }
+
+        dialog.setOnShowListener(d -> {
+            // 🎬 ظهور القائمة بالكامل بحركة انزلاق
+            if (root != null) {
+                root.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(350)
+                        .setInterpolator(new DecelerateInterpolator())
+                        .start();
+            }
+
+            // 🎬 ظهور متتالي لكل أيقونة في الشبكة
+            if (grid != null) {
+                for (int i = 0; i < grid.getChildCount(); i++) {
+                    View child = grid.getChildAt(i);
+                    if (child.getVisibility() != View.VISIBLE) continue;
+
+                    child.setAlpha(0f);
+                    child.setScaleX(0.4f);
+                    child.setScaleY(0.4f);
+                    child.setTranslationY(30f);
+
+                    child.animate()
+                            .alpha(1f)
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .translationY(0f)
+                            .setStartDelay(120 + (i * 45L))
+                            .setDuration(400)
+                            .setInterpolator(new OvershootInterpolator(1.4f))
+                            .start();
                 }
             }
+        });
 
-            applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
-                    pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
-                    new MiraRfidBindingsFragment(), "RfidBindings");
-
-            applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
-                    pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
-                    new MiraIdentityStudioFragment(), "IdentityStudio");
-
-            applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
-                    pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
-                    new MiraUHFRadarLocationFragment(), "Radar");
-
-            applyQuickActionButton(view, R.id.btnSecureGate, dialog,
-                    pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
-                    new MiraSecureGateFragment(), "SecureGate");
-
-            applyQuickActionButton(view, R.id.btnReports, dialog,
-                    pm.canExportReports() && quickAccess.isActionEnabled("reports"),
-                    new MiraReportsProFragment(), "Reports");
-
-            applyQuickActionButton(view, R.id.btnAccounting, dialog,
-                    pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
-                    new MiraAccountingFragment(), "Accounting");
-
-            applyQuickActionButton(view, R.id.btnTransfer, dialog,
-                    pm.canAccessTransfers() && quickAccess.isActionEnabled("transfers"),
-                    new MiraTransferFragment(), "Transfers");
-
-            applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
-                    pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
-                    new MiraSalesHistoryFragment(), "SalesHistory");
-
-            applyQuickActionButton(view, R.id.btnAdminHub, dialog,
-                    pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
-                    new MiraAdminHubFragment(), "AdminHub");
-
-            applyQuickActionButton(view, R.id.btnServerConfig, dialog,
-                    pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
-                    new MiraServerConfigFragment(), "ServerConfig");
-
-            View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
-            if (fabCloseSheet != null) {
-                fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
+        // 🎬 حركة الإغلاق
+        dialog.setOnDismissListener(d -> {
+            if (root != null) {
+                root.animate()
+                        .alpha(0f)
+                        .translationY(80f)
+                        .setDuration(200)
+                        .setInterpolator(new AccelerateInterpolator())
+                        .start();
             }
+        });
 
-            dialog.show();
-        } catch (Exception e) {
-            Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
+        dialog.show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
+    }
+}
+
+/**
+ * ✅ دالة مساعدة لربط أزرار الإجراءات السريعة
+ */
+private void bindQuickAction(View root, int viewId, BottomSheetDialog dialog,
+                              boolean allowed, Fragment fragment, String tag) {
+    View btn = root.findViewById(viewId);
+    if (btn != null) {
+        btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
+        if (allowed) {
+            btn.setOnClickListener(v -> {
+                // 🎬 حركة صغيرة عند الضغط
+                v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100)
+                        .withEndAction(() -> {
+                            v.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
+                            dialog.dismiss();
+                            loadFragment(fragment, tag);
+                        }).start();
+            });
         }
     }
-
-    private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
-                                        boolean allowed, Fragment fragment, String tag) {
-        View btn = root.findViewById(viewId);
-        if (btn != null) {
-            btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
-            if (allowed) {
-                btn.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    loadFragment(fragment, tag);
-                });
-            }
-        }
-    }
-
+}
+    
     // ==================== حالة الجرد ====================
 
     public boolean isInventoryActive() {
