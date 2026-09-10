@@ -83,7 +83,7 @@
 
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- ✅ الشريط الثانوي - يتبع الثيم -->
+        <!-- ✅ الشريط الثانوي -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
@@ -110,7 +110,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- ==================== طبقة التحميل ==================== -->
+        <!-- طبقة التحميل -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
@@ -126,16 +126,23 @@
                 android:layout_gravity="center" />
         </FrameLayout>
 
-        <!-- ==================== 3. BOTTOM NAVIGATION ==================== -->
+        <!-- ==================== 3. BOTTOM NAVIGATION (MD3) ==================== -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:background="?attr/colorSurface"
-            app:elevation="8dp"
+            android:elevation="16dp"
+            app:elevation="16dp"
+            app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
+            app:itemIconSize="26dp"
             app:itemIconTint="@color/nav_item_color_selector"
+            app:itemRippleColor="@color/nav_ripple_color"
+            app:itemTextAppearanceActive="@style/NavItemTextActive"
+            app:itemTextAppearanceInactive="@style/NavItemTextInactive"
             app:itemTextColor="@color/nav_item_color_selector"
             app:labelVisibilityMode="labeled"
+            app:itemHorizontalTranslationEnabled="false"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -154,7 +161,7 @@
         app:maxImageSize="24dp"
         app:fabSize="normal"
         app:borderWidth="0dp"
-        app:elevation="6dp"
+        app:elevation="8dp"
         app:layout_anchor="@id/bottomNavigationView"
         app:layout_anchorGravity="center|top" />
 
