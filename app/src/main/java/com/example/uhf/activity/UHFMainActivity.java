@@ -588,30 +588,87 @@ private void performConnectionTest() {
     // ==================== التنقل ====================
 
     public void loadFragment(Fragment fragment, String tag) {
-    showLoading();  // ✅ عرض شاشة التحميل
+    showLoading();
     navigationManager.loadFragment(fragment, tag, true);
     currentFragment = navigationManager.getCurrentFragment();
     currentFragmentTag = tag;
     updateBottomNavSelectionByTag(tag);
-    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء بعد 250ms
+    updateSecondaryToolbarVisibility(tag);   // 🆕
+    mainHandler.postDelayed(this::hideLoading, 250);
 }
 
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    showLoading();  // ✅ عرض شاشة التحميل
+    showLoading();
     navigationManager.loadFragment(fragment, tag, addToBackStack);
     currentFragment = navigationManager.getCurrentFragment();
     currentFragmentTag = tag;
     updateBottomNavSelectionByTag(tag);
-    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء
+    updateSecondaryToolbarVisibility(tag);   // 🆕
+    mainHandler.postDelayed(this::hideLoading, 250);
 }
 
 public void loadFragmentDirectly(Fragment fragment, String tag) {
-    showLoading();  // ✅ عرض شاشة التحميل
+    showLoading();
     navigationManager.loadFragmentDirectly(fragment, tag);
     currentFragment = navigationManager.getCurrentFragment();
     currentFragmentTag = tag;
     updateBottomNavSelectionByTag(tag);
-    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء
+    updateSecondaryToolbarVisibility(tag);   // 🆕
+    mainHandler.postDelayed(this::hideLoading, 250);
+}
+/**
+ * 🆕 تحديث واجهة الشريط الثانوي حسب الشاشة الحالية
+ * تُستدعى بعد كل تنقل
+ */
+private void updateSecondaryToolbarVisibility(String tag) {
+    try {
+        View secondaryToolbar = findViewById(R.id.secondaryToolbar);
+        if (secondaryToolbar == null) return;
+        
+        // 🎯 إخفاء Secondary Toolbar عند شاشات محددة
+        boolean shouldHide = isScreenThatHidesToolbar(tag);
+        
+        if (shouldHide) {
+            // إخفاء
+            if (secondaryToolbar.getVisibility() == View.VISIBLE) {
+                secondaryToolbar.animate()
+                        .alpha(0f)
+                        .setDuration(200)
+                        .withEndAction(() -> secondaryToolbar.setVisibility(View.GONE))
+                        .start();
+            }
+        } else {
+            // إظهار
+            if (secondaryToolbar.getVisibility() != View.VISIBLE) {
+                secondaryToolbar.setVisibility(View.VISIBLE);
+                secondaryToolbar.setAlpha(0f);
+                secondaryToolbar.animate()
+                        .alpha(1f)
+                        .setDuration(200)
+                        .start();
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error updating secondary toolbar visibility", e);
+    }
+}
+
+/**
+ * 🆕 هل الشاشة تُخفي Secondary Toolbar؟
+ */
+private boolean isScreenThatHidesToolbar(String tag) {
+    if (tag == null) return false;
+    
+    // 🎯 الشاشات التي تُخفي Secondary Toolbar
+    // (لأنها تحتوي على شريطها الخاص)
+    switch (tag) {
+        case "Scan":
+        case "MiraInventoryProFragment":
+            return true;
+        // أضف شاشات أخرى هنا إذا لزم الأمر
+        default:
+            return false;
+    }
 }
 
     public Fragment createFragmentByTag(String tag) {
@@ -1532,24 +1589,25 @@ public boolean isInventoryLocked() {
             }
 
             if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-                getSupportFragmentManager().popBackStackImmediate();
-                Fragment topFragment = navigationManager.getTopFragment();
-                if (topFragment != null) {
-                    String tag = topFragment.getTag();
-                    if (tag != null && !permissionManager.canAccessFragment(tag)) {
-                        navigationManager.clearBackStack();
-                        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-                        return;
-                    }
-                    currentFragment = topFragment;
-                    if (tag != null) {
-                        currentFragmentTag = tag;
-                        saveFragmentTagToPrefs(tag);
-                    }
+            getSupportFragmentManager().popBackStackImmediate();
+            Fragment topFragment = navigationManager.getTopFragment();
+            if (topFragment != null) {
+                String tag = topFragment.getTag();
+                if (tag != null && !permissionManager.canAccessFragment(tag)) {
+                    navigationManager.clearBackStack();
+                    loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+                    return;
                 }
-                return;
+                currentFragment = topFragment;
+                if (tag != null) {
+                    currentFragmentTag = tag;
+                    saveFragmentTagToPrefs(tag);
+                    updateSecondaryToolbarVisibility(tag);   // 🆕
+                }
             }
+            return;
         }
+    }
 
         if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
             navigationManager.clearBackStack();
