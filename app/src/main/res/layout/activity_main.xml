@@ -22,111 +22,66 @@
             android:layout_height="?attr/actionBarSize"
             android:paddingHorizontal="8dp"
             app:contentInsetStartWithNavigation="0dp"
-            app:menu="@menu/main_menu">  <!-- ✅ القائمة -->
+            app:menu="@menu/main_menu">
 
-            <RelativeLayout
+            <!-- ==================== اسم المؤسسة والفرع ==================== -->
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center_vertical"
+                android:paddingEnd="48dp"
+                android:paddingStart="0dp">
 
-                <!-- اسم المؤسسة والفرع -->
-                <LinearLayout
-                    android:id="@+id/containerTitle"
+                <!-- اسم المؤسسة -->
+                <TextView
+                    android:id="@+id/tvTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:layout_centerVertical="true"
-                    android:layout_toStartOf="@+id/containerActions"
-                    android:orientation="vertical">
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="البوعاني للذهب والمجوهرات" />
+
+                <!-- الفرع + مؤشر حالة الجهاز -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <TextView
-                        android:id="@+id/tvTitle"
+                        android:id="@+id/tvSubtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="@color/white"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        tools:text="البوعاني للذهب والمجوهرات" />
+                        android:textColor="#E0E0E0"
+                        android:textSize="10sp"
+                        tools:text="📍 Main Branch" />
 
-                    <LinearLayout
+                    <!-- مؤشر حالة الجهاز (Dot) -->
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_status_dot"
+                        android:visibility="gone" />
+
+                    <!-- نص حالة الجهاز -->
+                    <TextView
+                        android:id="@+id/statusText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/tvSubtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="#E0E0E0"
-                            android:textSize="10sp"
-                            tools:text="📍 Main Branch" />
-
-                        <!-- مؤشر حالة الجهاز -->
-                        <View
-                            android:id="@+id/statusDot"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_status_dot"
-                            android:visibility="gone" />
-
-                        <TextView
-                            android:id="@+id/statusText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:textColor="#FFFFFF"
-                            android:textSize="9sp"
-                            android:visibility="gone" />
-                    </LinearLayout>
+                        android:layout_marginStart="4dp"
+                        android:textColor="#FFFFFF"
+                        android:textSize="9sp"
+                        android:visibility="gone" />
                 </LinearLayout>
-
-                <!-- أزرار الإجراءات والاستشعار -->
-                <LinearLayout
-                    android:id="@+id/containerActions"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <ImageButton
-                        android:id="@+id/btnSubSync"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Sync"
-                        android:padding="8dp"
-                        android:src="@drawable/ic_export"
-                        app:tint="@color/white" />
-
-                    <ImageButton
-                        android:id="@+id/btnSubSearch"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Search"
-                        android:padding="8dp"
-                        android:src="@drawable/ic_search"
-                        app:tint="@color/white" />
-
-                    <ImageButton
-                        android:id="@+id/btnHardwareStatus"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Device Status"
-                        android:padding="8dp"
-                        android:src="@drawable/ic_security"
-                        app:tint="@color/white" />
-                </LinearLayout>
-
-            </RelativeLayout>
+            </LinearLayout>
 
         </com.google.android.material.appbar.MaterialToolbar>
 
@@ -138,7 +93,7 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات -->
+        <!-- ==================== حاوي الشاشات (Fragments) ==================== -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
@@ -148,7 +103,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- طبقة التحميل -->
+        <!-- ==================== طبقة التحميل ==================== -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
