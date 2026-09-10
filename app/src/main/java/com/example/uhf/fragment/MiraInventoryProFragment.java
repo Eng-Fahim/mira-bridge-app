@@ -36,6 +36,7 @@ import com.example.uhf.model.InventoryItem;
 import com.example.uhf.model.ScannedItemDisplay;
 import com.example.uhf.model.InventoryReport;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.ModernScannedItemsAdapter;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
@@ -384,64 +385,72 @@ private String currentKaratFilter = "all";  // 🆕 all / 24K / 22K / 21K / 18K 
     /**
      * إعداد معالج زر الرجوع
      */
-    private void setupBackPressHandler() {
-        backPressedCallback = new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                if (isScanning) {
-                    showExitWarning(() -> {
-                        stopScanning();
-                        setEnabled(false);
-                        requireActivity().getOnBackPressedDispatcher().onBackPressed();
-                    });
-                } else {
+    /**
+ * إعداد معالج زر الرجوع
+ */
+private void setupBackPressHandler() {
+    backPressedCallback = new OnBackPressedCallback(true) {
+        @Override
+        public void handleOnBackPressed() {
+            if (isScanning) {
+                showExitWarning(() -> {
+                    stopScanning();
                     setEnabled(false);
                     requireActivity().getOnBackPressedDispatcher().onBackPressed();
-                }
+                });
+            } else {
+                setEnabled(false);
+                requireActivity().getOnBackPressedDispatcher().onBackPressed();
             }
-        };
-        
-        requireActivity().getOnBackPressedDispatcher().addCallback(
-            getViewLifecycleOwner(), 
-            backPressedCallback
-        );
-    }
+        }
+    };
+    
+    requireActivity().getOnBackPressedDispatcher().addCallback(
+        getViewLifecycleOwner(), 
+        backPressedCallback
+    );
+}
 
-    /**
-     * عرض تحذير الخروج
-     */
-    private void showExitWarning(Runnable onConfirm) {
-        if (!isAdded() || isFragmentDestroyed) return;
-        
-        String title = isArabic ? "⚠️ تحذير مهم" : "⚠️ Important Warning";
-        String message = isArabic ? 
-            "الجرد ما زال قيد التشغيل!\n\n" +
-            "إذا قمت بتغيير الواجهة، سيتوقف الجرد وستفقد البيانات غير المحفوظة.\n\n" +
-            "هل تريد إيقاف الجرد والمتابعة؟" :
-            "Inventory is still running!\n\n" +
-            "If you change the screen, the inventory will stop and unsaved data will be lost.\n\n" +
-            "Do you want to stop and continue?";
-        String positiveBtn = isArabic ? "إيقاف والمتابعة" : "Stop and Continue";
-        String negativeBtn = isArabic ? "البقاء في الجرد" : "Stay in Inventory";
-        
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton(positiveBtn, (dialog, which) -> {
+/**
+ * 🆕 عرض تحذير الخروج الاحترافي (3 خيارات)
+ */
+private void showExitWarning(Runnable onConfirm) {
+    if (!isAdded() || isFragmentDestroyed) return;
+    
+    int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+    long elapsedSeconds = (SystemClock.elapsedRealtime() - scanStartTime) / 1000;
+    long minutes = elapsedSeconds / 60;
+    long seconds = elapsedSeconds % 60;
+    
+    String title = isArabic ? "🔴 جرد نشط" : "🔴 Inventory Active";
+    String message = isArabic ?
+        "لا يمكنك الخروج أثناء الجرد النشط.\n\n" +
+        "📊 القطع الممسوحة: " + scanned + "\n" +
+        "⏱ الوقت المنقضي: " + String.format(Locale.US, "%02d:%02d", minutes, seconds) +
+        "\n\nاختر الإجراء المناسب:" :
+        "You cannot exit during an active inventory.\n\n" +
+        "📊 Scanned items: " + scanned + "\n" +
+        "⏱ Elapsed time: " + String.format(Locale.US, "%02d:%02d", minutes, seconds) +
+        "\n\nChoose the appropriate action:";
+    
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "✅ البقاء في الجرد" : "✅ Stay", 
+                (dialog, which) -> dialog.dismiss())
+            .setNeutralButton(isArabic ? "⏹️ إيقاف والانتقال" : "⏹️ Stop & Exit", 
+                (dialog, which) -> {
+                    stopScanning();
                     if (onConfirm != null) {
                         onConfirm.run();
                     }
                 })
-                .setNegativeButton(negativeBtn, (dialog, which) -> {
-                    dialog.dismiss();
-                })
-                .setCancelable(false)
-                .show();
-    }
+            .setNegativeButton(isArabic ? "📊 اعتماد الآن" : "📊 Commit Now", 
+                (dialog, which) -> showCommitSummaryDialog())
+            .setCancelable(false)
+            .show();
+}
 
-    /**
-     * تطبيق الصلاحيات
-     */
    /**
  * تطبيق الصلاحيات
  */
@@ -1585,6 +1594,15 @@ private void startReadingSource() {
     
     
     if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
+    
+    // ✅ 🔒 تفعيل وضع الجرد المحصّن
+try {
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).enterInventoryLockMode();
+    }
+} catch (Exception e) {
+    Log.e(TAG, "Error entering lock mode", e);
+}
 }
 
 /**
@@ -1660,7 +1678,15 @@ public void stopScanning() {
                 
                 updateUI();
                 syncOfflineTransactions();
-            });
+                // ✅ 🔓 إلغاء وضع القفل
+                try {
+                if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).exitInventoryLockMode();
+                }
+                } catch (Exception e) {
+                Log.e(TAG, "Error exiting lock mode", e);
+                }
+          });
         } catch (Exception e) {
             Log.e(TAG, "Error processing session close", e);
         }
@@ -2758,6 +2784,14 @@ private void printCurrentReport() {
         }
         
         isFragmentDestroyed = true;
+        // ✅ 🔓 إلغاء القفل كإجراء احترازي
+        try {
+        if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).exitInventoryLockMode();
+        }
+        } catch (Exception e) {
+        Log.e(TAG, "Error exiting lock mode on destroy", e);
+        }
         isScanning = false;
         
         stopSimulationLoop();
