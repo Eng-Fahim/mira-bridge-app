@@ -29,11 +29,10 @@
         <item name="android:popupBackground">@drawable/bg_custom_popup_menu</item>
         <item name="android:itemIconDisabledAlpha">0.5</item>
     </style>
-
     <style name="TransparentBottomSheetDialog" parent="Theme.Design.Light.BottomSheetDialog">
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="androihttps://github.com/Eng-Fahim/mira-bridge-app/edit/main/app/src/main/res/values/styles.xmld:windowBackground">@android:color/transparent</item>
-    </style>
+    <item name="android:windowIsTranslucent">true</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
+</style>
 
     <!-- ==================== Bottom Navigation (MD3 Floating Luxury) ==================== -->
 
