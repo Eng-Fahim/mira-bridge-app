@@ -102,7 +102,9 @@
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintBottom_toTopOf="@+id/bottomAppBar"
+            android:paddingBottom="80dp"
+            android:clipToPadding="false"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -125,40 +127,32 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ==================== 3. BOTTOM APP BAR (مع Cradle) ==================== -->
-    <com.google.android.material.bottomappbar.BottomAppBar
-        android:id="@+id/bottomAppBar"
+    <!-- ==================== 3. FLOATING LUXURY NAV DOCK ==================== -->
+    <FrameLayout
+        android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@drawable/bg_bottom_nav_rounded"
-        android:clipToOutline="true"
-        android:elevation="16dp"
-        app:fabAlignmentMode="center"
-        app:fabCradleMargin="8dp"
-        app:fabCradleRoundedCornerRadius="16dp"
-        app:fabCradleVerticalOffset="12dp"
-        app:popupTheme="@style/ThemeOverlay.Material3.Light">
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="16dp">
 
-        <!-- ✅ BottomNavigationView مفصول لتجنب التكرار -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
-            app:elevation="0dp"
+            android:layout_height="64dp"
+            android:background="@drawable/bg_bottom_nav_rounded"
+            android:elevation="12dp"
             app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
-            app:itemIconSize="24dp"
+            app:itemIconSize="22dp"
             app:itemIconTint="@color/nav_item_color_selector"
             app:itemRippleColor="@color/nav_ripple_color"
             app:itemTextAppearanceActive="@style/NavItemTextActive"
             app:itemTextAppearanceInactive="@style/NavItemTextInactive"
             app:itemTextColor="@color/nav_item_color_selector"
             app:labelVisibilityMode="labeled"
-            app:itemHorizontalTranslationEnabled="false"
             app:menu="@menu/bottom_nav_menu" />
 
-    </com.google.android.material.bottomappbar.BottomAppBar>
+    </FrameLayout>
 
     <!-- ==================== 4. FAB ==================== -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -168,10 +162,12 @@
         android:src="@drawable/ic_add"
         app:backgroundTint="?attr/colorPrimary"
         app:tint="@color/white"
-        app:maxImageSize="24dp"
+        app:maxImageSize="26dp"
         app:fabSize="normal"
-        app:borderWidth="0dp"
-        app:elevation="12dp"
-        app:layout_anchor="@id/bottomAppBar" />
+        app:borderWidth="2dp"
+        app:borderColor="#20D9A736"
+        app:elevation="16dp"
+        app:layout_anchor="@id/bottomNavContainer"
+        app:layout_anchorGravity="center_horizontal|top" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
