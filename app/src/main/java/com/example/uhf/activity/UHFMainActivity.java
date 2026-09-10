@@ -79,6 +79,7 @@ import com.example.uhf.fragment.MiraUHFReadWriteFragment;
 import com.example.uhf.fragment.MiraAccountingFragment;
 import com.example.uhf.fragment.MiraAdminHubFragment;
 import com.example.uhf.fragment.MiraBranchesManagementFragment;
+import com.example.uhf.manager.InventoryLockManager;
 import com.example.uhf.fragment.MiraGoldCurrencyFragment;
 import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraProfileFragment;
@@ -108,6 +109,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private SoundManager soundManager;
     private NotificationManager notificationManager;
     private StatusIndicatorManager statusIndicatorManager;
+    
+    private InventoryLockManager inventoryLockManager; 
+    
+    
     
     // ✅ المتغيرات الأساسية
     private TextView txtBadgeCount;
@@ -212,6 +217,10 @@ if (toolbar != null) {
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             permissionManager = PermissionManager.getInstance(getApplicationContext());
             navigationManager = new NavigationManager(getSupportFragmentManager(), permissionManager);
+            // 🆕 تهيئة مدير القفل
+            inventoryLockManager = new InventoryLockManager(this);
+            inventoryLockManager.initialize();
+            
             
             hardwareManager = new HardwareManager(this, new HardwareManager.HardwareStatusListener() {
                 @Override
@@ -1425,6 +1434,35 @@ private void bindQuickAction(View root, int viewId, BottomSheetDialog dialog,
         }
     }
 }
+
+// ==================== 🔒 وضع الجرد المحصّن (API عام) ====================
+
+/**
+ * 🆕 تفعيل وضع الجرد المحصّن
+ * تُستدعى من Fragment عند بدء الجرد
+ */
+public void enterInventoryLockMode() {
+    if (inventoryLockManager != null) {
+        inventoryLockManager.lock();
+    }
+}
+
+/**
+ * 🆕 إلغاء وضع الجرد المحصّن
+ * تُستدعى من Fragment عند إيقاف الجرد
+ */
+public void exitInventoryLockMode() {
+    if (inventoryLockManager != null) {
+        inventoryLockManager.unlock();
+    }
+}
+
+/**
+ * هل وضع القفل نشط حالياً؟
+ */
+public boolean isInventoryLocked() {
+    return inventoryLockManager != null && inventoryLockManager.isLocked();
+}
     
     // ==================== حالة الجرد ====================
 
@@ -1624,6 +1662,11 @@ private void bindQuickAction(View root, int viewId, BottomSheetDialog dialog,
 
             if (orgProfileManager != null) {
                 orgProfileManager.removeListener(this::updateAppTitle);
+            }
+            
+            if (inventoryLockManager != null) {
+            inventoryLockManager.cleanup();
+            inventoryLockManager = null;
             }
 
             SessionMonitorManager.getInstance(this).stopMonitoring();
