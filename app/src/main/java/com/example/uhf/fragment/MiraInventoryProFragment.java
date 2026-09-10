@@ -1760,42 +1760,6 @@ private void applyAntennaPower(int dbm) {
     }
 }
 
-// ==================== اختيار الفئة ====================
-
-/**
- * عرض حوار اختيار الفئة للجرد الفئوي
- */
-private void showCategorySelectionDialog() {
-    if (!isAdded() || isFragmentDestroyed) return;
-    
-    final String[] categories = isArabic ? new String[]{
-        "عيار 24", "عيار 22", "عيار 21", "عيار 18", "عيار 14",
-        "سبائك", "أونصات", "فضة", "ألماس", "أخرى"
-    } : new String[]{
-        "24K", "22K", "21K", "18K", "14K",
-        "Bullion", "Ounces", "Silver", "Diamond", "Other"
-    };
-    
-    new MaterialAlertDialogBuilder(requireContext())
-        .setTitle(isArabic ? "اختر الفئة للجرد" : "Select Category")
-        .setItems(categories, (dialog, which) -> {
-            String category = categories[which];
-            Toast.makeText(requireContext(), 
-                (isArabic ? "جرد فئوي: " : "Category inventory: ") + category, 
-                Toast.LENGTH_SHORT).show();
-            
-            if (segmentedModes != null && btnModeFull != null) {
-                segmentedModes.check(R.id.btnModeFull);
-            }
-        })
-        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (dialog, which) -> {
-            if (segmentedModes != null && btnModeFull != null) {
-                segmentedModes.check(R.id.btnModeFull);
-            }
-        })
-        .show();
-}
-
 
     // ==================== اعتماد الجرد وإرسال البيانات ====================
 
