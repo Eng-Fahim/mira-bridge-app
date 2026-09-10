@@ -1445,6 +1445,8 @@ public void enterInventoryLockMode() {
     if (inventoryLockManager != null) {
         inventoryLockManager.lock();
     }
+     // 🆕 أخفِ Secondary Toolbar
+    showInventoryStatusBar();
 }
 
 /**
@@ -1455,6 +1457,8 @@ public void exitInventoryLockMode() {
     if (inventoryLockManager != null) {
         inventoryLockManager.unlock();
     }
+    // 🆕 أظهر Secondary Toolbar
+    hideInventoryStatusBar();
 }
 
 /**
@@ -1613,7 +1617,42 @@ public boolean isInventoryLocked() {
             }
         });
     }
+/**
+ * 🆕 إخفاء Secondary Toolbar أثناء الجرد
+ */
+public void showInventoryStatusBar() {
+    try {
+        View secondaryToolbar = findViewById(R.id.secondaryToolbar);
+        if (secondaryToolbar != null) {
+            secondaryToolbar.animate()
+                    .alpha(0f)
+                    .setDuration(200)
+                    .withEndAction(() -> secondaryToolbar.setVisibility(View.GONE))
+                    .start();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error hiding secondary toolbar", e);
+    }
+}
 
+/**
+ * 🆕 إظهار Secondary Toolbar بعد الجرد
+ */
+public void hideInventoryStatusBar() {
+    try {
+        View secondaryToolbar = findViewById(R.id.secondaryToolbar);
+        if (secondaryToolbar != null) {
+            secondaryToolbar.setVisibility(View.VISIBLE);
+            secondaryToolbar.setAlpha(0f);
+            secondaryToolbar.animate()
+                    .alpha(1f)
+                    .setDuration(200)
+                    .start();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error showing secondary toolbar", e);
+    }
+}
     public void showToast(String text) {
         if (text == null) return;
         mainHandler.post(() -> Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show());
