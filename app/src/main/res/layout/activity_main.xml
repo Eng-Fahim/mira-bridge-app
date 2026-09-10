@@ -143,11 +143,12 @@
             android:id="@+id/bottomNavigationView"
             android:layout_width="match_parent"
             android:layout_height="64dp"
+            android:layout_marginTop="16dp"
             android:background="@drawable/bg_floating_bottom_nav_with_shadow"
             app:itemBackground="@null"
             app:elevation="0dp"
             app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
-            app:itemIconSize="26dp"
+            app:itemIconSize="24dp"
             app:itemIconTint="@color/nav_item_color_selector"
             app:itemRippleColor="@color/nav_ripple_color"
             app:itemTextAppearanceActive="@style/NavItemTextActive"
@@ -156,18 +157,18 @@
             app:labelVisibilityMode="labeled"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- ✅ الـ FAB الآن داخل نفس الحاوية، فوق الشريط مباشرة -->
+        <!-- ✅ الـ FAB الآن طافٍ بشكل كامل فوق الشريط، متمركز في المنتصف -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:layout_gravity="center_horizontal|top"
-            android:layout_marginTop="-32dp"
             android:src="@drawable/ic_add"
             app:backgroundTint="?attr/colorPrimary"
             app:tint="@color/white"
-            app:maxImageSize="28dp"
+            app:maxImageSize="26dp"
             app:fabSize="normal"
+            app:borderWidth="0dp"
             app:elevation="12dp"
             app:pressedTranslationZ="6dp" />
 
