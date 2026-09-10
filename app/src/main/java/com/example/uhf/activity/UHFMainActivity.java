@@ -178,7 +178,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 cleanupOldFragments();
 
 // ✅ ربط الشريط الثانوي
-setupSecondaryAppBar();
+setupSecondaryToolbar();
 
 // ✅ إعداد القائمة والـ Toolbar
 MaterialToolbar toolbar = findViewById(R.id.toolbar);
@@ -262,12 +262,11 @@ if (toolbar != null) {
         }
     }
     
-    private void setupSecondaryAppBar() {
-    com.google.android.material.bottomappbar.BottomAppBar secondaryAppBar = 
-        findViewById(R.id.secondaryAppBar);
+    private void setupSecondaryToolbar() {
+    MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
     
-    if (secondaryAppBar != null) {
-        secondaryAppBar.setOnMenuItemClickListener(item -> {
+    if (secondaryToolbar != null) {
+        secondaryToolbar.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             
             if (id == R.id.action_sync) {
