@@ -8,7 +8,6 @@
     android:fitsSystemWindows="true"
     tools:context=".activity.UHFMainActivity">
 
-    <!-- ==================== 1. APP BAR & TOOLBAR ==================== -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
@@ -16,7 +15,6 @@
         android:background="?attr/colorPrimary"
         app:elevation="4dp">
 
-        <!-- ========== Toolbar الرئيسي ========== -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
@@ -30,7 +28,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- اسم المؤسسة والفرع -->
+                <!-- اسم المؤسسة والفرع ومؤشر الحالة -->
                 <LinearLayout
                     android:id="@+id/containerTitle"
                     android:layout_width="wrap_content"
@@ -51,18 +49,42 @@
                         android:textStyle="bold"
                         tools:text="MIRA Jewelry" />
 
-                    <TextView
-                        android:id="@+id/tvSubtitle"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="#E0E0E0"
-                        android:textSize="10sp"
-                        tools:text="📍 Main Branch" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvSubtitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="#E0E0E0"
+                            android:textSize="10sp"
+                            tools:text="📍 Main Branch" />
+
+                        <!-- ✅ مطلوب لـ StatusIndicatorManager -->
+                        <View
+                            android:id="@+id/statusDot"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_status_dot_green" />
+
+                        <TextView
+                            android:id="@+id/statusText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:textColor="#FFFFFF"
+                            android:textSize="9sp"
+                            tools:text="متصل" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <!-- أزرار الإجراءات المخصصة في Toolbar -->
+                <!-- أزرار الإجراءات في Toolbar -->
                 <LinearLayout
                     android:id="@+id/containerActions"
                     android:layout_width="wrap_content"
@@ -72,7 +94,6 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <!-- زر المزامنة -->
                     <ImageButton
                         android:id="@+id/btnSync"
                         android:layout_width="38dp"
@@ -83,7 +104,6 @@
                         android:src="@drawable/ic_sync"
                         app:tint="@color/white" />
 
-                    <!-- زر البحث -->
                     <ImageButton
                         android:id="@+id/btnSearch"
                         android:layout_width="38dp"
@@ -94,7 +114,6 @@
                         android:src="@drawable/ic_search"
                         app:tint="@color/white" />
 
-                    <!-- زر حالة الجهاز -->
                     <ImageButton
                         android:id="@+id/btnDeviceStatus"
                         android:layout_width="38dp"
@@ -109,13 +128,11 @@
         </com.google.android.material.appbar.MaterialToolbar>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ==================== 2. MAIN CONTENT ==================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
@@ -126,7 +143,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- ==================== 3. BOTTOM NAVIGATION ==================== -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
@@ -144,7 +160,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- ==================== 4. FAB (وسط أسفل) ==================== -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="wrap_content"
@@ -163,7 +178,6 @@
             app:strokeWidth="3dp"
             app:tint="@color/fab_icon_color" />
 
-        <!-- ==================== 5. LOADING OVERLAY ==================== -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
