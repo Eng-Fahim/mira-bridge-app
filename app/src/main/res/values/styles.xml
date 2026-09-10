@@ -37,14 +37,15 @@
 
     <!-- ==================== Bottom Navigation (MD3) ==================== -->
 
-    <!-- ✅ Active Indicator (Pill Shape) -->
-    <style name="CustomActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <item name="android:color">#20D9A736</item>
-        <item name="android:width">64dp</item>
-        <item name="android:height">36dp</item>
-        <item name="marginHorizontal">4dp</item>
-        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
-    </style>
+    <!-- ✅ Active Indicator (Pill Shape الفاخر) -->
+<style name="CustomActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+    <item name="android:color">#25D9A736</item>
+    <item name="android:width">52dp</item>
+    <item name="android:height">32dp</item>
+    <item name="marginHorizontal">2dp</item>
+    <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+</style>
+
 
     <!-- ✅ نمط Bottom Navigation الرئيسي -->
     <style name="AppBottomNavigationViewStyle" parent="Widget.Material3.BottomNavigationView">
