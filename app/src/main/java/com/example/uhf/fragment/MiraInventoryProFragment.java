@@ -45,7 +45,6 @@ import com.example.uhf.utils.RFIDCodeUtils;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
-import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.slider.Slider;
 
@@ -71,23 +70,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * MiraInventoryProFragment - الإصدار الاحترافي 2.0
  * 
- * ✅ تحسينات الإصدار الجديد:
+ * ✅ الميزات:
  * - ListAdapter + DiffUtil لأداء محسن
  * - Power Control Slider (5-30 dBm)
  * - Search Bar حي
  * - Segmented Control (شامل/فئوي/أعمى)
  * - Hero Progress Circle
  * - Floating Action Dock
- * 
- * ✅ الأمان:
- * - Thread-Safe Collections
- * - AtomicBoolean للتزامن
- * - إدارة آمنة للذاكرة
- * 
- * ✅ الجودة:
- * - دعم SGTIN-96 مع EAN-13
- * - بناء خريطة عكسية للباركود
- * - تتبع دقيق للوزن والقيمة
  */
 public class MiraInventoryProFragment extends KeyDwonFragment 
         implements MiraIRFIDReader.OnTagReadListener {
@@ -102,76 +91,58 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final long BEEP_THROTTLE_MS = 60;
     private static final int EXECUTOR_SHUTDOWN_TIMEOUT_MS = 1000;
     private static final long TAG_READ_DEBOUNCE_MS = 500;
-    private static final int MAX_AUDIT_ENTRIES = 1000;
     private static final int MAX_CACHE_ITEMS = 5000;
-    
-    // ==================== ثوابت المعرفات ====================
-    private static final int EAN13_LENGTH = 13;
-    private static final int UPC12_LENGTH = 12;
     
     // ==================== مفاتيح الزناد ====================
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
     private static final int KEYCODE_RFID_TRIGGER_3 = 293;
     
-    // ==================== مكونات الواجهة - الإصدار الجديد ====================
-    // Hero Circle
+    // ==================== مكونات الواجهة - Hero Circle ====================
     private TextView tvProgressPercent;
     private ProgressBar progressScanned;
     private TextView tvScannedCount;
     private TextView tvExpectedCount;
     
-    // Status Header
+    // ==================== Status Header ====================
     private View statusDot;
     private View statusBar;
     private TextView tvInventoryStatus;
     private TextView tvElapsedTime;
     private TextView tvRssi;
     
-    // Segmented Control
+    // ==================== Segmented Control ====================
     private MaterialButtonToggleGroup segmentedModes;
     private MaterialButton btnModeFull;
     private MaterialButton btnModeCategory;
     private MaterialButton btnModeBlind;
     
-    // Stats Strip
+    // ==================== Stats Strip ====================
     private TextView tvVariance;
     private TextView tvAccuracy;
     private TextView tvItemCount;
     
-    // Gold Metrics
+    // ==================== Gold Metrics ====================
     private TextView tvTotalWeight;
     private TextView tvTotalValue;
     
-    // Action Dock
+    // ==================== Action Dock ====================
     private MaterialButton btnPowerControl;
     private MaterialButton btnGenerateReport;
     private MaterialButton btnArchiveReports;
     
-    // Search
+    // ==================== Search ====================
     private EditText etSearchItems;
     private ImageView btnClearSearch;
     
-    // RecyclerView
+    // ==================== RecyclerView ====================
     private RecyclerView rvInventoryItems;
     private ModernScannedItemsAdapter modernAdapter;
     private View tvEmptyState;
     
-    // Floating Action Dock (السفلي)
+    // ==================== Floating Action Dock (السفلي) ====================
     private MaterialButton btnMainToggleScan;
     private MaterialButton btnCommitSession;
-    
-    // الأزرار القديمة (محتفظ بها للتوافق)
-    private MaterialButton btnStartInventory;
-    private MaterialButton btnBlindInventory;
-    private MaterialButton btnStopInventory;
-    private MaterialButton btnViewSnapshots;
-    
-    // Comparison Card
-    private TextView tvPrevItems;
-    private TextView tvCurrItems;
-    private TextView tvDeltaItems;
-    private MaterialCardView cardComparison;
 
     // ==================== مجموعات آمنة للخيوط ====================
     private final List<ScannedItemDisplay> scannedItemsDisplayList = 
@@ -472,12 +443,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         boolean canEdit = permissionManager.canEdit("inventory") || permissionManager.isManager();
         
         if (btnMainToggleScan != null) btnMainToggleScan.setEnabled(canEdit);
-        if (btnStartInventory != null) btnStartInventory.setEnabled(canEdit);
-        if (btnBlindInventory != null) btnBlindInventory.setEnabled(canEdit);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(canEdit);
         if (btnCommitSession != null) btnCommitSession.setEnabled(canEdit);
         if (btnArchiveReports != null) btnArchiveReports.setEnabled(canView);
-        if (btnViewSnapshots != null) btnViewSnapshots.setEnabled(canView);
         
         if (!canView && !canEdit && tvInventoryStatus != null) {
             tvInventoryStatus.setText(isArabic ? "⛔ غير مصرح لك بالوصول" : "⛔ Access denied");
@@ -490,18 +458,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private void applyLanguage() {
         if (btnMainToggleScan != null) 
             btnMainToggleScan.setText(isArabic ? "▶️ بدء جرد RFID" : "▶️ Start RFID Inventory");
-        if (btnStartInventory != null) 
-            btnStartInventory.setText(isArabic ? "▶️ بدء الجرد" : "▶️ Start Inventory");
-        if (btnBlindInventory != null) 
-            btnBlindInventory.setText(isArabic ? "👁️ جرد أعمى" : "👁️ Blind Inventory");
-        if (btnStopInventory != null) 
-            btnStopInventory.setText(isArabic ? "⏹️ إيقاف" : "⏹️ Stop");
         if (btnGenerateReport != null) 
             btnGenerateReport.setText(isArabic ? "📋 تقرير" : "📋 Report");
         if (btnArchiveReports != null) 
             btnArchiveReports.setText(isArabic ? "📂 الأرشيف" : "📂 Archive");
-        if (btnViewSnapshots != null) 
-            btnViewSnapshots.setText(isArabic ? "📸 اللقطات" : "📸 Snapshots");
         if (btnPowerControl != null) 
             btnPowerControl.setText("⚡ " + currentPowerDbm + " dBm");
         if (btnCommitSession != null)
@@ -509,7 +469,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     /**
-     * تهيئة عناصر الواجهة - الإصدار الجديد
+     * تهيئة عناصر الواجهة
      */
     private void initViews(View view) {
         // ==================== Hero Circle ====================
@@ -567,18 +527,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         btnMainToggleScan = view.findViewById(R.id.btnMainToggleScan);
         btnCommitSession = view.findViewById(R.id.btnCommitSession);
         
-        // ==================== Legacy Buttons (للتوافق) ====================
-        btnStartInventory = view.findViewById(R.id.btnStartInventory);
-        btnBlindInventory = view.findViewById(R.id.btnBlindInventory);
-        btnStopInventory = view.findViewById(R.id.btnStopInventory);
-        btnViewSnapshots = view.findViewById(R.id.btnViewSnapshots);
-        
-        // ==================== Comparison Card ====================
-        tvPrevItems = view.findViewById(R.id.tvPrevItems);
-        tvCurrItems = view.findViewById(R.id.tvCurrItems);
-        tvDeltaItems = view.findViewById(R.id.tvDeltaItems);
-        cardComparison = view.findViewById(R.id.cardComparison);
-        
         // ==================== إعداد الأزرار ====================
         setupButtons();
         setupSegmentedControl();
@@ -589,7 +537,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
      * إعداد الأزرار الجديدة
      */
     private void setupButtons() {
-        // ==================== زر البدء/الإيقاف الذكي ====================
+        // زر البدء/الإيقاف الذكي
         if (btnMainToggleScan != null) {
             btnMainToggleScan.setOnClickListener(v -> {
                 if (isScanning) {
@@ -605,60 +553,25 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             });
         }
         
-        // ==================== زر الاعتماد ====================
+        // زر الاعتماد
         if (btnCommitSession != null) {
             btnCommitSession.setOnClickListener(v -> showCommitConfirmationDialog());
         }
         
-        // ==================== زر Power Control ====================
+        // زر Power Control
         if (btnPowerControl != null) {
             btnPowerControl.setOnClickListener(v -> showPowerControlSheet());
         }
         
-        // ==================== زر التقرير ====================
+        // زر التقرير
         if (btnGenerateReport != null) {
             btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
             btnGenerateReport.setEnabled(false);
         }
         
-        // ==================== زر الأرشيف ====================
+        // زر الأرشيف
         if (btnArchiveReports != null) {
             btnArchiveReports.setOnClickListener(v -> showArchiveReports());
-        }
-        
-        // ==================== زر اللقطات ====================
-        if (btnViewSnapshots != null) {
-            btnViewSnapshots.setOnClickListener(v -> showSnapshotsDialog());
-        }
-        
-        // ==================== Legacy: بدء ====================
-        if (btnStartInventory != null) {
-            btnStartInventory.setOnClickListener(v -> {
-                if (permissionManager != null && 
-                    (permissionManager.canEdit("inventory") || permissionManager.isManager())) {
-                    startScanning();
-                } else {
-                    showAccessDenied();
-                }
-            });
-        }
-        
-        // ==================== Legacy: أعمى ====================
-        if (btnBlindInventory != null) {
-            btnBlindInventory.setOnClickListener(v -> {
-                if (permissionManager != null && 
-                    (permissionManager.canEdit("inventory") || permissionManager.isManager())) {
-                    startBlindInventory();
-                } else {
-                    showAccessDenied();
-                }
-            });
-        }
-        
-        // ==================== Legacy: إيقاف ====================
-        if (btnStopInventory != null) {
-            btnStopInventory.setOnClickListener(v -> stopScanning());
-            btnStopInventory.setEnabled(false);
         }
     }
 
@@ -672,7 +585,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             if (!isChecked) return;
             
             if (checkedId == R.id.btnModeFull) {
-                // الوضع الشامل (افتراضي)
                 Log.d(TAG, "Mode: Full");
             } else if (checkedId == R.id.btnModeCategory) {
                 showCategorySelectionDialog();
@@ -751,10 +663,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
         return false;
     }
-
-    // ==================== [يتبع في الجزء 2] ====================
-    
-    
 // ==================== معالجة قراءة الوسم ====================
 
 /**
@@ -787,7 +695,9 @@ public void onTagRead(String epc, int rssi) {
 
     backgroundExecutor.execute(() -> {
         try {
-            inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
+            if (inventoryEngine != null) {
+                inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
+            }
             saveTransactionLocally(normalizedEpc, finalRssi);
             
             mainThreadHandler.post(() -> {
@@ -821,6 +731,8 @@ private void cleanOldTagReads(long currentTime) {
  */
 private void saveTransactionLocally(String epc, int rssi) {
     try {
+        if (inventoryEngine == null || transactionDao == null) return;
+        
         InventoryTransactionEntity transaction = new InventoryTransactionEntity();
         transaction.sessionId = inventoryEngine.getClientSessionId();
         transaction.epcCode = epc;
@@ -834,7 +746,7 @@ private void saveTransactionLocally(String epc, int rssi) {
             transaction.branchId = branchesManager.getActiveBranchId();
         }
         
-        if (backgroundExecutor != null && !backgroundExecutor.isShutdown() && transactionDao != null) {
+        if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
             backgroundExecutor.execute(() -> {
                 try {
                     transactionDao.insertTransaction(transaction);
@@ -921,7 +833,6 @@ private String getCurrentUserId() {
 
 /**
  * إضافة عنصر ممسوح للعرض مع جلب معلومات القطعة الكاملة
- * ✅ النسخة المحسّنة: تستخدم DiffUtil عبر submitList
  */
 private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
     if (!isAdded() || isFragmentDestroyed || modernAdapter == null) {
@@ -935,17 +846,14 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
     
     synchronized (scannedItemsDisplayList) {
         boolean exists = false;
-        int existingIndex = -1;
 
-        for (int i = 0; i < scannedItemsDisplayList.size(); i++) {
-            ScannedItemDisplay display = scannedItemsDisplayList.get(i);
+        for (ScannedItemDisplay display : scannedItemsDisplayList) {
             if (display != null && epc.equals(display.epc)) {
                 display.count++;
                 display.rssi = rssi;
                 display.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                     .format(new Date());
                 exists = true;
-                existingIndex = i;
                 break;
             }
         }
@@ -1019,7 +927,6 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
 
 /**
  * ✅ تحديث قائمة الـ Adapter باستخدام DiffUtil
- * يجمع بين نتائج البحث والفلترة الحالية
  */
 private void updateAdapterList() {
     if (modernAdapter == null || isFragmentDestroyed) return;
@@ -1230,7 +1137,6 @@ private void showDamageDialog(ScannedItemDisplay item) {
  */
 private void updateItemStatus(String epc, String status) {
     Log.d(TAG, "Update status " + epc + " to " + status);
-    // TODO: إرسال للخادم
 }
 
 /**
@@ -1238,7 +1144,6 @@ private void updateItemStatus(String epc, String status) {
  */
 private void registerItemDamage(String epc, String damageType) {
     Log.d(TAG, "Register damage " + epc + " - " + damageType);
-    // TODO: إرسال للخادم
 }
 
 /**
@@ -1326,26 +1231,6 @@ private void updateUI() {
     
     if (tvItemCount != null) {
         tvItemCount.setText(String.valueOf(scanned));
-    }
-
-    // تحديث كارت المقارنة الحي
-    if (tvCurrItems != null) {
-        tvCurrItems.setText(String.valueOf(scanned));
-    }
-    if (tvPrevItems != null) {
-        tvPrevItems.setText(String.valueOf(expectedCount));
-    }
-    if (tvDeltaItems != null) {
-        int delta = scanned - expectedCount;
-        tvDeltaItems.setText(String.format(Locale.US, "%+d", delta));
-        
-        if (delta == 0 && expectedCount > 0) {
-            tvDeltaItems.setTextColor(0xFF2E7D32);
-        } else if (delta < 0) {
-            tvDeltaItems.setTextColor(0xFFC62828);
-        } else {
-            tvDeltaItems.setTextColor(0xFF1565C0);
-        }
     }
 
     if (expectedCount > 0) {
@@ -1628,12 +1513,8 @@ private void startReadingSource() {
     // ✅ تحديث زر البدء الذكي
     updateMainToggleButton(true);
     
-    if (btnStartInventory != null) btnStartInventory.setEnabled(false);
-    if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
-    if (btnStopInventory != null) btnStopInventory.setEnabled(true);
     if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
     if (btnArchiveReports != null) btnArchiveReports.setEnabled(false);
-    if (btnViewSnapshots != null) btnViewSnapshots.setEnabled(false);
     
     if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
 }
@@ -1705,15 +1586,10 @@ public void stopScanning() {
                 
                 if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.ERROR);
                 
-                // ✅ تحديث زر البدء الذكي
                 updateMainToggleButton(false);
                 
-                if (btnStartInventory != null) btnStartInventory.setEnabled(true);
-                if (btnBlindInventory != null) btnBlindInventory.setEnabled(true);
-                if (btnStopInventory != null) btnStopInventory.setEnabled(false);
                 if (btnGenerateReport != null) btnGenerateReport.setEnabled(true);
                 if (btnArchiveReports != null) btnArchiveReports.setEnabled(true);
-                if (btnViewSnapshots != null) btnViewSnapshots.setEnabled(true);
                 
                 updateUI();
                 syncOfflineTransactions();
@@ -1781,8 +1657,6 @@ private void showPowerControlSheet() {
 private void applyAntennaPower(int dbm) {
     try {
         if (rfidManager != null && rfidManager.getActiveDevice() != null) {
-            // استدعاء دالة تغيير الطاقة حسب الـ API المتوفر في RFIDManager
-            // rfidManager.setPower(dbm);
             Log.d(TAG, "Antenna power set to: " + dbm + " dBm");
         }
         Toast.makeText(requireContext(), 
@@ -1817,7 +1691,6 @@ private void showCategorySelectionDialog() {
                 (isArabic ? "جرد فئوي: " : "Category inventory: ") + category, 
                 Toast.LENGTH_SHORT).show();
             
-            // إعادة التحديد إلى "شامل" إذا فشل البدء
             if (segmentedModes != null && btnModeFull != null) {
                 segmentedModes.check(R.id.btnModeFull);
             }
@@ -1830,8 +1703,7 @@ private void showCategorySelectionDialog() {
         .show();
 }
 
-// ==================== [يتبع في الجزء 3] ====================
-    
+
     // ==================== اعتماد الجرد وإرسال البيانات ====================
 
     /**
@@ -1871,8 +1743,14 @@ private void showCategorySelectionDialog() {
                             missing,
                             isArabic ? "جارية" : "In progress"
                         );
+                        
+                        List<ScannedItemDisplay> snapshotList;
+                        synchronized (scannedItemsDisplayList) {
+                            snapshotList = new ArrayList<>(scannedItemsDisplayList);
+                        }
+                        
                         PrintUtils.printReportWithQRCode(requireContext(), currentReport, 
-                            new ArrayList<>(scannedItemsDisplayList), isArabic, null);
+                            snapshotList, isArabic, null);
                     })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                 .show();
@@ -2037,8 +1915,14 @@ private void showCategorySelectionDialog() {
                             Math.max(0, expectedCount - scanned),
                             isArabic ? "معتمد" : "Committed"
                         );
+                        
+                        List<ScannedItemDisplay> snapshotList;
+                        synchronized (scannedItemsDisplayList) {
+                            snapshotList = new ArrayList<>(scannedItemsDisplayList);
+                        }
+                        
                         PrintUtils.printReportWithQRCode(requireContext(), committedReport, 
-                            new ArrayList<>(scannedItemsDisplayList), isArabic, null);
+                            snapshotList, isArabic, null);
                     })
                 .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
                 .show();
@@ -2209,8 +2093,12 @@ private void showCategorySelectionDialog() {
                 .setItems(options, (dialog, which) -> {
                     switch (which) {
                         case 0:
+                            List<ScannedItemDisplay> snapshotList;
+                            synchronized (scannedItemsDisplayList) {
+                                snapshotList = new ArrayList<>(scannedItemsDisplayList);
+                            }
                             PrintUtils.printReportWithQRCode(requireContext(), report, 
-                                new ArrayList<>(scannedItemsDisplayList), isArabic, null);
+                                snapshotList, isArabic, null);
                             break;
                         case 1:
                             compareWithCurrent(report);
@@ -2225,9 +2113,15 @@ private void showCategorySelectionDialog() {
      */
     private void printAllReports(List<InventoryReport> reports) {
         if (!isAdded() || isFragmentDestroyed || reports.isEmpty()) return;
+        
+        List<ScannedItemDisplay> snapshotList;
+        synchronized (scannedItemsDisplayList) {
+            snapshotList = new ArrayList<>(scannedItemsDisplayList);
+        }
+        
         for (InventoryReport r : reports) {
             PrintUtils.printReportWithQRCode(requireContext(), r, 
-                new ArrayList<>(scannedItemsDisplayList), isArabic, null);
+                snapshotList, isArabic, null);
         }
     }
 
@@ -2646,8 +2540,14 @@ private void showCategorySelectionDialog() {
                                     missing2,
                                     isArabic ? "مقارنة" : "Comparison"
                                 );
+                                
+                                List<ScannedItemDisplay> snapshotList;
+                                synchronized (scannedItemsDisplayList) {
+                                    snapshotList = new ArrayList<>(scannedItemsDisplayList);
+                                }
+                                
                                 PrintUtils.printReportWithQRCode(requireContext(), compReport, 
-                                    new ArrayList<>(scannedItemsDisplayList), isArabic, null);
+                                    snapshotList, isArabic, null);
                             })
                         .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
                         .show();
@@ -2788,4 +2688,6 @@ private void showCategorySelectionDialog() {
     }
 
 } // ✅ نهاية الكلاس MiraInventoryProFragment
+
+
     
