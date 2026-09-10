@@ -250,24 +250,27 @@ if (toolbar != null) {
     }
 
     private void setupWindowInsets() {
-        View bottomNavView = findViewById(R.id.bottomNavigationView);
-        if (bottomNavView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(bottomNavView, (v, insets) -> {
-                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(0, 0, 0, systemBars.bottom);
-                return insets;
-            });
-        }
-
-        View toolbarView = findViewById(R.id.toolbar);
-        if (toolbarView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
-                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(0, systemBars.top, 0, 0);
-                return insets;
-            });
-        }
+    View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+    if (bottomNavContainer != null) {
+        ViewCompat.setOnApplyWindowInsetsListener(bottomNavContainer, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            MarginLayoutParams params = (MarginLayoutParams) v.getLayoutParams();
+            params.bottomMargin = systemBars.bottom + 12; // إبقاء المسافة العائمة ثابته فوق أزرار النظام
+            v.setLayoutParams(params);
+            return insets;
+        });
     }
+
+    View toolbarView = findViewById(R.id.toolbar);
+    if (toolbarView != null) {
+        ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(0, systemBars.top, 0, 0);
+            return insets;
+        });
+    }
+}
+
     
     private void setupSecondaryToolbar() {
     MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
