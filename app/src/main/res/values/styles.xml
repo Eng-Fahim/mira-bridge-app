@@ -35,29 +35,51 @@
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
-    <!-- ==================== مؤشر الفوتر النشط والـ BottomNavigationView ==================== -->
+    <!-- ==================== Bottom Navigation (MD3) ==================== -->
+
+    <!-- ✅ Active Indicator (Pill Shape) -->
     <style name="CustomActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <item name="android:color">#1AD9A736</item>
-        <item name="android:width">54dp</item>
-        <item name="android:height">32dp</item>
+        <item name="android:color">#20D9A736</item>
+        <item name="android:width">64dp</item>
+        <item name="android:height">36dp</item>
         <item name="marginHorizontal">4dp</item>
         <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
     </style>
 
+    <!-- ✅ نمط Bottom Navigation الرئيسي -->
     <style name="AppBottomNavigationViewStyle" parent="Widget.Material3.BottomNavigationView">
         <item name="itemActiveIndicatorStyle">@style/CustomActiveIndicator</item>
-        <item name="itemRippleColor">#1AD9A736</item>
-        <item name="elevation">8dp</item>
+        <item name="itemRippleColor">@color/nav_ripple_color</item>
+        <item name="elevation">16dp</item>
+        <item name="itemIconSize">26dp</item>
+        <item name="itemTextAppearanceActive">@style/NavItemTextActive</item>
+        <item name="itemTextAppearanceInactive">@style/NavItemTextInactive</item>
+        <item name="labelVisibilityMode">labeled</item>
+    </style>
+
+    <!-- ✅ نص العنصر النشط -->
+    <style name="NavItemTextActive" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+    </style>
+
+    <!-- ✅ نص العنصر غير النشط -->
+    <style name="NavItemTextInactive" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textSize">11sp</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
     </style>
 
     <!-- ==================== ستايلات التبويبات والقوائم السريعة ==================== -->
-    <style name="MyActionBarTabTextStyle" parent="TextAppearance.Material3.TitleMedium">          
+    <style name="MyActionBarTabTextStyle" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:textColor">@drawable/check_text_color</item>
-        <item name="android:textSize">16sp</item>  
+        <item name="android:textSize">16sp</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
-    </style>  
-    
+    </style>
+
     <style name="QuickMenuItemStyle">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">86dp</item>
