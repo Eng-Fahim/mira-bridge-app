@@ -38,25 +38,30 @@
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🎨 لوحة الألوان الفاخرة للوضع الفاتح (Enterprise Gold & Royal Slate) -->
-        <item name="colorPrimary">#D9A736</item>
+        <!-- 🎨 لوحة الألوان المعدلة للوضع الفاتح (High Contrast Luxury Gold) -->
+        <!-- اللون الرئيسي (ذهبي دافئ غني يسهل قراءته على الخلفيات البيضاء) -->
+        <item name="colorPrimary">#B8860B</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#FFF9ED</item>
-        <item name="colorOnPrimaryContainer">#423100</item>
+        <item name="colorPrimaryContainer">#FFF6E5</item>
+        <item name="colorOnPrimaryContainer">#3D2A00</item>
 
+        <!-- اللون الثانوي (كحلي داكن/رصاصي ملكي لإعطاء تباين وفخامة) -->
         <item name="colorSecondary">#1E293B</item>
         <item name="colorOnSecondary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#F1F5F9</item>
         <item name="colorOnSecondaryContainer">#0F172A</item>
 
-        <item name="android:colorBackground">#FAF8F5</item>
-        <item name="colorOnBackground">#1E293B</item>
+        <!-- خلفية التطبيق والأسطح -->
+        <item name="android:colorBackground">#F8F9FA</item>
+        <item name="colorOnBackground">#0F172A</item>
 
+        <!-- خلفية البطاقات (تدرج بين الأبيض الناصع والخلفية) -->
         <item name="colorSurface">#FFFFFF</item>
-        <item name="colorOnSurface">#1E293B</item>
-        <item name="colorSurfaceVariant">#F4F0E8</item>
-        <item name="colorOnSurfaceVariant">#64748B</item>
+        <item name="colorOnSurface">#0F172A</item>
+        <item name="colorSurfaceVariant">#F1F3F5</item> <!-- خلفية البطاقات الفرعية -->
+        <item name="colorOnSurfaceVariant">#475569</item> <!-- النصوص الفرعية والرمادية بدلاً من الذهبي الباهت -->
 
+        <!-- الحدود الفاصلة (Borders) -->
         <item name="colorOutline">#E2E8F0</item>
         <item name="colorOutlineVariant">#CBD5E1</item>
 
