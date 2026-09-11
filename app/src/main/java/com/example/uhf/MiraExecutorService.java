@@ -44,6 +44,19 @@ public class MiraExecutorService {
 
         Log.i(TAG, "✅ MiraExecutorService initialized");
     }
+    /**
+ * ✅ فحص سلامة المدير
+ */
+public boolean isHealthy() {
+    try {
+        return !singleThreadExecutor.isShutdown()
+                && !networkExecutor.isShutdown()
+                && !backgroundExecutor.isShutdown()
+                && !imageExecutor.isShutdown();
+    } catch (Exception e) {
+        return false;
+    }
+}
 
     public static MiraExecutorService getInstance() {
         if (INSTANCE == null) {
