@@ -82,12 +82,11 @@
         </com.google.android.material.appbar.MaterialToolbar>
 
         <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/secondaryToolbar"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:background="?attr/colorSurface"
-            app:elevation="2dp"
-            app:menu="@menu/secondary_menu" />
+    android:id="@+id/secondaryToolbar"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:background="?attr/colorSurface"
+    app:elevation="2dp" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
