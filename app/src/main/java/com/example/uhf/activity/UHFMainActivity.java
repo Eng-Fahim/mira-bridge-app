@@ -281,18 +281,39 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             setupOrgProfileListener();
 
             // ✅ التنقل الأولي
-            if (savedInstanceState == null) {
-                currentFragmentTag = "Dashboard";
-            } else {
-                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-            }
+            // ✅ التنقل الأولي
+if (savedInstanceState == null) {
+    // حالة جديدة → Dashboard افتراضي
+    currentFragmentTag = "Dashboard";
+    navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+} else {
+    // استعادة الحالة
+    currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
 
-            navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-            currentFragment = navigationManager.getCurrentFragment();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+    Fragment restored = getSupportFragmentManager().findFragmentByTag(currentFragmentTag);
+    if (restored != null) {
+        currentFragment = restored;
+        if (restored.isHidden()) {
+            getSupportFragmentManager().beginTransaction()
+                    .show(restored)
+                    .commitNowAllowingStateLoss();
         }
+        Log.d(TAG, "Restored fragment: " + currentFragmentTag);
+    } else {
+        Fragment newFragment = navigationManager.createFragmentByTag(currentFragmentTag);
+        if (newFragment != null) {
+            navigationManager.loadFragmentDirectly(newFragment, currentFragmentTag);
+        } else {
+            navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+        }
+    }
+}
+
+currentFragment = navigationManager.getCurrentFragment();
+
+} catch (Exception e) {
+    Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+}
     }
 
     private void setupSecondaryToolbar() {
@@ -619,11 +640,19 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
 
 public void loadFragmentDirectly(Fragment fragment, String tag) {
     showLoading();
-    navigationManager.loadFragmentDirectly(fragment, tag);
-    currentFragment = navigationManager.getCurrentFragment();
+    
+    // ✅ فقط استدعِ NavigationManager — لا تكرر المنطق هنا
+    if (navigationManager != null) {
+        navigationManager.loadFragmentDirectly(fragment, tag);
+    }
+    
+    currentFragment = navigationManager != null ? 
+            navigationManager.getCurrentFragment() : fragment;
     currentFragmentTag = tag;
+    
     updateBottomNavSelectionByTag(tag);
-    updateSecondaryToolbarVisibility(tag);   // 🆕
+    updateSecondaryToolbarVisibility(tag);
+    
     mainHandler.postDelayed(this::hideLoading, 250);
 }
 /**
@@ -1599,24 +1628,41 @@ public boolean isInventoryLocked() {
             }
 
             if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-            getSupportFragmentManager().popBackStackImmediate();
-            Fragment topFragment = navigationManager.getTopFragment();
-            if (topFragment != null) {
-                String tag = topFragment.getTag();
-                if (tag != null && !permissionManager.canAccessFragment(tag)) {
-                    navigationManager.clearBackStack();
-                    loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-                    return;
-                }
-                currentFragment = topFragment;
-                if (tag != null) {
-                    currentFragmentTag = tag;
-                    saveFragmentTagToPrefs(tag);
-                    updateSecondaryToolbarVisibility(tag);   // 🆕
-                }
-            }
+    getSupportFragmentManager().popBackStackImmediate();
+    Fragment topFragment = navigationManager.getTopFragment();
+    if (topFragment != null) {
+        String tag = topFragment.getTag();
+        if (tag != null && !permissionManager.canAccessFragment(tag)) {
+            navigationManager.clearBackStack();
+            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
             return;
         }
+        
+        // ✅ أظهر الـ Fragment المستعاد (إذا كان مخفياً)
+        if (topFragment.isHidden()) {
+            getSupportFragmentManager().beginTransaction()
+                    .show(topFragment)
+                    .commitAllowingStateLoss();
+        }
+        
+        // ✅ أخفِ الآخرين (اختياري لكنه أنظف)
+        for (Fragment f : getSupportFragmentManager().getFragments()) {
+            if (f != null && f != topFragment && f.isAdded() && !f.isHidden()) {
+                getSupportFragmentManager().beginTransaction()
+                        .hide(f)
+                        .commitAllowingStateLoss();
+            }
+        }
+        
+        currentFragment = topFragment;
+        if (tag != null) {
+            currentFragmentTag = tag;
+            saveFragmentTagToPrefs(tag);
+            updateSecondaryToolbarVisibility(tag);
+        }
+    }
+    return;
+}
     }
 
         if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
@@ -1756,22 +1802,35 @@ protected void onDestroy() {
         super.onDestroy();
     }
 
-    private void cleanupOldFragments() {
-        try {
-            FragmentManager fm = getSupportFragmentManager();
-            for (Fragment fragment : fm.getFragments()) {
-                if (fragment != null) {
-                    FragmentTransaction transaction = fm.beginTransaction();
-                    transaction.remove(fragment);
-                    transaction.commitAllowingStateLoss();
-                }
-            }
-            fm.executePendingTransactions();
-            fm.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-        } catch (Exception e) {
-            Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
+    /**
+ * ✅ تنظيف ذكي — يُنفَّذ فقط عند الحاجة الفعلية
+ */
+private void cleanupOldFragments() {
+    try {
+        FragmentManager fm = getSupportFragmentManager();
+
+        // ✅ إذا كان هناك حالة محفوظة → لا تحذف
+        // (هذا يعني أن النظام يحاول استعادة الحالة — لا تعطله)
+        if (fm.getFragments().isEmpty() 
+                && fm.getBackStackEntryCount() == 0) {
+            Log.d(TAG, "cleanupOldFragments: nothing to clean");
+            return;
         }
+
+        // ✅ فقط امسح الـ back stack — لا تحذف الـ fragments
+        if (fm.getBackStackEntryCount() > 0) {
+            fm.popBackStackImmediate(
+                    null,
+                    FragmentManager.POP_BACK_STACK_INCLUSIVE
+            );
+        }
+
+        Log.d(TAG, "cleanupOldFragments: back stack cleared");
+
+    } catch (Exception e) {
+        Log.e(TAG, "cleanupOldFragments error: " + e.getMessage(), e);
     }
+}
 
     // ==================== التفاعل مع الكيبورد ====================
 
