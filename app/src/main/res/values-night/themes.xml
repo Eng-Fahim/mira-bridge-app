@@ -58,7 +58,7 @@
         <item name="colorSurface">#161618</item>
         <item name="colorOnSurface">#F9FAFB</item>
         <item name="colorSurfaceVariant">#1E1E22</item>
-        <item name="colorOnSurfaceVariant">#9CA3AF</item>
+        <item name="colorOnSurfaceVariant">#CBD5E1</item> <!-- 👈 تحسين وضوح النصوص الفرعية في الوضع الداكن -->
 
         <!-- 🔲 الحدود والإطارات -->
         <item name="colorOutline">#2D2D32</item>
@@ -95,7 +95,7 @@
         <item name="android:windowBackground">@drawable/bg_mira_dialog_dark</item>
         <item name="android:backgroundDimAmount">0.7</item>
         <item name="android:textColorPrimary">#F9FAFB</item>
-        <item name="android:textColorSecondary">#9CA3AF</item>
+        <item name="android:textColorSecondary">#CBD5E1</item> <!-- 👈 تباين محسن للنصوص الفرعية -->
         <item name="android:titleTextColor">#D4AF37</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
@@ -122,7 +122,7 @@
     </style>
 
     <style name="MiraDialogButton.Negative" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">#9CA3AF</item>
+        <item name="android:textColor">#CBD5E1</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textSize">14sp</item>
     </style>
