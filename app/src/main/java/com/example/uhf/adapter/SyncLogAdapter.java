@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.manager.IdentitySyncManager;
+import com.example.uhf.dialog.EditSyncItemDialog;
 import com.google.android.material.button.MaterialButton;
 
 import java.util.ArrayList;
