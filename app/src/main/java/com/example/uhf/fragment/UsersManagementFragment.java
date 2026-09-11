@@ -1,6 +1,10 @@
 package com.example.uhf.fragment;
 
-import android.app.AlertDialog;
+// ✅ بهذا
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.view.ContextThemeWrapper;
+
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -509,6 +513,7 @@ public class UsersManagementFragment extends Fragment {
 
     // ==================== User Dialog ====================
 
+
     private void showUserDialog(@Nullable UserData existingUser) {
         try {
             if (!isAdded() || getContext() == null) return;
@@ -516,10 +521,12 @@ public class UsersManagementFragment extends Fragment {
             boolean isEdit = existingUser != null;
             View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
 
-            AlertDialog dialog = new AlertDialog.Builder(requireContext())
-                .setView(dialogView)
-                .setCancelable(true)
-                .create();
+            // ✅ إنشاء الدايلوج بطريقة صحيحة باستخدام MaterialAlertDialogBuilder وثيم مخصص
+            Context themedContext = new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme);
+            AlertDialog dialog = new MaterialAlertDialogBuilder(themedContext)
+                    .setView(dialogView)
+                    .setCancelable(true)
+                    .create();
 
             if (dialog.getWindow() != null) {
                 dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
@@ -555,7 +562,7 @@ public class UsersManagementFragment extends Fragment {
 
             // ==================== مجموعة الأدوار المختارة ====================
             final Set<String> selectedRoles = new HashSet<>();
-            if (isEdit && existingUser != null && existingUser.roles != null) {
+            if (isEdit && existingUser.roles != null) {
                 selectedRoles.addAll(existingUser.roles);
             }
 
@@ -595,7 +602,8 @@ public class UsersManagementFragment extends Fragment {
                 etBranch.setFocusable(false);
                 etBranch.setClickable(true);
                 etBranch.setOnClickListener(v -> {
-                    new AlertDialog.Builder(requireContext())
+                    // ✅ تم إصلاح بناء دايلوج الفروع أيضاً ليتبع MaterialTheme
+                    new MaterialAlertDialogBuilder(new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
                         .setTitle(isArabic ? "اختر الفرع" : "Select Branch")
                         .setItems(branchNames.toArray(new String[0]), (dialog1, which) -> {
                             etBranch.setText(branchNames.get(which));
@@ -618,7 +626,7 @@ public class UsersManagementFragment extends Fragment {
 
             // ==================== رقم موظف تلقائي ====================
             String branchCode = branchesManager.getActiveBranchCode();
-            if (etEmployeeId != null) {
+            if (etEmployeeId != null && !isEdit) {
                 etEmployeeId.setText(generateEmployeeId(branchCode));
                 etEmployeeId.setEnabled(false);
             }
@@ -655,7 +663,7 @@ public class UsersManagementFragment extends Fragment {
             }
 
             // ==================== تعبئة بيانات التعديل ====================
-            if (isEdit && existingUser != null) {
+            if (isEdit) {
                 if (etDisplayName != null) etDisplayName.setText(existingUser.displayName);
                 if (etUsername != null) {
                     etUsername.setText(existingUser.username);
@@ -798,7 +806,7 @@ public class UsersManagementFragment extends Fragment {
 
                     if (loadingOverlay != null) loadingOverlay.setVisibility(View.VISIBLE);
                     if (tvLoadingText != null) tvLoadingText.setText(isArabic ? "جاري الحفظ..." : "Saving...");
-                    if (btnSaveUser != null) btnSaveUser.setEnabled(false);
+                    btnSaveUser.setEnabled(false);
 
                     final int fBranchId = branchId;
                     final String fBranchName = branchName;
@@ -847,14 +855,14 @@ public class UsersManagementFragment extends Fragment {
                                         ? response.error
                                         : (isArabic ? "فشل العملية" : "Operation failed");
                                     showToast("❌ " + errorMsg);
-                                    if (btnSaveUser != null) btnSaveUser.setEnabled(true);
+                                    btnSaveUser.setEnabled(true);
                                 }
                             });
                         } catch (Exception e) {
                             mainHandler.post(() -> {
                                 if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
                                 showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage());
-                                if (btnSaveUser != null) btnSaveUser.setEnabled(true);
+                                btnSaveUser.setEnabled(true);
                             });
                         }
                     });
@@ -867,6 +875,7 @@ public class UsersManagementFragment extends Fragment {
             showToast("Error: " + e.getMessage());
         }
     }
+
 
     // ==================== Helper Methods ====================
 
