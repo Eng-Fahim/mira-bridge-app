@@ -18,7 +18,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraQuickAccessSettings;
-
+import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import java.util.List;
 import java.util.Locale;
 
