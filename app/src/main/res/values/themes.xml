@@ -92,7 +92,8 @@
     </style>
 
     <!-- ==================== MiraDialogTheme (نوافذ حوارية) ==================== -->
-    <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+    <!-- ✅ الصحيح: التوارث من Theme كامل بدلاً من ThemeOverlay -->
+<style name="MiraDialogTheme" parent="Theme.Material3.DayNight.Dialog.Alert">
         <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
         <item name="android:backgroundDimAmount">0.5</item>
         <item name="android:textColorPrimary">?attr/colorOnSurface</item>
@@ -135,7 +136,8 @@
     </style>
 
     <!-- ==================== BottomSheet ==================== -->
-    <style name="MiraBottomSheetDialogTheme" parent="ThemeOverlay.Material3.BottomSheetDialog">
+    <!-- ✅ الصحيح -->
+<style name="MiraBottomSheetDialogTheme" parent="Theme.Material3.DayNight.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/MiraBottomSheetStyle</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
