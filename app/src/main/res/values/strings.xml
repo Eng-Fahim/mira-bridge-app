@@ -2168,6 +2168,25 @@
 
 <!-- اعدادات الصوت -->
 <string name="menu_sounds_setting">📦 اعدادات الصوت </string>
-</resources>
 
+
+<!-- ==================== القوائم الثانوية ==================== -->
+
+
+
+<!-- شاشة الجرد -->
+<string name="menu_power">قوة الإشارة</string>
+<string name="menu_live_stats">إحصائيات مباشرة</string>
+<string name="menu_session_settings">إعدادات الجلسة</string>
+
+<!-- شاشة البيع -->
+<string name="menu_cart">السلة</string>
+<string name="menu_search_item">بحث عن قطعة</string>
+<string name="menu_discount">خصم</string>
+<string name="menu_receipt">إيصال</string>
+
+<!-- شاشة التحويلات -->
+<string name="menu_export">تصدير</string>
+<string name="menu_import">استيراد</string>
+</resources>
 
