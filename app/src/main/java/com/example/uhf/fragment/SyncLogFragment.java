@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.SyncLogAdapter;
+import com.example.uhf.dialog.EditSyncItemDialog;
 import com.example.uhf.manager.IdentitySyncManager;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.utils.MiraExecutorService;
