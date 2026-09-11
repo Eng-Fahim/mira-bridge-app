@@ -123,7 +123,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     // في تعريف المتغيرات
-    private final Runnable orgProfileListener = this::updateAppTitle;
+    private final OrgProfileManager.OnProfileChangedListener orgProfileListener = this::updateAppTitle;
+
+    
+    
 
 
     // ✅ إدارة RFID
@@ -177,6 +180,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         MiraLanguageHelper.applyLanguage(newBase, savedLang);
         super.attachBaseContext(newBase);
     }
+    
+    private void setupWindowInsets() {
+    ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+        Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+        v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+        return insets;
+    });
+}
+
 
         @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -538,12 +550,11 @@ private void performConnectionTest() {
     }
 
     private void setupOrgProfileListener() {
+    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
     orgProfileManager.addListener(orgProfileListener);
-        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-        orgProfileManager.addListener(this::updateAppTitle);
-        orgProfileManager.addListener(orgProfileListener);
-        updateAppTitle();
-    }
+    updateAppTitle();
+}
+
 
     private void updateAppTitle() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -1724,8 +1735,9 @@ protected void onDestroy() {
             }
 
             if (orgProfileManager != null) {
-                orgProfileManager.removeListener(this::updateAppTitle);
+            orgProfileManager.removeListener(orgProfileListener);
             }
+
             
             if (inventoryLockManager != null) {
             inventoryLockManager.cleanup();
@@ -1740,12 +1752,6 @@ protected void onDestroy() {
                 tagList.clear();
                 tagList = null;
             }
-            
-            
-// في onDestroy()
-if (orgProfileManager != null) {
-    orgProfileManager.removeListener(orgProfileListener);
-}
 
         } catch (Exception e) {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
@@ -1796,4 +1802,4 @@ if (orgProfileManager != null) {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-    }
+                         }
