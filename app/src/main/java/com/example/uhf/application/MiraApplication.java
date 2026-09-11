@@ -15,6 +15,7 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.utils.MiraExecutorService;   // 🆕
 
 public class MiraApplication extends AppContext {
     
@@ -27,20 +28,32 @@ public class MiraApplication extends AppContext {
     
     @Override
     public void onCreate() {
-        super.onCreate(); // ✅ يستدعي AppContext.onCreate() بدون معالج
+        super.onCreate();
         
         instance = this;
         
-        // ✅ تثبيت معالج الأخطاء هنا - مرة واحدة فقط
         Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
         
         Log.i(TAG, "MiraApplication Started: onCreate()");
         
         initializeCoreServices();
         initializeDatabase();
+        initializeExecutors();   // 🆕
         logDeviceInfo();
         
         Log.d(TAG, "MiraApplication initialized successfully");
+    }
+
+    /**
+     * 🆕 تهيئة مدير الخيوط المشترك
+     */
+    private void initializeExecutors() {
+        try {
+            MiraExecutorService.getInstance();
+            Log.d(TAG, "✅ MiraExecutorService initialized");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to initialize MiraExecutorService", e);
+        }
     }
 
     private void logDeviceInfo() {
@@ -65,7 +78,6 @@ public class MiraApplication extends AppContext {
         try {
             Log.d(TAG, "Initializing Core Services...");
             
-            // إعادة تصفير وبناء الحالات بانتظام لمنع بقاء الذاكرة قديمة عند إعادة التشغيل
             SessionManager sessionManager = new SessionManager(appContext);
             MiraServerConfig serverConfig = MiraServerConfig.getInstance(appContext);
             MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
@@ -118,9 +130,6 @@ public class MiraApplication extends AppContext {
         return inventoryDatabase;
     }
     
-    /**
-     * ✅ تنظيف الموارد عند إعادة التشغيل
-     */
     public void cleanupOnRestart() {
         if (isRestarting) return;
         isRestarting = true;
@@ -128,7 +137,6 @@ public class MiraApplication extends AppContext {
         try {
             Log.i(TAG, "Cleaning up application resources...");
             
-            // إغلاق قاعدة البيانات
             if (inventoryDatabase != null) {
                 try {
                     inventoryDatabase.close();
@@ -139,7 +147,6 @@ public class MiraApplication extends AppContext {
                 }
             }
             
-            // تنظيف الذاكرة
             System.gc();
             
             Log.i(TAG, "Cleanup On Restart Completed");
@@ -149,17 +156,11 @@ public class MiraApplication extends AppContext {
         }
     }
     
-    /**
-     * ✅ إعادة تشغيل التطبيق
-     */
     public void restartApp() {
         try {
             Log.i(TAG, "Manual restart requested");
             
-            // تنظيف الموارد
             cleanupOnRestart();
-            
-            // إعادة التشغيل
             AppRestartManager.restartApp(this);
             
         } catch (Exception e) {
@@ -167,9 +168,6 @@ public class MiraApplication extends AppContext {
         }
     }
     
-    /**
-     * ✅ إعادة تهيئة قاعدة البيانات (عند الحاجة)
-     */
     public synchronized void reinitializeDatabase() {
         try {
             if (inventoryDatabase != null) {
@@ -203,7 +201,6 @@ public class MiraApplication extends AppContext {
         super.onLowMemory();
         Log.w(TAG, "Low Memory Warning: System.gc() called");
         
-        // ✅ تنظيف إضافي عند انخفاض الذاكرة
         try {
             System.gc();
             if (inventoryDatabase != null && !inventoryDatabase.isOpen()) {
@@ -215,18 +212,13 @@ public class MiraApplication extends AppContext {
         }
     }
     
-    /**
-     * ✅ التحقق من حالة التطبيق
-     */
     public boolean isAppHealthy() {
         try {
-            // فحص قاعدة البيانات
             if (inventoryDatabase != null && !inventoryDatabase.isOpen()) {
                 Log.w(TAG, "Database is not open");
                 return false;
             }
             
-            // فحص الخدمات الأساسية
             if (MiraApiClient.getInstance(getApplicationContext()) == null) {
                 Log.w(TAG, "API Client is null");
                 return false;
