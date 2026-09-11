@@ -662,9 +662,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         return false;
     }
 
-    // ==================== [يتبع في المرحلة 2] ====================
-
-
 // ==================== معالجة قراءة الوسم ====================
 
 @Override
@@ -1247,9 +1244,7 @@ private void updateElapsedTime() {
     }
 }
 
-// ==================== [يتبع في المرحلة 3] ====================
-
-
+        
     // ==================== بدء وإيقاف المسح ====================
 
     private void startScanning() {
