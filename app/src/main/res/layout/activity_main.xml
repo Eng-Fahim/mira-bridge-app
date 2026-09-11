@@ -81,12 +81,41 @@
 
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <com.google.android.material.appbar.MaterialToolbar
-    android:id="@+id/secondaryToolbar"
-    android:layout_width="match_parent"
-    android:layout_height="48dp"
-    android:background="?attr/colorSurface"
-    app:elevation="2dp" />
+        <!-- ═══════════════════════════════════════════════════
+             الشريط الثانوي الجديد — أزرار مباشرة (بدون Menu)
+             ═══════════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/secondaryToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="?attr/colorSurface"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:elevation="2dp"
+            android:layoutDirection="locale">
+
+            <!-- ✅ يمين (RTL): حاوية حالة الجهاز -->
+            <FrameLayout
+                android:id="@+id/statusChipContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp" />
+
+            <!-- ✅ مسافة مرنة -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+
+            <!-- ✅ يسار (RTL): حاوية الأزرار الديناميكية -->
+            <LinearLayout
+                android:id="@+id/secondaryActionsContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+
+        </LinearLayout>
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -128,7 +157,7 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
+    <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -139,7 +168,6 @@
         android:paddingHorizontal="20dp"
         android:paddingBottom="16dp">
 
-        <!-- الشريط العائم السفلي -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
@@ -161,8 +189,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-
-        <!-- زر الإضافة العائم FAB بأيقونة الجوهرة وارتفاع مريح -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="56dp"
