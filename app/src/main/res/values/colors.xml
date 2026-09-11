@@ -241,5 +241,15 @@
     <color name="accent_light">#D4AF37</color>
     <color name="accent_dark">#8B6508</color>
     <!-- ✅ Alias للتوافق مع الكود -->
+        <!-- ═══════════════════════════════════════════════════
+         Material 3 Aliases (Light)
+         ═══════════════════════════════════════════════════ -->
     <color name="on_surface">@color/colorOnSurface</color>
+    <color name="on_surface_variant_alias">@color/colorOnSurfaceVariant</color>
+    <color name="primary_alias">@color/colorPrimary</color>
+    <color name="surface_alias">@color/colorSurface</color>
+    <color name="on_primary_alias">@color/colorOnPrimary</color>
+    <color name="surface_variant_alias">@color/colorSurfaceVariant</color>
+    <color name="outline_alias">@color/colorOutline</color>
+    <color name="outline_variant_alias">@color/colorOutlineVariant</color>
 </resources>
