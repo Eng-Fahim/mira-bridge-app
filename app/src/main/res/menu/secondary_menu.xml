@@ -2,37 +2,35 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!-- 🟢 جهة اليمين: زر حالة الأجهزة (يظهر أولاً في RTL)  -->
-    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 🟢 حالة الأجهزة (Custom View) -->
     <item
         android:id="@+id/action_device_status"
         android:title="@string/menu_device_status"
         app:actionLayout="@layout/action_device_status"
         app:showAsAction="always" />
 
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!-- 🔍 ⚙️ جهة اليسار: بحث، مزامنة، إعدادات الوصول السريع -->
-    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 🔍 البحث (يفضل إعطاؤه أولوية الظهور) -->
     <item
         android:id="@+id/action_search"
         android:icon="@drawable/ic_search"
         android:title="@string/menu_search"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="always" />
+        app:showAsAction="always|collapseActionView" />
 
+    <!-- 🔄 المزامنة -->
     <item
         android:id="@+id/action_sync"
         android:icon="@drawable/ic_sync"
         android:title="@string/menu_sync"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
 
+    <!-- ⚙️ إعدادات الوصول السريع -->
     <item
         android:id="@+id/action_quick_access_settings"
         android:icon="@drawable/ic_settings"
         android:title="@string/menu_quick_access"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
 
 </menu>
