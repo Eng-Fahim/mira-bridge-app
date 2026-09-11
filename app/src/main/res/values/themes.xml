@@ -31,7 +31,7 @@
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- 🔤 إجبار المكونات المخصصة -->
+        <!-- 🔤 إجبار المكونات المخصصة على استخدام Material3 -->
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
         <item name="buttonStyle">@style/AppButtonStyle</item>
         <item name="radioButtonStyle">@style/AppRadioButtonStyle</item>
@@ -39,13 +39,12 @@
         <item name="tabStyle">@style/AppTabStyle</item>
 
         <!-- 🎨 لوحة الألوان المعدلة للوضع الفاتح (High Contrast Luxury Gold) -->
-        <!-- اللون الرئيسي (ذهبي دافئ غني يسهل قراءته على الخلفيات البيضاء) -->
         <item name="colorPrimary">#B8860B</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#FFF6E5</item>
         <item name="colorOnPrimaryContainer">#3D2A00</item>
 
-        <!-- اللون الثانوي (كحلي داكن/رصاصي ملكي لإعطاء تباين وفخامة) -->
+        <!-- اللون الثانوي -->
         <item name="colorSecondary">#1E293B</item>
         <item name="colorOnSecondary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#F1F5F9</item>
@@ -55,13 +54,13 @@
         <item name="android:colorBackground">#F8F9FA</item>
         <item name="colorOnBackground">#0F172A</item>
 
-        <!-- خلفية البطاقات (تدرج بين الأبيض الناصع والخلفية) -->
+        <!-- خلفية البطاقات -->
         <item name="colorSurface">#FFFFFF</item>
         <item name="colorOnSurface">#0F172A</item>
-        <item name="colorSurfaceVariant">#F1F3F5</item> <!-- خلفية البطاقات الفرعية -->
-        <item name="colorOnSurfaceVariant">#475569</item> <!-- النصوص الفرعية والرمادية بدلاً من الذهبي الباهت -->
+        <item name="colorSurfaceVariant">#F1F3F5</item>
+        <item name="colorOnSurfaceVariant">#475569</item>
 
-        <!-- الحدود الفاصلة (Borders) -->
+        <!-- الحدود الفاصلة -->
         <item name="colorOutline">#E2E8F0</item>
         <item name="colorOutlineVariant">#CBD5E1</item>
 
@@ -92,8 +91,7 @@
     </style>
 
     <!-- ==================== MiraDialogTheme (نوافذ حوارية) ==================== -->
-    <!-- ✅ الصحيح: التوارث من Theme كامل بدلاً من ThemeOverlay -->
-<style name="MiraDialogTheme" parent="Theme.Material3.DayNight.Dialog.Alert">
+    <style name="MiraDialogTheme" parent="Theme.Material3.DayNight.Dialog.Alert">
         <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
         <item name="android:backgroundDimAmount">0.5</item>
         <item name="android:textColorPrimary">?attr/colorOnSurface</item>
@@ -136,8 +134,7 @@
     </style>
 
     <!-- ==================== BottomSheet ==================== -->
-    <!-- ✅ الصحيح -->
-<style name="MiraBottomSheetDialogTheme" parent="Theme.Material3.DayNight.BottomSheetDialog">
+    <style name="MiraBottomSheetDialogTheme" parent="Theme.Material3.DayNight.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/MiraBottomSheetStyle</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
@@ -183,12 +180,14 @@
         <item name="cornerRadius">12dp</item>
     </style>
 
-    <style name="AppRadioButtonStyle" parent="Widget.AppCompat.CompoundButton.RadioButton">
+    <!-- ✅ تم التعديل إلى Material3 -->
+    <style name="AppRadioButtonStyle" parent="Widget.Material3.CompoundButton.RadioButton">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <style name="AppCheckBoxStyle" parent="Widget.AppCompat.CompoundButton.CheckBox">
+    <!-- ✅ تم التعديل إلى Material3 -->
+    <style name="AppCheckBoxStyle" parent="Widget.Material3.CompoundButton.CheckBox">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
