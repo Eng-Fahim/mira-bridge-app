@@ -122,6 +122,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
+    // في تعريف المتغيرات
+    private final Runnable orgProfileListener = this::updateAppTitle;
+
+
     // ✅ إدارة RFID
     private MiraPosFragment activePOSFragment = null;
     private MiraIdentityStudioFragment activeEncodingFragment = null;
@@ -143,6 +147,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public interface OnRfidScannedListener {
         void onRfidScanned(String epc);
     }
+
 
     // ==================== Setters ====================
 
@@ -173,7 +178,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.attachBaseContext(newBase);
     }
 
-    @Override
+        @Override
     protected void onCreate(Bundle savedInstanceState) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
@@ -188,22 +193,23 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             setContentView(R.layout.activity_main);
 
             setupWindowInsets();
-cleanupOldFragments();
+            cleanupOldFragments();
 
-// ✅ ربط الشريط الثانوي
-setupSecondaryToolbar();
+            // ✅ ربط الشريط الثانوي
+            setupSecondaryToolbar();
 
-MaterialToolbar toolbar = findViewById(R.id.toolbar);
-if (toolbar != null) {
-    setSupportActionBar(toolbar);
-    
-    // ✅ إخفاء العنوان الافتراضي للـ ActionBar
-    if (getSupportActionBar() != null) {
-        getSupportActionBar().setDisplayShowTitleEnabled(false);
-    }
-    
-    updateToolbarTitle();
-}
+            MaterialToolbar toolbar = findViewById(R.id.toolbar);
+            if (toolbar != null) {
+                setSupportActionBar(toolbar);
+                
+                // ✅ إخفاء العنوان الافتراضي للـ ActionBar
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().setDisplayShowTitleEnabled(false);
+                }
+                
+                updateToolbarTitle();
+            }
+
             // ✅ مراقبة استجابة الـ UI Thread
             AppWatchdog.getInstance().startMonitoring(() -> {
                 Log.e(TAG, "UI Thread FROZEN! Restarting app...");
@@ -211,16 +217,33 @@ if (toolbar != null) {
             });
 
             ToastUtil.init(getApplicationContext());
+            
+            // ✅ تهيئة متغيرة اللغة أولاً قبل فحص اتجاه الواجهة
             initializeLanguageState();
+
+            // ==================== ضبط اتجاه الواجهة لشريط التنقل ====================
+            View bottomNavigationView = findViewById(R.id.bottomNavigationView);
+            View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+
+            int layoutDirection = isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR;
+
+            if (bottomNavigationView != null) {
+                bottomNavigationView.setLayoutDirection(layoutDirection);
+            }
+
+            if (bottomNavContainer != null) {
+                bottomNavContainer.setLayoutDirection(layoutDirection);
+            }
+            // ====================================================================
 
             // ✅ تهيئة المديرين
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             permissionManager = PermissionManager.getInstance(getApplicationContext());
             navigationManager = new NavigationManager(getSupportFragmentManager(), permissionManager);
+            
             // 🆕 تهيئة مدير القفل
             inventoryLockManager = new InventoryLockManager(this);
             inventoryLockManager.initialize();
-            
             
             hardwareManager = new HardwareManager(this, new HardwareManager.HardwareStatusListener() {
                 @Override
@@ -264,28 +287,6 @@ if (toolbar != null) {
         }
     }
 
-    private void setupWindowInsets() {
-    View bottomNavContainer = findViewById(R.id.bottomNavContainer);
-    if (bottomNavContainer != null) {
-        ViewCompat.setOnApplyWindowInsetsListener(bottomNavContainer, (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
-            // مسافة أمان موحدة فوق أزرار النظام (بدون إضافة paddingBottom في XML)
-            params.bottomMargin = systemBars.bottom + 8;
-            v.setLayoutParams(params);
-            return insets;
-        });
-    }
-
-    View toolbarView = findViewById(R.id.toolbar);
-    if (toolbarView != null) {
-        ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(0, systemBars.top, 0, 0);
-            return insets;
-        });
-    }
-}
     private void setupSecondaryToolbar() {
     MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
     
@@ -537,8 +538,10 @@ private void performConnectionTest() {
     }
 
     private void setupOrgProfileListener() {
+    orgProfileManager.addListener(orgProfileListener);
         orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
         orgProfileManager.addListener(this::updateAppTitle);
+        orgProfileManager.addListener(orgProfileListener);
         updateAppTitle();
     }
 
@@ -1702,14 +1705,16 @@ public boolean isInventoryLocked() {
 
     // ==================== تنظيف ====================
 
-    @Override
-    protected void onDestroy() {
-        try {
-            if (notificationManager != null) notificationManager.cleanup();
-            if (soundManager != null) soundManager.cleanup();
-            if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
-            if (hardwareManager != null) hardwareManager.cleanup();
 
+@Override
+protected void onDestroy() {
+    try {
+        stopActiveInventory(); // إيقاف المسح أولاً قبل تفكيك العتاد
+        
+        if (notificationManager != null) notificationManager.cleanup();
+        if (soundManager != null) soundManager.cleanup();
+        if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
+        if (hardwareManager != null) hardwareManager.cleanup();
             AppWatchdog.getInstance().stopMonitoring();
             hideLoading();
             stopActiveInventory();
@@ -1735,6 +1740,12 @@ public boolean isInventoryLocked() {
                 tagList.clear();
                 tagList = null;
             }
+            
+            
+// في onDestroy()
+if (orgProfileManager != null) {
+    orgProfileManager.removeListener(orgProfileListener);
+}
 
         } catch (Exception e) {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
