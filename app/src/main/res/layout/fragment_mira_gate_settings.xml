@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
+    android:background="?attr/colorSurface"
     android:fillViewport="true">
 
     <LinearLayout
@@ -16,20 +18,20 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🚪 لوحة تحكم البوابات الأمنية"
+            android:layout_marginBottom="12dp"
+            android:textColor="?attr/colorPrimary"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="12dp"/>
+            tools:text="🚪 لوحة تحكم البوابات الأمنية" />
 
         <!-- بطاقة الإحصائيات -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
             app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
+            app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
@@ -42,6 +44,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:baselineAligned="false"
                     android:orientation="horizontal"
                     android:weightSum="3">
 
@@ -56,17 +59,17 @@
                             android:id="@+id/tvTotalGates"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="20sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="0" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="الإجمالي"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp" />
+                            android:textSize="11sp"
+                            tools:text="الإجمالي" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -80,17 +83,17 @@
                             android:id="@+id/tvOnlineGates"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="#2ECC71"
+                            android:textColor="?attr/colorTertiary"
                             android:textSize="20sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="0" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="متصل"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp" />
+                            android:textSize="11sp"
+                            tools:text="متصل" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -104,17 +107,17 @@
                             android:id="@+id/tvOfflineGates"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="#E74C3C"
+                            android:textColor="?attr/colorError"
                             android:textSize="20sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="0" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="غير متصل"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp" />
+                            android:textSize="11sp"
+                            tools:text="غير متصل" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -124,9 +127,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:gravity="center"
-                    android:text="آخر حدث: -"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp" />
+                    android:textSize="11sp"
+                    tools:text="آخر حدث: -" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -137,8 +140,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:hint="🏢 تصفية حسب الفرع"
-            android:visibility="gone">
+            android:visibility="gone"
+            tools:hint="🏢 تصفية حسب الفرع">
 
             <AutoCompleteTextView
                 android:id="@+id/spBranchFilter"
@@ -151,29 +154,35 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAddGate"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="48dp"
-                android:text="➕ إضافة بوابة جديدة"
-                android:textSize="13sp"
                 android:layout_marginEnd="6dp"
-                app:cornerRadius="10dp" />
+                android:layout_weight="1"
+                android:textColor="?attr/colorOnPrimary"
+                android:textSize="13sp"
+                app:backgroundTint="?attr/colorPrimary"
+                app:cornerRadius="10dp"
+                app:icon="@android:drawable/ic_input_add"
+                tools:text="إضافة بوابة جديد" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRefreshStatus"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="48dp"
-                android:text="🔄 تحديث الحالة"
-                android:textSize="13sp"
                 android:layout_marginStart="6dp"
-                app:cornerRadius="10dp" />
+                android:layout_weight="1"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="13sp"
+                app:cornerRadius="10dp"
+                app:icon="@android:drawable/ic_popup_sync"
+                app:strokeColor="?attr/colorPrimary"
+                tools:text="تحديث الحالة" />
         </LinearLayout>
 
         <!-- قائمة البوابات -->
@@ -181,211 +190,208 @@
             android:id="@+id/rvGates"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
             android:minHeight="120dp"
-            android:nestedScrollingEnabled="false"
-            android:layout_marginBottom="20dp"/>
+            android:nestedScrollingEnabled="false" />
 
         <!-- خط فاصل -->
-        <View
+        <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?attr/colorOutlineVariant"
-            android:layout_marginBottom="20dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp" />
 
         <!-- 🔊 قسم الأصوات -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🔊 إعدادات الأصوات والتنبيهات"
+            android:layout_marginBottom="12dp"
+            android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="12dp"/>
+            tools:text="🔊 إعدادات الأصوات والتنبيهات" />
 
-        <TextView
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="صوت النجاح (المرور المقبول)"
-            android:textSize="12sp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="12dp"
+            tools:hint="صوت النجاح (المرور المقبول)">
 
-        <Spinner
-            android:id="@+id/spSoundPass"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="12dp"/>
+            <AutoCompleteTextView
+                android:id="@+id/spSoundPass"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="صوت الرفض (العوائق والمنع)"
-            android:textSize="12sp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginBottom="4dp"/>
-
-        <Spinner
-            android:id="@+id/spSoundDeny"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="12dp"/>
-
-        <TextView
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="صوت الإنذار الأمني"
-            android:textSize="12sp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="12dp"
+            tools:hint="صوت الرفض (العوائق والمنع)">
 
-        <Spinner
-            android:id="@+id/spSoundAlarm"
+            <AutoCompleteTextView
+                android:id="@+id/spSoundDeny"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="12dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            tools:hint="صوت الإنذار الأمني">
+
+            <AutoCompleteTextView
+                android:id="@+id/spSoundAlarm"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="20dp"
+            android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnTestSound"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="48dp"
-                android:text="🔊 اختبار الصوت"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:textColor="?attr/colorPrimary"
                 app:cornerRadius="10dp"
-                android:layout_marginEnd="6dp" />
+                app:strokeColor="?attr/colorPrimary"
+                tools:text="اختبار الصوت" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSaveSounds"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="48dp"
-                android:text="💾 حفظ الأصوات"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:textColor="?attr/colorOnPrimary"
+                app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="10dp"
-                android:layout_marginStart="6dp" />
+                tools:text="حفظ الأصوات" />
         </LinearLayout>
 
         <!-- خط فاصل -->
-        <View
+        <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?attr/colorOutlineVariant"
-            android:layout_marginBottom="20dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp" />
 
         <!-- ⚙️ إعدادات النظام الإضافية -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⚙️ خصائص الهاردوير والنظام"
+            android:layout_marginBottom="12dp"
+            android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="12dp"/>
+            tools:text="⚙️ خصائص الهاردوير والنظام" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:layout_marginBottom="10dp"
             android:gravity="center_vertical"
-            android:layout_marginBottom="10dp">
+            android:orientation="horizontal">
 
             <TextView
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="تفعيل الاهتزاز عند القراءة"
+                android:layout_weight="1"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
-                android:textColor="?attr/colorOnSurface"/>
+                tools:text="تفعيل الاهتزاز عند القراءة" />
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switchVibration"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+                android:layout_height="wrap_content" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:layout_marginBottom="12dp"
             android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
+            android:orientation="horizontal">
 
             <TextView
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="وميض الشاشة عند الإنذار"
+                android:layout_weight="1"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
-                android:textColor="?attr/colorOnSurface"/>
+                tools:text="وميض الشاشة عند الإنذار" />
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switchFlash"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+                android:layout_height="wrap_content" />
         </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="مدة الإنذار (بالثواني)"
-            android:textSize="12sp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginBottom="4dp"/>
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="12dp"
+            tools:hint="مدة الإنذار (بالثواني)">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etAlarmDuration"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="number"
-                android:hint="10" />
+                tools:text="10" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="قوة قارئ RFID الافتراضية"
-            android:textSize="12sp"
+            android:layout_marginBottom="4dp"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginBottom="4dp"/>
+            android:textSize="12sp"
+            tools:text="قوة قارئ RFID الافتراضية" />
 
         <SeekBar
             android:id="@+id/seekRfidPower"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
             android:max="30"
-            android:progress="28"
-            android:layout_marginBottom="4dp"/>
+            android:progress="28" />
 
         <TextView
             android:id="@+id/tvRfidPowerValue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="28 dBm"
+            android:layout_marginBottom="20dp"
             android:gravity="center"
+            android:textColor="?attr/colorPrimary"
             android:textSize="15sp"
             android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="20dp"/>
+            tools:text="28 dBm" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSaveAll"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:text="💾 حفظ جميع الإعدادات العامة"
+            android:textColor="?attr/colorOnPrimary"
             android:textSize="15sp"
             android:textStyle="bold"
-            app:cornerRadius="12dp"/>
+            app:backgroundTint="?attr/colorPrimary"
+            app:cornerRadius="12dp"
+            tools:text="حفظ جميع الإعدادات العامة" />
 
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>
