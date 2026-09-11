@@ -17,6 +17,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.annotation.SuppressLint;
@@ -27,8 +31,6 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.GridLayout;
 
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.graphics.Typeface;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
@@ -112,8 +114,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     
     private InventoryLockManager inventoryLockManager; 
     
-    
-    
     // ✅ المتغيرات الأساسية
     private TextView txtBadgeCount;
     private SessionManager sessionManager;
@@ -122,16 +122,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
-    // ✅ خريطة القوائم الثانوية حسب الشاشة
-    private static final java.util.Map<String, Integer> SECONDARY_MENUS_MAP;
-    static {
-    java.util.Map<String, Integer> map = new java.util.HashMap<>();
-    map.put("Dashboard", R.menu.secondary_menu_dashboard);
-    map.put("Scan", R.menu.secondary_menu_inventory);
-    map.put("POS", R.menu.secondary_menu_pos);
-    map.put("Transfers", R.menu.secondary_menu_transfers);
-    SECONDARY_MENUS_MAP = java.util.Collections.unmodifiableMap(map);
-    }
+    // ✅ حقول الشريط الثانوي الجديد (بديل SECONDARY_MENUS_MAP)
+    private LinearLayout statusChipContainer;
+    private LinearLayout secondaryActionsContainer;
+    private View statusChipView;
     
     // في تعريف المتغيرات
     private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener = this::updateAppTitle;
@@ -157,12 +151,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public interface OnRfidScannedListener {
         void onRfidScanned(String epc);
     }
+    
     /**
- * 🆕 واجهة لاستقبال أحداث الشريط الثانوي في الـ Fragment
- */
-public interface SecondaryToolbarListener {
-    void onSecondaryToolbarEvent(String event);
-}
+     * 🆕 واجهة لاستقبال أحداث الشريط الثانوي في الـ Fragment
+     */
+    public interface SecondaryToolbarListener {
+        void onSecondaryToolbarEvent(String event);
+    }
     
 
 
@@ -196,33 +191,32 @@ public interface SecondaryToolbarListener {
     }
     
     private void setupWindowInsets() {
-    View mainView = findViewById(R.id.main);
-    if (mainView == null) return;
-    
-    // ✅ حفظ الحشوة الأصلية (قبل إضافة الـ insets)
-    final int originalPaddingLeft = mainView.getPaddingLeft();
-    final int originalPaddingTop = mainView.getPaddingTop();
-    final int originalPaddingRight = mainView.getPaddingRight();
-    final int originalPaddingBottom = mainView.getPaddingBottom();
-    
-    ViewCompat.setOnApplyWindowInsetsListener(mainView, (v, insets) -> {
-        Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+        View mainView = findViewById(R.id.main);
+        if (mainView == null) return;
         
-        v.setPadding(
-                originalPaddingLeft + systemBars.left,
-                originalPaddingTop + systemBars.top,
-                originalPaddingRight + systemBars.right,
-                originalPaddingBottom + systemBars.bottom
-        );
+        // ✅ حفظ الحشوة الأصلية (قبل إضافة الـ insets)
+        final int originalPaddingLeft = mainView.getPaddingLeft();
+        final int originalPaddingTop = mainView.getPaddingTop();
+        final int originalPaddingRight = mainView.getPaddingRight();
+        final int originalPaddingBottom = mainView.getPaddingBottom();
         
-        // ✅ استهلك الـ insets — لا تمررها للأبناء
-        // هذا يمنع أي Fragment من محاولة تطبيقها مرة أخرى
-        return WindowInsetsCompat.CONSUMED;
-    });
-}
+        ViewCompat.setOnApplyWindowInsetsListener(mainView, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            
+            v.setPadding(
+                    originalPaddingLeft + systemBars.left,
+                    originalPaddingTop + systemBars.top,
+                    originalPaddingRight + systemBars.right,
+                    originalPaddingBottom + systemBars.bottom
+            );
+            
+            // ✅ استهلك الـ insets — لا تمررها للأبناء
+            return WindowInsetsCompat.CONSUMED;
+        });
+    }
 
 
-        @Override
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
@@ -239,7 +233,7 @@ public interface SecondaryToolbarListener {
             setupWindowInsets();
             cleanupOldFragments();
 
-            // ✅ ربط الشريط الثانوي
+            // ✅ ربط الشريط الثانوي الجديد
             setupSecondaryToolbar();
 
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
@@ -295,6 +289,11 @@ public interface SecondaryToolbarListener {
                     if (statusIndicatorManager != null) {
                         statusIndicatorManager.update();
                     }
+                    // ✅ تحديث شريحة الحالة في الشريط الثانوي
+                    if (hardwareManager != null) {
+                        boolean isConnected = hardwareManager.isConnected();
+                        mainHandler.post(() -> updateSecondaryStatusChip(isConnected));
+                    }
                 }
 
                 @Override
@@ -317,323 +316,376 @@ public interface SecondaryToolbarListener {
             setupOrgProfileListener();
 
             // ✅ التنقل الأولي
-            // ✅ التنقل الأولي
-if (savedInstanceState == null) {
-    // حالة جديدة → Dashboard افتراضي
-    currentFragmentTag = "Dashboard";
-    navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-} else {
-    // استعادة الحالة
-    currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+            if (savedInstanceState == null) {
+                // حالة جديدة → Dashboard افتراضي
+                currentFragmentTag = "Dashboard";
+                navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+            } else {
+                // استعادة الحالة
+                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
 
-    Fragment restored = getSupportFragmentManager().findFragmentByTag(currentFragmentTag);
-    if (restored != null) {
-        currentFragment = restored;
-        if (restored.isHidden()) {
-            getSupportFragmentManager().beginTransaction()
-                    .show(restored)
-                    .commitNowAllowingStateLoss();
-        }
-        Log.d(TAG, "Restored fragment: " + currentFragmentTag);
-    } else {
-        Fragment newFragment = navigationManager.createFragmentByTag(currentFragmentTag);
-        if (newFragment != null) {
-            navigationManager.loadFragmentDirectly(newFragment, currentFragmentTag);
-        } else {
-            navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+                Fragment restored = getSupportFragmentManager().findFragmentByTag(currentFragmentTag);
+                if (restored != null) {
+                    currentFragment = restored;
+                    if (restored.isHidden()) {
+                        getSupportFragmentManager().beginTransaction()
+                                .show(restored)
+                                .commitNowAllowingStateLoss();
+                    }
+                    Log.d(TAG, "Restored fragment: " + currentFragmentTag);
+                } else {
+                    Fragment newFragment = navigationManager.createFragmentByTag(currentFragmentTag);
+                    if (newFragment != null) {
+                        navigationManager.loadFragmentDirectly(newFragment, currentFragmentTag);
+                    } else {
+                        navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+                    }
+                }
+            }
+
+            currentFragment = navigationManager.getCurrentFragment();
+            
+            // ✅ تحديث الشريط الثانوي بعد التنقل الأولي
+            refreshSecondaryToolbar(currentFragmentTag);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
     }
-}
 
-currentFragment = navigationManager.getCurrentFragment();
+    // ══════════════════════════════════════════════════════════════
+    //  الشريط الثانوي الجديد (أزرار مباشرة)
+    // ══════════════════════════════════════════════════════════════
 
-} catch (Exception e) {
-    Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
-}
+    /**
+     * ✅ إعداد الشريط الثانوي الجديد (أزرار مباشرة، بدون Menu منسدل)
+     */
+    private void setupSecondaryToolbar() {
+        statusChipContainer = findViewById(R.id.statusChipContainer);
+        secondaryActionsContainer = findViewById(R.id.secondaryActionsContainer);
+        
+        if (statusChipContainer != null) {
+            // ✅ حمّل عرض حالة الجهاز من XML الموجود
+            try {
+                statusChipView = getLayoutInflater().inflate(
+                        R.layout.action_device_status, statusChipContainer, false);
+                
+                // ✅ اجعله قابل للنقر (يفتح حوار الأجهزة)
+                if (statusChipView != null) {
+                    statusChipView.setOnClickListener(v -> showHardwareOptionsDialog());
+                    
+                    statusChipContainer.addView(statusChipView);
+                    
+                    // ✅ تحديث الحالة الأولية
+                    if (hardwareManager != null) {
+                        updateSecondaryStatusChip(hardwareManager.isConnected());
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "setupSecondaryToolbar error: " + e.getMessage(), e);
+            }
+        }
     }
 
     /**
- * إعداد الشريط الثانوي (سيتم استدعاؤه عند كل تغيير شاشة)
- */
-private void setupSecondaryToolbar() {
-    MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
-    
-    if (secondaryToolbar != null) {
-        // 🎯 بناء القائمة ديناميكياً حسب الشاشة الحالية
-        refreshSecondaryToolbar(secondaryToolbar);
+     * ✅ تحديث الشريط الثانوي حسب الشاشة الحالية
+     */
+    private void refreshSecondaryToolbar(String tag) {
+        if (secondaryActionsContainer == null) {
+            secondaryActionsContainer = findViewById(R.id.secondaryActionsContainer);
+        }
+        if (secondaryActionsContainer == null) return;
         
-        // 🎯 معالج النقر
-        secondaryToolbar.setOnMenuItemClickListener(item -> {
-            return handleSecondaryMenuItemClick(item);
-        });
+        try {
+            // 1. مسح الأزرار الحالية
+            secondaryActionsContainer.removeAllViews();
+            
+            // 2. أضف الأزرار حسب الشاشة
+            if (tag == null) tag = "Dashboard";
+            
+            switch (tag) {
+                case "Dashboard":
+                    setupDashboardActions();
+                    break;
+                case "Scan":
+                case "MiraInventoryProFragment":
+                    // الشاشة تُخفي الشريط بالكامل — لا حاجة لأزرار
+                    break;
+                case "POS":
+                    setupPosActions();
+                    break;
+                case "Transfers":
+                    setupTransfersActions();
+                    break;
+                default:
+                    setupDashboardActions();
+                    break;
+            }
+            
+            Log.d(TAG, "Secondary toolbar refreshed for: " + tag);
+        } catch (Exception e) {
+            Log.e(TAG, "Error refreshing secondary toolbar", e);
+        }
     }
-}
 
-/**
- * 🆕 تحديث محتوى الشريط الثانوي حسب الشاشة الحالية
- */
-private void refreshSecondaryToolbar(MaterialToolbar toolbar) {
-    if (toolbar == null) return;
-    
-    try {
-        // 1. مسح القائمة الحالية
-        toolbar.getMenu().clear();
+    /**
+     * 🏠 Dashboard Actions
+     * الترتيب (RTL): [🟢 متصل] [⚙️] [🔄] [🔍]
+     */
+    private void setupDashboardActions() {
+        addActionButton(R.drawable.ic_settings, "إعدادات سريعة",
+                v -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+
+        addActionButton(R.drawable.ic_sync, "مزامنة",
+                v -> performDataSync());
+
+        addActionButton(R.drawable.ic_search, "بحث",
+                v -> showGlobalSearchDialog());
+    }
+
+    /**
+     * 📡 Inventory Actions
+     * (تُستخدم فقط إذا أُظهر الشريط مستقبلاً)
+     */
+    @SuppressWarnings("unused")
+    private void setupInventoryActions() {
+        addActionButton(R.drawable.ic_settings, "إعدادات الجلسة",
+                v -> sendEventToCurrentFragment("inventory_settings"));
+
+        addActionButton(R.drawable.ic_stats, "إحصائيات",
+                v -> sendEventToCurrentFragment("inventory_stats"));
+
+        addActionButton(R.drawable.ic_search, "بحث في الممسوحات",
+                v -> sendEventToCurrentFragment("inventory_search"));
+    }
+
+    /**
+     * 💰 POS Actions
+     * الترتيب (RTL): [🟢 RFID] [🧾] [💰] [🔍] [🛒]
+     */
+    private void setupPosActions() {
+        addActionButton(R.drawable.ic_receipt, "الإيصال الأخير",
+                v -> sendEventToCurrentFragment("pos_receipt"));
+
+        addActionButton(R.drawable.ic_discount, "خصم",
+                v -> sendEventToCurrentFragment("pos_discount"));
+
+        addActionButton(R.drawable.ic_search, "بحث",
+                v -> sendEventToCurrentFragment("pos_search"));
+
+        addActionButton(R.drawable.ic_shopping_cart, "السلة",
+                v -> sendEventToCurrentFragment("pos_cart"));
+    }
+
+    /**
+     * 🚚 Transfers Actions
+     * الترتيب (RTL): [🟢 الشبكة] [📋] [📥] [📤] [🔄]
+     */
+    private void setupTransfersActions() {
+        addActionButton(R.drawable.ic_history, "السجل",
+                v -> sendEventToCurrentFragment("transfers_history"));
+
+        addActionButton(R.drawable.ic_import, "استيراد",
+                v -> sendEventToCurrentFragment("transfers_import"));
+
+        addActionButton(R.drawable.ic_export, "تصدير",
+                v -> sendEventToCurrentFragment("transfers_export"));
+
+        addActionButton(R.drawable.ic_sync, "مزامنة",
+                v -> performDataSync());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Helpers
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ إضافة زر إلى الشريط الثانوي
+     */
+    private void addActionButton(int iconRes, String description, View.OnClickListener listener) {
+        if (secondaryActionsContainer == null) return;
         
-        // 2. تحديد القائمة المناسبة
-        Integer menuResId = SECONDARY_MENUS_MAP.get(currentFragmentTag);
+        try {
+            ImageView btn = new ImageView(this);
+            
+            float density = getResources().getDisplayMetrics().density;
+            int size = (int) (40 * density);
+            int padding = (int) (8 * density);
+            int margin = (int) (4 * density);
+            
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+            params.setMarginStart(margin);
+            btn.setLayoutParams(params);
+            
+            btn.setPadding(padding, padding, padding, padding);
+            btn.setImageResource(iconRes);
+            btn.setContentDescription(description);
+            btn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            btn.setBackgroundResource(getSelectableItemBackgroundBorderless());
+            
+            // ✅ لون الأيقونة حسب الثيم
+            try {
+                btn.setColorFilter(getColor(R.color.on_surface));
+            } catch (Exception e) {
+                btn.setColorFilter(0xFF000000);
+            }
+            
+            btn.setOnClickListener(listener);
+            
+            secondaryActionsContainer.addView(btn);
+        } catch (Exception e) {
+            Log.e(TAG, "addActionButton error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ الحصول على selectableItemBackgroundBorderless
+     */
+    private int getSelectableItemBackgroundBorderless() {
+        android.util.TypedValue outValue = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true);
+        return outValue.resourceId;
+    }
+
+    /**
+     * ✅ تحديث شريحة حالة الجهاز
+     */
+    private void updateSecondaryStatusChip(boolean isConnected) {
+        if (statusChipView == null) return;
         
-        // 3. إذا لم تكن الشاشة محددة، استخدم قائمة Dashboard كافتراضي
-        if (menuResId == null) {
-            menuResId = R.menu.secondary_menu_dashboard;
+        try {
+            View dot = statusChipView.findViewById(R.id.deviceStatusDot);
+            TextView text = statusChipView.findViewById(R.id.deviceStatusText);
+            
+            if (dot != null) {
+                dot.setBackgroundResource(isConnected 
+                        ? R.drawable.bg_status_dot_green 
+                        : R.drawable.bg_status_dot_red);
+            }
+            
+            if (text != null) {
+                text.setText(isConnected 
+                        ? (isArabic ? "متصل" : "Online")
+                        : (isArabic ? "غير متصل" : "Offline"));
+                
+                int colorRes = isConnected 
+                        ? android.R.color.holo_green_dark
+                        : android.R.color.holo_red_dark;
+                text.setTextColor(getResources().getColor(colorRes, getTheme()));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "updateSecondaryStatusChip error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 🆕 إرسال حدث للـ Fragment الحالي
+     */
+    private void sendEventToCurrentFragment(String event) {
+        try {
+            if (currentFragment instanceof SecondaryToolbarListener) {
+                ((SecondaryToolbarListener) currentFragment).onSecondaryToolbarEvent(event);
+            } else {
+                Log.d(TAG, "Event '" + event + "' received but fragment doesn't implement listener");
+                // ✅ Fallback: عرض Toast للمستخدم
+                showToast(isArabic ? "قيد التطوير: " + event : "Coming soon: " + event);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending event to fragment", e);
+        }
+    }
+
+    /**
+     * ✅ حوار خيارات الأجهزة (يُفتح عند النقر على شريحة الحالة)
+     */
+    private void showHardwareOptionsDialog() {
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+        List<String> optionsList = new ArrayList<>();
+        List<Runnable> actionsList = new ArrayList<>();
+        
+        // 1. إعدادات قارئ RFID
+        if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
+            optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
+            actionsList.add(() -> loadFragment(new MiraReaderSetupFragment(), "ReaderSetup"));
         }
         
-        // 4. تحميل القائمة الجديدة
-        toolbar.inflateMenu(menuResId);
-        
-        // 5. إذا كانت القائمة تحتوي على status button، أعد تهيئته
-        if (menuResId == R.menu.secondary_menu_dashboard) {
-            setupDeviceStatusButton(toolbar);
+        // 2. إعدادات البوابات الأمنية
+        if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
+            optionsList.add(isArabic ? "🚧 تهيئة البوابات الأمنية" : "🚧 Gate Security Setup");
+            actionsList.add(() -> loadFragment(new MiraGateSettingsFragment(), "GateSettings"));
         }
         
-        Log.d(TAG, "Secondary toolbar refreshed for: " + currentFragmentTag);
-    } catch (Exception e) {
-        Log.e(TAG, "Error refreshing secondary toolbar", e);
-    }
-}
-
-/**
- * 🆕 معالج نقرات القائمة الثانوية
- */
-private boolean handleSecondaryMenuItemClick(MenuItem item) {
-    int id = item.getItemId();
-    
-    // ==================== Dashboard ====================
-    if (id == R.id.action_sync) {
-        performDataSync();
-        return true;
-    } else if (id == R.id.action_search) {
-        showGlobalSearchDialog();
-        return true;
-    } else if (id == R.id.action_quick_access_settings) {
-        loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
-        return true;
-    } else if (id == R.id.action_device_status) {
-        // مُعالج بواسطة actionView
-        return true;
-    }
-    
-    // ==================== Inventory ====================
-    else if (id == R.id.action_inventory_power) {
-        // مُعالج بواسطة actionView
-        return true;
-    } else if (id == R.id.action_inventory_search) {
-        // إرسال حدث للـ Fragment
-        sendEventToCurrentFragment("inventory_search");
-        return true;
-    } else if (id == R.id.action_inventory_stats) {
-        sendEventToCurrentFragment("inventory_stats");
-        return true;
-    } else if (id == R.id.action_inventory_settings) {
-        sendEventToCurrentFragment("inventory_settings");
-        return true;
-    }
-    
-    // ==================== POS ====================
-    else if (id == R.id.action_pos_cart) {
-        sendEventToCurrentFragment("pos_cart");
-        return true;
-    } else if (id == R.id.action_pos_search) {
-        sendEventToCurrentFragment("pos_search");
-        return true;
-    } else if (id == R.id.action_pos_discount) {
-        sendEventToCurrentFragment("pos_discount");
-        return true;
-    } else if (id == R.id.action_pos_receipt) {
-        sendEventToCurrentFragment("pos_receipt");
-        return true;
-    }
-    
-    // ==================== Transfers ====================
-    else if (id == R.id.action_transfers_sync) {
-        performDataSync();
-        return true;
-    } else if (id == R.id.action_transfers_export) {
-        sendEventToCurrentFragment("transfers_export");
-        return true;
-    } else if (id == R.id.action_transfers_import) {
-        sendEventToCurrentFragment("transfers_import");
-        return true;
-    } else if (id == R.id.action_transfers_history) {
-        sendEventToCurrentFragment("transfers_history");
-        return true;
-    }
-    
-    return false;
-}
-
-/**
- * 🆕 إرسال حدث للـ Fragment الحالي
- * (سيتم استقباله عبر واجهة InventoryToolbarListener)
- */
-private void sendEventToCurrentFragment(String event) {
-    try {
-        if (currentFragment instanceof SecondaryToolbarListener) {
-            ((SecondaryToolbarListener) currentFragment).onSecondaryToolbarEvent(event);
-        } else {
-            Log.d(TAG, "Event '" + event + "' received but fragment doesn't implement listener");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Error sending event to fragment", e);
-    }
-}
-
-/**
- * ✅ إعداد زر حالة الأجهزة (متصل/غير متصل)
- */
-private void setupDeviceStatusButton(MaterialToolbar toolbar) {
-    try {
-        // البحث عن MenuItem بواسطة ID
-        Menu menu = toolbar.getMenu();
-        MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
-        
-        if (deviceStatusItem == null) return;
-        
-        View actionView = deviceStatusItem.getActionView();
-        if (actionView == null) return;
-        
-        // ✅ ربط العناصر
-        View statusDot = actionView.findViewById(R.id.deviceStatusDot);
-        TextView statusText = actionView.findViewById(R.id.deviceStatusText);
-        
-        // ✅ عند الضغط على الزر
-        actionView.setOnClickListener(v -> showHardwareOptionsDialog());
-        
-        // ✅ تحديث الحالة الأولية
-        updateDeviceStatusUI(statusDot, statusText);
-        
-        // ✅ الاستماع لتغيرات حالة الجهاز
-        if (hardwareManager != null) {
-            hardwareManager.setStatusChangeCallback(status -> {
-                mainHandler.post(() -> updateDeviceStatusUI(statusDot, statusText));
-            });
+        // 3. إعدادات السيرفر
+        if (pm.canViewServerConfig()) {
+            optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
+            actionsList.add(() -> loadFragment(new MiraServerConfigFragment(), "ServerConfig"));
         }
         
-    } catch (Exception e) {
-        Log.e(TAG, "setupDeviceStatusButton error: " + e.getMessage());
-    }
-}
-
-/**
- * ✅ تحديث واجهة حالة الأجهزة
- */
-private void updateDeviceStatusUI(View statusDot, TextView statusText) {
-    try {
-        if (statusDot == null || statusText == null) return;
-        
-        boolean isConnected = false;
-        
-        if (hardwareManager != null) {
-            isConnected = hardwareManager.isConnected();
+        // 4. إدارة الشرائح المبرمجة
+        if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
+            optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
+            actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
         }
         
-        if (isConnected) {
-            statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
-            statusText.setText(isArabic ? "متصل" : "Connected");
-            statusText.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-        } else {
-            statusDot.setBackgroundResource(R.drawable.bg_status_dot_red);
-            statusText.setText(isArabic ? "غير متصل" : "Disconnected");
-            statusText.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+        // 5. ⚙️ إعدادات الوصول السريع
+        if (pm.canManageQuickAccess() || pm.isManager() || pm.isAdmin()) {
+            optionsList.add(isArabic ? "⚙️ إعدادات الوصول السريع" : "⚙️ Quick Access Settings");
+            actionsList.add(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
         }
         
-    } catch (Exception e) {
-        Log.e(TAG, "updateDeviceStatusUI error: " + e.getMessage());
-    }
-}
-
-
-private void showHardwareOptionsDialog() {
-    PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-    List<String> optionsList = new ArrayList<>();
-    List<Runnable> actionsList = new ArrayList<>();
-    
-    // 1. إعدادات قارئ RFID
-    if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
-        optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
-        actionsList.add(() -> loadFragment(new MiraReaderSetupFragment(), "ReaderSetup"));
-    }
-    
-    // 2. إعدادات البوابات الأمنية
-    if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
-        optionsList.add(isArabic ? "🚧 تهيئة البوابات الأمنية" : "🚧 Gate Security Setup");
-        actionsList.add(() -> loadFragment(new MiraGateSettingsFragment(), "GateSettings"));
-    }
-    
-    // 3. إعدادات السيرفر
-    if (pm.canViewServerConfig()) {
-        optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
-        actionsList.add(() -> loadFragment(new MiraServerConfigFragment(), "ServerConfig"));
-    }
-    
-    // 4. إدارة الشرائح المبرمجة
-    if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
-        optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
-        actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
-    }
-    
-    // 5. ⚙️ إعدادات تخصيص الوصول السريع (جديد!)
-    if (pm.canManageQuickAccess() || pm.isManager() || pm.isAdmin()) {
-        optionsList.add(isArabic ? "⚙️ إعدادات الوصول السريع" : "⚙️ Quick Access Settings");
-        actionsList.add(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
-    }
-    
-    // 6. اختبار التوصيل
-    optionsList.add(isArabic ? "🔄 اختبار التوصيل والربط" : "🔄 Connection Test");
-    actionsList.add(this::performConnectionTest);
-    
-    String[] options = optionsList.toArray(new String[0]);
-    
-    new MaterialAlertDialogBuilder(this)
-            .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
-            .setItems(options, (dialog, which) -> {
-                if (which >= 0 && which < actionsList.size()) {
-                    actionsList.get(which).run();
-                }
-            })
-            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-            .show();
-}
-
-/**
- * ✅ اختبار التوصيل والربط
- */
-private void performConnectionTest() {
-    showLoading();
-    
-    mainHandler.postDelayed(() -> {
-        hideLoading();
+        // 6. اختبار التوصيل
+        optionsList.add(isArabic ? "🔄 اختبار التوصيل والربط" : "🔄 Connection Test");
+        actionsList.add(this::performConnectionTest);
         
-        boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
-        
-        String message = isConnected 
-            ? (isArabic ? "✅ الاتصال بالجهاز سليم\nجميع الأجهزة تعمل بشكل صحيح" 
-                        : "✅ Device connection OK\nAll devices operational")
-            : (isArabic ? "⚠️ لا يوجد اتصال بالجهاز\nيرجى التحقق من الاتصال" 
-                        : "⚠️ No device connection\nPlease check connection");
+        String[] options = optionsList.toArray(new String[0]);
         
         new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic ? "نتيجة الاختبار" : "Test Result")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
+                .setItems(options, (dialog, which) -> {
+                    if (which >= 0 && which < actionsList.size()) {
+                        actionsList.get(which).run();
+                    }
+                })
+                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
                 .show();
-    }, 1500);
-}
+    }
+
+    /**
+     * ✅ اختبار التوصيل والربط
+     */
+    private void performConnectionTest() {
+        showLoading();
+        
+        mainHandler.postDelayed(() -> {
+            hideLoading();
+            
+            boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
+            
+            String message = isConnected 
+                ? (isArabic ? "✅ الاتصال بالجهاز سليم\nجميع الأجهزة تعمل بشكل صحيح" 
+                            : "✅ Device connection OK\nAll devices operational")
+                : (isArabic ? "⚠️ لا يوجد اتصال بالجهاز\nيرجى التحقق من الاتصال" 
+                            : "⚠️ No device connection\nPlease check connection");
+            
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(isArabic ? "نتيجة الاختبار" : "Test Result")
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                    .show();
+        }, 1500);
+    }
+
     @Override
     public void onResume() {
         super.onResume();
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         mainHandler.postDelayed(this::hideLoading, 100);
+        
+        // ✅ تحديث شريحة حالة الجهاز عند العودة
+        if (hardwareManager != null) {
+            updateSecondaryStatusChip(hardwareManager.isConnected());
+        }
     }
 
     @Override
@@ -709,11 +761,10 @@ private void performConnectionTest() {
     }
 
     private void setupOrgProfileListener() {
-    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-    orgProfileManager.addListener(orgProfileListener);
-    updateAppTitle();
-}
-
+        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+        orgProfileManager.addListener(orgProfileListener);
+        updateAppTitle();
+    }
 
     private void updateAppTitle() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -729,135 +780,126 @@ private void performConnectionTest() {
     }
 
     private void updateToolbarTitle() {
-    try {
-        // ✅ تحديث TextView مباشرة (وليس ActionBar)
-        TextView tvTitle = findViewById(R.id.tvTitle);
-        TextView tvSubtitle = findViewById(R.id.tvSubtitle);
-        
-        String orgName = "MIRA ID";
-        if (orgProfileManager != null) {
-            String name = orgProfileManager.getDisplayName();
-            if (name != null && !name.trim().isEmpty()) {
-                orgName = name;
+        try {
+            TextView tvTitle = findViewById(R.id.tvTitle);
+            TextView tvSubtitle = findViewById(R.id.tvSubtitle);
+            
+            String orgName = "MIRA ID";
+            if (orgProfileManager != null) {
+                String name = orgProfileManager.getDisplayName();
+                if (name != null && !name.trim().isEmpty()) {
+                    orgName = name;
+                }
             }
-        }
-        
-        if (tvTitle != null) {
-            tvTitle.setText(orgName);
-        }
-        
-        if (tvSubtitle != null) {
-            if (branchesManager != null && branchesManager.hasActiveBranch()) {
-                tvSubtitle.setText("📍 " + branchesManager.getActiveBranchDisplayName());
-            } else {
-                tvSubtitle.setText(isArabic ? "📍 الفرع الرئيسي" : "📍 Main Branch");
+            
+            if (tvTitle != null) {
+                tvTitle.setText(orgName);
             }
+            
+            if (tvSubtitle != null) {
+                if (branchesManager != null && branchesManager.hasActiveBranch()) {
+                    tvSubtitle.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+                } else {
+                    tvSubtitle.setText(isArabic ? "📍 الفرع الرئيسي" : "📍 Main Branch");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
     }
-}
 
     // ==================== التنقل ====================
 
-   // ==================== التنقل ====================
-
-/**
- * 🆕 نسخة loadFragment بمعاملين فقط
- * (تُستخدم addToBackStack = true افتراضياً)
- */
-public void loadFragment(Fragment fragment, String tag) {
-    loadFragment(fragment, tag, true);
-}
-
-/**
- * نسخة loadFragment بثلاث معاملات
- */
-public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    showLoading();
-    navigationManager.loadFragment(fragment, tag, addToBackStack);
-    currentFragment = navigationManager.getCurrentFragment();
-    currentFragmentTag = tag;
-    updateBottomNavSelectionByTag(tag);
-    mainHandler.postDelayed(this::hideLoading, 250);
-    
-    // 🆕 تحديث القائمة الثانوية
-    refreshSecondaryToolbar(findViewById(R.id.secondaryToolbar));
-}
-
-public void loadFragmentDirectly(Fragment fragment, String tag) {
-    showLoading();
-    
-    if (navigationManager != null) {
-        navigationManager.loadFragmentDirectly(fragment, tag);
+    /**
+     * نسخة loadFragment بمعاملين فقط
+     */
+    public void loadFragment(Fragment fragment, String tag) {
+        loadFragment(fragment, tag, true);
     }
-    
-    currentFragment = navigationManager != null ? 
-            navigationManager.getCurrentFragment() : fragment;
-    currentFragmentTag = tag;
-    
-    updateBottomNavSelectionByTag(tag);
-    updateSecondaryToolbarVisibility(tag);
-    
-    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ mainHandler بدل mainHandlerThread
-    
-    // 🆕 تحديث القائمة الثانوية
-    refreshSecondaryToolbar(findViewById(R.id.secondaryToolbar));
-}
-/**
- * 🆕 تحديث واجهة الشريط الثانوي حسب الشاشة الحالية
- * تُستدعى بعد كل تنقل
- */
-private void updateSecondaryToolbarVisibility(String tag) {
-    try {
-        View secondaryToolbar = findViewById(R.id.secondaryToolbar);
-        if (secondaryToolbar == null) return;
+
+    /**
+     * نسخة loadFragment بثلاث معاملات
+     */
+    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+        showLoading();
+        navigationManager.loadFragment(fragment, tag, addToBackStack);
+        currentFragment = navigationManager.getCurrentFragment();
+        currentFragmentTag = tag;
+        updateBottomNavSelectionByTag(tag);
+        mainHandler.postDelayed(this::hideLoading, 250);
         
-        // 🎯 إخفاء Secondary Toolbar عند شاشات محددة
-        boolean shouldHide = isScreenThatHidesToolbar(tag);
+        // ✅ تحديث الشريط الثانوي
+        refreshSecondaryToolbar(tag);
+        updateSecondaryToolbarVisibility(tag);
+    }
+
+    public void loadFragmentDirectly(Fragment fragment, String tag) {
+        showLoading();
         
-        if (shouldHide) {
-            // إخفاء
-            if (secondaryToolbar.getVisibility() == View.VISIBLE) {
-                secondaryToolbar.animate()
-                        .alpha(0f)
-                        .setDuration(200)
-                        .withEndAction(() -> secondaryToolbar.setVisibility(View.GONE))
-                        .start();
-            }
-        } else {
-            // إظهار
-            if (secondaryToolbar.getVisibility() != View.VISIBLE) {
-                secondaryToolbar.setVisibility(View.VISIBLE);
-                secondaryToolbar.setAlpha(0f);
-                secondaryToolbar.animate()
-                        .alpha(1f)
-                        .setDuration(200)
-                        .start();
-            }
+        if (navigationManager != null) {
+            navigationManager.loadFragmentDirectly(fragment, tag);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Error updating secondary toolbar visibility", e);
+        
+        currentFragment = navigationManager != null ? 
+                navigationManager.getCurrentFragment() : fragment;
+        currentFragmentTag = tag;
+        
+        updateBottomNavSelectionByTag(tag);
+        updateSecondaryToolbarVisibility(tag);
+        
+        mainHandler.postDelayed(this::hideLoading, 250);
+        
+        // ✅ تحديث الشريط الثانوي
+        refreshSecondaryToolbar(tag);
     }
-}
 
-/**
- * 🆕 هل الشاشة تُخفي Secondary Toolbar؟
- */
-private boolean isScreenThatHidesToolbar(String tag) {
-    if (tag == null) return false;
-    
-    // 🎯 الشاشات التي تُخفي Secondary Toolbar
-    // (لأنها تحتوي على شريطها الخاص)
-    switch (tag) {
-        case "Scan":
-        case "MiraInventoryProFragment":
-            return true;
-        // أضف شاشات أخرى هنا إذا لزم الأمر
-        default:
-            return false;
+    /**
+     * ✅ تحديث واجهة الشريط الثانوي (إظهار/إخفاء)
+     */
+    private void updateSecondaryToolbarVisibility(String tag) {
+        try {
+            View secondaryToolbar = findViewById(R.id.secondaryToolbar);
+            if (secondaryToolbar == null) return;
+            
+            boolean shouldHide = isScreenThatHidesToolbar(tag);
+            
+            if (shouldHide) {
+                if (secondaryToolbar.getVisibility() == View.VISIBLE) {
+                    secondaryToolbar.animate()
+                            .alpha(0f)
+                            .setDuration(200)
+                            .withEndAction(() -> secondaryToolbar.setVisibility(View.GONE))
+                            .start();
+                }
+            } else {
+                if (secondaryToolbar.getVisibility() != View.VISIBLE) {
+                    secondaryToolbar.setVisibility(View.VISIBLE);
+                    secondaryToolbar.setAlpha(0f);
+                    secondaryToolbar.animate()
+                            .alpha(1f)
+                            .setDuration(200)
+                            .start();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating secondary toolbar visibility", e);
+        }
     }
-}
+
+    /**
+     * ✅ هل الشاشة تُخفي Secondary Toolbar؟
+     */
+    private boolean isScreenThatHidesToolbar(String tag) {
+        if (tag == null) return false;
+        
+        switch (tag) {
+            case "Scan":
+            case "MiraInventoryProFragment":
+                return true;
+            default:
+                return false;
+        }
+    }
 
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
@@ -880,7 +922,6 @@ private boolean isScreenThatHidesToolbar(String tag) {
         }
     }
 
-    
     public void playSoundDelayed(int value) {
         if (soundManager != null) {
             soundManager.playDelayedSound(this, value);
@@ -1534,180 +1575,157 @@ private boolean isScreenThatHidesToolbar(String tag) {
     // ==================== قائمة الإجراءات السريعة ====================
 
     private void showQuickActionMenu() {
-    try {
-        // ✅ 1. إنشاء الحوار بالنمط الفاخر
-        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.LuxuryBottomSheetDialog);
-        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_sheet, null);
-        dialog.setContentView(view);
+        try {
+            BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.LuxuryBottomSheetDialog);
+            View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_sheet, null);
+            dialog.setContentView(view);
 
-        // ✅ 2. ربط العناصر
-        PermissionManager pm = permissionManager;
-        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
+            PermissionManager pm = permissionManager;
+            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
-        // ✅ 3. ربط جميع الأزرار
-        bindQuickAction(view, R.id.btnRfidWrite, dialog,
-                pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write"),
-                new MiraUHFReadWriteFragment(), "RFIDWrite");
+            bindQuickAction(view, R.id.btnRfidWrite, dialog,
+                    pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write"),
+                    new MiraUHFReadWriteFragment(), "RFIDWrite");
 
-        bindQuickAction(view, R.id.btnRfidBindings, dialog,
-                pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
-                new MiraRfidBindingsFragment(), "RfidBindings");
+            bindQuickAction(view, R.id.btnRfidBindings, dialog,
+                    pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
+                    new MiraRfidBindingsFragment(), "RfidBindings");
 
-        bindQuickAction(view, R.id.btnIdentityStudio, dialog,
-                pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
-                new MiraIdentityStudioFragment(), "IdentityStudio");
+            bindQuickAction(view, R.id.btnIdentityStudio, dialog,
+                    pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
+                    new MiraIdentityStudioFragment(), "IdentityStudio");
 
-        bindQuickAction(view, R.id.btnRadarLocation, dialog,
-                pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
-                new MiraUHFRadarLocationFragment(), "Radar");
+            bindQuickAction(view, R.id.btnRadarLocation, dialog,
+                    pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
+                    new MiraUHFRadarLocationFragment(), "Radar");
 
-        bindQuickAction(view, R.id.btnSecureGate, dialog,
-                pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
-                new MiraSecureGateFragment(), "SecureGate");
+            bindQuickAction(view, R.id.btnSecureGate, dialog,
+                    pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
+                    new MiraSecureGateFragment(), "SecureGate");
 
-        bindQuickAction(view, R.id.btnReports, dialog,
-                pm.canExportReports() && quickAccess.isActionEnabled("reports"),
-                new MiraReportsProFragment(), "Reports");
+            bindQuickAction(view, R.id.btnReports, dialog,
+                    pm.canExportReports() && quickAccess.isActionEnabled("reports"),
+                    new MiraReportsProFragment(), "Reports");
 
-        bindQuickAction(view, R.id.btnAccounting, dialog,
-                pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
-                new MiraAccountingFragment(), "Accounting");
+            bindQuickAction(view, R.id.btnAccounting, dialog,
+                    pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
+                    new MiraAccountingFragment(), "Accounting");
 
-        bindQuickAction(view, R.id.btnTransfer, dialog,
-                pm.canAccessTransfers() && quickAccess.isActionEnabled("transfer"),
-                new MiraTransferFragment(), "Transfers");
+            bindQuickAction(view, R.id.btnTransfer, dialog,
+                    pm.canAccessTransfers() && quickAccess.isActionEnabled("transfer"),
+                    new MiraTransferFragment(), "Transfers");
 
-        bindQuickAction(view, R.id.btnSalesHistory, dialog,
-                pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
-                new MiraSalesHistoryFragment(), "SalesHistory");
+            bindQuickAction(view, R.id.btnSalesHistory, dialog,
+                    pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
+                    new MiraSalesHistoryFragment(), "SalesHistory");
 
-        bindQuickAction(view, R.id.btnAdminHub, dialog,
-                pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
-                new MiraAdminHubFragment(), "AdminHub");
+            bindQuickAction(view, R.id.btnAdminHub, dialog,
+                    pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
+                    new MiraAdminHubFragment(), "AdminHub");
 
-        bindQuickAction(view, R.id.btnServerConfig, dialog,
-                pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
-                new MiraServerConfigFragment(), "ServerConfig");
+            bindQuickAction(view, R.id.btnServerConfig, dialog,
+                    pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
+                    new MiraServerConfigFragment(), "ServerConfig");
 
-        // ✅ 4. زر الإغلاق
-        View btnClose = view.findViewById(R.id.btnCloseSheet);
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        // ✅ 5. 🎬 حركات الفتح الانسيابية
-        GridLayout grid = view.findViewById(R.id.gridQuickActions);
-        LinearLayout root = view.findViewById(R.id.quickActionSheetRoot);
-
-        if (root != null) {
-            root.setAlpha(0f);
-            root.setTranslationY(80f);
-        }
-
-        dialog.setOnShowListener(d -> {
-            // 🎬 ظهور القائمة بالكامل بحركة انزلاق
-            if (root != null) {
-                root.animate()
-                        .alpha(1f)
-                        .translationY(0f)
-                        .setDuration(350)
-                        .setInterpolator(new DecelerateInterpolator())
-                        .start();
+            View btnClose = view.findViewById(R.id.btnCloseSheet);
+            if (btnClose != null) {
+                btnClose.setOnClickListener(v -> dialog.dismiss());
             }
 
-            // 🎬 ظهور متتالي لكل أيقونة في الشبكة
-            if (grid != null) {
-                for (int i = 0; i < grid.getChildCount(); i++) {
-                    View child = grid.getChildAt(i);
-                    if (child.getVisibility() != View.VISIBLE) continue;
+            GridLayout grid = view.findViewById(R.id.gridQuickActions);
+            LinearLayout root = view.findViewById(R.id.quickActionSheetRoot);
 
-                    child.setAlpha(0f);
-                    child.setScaleX(0.4f);
-                    child.setScaleY(0.4f);
-                    child.setTranslationY(30f);
+            if (root != null) {
+                root.setAlpha(0f);
+                root.setTranslationY(80f);
+            }
 
-                    child.animate()
+            dialog.setOnShowListener(d -> {
+                if (root != null) {
+                    root.animate()
                             .alpha(1f)
-                            .scaleX(1f)
-                            .scaleY(1f)
                             .translationY(0f)
-                            .setStartDelay(120 + (i * 45L))
-                            .setDuration(400)
-                            .setInterpolator(new OvershootInterpolator(1.4f))
+                            .setDuration(350)
+                            .setInterpolator(new DecelerateInterpolator())
                             .start();
                 }
-            }
-        });
 
-        // 🎬 حركة الإغلاق
-        dialog.setOnDismissListener(d -> {
-            if (root != null) {
-                root.animate()
-                        .alpha(0f)
-                        .translationY(80f)
-                        .setDuration(200)
-                        .setInterpolator(new AccelerateInterpolator())
-                        .start();
-            }
-        });
+                if (grid != null) {
+                    for (int i = 0; i < grid.getChildCount(); i++) {
+                        View child = grid.getChildAt(i);
+                        if (child.getVisibility() != View.VISIBLE) continue;
 
-        dialog.show();
+                        child.setAlpha(0f);
+                        child.setScaleX(0.4f);
+                        child.setScaleY(0.4f);
+                        child.setTranslationY(30f);
 
-    } catch (Exception e) {
-        Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
-    }
-}
-
-/**
- * ✅ دالة مساعدة لربط أزرار الإجراءات السريعة
- */
-private void bindQuickAction(View root, int viewId, BottomSheetDialog dialog,
-                              boolean allowed, Fragment fragment, String tag) {
-    View btn = root.findViewById(viewId);
-    if (btn != null) {
-        btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
-        if (allowed) {
-            btn.setOnClickListener(v -> {
-                // 🎬 حركة صغيرة عند الضغط
-                v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100)
-                        .withEndAction(() -> {
-                            v.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
-                            dialog.dismiss();
-                            loadFragment(fragment, tag);
-                        }).start();
+                        child.animate()
+                                .alpha(1f)
+                                .scaleX(1f)
+                                .scaleY(1f)
+                                .translationY(0f)
+                                .setStartDelay(120 + (i * 45L))
+                                .setDuration(400)
+                                .setInterpolator(new OvershootInterpolator(1.4f))
+                                .start();
+                    }
+                }
             });
+
+            dialog.setOnDismissListener(d -> {
+                if (root != null) {
+                    root.animate()
+                            .alpha(0f)
+                            .translationY(80f)
+                            .setDuration(200)
+                            .setInterpolator(new AccelerateInterpolator())
+                            .start();
+                }
+            });
+
+            dialog.show();
+
+        } catch (Exception e) {
+            Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
         }
     }
-}
 
-// ==================== 🔒 وضع الجرد المحصّن (API عام) ====================
-
-/**
- * 🆕 تفعيل وضع الجرد المحصّن
- * تُستدعى من Fragment عند بدء الجرد
- */
-public void enterInventoryLockMode() {
-    if (inventoryLockManager != null) {
-        inventoryLockManager.lock();
+    private void bindQuickAction(View root, int viewId, BottomSheetDialog dialog,
+                                  boolean allowed, Fragment fragment, String tag) {
+        View btn = root.findViewById(viewId);
+        if (btn != null) {
+            btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
+            if (allowed) {
+                btn.setOnClickListener(v -> {
+                    v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100)
+                            .withEndAction(() -> {
+                                v.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
+                                dialog.dismiss();
+                                loadFragment(fragment, tag);
+                            }).start();
+                });
+            }
+        }
     }
-}
 
-/**
- * 🆕 إلغاء وضع الجرد المحصّن
- * تُستدعى من Fragment عند إيقاف الجرد
- */
-public void exitInventoryLockMode() {
-    if (inventoryLockManager != null) {
-        inventoryLockManager.unlock();
+    // ==================== 🔒 وضع الجرد المحصّن ====================
+
+    public void enterInventoryLockMode() {
+        if (inventoryLockManager != null) {
+            inventoryLockManager.lock();
+        }
     }
-}
 
-/**
- * هل وضع القفل نشط حالياً؟
- */
-public boolean isInventoryLocked() {
-    return inventoryLockManager != null && inventoryLockManager.isLocked();
-}
+    public void exitInventoryLockMode() {
+        if (inventoryLockManager != null) {
+            inventoryLockManager.unlock();
+        }
+    }
+
+    public boolean isInventoryLocked() {
+        return inventoryLockManager != null && inventoryLockManager.isLocked();
+    }
     
     // ==================== حالة الجرد ====================
 
@@ -1764,73 +1782,72 @@ public boolean isInventoryLocked() {
     }
 
     private void handleBackNavigation() {
-    clearActiveListeners();
-    
-    if (getSupportFragmentManager() != null) {
-        // 1. إغلاق الحوارات إن وجدت
-        for (Fragment fragment : getSupportFragmentManager().getFragments()) {
-            if (fragment instanceof androidx.fragment.app.DialogFragment) {
-                androidx.fragment.app.DialogFragment dialogFragment = 
-                        (androidx.fragment.app.DialogFragment) fragment;
-                if (dialogFragment.getDialog() != null && dialogFragment.getDialog().isShowing()) {
-                    dialogFragment.dismissAllowingStateLoss();
-                    return;
-                }
-            }
-        }
-
-        // 2. الرجوع في الـ BackStack
-        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-            getSupportFragmentManager().popBackStackImmediate();
-            Fragment topFragment = navigationManager.getTopFragment();
-            
-            if (topFragment != null) {
-                String tag = topFragment.getTag();
-                if (tag != null && !permissionManager.canAccessFragment(tag)) {
-                    navigationManager.clearBackStack();
-                    loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-                    return;
-                }
-                
-                // إظهار الـ Fragment المستعاد
-                if (topFragment.isHidden()) {
-                    getSupportFragmentManager().beginTransaction()
-                            .show(topFragment)
-                            .commitAllowingStateLoss();
-                }
-                
-                // إخفاء الآخرين
-                for (Fragment f : getSupportFragmentManager().getFragments()) {
-                    if (f != null && f != topFragment && f.isAdded() && !f.isHidden()) {
-                        getSupportFragmentManager().beginTransaction()
-                                .hide(f)
-                                .commitAllowingStateLoss();
+        clearActiveListeners();
+        
+        if (getSupportFragmentManager() != null) {
+            // 1. إغلاق الحوارات إن وجدت
+            for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+                if (fragment instanceof androidx.fragment.app.DialogFragment) {
+                    androidx.fragment.app.DialogFragment dialogFragment = 
+                            (androidx.fragment.app.DialogFragment) fragment;
+                    if (dialogFragment.getDialog() != null && dialogFragment.getDialog().isShowing()) {
+                        dialogFragment.dismissAllowingStateLoss();
+                        return;
                     }
                 }
-                
-                currentFragment = topFragment;
-                if (tag != null) {
-                    currentFragmentTag = tag;
-                    saveFragmentTagToPrefs(tag);
-                    updateSecondaryToolbarVisibility(tag);
-                    refreshSecondaryToolbar(findViewById(R.id.secondaryToolbar));
-                }
             }
+
+            // 2. الرجوع في الـ BackStack
+            if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                getSupportFragmentManager().popBackStackImmediate();
+                Fragment topFragment = navigationManager.getTopFragment();
+                
+                if (topFragment != null) {
+                    String tag = topFragment.getTag();
+                    if (tag != null && !permissionManager.canAccessFragment(tag)) {
+                        navigationManager.clearBackStack();
+                        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+                        return;
+                    }
+                    
+                    // إظهار الـ Fragment المستعاد
+                    if (topFragment.isHidden()) {
+                        getSupportFragmentManager().beginTransaction()
+                                .show(topFragment)
+                                .commitAllowingStateLoss();
+                    }
+                    
+                    // إخفاء الآخرين
+                    for (Fragment f : getSupportFragmentManager().getFragments()) {
+                        if (f != null && f != topFragment && f.isAdded() && !f.isHidden()) {
+                            getSupportFragmentManager().beginTransaction()
+                                    .hide(f)
+                                    .commitAllowingStateLoss();
+                        }
+                    }
+                    
+                    currentFragment = topFragment;
+                    if (tag != null) {
+                        currentFragmentTag = tag;
+                        saveFragmentTagToPrefs(tag);
+                        updateSecondaryToolbarVisibility(tag);
+                        refreshSecondaryToolbar(tag);
+                    }
+                }
+                return;
+            }
+        }
+
+        // 3. إذا لم يكن هناك BackStack، عد للـ Dashboard
+        if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
+            navigationManager.clearBackStack();
+            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
             return;
         }
-    }
 
-    // 3. إذا لم يكن هناك BackStack، عد للـ Dashboard
-    if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
-        navigationManager.clearBackStack();
-        loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-        return;
+        // 4. الخروج المزدوج
+        handleDoubleBackToExit();
     }
-
-    // 4. الخروج المزدوج
-    handleDoubleBackToExit();
-}
-    
 
     private void handleDoubleBackToExit() {
         long currentTime = System.currentTimeMillis();
@@ -1916,16 +1933,16 @@ public boolean isInventoryLocked() {
 
     // ==================== تنظيف ====================
 
-
-@Override
-protected void onDestroy() {
-    try {
-        stopActiveInventory(); // إيقاف المسح أولاً قبل تفكيك العتاد
-        
-        if (notificationManager != null) notificationManager.cleanup();
-        if (soundManager != null) soundManager.cleanup();
-        if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
-        if (hardwareManager != null) hardwareManager.cleanup();
+    @Override
+    protected void onDestroy() {
+        try {
+            stopActiveInventory();
+            
+            if (notificationManager != null) notificationManager.cleanup();
+            if (soundManager != null) soundManager.cleanup();
+            if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
+            if (hardwareManager != null) hardwareManager.cleanup();
+            
             AppWatchdog.getInstance().stopMonitoring();
             hideLoading();
             stopActiveInventory();
@@ -1935,13 +1952,12 @@ protected void onDestroy() {
             }
 
             if (orgProfileManager != null) {
-            orgProfileManager.removeListener(orgProfileListener);
+                orgProfileManager.removeListener(orgProfileListener);
             }
 
-            
             if (inventoryLockManager != null) {
-            inventoryLockManager.cleanup();
-            inventoryLockManager = null;
+                inventoryLockManager.cleanup();
+                inventoryLockManager = null;
             }
 
             SessionMonitorManager.getInstance(this).stopMonitoring();
@@ -1961,34 +1977,31 @@ protected void onDestroy() {
     }
 
     /**
- * ✅ تنظيف ذكي — يُنفَّذ فقط عند الحاجة الفعلية
- */
-private void cleanupOldFragments() {
-    try {
-        FragmentManager fm = getSupportFragmentManager();
+     * ✅ تنظيف ذكي — يُنفَّذ فقط عند الحاجة الفعلية
+     */
+    private void cleanupOldFragments() {
+        try {
+            FragmentManager fm = getSupportFragmentManager();
 
-        // ✅ إذا كان هناك حالة محفوظة → لا تحذف
-        // (هذا يعني أن النظام يحاول استعادة الحالة — لا تعطله)
-        if (fm.getFragments().isEmpty() 
-                && fm.getBackStackEntryCount() == 0) {
-            Log.d(TAG, "cleanupOldFragments: nothing to clean");
-            return;
+            if (fm.getFragments().isEmpty() 
+                    && fm.getBackStackEntryCount() == 0) {
+                Log.d(TAG, "cleanupOldFragments: nothing to clean");
+                return;
+            }
+
+            if (fm.getBackStackEntryCount() > 0) {
+                fm.popBackStackImmediate(
+                        null,
+                        FragmentManager.POP_BACK_STACK_INCLUSIVE
+                );
+            }
+
+            Log.d(TAG, "cleanupOldFragments: back stack cleared");
+
+        } catch (Exception e) {
+            Log.e(TAG, "cleanupOldFragments error: " + e.getMessage(), e);
         }
-
-        // ✅ فقط امسح الـ back stack — لا تحذف الـ fragments
-        if (fm.getBackStackEntryCount() > 0) {
-            fm.popBackStackImmediate(
-                    null,
-                    FragmentManager.POP_BACK_STACK_INCLUSIVE
-            );
-        }
-
-        Log.d(TAG, "cleanupOldFragments: back stack cleared");
-
-    } catch (Exception e) {
-        Log.e(TAG, "cleanupOldFragments error: " + e.getMessage(), e);
     }
-}
 
     // ==================== التفاعل مع الكيبورد ====================
 
@@ -2015,4 +2028,4 @@ private void cleanupOldFragments() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-                    }
+}
