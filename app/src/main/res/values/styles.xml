@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:android="http://schemas.android.com/apk/res/android">
+<resources xmlns:android="http://schemas.android.com/schemas/android">
 
     <!-- ==================== أشكال الحواف الفاخرة ==================== -->
     <style name="CircleImageView">
@@ -29,14 +29,16 @@
         <item name="android:popupBackground">@drawable/bg_custom_popup_menu</item>
         <item name="android:itemIconDisabledAlpha">0.5</item>
     </style>
-    <style name="TransparentBottomSheetDialog" parent="Theme.Design.Light.BottomSheetDialog">
-    <item name="android:windowIsTranslucent">true</item>
-    <item name="android:windowBackground">@android:color/transparent</item>
-</style>
+
+    <!-- ✅ تم التعديل للتوارث من Material3 -->
+    <style name="TransparentBottomSheetDialog" parent="Theme.Material3.DayNight.BottomSheetDialog">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
 
     <!-- ==================== Bottom Navigation (MD3 Floating Luxury) ==================== -->
 
-    <!-- ✅ Active Indicator (Pill Shape) - تصميم الحبة الذهبية الشفافة -->
+    <!-- ✅ Active Indicator (Pill Shape) -->
     <style name="CustomActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">#25D9A736</item> <!-- ذهبي شفاف 15% -->
         <item name="android:width">56dp</item>
@@ -45,66 +47,69 @@
         <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
     </style>
 
-    <!-- ✅ نمط Bottom Navigation الرئيسي (الذي كان مفقوداً) -->
-<style name="AppBottomNavigationViewStyle" parent="Widget.Material3.BottomNavigationView">
-    <item name="itemActiveIndicatorStyle">@style/CustomActiveIndicator</item>
-    <item name="itemRippleColor">@color/nav_ripple_color</item>
-    <item name="elevation">16dp</item>
-    <item name="itemIconSize">26dp</item>
-    <item name="itemTextAppearanceActive">@style/NavItemTextActive</item>
-    <item name="itemTextAppearanceInactive">@style/NavItemTextInactive</item>
-    <item name="labelVisibilityMode">labeled</item>
-</style>
-<!-- ✅ أنماط قائمة الإجراءات السريعة الفاخرة -->
-<style name="LuxuryQuickActionItem">
-    <item name="android:layout_width">0dp</item>
-    <item name="android:layout_height">wrap_content</item>
-    <item name="android:layout_columnWeight">1</item>
-    <item name="android:layout_margin">6dp</item>
-    <item name="android:orientation">vertical</item>
-    <item name="android:gravity">center</item>
-    <item name="android:clickable">true</item>
-    <item name="android:focusable">true</item>
-    <item name="android:paddingTop">8dp</item>
-    <item name="android:paddingBottom">8dp</item>
-    <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
-</style>
+    <!-- ✅ نمط Bottom Navigation الرئيسي -->
+    <style name="AppBottomNavigationViewStyle" parent="Widget.Material3.BottomNavigationView">
+        <item name="itemActiveIndicatorStyle">@style/CustomActiveIndicator</item>
+        <item name="itemRippleColor">@color/nav_ripple_color</item>
+        <item name="elevation">16dp</item>
+        <item name="itemIconSize">26dp</item>
+        <item name="itemTextAppearanceActive">@style/NavItemTextActive</item>
+        <item name="itemTextAppearanceInactive">@style/NavItemTextInactive</item>
+        <item name="labelVisibilityMode">labeled</item>
+    </style>
 
-<style name="LuxuryQuickActionIcon">
-    <item name="android:layout_width">48dp</item>
-    <item name="android:layout_height">48dp</item>
-    <item name="android:padding">12dp</item>
-    <item name="android:background">@drawable/bg_luxury_quick_action_icon</item>
-</style>
+    <!-- ✅ أنماط قائمة الإجراءات السريعة الفاخرة -->
+    <style name="LuxuryQuickActionItem">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:layout_margin">6dp</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+    </style>
 
-<style name="LuxuryQuickActionText">
-    <item name="android:layout_width">wrap_content</item>
-    <item name="android:layout_height">wrap_content</item>
-    <item name="android:layout_marginTop">6dp</item>
-    <item name="android:textSize">11sp</item>
-    <item name="android:textColor">?attr/colorOnSurface</item>
-    <item name="android:textStyle">bold</item>
-    <item name="android:fontFamily">@font/cairo</item>
-</style>
+    <style name="LuxuryQuickActionIcon">
+        <item name="android:layout_width">48dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:background">@drawable/bg_luxury_quick_action_icon</item>
+    </style>
 
-<!-- ✅ نمط BottomSheet فاخر مع خلفية شفافة -->
-<style name="LuxuryBottomSheetDialog" parent="Theme.Design.Light.BottomSheetDialog">
-    <item name="android:windowIsFloating">false</item>
-    <item name="android:windowIsTranslucent">true</item>
-    <item name="android:windowBackground">@android:color/transparent</item>
-    <item name="android:backgroundDimEnabled">true</item>
-    <item name="android:backgroundDimAmount">0.7</item>
-    <item name="bottomSheetStyle">@style/LuxuryBottomSheetStyle</item>
-    <item name="android:windowContentOverlay">@null</item>
-    <item name="android:windowNoTitle">true</item>
-</style>
+    <style name="LuxuryQuickActionText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
 
-<style name="LuxuryBottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
-    <item name="android:background">@android:color/transparent</item>
-    <item name="behavior_peekHeight">auto</item>
-    <item name="behavior_hideable">true</item>
-    <item name="behavior_draggable">true</item>
-</style>
+    <!-- ✅ تم التعديل للتوارث من Material3 -->
+    <style name="LuxuryBottomSheetDialog" parent="Theme.Material3.DayNight.BottomSheetDialog">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.7</item>
+        <item name="bottomSheetStyle">@style/LuxuryBottomSheetStyle</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- ✅ تم التعديل للتوارث من Material3 -->
+    <style name="LuxuryBottomSheetStyle" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="behavior_peekHeight">auto</item>
+        <item name="behavior_hideable">true</item>
+        <item name="behavior_draggable">true</item>
+    </style>
+
     <!-- ✅ نص العنصر النشط -->
     <style name="NavItemTextActive" parent="TextAppearance.Material3.LabelMedium">
         <item name="android:textSize">12sp</item>
@@ -147,7 +152,8 @@
         <item name="android:textStyle">bold</item>
     </style>
 
-    <style name="TabTextStyle" parent="TextAppearance.Design.Tab">
+    <!-- ✅ تم التعديل للتوارث من Material3 -->
+    <style name="TabTextStyle" parent="TextAppearance.Material3.TitleSmall">
         <item name="android:textSize">13sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:letterSpacing">0.3</item>
