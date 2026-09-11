@@ -40,7 +40,7 @@
                     android:textColor="?attr/colorOnPrimaryContainer"
                     android:textSize="15sp"
                     android:textStyle="bold"
-                    tools:text="البوعاني للذهب والمجوهرات" />
+                    tools:text="منظومة الذهب الدولية" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -52,12 +52,12 @@
                         android:id="@+id/tvSubtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:alpha="0.8"
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:textColor="?attr/colorOnPrimaryContainer"
                         android:textSize="10sp"
-                        android:alpha="0.8"
-                        tools:text="📍 الفرع الرئيسي" />
+                        tools:text="📍 Main Branch" />
 
                     <View
                         android:id="@+id/statusDot"
@@ -129,22 +129,20 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
-    <!-- تم ضبط الارتفاع تلقائياً وتوزيع الـ Elevation لتجنب اعتراض اللمسات -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
+        android:clipToPadding="false"
         android:paddingHorizontal="20dp"
-        android:paddingBottom="16dp"
-        android:clipToPadding="false">
+        android:paddingBottom="16dp">
 
-        <!-- الشريط العائم -->
+        <!-- الشريط العائم السفلي -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
             android:layout_height="64dp"
-            android:layout_marginTop="20dp"
             android:background="@drawable/bg_floating_bottom_nav_with_shadow"
             app:elevation="4dp"
             app:itemBackground="@null"
@@ -161,12 +159,13 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- الـ FAB العائم متمركز فوق الشريط تماماً بدون حجزه لمحيط اللمس -->
+        <!-- زر الإضافة العائم FAB بأيقونة الجوهرة وارتفاع مريح -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="56dp"
             android:layout_height="56dp"
-            android:src="@drawable/ic_add"
+            android:layout_marginBottom="18dp"
+            android:src="@drawable/ic_diamond"
             app:backgroundTint="?attr/colorPrimary"
             app:borderWidth="0dp"
             app:elevation="10dp"
@@ -175,7 +174,7 @@
             app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
             app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
             app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
-            app:maxImageSize="26dp"
+            app:maxImageSize="28dp"
             app:pressedTranslationZ="6dp"
             app:tint="?attr/colorOnPrimary" />
 
