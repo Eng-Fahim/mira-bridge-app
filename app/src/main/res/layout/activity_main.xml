@@ -128,12 +128,13 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
+        <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
+        android:layoutDirection="locale"
         android:clipToPadding="false"
         android:paddingHorizontal="20dp"
         android:paddingBottom="16dp">
@@ -143,6 +144,7 @@
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
             android:layout_height="64dp"
+            android:layoutDirection="locale"
             android:background="@drawable/bg_floating_bottom_nav_with_shadow"
             app:elevation="4dp"
             app:itemBackground="@null"
@@ -158,6 +160,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
+
 
         <!-- زر الإضافة العائم FAB بأيقونة الجوهرة وارتفاع مريح -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
