@@ -46,21 +46,21 @@
     
     <color name="nav_bar_background">#161618</color>
     <color name="nav_item_selected">#D4AF37</color>
-    <color name="nav_item_unselected">#CBD5E1</color> <!-- 👈 تحسين التباين -->
+    <color name="nav_item_unselected">#CBD5E1</color>
     
     <color name="action_sheet_bg">#12141A</color>
     <color name="action_sheet_card_bg">#1C2029</color>
     <color name="action_sheet_text_primary">#FFFFFF</color>
-    <color name="action_sheet_text_secondary">#CBD5E1</color> <!-- 👈 تحسين التباين -->
+    <color name="action_sheet_text_secondary">#CBD5E1</color>
     <color name="action_sheet_divider">#272C38</color>
     <color name="listitem_black">#FFFFFF</color>
-    <color name="listitem_gray">#CBD5E1</color> <!-- 👈 تحسين التباين -->
+    <color name="listitem_gray">#CBD5E1</color>
 
     <color name="deep_gray">#E0E0E0</color>
     <color name="text_gray">#999999</color>
     <color name="red_qian">#FF8A80</color>
 
-    <!-- ==================== القائمة الجانبية (Sliding Menu) ==================== -->
+    <!-- ==================== القائمة الجانبية ==================== -->
     <color name="sliding_menu_back">#FF1C1C1E</color>
     <color name="sliding_menu_title_text_color">#FF999999</color>
     <color name="sliding_menu_item_text_color">#FFB1B1B1</color>
@@ -68,7 +68,7 @@
     <color name="sliding_menu_item_pressed">#FF39393B</color>
     <color name="sliding_menu_item">#00000000</color>
 
-    <!-- ==================== ألوان ZXing والمسح الضوئي ==================== -->
+    <!-- ==================== ألوان ZXing ==================== -->
     <color name="contents_text">#FFFFFFFF</color>
     <color name="encode_view">#FF000000</color>
     <color name="help_button_view">#FF333333</color>
@@ -92,14 +92,14 @@
     <color name="viewfinder_laser">#FF4444</color>
     <color name="viewfinder_mask">#60000000</color>
     <color name="primary">#D4AF37</color>
-    <color name="on_surface_variant">#CBD5E1</color> <!-- 👈 تحسين التباين -->
+    <color name="on_surface_variant">#CBD5E1</color>
     <color name="outline">#2D2D32</color>
 
-    <!-- ==================== ألوان لوحة التحكم (Dashboard) ==================== -->
+    <!-- ==================== ألوان الداشبورد ==================== -->
     <color name="primary_text">#FFFFFFFF</color>
     <color name="primary_text_variant">#FFE0E0E0</color>
     
-    <color name="text_secondary">#FFCBD5E1</color> <!-- 👈 تحسين التباين -->
+    <color name="text_secondary">#FFCBD5E1</color>
     <color name="text_secondary_variant">#FFA0AEC0</color>
 
     <color name="background_dark">#FF0B0B0C</color>
@@ -121,5 +121,39 @@
 
     <color name="karat_text">#FFE0E0E0</color>
     <color name="karat_text_empty">#FF6B6B6B</color>
+
+    <!-- ═══════════════════════════════════════════════════
+         Material 3 Colors (Dark) — Aliases
+         ═══════════════════════════════════════════════════ -->
+    
+    <!-- 🔑 الأساسية -->
+    <color name="colorOnSurface">#FFFFFFFF</color>
+    <color name="colorSurface">#FF161618</color>
+    <color name="colorPrimary">#D4AF37</color>
+    <color name="colorOnPrimary">#FF1A1A1A</color>
+    <color name="colorSurfaceVariant">#FF1E1E22</color>
+    <color name="colorOnSurfaceVariant">#FFCBD5E1</color>
+    <color name="colorOutline">#FF2D2D32</color>
+    <color name="colorOutlineVariant">#FF38383D</color>
+    
+    <!-- ✅ Aliases مستخدمة في الكود -->
+    <color name="on_surface">@color/colorOnSurface</color>
+    <color name="on_surface_variant_alias">@color/colorOnSurfaceVariant</color>
+    <color name="primary_alias">@color/colorPrimary</color>
+    <color name="surface_alias">@color/colorSurface</color>
+    <color name="on_primary_alias">@color/colorOnPrimary</color>
+    <color name="surface_variant_alias">@color/colorSurfaceVariant</color>
+    <color name="outline_alias">@color/colorOutline</color>
+    <color name="outline_variant_alias">@color/colorOutlineVariant</color>
+    
+    <!-- ✅ ألوان إضافية للتصميم الجديد -->
+    <color name="bg_main">#FF0B0B0C</color>
+    <color name="bg_card">#FF161618</color>
+    <color name="accent">#D4AF37</color>
+    <color name="accent_light">#E6C158</color>
+    <color name="accent_dark">#9E8033</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_light">#FFFFFFFF</color>
+    <color name="text_muted">#FFCBD5E1</color>
 
 </resources>
