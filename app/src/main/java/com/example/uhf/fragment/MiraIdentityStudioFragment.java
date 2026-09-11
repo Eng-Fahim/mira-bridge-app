@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.Manifest;
+import androidx.fragment.app.FragmentManager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -100,7 +101,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private MiraOrgProfileManager orgProfile;
     private MiraPriceManager priceManager;
     private PermissionManager permissionManager;
-
+    
+    private Runnable onResumeRunnable;
     // ✅ المديرون
     private IdentityFormManager formManager;
     private IdentityPhotoManager photoManager;
@@ -133,43 +135,45 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
 
-        try {
-            initializeComponents();
-            isArabic = Locale.getDefault().getLanguage().equals("ar");
-            setupPhotoLaunchers();
-            applyLanguage();
-            setupPhotosRecyclerView();
+    try {
+        initializeComponents();
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        setupPhotoLaunchers();
+        applyLanguage();
+        setupPhotosRecyclerView();
 
-            // تأجيل المهام الخفيفة
-            view.postDelayed(() -> {
-                if (!isAdded()) return;
+        // ✅ استخدام post بدون تأخير صناعي
+        view.post(() -> {
+            if (!isAdded() || binding == null) return;
 
-                try {
-                    setupListeners();
-                    applyPermissions();
+            try {
+                setupListeners();
+                applyPermissions();
 
-                    if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-                    }
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+                }
 
+                if (miraExecutor != null && miraExecutor.isHealthy()) {
                     miraExecutor.getSingleThreadExecutor().execute(() -> {
                         restoreDraftIfExists();
                         safeRun(this::updatePendingSyncBadge);
                     });
-
-                    Log.d(TAG, "✅ IdentityStudio initialization complete");
-                } catch (Exception e) {
-                    Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
                 }
-            }, 100);
 
-        } catch (Exception e) {
-            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
-        }
+                Log.d(TAG, "✅ IdentityStudio initialization complete");
+            } catch (Exception e) {
+                Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
+            }
+        });
+
+    } catch (Exception e) {
+        Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
     }
+}
 
     private void initializeComponents() {
         if (getContext() != null) {
@@ -192,55 +196,177 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     // ==================== إدارة النموذج ====================
 
     private void restoreDraftIfExists() {
-        boolean restored = formManager.restoreDraft(new IdentityFormManager.FormData() {
-            @Override public String getEpc() { return binding.etEpc.getText().toString(); }
-            @Override public String getTitle() { return binding.etTitle.getText().toString(); }
-            @Override public String getGrossWeight() { return binding.etGrossWeight.getText().toString(); }
-            @Override public boolean isHasStones() { return binding.switchHasStones.isChecked(); }
-            @Override public String getStoneType() { return binding.etStoneType.getText().toString(); }
-            @Override public String getStoneWeight() { return binding.etStoneWeight.getText().toString(); }
-            @Override public String getStoneCount() { return binding.etStoneCount.getText().toString(); }
-            @Override public String getStoneValue() { return binding.etStoneValue.getText().toString(); }
-            @Override public void setEpc(String value) { binding.etEpc.setText(value); }
-            @Override public void setTitle(String value) { binding.etTitle.setText(value); }
-            @Override public void setGrossWeight(String value) { binding.etGrossWeight.setText(value); }
-            @Override public void setStoneType(String value) { binding.etStoneType.setText(value); }
-            @Override public void setStoneWeight(String value) { binding.etStoneWeight.setText(value); }
-            @Override public void setStoneCount(String value) { binding.etStoneCount.setText(value); }
-            @Override public void setStoneValue(String value) { binding.etStoneValue.setText(value); }
-            @Override public void setHasStones(boolean value) { binding.switchHasStones.setChecked(value); }
-        }, photoManager.getPhotoPaths());
-
-        if (restored) {
-            safeRun(() -> {
-                showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
-                onPhotosUpdated();
-            });
-        }
+    // ✅ فحص أولي: لا نُكمل إذا كان binding أو formManager غير جاهز
+    if (binding == null || formManager == null) {
+        Log.w(TAG, "restoreDraftIfExists skipped: binding or formManager is null");
+        return;
     }
+
+    boolean restored;
+    try {
+        restored = formManager.restoreDraft(new IdentityFormManager.FormData() {
+
+            // ==================== Getters ====================
+
+            @Override
+            public String getEpc() {
+                return (binding != null && binding.etEpc != null)
+                        ? binding.etEpc.getText().toString()
+                        : "";
+            }
+
+            @Override
+            public String getTitle() {
+                return (binding != null && binding.etTitle != null)
+                        ? binding.etTitle.getText().toString()
+                        : "";
+            }
+
+            @Override
+            public String getGrossWeight() {
+                return (binding != null && binding.etGrossWeight != null)
+                        ? binding.etGrossWeight.getText().toString()
+                        : "";
+            }
+
+            @Override
+            public boolean isHasStones() {
+                return binding != null
+                        && binding.switchHasStones != null
+                        && binding.switchHasStones.isChecked();
+            }
+
+            @Override
+            public String getStoneType() {
+                return (binding != null && binding.etStoneType != null)
+                        ? binding.etStoneType.getText().toString()
+                        : "";
+            }
+
+            @Override
+            public String getStoneWeight() {
+                return (binding != null && binding.etStoneWeight != null)
+                        ? binding.etStoneWeight.getText().toString()
+                        : "";
+            }
+
+            @Override
+            public String getStoneCount() {
+                return (binding != null && binding.etStoneCount != null)
+                        ? binding.etStoneCount.getText().toString()
+                        : "";
+            }
+
+            @Override
+            public String getStoneValue() {
+                return (binding != null && binding.etStoneValue != null)
+                        ? binding.etStoneValue.getText().toString()
+                        : "";
+            }
+
+            // ==================== Setters ====================
+
+            @Override
+            public void setEpc(String value) {
+                if (binding != null && binding.etEpc != null && value != null) {
+                    binding.etEpc.setText(value);
+                }
+            }
+
+            @Override
+            public void setTitle(String value) {
+                if (binding != null && binding.etTitle != null && value != null) {
+                    binding.etTitle.setText(value);
+                }
+            }
+
+            @Override
+            public void setGrossWeight(String value) {
+                if (binding != null && binding.etGrossWeight != null && value != null) {
+                    binding.etGrossWeight.setText(value);
+                }
+            }
+
+            @Override
+            public void setStoneType(String value) {
+                if (binding != null && binding.etStoneType != null && value != null) {
+                    binding.etStoneType.setText(value);
+                }
+            }
+
+            @Override
+            public void setStoneWeight(String value) {
+                if (binding != null && binding.etStoneWeight != null && value != null) {
+                    binding.etStoneWeight.setText(value);
+                }
+            }
+
+            @Override
+            public void setStoneCount(String value) {
+                if (binding != null && binding.etStoneCount != null && value != null) {
+                    binding.etStoneCount.setText(value);
+                }
+            }
+
+            @Override
+            public void setStoneValue(String value) {
+                if (binding != null && binding.etStoneValue != null && value != null) {
+                    binding.etStoneValue.setText(value);
+                }
+            }
+
+            @Override
+            public void setHasStones(boolean value) {
+                if (binding != null && binding.switchHasStones != null) {
+                    binding.switchHasStones.setChecked(value);
+                }
+            }
+        }, photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
+
+    } catch (Exception e) {
+        Log.e(TAG, "restoreDraftIfExists error: " + e.getMessage(), e);
+        return;
+    }
+
+    // ==================== تطبيق النتيجة ====================
+
+    if (restored) {
+        safeRun(() -> {
+            if (!isAdded() || binding == null) return;
+            showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
+            onPhotosUpdated();
+        });
+    }
+}
 
     private void saveCurrentDraftAsync() {
-        if (formManager == null || binding == null) return;
+    final FragmentMiraIdentityStudioBinding b = binding;   // ← احتفظ بمرجع محلي
+    if (formManager == null || b == null) return;
 
-        formManager.saveDraft(new IdentityFormManager.FormData() {
-            @Override public String getEpc() { return binding.etEpc.getText().toString(); }
-            @Override public String getTitle() { return binding.etTitle.getText().toString(); }
-            @Override public String getGrossWeight() { return binding.etGrossWeight.getText().toString(); }
-            @Override public boolean isHasStones() { return binding.switchHasStones.isChecked(); }
-            @Override public String getStoneType() { return binding.etStoneType.getText().toString(); }
-            @Override public String getStoneWeight() { return binding.etStoneWeight.getText().toString(); }
-            @Override public String getStoneCount() { return binding.etStoneCount.getText().toString(); }
-            @Override public String getStoneValue() { return binding.etStoneValue.getText().toString(); }
-            @Override public void setEpc(String value) { }
-            @Override public void setTitle(String value) { }
-            @Override public void setGrossWeight(String value) { }
-            @Override public void setStoneType(String value) { }
-            @Override public void setStoneWeight(String value) { }
-            @Override public void setStoneCount(String value) { }
-            @Override public void setStoneValue(String value) { }
-            @Override public void setHasStones(boolean value) { }
-        }, photoManager.getPhotoPaths());
-    }
+    formManager.saveDraft(new IdentityFormManager.FormData() {
+        @Override public String getEpc() { return safeGet(b.etEpc); }
+        @Override public String getTitle() { return safeGet(b.etTitle); }
+        @Override public String getGrossWeight() { return safeGet(b.etGrossWeight); }
+        @Override public boolean isHasStones() { return b.switchHasStones != null && b.switchHasStones.isChecked(); }
+        @Override public String getStoneType() { return safeGet(b.etStoneType); }
+        @Override public String getStoneWeight() { return safeGet(b.etStoneWeight); }
+        @Override public String getStoneCount() { return safeGet(b.etStoneCount); }
+        @Override public String getStoneValue() { return safeGet(b.etStoneValue); }
+        // setters: فارغة لأنها read-only
+        @Override public void setEpc(String v) {}
+        @Override public void setTitle(String v) {}
+        @Override public void setGrossWeight(String v) {}
+        @Override public void setStoneType(String v) {}
+        @Override public void setStoneWeight(String v) {}
+        @Override public void setStoneCount(String v) {}
+        @Override public void setStoneValue(String v) {}
+        @Override public void setHasStones(boolean v) {}
+    }, photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
+}
+
+private String safeGet(android.widget.TextView tv) {
+    return tv != null && tv.getText() != null ? tv.getText().toString() : "";
+}
 
     // ==================== إدارة الصور ====================
 
@@ -788,24 +914,33 @@ private void openBarcodeScannerForEPC() {
     try {
         if (!isAdded()) return;
 
+        FragmentManager fm = getParentFragmentManager();
+        if (fm.isStateSaved()) return;
+
         MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
         sf.setOnBarcodeScannedListener((data, format) -> {
             if (binding != null && binding.etEpc != null) {
                 binding.etEpc.setText(data);
                 binding.tvStatusBadge.setText("BOUND");
             }
-            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
-                getParentFragmentManager().popBackStack();
+            if (fm.getBackStackEntryCount() > 0) {
+                fm.popBackStack();
             }
         });
 
         View view = getView();
-        int cid = (view != null && view.getParent() instanceof View) ? 
-                ((View) view.getParent()).getId() : android.R.id.content;
-        getParentFragmentManager().beginTransaction()
-                .replace(cid, sf)
+        int cid = (view != null && view.getParent() instanceof View)
+                ? ((View) view.getParent()).getId()
+                : android.R.id.content;
+
+        fm.beginTransaction()
+                .setCustomAnimations(
+                        android.R.anim.fade_in, android.R.anim.fade_out,
+                        android.R.anim.fade_in, android.R.anim.fade_out)
+                .add(cid, sf, "barcode_scanner_tag")    // ← add
                 .addToBackStack("barcode_scanner_encode")
                 .commit();
+
     } catch (Exception e) {
         Log.e(TAG, "Barcode scanner error: " + e.getMessage(), e);
         showToast(isArabic ? "❌ خطأ في فتح الماسح" : "❌ Scanner error");
@@ -1190,26 +1325,37 @@ private void openBarcodeScannerForEPC() {
      * ✅ فتح شاشة سجل المزامنة التفاعلية
      */
     private void openSyncLogFragment() {
-        try {
-            if (!isAdded() || getActivity() == null) return;
+    try {
+        if (!isAdded() || getActivity() == null) return;
 
-            SyncLogFragment syncLogFragment = new SyncLogFragment();
-
-            View view = getView();
-            int cid = (view != null && view.getParent() instanceof View) ? 
-                    ((View) view.getParent()).getId() : android.R.id.content;
-
-            getParentFragmentManager().beginTransaction()
-                    .replace(cid, syncLogFragment)
-                    .addToBackStack("sync_log")
-                    .commit();
-
-            Log.i(TAG, "✅ Opened SyncLogFragment");
-        } catch (Exception e) {
-            Log.e(TAG, "openSyncLogFragment error: " + e.getMessage(), e);
-            showToast(isArabic ? "❌ خطأ في فتح السجل" : "❌ Error opening log");
+        FragmentManager fm = getParentFragmentManager();
+        if (fm.isStateSaved()) {
+            Log.w(TAG, "State saved, cannot commit transaction");
+            return;
         }
+
+        View view = getView();
+        int cid = (view != null && view.getParent() instanceof View)
+                ? ((View) view.getParent()).getId()
+                : android.R.id.content;
+
+        SyncLogFragment syncLogFragment = new SyncLogFragment();
+
+        fm.beginTransaction()
+                .setCustomAnimations(
+                        android.R.anim.fade_in, android.R.anim.fade_out,
+                        android.R.anim.fade_in, android.R.anim.fade_out)
+                .add(cid, syncLogFragment, "sync_log_tag")    // ← add
+                .addToBackStack("sync_log")
+                .commit();
+
+        Log.i(TAG, "✅ Opened SyncLogFragment");
+
+    } catch (Exception e) {
+        Log.e(TAG, "openSyncLogFragment error: " + e.getMessage(), e);
+        showToast(isArabic ? "❌ خطأ في فتح السجل" : "❌ Error opening log");
     }
+}
 
     /**
      * ✅ جدولة مزامنة تلقائية بعد حفظ Offline
@@ -1676,42 +1822,50 @@ private void openBarcodeScannerForEPC() {
 
     // ==================== دورة الحياة ====================
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (getView() != null) {
-            getView().postDelayed(() -> {
-                if (!isAdded()) return;
-                try {
-                    if (priceManager != null) {
-                        priceManager.refreshNow();
-                        handler.postDelayed(() -> {
-                            if (isAdded() && binding != null) calculateEstimatedGoldValue();
-                        }, 300);
-                    }
+    
 
-                    if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-                    }
-                    
-                    // ✅ مزامنة تلقائية عند العودة
-                    scheduleAutoSync();
-                } catch (Exception e) {
-                    Log.e(TAG, "onResume error: " + e.getMessage(), e);
-                }
-            }, 150);
-        }
-    }
+@Override
+public void onResume() {
+    super.onResume();
+    View v = getView();
+    if (v == null) return;
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        stopRfidScanningMode();
-        saveCurrentDraftAsync();
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
+    onResumeRunnable = () -> {
+        if (!isAdded() || binding == null) return;
+        try {
+            if (priceManager != null) {
+                priceManager.refreshNow();
+                // ✅ لا داعي للتأخير 300ms — refreshNow() يجب أن يعمل بشكل متزامن أو مع callback
+                calculateEstimatedGoldValue();
+            }
+
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+            }
+
+            scheduleAutoSync();
+        } catch (Exception e) {
+            Log.e(TAG, "onResume runnable error: " + e.getMessage(), e);
         }
+    };
+    v.post(onResumeRunnable);
+}
+
+@Override
+public void onPause() {
+    super.onPause();
+    // ✅ إلغاء المهمة المعلّقة
+    View v = getView();
+    if (v != null && onResumeRunnable != null) {
+        v.removeCallbacks(onResumeRunnable);
+        onResumeRunnable = null;
     }
+    stopRfidScanningMode();
+    saveCurrentDraftAsync();
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
+    }
+}
 
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
@@ -1722,18 +1876,34 @@ private void openBarcodeScannerForEPC() {
     }
 
     @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        stopRfidScanningMode();
+public void onDestroyView() {
+    // 1) إيقاف RFID
+    stopRfidScanningMode();
 
-        // ✅ لا نُغلق MiraExecutorService — إنه على مستوى التطبيق
-        // فقط نلغي الـ handler callbacks الخاصة بهذا Fragment
-
-        if (handler != null) {
-            handler.removeCallbacksAndMessages(null);
-        }
-        
-        binding = null;
+    // 2) إزالة callbacks
+    if (handler != null) {
+        handler.removeCallbacksAndMessages(null);
     }
+
+    // 3) فصل مرجع النشاط
+    if (getActivity() instanceof UHFMainActivity) {
+        try {
+            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to clear active encoding fragment", e);
+        }
+    }
+
+    // 4) تنظيف RecyclerView
+    if (binding != null && binding.rvPhotosPreview != null) {
+        binding.rvPhotosPreview.setAdapter(null);
+    }
+
+    // 5) إلغاء binding
+    binding = null;
+
+    // 6) أخيراً super
+    super.onDestroyView();
+}
 
 } // ✅ نهاية الكلاس MiraIdentityStudioFragment
