@@ -6,7 +6,6 @@
     android:id="@+id/coordinatorLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layoutDirection="rtl"
     tools:context=".activity.UHFMainActivity">
 
     <!-- ==================== 1. TOOLBAR / APP BAR ==================== -->
@@ -14,14 +13,13 @@
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
-        app:elevation="4dp">
+        android:background="?attr/colorPrimaryContainer"
+        app:elevation="2dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
             android:paddingHorizontal="8dp"
             app:contentInsetStartWithNavigation="0dp"
             app:menu="@menu/main_menu">
@@ -29,8 +27,8 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:orientation="vertical"
                 android:gravity="center_vertical"
+                android:orientation="vertical"
                 android:paddingEnd="8dp">
 
                 <TextView
@@ -39,7 +37,7 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:textColor="@color/white"
+                    android:textColor="?attr/colorOnPrimaryContainer"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:text="البوعاني للذهب والمجوهرات" />
@@ -56,8 +54,9 @@
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="#E0E0E0"
+                        android:textColor="?attr/colorOnPrimaryContainer"
                         android:textSize="10sp"
+                        android:alpha="0.8"
                         tools:text="📍 الفرع الرئيسي" />
 
                     <View
@@ -73,7 +72,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="4dp"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?attr/colorOnPrimaryContainer"
                         android:textSize="9sp"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -86,7 +85,7 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:background="?attr/colorSurface"
-            app:elevation="4dp"
+            app:elevation="2dp"
             app:menu="@menu/secondary_menu" />
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -97,13 +96,12 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- حاوي الشاشات مع Padding سفلي 120dp لضمان حرية حركة الشريط العائم -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:paddingBottom="120dp"
             android:clipToPadding="false"
+            android:paddingBottom="90dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -114,39 +112,42 @@
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#80000000"
+            android:alpha="0.5"
+            android:background="?attr/colorOnSurface"
             android:clickable="true"
             android:focusable="true"
             android:visibility="gone">
 
-            <ProgressBar
+            <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center" />
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                app:indicatorColor="?attr/colorPrimary" />
         </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
-    <FrameLayout
+    <!-- تم ضبط الارتفاع تلقائياً وتوزيع الـ Elevation لتجنب اعتراض اللمسات -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="20dp"
+        android:paddingHorizontal="20dp"
+        android:paddingBottom="16dp"
         android:clipToPadding="false">
 
         <!-- الشريط العائم -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="64dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="20dp"
             android:background="@drawable/bg_floating_bottom_nav_with_shadow"
+            app:elevation="4dp"
             app:itemBackground="@null"
-            app:elevation="0dp"
             app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
             app:itemIconSize="24dp"
             app:itemIconTint="@color/nav_item_color_selector"
@@ -155,23 +156,29 @@
             app:itemTextAppearanceInactive="@style/NavItemTextInactive"
             app:itemTextColor="@color/nav_item_color_selector"
             app:labelVisibilityMode="labeled"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- ✅ الـ FAB الآن طافٍ بشكل كامل فوق الشريط، متمركز في المنتصف -->
+        <!-- الـ FAB العائم متمركز فوق الشريط تماماً بدون حجزه لمحيط اللمس -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="56dp"
             android:layout_height="56dp"
-            android:layout_gravity="center_horizontal|top"
             android:src="@drawable/ic_add"
             app:backgroundTint="?attr/colorPrimary"
-            app:tint="@color/white"
-            app:maxImageSize="26dp"
-            app:fabSize="normal"
             app:borderWidth="0dp"
-            app:elevation="12dp"
-            app:pressedTranslationZ="6dp" />
+            app:elevation="10dp"
+            app:fabSize="normal"
+            app:layout_constraintBottom_toTopOf="@id/bottomNavigationView"
+            app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
+            app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
+            app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
+            app:maxImageSize="26dp"
+            app:pressedTranslationZ="6dp"
+            app:tint="?attr/colorOnPrimary" />
 
-    </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
