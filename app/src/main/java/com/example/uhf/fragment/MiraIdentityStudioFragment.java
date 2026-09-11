@@ -47,7 +47,7 @@ import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.adapter.PhotosAdapter;
 import com.example.uhf.utils.BarcodeGenerator;
-import com.example.uhf.utils.MiraExecutorService;   // 🆕
+import com.example.uhf.utils.MiraExecutorService;
 import com.example.uhf.utils.PricingCalculator;
 import com.example.uhf.utils.TagPrinter;
 import com.example.uhf.MiraRfid.MiraRfidService;
@@ -65,13 +65,18 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 /**
- * MiraIdentityStudioFragment - نسخة نظيفة ومنظمة
+ * MiraIdentityStudioFragment - الإصدار الاحترافي 3.0
+ * 
+ * ✅ الميزات:
+ * - MiraExecutorService (مدير خيوط على مستوى التطبيق)
+ * - IdentitySyncManager الاحترافي (CRUD كامل + Retry + Backoff)
+ * - الربط مع SyncLogFragment (شاشة سجل تفاعلية)
+ * - إدارة كاملة للصور والنموذج
+ * - مزامنة تلقائية ويدوية
  * 
  * ✅ الفصل بين المسؤوليات:
  * - IdentityFormManager: إدارة النموذج والمسودة
@@ -81,7 +86,8 @@ import java.util.Map;
  * - BarcodeGenerator: توليد الباركود
  * - PricingCalculator: حساب الأسعار
  * - TagPrinter: طباعة الملصقات
- * - MiraExecutorService: مدير الخيوط المشترك (Application-level)
+ * - MiraExecutorService: مدير الخيوط المشترك
+ * - SyncLogFragment: عرض سجل المزامنة التفاعلي
  */
 public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
@@ -95,13 +101,13 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private MiraPriceManager priceManager;
     private PermissionManager permissionManager;
 
-    // ✅ المديرون الجدد
+    // ✅ المديرون
     private IdentityFormManager formManager;
     private IdentityPhotoManager photoManager;
     private IdentitySyncManager syncManager;
     private PhotosAdapter photosAdapter;
 
-    // ✅ 🆕 استبدال executorService بـ miraExecutor
+    // ✅ مدير الخيوط المشترك
     private MiraExecutorService miraExecutor;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -115,6 +121,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private Uri photoUri;
     private String currentPhotoPath;
+
+    // ==================== Lifecycle ====================
 
     @Nullable
     @Override
@@ -143,15 +151,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     setupListeners();
                     applyPermissions();
 
-                    if (savedInstanceState != null) {
-                        // استعادة الحالة
-                    }
-
                     if (getActivity() instanceof UHFMainActivity) {
                         ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
                     }
 
-                    // 🆕 استخدام المدير المشترك
                     miraExecutor.getSingleThreadExecutor().execute(() -> {
                         restoreDraftIfExists();
                         safeRun(this::updatePendingSyncBadge);
@@ -176,7 +179,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             priceManager = MiraPriceManager.getInstance(getContext());
             permissionManager = PermissionManager.getInstance(getContext());
 
-            // 🆕 استخدام MiraExecutorService المشترك
+            // ✅ مدير الخيوط المشترك
             miraExecutor = MiraExecutorService.getInstance();
 
             formManager = new IdentityFormManager(getContext());
@@ -272,7 +275,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 new ActivityResultContracts.TakePicture(),
                 success -> {
                     if (success) {
-                        // 🆕 استخدام imageExecutor
                         miraExecutor.getImageExecutor().execute(() -> {
                             photoManager.compressAndAddPhoto(currentPhotoPath);
                             safeRun(this::onPhotosUpdated);
@@ -285,7 +287,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 new ActivityResultContracts.OpenMultipleDocuments(),
                 uris -> {
                     if (uris != null && !uris.isEmpty()) {
-                        // 🆕 استخدام imageExecutor
                         miraExecutor.getImageExecutor().execute(() -> {
                             for (Uri uri : uris) {
                                 photoManager.copyAndAddPhoto(uri);
@@ -412,7 +413,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== [يتبع في المرحلة 2] ====================
     
-    
 // ==================== المستمعون ====================
 
 private void setupListeners() {
@@ -518,7 +518,8 @@ private void setupListeners() {
             }
         });
 
-        binding.btnViewPending.setOnClickListener(v -> showPendingItemsDialog());
+        // ✅ ربط زر "عرض الطلبات المحفوظة" بشاشة سجل المزامنة الجديدة
+        binding.btnViewPending.setOnClickListener(v -> openSyncLogFragment());
 
     } catch (Exception e) {
         Log.e(TAG, "setupListeners error: " + e.getMessage(), e);
@@ -572,7 +573,6 @@ private void activateRFIDModeForEncoding() {
                 final String normalizedEpc = epc != null ? 
                         epc.trim().toUpperCase(Locale.US) : "";
 
-                // 🆕 استخدام backgroundExecutor
                 miraExecutor.getBackgroundExecutor().execute(() -> {
                     boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedEpc);
                     safeRun(() -> {
@@ -636,7 +636,6 @@ public void onRfidScanned(String epc) {
     if (!isAdded() || getActivity() == null) return;
     final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
 
-    // 🆕 استخدام backgroundExecutor
     miraExecutor.getBackgroundExecutor().execute(() -> {
         boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedEpc);
         safeRun(() -> {
@@ -814,6 +813,7 @@ private void openBarcodeScannerForEPC() {
 
 // ==================== [يتبع في المرحلة 3] ====================
 
+
     // ==================== الحفظ والتكويد ====================
 
     private void finalizeItemIdentity() {
@@ -922,7 +922,7 @@ private void openBarcodeScannerForEPC() {
             final String tid = rfidService.readTid("00000000");
             final boolean isSim = rfidService.isSimulationMode();
 
-            // 🆕 استخدام backgroundExecutor للمعالجة الثقيلة
+            // ✅ استخدام backgroundExecutor للمعالجة الثقيلة
             miraExecutor.getBackgroundExecutor().execute(() -> {
                 try {
                     JSONObject payload = buildPayload(
@@ -973,11 +973,11 @@ private void openBarcodeScannerForEPC() {
                         if (success) {
                             playSuccessSound();
                             
-                            // 🆕 إزالة المسودة بعد النجاح
+                            // ✅ إزالة المسودة بعد النجاح
                             miraExecutor.getSingleThreadExecutor().execute(() -> 
                                     syncManager.removePendingEncode(finalEpc));
                             
-                            // 🆕 مسح المسودة المحفوظة
+                            // ✅ مسح المسودة المحفوظة
                             if (formManager != null) {
                                 formManager.clearDraft();
                             }
@@ -1017,7 +1017,7 @@ private void openBarcodeScannerForEPC() {
                             );
 
                         } else if (networkError) {
-                            // 🆕 حفظ Offline مع مزامنة احترافية
+                            // ✅ حفظ Offline مع مزامنة احترافية
                             miraExecutor.getSingleThreadExecutor().execute(() -> {
                                 syncManager.saveEncodeOffline(payload);
                                 safeRun(this::updatePendingSyncBadge);
@@ -1026,7 +1026,7 @@ private void openBarcodeScannerForEPC() {
                             showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : 
                                                "💾 Saved locally (Offline)");
                             
-                            // 🆕 محاولة مزامنة تلقائية في الخلفية
+                            // ✅ محاولة مزامنة تلقائية
                             scheduleAutoSync();
                             
                             unlockFormFast();
@@ -1183,16 +1183,41 @@ private void openBarcodeScannerForEPC() {
         return payload;
     }
 
-    // ==================== 🆕 المزامنة الاحترافية ====================
+    // ==================== ✅ المزامنة الاحترافية ====================
 
     /**
-     * 🆕 جدولة مزامنة تلقائية بعد حفظ Offline
+     * ✅ فتح شاشة سجل المزامنة التفاعلية
+     */
+    private void openSyncLogFragment() {
+        try {
+            if (!isAdded() || getActivity() == null) return;
+
+            SyncLogFragment syncLogFragment = new SyncLogFragment();
+
+            View view = getView();
+            int cid = (view != null && view.getParent() instanceof View) ? 
+                    ((View) view.getParent()).getId() : android.R.id.content;
+
+            getParentFragmentManager().beginTransaction()
+                    .replace(cid, syncLogFragment)
+                    .addToBackStack("sync_log")
+                    .commit();
+
+            Log.i(TAG, "✅ Opened SyncLogFragment");
+        } catch (Exception e) {
+            Log.e(TAG, "openSyncLogFragment error: " + e.getMessage(), e);
+            showToast(isArabic ? "❌ خطأ في فتح السجل" : "❌ Error opening log");
+        }
+    }
+
+    /**
+     * ✅ جدولة مزامنة تلقائية بعد حفظ Offline
      */
     private void scheduleAutoSync() {
         try {
             if (syncManager == null) return;
             
-            // جدولة المزامنة بعد 3 ثوانٍ (فرصة لاستقرار الشبكة)
+            // جدولة المزامنة بعد 3 ثوانٍ
             handler.postDelayed(this::performAutoSync, 3000);
             
             Log.d(TAG, "🔄 Auto-sync scheduled in 3s");
@@ -1202,7 +1227,7 @@ private void openBarcodeScannerForEPC() {
     }
 
     /**
-     * 🆕 تنفيذ المزامنة التلقائية
+     * ✅ تنفيذ المزامنة التلقائية
      */
     private void performAutoSync() {
         try {
@@ -1219,7 +1244,6 @@ private void openBarcodeScannerForEPC() {
             int branchId = (branchesManager != null) ? 
                     branchesManager.getActiveBranchId() : 1;
             
-            // 🆕 استخدام networkExecutor للمزامنة
             miraExecutor.getNetworkExecutor().execute(() -> {
                 syncManager.syncPendingEncodes(branchId, new IdentitySyncManager.SyncCallback() {
                     @Override
@@ -1234,6 +1258,8 @@ private void openBarcodeScannerForEPC() {
                                             "✅ تمت مزامنة " + syncedCount + " تكويد" : 
                                             "✅ Synced " + syncedCount + " encodings");
                                 }
+                                
+                                notifyDashboardUpdate("sync_complete");
                             }
                         });
                     }
@@ -1241,7 +1267,6 @@ private void openBarcodeScannerForEPC() {
                     @Override
                     public void onSyncError(String error) {
                         Log.w(TAG, "⚠️ Auto-sync failed: " + error);
-                        // لا نُظهر رسالة خطأ للمستخدم — المزامنة ستُعاد لاحقاً
                     }
                 });
             });
@@ -1250,83 +1275,9 @@ private void openBarcodeScannerForEPC() {
         }
     }
 
-    private void showPendingItemsDialog() {
-        if (syncManager == null || !isAdded() || getContext() == null) return;
-
-        // 🆕 استخدام singleThreadExecutor لقراءة القائمة
-        miraExecutor.getSingleThreadExecutor().execute(() -> {
-            try {
-                int pendingCount = syncManager.getPendingCount();
-
-                safeRun(() -> {
-                    if (!isAdded() || getContext() == null) return;
-                    if (pendingCount == 0) {
-                        showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
-                        return;
-                    }
-
-                    new MaterialAlertDialogBuilder(requireContext())
-                            .setTitle(isArabic ? "العناصر المخزنة محلياً" : 
-                                                "Offline Stored Items")
-                            .setMessage(isArabic ? 
-                                    "لديك " + pendingCount + " عنصر بانتظار المزامنة\n\n" +
-                                    "سيتم المزامنة تلقائياً عند عودة الاتصال" : 
-                                    "You have " + pendingCount + " items waiting for sync\n\n" +
-                                    "Will sync automatically when connection returns")
-                            .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", 
-                                    (d, w) -> performManualSync())
-                            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                            .show();
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
-            }
-        });
-    }
-
     /**
-     * 🆕 المزامنة اليدوية
+     * ✅ تحديث شارة المزامنة
      */
-    private void performManualSync() {
-        if (syncManager == null) return;
-        
-        int branchId = (branchesManager != null) ? 
-                branchesManager.getActiveBranchId() : 1;
-        
-        showToast(isArabic ? "🔄 جاري المزامنة..." : "🔄 Syncing...");
-        
-        // 🆕 استخدام networkExecutor
-        miraExecutor.getNetworkExecutor().execute(() -> {
-            syncManager.syncPendingEncodes(branchId, new IdentitySyncManager.SyncCallback() {
-                @Override
-                public void onSyncComplete(int syncedCount) {
-                    safeRun(() -> {
-                        if (syncedCount > 0) {
-                            showToast(isArabic ? 
-                                    "✅ تمت مزامنة " + syncedCount + " تكويد" : 
-                                    "✅ Synced " + syncedCount + " encodings");
-                            updatePendingSyncBadge();
-                            
-                            // 🆕 تحديث Dashboard بعد المزامنة
-                            notifyDashboardUpdate("sync_complete");
-                        } else {
-                            showToast(isArabic ? "لا توجد عناصر للمزامنة" : 
-                                               "No items to sync");
-                        }
-                    });
-                }
-
-                @Override
-                public void onSyncError(String error) {
-                    safeRun(() -> {
-                        showToast(isArabic ? "❌ فشل المزامنة: " + error : 
-                                            "❌ Sync failed: " + error);
-                    });
-                }
-            });
-        });
-    }
-
     private void updatePendingSyncBadge() {
         try {
             if (syncManager == null || binding == null) return;
@@ -1352,7 +1303,6 @@ private void openBarcodeScannerForEPC() {
     private void uploadItemImages(int itemId, List<String> imagePaths) {
         if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0 || apiClient == null) return;
 
-        // 🆕 استخدام imageExecutor
         miraExecutor.getImageExecutor().execute(() -> {
             int uploaded = 0;
             for (String path : imagePaths) {
@@ -1413,7 +1363,6 @@ private void openBarcodeScannerForEPC() {
             tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice) + " " + currency);
         }
 
-        // 🆕 استخدام imageExecutor لتوليد الباركود
         miraExecutor.getImageExecutor().execute(() -> {
             Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty()) ? 
                     BarcodeGenerator.generateGS1DataMatrix(gs1Code, 250, 250) : null;
@@ -1527,7 +1476,7 @@ private void openBarcodeScannerForEPC() {
             binding.etTitle.setHint("عنوان ووصف القطعة");
             binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
             binding.btnAddPhotos.setText("📷 إرفاق صور القطعة");
-            binding.btnViewPending.setText("📦 عرض الطلبات المحفوظة محلياً");
+            binding.btnViewPending.setText("📦 عرض سجل المزامنة");
             updatePhotosCountText();
             calculateEstimatedGoldValue();
         } catch (Exception e) {
@@ -1544,7 +1493,7 @@ private void openBarcodeScannerForEPC() {
             binding.etTitle.setHint("Item Title & Description");
             binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
             binding.btnAddPhotos.setText("📷 Attach Photos");
-            binding.btnViewPending.setText("📦 View Offline Pending Items");
+            binding.btnViewPending.setText("📦 View Sync Log");
             updatePhotosCountText();
             calculateEstimatedGoldValue();
         } catch (Exception e) {
@@ -1744,7 +1693,7 @@ private void openBarcodeScannerForEPC() {
                         ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
                     }
                     
-                    // 🆕 محاولة مزامنة تلقائية عند العودة
+                    // ✅ مزامنة تلقائية عند العودة
                     scheduleAutoSync();
                 } catch (Exception e) {
                     Log.e(TAG, "onResume error: " + e.getMessage(), e);
@@ -1776,7 +1725,7 @@ private void openBarcodeScannerForEPC() {
         super.onDestroyView();
         stopRfidScanningMode();
 
-        // 🆕 لا نُغلق MiraExecutorService — إنه على مستوى التطبيق
+        // ✅ لا نُغلق MiraExecutorService — إنه على مستوى التطبيق
         // فقط نلغي الـ handler callbacks الخاصة بهذا Fragment
 
         if (handler != null) {
@@ -1785,4 +1734,5 @@ private void openBarcodeScannerForEPC() {
         
         binding = null;
     }
+
 } // ✅ نهاية الكلاس MiraIdentityStudioFragment
