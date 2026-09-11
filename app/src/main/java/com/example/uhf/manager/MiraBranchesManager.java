@@ -29,7 +29,39 @@ public class MiraBranchesManager {
     private final SharedPreferences prefs;
     private final Context context;
     private MiraApiClient apiClient; // ✅ إضافة المتغير
+    
+    // في أعلى الكلاس — أضف:
+private final List<OnBranchChangedListener> listeners = new ArrayList<>();
 
+public interface OnBranchChangedListener {
+    void onBranchChanged();
+}
+
+public void addListener(OnBranchChangedListener listener) {
+    if (listener != null && !listeners.contains(listener)) {
+        listeners.add(listener);
+    }
+}
+
+public void removeListener(OnBranchChangedListener listener) {
+    listeners.remove(listener);
+}
+
+public void notifyListeners() {
+    // ✅ تنفيذ على الـ main thread
+    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+        List<OnBranchChangedListener> copy = new ArrayList<>(listeners);
+        for (OnBranchChangedListener l : copy) {
+            if (l != null) {
+                try {
+                    l.onBranchChanged();
+                } catch (Exception e) {
+                    Log.e(TAG, "Listener error: " + e.getMessage());
+                }
+            }
+        }
+    });
+}
     private MiraBranchesManager(Context context) {
         this.context = context.getApplicationContext();
         prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -44,17 +76,20 @@ public class MiraBranchesManager {
     }
 
     public void setActiveBranch(int branchId, String branchName, String branchCode,
-                                String branchType, String city) {
-        prefs.edit()
-            .putInt(KEY_ACTIVE_BRANCH_ID, branchId)
-            .putString(KEY_ACTIVE_BRANCH_NAME, branchName)
-            .putString(KEY_ACTIVE_BRANCH_CODE, branchCode)
-            .putString(KEY_ACTIVE_BRANCH_TYPE, branchType)
-            .putString(KEY_ACTIVE_BRANCH_CITY, city)
-            .apply();
-        
-        Log.d(TAG, "✅ Active branch saved: ID=" + branchId + ", Name=" + branchName);
-    }
+                            String branchType, String city) {
+    prefs.edit()
+        .putInt(KEY_ACTIVE_BRANCH_ID, branchId)
+        .putString(KEY_ACTIVE_BRANCH_NAME, branchName)
+        .putString(KEY_ACTIVE_BRANCH_CODE, branchCode)
+        .putString(KEY_ACTIVE_BRANCH_TYPE, branchType)
+        .putString(KEY_ACTIVE_BRANCH_CITY, city)
+        .apply();
+    
+    Log.d(TAG, "✅ Active branch saved: ID=" + branchId + ", Name=" + branchName);
+    
+    // ✅ إشعار المستمعين
+    notifyListeners();
+}
     
     // في MiraBranchesManager.java - أضف هذه الدالة
 
@@ -74,6 +109,7 @@ public void saveBranchesFromServer(JSONObject data) {
         }
         
         SharedPreferences.Editor editor = prefs.edit();
+        int currentActiveId = getActiveBranchId();   // ← احصل على الفرع النشط الحالي
         
         // حفظ قائمة الفروع كاملة
         editor.putString("branches_list", branches.toString());
@@ -83,10 +119,15 @@ public void saveBranchesFromServer(JSONObject data) {
             try {
                 JSONObject branch = branches.getJSONObject(i);
                 int branchId = branch.optInt("id", branch.optInt("branch_id", 0));
-                String branchName = branch.optString("name", branch.optString("branch_name", ""));
-                String branchCode = branch.optString("code", branch.optString("branch_code", ""));
+                String branchName = branch.optString("branch_name_ar",
+                                    branch.optString("name",
+                                    branch.optString("branch_name", "")));
+                String branchCode = branch.optString("branch_code",
+                                    branch.optString("code", ""));
                 String branchAddress = branch.optString("address", "");
                 String branchPhone = branch.optString("phone", "");
+                String branchCity = branch.optString("city", "");
+                String branchType = branch.optString("branch_type", "main");
                 
                 if (branchId > 0) {
                     editor.putInt("branch_id_" + branchId, branchId);
@@ -94,14 +135,29 @@ public void saveBranchesFromServer(JSONObject data) {
                     editor.putString("branch_code_" + branchId, branchCode);
                     editor.putString("branch_address_" + branchId, branchAddress);
                     editor.putString("branch_phone_" + branchId, branchPhone);
+                    
+                    // ✅ إذا كان هذا الفرع هو النشط → حدّث بياناته
+                    if (branchId == currentActiveId && !branchName.isEmpty()) {
+                        editor.putString(KEY_ACTIVE_BRANCH_NAME, branchName);
+                        if (!branchCode.isEmpty()) editor.putString(KEY_ACTIVE_BRANCH_CODE, branchCode);
+                        if (!branchCity.isEmpty()) editor.putString(KEY_ACTIVE_BRANCH_CITY, branchCity);
+                        if (!branchType.isEmpty()) editor.putString(KEY_ACTIVE_BRANCH_TYPE, branchType);
+                        
+                        Log.d(TAG, "✅ Active branch refreshed: " + branchName);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Parse branch error: " + e.getMessage());
             }
         }
         
+        editor.putLong(KEY_BRANCHES_LAST_SYNC, System.currentTimeMillis());
         editor.apply();
+        
         Log.i(TAG, "✅ Branches saved: " + branches.length());
+        
+        // ✅ إشعار المستمعين (لأن الفرع النشط قد يكون تغيّر)
+        notifyListeners();
         
     } catch (Exception e) {
         Log.e(TAG, "Save branches error: " + e.getMessage());
@@ -226,6 +282,71 @@ public void saveBranchesFromServer(JSONObject data) {
         }
         return branches;
     }
+
+/**
+ * ✅ تحديث الفرع النشط من استجابة السيرفر
+ * تُستدعى من MiraOrgProfileManager بعد مزامنة /profile/get
+ */
+public void updateActiveBranchFromServer(int branchId, String branchName) {
+    if (branchId <= 0 || branchName == null || branchName.isEmpty()) return;
+    
+    try {
+        prefs.edit()
+            .putInt(KEY_ACTIVE_BRANCH_ID, branchId)
+            .putString(KEY_ACTIVE_BRANCH_NAME, branchName)
+            .apply();
+        
+        Log.i(TAG, "✅ Active branch updated: ID=" + branchId + ", Name=" + branchName);
+    } catch (Exception e) {
+        Log.e(TAG, "updateActiveBranchFromServer error: " + e.getMessage());
+    }
+}
+/**
+ * ✅ مزامنة كاملة للفروع من السيرفر
+ * تستدعي /profile/get لاستخراج معلومات الفرع النشط
+ * وتستدعي /branches لجلب قائمة الفروع كاملة
+ */
+/**
+ * ✅ مزامنة قائمة الفروع من السيرفر
+ * ⚠️ ملاحظة: الفرع النشط يُحدَّث تلقائياً من MiraOrgProfileManager.saveUserBranchInfo
+ */
+public void syncFromServer(SyncCallback callback) {
+    if (apiClient == null) {
+        apiClient = MiraApiClient.getInstance(context);
+    }
+    if (apiClient == null) {
+        if (callback != null) callback.onError("apiClient not available");
+        return;
+    }
+    
+    new Thread(() -> {
+        try {
+            // ✅ فقط جلب قائمة الفروع — لا تكرر /profile/get
+            MiraApiClient.ApiResponse branchesResponse = apiClient.getBranches();
+            
+            if (branchesResponse != null && branchesResponse.isSuccess && branchesResponse.data != null) {
+                saveBranchesFromServer(branchesResponse.data);
+                Log.i(TAG, "✅ Branches list synced");
+            } else {
+                String err = branchesResponse != null ? branchesResponse.error : "Unknown";
+                Log.w(TAG, "⚠️ Branches sync failed: " + err);
+            }
+            
+            if (callback != null) callback.onSuccess();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "syncFromServer error: " + e.getMessage(), e);
+            if (callback != null) callback.onError(e.getMessage());
+        }
+    }).start();
+}
+/**
+ * ✅ واجهة رد النداء
+ */
+public interface SyncCallback {
+    void onSuccess();
+    void onError(String error);
+}
 
     /**
      * ✅ كلاس معلومات الفرع
