@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- 📶 قوة الإشارة (Custom View - نشط) -->
+    <item
+        android:id="@+id/action_inventory_power"
+        android:title="@string/menu_power"
+        app:actionLayout="@layout/action_device_status"
+        app:showAsAction="always" />
+
+    <!-- 🔍 البحث في الممسوحات -->
+    <item
+        android:id="@+id/action_inventory_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/menu_search"
+        app:iconTint="?attr/colorOnSurface"
+        app:showAsAction="always" />
+
+    <!-- 📊 إحصائيات مباشرة -->
+    <item
+        android:id="@+id/action_inventory_stats"
+        android:icon="@drawable/ic_stats"
+        android:title="@string/menu_live_stats"
+        app:iconTint="?attr/colorOnSurface"
+        app:showAsAction="ifRoom" />
+
+    <!-- ⚙️ إعدادات الجلسة -->
+    <item
+        android:id="@+id/action_inventory_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/menu_session_settings"
+        app:iconTint="?attr/colorOnSurface"
+        app:showAsAction="ifRoom" />
+
+</menu>
