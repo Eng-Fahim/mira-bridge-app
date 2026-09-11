@@ -742,18 +742,19 @@ private void performConnectionTest() {
 
     // ==================== التنقل ====================
 
-   public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    showLoading();
-    navigationManager.loadFragment(fragment, tag, addToBackStack);
-    currentFragment = navigationManager.getCurrentFragment();
-    currentFragmentTag = tag;
-    updateBottomNavSelectionByTag(tag);
-    mainHandler.postDelayed(this::hideLoading, 250);  // ✅ mainHandler بدل mainHandlerThread
-    
-    // 🆕 تحديث القائمة الثانوية
-    refreshSecondaryToolbar(findViewById(R.id.secondaryToolbar));
+   // ==================== التنقل ====================
+
+/**
+ * 🆕 نسخة loadFragment بمعاملين فقط
+ * (تُستخدم addToBackStack = true افتراضياً)
+ */
+public void loadFragment(Fragment fragment, String tag) {
+    loadFragment(fragment, tag, true);
 }
 
+/**
+ * نسخة loadFragment بثلاث معاملات
+ */
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
     showLoading();
     navigationManager.loadFragment(fragment, tag, addToBackStack);
