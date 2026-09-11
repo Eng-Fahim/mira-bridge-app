@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
@@ -14,36 +15,36 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="14dp">
+        android:paddingVertical="12dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="👥 إدارة المستخدمين والصلاحيات"
             android:textColor="?attr/colorOnPrimary"
             android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            tools:text="👥 إدارة المستخدمين والصلاحيات" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAddUser"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="wrap_content"
-            android:layout_height="38dp"
-            android:backgroundTint="@android:color/white"
-            android:text="+ إضافة مستخدم"
+            android:layout_height="40dp"
             android:textColor="?attr/colorPrimary"
             android:textSize="12sp"
             android:textStyle="bold"
-            app:cornerRadius="8dp" />
+            app:cornerRadius="8dp"
+            tools:text="+ إضافة مستخدم" />
     </LinearLayout>
 
     <!-- ملخص سريع -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceContainerLow"
         android:orientation="horizontal"
-        android:padding="12dp"
-        android:background="?attr/colorSurfaceVariant">
+        android:padding="12dp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -56,23 +57,22 @@
                 android:id="@+id/tvTotalUsers"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="0" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="مستخدم"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                tools:text="مستخدم" />
         </LinearLayout>
 
-        <View
+        <com.google.android.material.divider.MaterialDivider
             android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:background="?attr/colorOutline" />
+            android:layout_height="match_parent" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -85,23 +85,22 @@
                 android:id="@+id/tvActiveUsers"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#22C55E"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textColor="?attr/colorTertiary"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="0" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="نشط"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                tools:text="نشط" />
         </LinearLayout>
 
-        <View
+        <com.google.android.material.divider.MaterialDivider
             android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:background="?attr/colorOutline" />
+            android:layout_height="match_parent" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -114,23 +113,22 @@
                 android:id="@+id/tvOnlineNow"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#3B82F6"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textColor="?attr/colorPrimary"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="0" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="متصل الآن"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                tools:text="متصل الآن" />
         </LinearLayout>
 
-        <View
+        <com.google.android.material.divider.MaterialDivider
             android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:background="?attr/colorOutline" />
+            android:layout_height="match_parent" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -143,69 +141,67 @@
                 android:id="@+id/tvSuspendedUsers"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#EF4444"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textColor="?attr/colorError"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="0" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="موقوف"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                tools:text="موقوف" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- شريط الأدوات -->
+    <!-- شريط الأدوات والبحث -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="12dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:padding="12dp">
 
-        <EditText
-            android:id="@+id/etSearchUser"
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
+            android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:background="?attr/colorSurfaceVariant"
-            android:hint="بحث عن مستخدم..."
-            android:textColorHint="?attr/colorOnSurfaceVariant"
-            android:paddingHorizontal="12dp"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="13sp" />
+            android:layout_weight="1"
+            tools:hint="بحث عن مستخدم...">
 
-        <Button
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etSearchUser"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnFilter"
+            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:layout_marginEnd="4dp"
-            android:backgroundTint="?attr/colorPrimaryContainer"
-            android:text="🔍"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textSize="16sp" />
+            app:icon="@android:drawable/ic_menu_search" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnExport"
+            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:layout_marginEnd="4dp"
-            android:backgroundTint="?attr/colorPrimaryContainer"
-            android:text="📤"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textSize="16sp" />
+            app:icon="@android:drawable/ic_menu_share" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRefreshUsers"
+            style="@style/Widget.Material3.Button.IconButton.Filled"
             android:layout_width="44dp"
             android:layout_height="44dp"
-            android:backgroundTint="?attr/colorPrimary"
-            android:text="🔄"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="16sp" />
+            app:icon="@android:drawable/ic_popup_sync" />
     </LinearLayout>
 
     <!-- SwipeRefreshLayout -->
@@ -215,21 +211,18 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- حاوية القائمة والحالة الفارغة -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <!-- قائمة المستخدمين -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvUsersList"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:clipToPadding="false"
                 android:paddingHorizontal="12dp"
-                android:paddingVertical="8dp"
-                android:clipToPadding="false" />
+                android:paddingVertical="8dp" />
 
-            <!-- الحالة الفارغة -->
             <LinearLayout
                 android:id="@+id/emptyStateLayout"
                 android:layout_width="match_parent"
@@ -239,19 +232,12 @@
                 android:visibility="gone">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="👥"
-                    android:textSize="64sp" />
-
-                <TextView
                     android:id="@+id/tvEmptyState"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="لا يوجد مستخدمين"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="16sp" />
+                    android:textSize="16sp"
+                    tools:text="لا يوجد مستخدمين" />
             </LinearLayout>
         </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
