@@ -2,6 +2,7 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
@@ -23,14 +24,14 @@
                 android:id="@+id/tvReportDialogTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="نتائج التقرير المالي والجرام"
                 android:textColor="?attr/colorOnPrimaryContainer"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toStartOf="@id/btnReportClose"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                app:layout_constraintTop_toTopOf="parent"
+                tools:text="نتائج التقرير المالي والجرام" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportClose"
@@ -59,11 +60,11 @@
                 android:layout_height="38dp"
                 android:layout_weight="1"
                 android:padding="0dp"
-                android:text="من: 2026-08-01"
-                android:textSize="11sp"
                 android:textColor="?attr/colorPrimary"
+                android:textSize="11sp"
+                app:cornerRadius="8dp"
                 app:strokeColor="?attr/colorPrimary"
-                app:cornerRadius="8dp" />
+                tools:text="من: 2026-08-01" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportDateTo"
@@ -73,22 +74,22 @@
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:padding="0dp"
-                android:text="إلى: 2026-08-30"
-                android:textSize="11sp"
                 android:textColor="?attr/colorPrimary"
+                android:textSize="11sp"
+                app:cornerRadius="8dp"
                 app:strokeColor="?attr/colorPrimary"
-                app:cornerRadius="8dp" />
+                tools:text="إلى: 2026-08-30" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportApplyFilter"
                 android:layout_width="wrap_content"
                 android:layout_height="38dp"
                 android:layout_marginStart="6dp"
-                android:text="تحديث"
                 android:textColor="?attr/colorOnPrimary"
                 android:textSize="11sp"
                 app:backgroundTint="?attr/colorPrimary"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                tools:text="تحديث" />
         </LinearLayout>
 
         <!-- أزرار الإجراءات -->
@@ -105,11 +106,11 @@
                 android:layout_width="0dp"
                 android:layout_height="36dp"
                 android:layout_weight="1"
-                android:text="فلترة خيارات"
-                android:textSize="10sp"
                 android:textColor="?attr/colorOnSecondaryContainer"
+                android:textSize="10sp"
                 app:backgroundTint="?attr/colorSecondaryContainer"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                tools:text="فلترة خيارات" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportExport"
@@ -118,11 +119,11 @@
                 android:layout_height="36dp"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="تصدير Excel/PDF"
-                android:textSize="10sp"
                 android:textColor="?attr/colorOnSecondaryContainer"
+                android:textSize="10sp"
                 app:backgroundTint="?attr/colorSecondaryContainer"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                tools:text="تصدير Excel/PDF" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportPrint"
@@ -131,11 +132,11 @@
                 android:layout_height="36dp"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="طباعة"
-                android:textSize="10sp"
                 android:textColor="?attr/colorOnSecondaryContainer"
+                android:textSize="10sp"
                 app:backgroundTint="?attr/colorSecondaryContainer"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                tools:text="طباعة" />
 
         </LinearLayout>
 
@@ -146,6 +147,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="?attr/colorSurface"
+        android:fillViewport="true"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
@@ -164,7 +166,8 @@
                     android:id="@+id/ivChart"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:adjustViewBounds="true" />
+                    android:adjustViewBounds="true"
+                    android:importantForAccessibility="no" />
             </FrameLayout>
 
             <!-- البيانات -->
@@ -173,8 +176,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:clipToPadding="false"
-                android:padding="8dp"
-                android:nestedScrollingEnabled="false" />
+                android:nestedScrollingEnabled="false"
+                android:padding="8dp" />
 
         </LinearLayout>
 
@@ -185,8 +188,10 @@
         android:id="@+id/layoutLoadingContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface"
         android:alpha="0.8"
+        android:background="?attr/colorSurface"
+        android:clickable="true"
+        android:focusable="true"
         android:visibility="gone"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
@@ -194,16 +199,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant"
             app:cardCornerRadius="16dp"
-            app:cardElevation="6dp"
-            app:cardBackgroundColor="?attr/colorSurfaceVariant">
+            app:cardElevation="6dp">
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:padding="24dp"
                 android:gravity="center"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:padding="24dp">
 
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:layout_width="wrap_content"
@@ -216,9 +221,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="جاري تحليل البيانات وإعداد الجدول..."
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    tools:text="جاري تحليل البيانات وإعداد الجدول..." />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </FrameLayout>
@@ -228,34 +233,37 @@
         android:id="@+id/layoutEmptyState"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="?attr/colorSurface"
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone"
-        android:background="?attr/colorSurface"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <ImageView
             android:layout_width="80dp"
             android:layout_height="80dp"
+            android:importantForAccessibility="no"
             android:src="@android:drawable/ic_menu_info_details"
             app:tint="?attr/colorOnSurfaceVariant" />
 
         <TextView
+            android:id="@+id/tvEmptyTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="لا توجد بيانات متاحة لهذا التقرير"
             android:textColor="?attr/colorOnSurface"
             android:textSize="15sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            tools:text="لا توجد بيانات متاحة لهذا التقرير" />
 
         <TextView
+            android:id="@+id/tvEmptySubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="يرجى مراجعة نطاق التاريخ أو خيارات الفلترة"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            tools:text="يرجى مراجعة نطاق التاريخ أو خيارات الفلترة" />
 
     </LinearLayout>
 
