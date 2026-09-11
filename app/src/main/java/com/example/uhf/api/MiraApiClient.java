@@ -921,18 +921,17 @@ private NotificationModel parseNotificationFromJson(JSONObject json) {
         return getDashboardFull(0);
     }
     
-    /**
- * ✅ Checkout مع Timeout مخصص
+   /**
+ * ✅ Checkout مع Timeout طويل (60 ثانية)
+ * يستخدم لعمليات البيع التي قد تستغرق وقتاً طويلاً على السيرفر
  */
 public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
     HttpURLConnection conn = null;
     try {
-        String token = getAuthToken();
-        
-        String cleanEndpoint = "/pos/checkout".substring(1);
+        String cleanEndpoint = "pos/checkout";
         String fullUrl = apiUrl + cleanEndpoint;
-        
         URL url = new URL(fullUrl);
+        
         if (url.getProtocol().equals("https")) {
             HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
             CertificatePinningManager.applyPinning(httpsConn);
@@ -944,9 +943,9 @@ public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
         conn.setRequestMethod("POST");
         applyStandardHeaders(conn, true);
         
-        // ✅ زيادة خاصة للـ Checkout
-        conn.setConnectTimeout(15000);  
-        conn.setReadTimeout(60000);      // ← 60 ثانية!
+        // ✅ Timeout مخصص للـ Checkout
+        conn.setConnectTimeout(15000);   // 15 ثانية للاتصال
+        conn.setReadTimeout(60000);      // 60 ثانية للقراءة
         
         conn.setDoOutput(true);
         
@@ -960,11 +959,20 @@ public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
         return buildResponse(conn);
         
     } catch (java.net.SocketTimeoutException e) {
-        Log.e(TAG, "Checkout timeout after 60s");
+        Log.e(TAG, "Checkout timeout — Sale may have succeeded");
         ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
         response.isNetworkError = true;
         return response;
+    } catch (java.net.UnknownHostException e) {
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.ConnectException e) {
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true;
+        return response;
     } catch (Exception e) {
+        Log.e(TAG, "checkoutWithLongTimeout error: " + e.getMessage());
         ApiResponse response = new ApiResponse(-1, null, e.getMessage());
         response.isNetworkError = true;
         return response;
