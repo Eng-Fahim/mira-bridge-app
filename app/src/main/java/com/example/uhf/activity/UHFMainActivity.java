@@ -196,10 +196,28 @@ public interface SecondaryToolbarListener {
     }
     
     private void setupWindowInsets() {
-    ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+    View mainView = findViewById(R.id.main);
+    if (mainView == null) return;
+    
+    // ✅ حفظ الحشوة الأصلية (قبل إضافة الـ insets)
+    final int originalPaddingLeft = mainView.getPaddingLeft();
+    final int originalPaddingTop = mainView.getPaddingTop();
+    final int originalPaddingRight = mainView.getPaddingRight();
+    final int originalPaddingBottom = mainView.getPaddingBottom();
+    
+    ViewCompat.setOnApplyWindowInsetsListener(mainView, (v, insets) -> {
         Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-        v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-        return insets;
+        
+        v.setPadding(
+                originalPaddingLeft + systemBars.left,
+                originalPaddingTop + systemBars.top,
+                originalPaddingRight + systemBars.right,
+                originalPaddingBottom + systemBars.bottom
+        );
+        
+        // ✅ استهلك الـ insets — لا تمررها للأبناء
+        // هذا يمنع أي Fragment من محاولة تطبيقها مرة أخرى
+        return WindowInsetsCompat.CONSUMED;
     });
 }
 
@@ -1997,4 +2015,4 @@ private void cleanupOldFragments() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-    }
+                    }
