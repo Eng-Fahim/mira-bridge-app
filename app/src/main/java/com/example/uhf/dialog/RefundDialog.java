@@ -23,6 +23,7 @@ public class RefundDialog extends Dialog {
     public interface RefundCallback {
         void onRefundConfirm(String code, String reason);
         void onBarcodeScan();
+        void onCodeChanged(String code);
     }
 
     private EditText etRefundCode;
@@ -94,16 +95,16 @@ public class RefundDialog extends Dialog {
         });
         
         etRefundCode.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() >= 4) {
-                    // سيتم البحث من الـ Fragment
-                } else {
-                    hideRefundItemInfo();
-                }
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+        if (s.length() >= 4) {
+            // سيتم البحث من الـ Fragment   ← ❌ تعليق فقط، لا شيء يحدث!
+        } else {
+            hideRefundItemInfo();
+        }
+    }
+    @Override public void afterTextChanged(Editable s) {}
+    });
     }
 
     private void setupListeners() {
