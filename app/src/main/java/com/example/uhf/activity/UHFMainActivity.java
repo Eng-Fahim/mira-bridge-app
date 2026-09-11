@@ -754,6 +754,17 @@ private void performConnectionTest() {
     refreshSecondaryToolbar(findViewById(R.id.secondaryToolbar));
 }
 
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    showLoading();
+    navigationManager.loadFragment(fragment, tag, addToBackStack);
+    currentFragment = navigationManager.getCurrentFragment();
+    currentFragmentTag = tag;
+    updateBottomNavSelectionByTag(tag);
+    mainHandler.postDelayed(this::hideLoading, 250);
+    
+    // 🆕 تحديث القائمة الثانوية
+    refreshSecondaryToolbar(findViewById(R.id.secondaryToolbar));
+}
 
 public void loadFragmentDirectly(Fragment fragment, String tag) {
     showLoading();
