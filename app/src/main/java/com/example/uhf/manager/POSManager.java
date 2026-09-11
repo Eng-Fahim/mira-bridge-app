@@ -11,11 +11,7 @@ import com.example.uhf.model.CartItem;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 public class POSManager {
 
@@ -45,19 +41,53 @@ public class POSManager {
             JSONObject payload = createPayload(cartList, data, branchId);
             String localSaleId = saveSaleLocally(payload, data, cartList.size(), branchId);
             
-            MiraApiClient.ApiResponse response = apiClient.checkout(payload);
+            // ✅ استخدام Checkout مع Timeout طويل (60 ثانية)
+            MiraApiClient.ApiResponse response = apiClient.checkoutWithLongTimeout(payload);
+            
+            Log.d(TAG, "=== CHECKOUT RESPONSE ===");
+            Log.d(TAG, "Response code: " + (response != null ? response.code : "null"));
+            Log.d(TAG, "Is success: " + (response != null && response.isSuccess));
+            Log.d(TAG, "Is network error: " + (response != null && response.isNetworkError));
+            Log.d(TAG, "Error: " + (response != null ? response.error : "null"));
             
             if (response != null && response.isSuccess) {
+                // ✅ نجح — احذف السجل المحلي
                 removeSaleFromLocal(localSaleId, branchId);
                 callback.onSuccess(response);
-            } else if (response == null || response.isNetworkError) {
+                
+            } else if (response != null && response.isNetworkError) {
+                // ✅ تمييز بين Timeout وبين عدم الاتصال
+                String err = response.error != null ? response.error : "";
+                
+                if (err.contains("انتهت المهلة") || err.toLowerCase().contains("timeout")) {
+                    // ⏱️ Timeout — قد يكون البيع نجح على السيرفر!
+                    // ❌ لا تحفظ Offline — أبلغ المستخدم
+                    Log.w(TAG, "⚠️ CHECKOUT TIMEOUT — Sale may have succeeded server-side");
+                    callback.onError(isArabic 
+                        ? "⚠️ انتهت مهلة الاتصال — يرجى التحقق من سجل المبيعات قبل إعادة المحاولة"
+                        : "⚠️ Connection timeout — Check sales history before retrying");
+                        
+                } else {
+                    // 🌐 UnknownHost / ConnectException — لم يصل الطلب
+                    // ✅ آمن للحفظ Offline
+                    Log.i(TAG, "📴 CHECKOUT OFFLINE (network unreachable) — Sale saved locally");
+                    callback.onOfflineSuccess(localSaleId);
+                }
+                
+            } else if (response == null) {
+                // ✅ لم يصل الطلب — آمن للحفظ
+                Log.w(TAG, "⚠️ NULL RESPONSE — Saving offline");
                 callback.onOfflineSuccess(localSaleId);
+                
             } else {
-                callback.onError(response != null ? response.error : "Unknown error");
+                // ❌ السيرفر رفض الطلب (400, 500) — احذفه من المحلي
+                Log.e(TAG, "❌ SERVER REJECTED — " + response.code + ": " + response.error);
+                removeSaleFromLocal(localSaleId, branchId);
+                callback.onError(response.error != null ? response.error : "Unknown error");
             }
             
         } catch (Exception e) {
-            Log.e(TAG, "executeCheckout error: " + e.getMessage());
+            Log.e(TAG, "executeCheckout error: " + e.getMessage(), e);
             callback.onError(e.getMessage());
         }
     }
