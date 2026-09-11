@@ -529,9 +529,16 @@ public class UsersManagementFragment extends Fragment {
                     .create();
 
             if (dialog.getWindow() != null) {
-                dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
-            }
-
+    boolean isDarkMode = (getResources().getConfiguration().uiMode 
+            & android.content.res.Configuration.UI_MODE_NIGHT_MASK) 
+            == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    
+    if (isDarkMode) {
+        dialog.getWindow().setBackgroundDrawableResource(R.drawable.bg_mira_dialog_dark);
+    } else {
+        dialog.getWindow().setBackgroundDrawableResource(R.drawable.bg_mira_dialog);
+    }
+}
             // ==================== استخراج عناصر الواجهة ====================
             TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
             TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
