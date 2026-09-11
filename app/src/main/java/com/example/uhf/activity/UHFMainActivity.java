@@ -123,11 +123,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     // في تعريف المتغيرات
-    private final OrgProfileManager.OnProfileChangedListener orgProfileListener = this::updateAppTitle;
-
-    
-    
-
+    private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener = this::updateAppTitle;
 
     // ✅ إدارة RFID
     private MiraPosFragment activePOSFragment = null;
@@ -1802,4 +1798,4 @@ protected void onDestroy() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-                         }
+    }
