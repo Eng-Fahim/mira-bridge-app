@@ -1005,77 +1005,168 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void processCheckoutAndStockUpdate() {
-        try {
-            if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
-                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-                return;
-            }
-            if (cartList.isEmpty()) {
-                showToast(isArabic ? "السلة فارغة" : "Cart is empty");
-                return;
-            }
-            if (isCheckoutDialogShowing) return;
-            if (!isAdded() || getActivity() == null) return;
-            
-            UIHelper.hideKeyboard(getActivity());
-            isCheckoutDialogShowing = true;
-            
-            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
-            dialog.setCheckoutListener(data -> {
-                isCheckoutDialogShowing = false;
-                posManager.executeCheckout(cartList, data, getActiveBranchId(), new POSManager.CheckoutCallback() {
-                    @Override
-                    public void onSuccess(MiraApiClient.ApiResponse response) {
-                        safeRun(() -> {
-                            removeSoldItemsFromCache();
-                            playAlertSound(1);
-                            clearCart();
-                            lastSaleResponse = response;
-                            showReceipt(response);
-                            notifyDashboardAndInventoryUpdate("sale");
-                        });
-                    }
+    try {
+        if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
+        if (cartList.isEmpty()) {
+            showToast(isArabic ? "السلة فارغة" : "Cart is empty");
+            return;
+        }
+        if (isCheckoutDialogShowing) return;
+        if (!isAdded() || getActivity() == null) return;
+        
+        UIHelper.hideKeyboard(getActivity());
+        isCheckoutDialogShowing = true;
+        
+        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
+        
+        // ✅ المستمع 1: عند تأكيد البيع
+        dialog.setCheckoutListener(data -> {
+            isCheckoutDialogShowing = false;
+            executeCheckoutDirectly(data);
+        });
+        
+        // ✅ المستمع 2: عند إغلاق النافذة
+        dialog.setOnDismissListener(() -> {
+            isCheckoutDialogShowing = false;
+        });
+        
+        FragmentManager fm = getParentFragmentManager();
+        if (!fm.isStateSaved()) {
+            dialog.show(fm, "POSCheckoutDialog");
+        } else {
+            isCheckoutDialogShowing = false;
+        }
+        
+    } catch (Exception e) {
+        isCheckoutDialogShowing = false;
+        Log.e(TAG, "processCheckout error: " + e.getMessage());
+        showToast(isArabic ? "خطأ: " + e.getMessage() : "Error: " + e.getMessage());
+    }
+}
 
-                    @Override
-                    public void onOfflineSuccess(String saleId) {
-                        safeRun(() -> {
-                            removeSoldItemsFromCache();
-                            playAlertSound(1);
-                            clearCart();
-                            showOfflineSaleSuccess(saleId);
-                            notifyDashboardAndInventoryUpdate("offline_sale");
-                        });
-                    }
 
-                    @Override
-                    public void onError(String error) {
-                        safeRun(() -> {
-                            showRetryDialog(
-                                isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
-                                error,
-                                null
-                            );
-                        });
+/**
+ * ✅✅✅ تنفيذ البيع مباشرة - كما في النسخة القديمة العاملة
+ */
+private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
+    try {
+        if (!isAdded()) return;
+        
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+        if (loadingDialog == null) return;
+        
+        setButtonsEnabled(false);
+        
+        new Thread(() -> {
+            try {
+                Context ctx = getContext();
+                if (ctx == null) return;
+                
+                MiraApiClient client = MiraApiClient.getInstance(ctx);
+                
+                JSONObject payload = new JSONObject();
+                payload.put("action", "COMPLETE_POS_SALE");
+                payload.put("gate_id", client.getGateId());
+                payload.put("branch_id", getActiveBranchId());
+                payload.put("user_id", sessionManager.getUserId());
+                payload.put("username", sessionManager.getUsername());
+                
+                payload.put("customer_name", 
+                    data.customerName != null && !data.customerName.isEmpty() 
+                        ? data.customerName : "عميل نقدي");
+                payload.put("customer_phone", 
+                    data.customerPhone != null ? data.customerPhone : "-");
+                
+                JSONObject customer = new JSONObject();
+                customer.put("name", payload.getString("customer_name"));
+                customer.put("phone", payload.getString("customer_phone"));
+                customer.put("payment_method", data.paymentMethod);
+                payload.put("customer", customer);
+                
+                JSONArray itemsArr = new JSONArray();
+                for (CartItem item : cartList) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("epc", item.epc);
+                    obj.put("title", item.name);
+                    obj.put("karat", item.karat);
+                    obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+                    obj.put("price_usd", item.price);
+                    obj.put("item_id", item.itemId);
+                    obj.put("serial_no", item.serialNo);
+                    itemsArr.put(obj);
+                }
+                payload.put("items", itemsArr);
+                
+                JSONObject payment = new JSONObject();
+                payment.put("subtotal_usd", data.originalTotal);
+                payment.put("discount_amount_usd", data.discountAmount);
+                payment.put("final_amount_usd", data.finalAmount);
+                payment.put("currency_code", "YER");
+                payment.put("payment_method", data.paymentMethod);
+                payload.put("payment", payment);
+                
+                // ✅ طباعة التشخيص
+                Log.e("POS_DEBUG", "🚨 SENDING CHECKOUT");
+                Log.e("POS_DEBUG", "URL: " + client.getApiUrl() + "pos/checkout");
+                Log.e("POS_DEBUG", "Gate ID: " + client.getGateId());
+                Log.e("POS_DEBUG", "Payload: " + payload.toString());
+                
+                MiraApiClient.ApiResponse response = client.checkout(payload);
+                
+                Log.e("POS_DEBUG", "🚨 RESPONSE: code=" + (response != null ? response.code : "null") 
+                    + ", success=" + (response != null && response.isSuccess)
+                    + ", networkError=" + (response != null && response.isNetworkError)
+                    + ", error=" + (response != null ? response.error : "null"));
+                
+                final MiraApiClient.ApiResponse finalResponse = response;
+                
+                safeRun(() -> {
+                    if (loadingDialog != null && loadingDialog.isShowing()) {
+                        loadingDialog.dismiss();
+                    }
+                    setButtonsEnabled(true);
+                    
+                    if (finalResponse != null && finalResponse.isSuccess) {
+                        // ✅ نجاح
+                        playAlertSound(1);
+                        clearCart();
+                        showReceipt(finalResponse);
+                        notifyDashboardAndInventoryUpdate("sale");
+                        showToast(isArabic ? "✅ تم البيع بنجاح" : "✅ Sale Successful");
+                        
+                    } else if (finalResponse != null && finalResponse.isNetworkError) {
+                        // ✅ Offline
+                        playAlertSound(1);
+                        clearCart();
+                        showToast(isArabic ? "✅ تم البيع (أوفلاين)" : "✅ Sale (Offline)");
+                        
+                    } else {
+                        // ❌ فشل
+                        String errorMsg = finalResponse != null && finalResponse.error != null 
+                            ? finalResponse.error : "Unknown error";
+                        showToast(isArabic ? "❌ فشل البيع: " + errorMsg : "❌ Failed: " + errorMsg);
                     }
                 });
-            });
-            dialog.setOnDismissListener(() -> {
-                isCheckoutDialogShowing = false;
-            });
-            
-            FragmentManager fm = getParentFragmentManager();
-            if (!fm.isStateSaved()) {
-                dialog.show(fm, "POSCheckoutDialog");
-            } else {
-                isCheckoutDialogShowing = false;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "executeCheckoutDirectly error: " + e.getMessage(), e);
+                safeRun(() -> {
+                    if (loadingDialog != null && loadingDialog.isShowing()) {
+                        loadingDialog.dismiss();
+                    }
+                    setButtonsEnabled(true);
+                    showToast(isArabic ? "❌ خطأ: " + e.getMessage() : "❌ Error: " + e.getMessage());
+                });
             }
-        } catch (Exception e) {
-            isCheckoutDialogShowing = false;
-            Log.e(TAG, "processCheckout error: " + e.getMessage());
-            showToast(isArabic ? "خطأ: " + e.getMessage() : "Error: " + e.getMessage());
-        }
+        }).start();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "executeCheckoutDirectly error: " + e.getMessage());
     }
-
+}
     private void showReceipt(MiraApiClient.ApiResponse response) {
         try {
             if (!isAdded() || getActivity() == null) return;
