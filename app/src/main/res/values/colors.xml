@@ -240,4 +240,6 @@
     <color name="accent">#B8860B</color>
     <color name="accent_light">#D4AF37</color>
     <color name="accent_dark">#8B6508</color>
+    <!-- ✅ Alias للتوافق مع الكود -->
+    <color name="on_surface">@color/colorOnSurface</color>
 </resources>
