@@ -4,6 +4,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
+
+import com.example.uhf.api.MiraApiClient;
+
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -11,22 +15,36 @@ import java.util.List;
 
 /**
  * 🏢 MiraOrgProfileManager - مدير بيانات الجهة المركزي
+ * 
+ * ✅ الإصدار المُحدَّث:
+ * - إضافة syncFromServer() لجلب البيانات من السيرفر
+ * - حفظ تلقائي عند النجاح
+ * - إشعار المستمعين تلقائياً
  */
 public class MiraOrgProfileManager {
 
+    private static final String TAG = "MiraOrgProfile";
     private static final String PREFS_NAME = "MIRA_ORG_PROFILE";
+    private static final long SYNC_COOLDOWN_MS = 15 * 60 * 1000; // 15 دقيقة
+
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static MiraOrgProfileManager instance;
     private final SharedPreferences prefs;
     private final Context context;
     
-    // ✅ قائمة المستمعين للتغييرات
     private final List<OnProfileChangedListener> listeners = new ArrayList<>();
 
-    // ✅ واجهة المستمع
     public interface OnProfileChangedListener {
         void onProfileChanged();
+    }
+    
+    /**
+     * ✅ واجهة رد النداء للمزامنة
+     */
+    public interface SyncCallback {
+        void onSuccess();
+        void onError(String error);
     }
 
     private MiraOrgProfileManager(Context context) {
@@ -41,7 +59,8 @@ public class MiraOrgProfileManager {
         return instance;
     }
 
-    // ✅ إضافة مستمع
+    // ==================== المستمعون ====================
+
     public void addListener(OnProfileChangedListener listener) {
         synchronized (listeners) {
             if (listener != null && !listeners.contains(listener)) {
@@ -50,14 +69,12 @@ public class MiraOrgProfileManager {
         }
     }
 
-    // ✅ إزالة مستمع
     public void removeListener(OnProfileChangedListener listener) {
         synchronized (listeners) {
             listeners.remove(listener);
         }
     }
 
-    // ✅ إشعار جميع المستمعين وآمن تماماً للـ UI والـ Thread Safety
     public void notifyListeners() {
         mainHandler.post(() -> {
             List<OnProfileChangedListener> listenersCopy;
@@ -70,11 +87,165 @@ public class MiraOrgProfileManager {
                     try {
                         listener.onProfileChanged();
                     } catch (Exception e) {
-                        // تجاهل أخطاء المستمعين الفردية لضمان استمرار البقية
+                        Log.e(TAG, "Listener error: " + e.getMessage());
                     }
                 }
             }
         });
+    }
+
+    // ==================== ✅ المزامنة من السيرفر (جديد) ====================
+
+    /**
+     * ✅ جلب بيانات المؤسسة من السيرفر وتحديث الكاش المحلي
+     * 
+     * @param apiClient  كائن MiraApiClient
+     * @param force      إذا true، يتجاهل فترة الانتظار (cooldown)
+     * @param callback   رد النداء (نجاح/فشل)
+     */
+    public void syncFromServer(MiraApiClient apiClient, boolean force, SyncCallback callback) {
+        if (apiClient == null) {
+            if (callback != null) callback.onError("apiClient is null");
+            return;
+        }
+        
+        // ✅ تحقق من cooldown
+        if (!force) {
+            long lastSync = prefs.getLong("last_server_sync", 0);
+            long now = System.currentTimeMillis();
+            
+            if (now - lastSync < SYNC_COOLDOWN_MS) {
+                Log.d(TAG, "syncFromServer skipped (cooldown active)");
+                if (callback != null) callback.onSuccess();  // اعتبره نجاح (البيانات محدَّثة)
+                return;
+            }
+        }
+        
+        Log.i(TAG, "🔄 Starting syncFromServer...");
+        
+        new Thread(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+                
+                if (response == null || !response.isSuccess || response.data == null) {
+                    String error = response != null ? response.error : "Unknown error";
+                    Log.w(TAG, "⚠️ syncFromServer failed: " + error);
+                    mainHandler.post(() -> {
+                        if (callback != null) callback.onError(error);
+                    });
+                    return;
+                }
+                
+                // ✅ استخراج organization
+                JSONObject organization = response.data.optJSONObject("organization");
+                if (organization != null) {
+                    saveOrganizationFromServer(organization);
+                    Log.i(TAG, "✅ Organization saved: " + 
+                            organization.optString("name_ar", ""));
+                }
+                
+                // ✅ استخراج user (يحتوي على branch_name)
+                JSONObject user = response.data.optJSONObject("user");
+                if (user != null) {
+                    saveUserBranchInfo(user);
+                }
+                
+                // ✅ استخراج system_config
+                JSONObject systemConfig = response.data.optJSONObject("system_config");
+                if (systemConfig != null) {
+                    saveSystemConfigFromServer(systemConfig);
+                }
+                
+                // ✅ حفظ وقت المزامنة
+                prefs.edit().putLong("last_server_sync", System.currentTimeMillis()).apply();
+                
+                // ✅ إشعار المستمعين
+                notifyListeners();
+                
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onSuccess();
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "syncFromServer error: " + e.getMessage(), e);
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * ✅ اختصار بدون force
+     */
+    public void syncFromServer(MiraApiClient apiClient, SyncCallback callback) {
+        syncFromServer(apiClient, false, callback);
+    }
+
+    // ==================== دوال حفظ داخلية ====================
+
+    /**
+     * ✅ حفظ بيانات المؤسسة من السيرفر
+     */
+    private void saveOrganizationFromServer(JSONObject org) {
+        if (org == null) return;
+        
+        SharedPreferences.Editor editor = prefs.edit();
+        
+        String nameAr = org.optString("name_ar", "").trim();
+        String nameEn = org.optString("name_en", "").trim();
+        String phone  = org.optString("phone", "").trim();
+        String email  = org.optString("email", "").trim();
+        String tax    = org.optString("tax_number", "").trim();
+        String logo   = org.optString("logo_url", "").trim();
+        
+        if (!nameAr.isEmpty()) {
+            editor.putString("org_name_ar", nameAr);
+            editor.putString("org_name", nameAr);
+        }
+        if (!nameEn.isEmpty()) editor.putString("org_name_en", nameEn);
+        if (!phone.isEmpty())  editor.putString("org_phone", phone);
+        if (!email.isEmpty())  editor.putString("org_email", email);
+        if (!tax.isEmpty())    editor.putString("tax_number", tax);
+        if (!logo.isEmpty())   editor.putString("org_logo", logo);
+        
+        editor.apply();
+        Log.d(TAG, "Organization saved: ar=" + nameAr + ", en=" + nameEn);
+    }
+
+    /**
+     * ✅ حفظ معلومات فرع المستخدم
+     */
+    private void saveUserBranchInfo(JSONObject user) {
+        if (user == null) return;
+        
+        int branchId = user.optInt("branch_id", 0);
+        String branchName = user.optString("branch_name", "").trim();
+        
+        if (branchId > 0 && !branchName.isEmpty()) {
+            prefs.edit()
+                .putInt("active_branch_id", branchId)
+                .putString("active_branch_name_" + branchId, branchName)
+                .putString("active_branch_display_name", branchName)
+                .apply();
+            
+            Log.d(TAG, "Branch saved: id=" + branchId + ", name=" + branchName);
+        }
+    }
+
+    /**
+     * ✅ حفظ إعدادات النظام من السيرفر
+     */
+    private void saveSystemConfigFromServer(JSONObject config) {
+        if (config == null) return;
+        
+        prefs.edit()
+            .putString("system_currency_ar", config.optString("currency_ar", "دولار"))
+            .putString("system_currency_en", config.optString("currency_en", "USD"))
+            .putBoolean("enable_rfid", config.optBoolean("enable_rfid", true))
+            .putBoolean("enable_barcode", config.optBoolean("enable_barcode", true))
+            .putBoolean("enable_biometric", config.optBoolean("enable_biometric", true))
+            .apply();
     }
 
     // ==================== Getters ====================
@@ -123,6 +294,10 @@ public class MiraOrgProfileManager {
         return prefs.getString("org_name_ar", prefs.getString("org_name", "ميرا للتكنولوجيا"));
     }
 
+    public long getLastSyncTime() {
+        return prefs.getLong("last_server_sync", 0);
+    }
+
     // ==================== Setters ====================
 
     public void setTaxNumber(String taxNumber) {
@@ -142,39 +317,23 @@ public class MiraOrgProfileManager {
     }
 
     /**
-     * ✅ حفظ بيانات كاملة من JSON (من السيرفر)
+     * ✅ حفظ بيانات كاملة من JSON (يُستخدم داخلياً ومتوافق مع الكود القديم)
      */
     public void saveFromServer(JSONObject org) {
         if (org == null) return;
-        
-        SharedPreferences.Editor editor = prefs.edit();
-        
-        editor.putString("org_name_ar", org.optString("name_ar", getOrgNameAr()));
-        editor.putString("org_name_en", org.optString("name_en", getOrgNameEn()));
-        editor.putString("org_name", org.optString("name_ar", getOrgName()));
-        editor.putString("org_phone", org.optString("phone", getOrgPhone()));
-        editor.putString("org_email", org.optString("email", getOrgEmail()));
-        editor.putString("tax_number", org.optString("tax_number", getTaxNumber()));
-        editor.putString("org_logo", org.optString("logo_url", getOrgLogo()));
-        
-        editor.apply();
+        saveOrganizationFromServer(org);
         notifyListeners();
     }
 
-    /**
-     * ✅ حفظ بيانات كاملة يدوياً
-     */
     public void saveFullProfile(String nameAr, String nameEn, String phone, String email, String tax) {
-        SharedPreferences.Editor editor = prefs.edit();
-        
-        editor.putString("org_name_ar", nameAr);
-        editor.putString("org_name_en", nameEn);
-        editor.putString("org_name", nameAr);
-        editor.putString("org_phone", phone);
-        editor.putString("org_email", email);
-        editor.putString("tax_number", tax);
-        
-        editor.apply();
+        prefs.edit()
+                .putString("org_name_ar", nameAr)
+                .putString("org_name_en", nameEn)
+                .putString("org_name", nameAr)
+                .putString("org_phone", phone)
+                .putString("org_email", email)
+                .putString("tax_number", tax)
+                .apply();
         notifyListeners();
     }
 
@@ -254,7 +413,7 @@ public class MiraOrgProfileManager {
                     .putString("auth_token", token)
                     .apply();
         } catch (Exception e) {
-            // تجاهل الأخطاء
+            Log.e(TAG, "saveUserAuth error: " + e.getMessage());
         }
     }
 }
