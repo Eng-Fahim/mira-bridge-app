@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp">
 
+    <!-- حقل الاسم المعروض -->
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilEditDisplayName"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
-        tools:hint="الاسم المعروض">
+        android:hint="الاسم المعروض">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etEditDisplayName"
@@ -23,13 +24,15 @@
             android:textColor="?attr/colorOnSurface" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- حقل رقم الهاتف -->
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilEditUserPhone"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        tools:hint="رقم الهاتف">
+        android:hint="رقم الهاتف">
 
-        <com.google.android.material.textfield.TextInputEditText
+        <com.google.android.material.TextInputEditText
             android:id="@+id/etEditUserPhone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
