@@ -33,7 +33,7 @@
             app:showAsAction="never" />
 
         <item
-            android:id="@+id/nav_sound_settings"
+            android:id="@+id/action_sound_settings"
             android:icon="@drawable/ic_volume_up"
             android:title="@string/menu_sounds_setting"
             app:showAsAction="never" />
@@ -54,7 +54,7 @@
             app:showAsAction="never" />
 
         <item
-            android:id="@+id/export"
+            android:id="@+id/action_export_data"
             android:icon="@drawable/ic_export"
             android:title="@string/menu_export_data"
             app:showAsAction="never" />
@@ -63,7 +63,7 @@
     <!-- حول الجهاز والنظام -->
     <group android:id="@+id/group_info">
         <item
-            android:id="@+id/UHF_ver"
+            android:id="@+id/action_device_version"
             android:icon="@drawable/ic_info"
             android:title="@string/menu_device_version"
             app:showAsAction="never" />
