@@ -920,6 +920,58 @@ private NotificationModel parseNotificationFromJson(JSONObject json) {
     public ApiResponse getDashboardFull() {
         return getDashboardFull(0);
     }
+    
+    /**
+ * ✅ Checkout مع Timeout مخصص
+ */
+public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
+    HttpURLConnection conn = null;
+    try {
+        String token = getAuthToken();
+        
+        String cleanEndpoint = "/pos/checkout".substring(1);
+        String fullUrl = apiUrl + cleanEndpoint;
+        
+        URL url = new URL(fullUrl);
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        
+        conn.setRequestMethod("POST");
+        applyStandardHeaders(conn, true);
+        
+        // ✅ زيادة خاصة للـ Checkout
+        conn.setConnectTimeout(15000);  
+        conn.setReadTimeout(60000);      // ← 60 ثانية!
+        
+        conn.setDoOutput(true);
+        
+        if (payload != null) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(input, 0, input.length);
+            }
+        }
+        
+        return buildResponse(conn);
+        
+    } catch (java.net.SocketTimeoutException e) {
+        Log.e(TAG, "Checkout timeout after 60s");
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+        response.isNetworkError = true;
+        return response;
+    } catch (Exception e) {
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
 
     public ApiResponse checkout(JSONObject payload) {
         return postWithAuth("/pos/checkout", payload);
