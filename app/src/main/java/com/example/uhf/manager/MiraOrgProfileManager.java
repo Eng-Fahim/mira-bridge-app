@@ -16,10 +16,14 @@ import java.util.List;
 /**
  * 🏢 MiraOrgProfileManager - مدير بيانات الجهة المركزي
  * 
- * ✅ الإصدار المُحدَّث:
- * - إضافة syncFromServer() لجلب البيانات من السيرفر
- * - حفظ تلقائي عند النجاح
- * - إشعار المستمعين تلقائياً
+ * ✅ المسؤوليات:
+ * - إدارة بيانات المؤسسة (اسم، شعار، اتصال، ...)
+ * - حفظ واسترجاع بيانات المستخدم الأساسية
+ * - المزامنة من السيرفر (/profile/get)
+ * 
+ * ❌ ليس مسؤولاً عن:
+ * - إدارة قائمة الفروع (→ MiraBranchesManager)
+ * - حفظ الفرع النشط (→ MiraBranchesManager)
  */
 public class MiraOrgProfileManager {
 
@@ -39,9 +43,6 @@ public class MiraOrgProfileManager {
         void onProfileChanged();
     }
     
-    /**
-     * ✅ واجهة رد النداء للمزامنة
-     */
     public interface SyncCallback {
         void onSuccess();
         void onError(String error);
@@ -94,14 +95,14 @@ public class MiraOrgProfileManager {
         });
     }
 
-    // ==================== ✅ المزامنة من السيرفر (جديد) ====================
+    // ==================== المزامنة من السيرفر ====================
 
     /**
-     * ✅ جلب بيانات المؤسسة من السيرفر وتحديث الكاش المحلي
+     * ✅ جلب بيانات المؤسسة من السيرفر (/profile/get)
      * 
      * @param apiClient  كائن MiraApiClient
-     * @param force      إذا true، يتجاهل فترة الانتظار (cooldown)
-     * @param callback   رد النداء (نجاح/فشل)
+     * @param force      إذا true، يتجاهل فترة الانتظار
+     * @param callback   رد النداء
      */
     public void syncFromServer(MiraApiClient apiClient, boolean force, SyncCallback callback) {
         if (apiClient == null) {
@@ -109,14 +110,14 @@ public class MiraOrgProfileManager {
             return;
         }
         
-        // ✅ تحقق من cooldown
+        // ✅ فحص cooldown
         if (!force) {
             long lastSync = prefs.getLong("last_server_sync", 0);
             long now = System.currentTimeMillis();
             
             if (now - lastSync < SYNC_COOLDOWN_MS) {
                 Log.d(TAG, "syncFromServer skipped (cooldown active)");
-                if (callback != null) callback.onSuccess();  // اعتبره نجاح (البيانات محدَّثة)
+                if (callback != null) callback.onSuccess();
                 return;
             }
         }
@@ -136,30 +137,29 @@ public class MiraOrgProfileManager {
                     return;
                 }
                 
-                // ✅ استخراج organization
+                // ✅ 1) حفظ organization
                 JSONObject organization = response.data.optJSONObject("organization");
                 if (organization != null) {
                     saveOrganizationFromServer(organization);
-                    Log.i(TAG, "✅ Organization saved: " + 
-                            organization.optString("name_ar", ""));
+                    Log.i(TAG, "✅ Organization saved: " + organization.optString("name_ar", ""));
                 }
                 
-                // ✅ استخراج user (يحتوي على branch_name)
+                // ✅ 2) تحديث الفرع النشط (عبر MiraBranchesManager — ليس هنا)
                 JSONObject user = response.data.optJSONObject("user");
                 if (user != null) {
-                    saveUserBranchInfo(user);
+                    syncBranchToBranchesManager(user);
                 }
                 
-                // ✅ استخراج system_config
+                // ✅ 3) حفظ system_config
                 JSONObject systemConfig = response.data.optJSONObject("system_config");
                 if (systemConfig != null) {
                     saveSystemConfigFromServer(systemConfig);
                 }
                 
-                // ✅ حفظ وقت المزامنة
+                // ✅ 4) حفظ وقت المزامنة
                 prefs.edit().putLong("last_server_sync", System.currentTimeMillis()).apply();
                 
-                // ✅ إشعار المستمعين
+                // ✅ 5) إشعار المستمعين
                 notifyListeners();
                 
                 mainHandler.post(() -> {
@@ -175,18 +175,12 @@ public class MiraOrgProfileManager {
         }).start();
     }
 
-    /**
-     * ✅ اختصار بدون force
-     */
     public void syncFromServer(MiraApiClient apiClient, SyncCallback callback) {
         syncFromServer(apiClient, false, callback);
     }
 
     // ==================== دوال حفظ داخلية ====================
 
-    /**
-     * ✅ حفظ بيانات المؤسسة من السيرفر
-     */
     private void saveOrganizationFromServer(JSONObject org) {
         if (org == null) return;
         
@@ -214,28 +208,26 @@ public class MiraOrgProfileManager {
     }
 
     /**
-     * ✅ حفظ معلومات فرع المستخدم
+     * ✅ تحديث الفرع النشط عبر MiraBranchesManager
+     * (لا نحفظ الفرع في SharedPreferences الخاصة بنا — المسؤولية لـ MiraBranchesManager)
      */
-    private void saveUserBranchInfo(JSONObject user) {
+    private void syncBranchToBranchesManager(JSONObject user) {
         if (user == null) return;
         
-        int branchId = user.optInt("branch_id", 0);
-        String branchName = user.optString("branch_name", "").trim();
-        
-        if (branchId > 0 && !branchName.isEmpty()) {
-            prefs.edit()
-                .putInt("active_branch_id", branchId)
-                .putString("active_branch_name_" + branchId, branchName)
-                .putString("active_branch_display_name", branchName)
-                .apply();
+        try {
+            int branchId = user.optInt("branch_id", 0);
+            String branchName = user.optString("branch_name", "").trim();
             
-            Log.d(TAG, "Branch saved: id=" + branchId + ", name=" + branchName);
+            if (branchId > 0 && !branchName.isEmpty()) {
+                MiraBranchesManager branchesMgr = MiraBranchesManager.getInstance(context);
+                branchesMgr.updateActiveBranchFromServer(branchId, branchName);
+                Log.d(TAG, "Branch updated via MiraBranchesManager: " + branchName);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "syncBranchToBranchesManager error: " + e.getMessage());
         }
     }
 
-    /**
-     * ✅ حفظ إعدادات النظام من السيرفر
-     */
     private void saveSystemConfigFromServer(JSONObject config) {
         if (config == null) return;
         
@@ -316,9 +308,6 @@ public class MiraOrgProfileManager {
         notifyListeners();
     }
 
-    /**
-     * ✅ حفظ بيانات كاملة من JSON (يُستخدم داخلياً ومتوافق مع الكود القديم)
-     */
     public void saveFromServer(JSONObject org) {
         if (org == null) return;
         saveOrganizationFromServer(org);
