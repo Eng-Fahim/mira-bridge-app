@@ -1,6 +1,8 @@
 package com.example.uhf.fragment;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.view.ContextThemeWrapper;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -359,9 +361,9 @@ public class MiraBranchesManagementFragment extends Fragment {
             "🗑️ حذف"
         };
         
-        new AlertDialog.Builder(context)
-            .setTitle(b.name)
-            .setItems(actions, (dialog, which) -> {
+        new MaterialAlertDialogBuilder(new ContextThemeWrapper(context, R.style.MiraDialogTheme))
+    .setTitle(b.name)
+    .setItems(actions, (dialog, which) -> {
                 switch (which) {
                     case 0:
                         if (branchesManager != null) {
@@ -410,11 +412,11 @@ public class MiraBranchesManagementFragment extends Fragment {
                         if (userList.isEmpty()) {
                             userList.add("لا يوجد مستخدمين في هذا الفرع");
                         }
-                        new AlertDialog.Builder(requireContext())
-                            .setTitle("👥 مستخدمي " + b.name)
-                            .setItems(userList.toArray(new String[0]), null)
-                            .setPositiveButton("إغلاق", null)
-                            .show();
+                        new MaterialAlertDialogBuilder(new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
+    .setTitle("👥 مستخدمي " + b.name)
+    .setItems(userList.toArray(new String[0]), null)
+    .setPositiveButton("إغلاق", null)
+    .show();
                     } else {
                         showToast("تعذر جلب المستخدمين");
                     }
@@ -429,10 +431,27 @@ public class MiraBranchesManagementFragment extends Fragment {
         Context context = getContextSafely();
         if (context == null || !canManageBranches()) return;
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_branch_edit, null);
-        builder.setView(dialogView);
-        AlertDialog dialog = builder.create();
+
+// ✅ استخدام MaterialAlertDialogBuilder مع ContextThemeWrapper
+Context themedContext = new ContextThemeWrapper(context, R.style.MiraDialogTheme);
+AlertDialog dialog = new MaterialAlertDialogBuilder(themedContext)
+        .setView(dialogView)
+        .setCancelable(true)
+        .create();
+
+// ✅ خلفية ديناميكية حسب الوضع
+if (dialog.getWindow() != null) {
+    boolean isDarkMode = (getResources().getConfiguration().uiMode 
+            & android.content.res.Configuration.UI_MODE_NIGHT_MASK) 
+            == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    
+    if (isDarkMode) {
+        dialog.getWindow().setBackgroundDrawableResource(R.drawable.bg_mira_dialog_dark);
+    } else {
+        dialog.getWindow().setBackgroundDrawableResource(R.drawable.bg_mira_dialog);
+    }
+}
 
         TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
         EditText etName = dialogView.findViewById(R.id.etBranchName);
@@ -525,10 +544,10 @@ public class MiraBranchesManagementFragment extends Fragment {
         Context context = getContextSafely();
         if (context == null || !canManageBranches()) return;
         
-        new AlertDialog.Builder(context)
-            .setTitle("حذف فرع")
-            .setMessage("هل أنت متأكد من حذف \"" + b.name + "\"؟")
-            .setPositiveButton("حذف", (d, w) -> {
+        new MaterialAlertDialogBuilder(new ContextThemeWrapper(context, R.style.MiraDialogTheme))
+    .setTitle("حذف فرع")
+    .setMessage("هل أنت متأكد من حذف \"" + b.name + "\"؟")
+    .setPositiveButton("حذف", (d, w) -> {
                 executeTask(() -> {
                     try {
                         if (apiClient == null) return;
