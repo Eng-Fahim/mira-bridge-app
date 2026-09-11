@@ -1,7 +1,9 @@
 package com.example.uhf.fragment;
 
 import android.content.Context;
-import android.content.SharedPreferences;
+import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,10 +23,6 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-
-import android.content.BroadcastReceiver;
-import android.content.Intent;
-import android.content.IntentFilter;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
@@ -52,7 +50,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
+public class MiraDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboardFragment";
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
@@ -85,6 +83,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private MiraOrgProfileManager.OnProfileChangedListener profileListener;
+    private MiraBranchesManager.OnBranchChangedListener branchListener;
     private MiraPriceManager priceManager;
     private MiraQuickAccessSettings quickAccessSettings;
     private PermissionManager permissionManager;
@@ -96,7 +95,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private boolean isArabic;
     private boolean isReceiverRegistered = false;
 
-    private SharedPreferences offlineCache, branchPrefs, goldCachePrefs;
+    private android.content.SharedPreferences offlineCache, goldCachePrefs;
     private int currentBranchId = -1;
     private boolean isViewInitialized = false;
     private final AtomicBoolean isLoading = new AtomicBoolean(false);
@@ -106,7 +105,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private int consecutiveFailures = 0;
 
     private SimpleDateFormat getDateFormatter() {
-        return isArabic ? new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")) : new SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US);
+        return isArabic
+                ? new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar"))
+                : new SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US);
     }
 
     private SimpleDateFormat getTimeFormatter() {
@@ -146,21 +147,21 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent == null || !isAdded() || !isViewInitialized) return;
-            
+
             String action = intent.getAction();
             Log.d(TAG, "Received broadcast: " + action);
-            
-            if ("com.example.uhf.REFRESH_DASHBOARD".equals(action) || 
-                "com.example.uhf.REFRESH_INVENTORY".equals(action) || 
+
+            if ("com.example.uhf.REFRESH_DASHBOARD".equals(action) ||
+                "com.example.uhf.REFRESH_INVENTORY".equals(action) ||
                 "com.example.uhf.REFRESH_SALES".equals(action)) {
-                
+
                 mainHandler.post(() -> {
                     if (isAdded() && isViewInitialized) {
                         Log.d(TAG, "Refreshing dashboard from broadcast");
                         isDataLoaded = false;
                         lastDataFetchTime = 0;
                         isLoading.set(false);
-                        
+
                         if (isResumed()) {
                             fetchData();
                         }
@@ -181,35 +182,36 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-   @Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
-    try {
-        initializeManagers();
-        initViews(view);
-        setupProfileListener();
-        setupQuickAccessGrid();
-        setupListeners();
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        try {
+            initializeManagers();
+            initViews(view);
+            setupProfileListener();
+            setupBranchListener();      // ← جديد
+            setupQuickAccessGrid();
+            setupListeners();
 
-        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-        initBranchCache(currentBranchId);
+            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            initBranchCache(currentBranchId);
 
-        // ❌ احذف هذا - لا تعرض الكاش المحلي أولاً
-        // loadOfflineData();
-        
-        updateHeader();
-        showShimmer(false);
-        
-        isViewInitialized = true;
-        
-        // ✅ جلب البيانات من السيرفر مباشرة
-        fetchData();
-        
-        startAutoRefresh();
-    } catch (Throwable e) {
-        logNonFatal("onViewCreated", e);
+            updateHeader();              // عرض فوري من الكاش
+            showShimmer(false);
+
+            isViewInitialized = true;
+
+            // ✅ مزامنة اسم المؤسسة والفرع من السيرفر
+            syncOrgProfileFromServer(false);
+
+            // ✅ ثم جلب بيانات Dashboard الكاملة
+            fetchData();
+
+            startAutoRefresh();
+        } catch (Throwable e) {
+            logNonFatal("onViewCreated", e);
+        }
     }
-}
 
     private void initializeManagers() {
         try {
@@ -223,10 +225,10 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
             permissionManager = PermissionManager.getInstance(context);
             isArabic = Locale.getDefault().getLanguage().equals("ar");
-            branchPrefs = context.getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
+            // ✅ لم نعد نحتاج branchPrefs — نستخدم مستمع MiraBranchesManager
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
-            
+
             boolean isLoggedIn = sessionManager != null && sessionManager.isLoggedIn();
             Log.d(TAG, "Dashboard Initialized. Logged in: " + isLoggedIn);
         } catch (Exception e) {
@@ -272,7 +274,8 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                 });
             }
 
-            if (cardGoldPrices != null && permissionManager != null && !permissionManager.canAccessFragment("GoldRates")) {
+            if (cardGoldPrices != null && permissionManager != null
+                    && !permissionManager.canAccessFragment("GoldRates")) {
                 cardGoldPrices.setVisibility(View.GONE);
             }
 
@@ -315,40 +318,142 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             logNonFatal("updateHeader", e);
         }
     }
-    
+
+    // ==================== ✅ مستمعو المزامنة (جديد) ====================
+
+    private void setupProfileListener() {
+        try {
+            if (orgProfile == null) return;
+            profileListener = () -> mainHandler.post(() -> {
+                if (isAdded() && isViewInitialized) {
+                    updateHeader();
+                }
+            });
+            orgProfile.addListener(profileListener);
+        } catch (Exception e) {
+            logNonFatal("setupProfileListener", e);
+        }
+    }
+
+    private void setupBranchListener() {
+        try {
+            if (branchesManager == null) return;
+
+            branchListener = new MiraBranchesManager.OnBranchChangedListener() {
+                @Override
+                public void onBranchChanged() {
+                    if (!isAdded()) return;
+                    Log.d(TAG, "🔄 Branch changed via listener");
+                    mainHandler.post(() -> {
+                        if (isAdded() && isViewInitialized) {
+                            updateHeader();
+                        }
+                    });
+                }
+            };
+
+            branchesManager.addListener(branchListener);
+        } catch (Exception e) {
+            logNonFatal("setupBranchListener", e);
+        }
+    }
+
+    /**
+     * ✅ مزامنة اسم المؤسسة + الفرع النشط من السيرفر
+     */
+    private void syncOrgProfileFromServer(boolean force) {
+        try {
+            if (orgProfile == null || apiClient == null) {
+                Log.w(TAG, "syncOrgProfileFromServer: managers not ready");
+                return;
+            }
+
+            Log.d(TAG, "🔄 Syncing org profile (force=" + force + ")");
+
+            orgProfile.syncFromServer(apiClient, force, new MiraOrgProfileManager.SyncCallback() {
+                @Override
+                public void onSuccess() {
+                    Log.i(TAG, "✅ Org profile synced");
+                    mainHandler.post(() -> {
+                        if (isAdded() && isViewInitialized) {
+                            updateHeader();
+                        }
+                    });
+
+                    // ✅ بعد نجاح المزامنة → زامن قائمة الفروع
+                    syncBranchesListFromServer();
+                }
+
+                @Override
+                public void onError(String error) {
+                    Log.w(TAG, "⚠️ Org sync failed: " + error);
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("syncOrgProfileFromServer", e);
+        }
+    }
+
+    /**
+     * ✅ مزامنة قائمة الفروع فقط (بدون تكرار /profile/get)
+     */
+    private void syncBranchesListFromServer() {
+        try {
+            if (branchesManager == null) return;
+
+            branchesManager.syncFromServer(new MiraBranchesManager.SyncCallback() {
+                @Override
+                public void onSuccess() {
+                    Log.i(TAG, "✅ Branches list synced");
+                    // notifyListeners في MiraBranchesManager سيُحدِّث الهيدر تلقائياً
+                }
+
+                @Override
+                public void onError(String error) {
+                    Log.w(TAG, "⚠️ Branches sync failed: " + error);
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("syncBranchesListFromServer", e);
+        }
+    }
+
+    // ==================== Quick Actions ====================
+
     private void setupQuickAccessGrid() {
         try {
             if (quickAccessSettings == null || quickAdapter == null) return;
-            
+
             sharedExecutor.execute(() -> {
                 try {
                     if (!isAdded()) return;
-                    
+
                     List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
                     List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
-                    
+
                     if (enabledActions != null && !enabledActions.isEmpty()) {
                         for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
                             String fragmentTag = getFragmentTagForAction(action.id);
-                            boolean hasPermission = permissionManager == null || permissionManager.canAccessFragment(fragmentTag);
-                            
+                            boolean hasPermission = permissionManager == null
+                                    || permissionManager.canAccessFragment(fragmentTag);
+
                             if (hasPermission) {
                                 filteredActions.add(action);
                             }
                         }
                     }
-                    
+
                     mainHandler.post(() -> {
                         if (isAdded() && quickAdapter != null) {
                             quickAdapter.submitList(filteredActions);
                         }
                     });
-                    
+
                 } catch (Exception e) {
                     logNonFatal("setupQuickAccessGrid.inner", e);
                 }
             });
-            
+
         } catch (Exception e) {
             logNonFatal("setupQuickAccessGrid", e);
         }
@@ -431,7 +536,8 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
                     if (providers != null && !providers.isEmpty()) {
                         for (ApiProvider provider : providers) {
-                            if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) {
+                            if (provider.isActive() && provider.getApiKey() != null
+                                    && !provider.getApiKey().isEmpty()) {
                                 activeProvider = provider;
                                 break;
                             }
@@ -459,10 +565,14 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                         if (priceData != null) {
                             lastGoldFetchTime = System.currentTimeMillis();
                             displayGoldPrices(priceData);
-                            Toast.makeText(getContext(), isArabic ? "✅ تم تحديث أسعار الذهب" : "✅ Gold prices updated", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(),
+                                    isArabic ? "✅ تم تحديث أسعار الذهب" : "✅ Gold prices updated",
+                                    Toast.LENGTH_SHORT).show();
                         } else {
                             displayGoldPricesFromCache();
-                            Toast.makeText(getContext(), isArabic ? "⚠️ تعذر التحديث - عرض الكاش" : "⚠️ Update failed - showing cache", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(),
+                                    isArabic ? "⚠️ تعذر التحديث - عرض الكاش" : "⚠️ Update failed - showing cache",
+                                    Toast.LENGTH_SHORT).show();
                         }
                     });
                 } catch (Exception e) {
@@ -493,6 +603,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             logNonFatal("showGoldLoadingState", e);
         }
     }
+
     private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
         try {
             if (response == null || !response.isSuccess || response.data == null) return null;
@@ -504,7 +615,8 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             double price24 = prices.optDouble("24k", 0);
             double price21 = prices.optDouble("21k", 0);
             double price18 = prices.optDouble("18k", 0);
-            double ouncePrice = data.optDouble("price_per_ounce", prices.optDouble("ounce_price", price24 * OUNCE_TO_GRAM));
+            double ouncePrice = data.optDouble("price_per_ounce",
+                    prices.optDouble("ounce_price", price24 * OUNCE_TO_GRAM));
             String source = data.optString("source", "server");
 
             return new GoldPriceData(price24, price21, price18, ouncePrice, source);
@@ -563,7 +675,9 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                 if (timeRemaining > 0) {
                     long hours = timeRemaining / (60 * 60 * 1000);
                     long minutes = (timeRemaining % (60 * 60 * 1000)) / (60 * 1000);
-                    tvPriceSource.setText(isArabic ? "📡 كاش محلي - التحديث بعد " + hours + " س " + minutes + " د" : "📡 Cache - update in " + hours + "h " + minutes + "m");
+                    tvPriceSource.setText(isArabic
+                            ? "📡 كاش محلي - التحديث بعد " + hours + " س " + minutes + " د"
+                            : "📡 Cache - update in " + hours + "h " + minutes + "m");
                 } else {
                     tvPriceSource.setText(isArabic ? "📡 جاهز للتحديث" : "📡 Ready to update");
                 }
@@ -584,7 +698,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
     private void loadOfflineData() {
         if (offlineCache == null) return;
-        
+
         sharedExecutor.execute(() -> {
             try {
                 final int totalItems = offlineCache.getInt("total_items", 0);
@@ -593,7 +707,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                 final float salesToday = offlineCache.getFloat("sales_today", 0.0f);
                 final float salesMonth = offlineCache.getFloat("sales_month", 0.0f);
                 final float salesYear = offlineCache.getFloat("sales_year", 0.0f);
-                
+
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
                     setText(tvTotalItems, String.valueOf(totalItems));
@@ -602,7 +716,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                     setText(tvSalesToday, formatCurrency(salesToday));
                     setText(tvSalesMonth, formatCurrency(salesMonth));
                     setText(tvSalesYear, formatCurrency(salesYear));
-                    
+
                     if (priceManager != null) {
                         displayGoldPricesFromCache();
                     }
@@ -615,15 +729,15 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
-        
+
         sharedExecutor.execute(() -> {
             try {
                 double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
-                
+
                 if (previousPrice > 0 && currentPrice > 0) {
                     double change = currentPrice - previousPrice;
                     double changePercent = (change / previousPrice) * 100;
-                    
+
                     mainHandler.post(() -> {
                         if (!isAdded()) return;
                         if (change > 0) {
@@ -641,7 +755,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
                         }
                     });
                 }
-                
+
                 if (currentPrice > 0) {
                     offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
                 }
@@ -678,184 +792,60 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     }
 
     private void fetchData() {
-    try {
-        if (apiClient == null || !isAdded()) return;
-
-        isLoading.set(true);
-
-        // ✅ التحقق من صلاحيات المدير (هل هو SYSTEM_ADMIN أو ORG_ADMIN؟)
-        // يمكنك فحص الدور من الـ SessionManager أو الصلاحيات المحفوظة لديك
-       // ✅ تحقق مباشر وبسيط باستخدام الدوال الجاهزة في SessionManager
-boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
-
-final int finalBranchId;
-if (isGlobalAdmin) {
-    // إذا كان مديراً، نرسل 0 افتراضياً لجلب كل الفروع، إلا إذا اختار المستخدم فرعاً محدداً
-    finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
-} else {
-    // للمستخدم العادي، نأخذ فرعه النشط حصراً
-    final int branchIdFromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
-    final int branchIdFromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-    finalBranchId = branchIdFromSession > 0 ? branchIdFromSession : 
-                   (branchIdFromManager > 0 ? branchIdFromManager : 1);
-}
-
-        cancelFuture(dataFuture);
-
-        dataFuture = sharedExecutor.submit(() -> {
-            try {
-                // ✅ الآن سيرسل للسيرفر 0 إذا كان مديراً، فيقوم الـ Backend بإرجاع إحصائيات كل الفروع!
-                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
-                
-                mainHandler.post(() -> {
-                    isLoading.set(false);
-                    lastDataFetchTime = System.currentTimeMillis();
-                    if (!isAdded()) return;
-
-                    if (response != null && response.isSuccess && response.data != null) {
-                        saveOfflineData(response.data);
-                        processData(response.data);
-                        
-                        // ✅ تحديث اسم الفرع في أعلى الشاشة بناءً على استجابة السيرفر
-                        if (isGlobalAdmin && finalBranchId == 0) {
-                            if (tvLocation != null) tvLocation.setText("📍 جميع الفروع");
-                        }
-                        
-                        isDataLoaded = true;
-                        updateLiveStatusText(true);
-                        showShimmer(false);
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    } else {
-                        updateLiveStatusText(false);
-                        loadOfflineData();
-                        showShimmer(false);
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    }
-                });
-            } catch (Exception e) {
-                mainHandler.post(() -> {
-                    isLoading.set(false);
-                    loadOfflineData();
-                    showShimmer(false);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                });
-            }
-        });
-    } catch (Exception e) {
-        isLoading.set(false);
-    }
-}
-
-    private void handleTokenExpired() {
         try {
-            Log.w(TAG, "401 received - clearing session and redirecting to login");
-            
-            if (sessionManager != null) {
-                sessionManager.clearAuthToken();
-                sessionManager.logoutUser();
-            }
-            
-            isLoading.set(false);
-            showShimmer(false);
-            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-            
-            if (isAdded() && getContext() != null) {
-                Toast.makeText(getContext(), 
-                    isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
-                    Toast.LENGTH_LONG).show();
-            }
-            
-            redirectToLogin();
-        } catch (Exception e) {
-            Log.e(TAG, "handleTokenExpired error: " + e.getMessage());
-        }
-    }
+            if (apiClient == null || !isAdded()) return;
 
-    private void redirectToLogin() {
-        try {
-            if (isAdded() && getActivity() != null) {
-                Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                intent.putExtra("session_expired", true);
-                startActivity(intent);
-                getActivity().finish();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "redirectToLogin error: " + e.getMessage());
-        }
-    }
+            isLoading.set(true);
 
-    private void fetchInventoryDataDirectly(int branchId) {
-        try {
-            if (apiClient == null || branchId <= 0) {
-                loadOfflineData();
-                updateLiveStatusText(false);
-                return;
+            boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
+
+            final int finalBranchId;
+            if (isGlobalAdmin) {
+                finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
+            } else {
+                final int branchIdFromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
+                final int branchIdFromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                finalBranchId = branchIdFromSession > 0 ? branchIdFromSession
+                        : (branchIdFromManager > 0 ? branchIdFromManager : 1);
             }
 
-            sharedExecutor.execute(() -> {
+            cancelFuture(dataFuture);
+
+            dataFuture = sharedExecutor.submit(() -> {
                 try {
-                    MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
+                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
+
                     mainHandler.post(() -> {
+                        isLoading.set(false);
+                        lastDataFetchTime = System.currentTimeMillis();
                         if (!isAdded()) return;
+
                         if (response != null && response.isSuccess && response.data != null) {
-                            int totalItems = response.data.optInt("total", 0);
-                            double totalWeight = 0;
+                            saveOfflineData(response.data);
+                            processData(response.data);
 
-                            org.json.JSONArray items = response.data.optJSONArray("items");
-                            if (items != null) {
-                                for (int i = 0; i < items.length(); i++) {
-                                    JSONObject item = items.optJSONObject(i);
-                                    if (item != null) {
-                                        totalWeight += item.optDouble("gross_weight_grams", 0);
-                                    }
-                                }
-                            }
-
-                            setText(tvTotalItems, String.valueOf(totalItems));
-                            setText(tvTotalWeight, formatWeight(totalWeight));
-
-                            if (offlineCache != null) {
-                                offlineCache.edit()
-                                        .putInt("total_items", totalItems)
-                                        .putFloat("total_weight", (float) totalWeight)
-                                        .putLong("last_update", System.currentTimeMillis())
-                                        .apply();
-                            }
-
+                            isDataLoaded = true;
                             updateLiveStatusText(true);
+                            showShimmer(false);
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         } else {
                             updateLiveStatusText(false);
                             loadOfflineData();
+                            showShimmer(false);
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         }
-                        showShimmer(false);
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
                 } catch (Exception e) {
-                    logNonFatal("fetchInventoryDataDirectly.thread", e);
                     mainHandler.post(() -> {
-                        if (!isAdded()) return;
+                        isLoading.set(false);
                         loadOfflineData();
-                        updateLiveStatusText(false);
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
                 }
             });
         } catch (Exception e) {
-            logNonFatal("fetchInventoryDataDirectly", e);
-            loadOfflineData();
-            updateLiveStatusText(false);
-            showShimmer(false);
-            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-        }
-    }
-
-    private void logNonFatal(String location, Throwable throwable) {
-        try {
-            Log.e(TAG, "Error at " + location + ": " + throwable.getMessage(), throwable);
-        } catch (Exception e) {
-            Log.e(TAG, "logNonFatal error: " + e.getMessage());
+            isLoading.set(false);
         }
     }
 
@@ -876,16 +866,6 @@ if (isGlobalAdmin) {
             }
         } catch (Exception e) {
             logNonFatal("processData", e);
-        }
-    }
-
-    private void setupProfileListener() {
-        try {
-            if (orgProfile == null) return;
-            profileListener = () -> mainHandler.post(this::updateHeader);
-            orgProfile.addListener(profileListener);
-        } catch (Exception e) {
-            logNonFatal("setupProfileListener", e);
         }
     }
 
@@ -914,13 +894,14 @@ if (isGlobalAdmin) {
     private void registerDataRefreshReceiver() {
         try {
             if (getContext() == null || isReceiverRegistered) return;
-            
+
             IntentFilter filter = new IntentFilter();
             filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
             filter.addAction("com.example.uhf.REFRESH_INVENTORY");
             filter.addAction("com.example.uhf.REFRESH_SALES");
-            
-            ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+
+            ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter,
+                    ContextCompat.RECEIVER_NOT_EXPORTED);
             isReceiverRegistered = true;
             Log.d(TAG, "DataRefreshReceiver registered");
         } catch (Exception e) {
@@ -998,7 +979,8 @@ if (isGlobalAdmin) {
     private void initBranchCache(int branchId) {
         try {
             if (getContext() != null) {
-                offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS_BASE + branchId, Context.MODE_PRIVATE);
+                offlineCache = requireContext()
+                        .getSharedPreferences(OFFLINE_PREFS_BASE + branchId, Context.MODE_PRIVATE);
             }
         } catch (Exception e) {
             logNonFatal("initBranchCache", e);
@@ -1046,32 +1028,32 @@ if (isGlobalAdmin) {
         try {
             if (actionId == null || actionId.isEmpty()) return;
             if (getActivity() == null || !(getActivity() instanceof UHFMainActivity)) return;
-            
+
             UHFMainActivity activity = (UHFMainActivity) getActivity();
             String tag = getFragmentTagForAction(actionId);
-            
+
             Fragment fragment = null;
             try {
                 fragment = activity.createFragmentByTag(tag);
             } catch (Exception e) {
                 Log.e(TAG, "Error creating fragment: " + e.getMessage(), e);
             }
-            
+
             if (fragment == null) {
-                Toast.makeText(getContext(), 
-                    isArabic ? "⚠️ تعذر فتح هذه الواجهة" : "⚠️ Cannot open this screen", 
-                    Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(),
+                        isArabic ? "⚠️ تعذر فتح هذه الواجهة" : "⚠️ Cannot open this screen",
+                        Toast.LENGTH_SHORT).show();
                 return;
             }
-            
+
             activity.loadFragment(fragment, tag);
-            
+
         } catch (Exception e) {
             logNonFatal("handleQuickAction", e);
             try {
-                Toast.makeText(getContext(), 
-                    isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen", 
-                    Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(),
+                        isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen",
+                        Toast.LENGTH_SHORT).show();
             } catch (Exception ignored) {}
         }
     }
@@ -1107,12 +1089,16 @@ if (isGlobalAdmin) {
 
     private void setGoldPrice(TextView tv, String label, double price) {
         if (tv == null) return;
-        tv.setText(price > 0 ? String.format(Locale.US, "%s: $%,.2f/g", label, price) : label + ": —");
+        tv.setText(price > 0
+                ? String.format(Locale.US, "%s: $%,.2f/g", label, price)
+                : label + ": —");
     }
 
     private void setText(TextView tv, String text) {
         if (tv != null) tv.setText(text);
     }
+
+    // ==================== دورة الحياة ====================
 
     public void onBranchChanged() {
         try {
@@ -1121,7 +1107,12 @@ if (isGlobalAdmin) {
             if (newBranchId != currentBranchId) {
                 currentBranchId = newBranchId;
                 initBranchCache(currentBranchId);
-                updateHeader();
+
+                updateHeader();   // عرض فوري
+
+                // ✅ مزامنة قوية (force) بعد تغيير الفرع
+                syncOrgProfileFromServer(true);
+
                 loadOfflineData();
                 showShimmer(true);
                 fetchData();
@@ -1136,20 +1127,21 @@ if (isGlobalAdmin) {
         super.onResume();
         try {
             registerDataRefreshReceiver();
-            
-            if (branchPrefs != null) {
-                branchPrefs.registerOnSharedPreferenceChangeListener(this);
-            }
+            // ✅ لم نعد نحتاج branchPrefs — نستخدم branchListener
 
             isDataLoaded = false;
             lastDataFetchTime = 0;
-            
+
             int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             if (latestBranchId != currentBranchId) {
                 onBranchChanged();
             } else if (isViewInitialized) {
                 setupQuickAccessGrid();
                 updateHeader();
+
+                // ✅ مزامنة خفيفة (تحترم الـ cooldown 15 دقيقة)
+                syncOrgProfileFromServer(false);
+
                 refreshInternalData();
             }
             startAutoRefresh();
@@ -1164,22 +1156,9 @@ if (isGlobalAdmin) {
         try {
             unregisterDataRefreshReceiver();
             stopAutoRefresh();
-            if (branchPrefs != null) {
-                branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
-            }
+            // ✅ لم نعد نحتاج branchPrefs
         } catch (Exception e) {
             logNonFatal("onPause", e);
-        }
-    }
-
-    @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        try {
-            if ("active_branch_id".equals(key) || "active_branch".equals(key)) {
-                mainHandler.post(this::onBranchChanged);
-            }
-        } catch (Exception e) {
-            logNonFatal("onSharedPreferenceChanged", e);
         }
     }
 
@@ -1189,9 +1168,14 @@ if (isGlobalAdmin) {
         try {
             unregisterDataRefreshReceiver();
             stopAutoRefresh();
-            if (branchPrefs != null) {
-                branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
+
+            // ✅ إزالة مستمع الفرع
+            if (branchesManager != null && branchListener != null) {
+                branchesManager.removeListener(branchListener);
+                branchListener = null;
             }
+
+            // ✅ إزالة مستمع البروفايل
             if (orgProfile != null && profileListener != null) {
                 orgProfile.removeListener(profileListener);
             }
@@ -1219,4 +1203,12 @@ if (isGlobalAdmin) {
             logNonFatal("cancelFuture", e);
         }
     }
-                        }
+
+    private void logNonFatal(String location, Throwable throwable) {
+        try {
+            Log.e(TAG, "Error at " + location + ": " + throwable.getMessage(), throwable);
+        } catch (Exception e) {
+            Log.e(TAG, "logNonFatal error: " + e.getMessage());
+        }
+    }
+}
