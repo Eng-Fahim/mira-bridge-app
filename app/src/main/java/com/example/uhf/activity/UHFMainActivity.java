@@ -103,7 +103,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
 
     // ═══════════════════════════════════════════════════════════════
-    // 🛡️ حماية التنقل — Debounce فقط للشاشات الفرعية + Loading Singleton
+    // 🛡️ حماية التنقل — Debounce + Loading
     // ═══════════════════════════════════════════════════════════════
     private long lastNavigationTime = 0;
     private static final long NAV_DEBOUNCE_DELAY = 300;
@@ -233,9 +233,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setupWindowInsets();
 
-            // ✅ لا حاجة لـ cleanupOldFragments هنا — FragmentManager يُدير حالته
-            // (تم حذفه لحل مشكلة تضارب الحالة مع الاستعادة)
-
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
             if (toolbar != null) {
                 setSupportActionBar(toolbar);
@@ -269,7 +266,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (bottomNavContainer != null) {
                 bottomNavContainer.setLayoutDirection(layoutDirection);
             }
-            // ====================================================================
 
             // ✅ تهيئة المديرين
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
@@ -315,33 +311,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             setupQuickNav();
             setupOrgProfileListener();
 
-            // ==================== ✅ التنقل الأولي (مُصلح) ====================
+            // ==================== ✅ التنقل الأولي (حسب إصلاح البروفيسور) ====================
             if (savedInstanceState == null) {
-                // حالة جديدة → Dashboard افتراضي
                 currentFragmentTag = "Dashboard";
                 navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
             } else {
-                // استعادة الحالة
                 currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-
                 Fragment restored = getSupportFragmentManager().findFragmentByTag(currentFragmentTag);
+
                 if (restored != null) {
+                    // ✅ لا نلمس hide/show — FragmentManager يتولّى ذلك
                     currentFragment = restored;
-                    // ✅ إظهار الـ Fragment المستعاد مع إخفاء الآخرين (معاملة ذرّية)
-                    FragmentTransaction ft = getSupportFragmentManager().beginTransaction()
-                            .setReorderingAllowed(true);
-
-                    for (Fragment f : getSupportFragmentManager().getFragments()) {
-                        if (f == null || !f.isAdded()) continue;
-                        if (f == restored) {
-                            if (f.isHidden()) ft.show(f);
-                        } else {
-                            if (!f.isHidden()) ft.hide(f);
-                        }
-                    }
-                    ft.commitNowAllowingStateLoss();
-
-                    Log.d(TAG, "Restored fragment: " + currentFragmentTag);
                 } else {
                     Fragment newFragment = navigationManager.createFragmentByTag(currentFragmentTag);
                     if (newFragment != null) {
@@ -354,7 +334,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             currentFragment = navigationManager.getCurrentFragment();
 
-            // ✅ تحديث الشريط عند الاستعادة
             lastToolbarTag = null;
             refreshSecondaryToolbar(currentFragmentTag);
             updateBottomNavSelectionByTag(currentFragmentTag);
@@ -379,7 +358,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
                 if (statusChipView != null) {
                     statusChipView.setOnClickListener(v -> showHardwareOptionsDialog());
-
                     statusChipContainer.addView(statusChipView);
 
                     if (hardwareManager != null) {
@@ -628,7 +606,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.onResume();
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
-        mainHandler.postDelayed(this::hideLoading, 100);
+
+        // ✅ إخفاء فوري — يمنع حجب اللمس عند العودة
+        hideLoadingDirectly();
 
         if (hardwareManager != null) {
             updateSecondaryStatusChip(hardwareManager.isConnected());
@@ -755,21 +735,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ==================== ✅ التنقل (مُصلح) ====================
+    // ==================== التنقل ====================
 
     public void loadFragment(Fragment fragment, String tag) {
         loadFragment(fragment, tag, true);
     }
 
-    /**
-     * ✅ loadFragment المُصلح:
-     * - Debounce فقط للشاشات الفرعية (addToBackStack=true)
-     * - التبويبات (addToBackStack=false) لا تُقيَّد بـ debounce
-     */
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
         long currentTime = System.currentTimeMillis();
 
-        // 🛡️ Debounce فقط للشاشات الفرعية
+        // 🛡️ Debounce فقط للشاشات الفرعية (addToBackStack=true)
+        // ✅ التبويبات (addToBackStack=false) لا تُقيَّد
         if (addToBackStack && currentTime - lastNavigationTime < NAV_DEBOUNCE_DELAY) {
             Log.d(TAG, "Navigation debounced (back-stack): " + tag);
             return;
@@ -777,7 +753,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         lastNavigationTime = currentTime;
 
         showLoading();
-
         navigationManager.loadFragment(fragment, tag, addToBackStack);
         currentFragment = navigationManager.getCurrentFragment();
         currentFragmentTag = tag;
@@ -789,10 +764,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         hideLoading();
     }
 
-    /**
-     * ✅ loadFragmentDirectly — بدون debounce (للتنقل الأولي والاستعادة)
-     */
     public void loadFragmentDirectly(Fragment fragment, String tag) {
+        // ✅ بدون debounce — للتنقل الأولي والاستعادة
         lastNavigationTime = System.currentTimeMillis();
 
         showLoading();
@@ -1468,8 +1441,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ==================== البحث والمزامنة ====================
-
     private void showGlobalSearchDialog() {
         BottomSheetDialog searchDialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
 
@@ -1523,8 +1494,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     .show();
         }, 1500);
     }
-
-    // ==================== قائمة الإجراءات السريعة ====================
 
     private void showQuickActionMenu() {
         try {
@@ -1740,6 +1709,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             return;
         }
 
+        // إغلاق أي DialogFragment مفتوح
         for (Fragment fragment : fm.getFragments()) {
             if (fragment instanceof androidx.fragment.app.DialogFragment) {
                 androidx.fragment.app.DialogFragment dialogFragment =
@@ -1766,16 +1736,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 FragmentTransaction ft = fm.beginTransaction()
                         .setReorderingAllowed(true);
 
-                if (topFragment.isHidden()) {
-                    ft.show(topFragment);
-                }
-
+                // ✅ show/hide صريح (حسب البروفيسور)
                 for (Fragment f : fm.getFragments()) {
-                    if (f != null && f != topFragment && f.isAdded() && !f.isHidden()) {
-                        ft.hide(f);
+                    if (f != null && f.isAdded()) {
+                        if (f == topFragment) {
+                            ft.show(f);
+                        } else {
+                            ft.hide(f);
+                        }
                     }
                 }
-
                 ft.commitNowAllowingStateLoss();
 
                 currentFragment = topFragment;
@@ -1822,6 +1792,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ==================== التحميل والعرض ====================
 
+    /**
+     * ✅ showLoading — مع تفعيل clickable/focusable أثناء التحميل
+     */
     public void showLoading() {
         mainHandler.removeCallbacks(hideLoadingRunnable);
         mainHandler.post(() -> {
@@ -1831,6 +1804,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     loadingOverlay.animate().cancel();
                     loadingOverlay.setVisibility(View.VISIBLE);
                     loadingOverlay.setAlpha(1.0f);
+                    loadingOverlay.setClickable(true);
+                    loadingOverlay.setFocusable(true);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error showing loading: " + e.getMessage());
@@ -1845,15 +1820,27 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         mainHandler.postDelayed(hideLoadingRunnable, HIDE_LOADING_DELAY);
     }
 
+    /**
+     * ✅ hideLoadingDirectly — تعطيل clickable/focusable أولاً (إصلاح البروفيسور)
+     */
     private void hideLoadingDirectly() {
         try {
             View loadingOverlay = findViewById(R.id.successOverlayMain);
-            if (loadingOverlay != null && loadingOverlay.getVisibility() == View.VISIBLE) {
-                loadingOverlay.animate()
-                        .alpha(0.0f)
-                        .setDuration(150)
-                        .withEndAction(() -> loadingOverlay.setVisibility(View.GONE))
-                        .start();
+            if (loadingOverlay != null) {
+                // ✅ تعطيل النقر أولاً — يمنع حجب اللمس
+                loadingOverlay.setClickable(false);
+                loadingOverlay.setFocusable(false);
+
+                if (loadingOverlay.getVisibility() == View.VISIBLE) {
+                    loadingOverlay.animate()
+                            .alpha(0.0f)
+                            .setDuration(150)
+                            .withEndAction(() -> loadingOverlay.setVisibility(View.GONE))
+                            .start();
+                } else {
+                    loadingOverlay.setVisibility(View.GONE);
+                    loadingOverlay.setAlpha(0.0f);
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error hiding loading: " + e.getMessage());
