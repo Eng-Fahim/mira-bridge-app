@@ -293,7 +293,10 @@ public class MiraInventoryViewModel extends AndroidViewModel {
     /**
      * 📥 تحميل الكتالوج من السيرفر (يُستدعى من الـ Fragment).
      */
-    public void updateCatalog(@NonNull Map<String, InventoryItem> catalog) {
+    /**
+ * 📥 تحميل الكتالوج من السيرفر (يُستدعى من الـ Fragment).
+ */
+public void updateCatalog(@NonNull Map<String, InventoryItem> catalog) {
     catalogEpcs.clear();
     catalogItemsMap.clear();
     barcodeToEpcMap.clear();
@@ -307,8 +310,18 @@ public class MiraInventoryViewModel extends AndroidViewModel {
         catalogEpcs.add(epc);
         catalogItemsMap.put(epc, item);
 
-        // ✅ خرائط الباركود تُبنى في الـ Fragment أثناء جلب الكتالوج
-        // (لأن InventoryItem لا يحتوي على gtin13/serialNumber كـ getters)
+        // ✅ بناء خرائط الباركود — باستخدام الأسماء الصحيحة
+        String gtin = item.getGtin();
+        if (gtin != null && !gtin.isEmpty()) {
+            barcodeToEpcMap.put(gtin, epc);
+            epcToBarcodeMap.put(epc, gtin);
+        }
+
+        String serial = item.getSerial();
+        if (serial != null && !serial.isEmpty()) {
+            barcodeToEpcMap.put(serial, epc);
+            epcToBarcodeMap.put(epc, serial);
+        }
     }
 
     expectedCountLiveData.setValue(catalog.size());
