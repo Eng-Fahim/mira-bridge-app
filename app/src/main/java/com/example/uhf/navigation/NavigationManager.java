@@ -57,7 +57,7 @@ public class NavigationManager {
                 transaction.addToBackStack(tag);
             }
 
-            transaction.commitNowAllowingStateLoss();
+            transaction.commitAllowingStateLoss();
 
             currentFragment = fragment;
             currentFragmentTag = tag;
@@ -81,7 +81,7 @@ public class NavigationManager {
 
             transaction.replace(CONTAINER_ID, fragment, tag);
 
-            transaction.commitNowAllowingStateLoss();
+            transaction.commitAllowingStateLoss();
 
             currentFragment = fragment;
             currentFragmentTag = tag;
