@@ -1,123 +1,141 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout 
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     tools:context=".activity.UHFMainActivity">
 
-    <!-- ==================== 1. TOOLBAR ==================== -->
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
+
+    <!-- ==================== 1. TOOLBAR / APP BAR ==================== -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="wrap_content"
         android:background="?attr/colorPrimaryContainer"
-        android:paddingHorizontal="8dp"
-        app:contentInsetStartWithNavigation="0dp"
-        app:menu="@menu/main_menu">
+        app:elevation="2dp">
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="vertical"
-            android:paddingEnd="8dp">
-
-            <TextView
-                android:id="@+id/tvTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                tools:text="منظومة الذهب الدولية" />
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:paddingHorizontal="8dp"
+            app:contentInsetStartWithNavigation="0dp"
+            app:menu="@menu/main_menu">
 
             <LinearLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="vertical"
+                android:paddingEnd="8dp">
 
                 <TextView
-                    android:id="@+id/tvSubtitle"
+                    android:id="@+id/tvTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:alpha="0.8"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="?attr/colorOnPrimaryContainer"
-                    android:textSize="10sp"
-                    tools:text="📍 Main Branch" />
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="منظومة الذهب الدولية" />
 
-                <View
-                    android:id="@+id/statusDot"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_status_dot"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/statusText"
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:textColor="?attr/colorOnPrimaryContainer"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-            </LinearLayout>
-        </LinearLayout>
-    </com.google.android.material.appbar.MaterialToolbar>
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-    <!-- ==================== 2. SECONDARY TOOLBAR ==================== -->
-    <LinearLayout
-        android:id="@+id/secondaryToolbar"
+                    <TextView
+                        android:id="@+id/tvSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:alpha="0.8"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        android:textSize="10sp"
+                        tools:text="📍 Main Branch" />
+
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_status_dot"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        android:textSize="9sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- ✅ الشريط الثانوي (MaterialToolbar مع Menu) -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/secondaryToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="?attr/colorSurface"
+            android:elevation="2dp"
+            android:layoutDirection="locale"
+            app:menu="@menu/main_menu" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- ==================== 2. MAIN CONTENT ==================== -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:background="?attr/colorSurface"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="12dp"
-        android:elevation="2dp"
-        android:layoutDirection="locale">
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <FrameLayout
-            android:id="@+id/statusChipContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp" />
-
-        <View
+            android:id="@+id/fragment_container"
             android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:clipToPadding="false"
+            android:paddingBottom="90dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <FrameLayout
+            android:id="@+id/successOverlayMain"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1" />
+            android:alpha="0.5"
+            android:background="?attr/colorOnSurface"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone">
 
-        <LinearLayout
-            android:id="@+id/secondaryActionsContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal" />
-    </LinearLayout>
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                app:indicatorColor="?attr/colorPrimary" />
+        </FrameLayout>
 
-    <!-- ==================== 3. FRAGMENT CONTAINER ==================== -->
-    <FrameLayout
-        android:id="@+id/fragment_container"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingBottom="90dp" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ==================== 4. BOTTOM NAV + FAB ==================== -->
+    <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
         android:layoutDirection="locale"
         android:clipToPadding="false"
         android:paddingHorizontal="20dp"
@@ -161,21 +179,7 @@
             app:maxImageSize="28dp"
             app:pressedTranslationZ="6dp"
             app:tint="?attr/colorOnPrimary" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ==================== 5. LOADING OVERLAY (صغير في الوسط) ==================== -->
-    <FrameLayout
-        android:id="@+id/successOverlayMain"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:visibility="gone">
-
-        <com.google.android.material.progressindicator.CircularProgressIndicator
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:indeterminate="true"
-            app:indicatorColor="?attr/colorPrimary" />
-    </FrameLayout>
-
-</LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
