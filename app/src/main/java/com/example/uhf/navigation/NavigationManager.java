@@ -6,7 +6,8 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.fragment.*;
 import com.example.uhf.manager.PermissionManager;
-
+import com.example.uhf.R;
+import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 public class NavigationManager {
 
     private final FragmentManager fragmentManager;
