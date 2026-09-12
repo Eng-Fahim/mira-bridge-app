@@ -294,33 +294,26 @@ public class MiraInventoryViewModel extends AndroidViewModel {
      * 📥 تحميل الكتالوج من السيرفر (يُستدعى من الـ Fragment).
      */
     public void updateCatalog(@NonNull Map<String, InventoryItem> catalog) {
-        catalogEpcs.clear();
-        catalogItemsMap.clear();
-        barcodeToEpcMap.clear();
-        epcToBarcodeMap.clear();
+    catalogEpcs.clear();
+    catalogItemsMap.clear();
+    barcodeToEpcMap.clear();
+    epcToBarcodeMap.clear();
 
-        for (Map.Entry<String, InventoryItem> entry : catalog.entrySet()) {
-            String epc = entry.getKey();
-            InventoryItem item = entry.getValue();
-            if (epc == null || item == null) continue;
+    for (Map.Entry<String, InventoryItem> entry : catalog.entrySet()) {
+        String epc = entry.getKey();
+        InventoryItem item = entry.getValue();
+        if (epc == null || item == null) continue;
 
-            catalogEpcs.add(epc);
-            catalogItemsMap.put(epc, item);
+        catalogEpcs.add(epc);
+        catalogItemsMap.put(epc, item);
 
-            // بناء خرائط الباركود
-            if (item.getGtin13() != null && !item.getGtin13().isEmpty()) {
-                barcodeToEpcMap.put(item.getGtin13(), epc);
-                epcToBarcodeMap.put(epc, item.getGtin13());
-            }
-            if (item.getSerialNumber() != null && !item.getSerialNumber().isEmpty()) {
-                barcodeToEpcMap.put(item.getSerialNumber(), epc);
-                epcToBarcodeMap.put(epc, item.getSerialNumber());
-            }
-        }
-
-        expectedCountLiveData.setValue(catalog.size());
-        Log.d(TAG, "Catalog loaded: " + catalog.size() + " items");
+        // ✅ خرائط الباركود تُبنى في الـ Fragment أثناء جلب الكتالوج
+        // (لأن InventoryItem لا يحتوي على gtin13/serialNumber كـ getters)
     }
+
+    expectedCountLiveData.setValue(catalog.size());
+    Log.d(TAG, "Catalog loaded: " + catalog.size() + " items");
+}
 
     /**
      * 🧹 مسح الكتالوج (للجرد الأعمى).
