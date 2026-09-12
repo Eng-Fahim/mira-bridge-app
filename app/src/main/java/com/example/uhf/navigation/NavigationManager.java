@@ -4,28 +4,10 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
-import android.util.Log;
-
 import com.example.uhf.fragment.*;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.R;
-import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 
-import java.util.List;
-
-/**
- * NavigationManager - الإصدار النهائي (replace-based)
- *
- * ✅ الميزات:
- * - استخدام replace بدل add/hide/show
- * - كل Fragment جديد يستبدل القديم تماماً
- * - لا تراكم، لا تعارض، لا شاشة فارغة
- * - ViewModel يحفظ البيانات (لا حاجة لحفظ Fragment)
- */
 public class NavigationManager {
-
-    private static final String TAG = "NavigationManager";
-    private static final int CONTAINER_ID = R.id.fragment_container;
 
     private final FragmentManager fragmentManager;
     private final PermissionManager permissionManager;
@@ -39,83 +21,45 @@ public class NavigationManager {
 
     // ==================== التنقل ====================
 
-    /**
-     * ✅ loadFragment — replace ذرّي
-     */
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
         if (fragmentManager == null || fragment == null) return;
 
         try {
-            FragmentTransaction transaction = fragmentManager.beginTransaction()
-                    .setReorderingAllowed(true)
-                    .setCustomAnimations(0, 0, 0, 0);
+            currentFragment = fragment;
+            currentFragmentTag = tag;
 
-            // ✅ replace: يُزيل القديم + يُضيف الجديد في معاملة واحدة
-            transaction.replace(CONTAINER_ID, fragment, tag);
+            if (!addToBackStack) {
+                clearBackStack();
+            }
+
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.setCustomAnimations(0, 0, 0, 0);
+            transaction.replace(R.id.fragment_container, fragment, tag);
 
             if (addToBackStack) {
                 transaction.addToBackStack(tag);
             }
 
-            transaction.commitAllowingStateLoss();
-
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-
-            Log.d(TAG, "loadFragment: " + tag + " (backStack=" + addToBackStack + ")");
-
+            transaction.commit();
         } catch (Exception e) {
-            Log.e(TAG, "loadFragment error: " + e.getMessage(), e);
+            e.printStackTrace();
         }
     }
 
-    /**
-     * ✅ loadFragmentDirectly — بدون backStack
-     */
     public void loadFragmentDirectly(Fragment fragment, String tag) {
         if (fragmentManager == null || fragment == null) return;
 
         try {
-            FragmentTransaction transaction = fragmentManager.beginTransaction()
-                    .setReorderingAllowed(true);
-
-            transaction.replace(CONTAINER_ID, fragment, tag);
-
-            transaction.commitAllowingStateLoss();
-
             currentFragment = fragment;
             currentFragmentTag = tag;
 
-            Log.d(TAG, "loadFragmentDirectly: " + tag);
-
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, fragment, tag);
+            transaction.commitNow();
         } catch (Exception e) {
-            Log.e(TAG, "loadFragmentDirectly error: " + e.getMessage(), e);
+            e.printStackTrace();
         }
     }
-
-    // ==================== أدوات مساعدة ====================
-
-    /**
-     * ✅ مسح الـ back stack
-     */
-    private void clearBackStackInternal() {
-        try {
-            if (fragmentManager.getBackStackEntryCount() > 0) {
-                fragmentManager.popBackStack(
-                        null,
-                        FragmentManager.POP_BACK_STACK_INCLUSIVE
-                );
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "clearBackStackInternal error: " + e.getMessage(), e);
-        }
-    }
-
-    public void clearBackStack() {
-        clearBackStackInternal();
-    }
-
-    // ==================== Factory ====================
 
     public Fragment createFragmentByTag(String tag) {
         if (tag == null) return new MiraDashboardFragment();
@@ -147,41 +91,16 @@ public class NavigationManager {
         }
     }
 
-    // ==================== استرجاع الحالة ====================
-
-    /**
-     * ✅ إرجاع أعلى Fragment في الـ back stack
-     */
-    public Fragment getTopFragment() {
-        try {
-            if (fragmentManager.getBackStackEntryCount() > 0) {
-                FragmentManager.BackStackEntry entry = fragmentManager.getBackStackEntryAt(
-                        fragmentManager.getBackStackEntryCount() - 1
-                );
-                Fragment f = fragmentManager.findFragmentByTag(entry.getName());
-                if (f != null) return f;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "getTopFragment error: " + e.getMessage());
+    public void clearBackStack() {
+        if (fragmentManager != null && fragmentManager.getBackStackEntryCount() > 0) {
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
         }
-        return currentFragment;
     }
 
-    /**
-     * ✅ إرجاع الـ Fragment الحالي المعروض فعلاً
-     */
-    public Fragment getVisibleFragment() {
-        try {
-            List<Fragment> fragments = fragmentManager.getFragments();
-            if (fragments != null) {
-                for (Fragment f : fragments) {
-                    if (f != null && f.isAdded() && !f.isHidden() && f.isVisible()) {
-                        return f;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "getVisibleFragment error: " + e.getMessage());
+    public Fragment getTopFragment() {
+        if (fragmentManager != null && fragmentManager.getBackStackEntryCount() > 0) {
+            FragmentManager.BackStackEntry entry = fragmentManager.getBackStackEntryAt(fragmentManager.getBackStackEntryCount() - 1);
+            return fragmentManager.findFragmentByTag(entry.getName());
         }
         return currentFragment;
     }
