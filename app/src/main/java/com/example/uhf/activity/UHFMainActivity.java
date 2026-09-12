@@ -713,57 +713,45 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
      * ✅ loadFragment المبسّط — FragmentManager مباشرة
      */
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (fragment == null) return;
+    if (fragment == null) return;
+    Log.d(TAG, "loadFragment: " + tag + " (backStack=" + addToBackStack + ")");
+    try {
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.fragment_container, fragment, tag);
 
-        Log.d(TAG, "loadFragment: " + tag);
-
-        try {
-            androidx.fragment.app.FragmentTransaction transaction =
-                    getSupportFragmentManager().beginTransaction();
-
-            transaction.replace(R.id.fragment_container, fragment, tag);
-
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-
-            transaction.commit();
-
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-
-            updateBottomNavSelectionByTag(tag);
-            refreshSecondaryToolbar(tag);
-            updateSecondaryToolbarVisibility(tag);
-
-        } catch (Exception e) {
-            Log.e(TAG, "loadFragment error: " + e.getMessage(), e);
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
+            transaction.commitAllowingStateLoss();   // ✅ للـ backstack
+        } else {
+            transaction.commitNowAllowingStateLoss(); // ✅ فوري للتبويبات!
         }
+
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        updateBottomNavSelectionByTag(tag);
+        refreshSecondaryToolbar(tag);
+        updateSecondaryToolbarVisibility(tag);
+    } catch (Exception e) {
+        Log.e(TAG, "loadFragment error: " + e.getMessage(), e);
     }
+}
 
     public void loadFragmentDirectly(Fragment fragment, String tag) {
-        if (fragment == null) return;
-
-        Log.d(TAG, "loadFragmentDirectly: " + tag);
-
-        try {
-            androidx.fragment.app.FragmentTransaction transaction =
-                    getSupportFragmentManager().beginTransaction();
-
-            transaction.replace(R.id.fragment_container, fragment, tag);
-            transaction.commit();
-
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-
-            updateBottomNavSelectionByTag(tag);
-            refreshSecondaryToolbar(tag);
-            updateSecondaryToolbarVisibility(tag);
-
-        } catch (Exception e) {
-            Log.e(TAG, "loadFragmentDirectly error: " + e.getMessage(), e);
-        }
+    if (fragment == null) return;
+    Log.d(TAG, "loadFragmentDirectly: " + tag);
+    try {
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.fragment_container, fragment, tag);
+        transaction.commitNowAllowingStateLoss();  // ✅ فوري
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        updateBottomNavSelectionByTag(tag);
+        refreshSecondaryToolbar(tag);
+        updateSecondaryToolbarVisibility(tag);
+    } catch (Exception e) {
+        Log.e(TAG, "loadFragmentDirectly error: " + e.getMessage(), e);
     }
+}
 
     /**
      * ✅ إرجاع الـ Fragment الحالي المعروض
