@@ -51,25 +51,18 @@ public class NavigationManager {
     if (fragmentManager == null || fragment == null) return;
 
     try {
-        if (currentFragment != null && tag != null && tag.equals(currentFragmentTag)) {
-            Log.d(TAG, "Same fragment, skipping: " + tag);
-            return;
-        }
+        // ✅ لا يوجد فحص "Same fragment" — نسمح بإعادة التنقل الآمن
 
         if (!addToBackStack) {
             clearBackStackInternal();
         }
 
         FragmentTransaction transaction = fragmentManager.beginTransaction();
-        
-        // ✅✅✅ المفتاح: setReorderingAllowed + setCustomAnimations
         transaction.setReorderingAllowed(true);
         transaction.setCustomAnimations(0, 0, 0, 0);
 
-        // ✅ 1) أخفِ كل الـ Fragments النشطة
         hideAllActiveFragments(transaction, tag);
 
-        // ✅ 2) ابحث عن المطلوب
         Fragment existingFragment = fragmentManager.findFragmentByTag(tag);
 
         if (existingFragment != null && existingFragment.isAdded()) {
@@ -88,14 +81,12 @@ public class NavigationManager {
             transaction.addToBackStack(tag);
         }
 
-        // ✅✅✅ المفتاح: commitNowAllowingStateLoss بدل commit
         transaction.commitNowAllowingStateLoss();
 
     } catch (Exception e) {
         Log.e(TAG, "loadFragment error: " + e.getMessage(), e);
     }
 }
-
     /**
      * ✅ تحميل فوري (يستبدل المحتوى)
      * ⚠️ استخدمه فقط عند الحاجة الفورية (مثل Dashboard الأولي)
