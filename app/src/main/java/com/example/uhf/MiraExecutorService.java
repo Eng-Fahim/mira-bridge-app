@@ -9,12 +9,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 🏗️ MiraExecutorService - مدير الخيوط المشترك على مستوى التطبيق
- * 
+ *
  * ⚠️ هذا الـ Singleton يعيش مع التطبيق كاملاً.
  * لا يُغلق أبداً خلال حياة العملية.
- * 
- * @author Mira Team
- * @version 1.0
+ *
+ * ✅ مُصحَّح: بدون setDaemon(true)
+ * — لأن Android يقتل daemon threads عند أول فرصة
+ * — مما يُسبب تجمّد التطبيق بعد config changes
  */
 public class MiraExecutorService {
 
@@ -44,19 +45,20 @@ public class MiraExecutorService {
 
         Log.i(TAG, "✅ MiraExecutorService initialized");
     }
+
     /**
- * ✅ فحص سلامة المدير
- */
-public boolean isHealthy() {
-    try {
-        return !singleThreadExecutor.isShutdown()
-                && !networkExecutor.isShutdown()
-                && !backgroundExecutor.isShutdown()
-                && !imageExecutor.isShutdown();
-    } catch (Exception e) {
-        return false;
+     * ✅ فحص سلامة المدير
+     */
+    public boolean isHealthy() {
+        try {
+            return !singleThreadExecutor.isShutdown()
+                    && !networkExecutor.isShutdown()
+                    && !backgroundExecutor.isShutdown()
+                    && !imageExecutor.isShutdown();
+        } catch (Exception e) {
+            return false;
+        }
     }
-}
 
     public static MiraExecutorService getInstance() {
         if (INSTANCE == null) {
@@ -111,7 +113,8 @@ public boolean isHealthy() {
         @Override
         public Thread newThread(Runnable r) {
             Thread t = new Thread(r, prefix + "-" + counter.incrementAndGet());
-            t.setDaemon(true);
+            // ✅ تم حذف t.setDaemon(true) — كان يُسبب موت الخيوط
+            // ✅ الآن الخيوط تبقى حية مع التطبيق
             return t;
         }
     }
