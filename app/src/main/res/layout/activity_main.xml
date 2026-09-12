@@ -82,7 +82,7 @@
         </com.google.android.material.appbar.MaterialToolbar>
 
         <!-- ═══════════════════════════════════════════════════
-             الشريط الثانوي الجديد — أزرار مباشرة (بدون Menu)
+             الشريط الثانوي — أزرار مباشرة
              ═══════════════════════════════════════════════════ -->
         <LinearLayout
             android:id="@+id/secondaryToolbar"
@@ -95,19 +95,16 @@
             android:elevation="2dp"
             android:layoutDirection="locale">
 
-            <!-- ✅ يمين (RTL): حاوية حالة الجهاز -->
             <FrameLayout
                 android:id="@+id/statusChipContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp" />
 
-            <!-- ✅ مسافة مرنة -->
             <View
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1" />
 
-            <!-- ✅ يسار (RTL): حاوية الأزرار الديناميكية -->
             <LinearLayout
                 android:id="@+id/secondaryActionsContainer"
                 android:layout_width="wrap_content"
@@ -125,6 +122,7 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
+        <!-- ✅ fragment_container — يبقى paddingBottom لتجنّب تراكب BottomNav -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
@@ -136,16 +134,20 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- طبقة التحميل -->
+        <!-- ✅ successOverlayMain — التعديل الحاسم: clickable=false + focusable=false -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:alpha="0.5"
             android:background="?attr/colorOnSurface"
-            android:clickable="true"
-            android:focusable="true"
-            android:visibility="gone">
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:layout_width="wrap_content"
