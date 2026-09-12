@@ -264,18 +264,21 @@ public class MiraInventoryViewModel extends AndroidViewModel {
      * 🗑️ حذف عنصر ممسوح حسب EPC.
      */
     public void removeScannedItem(@NonNull String epc) {
-        List<ScannedItemDisplay> current = scannedItemsLiveData.getValue();
-        if (current == null || current.isEmpty()) return;
+    List<ScannedItemDisplay> current = scannedItemsLiveData.getValue();
+    if (current == null || current.isEmpty()) return;
 
-        List<ScannedItemDisplay> updated = new ArrayList<>();
-        for (ScannedItemDisplay item : current) {
-            if (item != null && !epc.equals(item.epc)) {
-                updated.add(item);
-            }
+    List<ScannedItemDisplay> updated = new ArrayList<>();
+    for (ScannedItemDisplay item : current) {
+        if (item != null && !epc.equals(item.epc)) {
+            updated.add(item);
         }
-        scannedItemsLiveData.setValue(updated);
-        scannedCountLiveData.setValue(updated.size());
     }
+    scannedItemsLiveData.setValue(updated);
+    scannedCountLiveData.setValue(updated.size());
+    
+    // ✅ حذف من سجل التكرار لتمكين المسح الفوري
+    recentTagReads.remove(epc);
+}
 
     /**
      * 🧹 مسح كل العناصر الممسوحة (بداية جلسة جديدة).
@@ -297,32 +300,45 @@ public class MiraInventoryViewModel extends AndroidViewModel {
  * 📥 تحميل الكتالوج من السيرفر (يُستدعى من الـ Fragment).
  */
 public void updateCatalog(@NonNull Map<String, InventoryItem> catalog) {
-    catalogEpcs.clear();
-    catalogItemsMap.clear();
-    barcodeToEpcMap.clear();
-    epcToBarcodeMap.clear();
+    // ✅ 1. بناء الخرائط الجديدة أولاً (بدون لمس الأصلية)
+    Set<String> newCatalogEpcs = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    Map<String, InventoryItem> newCatalogItemsMap = new ConcurrentHashMap<>();
+    Map<String, String> newBarcodeToEpcMap = new ConcurrentHashMap<>();
+    Map<String, String> newEpcToBarcodeMap = new ConcurrentHashMap<>();
 
     for (Map.Entry<String, InventoryItem> entry : catalog.entrySet()) {
         String epc = entry.getKey();
         InventoryItem item = entry.getValue();
         if (epc == null || item == null) continue;
 
-        catalogEpcs.add(epc);
-        catalogItemsMap.put(epc, item);
+        newCatalogEpcs.add(epc);
+        newCatalogItemsMap.put(epc, item);
 
-        // ✅ بناء خرائط الباركود — باستخدام الأسماء الصحيحة
         String gtin = item.getGtin();
         if (gtin != null && !gtin.isEmpty()) {
-            barcodeToEpcMap.put(gtin, epc);
-            epcToBarcodeMap.put(epc, gtin);
+            newBarcodeToEpcMap.put(gtin, epc);
+            newEpcToBarcodeMap.put(epc, gtin);
         }
 
         String serial = item.getSerial();
         if (serial != null && !serial.isEmpty()) {
-            barcodeToEpcMap.put(serial, epc);
-            epcToBarcodeMap.put(epc, serial);
+            newBarcodeToEpcMap.put(serial, epc);
+            newEpcToBarcodeMap.put(epc, serial);
         }
     }
+
+    // ✅ 2. استبدال ذرّي — لا توجد فجوة زمنية
+    catalogEpcs.clear();
+    catalogEpcs.addAll(newCatalogEpcs);
+    
+    catalogItemsMap.clear();
+    catalogItemsMap.putAll(newCatalogItemsMap);
+    
+    barcodeToEpcMap.clear();
+    barcodeToEpcMap.putAll(newBarcodeToEpcMap);
+    
+    epcToBarcodeMap.clear();
+    epcToBarcodeMap.putAll(newEpcToBarcodeMap);
 
     expectedCountLiveData.setValue(catalog.size());
     Log.d(TAG, "Catalog loaded: " + catalog.size() + " items");
@@ -344,11 +360,21 @@ public void updateCatalog(@NonNull Map<String, InventoryItem> catalog) {
     // ═══════════════════════════════════════════════════════════════════
 
     public void setScanning(boolean scanning) {
-        isScanningLiveData.setValue(scanning);
-        if (scanning) {
-            scanStartTimeLiveData.setValue(android.os.SystemClock.elapsedRealtime());
-        }
+    Boolean currentScanning = isScanningLiveData.getValue();
+    boolean wasScanning = Boolean.TRUE.equals(currentScanning);
+    
+    isScanningLiveData.setValue(scanning);
+    
+    // ✅ فقط عند بدء جلسة جديدة (لا عند الاستعادة)
+    if (scanning && !wasScanning) {
+        scanStartTimeLiveData.setValue(android.os.SystemClock.elapsedRealtime());
     }
+    
+    // ✅ إعادة تعيين وقت البدء عند التوقف
+    if (!scanning && wasScanning) {
+        scanStartTimeLiveData.setValue(0L);
+    }
+}
 
     public void setCurrentMode(@NonNull String mode) {
         currentModeLiveData.setValue(mode);
@@ -410,20 +436,35 @@ public void updateCatalog(@NonNull Map<String, InventoryItem> catalog) {
     // ═══════════════════════════════════════════════════════════════════
 
     @Override
-    protected void onCleared() {
-        super.onCleared();
-        Log.d(TAG, "ViewModel cleared — releasing resources");
-        
-        // ✅ تنظيف صريح
-        scannedItemsLiveData.setValue(new ArrayList<>());
-        recentTagReads.clear();
-        catalogEpcs.clear();
-        catalogItemsMap.clear();
-        barcodeToEpcMap.clear();
-        epcToBarcodeMap.clear();
-        
+protected void onCleared() {
+    super.onCleared();
+    Log.d(TAG, "ViewModel cleared — releasing resources");
+    
+    // ✅ 1. تنظيف الـ Engine أولاً (قبل مسح البيانات)
+    if (inventoryEngine != null) {
+        try {
+            inventoryEngine.processSessionClose();
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing inventory session", e);
+        }
         inventoryEngine = null;
     }
+    
+    // ✅ 2. مسح كل البيانات
+    scannedItemsLiveData.setValue(new ArrayList<>());
+    scannedCountLiveData.setValue(0);
+    expectedCountLiveData.setValue(0);
+    isScanningLiveData.setValue(false);
+    scanStartTimeLiveData.setValue(0L);
+    
+    recentTagReads.clear();
+    catalogEpcs.clear();
+    catalogItemsMap.clear();
+    barcodeToEpcMap.clear();
+    epcToBarcodeMap.clear();
+    
+    Log.d(TAG, "ViewModel cleanup complete");
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  12. أنواع مساعدة (Helper Types)
