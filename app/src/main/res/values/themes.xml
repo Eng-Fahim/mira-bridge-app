@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ==================== الثيم الأساسي الرئيسي الفاخر (Material 3 Enterprise) ==================== -->
+    <!-- ==================== الثيم الأساسي الرئيسي ==================== -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
 
-        <!-- 🔗 ربط مكونات الماتيريال 3 الرئيسية -->
         <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
         <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
         <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
@@ -14,7 +13,7 @@
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
 
-        <!-- 🔤 أوزان Typography معززة للوضوح -->
+        <!-- 🔤 أوزان Typography -->
         <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplaySmall">@style/AppTextAppearance</item>
@@ -31,46 +30,41 @@
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- 🔤 إجبار المكونات المخصصة على استخدام Material3 -->
+        <!-- 🔤 المكونات -->
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
         <item name="buttonStyle">@style/AppButtonStyle</item>
         <item name="radioButtonStyle">@style/AppRadioButtonStyle</item>
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🎨 لوحة الألوان المعدلة للوضع الفاتح (High Contrast Luxury Gold) -->
+        <!-- 🎨 لوحة الألوان -->
         <item name="colorPrimary">#B8860B</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#FFF6E5</item>
         <item name="colorOnPrimaryContainer">#3D2A00</item>
 
-        <!-- اللون الثانوي -->
         <item name="colorSecondary">#1E293B</item>
         <item name="colorOnSecondary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#F1F5F9</item>
         <item name="colorOnSecondaryContainer">#0F172A</item>
 
-        <!-- خلفية التطبيق والأسطح -->
         <item name="android:colorBackground">#F8F9FA</item>
         <item name="colorOnBackground">#0F172A</item>
 
-        <!-- خلفية البطاقات -->
         <item name="colorSurface">#FFFFFF</item>
         <item name="colorOnSurface">#0F172A</item>
         <item name="colorSurfaceVariant">#F1F3F5</item>
         <item name="colorOnSurfaceVariant">#475569</item>
 
-        <!-- الحدود الفاصلة -->
         <item name="colorOutline">#E2E8F0</item>
         <item name="colorOutlineVariant">#CBD5E1</item>
 
-        <!-- ✅ توحيد النوافذ الحوارية والـ BottomSheets -->
+        <!-- ✅ الحوارات -->
         <item name="android:alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
-    <!-- ==================== تحويل الستايلات التابعة لتأخذ من الثيم الرئيسي ==================== -->
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
     <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
     <style name="AppTheme" parent="Theme.Uhfuartdemo" />
@@ -90,36 +84,30 @@
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- ==================== MiraDialogTheme (نوافذ حوارية) ==================== -->
-    <!-- ==================== MiraDialogTheme (نوافذ حوارية) - الوضع الفاتح ==================== -->
-<style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
-    <!-- 🎨 خلفية الحوار -->
-    <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
-    <item name="android:backgroundDimAmount">0.5</item>
+    <!-- ==================== MiraDialogTheme ==================== -->
+    <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
+        <item name="android:backgroundDimAmount">0.5</item>
 
-    <!-- 📝 الألوان -->
-    <item name="android:textColorPrimary">?attr/colorOnSurface</item>
-    <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
-    <item name="android:titleTextColor">?attr/colorPrimary</item>
-    <item name="colorAccent">?attr/colorPrimary</item>
-    <item name="colorPrimary">?attr/colorPrimary</item>
-    <item name="colorOnPrimary">?attr/colorOnPrimary</item>
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:titleTextColor">?attr/colorPrimary</item>
+        <item name="colorAccent">?attr/colorPrimary</item>
+        <item name="colorPrimary">?attr/colorPrimary</item>
+        <item name="colorOnPrimary">?attr/colorOnPrimary</item>
 
-    <!-- 🔤 الخطوط -->
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
 
-    <!-- 🔘 شكل الحوار -->
-    <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
+        <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
 
-    <!-- 🔘 أزرار الحوار -->
-    <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
-    <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
-    <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
-</style>
+        <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
+        <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
+        <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
+    </style>
 
-    <style name="MiraDialogShape" parent="">
-        <item name="cornerFamily">rounded</item>
+    <!-- ✅ تم إزالة parent="" -->
+    <style name="MiraDialogShape" parent="ShapeAppearance.Material3.Corner.Medium">
         <item name="cornerSize">20dp</item>
     </style>
 
@@ -153,15 +141,15 @@
         <item name="shapeAppearanceOverlay">@style/MiraBottomSheetShape</item>
     </style>
 
-    <style name="MiraBottomSheetShape" parent="">
-        <item name="cornerFamily">rounded</item>
+    <!-- ✅ تم إزالة parent="" -->
+    <style name="MiraBottomSheetShape" parent="ShapeAppearance.Material3.Corner.Top">
         <item name="cornerSizeTopLeft">24dp</item>
         <item name="cornerSizeTopRight">24dp</item>
         <item name="cornerSizeBottomLeft">0dp</item>
         <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
-    <!-- ==================== الأنماط المساعدة ومستطيلات المدخلات ==================== -->
+    <!-- ==================== Typography Helpers ==================== -->
     <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -189,13 +177,11 @@
         <item name="cornerRadius">12dp</item>
     </style>
 
-    <!-- ✅ تم التعديل إلى Material3 -->
     <style name="AppRadioButtonStyle" parent="Widget.Material3.CompoundButton.RadioButton">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- ✅ تم التعديل إلى Material3 -->
     <style name="AppCheckBoxStyle" parent="Widget.Material3.CompoundButton.CheckBox">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
