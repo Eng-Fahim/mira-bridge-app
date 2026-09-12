@@ -1,7 +1,6 @@
 package com.example.uhf.activity;
 
 import com.example.uhf.application.MiraApplication;
-import com.example.uhf.manager.AppWatchdog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -10,12 +9,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -38,7 +35,6 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
@@ -52,8 +48,6 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.SessionMonitorManager;
-import com.example.uhf.navigation.NavigationManager;
-import com.example.uhf.navigation.FragmentFactory;
 import com.example.uhf.manager.HardwareManager;
 import com.example.uhf.manager.MiraMessagingManager;
 import com.example.uhf.manager.NotificationManager;
@@ -97,6 +91,24 @@ import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.fragment.MiraGateSettingsFragment;
 
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ *  UHFMainActivity — النسخة المبسّطة (Simplified Navigation)
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ *  ✅ التغييرات:
+ *  - استخدام FragmentManager مباشرة (بدون NavigationManager)
+ *  - بدون AppWatchdog
+ *  - بدون Debounce
+ *  - بدون Overlay
+ *  - بدون FragmentFactory (switch مباشر)
+ *
+ *  ✅ محافظ على:
+ *  - MiraInventoryProFragment + ViewModel
+ *  - MiraPosFragment + ViewModel
+ *  - كل الحوارات والقوائم
+ *  - كل الميزات
+ */
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
@@ -104,7 +116,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
 
     // ✅ المديرين والمكونات
-    private NavigationManager navigationManager;
     private HardwareManager hardwareManager;
     private SoundManager soundManager;
     private NotificationManager notificationManager;
@@ -236,11 +247,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 updateToolbarTitle();
             }
 
-            //AppWatchdog.getInstance().startMonitoring(() -> {
-             //   Log.e(TAG, "UI Thread FROZEN! //Restarting app...");
-               // MiraApplication.getInstance//().restartApp();
-           // });
-
             ToastUtil.init(getApplicationContext());
 
             initializeLanguageState();
@@ -262,7 +268,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             // ✅ تهيئة المديرين
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             permissionManager = PermissionManager.getInstance(getApplicationContext());
-            navigationManager = new NavigationManager(getSupportFragmentManager(), permissionManager);
 
             inventoryLockManager = new InventoryLockManager(this);
             inventoryLockManager.initialize();
@@ -306,19 +311,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             // ==================== التنقل الأولي ====================
             if (savedInstanceState == null) {
                 currentFragmentTag = "Dashboard";
-                navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+                loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
             } else {
-                // ✅ استعادة الحالة — نبني الـ Fragment من جديد (لأن replace يدمّر القديم)
                 currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-                Fragment newFragment = navigationManager.createFragmentByTag(currentFragmentTag);
+                Fragment newFragment = createFragmentByTag(currentFragmentTag);
                 if (newFragment != null) {
-                    navigationManager.loadFragmentDirectly(newFragment, currentFragmentTag);
+                    loadFragmentDirectly(newFragment, currentFragmentTag);
                 } else {
-                    navigationManager.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+                    loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
                 }
             }
 
-            currentFragment = navigationManager.getCurrentFragment();
+            currentFragment = getCurrentVisibleFragment();
 
             lastToolbarTag = null;
             refreshSecondaryToolbar(currentFragmentTag);
@@ -583,7 +587,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public void onPause() {
         super.onPause();
-        AppWatchdog.getInstance().stopMonitoring();
         if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
 
         try {
@@ -699,46 +702,91 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ==================== التنقل ====================
+    // ==================== ✅ التنقل المبسّط ====================
 
     public void loadFragment(Fragment fragment, String tag) {
         loadFragment(fragment, tag, true);
     }
 
     /**
-     * ✅ loadFragment — بدون debounce، بدون overlay
+     * ✅ loadFragment المبسّط — FragmentManager مباشرة
      */
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (navigationManager == null) return;
+        if (fragment == null) return;
 
-        navigationManager.loadFragment(fragment, tag, addToBackStack);
-        currentFragment = navigationManager.getCurrentFragment();
-        currentFragmentTag = tag;
+        Log.d(TAG, "loadFragment: " + tag);
 
-        updateBottomNavSelectionByTag(tag);
-        refreshSecondaryToolbar(tag);
-        updateSecondaryToolbarVisibility(tag);
+        try {
+            androidx.fragment.app.FragmentTransaction transaction =
+                    getSupportFragmentManager().beginTransaction();
+
+            transaction.replace(R.id.fragment_container, fragment, tag);
+
+            if (addToBackStack) {
+                transaction.addToBackStack(tag);
+            }
+
+            transaction.commit();
+
+            currentFragment = fragment;
+            currentFragmentTag = tag;
+
+            updateBottomNavSelectionByTag(tag);
+            refreshSecondaryToolbar(tag);
+            updateSecondaryToolbarVisibility(tag);
+
+        } catch (Exception e) {
+            Log.e(TAG, "loadFragment error: " + e.getMessage(), e);
+        }
     }
 
     public void loadFragmentDirectly(Fragment fragment, String tag) {
-        if (navigationManager == null) return;
+        if (fragment == null) return;
 
-        navigationManager.loadFragmentDirectly(fragment, tag);
+        Log.d(TAG, "loadFragmentDirectly: " + tag);
 
-        currentFragment = navigationManager.getCurrentFragment();
-        currentFragmentTag = tag;
+        try {
+            androidx.fragment.app.FragmentTransaction transaction =
+                    getSupportFragmentManager().beginTransaction();
 
-        updateBottomNavSelectionByTag(tag);
-        updateSecondaryToolbarVisibility(tag);
-        refreshSecondaryToolbar(tag);
+            transaction.replace(R.id.fragment_container, fragment, tag);
+            transaction.commit();
+
+            currentFragment = fragment;
+            currentFragmentTag = tag;
+
+            updateBottomNavSelectionByTag(tag);
+            refreshSecondaryToolbar(tag);
+            updateSecondaryToolbarVisibility(tag);
+
+        } catch (Exception e) {
+            Log.e(TAG, "loadFragmentDirectly error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ إرجاع الـ Fragment الحالي المعروض
+     */
+    private Fragment getCurrentVisibleFragment() {
+        try {
+            List<Fragment> fragments = getSupportFragmentManager().getFragments();
+            if (fragments != null) {
+                for (Fragment f : fragments) {
+                    if (f != null && f.isAdded() && f.isVisible()) {
+                        return f;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "getCurrentVisibleFragment error: " + e.getMessage());
+        }
+        return currentFragment;
     }
 
     private void updateSecondaryToolbarVisibility(String tag) {
         try {
             View secondaryToolbar = findViewById(R.id.secondaryToolbar);
             if (secondaryToolbar == null) return;
-
-            secondaryToolbar.animate().cancel();
 
             boolean shouldHide = isScreenThatHidesToolbar(tag);
 
@@ -764,8 +812,37 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
+    /**
+     * ✅ إنشاء Fragment حسب الـ tag
+     */
     public Fragment createFragmentByTag(String tag) {
-        return FragmentFactory.createFragmentByTag(tag);
+        if (tag == null) return new MiraDashboardFragment();
+
+        switch (tag) {
+            case "Dashboard": return new MiraDashboardFragment();
+            case "Scan": return new MiraInventoryProFragment();
+            case "POS": return new MiraPosFragment();
+            case "Transfers": return new MiraTransferFragment();
+            case "IdentityStudio": return new MiraIdentityStudioFragment();
+            case "Radar": return new MiraUHFRadarLocationFragment();
+            case "SecureGate": return new MiraSecureGateFragment();
+            case "Reports": return new MiraReportsProFragment();
+            case "Accounting": return new MiraAccountingFragment();
+            case "AdminHub": return new MiraAdminHubFragment();
+            case "SalesHistory": return new MiraSalesHistoryFragment();
+            case "ServerConfig": return new MiraServerConfigFragment();
+            case "GoldRates": return new MiraGoldCurrencyFragment();
+            case "Profile": return new MiraProfileFragment();
+            case "UsersManagement": return new UsersManagementFragment();
+            case "RFIDWrite": return new MiraUHFReadWriteFragment();
+            case "ReaderSetup": return new MiraReaderSetupFragment();
+            case "GateSettings": return new MiraGateSettingsFragment();
+            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+            case "Branches": return new MiraBranchesManagementFragment();
+            case "RfidBindings": return new MiraRfidBindingsFragment();
+            case "SoundSettings": return new MiraSoundSettingsFragment();
+            default: return new MiraDashboardFragment();
+        }
     }
 
     public void openReceiptFragment(String rawJson) {
@@ -845,7 +922,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 quickNav.setOnItemSelectedListener(item -> {
                     int id = item.getItemId();
                     String tag = getFragmentTagForNavItem(id);
-                    Fragment fragment = FragmentFactory.createFragmentByTag(tag);
+                    Fragment fragment = createFragmentByTag(tag);
+
+                    Log.d(TAG, "Nav item selected: " + tag);
 
                     if (fragment != null) {
                         loadFragment(fragment, tag, false);
@@ -864,7 +943,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (itemId == R.id.nav_inventory) return "Scan";
         if (itemId == R.id.nav_sales) return "POS";
         if (itemId == R.id.nav_transfers) return "Transfers";
-        return "";
+        return "Dashboard";
     }
 
     private void updateBottomNavSelectionByTag(String tag) {
@@ -1621,8 +1700,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 Toast.LENGTH_SHORT).show();
     }
 
-   
-
     // ==================== التحميل والعرض ====================
 
     public void showLoading() {
@@ -1672,12 +1749,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
             if (hardwareManager != null) hardwareManager.cleanup();
 
-            AppWatchdog.getInstance().stopMonitoring();
-
-            if (getSupportFragmentManager() != null && navigationManager != null) {
-                navigationManager.clearBackStack();
-            }
-
             if (orgProfileManager != null) {
                 orgProfileManager.removeListener(orgProfileListener);
             }
@@ -1726,4 +1797,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-                }
+}
