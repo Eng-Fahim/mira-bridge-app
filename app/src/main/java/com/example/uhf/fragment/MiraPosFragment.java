@@ -26,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.FragmentManager;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -56,42 +57,53 @@ import com.example.uhf.manager.MiraLocalItemCache;
 import com.example.uhf.manager.MiraItemSyncManager;
 import com.example.uhf.utils.MiraExecutorService;
 import com.example.uhf.utils.ScaleSimulationHelper;
+import com.example.uhf.viewmodel.MiraPosViewModel;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * MiraPosFragment - الإصدار الاحترافي 3.0
- * 
- * ✅ الميزات:
- * - استخدام MiraExecutorService (مدير خيوط على مستوى التطبيق)
- * - Payload كامل مع gate_id, user_id, username
- * - بحث ذكي عن القطع مع منع التكرار
- * - إتمام البيع مع Retry
- * - الإرجاع مع Payload كامل
- * - الميزان الذكي + المحاكاة
- * - دعم Offline
- * 
- * ✅ الإصلاحات:
- * - إضافة gate_id و user_id و username لكل الطلبات
- * - فصل البحث عن الإرجاع في RefundDialog
- * - تنظيف الكود وإزالة التكرار
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  MiraPosFragment — الإصدار 4.0 (ViewModel-Integrated)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  🎯 الترقية الرئيسية:
+ *  - كل بيانات POS انتقلت إلى MiraPosViewModel
+ *  - السلة تبقى عبر التنقلات
+ *  - RFID/الوزن/حالة الإرجاع محفوظة
+ *  - Root View Cache للأداء
+ *  - LiveData يُحدّث الواجهة تلقائياً
+ *
+ *  ✅ محافظ على:
+ *  - MiraExecutorService (Singleton)
+ *  - MiraBaseFragment (dialogs helpers)
+ *  - كل منطق البيع والإرجاع
+ *  - SmartScale + Simulation
+ *  - Barcode + RFID scanning
  */
 public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
 
-    // ✅ المتغيرات
+    // ═══════════════════════════════════════════════════════════════════
+    // 🎯 ViewModel — المصدر الوحيد للحقيقة
+    // ═══════════════════════════════════════════════════════════════════
+    private MiraPosViewModel viewModel;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🖼️ Root View Cache
+    // ═══════════════════════════════════════════════════════════════════
+    private View rootView;
+    private boolean isViewInitialized = false;
+
+    // ==================== المتغيرات المحلية (لا تحتاج حفظ) ====================
     private boolean isSyncing = false;
-    private boolean isCheckoutDialogShowing = false;
     private AlertDialog searchLoadingDialog;
     private SessionManager sessionManager;
     private SmartScaleManager scaleManager;
@@ -100,7 +112,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private PendingSalesManager pendingSalesManager;
     private RefundDialog refundDialog;
 
-    // ✅ مدير الخيوط المشترك
+    // ✅ مدير الخيوط المشترك (Singleton)
     private MiraExecutorService miraExecutor;
     private MiraApiClient apiClient;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -111,8 +123,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private RFIDManager rfidManager;
     private boolean isRFIDScanActive = false;
-    private final Set<String> pendingEpcs = new HashSet<>();
-    private final Map<String, Long> lastScannedTimes = new HashMap<>();
 
     // ✅ Views
     private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
@@ -123,28 +133,44 @@ public class MiraPosFragment extends MiraBaseFragment {
     private RecyclerView rvCartItems;
     private View layoutCartEmptyState;
 
-    private boolean isRFIDModeActive = false;
-    private boolean isArabic;
-    private MiraApiClient.ApiResponse lastSaleResponse = null;
-    private boolean isRefundable = false;
-    private double liveScaleWeight = 0.0;
-
-    private final List<CartItem> cartList = new ArrayList<>();
-    private final Set<String> scannedEpcs = new HashSet<>();
     private CartAdapter cartAdapter;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ⚠️ المتغيرات التالية انتقلت إلى MiraPosViewModel:
+    // ---------------------------------------------------------------
+    // ❌ private final List<CartItem> cartList
+    // ❌ private final Set<String> scannedEpcs
+    // ❌ private final Set<String> pendingEpcs
+    // ❌ private final Map<String, Long> lastScannedTimes
+    // ❌ private boolean isRFIDModeActive
+    // ❌ private boolean isRefundable
+    // ❌ private double liveScaleWeight
+    // ❌ private MiraApiClient.ApiResponse lastSaleResponse
+    // ❌ private boolean isCheckoutDialogShowing
+    // ═══════════════════════════════════════════════════════════════════
 
     // ==================== دورة الحياة ====================
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        try {
-            return inflater.inflate(R.layout.fragment_mira_pos, container, false);
-        } catch (Exception e) {
-            Log.e(TAG, "onCreateView error: " + e.getMessage(), e);
-            return null;
+        // ✅ Root View Cache
+        if (rootView == null) {
+            try {
+                rootView = inflater.inflate(R.layout.fragment_mira_pos, container, false);
+            } catch (Exception e) {
+                Log.e(TAG, "onCreateView inflate error: " + e.getMessage(), e);
+                return null;
+            }
+        } else {
+            if (rootView.getParent() != null) {
+                ((ViewGroup) rootView.getParent()).removeView(rootView);
+            }
         }
+
+        return rootView;
     }
 
     @Override
@@ -153,6 +179,10 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         try {
             Context ctx = requireContext();
+
+            // ✅ الحصول على ViewModel (Activity-scoped)
+            viewModel = new ViewModelProvider(requireActivity())
+                    .get(MiraPosViewModel.class);
 
             // ✅ تهيئة المديرين
             branchesManager = MiraBranchesManager.getInstance(ctx);
@@ -166,45 +196,139 @@ public class MiraPosFragment extends MiraBaseFragment {
             // ✅ مدير الخيوط المشترك
             miraExecutor = MiraExecutorService.getInstance();
 
-            // ✅ تهيئة RFID
-            rfidManager = RFIDManager.getInstance(ctx);
-            if (rfidManager != null) {
-                rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
-                    @Override
-                    public void onTagRead(String epc, int rssi) {
-                        if (isRFIDScanActive) onRingScanned(epc);
-                    }
-                    @Override
-                    public void onScanStarted() {}
-                    @Override
-                    public void onScanStopped() {}
-                    @Override
-                    public void onConnectionChanged(boolean connected) {
-                        safeRun(() -> {
-                            if (btnPosRFIDMode != null && isRFIDModeActive) {
-                                btnPosRFIDMode.setAlpha(connected ? 1.0f : 0.5f);
-                            }
-                        });
-                    }
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, "RFID Error: " + error);
-                    }
-                });
+            // ✅ تهيئة RFID (مرة واحدة فقط)
+            if (rfidManager == null) {
+                rfidManager = RFIDManager.getInstance(ctx);
+                if (rfidManager != null) {
+                    rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
+                        @Override
+                        public void onTagRead(String epc, int rssi) {
+                            if (isRFIDScanActive) onRingScanned(epc);
+                        }
+                        @Override
+                        public void onScanStarted() {}
+                        @Override
+                        public void onScanStopped() {}
+                        @Override
+                        public void onConnectionChanged(boolean connected) {
+                            safeRun(() -> {
+                                if (btnPosRFIDMode != null 
+                                        && Boolean.TRUE.equals(viewModel.getIsRFIDModeActive().getValue())) {
+                                    btnPosRFIDMode.setAlpha(connected ? 1.0f : 0.5f);
+                                }
+                            });
+                        }
+                        @Override
+                        public void onError(String error) {
+                            Log.e(TAG, "RFID Error: " + error);
+                        }
+                    });
+                }
             }
 
             apiClient = MiraApiClient.getInstance(ctx);
-            bindViews(view);
-            setupRecyclerView();
-            setupListeners();
-            applyPermissions();
-            initSmartScale();
-            updateCartSummary();
+
+            // ✅ تهيئة Views (مرة واحدة فقط)
+            if (!isViewInitialized) {
+                bindViews(view);
+                setupRecyclerView();
+                setupListeners();
+                applyPermissions();
+                initSmartScale();
+                isViewInitialized = true;
+                Log.d(TAG, "Views initialized for the first time");
+            } else {
+                Log.d(TAG, "Views already initialized — reusing");
+            }
+
+            // ✅ مراقبة LiveData (يُنفَّذ في كل مرة — آمن)
+            observeViewModel();
+
+            // ✅ تحديث أولي
+            updateCartSummaryFromVM();
+
+            // ✅ استعادة حالة RFID إن كانت نشطة
+            restoreRFIDStateIfNeeded();
 
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * ✅ مراقبة كل LiveData
+     */
+    private void observeViewModel() {
+        if (viewModel == null) return;
+
+        // 🛒 السلة — تُحدّث Adapter تلقائياً
+        viewModel.getCartList().observe(getViewLifecycleOwner(), items -> {
+            if (items == null) items = new ArrayList<>();
+            cartAdapter.submitList(new ArrayList<>(items));
+            updateCartSummaryFromVM();
+        });
+
+        // 💰 المجموع
+        viewModel.getCartTotal().observe(getViewLifecycleOwner(), total -> {
+            if (tvTotalAmount != null && total != null) {
+                try {
+                    tvTotalAmount.setText(priceManager.formatPriceDefault(total));
+                } catch (Exception e) {
+                    tvTotalAmount.setText(String.format(Locale.US, "$%.2f", total));
+                }
+            }
+        });
+
+        // 🔢 عدد القطع
+        viewModel.getCartItemCount().observe(getViewLifecycleOwner(), count -> {
+            if (tvItemCount != null && count != null) {
+                tvItemCount.setText(String.valueOf(count));
+            }
+        });
+
+        // 📡 حالة RFID
+        viewModel.getIsRFIDModeActive().observe(getViewLifecycleOwner(), active -> {
+            boolean isActive = Boolean.TRUE.equals(active);
+            if (btnPosRFIDMode != null) {
+                btnPosRFIDMode.setText(isActive
+                        ? (isArabic ? "📡 RFID نشط" : "📡 RFID Active")
+                        : (isArabic ? getString(R.string.pos_scan_rfid) : "📡 Scan RFID"));
+            }
+            if (tvCartStatus != null && isActive) {
+                tvCartStatus.setText(isArabic ? "📡 جاهز لمسح RFID..." : "📡 Ready for RFID...");
+            }
+        });
+
+        // ⚖️ وزن الميزان
+        viewModel.getLiveScaleWeight().observe(getViewLifecycleOwner(), weight -> {
+            if (tvScaleStatus != null && weight != null && weight > 0) {
+                tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", weight));
+                tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
+            }
+        });
+
+        // ⏳ حوار الدفع
+        viewModel.getIsCheckoutDialogShowing().observe(getViewLifecycleOwner(), showing -> {
+            // لا حاجة لعمل شيء — العلم يُدار من ViewModel
+        });
+    }
+
+    /**
+     * ✅ استعادة حالة RFID النشطة بعد العودة
+     */
+    private void restoreRFIDStateIfNeeded() {
+        if (viewModel == null) return;
+
+        if (Boolean.TRUE.equals(viewModel.getIsRFIDModeActive().getValue())) {
+            Log.d(TAG, "Restoring active RFID mode");
+            isRFIDScanActive = true;
+            if (rfidManager != null) {
+                rfidManager.startScan();
+            }
+        }
+    }
+
+    // ==================== دورة الحياة - onResume/onPause ====================
 
     @Override
     public void onResume() {
@@ -216,8 +340,14 @@ public class MiraPosFragment extends MiraBaseFragment {
             if (scaleManager != null) {
                 scaleManager.connect();
             }
-            if (tvCartStatus != null && cartList.isEmpty()) {
-                tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
+            if (tvCartStatus != null) {
+                int count = viewModel != null 
+                        ? viewModel.getCartItemCountValue() : 0;
+                if (count == 0) {
+                    tvCartStatus.setText(isArabic 
+                            ? getString(R.string.pos_ready_scan) 
+                            : "Ready to scan...");
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "onResume error: " + e.getMessage());
@@ -229,7 +359,9 @@ public class MiraPosFragment extends MiraBaseFragment {
         super.onPause();
         try {
             stopRFIDScan();
-            isCheckoutDialogShowing = false;
+            if (viewModel != null) {
+                viewModel.setCheckoutDialogShowing(false);
+            }
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
             }
@@ -238,17 +370,47 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
+    // ==================== دورة الحياة - التنظيف ====================
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         try {
-            stopRFIDScan();
-            isCheckoutDialogShowing = false;
-            if (rfidManager != null) rfidManager.setListener(null);
-            if (scaleManager != null) scaleManager.cleanup();
-            if (simulationHelper != null) simulationHelper.cleanup();
+            // ✅ إيقاف RFID إذا لم يكن نشطاً في ViewModel
+            if (viewModel != null 
+                    && !Boolean.TRUE.equals(viewModel.getIsRFIDModeActive().getValue())) {
+                stopRFIDScan();
+            }
+            
+            if (viewModel != null) {
+                viewModel.setCheckoutDialogShowing(false);
+            }
+            
+            // ⚠️ لا نُلغي listener إذا الجرد نشط
+            if (rfidManager != null 
+                    && (viewModel == null 
+                        || !Boolean.TRUE.equals(viewModel.getIsRFIDModeActive().getValue()))) {
+                rfidManager.setListener(null);
+            }
+            
+            if (scaleManager != null) {
+                scaleManager.cleanup();
+                scaleManager = null;
+            }
+            
+            if (simulationHelper != null) {
+                simulationHelper.cleanup();
+                simulationHelper = null;
+            }
 
-            // ✅ لا نُغلق miraExecutor — إنه على مستوى التطبيق
+            // ✅ إعادة تعيين حالة التهيئة
+            isViewInitialized = false;
+
+            // ✅ إزالة rootView من parent
+            if (rootView != null && rootView.getParent() != null) {
+                ((ViewGroup) rootView.getParent()).removeView(rootView);
+            }
+
         } catch (Exception e) {
             Log.e(TAG, "onDestroyView error: " + e.getMessage());
         }
@@ -259,138 +421,172 @@ public class MiraPosFragment extends MiraBaseFragment {
         super.onDestroy();
         try {
             stopRFIDScan();
-            if (scaleManager != null) scaleManager.cleanup();
-            if (rfidManager != null) rfidManager.release();
+            if (scaleManager != null) {
+                scaleManager.cleanup();
+                scaleManager = null;
+            }
+            if (rfidManager != null) {
+                rfidManager.release();
+                rfidManager = null;
+            }
+            rootView = null;
         } catch (Exception e) {
             Log.e(TAG, "onDestroy error: " + e.getMessage());
         }
     }
+// ==================== [بداية الجزء 3.2] ====================
 
-    // ==================== أدوات مساعدة ====================
+// ═══════════════════════════════════════════════════════════════════
+//  أدوات مساعدة (Helpers)
+// ═══════════════════════════════════════════════════════════════════
 
-    private int getActiveBranchId() {
-        try {
-            return branchesManager != null ? branchesManager.getActiveBranchId() : 1;
-        } catch (Exception e) {
-            return 1;
-        }
+private int getActiveBranchId() {
+    try {
+        return branchesManager != null ? branchesManager.getActiveBranchId() : 1;
+    } catch (Exception e) {
+        return 1;
     }
+}
 
-    private int getKaratNumber(String karat) {
-        if (karat == null) return 21;
-        switch (karat.toUpperCase()) {
-            case "24K": return 24;
-            case "22K": return 22;
-            case "21K": return 21;
-            case "18K": return 18;
-            case "14K": return 14;
-            default: return 21;
-        }
+private int getKaratNumber(String karat) {
+    if (karat == null) return 21;
+    switch (karat.toUpperCase()) {
+        case "24K": return 24;
+        case "22K": return 22;
+        case "21K": return 21;
+        case "18K": return 18;
+        case "14K": return 14;
+        default: return 21;
     }
+}
 
-    private void safeRun(Runnable r) {
-        try {
-            if (isAdded() && getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (isAdded()) r.run();
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "safeRun error: " + e.getMessage());
-        }
-    }
-
-    private void showToast(String m) {
-        try {
-            if (getContext() != null && isAdded()) {
-                Toast.makeText(getContext(), m, Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "showToast error: " + e.getMessage());
-        }
-    }
-
-    private void playAlertSound(int id) {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).playSound(id);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "playAlertSound error: " + e.getMessage());
-        }
-    }
-
-    // ==================== تهيئة الواجهة ====================
-
-    private void bindViews(View view) {
-        tvScaleStatus = view.findViewById(R.id.tvPosScaleStatus);
-        tvItemCount = view.findViewById(R.id.tvPosItemCount);
-        tvTotalAmount = view.findViewById(R.id.tvPosTotalAmount);
-        tvCartStatus = view.findViewById(R.id.tvPosCartStatus);
-        tilManualEpc = view.findViewById(R.id.tilPosManualEpc);
-        etManualEpc = view.findViewById(R.id.etPosManualEpc);
-        btnAddManual = view.findViewById(R.id.btnPosAddManual);
-        btnCheckout = view.findViewById(R.id.btnPosCheckout);
-        btnClearCart = view.findViewById(R.id.btnPosClearCart);
-        btnOpenScanner = view.findViewById(R.id.btnOpenScanner);
-        btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
-        rvCartItems = view.findViewById(R.id.rvPosCartItems);
-        layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
-        btnPosRefund = view.findViewById(R.id.btnPosRefund);
-
-        if (tvScaleStatus != null) {
-            tvScaleStatus.setOnClickListener(v -> {
-                if (scaleManager != null) scaleManager.showSettingsDialog();
+/**
+ * ✅ safeRun — تشغيل آمن على UI Thread
+ */
+private void safeRun(Runnable r) {
+    try {
+        if (isAdded() && getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                if (isAdded()) r.run();
             });
         }
-
-        applyLanguage();
+    } catch (Exception e) {
+        Log.e(TAG, "safeRun error: " + e.getMessage());
     }
+}
 
-    private void applyLanguage() {
-        try {
-            if (isArabic) {
-                if (tilManualEpc != null) tilManualEpc.setHint(getString(R.string.pos_manual_hint));
-                if (btnCheckout != null) btnCheckout.setText(R.string.pos_checkout);
-                if (btnClearCart != null) btnClearCart.setText(R.string.pos_clear);
-                if (btnOpenScanner != null) btnOpenScanner.setText(R.string.pos_scan_gs1);
-                if (btnPosRFIDMode != null && !isRFIDModeActive) btnPosRFIDMode.setText(R.string.pos_scan_rfid);
-                if (btnAddManual != null) btnAddManual.setText(R.string.pos_add);
-            } else {
-                if (tilManualEpc != null) tilManualEpc.setHint("Enter EPC or Barcode...");
-                if (btnCheckout != null) btnCheckout.setText("Checkout");
-                if (btnClearCart != null) btnClearCart.setText("Clear");
-                if (btnOpenScanner != null) btnOpenScanner.setText("📷 Scan GS1");
-                if (btnPosRFIDMode != null && !isRFIDModeActive) btnPosRFIDMode.setText("📡 Scan RFID");
-                if (btnAddManual != null) btnAddManual.setText("Add");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "applyLanguage error: " + e.getMessage());
+private void showToast(String m) {
+    try {
+        if (getContext() != null && isAdded()) {
+            Toast.makeText(getContext(), m, Toast.LENGTH_SHORT).show();
         }
+    } catch (Exception e) {
+        Log.e(TAG, "showToast error: " + e.getMessage());
     }
+}
 
-    private void setupRecyclerView() {
-        try {
-            if (rvCartItems != null) {
-                rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
-                cartAdapter = new CartAdapter(cartList, this::removeItemFromCart, isArabic, priceManager);
-                rvCartItems.setAdapter(cartAdapter);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "setupRecyclerView error: " + e.getMessage());
+private void playAlertSound(int id) {
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).playSound(id);
         }
+    } catch (Exception e) {
+        Log.e(TAG, "playAlertSound error: " + e.getMessage());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  تهيئة الواجهة
+// ═══════════════════════════════════════════════════════════════════
+
+private void bindViews(View view) {
+    tvScaleStatus = view.findViewById(R.id.tvPosScaleStatus);
+    tvItemCount = view.findViewById(R.id.tvPosItemCount);
+    tvTotalAmount = view.findViewById(R.id.tvPosTotalAmount);
+    tvCartStatus = view.findViewById(R.id.tvPosCartStatus);
+    tilManualEpc = view.findViewById(R.id.tilPosManualEpc);
+    etManualEpc = view.findViewById(R.id.etPosManualEpc);
+    btnAddManual = view.findViewById(R.id.btnPosAddManual);
+    btnCheckout = view.findViewById(R.id.btnPosCheckout);
+    btnClearCart = view.findViewById(R.id.btnPosClearCart);
+    btnOpenScanner = view.findViewById(R.id.btnOpenScanner);
+    btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
+    rvCartItems = view.findViewById(R.id.rvPosCartItems);
+    layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
+    btnPosRefund = view.findViewById(R.id.btnPosRefund);
+
+    if (tvScaleStatus != null) {
+        tvScaleStatus.setOnClickListener(v -> {
+            if (scaleManager != null) scaleManager.showSettingsDialog();
+        });
     }
 
-    // ==================== [يتبع في المرحلة 2] ====================
+    applyLanguage();
+}
 
-// ==================== المستمعون ====================
+private void applyLanguage() {
+    try {
+        if (isArabic) {
+            if (tilManualEpc != null) tilManualEpc.setHint(getString(R.string.pos_manual_hint));
+            if (btnCheckout != null) btnCheckout.setText(R.string.pos_checkout);
+            if (btnClearCart != null) btnClearCart.setText(R.string.pos_clear);
+            if (btnOpenScanner != null) btnOpenScanner.setText(R.string.pos_scan_gs1);
+            if (btnPosRFIDMode != null && !isRFIDModeCurrentlyActive()) {
+                btnPosRFIDMode.setText(R.string.pos_scan_rfid);
+            }
+            if (btnAddManual != null) btnAddManual.setText(R.string.pos_add);
+        } else {
+            if (tilManualEpc != null) tilManualEpc.setHint("Enter EPC or Barcode...");
+            if (btnCheckout != null) btnCheckout.setText("Checkout");
+            if (btnClearCart != null) btnClearCart.setText("Clear");
+            if (btnOpenScanner != null) btnOpenScanner.setText("📷 Scan GS1");
+            if (btnPosRFIDMode != null && !isRFIDModeCurrentlyActive()) {
+                btnPosRFIDMode.setText("📡 Scan RFID");
+            }
+            if (btnAddManual != null) btnAddManual.setText("Add");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "applyLanguage error: " + e.getMessage());
+    }
+}
+
+private boolean isRFIDModeCurrentlyActive() {
+    return viewModel != null 
+            && Boolean.TRUE.equals(viewModel.getIsRFIDModeActive().getValue());
+}
+
+private void setupRecyclerView() {
+    try {
+        if (rvCartItems != null) {
+            rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
+
+            // ✅ CartAdapter الجديد — لا يستقبل قائمة
+            cartAdapter = new CartAdapter(
+                    this::removeItemFromCart,
+                    isArabic,
+                    priceManager
+            );
+
+            rvCartItems.setAdapter(cartAdapter);
+            rvCartItems.setHasFixedSize(false);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "setupRecyclerView error: " + e.getMessage());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  المستمعون (Listeners)
+// ═══════════════════════════════════════════════════════════════════
 
 private void setupListeners() {
     try {
         if (etManualEpc != null) {
             etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
-                if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEARCH
-                        || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER 
+                if (actionId == EditorInfo.IME_ACTION_DONE
+                        || actionId == EditorInfo.IME_ACTION_SEARCH
+                        || (event != null 
+                            && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
                             && event.getAction() == KeyEvent.ACTION_DOWN)) {
                     submitManualEpc();
                     return true;
@@ -428,7 +624,9 @@ private void setupListeners() {
                     openBarcodeScanner();
                 } catch (Exception e) {
                     Log.e(TAG, "Open scanner error: " + e.getMessage());
-                    showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+                    showToast(isArabic 
+                            ? "⚠️ تعذر فتح الماسح" 
+                            : "⚠️ Unable to open scanner");
                 }
             });
         }
@@ -449,22 +647,29 @@ private void setupListeners() {
     }
 }
 
-// ==================== إدخال EPC يدوياً ====================
+// ═══════════════════════════════════════════════════════════════════
+//  إدخال EPC يدوياً
+// ═══════════════════════════════════════════════════════════════════
 
 private void submitManualEpc() {
     try {
-        if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() 
+        if (!(permissionManager.canView("pos")
+                || permissionManager.isPosOperator()
                 || permissionManager.isManager())) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
 
         UIHelper.hideKeyboard(getActivity());
-        String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
+        String epc = etManualEpc != null 
+                ? etManualEpc.getText().toString().trim() : "";
 
         if (!epc.isEmpty()) {
-            if (scannedEpcs.contains(epc)) {
-                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
+            // ✅ فحص التكرار من ViewModel
+            if (viewModel != null && viewModel.getScannedEpcs().contains(epc)) {
+                showToast(isArabic 
+                        ? "⚠️ هذه القطعة مضافة مسبقاً!" 
+                        : "⚠️ Item already in cart!");
                 playAlertSound(2);
                 return;
             }
@@ -478,22 +683,21 @@ private void submitManualEpc() {
     }
 }
 
-// ==================== الميزان الذكي ====================
+// ═══════════════════════════════════════════════════════════════════
+//  الميزان الذكي
+// ═══════════════════════════════════════════════════════════════════
 
 private void initSmartScale() {
     try {
-        scaleManager = new SmartScaleManager(requireContext(), 
+        scaleManager = new SmartScaleManager(requireContext(),
                 new SmartScaleManager.ScaleCallback() {
             @Override
             public void onWeightReceived(double weight) {
-                liveScaleWeight = weight;
-                safeRun(() -> {
-                    if (tvScaleStatus != null) {
-                        tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", weight));
-                        tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
-                    }
+                // ✅ حفظ في ViewModel
+                if (viewModel != null) {
+                    viewModel.setScaleWeight(weight);
                     updateCartItemsScaleWeight(weight);
-                });
+                }
             }
 
             @Override
@@ -503,16 +707,22 @@ private void initSmartScale() {
                         tvScaleStatus.setText("⚖️ " + name);
                         tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
                     }
-                    showToast(isArabic ? "✅ تم الاتصال: " + name : "✅ Connected: " + name);
+                    showToast(isArabic 
+                            ? "✅ تم الاتصال: " + name 
+                            : "✅ Connected: " + name);
                 });
             }
 
             @Override
             public void onScaleDisconnected() {
-                liveScaleWeight = 0.0;
+                if (viewModel != null) {
+                    viewModel.setScaleWeight(0.0);
+                }
                 safeRun(() -> {
                     if (tvScaleStatus != null) {
-                        tvScaleStatus.setText(isArabic ? "⚖️ غير متصل" : "⚖️ Offline");
+                        tvScaleStatus.setText(isArabic 
+                                ? "⚖️ غير متصل" 
+                                : "⚖️ Offline");
                         tvScaleStatus.setTextColor(Color.parseColor("#E74C3C"));
                     }
                 });
@@ -524,18 +734,20 @@ private void initSmartScale() {
             }
         });
 
-        simulationHelper = new ScaleSimulationHelper(requireContext(), 
+        simulationHelper = new ScaleSimulationHelper(requireContext(),
                 new ScaleSimulationHelper.SimulationCallback() {
             @Override
             public void onWeightReceived(double weight, String label) {
                 safeRun(() -> {
-                    liveScaleWeight = weight;
+                    if (viewModel != null) {
+                        viewModel.setScaleWeight(weight);
+                        updateCartItemsScaleWeight(weight);
+                    }
                     if (tvScaleStatus != null) {
-                        tvScaleStatus.setText(String.format(Locale.US, 
+                        tvScaleStatus.setText(String.format(Locale.US,
                                 "⚖️ %.2fg (محاكاة)", weight));
                         tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
                     }
-                    updateCartItemsScaleWeight(weight);
                     showToast("📦 " + label + ": " + weight + "g");
                 });
             }
@@ -546,24 +758,26 @@ private void initSmartScale() {
     }
 }
 
+/**
+ * ✅ تحديث وزن القطعة الأولى عند تغير الميزان (يُفوّض لـ ViewModel)
+ */
 private void updateCartItemsScaleWeight(double currentScaleWeight) {
-    if (cartList.isEmpty() || currentScaleWeight <= 0) return;
+    if (viewModel == null) return;
 
-    CartItem topItem = cartList.get(0);
-    if (topItem.scaleWeight != currentScaleWeight) {
-        topItem.scaleWeight = currentScaleWeight;
-        if (priceManager != null && topItem.weight > 0) {
-            topItem.price = priceManager.calculateGoldPrice(
-                    getKaratNumber(topItem.karat), currentScaleWeight);
-        }
-        if (cartAdapter != null) {
-            cartAdapter.notifyItemChanged(0);
-        }
-        updateCartSummary();
-    }
+    viewModel.updateTopItemScaleWeight(currentScaleWeight,
+            (karat, weight) -> {
+                // ✅ حساب السعر عبر PriceCalculator
+                if (priceManager != null) {
+                    return priceManager.calculateGoldPrice(
+                            getKaratNumber(karat), weight);
+                }
+                return 0.0;
+            });
 }
 
-// ==================== الباركود ====================
+// ═══════════════════════════════════════════════════════════════════
+//  فتح ماسح الباركود
+// ═══════════════════════════════════════════════════════════════════
 
 private void openBarcodeScanner() {
     try {
@@ -575,8 +789,8 @@ private void openBarcodeScanner() {
         sf.setOnBarcodeScannedListener((data, format) -> {
             try {
                 onBarcodeScanned(data);
-                if (isAdded() && getParentFragmentManager() != null &&
-                        getParentFragmentManager().getBackStackEntryCount() > 0) {
+                if (isAdded() && getParentFragmentManager() != null
+                        && getParentFragmentManager().getBackStackEntryCount() > 0) {
                     getParentFragmentManager().popBackStack();
                 }
             } catch (Exception e) {
@@ -600,33 +814,36 @@ private void openBarcodeScanner() {
                 .commitAllowingStateLoss();
     } catch (Exception e) {
         Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
-        showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+        showToast(isArabic 
+                ? "⚠️ تعذر فتح الماسح" 
+                : "⚠️ Unable to open scanner");
     }
 }
 
-// ==================== RFID ====================
+// ═══════════════════════════════════════════════════════════════════
+//  RFID Mode
+// ═══════════════════════════════════════════════════════════════════
 
 private void toggleRFIDMode() {
     try {
-        if (!isAdded() || rfidManager == null) return;
+        if (!isAdded() || rfidManager == null || viewModel == null) return;
 
-        isRFIDModeActive = !isRFIDModeActive;
-        if (isRFIDModeActive) {
+        boolean currentlyActive = isRFIDModeCurrentlyActive();
+        boolean newState = !currentlyActive;
+
+        // ✅ حفظ في ViewModel
+        viewModel.setRFIDMode(newState);
+
+        if (newState) {
             startRFIDScan();
-            if (btnPosRFIDMode != null) 
-                btnPosRFIDMode.setText(isArabic ? "📡 RFID نشط" : "📡 RFID Active");
-            if (tvCartStatus != null) 
-                tvCartStatus.setText(isArabic ? "📡 جاهز لمسح RFID..." : "📡 Ready for RFID...");
         } else {
             stopRFIDScan();
-            if (btnPosRFIDMode != null) 
-                btnPosRFIDMode.setText(isArabic ? getString(R.string.pos_scan_rfid) : "📡 Scan RFID");
-            if (tvCartStatus != null) 
-                tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
         }
     } catch (Exception e) {
         Log.e(TAG, "toggleRFIDMode error: " + e.getMessage());
-        isRFIDModeActive = false;
+        if (viewModel != null) {
+            viewModel.setRFIDMode(false);
+        }
     }
 }
 
@@ -651,17 +868,24 @@ private void stopRFIDScan() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  استقبال القراءات (RFID + Barcode)
+// ═══════════════════════════════════════════════════════════════════
+
 public void onRingScanned(String epc) {
     try {
-        if (epc == null || epc.trim().isEmpty()) return;
-        long currentTime = System.currentTimeMillis();
-        Long lastTime = lastScannedTimes.get(epc);
-        if (lastTime != null && (currentTime - lastTime < 1500)) return;
-        lastScannedTimes.put(epc, currentTime);
+        if (epc == null || epc.trim().isEmpty() || viewModel == null) return;
 
-        if (scannedEpcs.contains(epc)) {
+        // ✅ فحص Debounce من ViewModel
+        if (viewModel.isDebounceActive(epc)) return;
+        viewModel.updateScanTime(epc);
+
+        // ✅ فحص التكرار
+        if (viewModel.getScannedEpcs().contains(epc)) {
             safeRun(() -> {
-                showToast(isArabic ? "⚠️ مضافة مسبقاً!" : "⚠️ Already in cart!");
+                showToast(isArabic 
+                        ? "⚠️ مضافة مسبقاً!" 
+                        : "⚠️ Already in cart!");
                 playAlertSound(2);
             });
             return;
@@ -674,15 +898,18 @@ public void onRingScanned(String epc) {
 
 public void onBarcodeScanned(String data) {
     try {
-        if (data == null || data.trim().isEmpty()) return;
-        long currentTime = System.currentTimeMillis();
-        Long lastTime = lastScannedTimes.get(data);
-        if (lastTime != null && (currentTime - lastTime < 1500)) return;
-        lastScannedTimes.put(data, currentTime);
+        if (data == null || data.trim().isEmpty() || viewModel == null) return;
 
-        if (scannedEpcs.contains(data)) {
+        // ✅ فحص Debounce من ViewModel
+        if (viewModel.isDebounceActive(data)) return;
+        viewModel.updateScanTime(data);
+
+        // ✅ فحص التكرار
+        if (viewModel.getScannedEpcs().contains(data)) {
             safeRun(() -> {
-                showToast(isArabic ? "⚠️ مضافة مسبقاً!" : "⚠️ Already in cart!");
+                showToast(isArabic 
+                        ? "⚠️ مضافة مسبقاً!" 
+                        : "⚠️ Already in cart!");
                 playAlertSound(2);
             });
             return;
@@ -693,35 +920,46 @@ public void onBarcodeScanned(String data) {
     }
 }
 
-// ==================== البحث عن القطعة ====================
+// ═══════════════════════════════════════════════════════════════════
+//  البحث عن القطعة (Core Logic)
+// ═══════════════════════════════════════════════════════════════════
 
 private void processRingEpc(final String code, final String source) {
     if (code == null || code.trim().isEmpty() || !isAdded()) return;
+    if (viewModel == null) return;
+
     final String cleanCode = code.trim();
 
-    synchronized (pendingEpcs) {
-        if (pendingEpcs.contains(cleanCode)) return;
-        pendingEpcs.add(cleanCode);
+    // ✅ فحص Pending من ViewModel (بدل synchronized يدوي)
+    if (!viewModel.startPendingSearch(cleanCode)) {
+        Log.d(TAG, "Search already pending for: " + cleanCode);
+        return;
     }
 
     playAlertSound(1);
 
     safeRun(() -> {
         showSearchLoadingDialog(cleanCode);
-        if (tvCartStatus != null) 
-            tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
+        if (tvCartStatus != null) {
+            tvCartStatus.setText(isArabic 
+                    ? "🔍 جاري البحث..." 
+                    : "🔍 Searching...");
+        }
     });
 
-    // ✅ استخدام networkExecutor بدلاً من new Thread
+    // ✅ استخدام networkExecutor المشترك
     miraExecutor.getNetworkExecutor().execute(() -> {
         try {
             Context context = getContext();
-            if (context == null) return;
+            if (context == null) {
+                viewModel.finishPendingSearch(cleanCode);
+                return;
+            }
 
             MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(context);
             final int branchId = getActiveBranchId();
 
-            syncManager.findItem(cleanCode, branchId, 
+            syncManager.findItem(cleanCode, branchId,
                     new MiraItemSyncManager.ItemLookupCallback() {
                 @Override
                 public void onItemFound(JSONObject item, boolean fromServer) {
@@ -730,10 +968,13 @@ private void processRingEpc(final String code, final String source) {
                         int itemBranchId = item.optInt("branch_id", -1);
                         if (itemBranchId > 0 && itemBranchId != branchId) {
                             showSuccessMessage(
-                                isArabic ? "❌ قطعة في فرع آخر" : "❌ Item in Another Branch",
-                                isArabic ? "هذه القطعة موجودة في فرع مختلف ولا يمكن بيعها من هنا" : 
-                                           "This item is in a different branch and cannot be sold here",
-                                false
+                                    isArabic 
+                                            ? "❌ قطعة في فرع آخر" 
+                                            : "❌ Item in Another Branch",
+                                    isArabic 
+                                            ? "هذه القطعة موجودة في فرع مختلف" 
+                                            : "This item is in a different branch",
+                                    false
                             );
                             playAlertSound(2);
                             return;
@@ -751,13 +992,15 @@ private void processRingEpc(final String code, final String source) {
                 }
             });
         } catch (Exception e) {
+            Log.e(TAG, "processRingEpc error: " + e.getMessage());
             safeRun(() -> {
                 dismissSearchLoadingDialog();
                 handleItemNotFound(cleanCode);
             });
         } finally {
-            synchronized (pendingEpcs) {
-                pendingEpcs.remove(cleanCode);
+            // ✅ إزالة Pending من ViewModel
+            if (viewModel != null) {
+                viewModel.finishPendingSearch(cleanCode);
             }
         }
     });
@@ -765,81 +1008,88 @@ private void processRingEpc(final String code, final String source) {
 
 private void parseItemResponse(String code, JSONObject data) {
     try {
+        if (viewModel == null) return;
+
         JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
         if (item == null) {
             handleItemNotFound(code);
             return;
         }
 
-        String vaultStatus = item.optString("status", 
+        String vaultStatus = item.optString("status",
                 item.optString("vault_status", "")).toLowerCase();
 
         if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
             safeRun(() -> {
                 showSuccessMessage(
-                    isArabic ? "❌ قطعة مباعة" : "❌ Item Sold",
-                    isArabic ? "هذه القطعة تم بيعها بالفعل ولا يمكن بيعها مرة أخرى" : 
-                               "This item has already been sold",
-                    false
+                        isArabic ? "❌ قطعة مباعة" : "❌ Item Sold",
+                        isArabic 
+                                ? "هذه القطعة تم بيعها بالفعل" 
+                                : "This item has already been sold",
+                        false
                 );
                 playAlertSound(2);
             });
             return;
         }
 
-        boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
-        String title = item.optString("title", 
+        boolean isAvailable = !vaultStatus.equals("sold") 
+                && !vaultStatus.equals("reserved");
+        String title = item.optString("title",
                 item.optString("item_title", isArabic ? "قطعة" : "Item"));
-        String karat = item.optString("karat", item.optString("gold_karat", "21K"));
-        double weight = item.optDouble("weight", 
-                item.optDouble("gross_weight", 
+        String karat = item.optString("karat", 
+                item.optString("gold_karat", "21K"));
+        double weight = item.optDouble("weight",
+                item.optDouble("gross_weight",
                         item.optDouble("gross_weight_grams", 0)));
-        double price = item.optDouble("retail_price", 
+        double price = item.optDouble("retail_price",
                 item.optDouble("retail_price_usd", item.optDouble("price", 0)));
 
         if (price <= 0 && weight > 0 && priceManager != null) {
             price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
         }
 
-        CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight, 
+        // ✅ إنشاء CartItem
+        CartItem cartItem = new CartItem(code, title, karat, weight, 0.0,
                 price, isAvailable, vaultStatus.toUpperCase());
-        cartItem.serialNo = item.optString("serial", item.optString("serial_number", ""));
+        cartItem.serialNo = item.optString("serial", 
+                item.optString("serial_number", ""));
         cartItem.gtin = item.optString("gtin", item.optString("gtin13", ""));
-        cartItem.location = item.optString("location", item.optString("current_location", ""));
+        cartItem.location = item.optString("location", 
+                item.optString("current_location", ""));
         cartItem.itemId = item.optInt("id", item.optInt("item_id", 0));
 
-        boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo, 
-                cartItem.gtin);
+        final CartItem finalItem = cartItem;
 
         safeRun(() -> {
-            if (alreadyInCart) {
-                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
+            if (!isAvailable) {
+                showSuccessMessage(
+                        isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
+                        isArabic 
+                                ? "حالة القطعة: " + vaultStatus 
+                                : "Item status: " + vaultStatus,
+                        false
+                );
+                updateCartSummaryFromVM();
+                return;
+            }
+
+            // ✅ إضافة للسلة عبر ViewModel
+            MiraPosViewModel.CartAddResult result = viewModel.addToCart(finalItem);
+
+            if (result == MiraPosViewModel.CartAddResult.DUPLICATE) {
+                showToast(isArabic 
+                        ? "⚠️ هذه القطعة مضافة مسبقاً!" 
+                        : "⚠️ Item already in cart!");
                 playAlertSound(2);
                 return;
             }
 
-            if (!isAvailable) {
-                showSuccessMessage(
-                    isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
-                    isArabic ? "حالة القطعة: " + vaultStatus : "Item status: " + vaultStatus,
-                    false
-                );
-                updateCartSummary();
-                return;
+            // ✅ نجحت الإضافة — تمرير للأعلى
+            if (rvCartItems != null) {
+                rvCartItems.scrollToPosition(0);
             }
-
-            scannedEpcs.add(code);
-            if (cartItem.serialNo != null && !cartItem.serialNo.isEmpty()) {
-                scannedEpcs.add(cartItem.serialNo);
-            }
-            if (cartItem.gtin != null && !cartItem.gtin.isEmpty()) {
-                scannedEpcs.add(cartItem.gtin);
-            }
-
-            cartList.add(0, cartItem);
-            if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
-            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-            updateCartSummary();
+            playAlertSound(1);
         });
     } catch (Exception e) {
         Log.e(TAG, "Parse error: " + e.getMessage());
@@ -847,20 +1097,9 @@ private void parseItemResponse(String code, JSONObject data) {
     }
 }
 
-private boolean isItemAlreadyInCart(String epc, String serialNo, String gtin) {
-    synchronized (cartList) {
-        for (CartItem item : cartList) {
-            if (item.epc != null && epc != null && item.epc.equalsIgnoreCase(epc)) return true;
-            if (item.serialNo != null && serialNo != null && !serialNo.isEmpty()
-                    && item.serialNo.equalsIgnoreCase(serialNo)) return true;
-            if (item.gtin != null && gtin != null && !gtin.isEmpty()
-                    && item.gtin.equalsIgnoreCase(gtin)) return true;
-        }
-    }
-    return false;
-}
-
-// ==================== Dialog البحث ====================
+// ═══════════════════════════════════════════════════════════════════
+//  Dialog البحث
+// ═══════════════════════════════════════════════════════════════════
 
 private void showSearchLoadingDialog(String code) {
     try {
@@ -886,14 +1125,17 @@ private void showSearchLoadingDialog(String code) {
 
         ProgressBar progressBar = new ProgressBar(ctx);
         progressBar.setIndeterminate(true);
-        LinearLayout.LayoutParams pbParams = new LinearLayout.LayoutParams(100, 100);
+        LinearLayout.LayoutParams pbParams = 
+                new LinearLayout.LayoutParams(100, 100);
         pbParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
         pbParams.topMargin = 16;
         progressBar.setLayoutParams(pbParams);
         layout.addView(progressBar);
 
         TextView tvLoading = new TextView(ctx);
-        tvLoading.setText(isArabic ? "جاري البحث عن القطعة..." : "Searching for item...");
+        tvLoading.setText(isArabic 
+                ? "جاري البحث عن القطعة..." 
+                : "Searching for item...");
         tvLoading.setTextSize(16);
         tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
         tvLoading.setGravity(android.view.Gravity.CENTER);
@@ -990,157 +1232,202 @@ private void showSuccessMessage(String title, String message, boolean isSuccess)
 private void handleItemNotFound(String code) {
     safeRun(() -> {
         showSuccessMessage(
-            isArabic ? "❌ القطعة غير موجودة" : "❌ Item Not Found",
-            isArabic ? "لم يتم العثور على القطعة بالكود:\n" + code : 
-                       "Item not found with code:\n" + code,
-            false
+                isArabic ? "❌ القطعة غير موجودة" : "❌ Item Not Found",
+                isArabic 
+                        ? "لم يتم العثور على القطعة بالكود:\n" + code 
+                        : "Item not found with code:\n" + code,
+                false
         );
         playAlertSound(2);
-        updateCartSummary();
+        updateCartSummaryFromVM();
     });
 }
 
-// ==================== السلة ====================
+// ═══════════════════════════════════════════════════════════════════
+//  السلة — تحديث وحذف
+// ═══════════════════════════════════════════════════════════════════
 
-private void updateCartSummary() {
+/**
+ * ✅ تحديث الواجهة من ViewModel
+ */
+private void updateCartSummaryFromVM() {
     try {
-        int count = cartList.size();
-        double sum = 0;
-        boolean bad = false;
-        for (CartItem i : cartList) {
-            sum += i.price;
-            if (!i.isAvailable) bad = true;
+        if (viewModel == null) return;
+
+        int count = viewModel.getCartItemCountValue();
+        double total = viewModel.getCartTotalValue();
+        List<CartItem> items = viewModel.getCartList().getValue();
+
+        boolean hasBadItem = false;
+        if (items != null) {
+            for (CartItem item : items) {
+                if (!item.isAvailable) {
+                    hasBadItem = true;
+                    break;
+                }
+            }
         }
+
         final int fc = count;
-        final double fs = sum;
-        final boolean fb = bad;
+        final double fs = total;
+        final boolean fb = hasBadItem;
 
         safeRun(() -> {
-            if (layoutCartEmptyState != null) 
+            if (layoutCartEmptyState != null) {
                 layoutCartEmptyState.setVisibility(fc == 0 ? View.VISIBLE : View.GONE);
-            if (tvItemCount != null) tvItemCount.setText(String.valueOf(fc));
-            if (tvTotalAmount != null) 
-                tvTotalAmount.setText(priceManager.formatPriceDefault(fs));
+            }
+            if (tvItemCount != null) {
+                tvItemCount.setText(String.valueOf(fc));
+            }
+            if (tvTotalAmount != null) {
+                try {
+                    tvTotalAmount.setText(priceManager.formatPriceDefault(fs));
+                } catch (Exception e) {
+                    tvTotalAmount.setText(String.format(Locale.US, "$%.2f", fs));
+                }
+            }
             if (tvCartStatus != null) {
-                if (fc == 0) 
-                    tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
-                else if (fb) 
-                    tvCartStatus.setText(isArabic ? "⚠️ قطعة غير متاحة!" : "⚠️ Unavailable item!");
-                else 
-                    tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
+                if (fc == 0) {
+                    tvCartStatus.setText(isArabic 
+                            ? getString(R.string.pos_ready_scan) 
+                            : "Ready to scan...");
+                } else if (fb) {
+                    tvCartStatus.setText(isArabic 
+                            ? "⚠️ قطعة غير متاحة!" 
+                            : "⚠️ Unavailable item!");
+                } else {
+                    tvCartStatus.setText(isArabic 
+                            ? "✓ جاهز للبيع" 
+                            : "✓ Ready for sale");
+                }
             }
             if (btnCheckout != null) {
-                btnCheckout.setEnabled(fc > 0 && !fb && 
-                        (permissionManager.canView("pos") || 
-                         permissionManager.isPosOperator() || 
-                         permissionManager.isManager()));
+                boolean canUsePos = permissionManager.canView("pos")
+                        || permissionManager.isPosOperator()
+                        || permissionManager.isManager();
+                btnCheckout.setEnabled(fc > 0 && !fb && canUsePos);
                 btnCheckout.setAlpha(fc > 0 && !fb ? 1f : 0.5f);
             }
         });
     } catch (Exception e) {
-        Log.e(TAG, "updateCartSummary error: " + e.getMessage());
+        Log.e(TAG, "updateCartSummaryFromVM error: " + e.getMessage());
     }
 }
 
+/**
+ * ✅ حذف قطعة من السلة (يُفوّض لـ ViewModel)
+ */
 private void removeItemFromCart(int pos) {
     try {
-        if (pos >= 0 && pos < cartList.size()) {
-            CartItem item = cartList.get(pos);
-            scannedEpcs.remove(item.epc);
-            if (item.serialNo != null && !item.serialNo.isEmpty()) {
-                scannedEpcs.remove(item.serialNo);
-            }
-            if (item.gtin != null && !item.gtin.isEmpty()) {
-                scannedEpcs.remove(item.gtin);
-            }
-            cartList.remove(pos);
-            if (cartAdapter != null) cartAdapter.notifyItemRemoved(pos);
-            updateCartSummary();
-        }
+        if (viewModel == null) return;
+        viewModel.removeFromCart(pos);
     } catch (Exception e) {
         Log.e(TAG, "removeItemFromCart error: " + e.getMessage());
     }
 }
 
+/**
+ * ✅ تفريغ السلة (يُفوّض لـ ViewModel)
+ */
 private void clearCart() {
     try {
-        int size = cartList.size();
-        if (size > 0) {
-            cartList.clear();
-            scannedEpcs.clear();
-            if (cartAdapter != null) cartAdapter.notifyItemRangeRemoved(0, size);
-            updateCartSummary();
-        }
+        if (viewModel == null) return;
+        viewModel.clearCart();
     } catch (Exception e) {
         Log.e(TAG, "clearCart error: " + e.getMessage());
     }
 }
 
+/**
+ * ✅ الحصول على المجموع من ViewModel
+ */
 private double getCartTotal() {
-    double t = 0;
-    for (CartItem i : cartList) t += i.price;
-    return t;
+    return viewModel != null ? viewModel.getCartTotalValue() : 0.0;
 }
+    // ==================== [بداية الجزء 3.3] ====================
 
-// ==================== [يتبع في المرحلة 3] ====================
-
-    // ==================== إتمام البيع ====================
+    // ═══════════════════════════════════════════════════════════════════
+    //  إتمام البيع
+    // ═══════════════════════════════════════════════════════════════════
 
     private void processCheckoutAndStockUpdate() {
         try {
-            if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() 
+            if (!(permissionManager.canView("pos")
+                    || permissionManager.isPosOperator()
                     || permissionManager.isManager())) {
                 showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
                 return;
             }
-            if (cartList.isEmpty()) {
+
+            List<CartItem> items = viewModel != null 
+                    ? viewModel.getCartList().getValue() : null;
+            if (items == null || items.isEmpty()) {
                 showToast(isArabic ? "السلة فارغة" : "Cart is empty");
                 return;
             }
-            if (isCheckoutDialogShowing) return;
+
+            // ✅ فحص من ViewModel
+            if (viewModel.isCheckoutDialogShowingValue()) {
+                return;
+            }
+
             if (!isAdded() || getActivity() == null) return;
 
             UIHelper.hideKeyboard(getActivity());
-            isCheckoutDialogShowing = true;
 
-            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
+            // ✅ تسجيل في ViewModel
+            viewModel.setCheckoutDialogShowing(true);
+
+            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(
+                    getCartTotal(), items.size());
 
             dialog.setCheckoutListener(data -> {
-                isCheckoutDialogShowing = false;
+                viewModel.setCheckoutDialogShowing(false);
                 executeCheckoutDirectly(data);
             });
 
             dialog.setOnDismissListener(() -> {
-                isCheckoutDialogShowing = false;
+                if (viewModel != null) {
+                    viewModel.setCheckoutDialogShowing(false);
+                }
             });
 
             FragmentManager fm = getParentFragmentManager();
             if (!fm.isStateSaved()) {
                 dialog.show(fm, "POSCheckoutDialog");
             } else {
-                isCheckoutDialogShowing = false;
+                viewModel.setCheckoutDialogShowing(false);
             }
 
         } catch (Exception e) {
-            isCheckoutDialogShowing = false;
+            if (viewModel != null) {
+                viewModel.setCheckoutDialogShowing(false);
+            }
             Log.e(TAG, "processCheckout error: " + e.getMessage());
-            showToast(isArabic ? "خطأ: " + e.getMessage() : "Error: " + e.getMessage());
+            showToast(isArabic 
+                    ? "خطأ: " + e.getMessage() 
+                    : "Error: " + e.getMessage());
         }
     }
 
     /**
-     * ✅ تنفيذ البيع مباشرة - مع Payload كامل
+     * ✅ تنفيذ البيع مباشرة — مع Payload كامل
      */
     private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
         try {
-            if (!isAdded()) return;
+            if (!isAdded() || viewModel == null) return;
 
             final AlertDialog loadingDialog = showProfessionalLoadingDialog();
             if (loadingDialog == null) return;
 
             setButtonsEnabled(false);
 
-            // ✅ استخدام networkExecutor بدلاً من new Thread
+            // ✅ أخذ نسخة من السلة قبل الاستخدام (thread-safety)
+            List<CartItem> itemsSnapshot = viewModel.getCartList().getValue();
+            if (itemsSnapshot == null) itemsSnapshot = new ArrayList<>();
+            final List<CartItem> cartSnapshot = new ArrayList<>(itemsSnapshot);
+
+            // ✅ استخدام networkExecutor المشترك
             miraExecutor.getNetworkExecutor().execute(() -> {
                 try {
                     Context ctx = getContext();
@@ -1168,12 +1455,13 @@ private double getCartTotal() {
                     payload.put("customer", customer);
 
                     JSONArray itemsArr = new JSONArray();
-                    for (CartItem item : cartList) {
+                    for (CartItem item : cartSnapshot) {
                         JSONObject obj = new JSONObject();
                         obj.put("epc", item.epc);
                         obj.put("title", item.name);
                         obj.put("karat", item.karat);
-                        obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+                        obj.put("weight", item.scaleWeight > 0 
+                                ? item.scaleWeight : item.weight);
                         obj.put("price_usd", item.price);
                         obj.put("item_id", item.itemId);
                         obj.put("serial_no", item.serialNo);
@@ -1189,7 +1477,6 @@ private double getCartTotal() {
                     payment.put("payment_method", data.paymentMethod);
                     payload.put("payment", payment);
 
-                    // ✅ Logging للتشخيص
                     Log.e("POS_DEBUG", "🚨 SENDING CHECKOUT");
                     Log.e("POS_DEBUG", "URL: " + client.getApiUrl() + "pos/checkout");
                     Log.e("POS_DEBUG", "Gate ID: " + client.getGateId());
@@ -1197,10 +1484,11 @@ private double getCartTotal() {
 
                     MiraApiClient.ApiResponse response = client.checkout(payload);
 
-                    Log.e("POS_DEBUG", "🚨 RESPONSE: code=" + (response != null ? response.code : "null")
+                    Log.e("POS_DEBUG", "🚨 RESPONSE: code=" 
+                            + (response != null ? response.code : "null")
                             + ", success=" + (response != null && response.isSuccess)
-                            + ", networkError=" + (response != null && response.isNetworkError)
-                            + ", error=" + (response != null ? response.error : "null"));
+                            + ", networkError=" 
+                            + (response != null && response.isNetworkError));
 
                     final MiraApiClient.ApiResponse finalResponse = response;
 
@@ -1212,22 +1500,15 @@ private double getCartTotal() {
 
                         if (finalResponse != null && finalResponse.isSuccess) {
                             // ✅ نجاح
-                            playAlertSound(1);
-                            clearCart();
-                            showReceipt(finalResponse);
-                            notifyDashboardAndInventoryUpdate("sale");
-                            showToast(isArabic ? "✅ تم البيع بنجاح" : "✅ Sale Successful");
-
-                        } else if (finalResponse != null && finalResponse.isNetworkError) {
+                            handleCheckoutSuccess(finalResponse);
+                        } else if (finalResponse != null 
+                                && finalResponse.isNetworkError) {
                             // ✅ Offline
-                            playAlertSound(1);
-                            clearCart();
-                            showToast(isArabic ? "✅ تم البيع (أوفلاين)" : "✅ Sale (Offline)");
-                            notifyDashboardAndInventoryUpdate("sale_offline");
-
+                            handleCheckoutOffline();
                         } else {
                             // ❌ فشل
-                            String errorMsg = finalResponse != null && finalResponse.error != null
+                            String errorMsg = finalResponse != null 
+                                    && finalResponse.error != null
                                     ? finalResponse.error : "Unknown error";
                             showRetryDialog(
                                     isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
@@ -1254,22 +1535,79 @@ private double getCartTotal() {
             });
 
         } catch (Exception e) {
-            Log.e(TAG, "executeCheckoutDirectly error: " + e.getMessage());
+            Log.e(TAG, "executeCheckoutDirectly outer error: " + e.getMessage());
         }
     }
 
-    private void showReceipt(MiraApiClient.ApiResponse response) {
+    /**
+     * ✅ معالجة نجاح البيع (Online)
+     */
+    private void handleCheckoutSuccess(MiraApiClient.ApiResponse response) {
+        try {
+            if (viewModel == null) return;
+
+            playAlertSound(1);
+
+            // ✅ حفظ استجابة البيع في ViewModel (للإرجاع)
+            String responseJson = "{}";
+            if (response.data != null) {
+                responseJson = response.data.toString();
+            } else if (response.getBody() != null) {
+                responseJson = response.getBody();
+            }
+            viewModel.setLastSaleResponseJson(responseJson);
+            viewModel.setRefundable(true);
+
+            // ✅ تفريغ السلة (عبر ViewModel)
+            viewModel.clearCart();
+
+            // ✅ عرض الإيصال
+            showReceipt(responseJson);
+
+            // ✅ إشعار التحديثات
+            notifyDashboardAndInventoryUpdate("sale");
+
+            showToast(isArabic ? "✅ تم البيع بنجاح" : "✅ Sale Successful");
+
+        } catch (Exception e) {
+            Log.e(TAG, "handleCheckoutSuccess error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ معالجة نجاح البيع (Offline)
+     */
+    private void handleCheckoutOffline() {
+        try {
+            if (viewModel == null) return;
+
+            playAlertSound(1);
+
+            // ✅ تفريغ السلة (عبر ViewModel)
+            viewModel.clearCart();
+
+            showToast(isArabic 
+                    ? "✅ تم البيع (أوفلاين)" 
+                    : "✅ Sale (Offline)");
+
+            notifyDashboardAndInventoryUpdate("sale_offline");
+
+        } catch (Exception e) {
+            Log.e(TAG, "handleCheckoutOffline error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ عرض الإيصال
+     */
+    private void showReceipt(String receiptJson) {
         try {
             if (!isAdded() || getActivity() == null) return;
+            if (receiptJson == null) receiptJson = "{}";
 
-            String receiptJson = "{}";
-            if (response != null && response.data != null) {
-                receiptJson = response.data.toString();
-            } else if (response != null && response.getBody() != null) {
-                receiptJson = response.getBody();
-            }
+            MiraReceiptFragment receiptFragment = 
+                    MiraReceiptFragment.newInstance(receiptJson);
 
-            MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(receiptJson);
             FragmentManager fm = getParentFragmentManager();
             if (!fm.isStateSaved()) {
                 receiptFragment.show(fm, "MiraReceiptFragment");
@@ -1279,6 +1617,9 @@ private double getCartTotal() {
         }
     }
 
+    /**
+     * ✅ حوار إعادة المحاولة
+     */
     private void showRetryDialog(String title, String message, Runnable retryAction) {
         try {
             Context ctx = getContext();
@@ -1286,14 +1627,17 @@ private double getCartTotal() {
 
             MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
             builder.setTitle(title).setMessage(message).setCancelable(false);
+
             if (retryAction != null) {
-                builder.setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry",
+                builder.setPositiveButton(
+                        isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry",
                         (dialog, which) -> {
                             dialog.dismiss();
                             retryAction.run();
                         });
             }
-            builder.setNegativeButton(isArabic ? "إغلاق" : "Close",
+            builder.setNegativeButton(
+                    isArabic ? "إغلاق" : "Close",
                     (dialog, which) -> dialog.dismiss());
             builder.show();
         } catch (Exception e) {
@@ -1301,13 +1645,16 @@ private double getCartTotal() {
         }
     }
 
-    // ==================== الإرجاع ====================
+    // ═══════════════════════════════════════════════════════════════════
+    //  الإرجاع (Refund)
+    // ═══════════════════════════════════════════════════════════════════
 
     private void showRefundDialog() {
         if (!isAdded() || getContext() == null) return;
 
         try {
-            refundDialog = new RefundDialog(requireContext(), new RefundDialog.RefundCallback() {
+            refundDialog = new RefundDialog(requireContext(), 
+                    new RefundDialog.RefundCallback() {
                 @Override
                 public void onRefundConfirm(String code, String reason) {
                     processRefund(code, reason);
@@ -1316,8 +1663,9 @@ private double getCartTotal() {
                 @Override
                 public void onBarcodeScan() {
                     ScanOptions options = new ScanOptions();
-                    options.setPrompt(isArabic ? "📷 وجه الكاميرا نحو باركود القطعة" : 
-                                                 "📷 Aim camera at item barcode");
+                    options.setPrompt(isArabic 
+                            ? "📷 وجه الكاميرا نحو باركود القطعة"
+                            : "📷 Aim camera at item barcode");
                     options.setBeepEnabled(false);
                     options.setOrientationLocked(true);
                     refundBarcodeLauncher.launch(options);
@@ -1325,7 +1673,6 @@ private double getCartTotal() {
 
                 @Override
                 public void onCodeChanged(String code) {
-                    // ✅ البحث عن القطعة للتحقق من إمكانية الإرجاع
                     searchItemForRefund(code);
                 }
             });
@@ -1351,37 +1698,49 @@ private double getCartTotal() {
                 payload.put("branch_id", getActiveBranchId());
                 payload.put("context", "refund_check");
                 payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
-                payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
-                payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
+                payload.put("user_id", 
+                        sessionManager != null ? sessionManager.getUserId() : 0);
+                payload.put("username", 
+                        sessionManager != null ? sessionManager.getUsername() : "");
 
                 MiraApiClient client = MiraApiClient.getInstance(requireContext());
                 MiraApiClient.ApiResponse response = client.searchItem(payload);
 
-                Log.e("REFUND_DEBUG", "Response code: " + (response != null ? response.code : "null"));
-                Log.e("REFUND_DEBUG", "Is success: " + (response != null && response.isSuccess));
-                Log.e("REFUND_DEBUG", "Body: " + (response != null ? response.getBody() : "null"));
+                Log.e("REFUND_DEBUG", "Response code: " 
+                        + (response != null ? response.code : "null"));
 
                 safeRun(() -> {
-                    if (response != null && response.isSuccess && response.data != null) {
+                    if (response != null && response.isSuccess 
+                            && response.data != null) {
                         JSONObject itemData = response.data.optJSONObject("item");
                         if (itemData == null) {
                             itemData = response.data;
                         }
 
-                        boolean isRefundable = itemData.optBoolean("is_refundable", false);
-                        String itemStatus = itemData.optString("status", 
+                        boolean isRefundable = itemData.optBoolean(
+                                "is_refundable", false);
+                        String itemStatus = itemData.optString("status",
                                 itemData.optString("vault_status", ""));
 
-                        Log.e("REFUND_DEBUG", "is_refundable: " + isRefundable + 
-                                ", status: " + itemStatus);
+                        Log.e("REFUND_DEBUG", "is_refundable: " + isRefundable 
+                                + ", status: " + itemStatus);
 
                         if (isRefundable) {
+                            // ✅ حفظ حالة الإرجاع
+                            if (viewModel != null) {
+                                viewModel.setRefundable(true);
+                            }
                             showRefundItemInfoInDialog(itemData);
                         } else {
+                            if (viewModel != null) {
+                                viewModel.setRefundable(false);
+                            }
                             showRefundItemErrorInDialog(
-                                isArabic ? "⚠️ القطعة غير صالحة للإرجاع (حالتها: " + 
-                                            itemStatus + ")" :
-                                            "⚠️ Item not eligible (status: " + itemStatus + ")"
+                                    isArabic 
+                                            ? "⚠️ القطعة غير صالحة للإرجاع (حالتها: " 
+                                                + itemStatus + ")"
+                                            : "⚠️ Item not eligible (status: " 
+                                                + itemStatus + ")"
                             );
                         }
                     } else {
@@ -1399,15 +1758,13 @@ private double getCartTotal() {
         });
     }
 
-    /**
-     * ✅ عرض معلومات القطعة القابلة للإرجاع
-     */
     private void showRefundItemInfoInDialog(JSONObject itemData) {
         try {
             if (refundDialog == null) return;
 
             String title = itemData.optString("title",
-                    itemData.optString("item_title", isArabic ? "قطعة ذهبية" : "Gold Item"));
+                    itemData.optString("item_title", 
+                            isArabic ? "قطعة ذهبية" : "Gold Item"));
             double price = itemData.optDouble("retail_price_usd",
                     itemData.optDouble("retail_price", 0.0));
 
@@ -1421,9 +1778,6 @@ private double getCartTotal() {
         }
     }
 
-    /**
-     * ✅ عرض خطأ الإرجاع
-     */
     private void showRefundItemErrorInDialog(String message) {
         try {
             if (refundDialog == null) return;
@@ -1434,7 +1788,7 @@ private double getCartTotal() {
     }
 
     /**
-     * ✅ تنفيذ الإرجاع - مع Payload كامل
+     * ✅ تنفيذ الإرجاع — مع Payload كامل
      */
     private void processRefund(String code, String reason) {
         final AlertDialog loadingDialog = showProfessionalLoadingDialog();
@@ -1446,9 +1800,12 @@ private double getCartTotal() {
                 payload.put("serial_no", code);
                 payload.put("reason", reason);
                 payload.put("branch_id", getActiveBranchId());
-                payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
-                payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
-                payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
+                payload.put("user_id", 
+                        sessionManager != null ? sessionManager.getUserId() : 0);
+                payload.put("gate_id", 
+                        apiClient != null ? apiClient.getGateId() : "");
+                payload.put("username", 
+                        sessionManager != null ? sessionManager.getUsername() : "");
 
                 Log.e("REFUND_DEBUG", "🚨 SENDING REFUND");
                 Log.e("REFUND_DEBUG", "Payload: " + payload.toString());
@@ -1456,8 +1813,8 @@ private double getCartTotal() {
                 MiraApiClient client = MiraApiClient.getInstance(requireContext());
                 MiraApiClient.ApiResponse response = client.processRefund(payload);
 
-                Log.e("REFUND_DEBUG", "Response code: " + (response != null ? response.code : "null"));
-                Log.e("REFUND_DEBUG", "Is success: " + (response != null && response.isSuccess));
+                Log.e("REFUND_DEBUG", "Response code: " 
+                        + (response != null ? response.code : "null"));
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
@@ -1467,9 +1824,12 @@ private double getCartTotal() {
 
                     if (response != null && response.isSuccess) {
                         showSuccessMessage(
-                                isArabic ? "✅ تم الإرجاع" : "✅ Refund Successful",
-                                isArabic ? "تم إرجاع القطعة بنجاح إلى المخزون" : 
-                                           "Item successfully returned to inventory",
+                                isArabic 
+                                        ? "✅ تم الإرجاع" 
+                                        : "✅ Refund Successful",
+                                isArabic 
+                                        ? "تم إرجاع القطعة بنجاح إلى المخزون"
+                                        : "Item successfully returned to inventory",
                                 true
                         );
                         notifyDashboardAndInventoryUpdate("refund");
@@ -1487,13 +1847,19 @@ private double getCartTotal() {
                 Log.e(TAG, "processRefund error: " + e.getMessage());
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
-                    showSuccessMessage(isArabic ? "❌ خطأ" : "❌ Error", e.getMessage(), false);
+                    showSuccessMessage(
+                            isArabic ? "❌ خطأ" : "❌ Error",
+                            e.getMessage(),
+                            false
+                    );
                 });
             }
         });
     }
 
-    // ==================== التحديث والإشعارات ====================
+    // ═══════════════════════════════════════════════════════════════════
+    //  الإشعارات والكاش
+    // ═══════════════════════════════════════════════════════════════════
 
     private void notifyDashboardAndInventoryUpdate(String source) {
         try {
@@ -1532,9 +1898,13 @@ private double getCartTotal() {
     private void removeSoldItemsFromCache() {
         try {
             Context ctx = getContext();
-            if (ctx == null) return;
+            if (ctx == null || viewModel == null) return;
+
+            List<CartItem> items = viewModel.getCartList().getValue();
+            if (items == null) return;
+
             MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
-            for (CartItem item : cartList) {
+            for (CartItem item : items) {
                 cache.markItemAsSold(item.epc);
             }
         } catch (Exception e) {
@@ -1542,7 +1912,9 @@ private double getCartTotal() {
         }
     }
 
-    // ==================== Dialogs المساعدة ====================
+    // ═══════════════════════════════════════════════════════════════════
+    //  Dialogs مساعدة
+    // ═══════════════════════════════════════════════════════════════════
 
     private AlertDialog showProfessionalLoadingDialog() {
         try {
@@ -1563,7 +1935,9 @@ private double getCartTotal() {
             layout.addView(progressBar);
 
             TextView tvLoading = new TextView(ctx);
-            tvLoading.setText(isArabic ? "جاري إتمام البيع..." : "Processing sale...");
+            tvLoading.setText(isArabic 
+                    ? "جاري إتمام البيع..." 
+                    : "Processing sale...");
             tvLoading.setTextSize(17);
             tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
             tvLoading.setGravity(android.view.Gravity.CENTER);
@@ -1578,7 +1952,8 @@ private double getCartTotal() {
 
             AlertDialog dialog = builder.create();
             if (dialog.getWindow() != null) {
-                dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                dialog.getWindow().setBackgroundDrawable(
+                        new ColorDrawable(Color.TRANSPARENT));
             }
             dialog.show();
             return dialog;
@@ -1588,29 +1963,36 @@ private double getCartTotal() {
         }
     }
 
-    protected void dismissDialog(AlertDialog dialog) {
-        try {
-            if (dialog != null && dialog.isShowing()) dialog.dismiss();
-        } catch (Exception e) {
-            Log.e(TAG, "dismissDialog error: " + e.getMessage());
-        }
-    }
-
-    // ==================== التفعيل والصلاحيات ====================
+    // ═══════════════════════════════════════════════════════════════════
+    //  التفعيل والصلاحيات
+    // ═══════════════════════════════════════════════════════════════════
 
     private void setButtonsEnabled(boolean enabled) {
         safeRun(() -> {
             try {
-                boolean canUsePos = permissionManager.canView("pos") 
-                        || permissionManager.isPosOperator() 
+                boolean canUsePos = permissionManager.canView("pos")
+                        || permissionManager.isPosOperator()
                         || permissionManager.isManager();
-                if (btnCheckout != null) 
-                    btnCheckout.setEnabled(enabled && canUsePos && !cartList.isEmpty());
+                int itemCount = viewModel != null 
+                        ? viewModel.getCartItemCountValue() : 0;
+
+                if (btnCheckout != null) {
+                    btnCheckout.setEnabled(
+                            enabled && canUsePos && itemCount > 0);
+                }
                 if (btnClearCart != null) btnClearCart.setEnabled(enabled);
-                if (btnAddManual != null) btnAddManual.setEnabled(enabled && canUsePos);
-                if (btnOpenScanner != null) btnOpenScanner.setEnabled(enabled && canUsePos);
-                if (btnPosRFIDMode != null) btnPosRFIDMode.setEnabled(enabled && canUsePos);
-                if (etManualEpc != null) etManualEpc.setEnabled(enabled && canUsePos);
+                if (btnAddManual != null) {
+                    btnAddManual.setEnabled(enabled && canUsePos);
+                }
+                if (btnOpenScanner != null) {
+                    btnOpenScanner.setEnabled(enabled && canUsePos);
+                }
+                if (btnPosRFIDMode != null) {
+                    btnPosRFIDMode.setEnabled(enabled && canUsePos);
+                }
+                if (etManualEpc != null) {
+                    etManualEpc.setEnabled(enabled && canUsePos);
+                }
             } catch (Exception e) {
                 Log.e(TAG, "setButtonsEnabled error: " + e.getMessage());
             }
@@ -1619,8 +2001,8 @@ private double getCartTotal() {
 
     private void applyPermissions() {
         try {
-            boolean canUsePos = permissionManager.canView("pos") 
-                    || permissionManager.isPosOperator() 
+            boolean canUsePos = permissionManager.canView("pos")
+                    || permissionManager.isPosOperator()
                     || permissionManager.isManager();
 
             if (btnCheckout != null) btnCheckout.setEnabled(false);
@@ -1628,35 +2010,80 @@ private double getCartTotal() {
             if (btnOpenScanner != null) btnOpenScanner.setEnabled(canUsePos);
             if (btnPosRFIDMode != null) btnPosRFIDMode.setEnabled(canUsePos);
             if (etManualEpc != null) etManualEpc.setEnabled(canUsePos);
+
             if (btnPosRefund != null) {
-                boolean canRefund = permissionManager.canEdit("pos") 
-                        || permissionManager.isAdmin() 
+                boolean canRefund = permissionManager.canEdit("pos")
+                        || permissionManager.isAdmin()
                         || permissionManager.isManager();
-                btnPosRefund.setVisibility(canRefund ? View.VISIBLE : View.GONE);
+                btnPosRefund.setVisibility(canRefund 
+                        ? View.VISIBLE : View.GONE);
             }
 
             if (!canUsePos && tvCartStatus != null) {
-                tvCartStatus.setText(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                tvCartStatus.setText(isArabic 
+                        ? "⛔ غير مصرح" 
+                        : "⛔ Access Denied");
             }
         } catch (Exception e) {
             Log.e(TAG, "applyPermissions error: " + e.getMessage());
         }
     }
 
-    // ==================== ActivityResultLauncher ====================
+    // ═══════════════════════════════════════════════════════════════════
+    //  ActivityResultLauncher للإرجاع
+    // ═══════════════════════════════════════════════════════════════════
 
-    private final ActivityResultLauncher<ScanOptions> refundBarcodeLauncher = 
+    private final ActivityResultLauncher<ScanOptions> refundBarcodeLauncher =
             registerForActivityResult(new ScanContract(), result -> {
         if (result.getContents() != null && isAdded()) {
             if (refundDialog != null) {
                 refundDialog.showRefundItemInfo(
                         result.getContents(),
-                        isArabic ? "✅ تم مسح الباركود" : "✅ Barcode scanned"
+                        isArabic 
+                                ? "✅ تم مسح الباركود" 
+                                : "✅ Barcode scanned"
                 );
-                // ✅ البحث عن القطعة تلقائياً
                 searchItemForRefund(result.getContents());
             }
         }
     });
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  أدوات مساعدة (Helpers)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ الحصول على وزن الميزان الحالي (من ViewModel)
+     */
+    private double getLiveScaleWeight() {
+        return viewModel != null ? viewModel.getScaleWeightValue() : 0.0;
+    }
+
+    /**
+     * ✅ الحصول على EPCs الممسوحة (من ViewModel)
+     */
+    private Set<String> getScannedEpcs() {
+        return viewModel != null 
+                ? viewModel.getScannedEpcs() 
+                : new java.util.HashSet<>();
+    }
+
+    /**
+     * ✅ الحصول على lastScannedTimes (من ViewModel)
+     */
+    private Map<String, Long> getLastScannedTimes() {
+        return viewModel != null 
+                ? viewModel.getLastScannedTimes() 
+                : new java.util.HashMap<>();
+    }
+
+    /**
+     * ✅ الحصول على pendingEpcs (من ViewModel)
+     */
+    private Set<String> getPendingEpcs() {
+        return viewModel != null 
+                ? viewModel.getPendingEpcs() 
+                : new java.util.HashSet<>();
+    }
 
 } // ✅ نهاية الكلاس MiraPosFragment
