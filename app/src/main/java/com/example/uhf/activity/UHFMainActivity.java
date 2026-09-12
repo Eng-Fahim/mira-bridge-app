@@ -41,6 +41,7 @@ import com.example.uhf.api.MiraApiClient;
 
 import com.example.uhf.activity.LoginActivity;
 import com.example.uhf.fragment.MiraDashboardFragment;
+import com.example.uhf.fragment.UsersManagementFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
