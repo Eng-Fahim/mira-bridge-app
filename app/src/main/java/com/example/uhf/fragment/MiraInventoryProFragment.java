@@ -429,19 +429,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
         // 🎛️ نمط الجرد
         viewModel.getCurrentMode().observe(getViewLifecycleOwner(), mode -> {
-            if (segmentedModes != null && mode != null) {
-                try {
-                    if ("category".equals(mode)) {
-                        segmentedModes.check(R.id.btnModeCategory);
-                    } else if ("blind".equals(mode)) {
-                        segmentedModes.check(R.id.btnModeBlind);
-                    } else {
-                        segmentedModes.check(R.id.btnModeFull);
-                    }
-                } catch (Exception ignored) {}
-            }
-        });
-
+    // لا شيء — القيمة تُقرأ عند عرض Bottom Sheet
+    Log.d(TAG, "Current mode changed to: " + mode);
+    });
         // ⚡ قدرة الهوائي
         viewModel.getCurrentPowerDbm().observe(getViewLifecycleOwner(), dbm -> {
             if (btnPowerControl != null && dbm != null) {
@@ -1518,72 +1508,97 @@ public class MiraInventoryProFragment extends KeyDwonFragment
      * ✅ جلب الكتالوج من السيرفر — لا يحتاج حفظ هنا (ViewModel يحفظه)
      */
     private Map<String, InventoryItem> fetchCatalogFromServer() {
-        Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
+    Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
 
-        try {
-            if (apiClient == null || branchesManager == null) {
-                return catalog;
-            }
-
-            int branchId = branchesManager.getActiveBranchId();
-            MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
-
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray items = response.data.optJSONArray("items");
-
-                if (items == null) {
-                    JSONObject dataObj = response.data.optJSONObject("data");
-                    if (dataObj != null) {
-                        items = dataObj.optJSONArray("items");
-                    }
-                }
-
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject obj = items.getJSONObject(i);
-
-                        String gtin13 = obj.optString("gtin13", "").trim();
-                        String serialNumber = obj.optString("serial_number", "").trim();
-                        String epcCode = obj.optString("epc", obj.optString("rfid_epc", "")).trim();
-
-                        String title = obj.optString("item_title",
-                                obj.optString("title", isArabic ? "قطعة ذهبية" : "Gold Item"));
-                        String karat = obj.optString("gold_karat", obj.optString("karat", "21K"));
-                        double weight = obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0));
-                        double price = obj.optDouble("retail_price_usd",
-                                obj.optDouble("retail_price", obj.optDouble("price", 0)));
-
-                        String primaryEpc;
-                        if (!epcCode.isEmpty()) {
-                            primaryEpc = epcCode.toUpperCase();
-                        } else if (!serialNumber.isEmpty()) {
-                            primaryEpc = serialNumber.toUpperCase();
-                        } else if (!gtin13.isEmpty()) {
-                            primaryEpc = "EAN13:" + gtin13;
-                        } else {
-                            continue;
-                        }
-
-                        Map<String, String> barcodeMap = viewModel != null
-                                ? viewModel.getBarcodeToEpcMap()
-                                : new ConcurrentHashMap<>();
-                        String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(primaryEpc, barcodeMap);
-
-                        InventoryItem item = new InventoryItem(
-                                normalizedEpc, gtin13, serialNumber, title, karat);
-                        item.setWeight(weight);
-                        item.setPrice(price);
-
-                        catalog.put(normalizedEpc, item);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching catalog from server", e);
+    try {
+        if (apiClient == null || branchesManager == null) {
+            return catalog;
         }
 
-        return catalog;
+        int branchId = branchesManager.getActiveBranchId();
+        MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
+
+        if (response != null && response.isSuccess && response.data != null) {
+            JSONArray items = response.data.optJSONArray("items");
+
+            if (items == null) {
+                JSONObject dataObj = response.data.optJSONObject("data");
+                if (dataObj != null) {
+                    items = dataObj.optJSONArray("items");
+                }
+            }
+
+            if (items != null) {
+                // ✅ خرائط محلية لبناء الباركود
+                Map<String, String> localBarcodeToEpc = new ConcurrentHashMap<>();
+                Map<String, String> localEpcToBarcode = new ConcurrentHashMap<>();
+
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject obj = items.getJSONObject(i);
+
+                    String gtin13 = obj.optString("gtin13", "").trim();
+                    String serialNumber = obj.optString("serial_number", "").trim();
+                    String epcCode = obj.optString("epc", obj.optString("rfid_epc", "")).trim();
+
+                    String title = obj.optString("item_title",
+                            obj.optString("title", isArabic ? "قطعة ذهبية" : "Gold Item"));
+                    String karat = obj.optString("gold_karat", obj.optString("karat", "21K"));
+                    double weight = obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0));
+                    double price = obj.optDouble("retail_price_usd",
+                            obj.optDouble("retail_price", obj.optDouble("price", 0)));
+
+                    String primaryEpc;
+                    if (!epcCode.isEmpty()) {
+                        primaryEpc = epcCode.toUpperCase();
+                    } else if (!serialNumber.isEmpty()) {
+                        primaryEpc = serialNumber.toUpperCase();
+                    } else if (!gtin13.isEmpty()) {
+                        primaryEpc = "EAN13:" + gtin13;
+                    } else {
+                        continue;
+                    }
+
+                    Map<String, String> barcodeMap = viewModel != null
+                            ? viewModel.getBarcodeToEpcMap()
+                            : new ConcurrentHashMap<>();
+                    String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(primaryEpc, barcodeMap);
+
+                    InventoryItem item = new InventoryItem(
+                            normalizedEpc, gtin13, serialNumber, title, karat);
+                    item.setWeight(weight);
+                    item.setPrice(price);
+
+                    catalog.put(normalizedEpc, item);
+
+                    // ✅ بناء خرائط الباركود محلياً
+                    if (!gtin13.isEmpty()) {
+                        localBarcodeToEpc.put(gtin13, normalizedEpc);
+                        localEpcToBarcode.put(normalizedEpc, gtin13);
+                    }
+                    if (!serialNumber.isEmpty()) {
+                        localBarcodeToEpc.put(serialNumber, normalizedEpc);
+                        localEpcToBarcode.put(normalizedEpc, serialNumber);
+                    }
+                    if (!epcCode.isEmpty()) {
+                        localBarcodeToEpc.put(epcCode.toUpperCase(), normalizedEpc);
+                    }
+                }
+
+                // ✅ حفظ الخرائط في ViewModel مباشرة
+                if (viewModel != null) {
+                    viewModel.getBarcodeToEpcMap().clear();
+                    viewModel.getBarcodeToEpcMap().putAll(localBarcodeToEpc);
+                    viewModel.getEpcToBarcodeMap().clear();
+                    viewModel.getEpcToBarcodeMap().putAll(localEpcToBarcode);
+                }
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error fetching catalog from server", e);
     }
+
+    return catalog;
+}
 
     private void startReadingSource() {
         boolean hardwareStarted = false;
