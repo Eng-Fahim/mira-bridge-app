@@ -131,6 +131,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraOrgProfileManager orgProfileManager;
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean isNavigating = false;
+    
 
     // ✅ حقول الشريط الثانوي
     private LinearLayout statusChipContainer;
@@ -896,36 +898,77 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== التنقل السريع ====================
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-            if (fabActionCenter != null) {
-                boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
-                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-                fabActionCenter.setEnabled(hasQuickActions);
-                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-            }
-
-            if (quickNav != null) {
-                quickNav.setOnItemSelectedListener(item -> {
-                    int id = item.getItemId();
-                    String tag = getFragmentTagForNavItem(id);
-                    Fragment fragment = createFragmentByTag(tag);
-
-                    Log.d(TAG, "Nav item selected: " + tag);
-
-                    if (fragment != null) {
-                        loadFragment(fragment, tag, false);
-                        return true;
-                    }
-                    return false;
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+        if (fabActionCenter != null) {
+            boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
+            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+            fabActionCenter.setEnabled(hasQuickActions);
+            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
         }
+
+        if (quickNav != null) {
+            quickNav.setOnItemSelectedListener(item -> {
+                // ✅ إذا كنا في منتصف التنقل — تجاهل
+                if (isNavigating) {
+                    Log.d(TAG, "Navigation in progress — ignoring item selection");
+                    return true;
+                }
+
+                int id = item.getItemId();
+                String tag = getFragmentTagForNavItem(id);
+                Fragment fragment = createFragmentByTag(tag);
+
+                Log.d(TAG, "Nav item selected: " + tag);
+
+                if (fragment != null) {
+                    // ✅ لا نستدعي updateBottomNavSelectionByTag — BottomNav يُحدّث نفسه
+                    loadFragmentWithoutBottomNavUpdate(fragment, tag);
+                    return true;
+                }
+                return false;
+            });
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
+
+/**
+ * ✅ نسخة خاصة من loadFragment للتبويبات
+ * لا تستدعي updateBottomNavSelectionByTag لأن BottomNav يُحدّث نفسه
+ */
+private void loadFragmentWithoutBottomNavUpdate(Fragment fragment, String tag) {
+    if (fragment == null) return;
+
+    Log.d(TAG, "loadFragmentWithoutBottomNavUpdate: " + tag);
+
+    try {
+        isNavigating = true;  // ✅ قفل
+
+        androidx.fragment.app.FragmentTransaction transaction =
+                getSupportFragmentManager().beginTransaction();
+
+        transaction.replace(R.id.fragment_container, fragment, tag);
+        transaction.commitNowAllowingStateLoss();  // ✅ فوري
+
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+
+        // ✅ لا نستدعي updateBottomNavSelectionByTag!
+        // (BottomNav يُحدّث نفسه عند النقر)
+
+        refreshSecondaryToolbar(tag);
+        updateSecondaryToolbarVisibility(tag);
+
+    } catch (Exception e) {
+        Log.e(TAG, "loadFragmentWithoutBottomNavUpdate error: " + e.getMessage(), e);
+    } finally {
+        isNavigating = false;  // ✅ فك القفل
+    }
+}
 
     private String getFragmentTagForNavItem(int itemId) {
         if (itemId == R.id.nav_home) return "Dashboard";
@@ -936,23 +979,34 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void updateBottomNavSelectionByTag(String tag) {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            if (quickNav == null || tag == null) return;
-
-            if (tag.equals("Dashboard")) {
-                quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
-            } else if (tag.equals("Scan")) {
-                quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
-            } else if (tag.equals("POS")) {
-                quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
-            } else if (tag.equals("Transfers")) {
-                quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
+    try {
+        // ✅ إذا كنا في منتصف التنقل — تجاهل
+        if (isNavigating) {
+            Log.d(TAG, "Skipping bottom nav update — navigating");
+            return;
         }
+
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        if (quickNav == null || tag == null) return;
+
+        isNavigating = true;  // ✅ قفل
+
+        if (tag.equals("Dashboard")) {
+            quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
+        } else if (tag.equals("Scan")) {
+            quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
+        } else if (tag.equals("POS")) {
+            quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
+        } else if (tag.equals("Transfers")) {
+            quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
+    } finally {
+        isNavigating = false;  // ✅ فك القفل
     }
+}
 
     private void updateBottomNavLanguage() {
         try {
