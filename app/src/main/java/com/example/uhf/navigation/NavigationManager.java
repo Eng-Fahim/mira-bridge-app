@@ -14,14 +14,13 @@ import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 import java.util.List;
 
 /**
- * NavigationManager - الإصدار المُصلح
+ * NavigationManager - الإصدار النهائي المُصلح
  *
  * ✅ الميزات:
- * - استخدام add/hide/show بدلاً من replace
- * - حفظ حالة Fragments في الذاكرة (لا تُدمَّر)
- * - أداء أسرع (لا إعادة إنشاء)
- * - لا اختفاء للمحتوى
- * - استعادة Fragments عند إعادة إنشاء Activity
+ * - add/hide/show بدلاً من replace
+ * - commitNowAllowingStateLoss للتنفيذ الفوري
+ * - setReorderingAllowed(true) لمنع الوميض
+ * - بدون فحص "Same fragment" (يُدار في UHFMainActivity)
  */
 public class NavigationManager {
 
@@ -42,109 +41,101 @@ public class NavigationManager {
 
     /**
      * ✅ تحميل Fragment بطريقة آمنة (بدون تدمير)
-     *
-     * @param fragment      الـ Fragment الجديد
-     * @param tag           الوسم
-     * @param addToBackStack هل يُضاف للـ back stack
      */
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (fragmentManager == null || fragment == null) return;
+        if (fragmentManager == null || fragment == null) return;
 
-    try {
-        // ✅ لا يوجد فحص "Same fragment" — نسمح بإعادة التنقل الآمن
+        try {
+            // ✅ لا يوجد فحص "Same fragment" — UHFMainActivity يتولّى debounce
 
-        if (!addToBackStack) {
-            clearBackStackInternal();
+            if (!addToBackStack) {
+                clearBackStackInternal();
+            }
+
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.setReorderingAllowed(true);
+            transaction.setCustomAnimations(0, 0, 0, 0);
+
+            hideAllActiveFragments(transaction, tag);
+
+            Fragment existingFragment = fragmentManager.findFragmentByTag(tag);
+
+            if (existingFragment != null && existingFragment.isAdded()) {
+                Log.d(TAG, "Showing existing fragment: " + tag);
+                if (existingFragment.isHidden()) {
+                    transaction.show(existingFragment);
+                }
+                currentFragment = existingFragment;
+            } else {
+                Log.d(TAG, "Adding new fragment: " + tag);
+                transaction.add(CONTAINER_ID, fragment, tag);
+                currentFragment = fragment;
+            }
+
+            currentFragmentTag = tag;
+
+            if (addToBackStack) {
+                transaction.addToBackStack(tag);
+            }
+
+            transaction.commitNowAllowingStateLoss();
+
+        } catch (Exception e) {
+            Log.e(TAG, "loadFragment error: " + e.getMessage(), e);
         }
-
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.setReorderingAllowed(true);
-        transaction.setCustomAnimations(0, 0, 0, 0);
-
-        hideAllActiveFragments(transaction, tag);
-
-        Fragment existingFragment = fragmentManager.findFragmentByTag(tag);
-
-        if (existingFragment != null && existingFragment.isAdded()) {
-            Log.d(TAG, "Showing existing fragment: " + tag);
-            transaction.show(existingFragment);
-            currentFragment = existingFragment;
-        } else {
-            Log.d(TAG, "Adding new fragment: " + tag);
-            transaction.add(CONTAINER_ID, fragment, tag);
-            currentFragment = fragment;
-        }
-
-        currentFragmentTag = tag;
-
-        if (addToBackStack) {
-            transaction.addToBackStack(tag);
-        }
-
-        transaction.commitNowAllowingStateLoss();
-
-    } catch (Exception e) {
-        Log.e(TAG, "loadFragment error: " + e.getMessage(), e);
     }
-}
+
     /**
-     * ✅ تحميل فوري (يستبدل المحتوى)
-     * ⚠️ استخدمه فقط عند الحاجة الفورية (مثل Dashboard الأولي)
+     * ✅ تحميل فوري (بدون backStack)
      */
     public void loadFragmentDirectly(Fragment fragment, String tag) {
-    if (fragmentManager == null || fragment == null) return;
+        if (fragmentManager == null || fragment == null) return;
 
-    try {
-        FragmentTransaction transaction = fragmentManager.beginTransaction()
-                .setReorderingAllowed(true);
+        try {
+            FragmentTransaction transaction = fragmentManager.beginTransaction()
+                    .setReorderingAllowed(true);
 
-        hideAllActiveFragments(transaction, tag);
+            hideAllActiveFragments(transaction, tag);
 
-        Fragment existingFragment = fragmentManager.findFragmentByTag(tag);
+            Fragment existingFragment = fragmentManager.findFragmentByTag(tag);
 
-        if (existingFragment != null && existingFragment.isAdded()) {
-            transaction.show(existingFragment);
-            currentFragment = existingFragment;
-        } else {
-            transaction.add(CONTAINER_ID, fragment, tag);
-            currentFragment = fragment;
+            if (existingFragment != null && existingFragment.isAdded()) {
+                if (existingFragment.isHidden()) {
+                    transaction.show(existingFragment);
+                }
+                currentFragment = existingFragment;
+            } else {
+                transaction.add(CONTAINER_ID, fragment, tag);
+                currentFragment = fragment;
+            }
+
+            currentFragmentTag = tag;
+            transaction.commitNowAllowingStateLoss();
+
+        } catch (Exception e) {
+            Log.e(TAG, "loadFragmentDirectly error: " + e.getMessage(), e);
         }
-
-        currentFragmentTag = tag;
-        
-        // ✅ المفتاح
-        transaction.commitNowAllowingStateLoss();
-
-    } catch (Exception e) {
-        Log.e(TAG, "loadFragmentDirectly error: " + e.getMessage(), e);
     }
-}
+
     // ==================== أدوات مساعدة ====================
 
-    /**
-     * ✅ إخفاء كل الـ Fragments النشطة (باستثناء المستهدف)
-     */
     private void hideAllActiveFragments(FragmentTransaction transaction, String exceptTag) {
-    try {
-        List<Fragment> fragments = fragmentManager.getFragments();
-        if (fragments == null) return;
+        try {
+            List<Fragment> fragments = fragmentManager.getFragments();
+            if (fragments == null) return;
 
-        for (Fragment f : fragments) {
-            if (f == null || !f.isAdded()) continue;
-            if (f.getTag() != null && f.getTag().equals(exceptTag)) continue;
-            if (f.isHidden()) continue;
+            for (Fragment f : fragments) {
+                if (f == null || !f.isAdded()) continue;
+                if (f.getTag() != null && f.getTag().equals(exceptTag)) continue;
+                if (f.isHidden()) continue;
 
-            Log.d(TAG, "Hiding fragment: " + f.getTag());
-            transaction.hide(f);
+                transaction.hide(f);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "hideAllActiveFragments error: " + e.getMessage(), e);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "hideAllActiveFragments error: " + e.getMessage(), e);
     }
-}
 
-    /**
-     * ✅ مسح الـ back stack (بدون تدمير Fragments)
-     */
     private void clearBackStackInternal() {
         try {
             if (fragmentManager.getBackStackEntryCount() > 0) {
@@ -196,9 +187,6 @@ public class NavigationManager {
 
     // ==================== استرجاع الحالة ====================
 
-    /**
-     * ✅ إرجاع أعلى Fragment في الـ back stack
-     */
     public Fragment getTopFragment() {
         try {
             if (fragmentManager.getBackStackEntryCount() > 0) {
@@ -214,9 +202,6 @@ public class NavigationManager {
         return currentFragment;
     }
 
-    /**
-     * ✅ إرجاع الـ Fragment الحالي المعروض فعلاً
-     */
     public Fragment getVisibleFragment() {
         try {
             List<Fragment> fragments = fragmentManager.getFragments();
