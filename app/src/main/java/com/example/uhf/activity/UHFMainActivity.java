@@ -216,7 +216,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     originalPaddingBottom + systemBars.bottom
             );
 
-            return WindowInsetsCompat.CONSUMED;
+            return insets;
         });
     }
 
@@ -1675,9 +1675,33 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         // 2. الرجوع في الـ BackStack
         if (fm.getBackStackEntryCount() > 0) {
-            fm.popBackStackImmediate();
-            return;
+    fm.popBackStackImmediate();
+    
+    // ✅ الحصول على الـ Fragment الحالي بعد الرجوع
+    Fragment current = null;
+    List<Fragment> fragments = fm.getFragments();
+    if (fragments != null) {
+        for (Fragment f : fragments) {
+            if (f != null && f.isAdded() && f.isVisible() && !f.isHidden()) {
+                current = f;
+                break;
+            }
         }
+    }
+    
+    if (current != null) {
+        currentFragment = current;
+        String tag = current.getTag();
+        if (tag != null) {
+            currentFragmentTag = tag;
+            saveFragmentTagToPrefs(tag);
+            updateBottomNavSelectionByTag(tag);
+            refreshSecondaryToolbar(tag);
+            updateSecondaryToolbarVisibility(tag);
+        }
+    }
+    return;
+}
 
         // 3. العودة للـ Dashboard
         if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
