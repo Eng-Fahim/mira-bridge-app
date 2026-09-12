@@ -193,17 +193,18 @@ public class CartAdapter extends ListAdapter<CartItem, CartAdapter.ViewHolder> {
     /**
      * ربط زر الحذف — يستخدم getBindingAdapterPosition للحصول على الموقع الصحيح.
      */
-    private void bindRemoveButton(@NonNull ViewHolder h) {
-        if (h.btnRemove == null) return;
+    @SuppressWarnings("deprecation")
+private void bindRemoveButton(@NonNull ViewHolder h) {
+    if (h.btnRemove == null) return;
 
-        h.btnRemove.setOnClickListener(v -> {
-            // ✅ getBindingAdapterPosition أكثر أماناً من getAdapterPosition
-            int pos = h.getBindingAdapterPosition();
-            if (pos != RecyclerView.NO_POSITION && removeListener != null) {
-                removeListener.onRemove(pos);
-            }
-        });
-    }
+    h.btnRemove.setOnClickListener(v -> {
+        // ✅ استخدام getAdapterPosition() — متوافقة مع كل إصدارات RecyclerView
+        int pos = h.getAdapterPosition();
+        if (pos != RecyclerView.NO_POSITION && removeListener != null) {
+            removeListener.onRemove(pos);
+        }
+    });
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  6. ViewHolder
