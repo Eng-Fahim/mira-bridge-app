@@ -236,10 +236,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 updateToolbarTitle();
             }
 
-            AppWatchdog.getInstance().startMonitoring(() -> {
-                Log.e(TAG, "UI Thread FROZEN! Restarting app...");
-                MiraApplication.getInstance().restartApp();
-            });
+            //AppWatchdog.getInstance().startMonitoring(() -> {
+             //   Log.e(TAG, "UI Thread FROZEN! //Restarting app...");
+               // MiraApplication.getInstance//().restartApp();
+           // });
 
             ToastUtil.init(getApplicationContext());
 
