@@ -86,10 +86,7 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         }
     }
     
-    public void clearListeners() {
-    this.onRemoveListener = null;
-    // إن كان لديك listeners آخرين، أفرغها هنا
-}
+    
 
     private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
         final int height = options.outHeight;
