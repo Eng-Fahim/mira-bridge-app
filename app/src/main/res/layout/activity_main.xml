@@ -8,7 +8,7 @@
     android:layout_height="match_parent"
     tools:context=".activity.UHFMainActivity">
 
-    <!-- ==================== 1. TOOLBAR / APP BAR ==================== -->
+    <!-- 1. TOOLBAR / APP BAR -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
@@ -16,14 +16,7 @@
         android:background="?attr/colorPrimaryContainer"
         app:elevation="2dp">
 
-        <!-- ============================================================
-             🏢 الشريط الرئيسي (Header Toolbar)
-             ------------------------------------------------------------
-             ✅ ثابت في كل الواجهات
-             ✅ يحتوي على: العنوان + الفرع + main_menu (Gold Rates, Profile,
-                Notifications, Settings, Branches, Export, ...)
-             ✅ لا يتغير أبداً عند التنقل بين الواجهات
-             ============================================================ -->
+        <!-- الشريط الرئيسي (ثابت في كل الواجهات) -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
@@ -88,20 +81,7 @@
 
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- ============================================================
-             📊 الشريط الثانوي (Secondary Toolbar)
-             ------------------------------------------------------------
-             ✅ ديناميكي — يتغير حسب الواجهة الحالية:
-                - Dashboard    → secondary_menu_dashboard.xml
-                - Inventory    → secondary_menu_inventory.xml
-                - POS          → secondary_menu_pos.xml
-                - Transfers    → secondary_menu_transfers.xml
-             
-             ⚠️ ملاحظة:
-                • لا يحتوي على app:menu في XML
-                • يُدار برمجياً عبر SecondaryToolbarManager
-                • القائمة تُحمَّل تلقائياً في updateSecondaryToolbar(tag)
-             ============================================================ -->
+        <!-- الشريط الثانوي (ديناميكي حسب الواجهة) -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
@@ -112,13 +92,12 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ==================== 2. MAIN CONTENT ==================== -->
+    <!-- 2. MAIN CONTENT -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- 📱 حاوية الـ Fragments -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
@@ -130,7 +109,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- 🔄 طبقة التحميل (Loading Overlay) -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
@@ -151,7 +129,7 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ==================== 3+4. FLOATING NAV + FAB ==================== -->
+    <!-- 3+4. FLOATING NAV + FAB -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
