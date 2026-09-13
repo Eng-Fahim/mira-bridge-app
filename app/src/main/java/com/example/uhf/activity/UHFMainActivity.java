@@ -55,6 +55,8 @@ import com.example.uhf.utils.StatusIndicatorManager;
 import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
+import com.example.uhf.manager.SecondaryToolbarManager;
+
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -104,6 +106,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private SoundManager soundManager;
     private NotificationManager notificationManager;
     private StatusIndicatorManager statusIndicatorManager;
+    private SecondaryToolbarManager secondaryToolbarManager;  // ✅ جديد
     
     // ✅ المتغيرات الأساسية
     private TextView txtBadgeCount;
@@ -115,7 +118,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     
     private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener = 
         this::updateAppTitle;
-    
     
     // ✅ إدارة RFID
     private MiraPosFragment activePOSFragment = null;
@@ -273,56 +275,171 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
     
+    // ==================== التولبار الثانوي الديناميكي ====================
+
+    /**
+     * ✅ إعداد التولبار الثانوي مع مدير ديناميكي
+     */
     private void setupSecondaryToolbar() {
         MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
         
-        if (secondaryToolbar != null) {
-            secondaryToolbar.setOnMenuItemClickListener(item -> {
-                int id = item.getItemId();
-                if (id == R.id.action_sync) {
-                    performDataSync();
-                    return true;
-                } else if (id == R.id.action_search) {
-                    showGlobalSearchDialog();
-                    return true;
-                } else if (id == R.id.action_quick_access_settings) {
-                    loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
-                    return true;
-                } else if (id == R.id.action_device_status) {
-                    return true;
-                }
-                return false;
-            });
-            
-            setupDeviceStatusButton(secondaryToolbar);
+        if (secondaryToolbar == null) {
+            Log.w(TAG, "Secondary toolbar not found");
+            return;
         }
-    }
-
-    private void setupDeviceStatusButton(MaterialToolbar toolbar) {
-        try {
-            Menu menu = toolbar.getMenu();
-            MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
-            if (deviceStatusItem == null) return;
+        
+        // ✅ 1) تهيئة المدير
+        secondaryToolbarManager = new SecondaryToolbarManager(secondaryToolbar);
+        
+        // ✅ 2) listener موحّد لكل القوائم
+        secondaryToolbarManager.setOnMenuItemClickListener((item, currentTag) -> {
+            int id = item.getItemId();
             
-            View actionView = deviceStatusItem.getActionView();
-            if (actionView == null) return;
-            
-            View statusDot = actionView.findViewById(R.id.deviceStatusDot);
-            TextView statusText = actionView.findViewById(R.id.deviceStatusText);
-            
-            actionView.setOnClickListener(v -> showHardwareOptionsDialog());
-            updateDeviceStatusUI(statusDot, statusText);
-            
-            if (hardwareManager != null) {
-                hardwareManager.setStatusChangeCallback(status -> {
-                    mainHandler.post(() -> updateDeviceStatusUI(statusDot, statusText));
-                });
+            // ==================== Dashboard ====================
+            if (id == R.id.action_device_status) {
+                showHardwareOptionsDialog();
+                return true;
+            } else if (id == R.id.action_search) {
+                showGlobalSearchDialog();
+                return true;
+            } else if (id == R.id.action_sync) {
+                performDataSync();
+                return true;
+            } else if (id == R.id.action_quick_access_settings) {
+                loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+                return true;
             }
+            
+            // ==================== Inventory ====================
+            else if (id == R.id.action_inventory_power) {
+                showHardwareOptionsDialog();
+                return true;
+            } else if (id == R.id.action_inventory_search) {
+                showGlobalSearchDialog();
+                return true;
+            } else if (id == R.id.action_inventory_stats) {
+                showInventoryStatsDialog();
+                return true;
+            } else if (id == R.id.action_inventory_settings) {
+                loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+                return true;
+            }
+            
+            // ==================== POS ====================
+            else if (id == R.id.action_pos_cart) {
+                showPOSCartDialog();
+                return true;
+            } else if (id == R.id.action_pos_search) {
+                showGlobalSearchDialog();
+                return true;
+            } else if (id == R.id.action_pos_discount) {
+                showPOSDiscountDialog();
+                return true;
+            } else if (id == R.id.action_pos_receipt) {
+                showPOSReceiptDialog();
+                return true;
+            }
+            
+            // ==================== Transfers ====================
+            else if (id == R.id.action_transfers_sync) {
+                performDataSync();
+                return true;
+            } else if (id == R.id.action_transfers_export) {
+                showToast(isArabic ? "📤 تصدير..." : "📤 Exporting...");
+                return true;
+            } else if (id == R.id.action_transfers_import) {
+                showToast(isArabic ? "📥 استيراد..." : "📥 Importing...");
+                return true;
+            } else if (id == R.id.action_transfers_history) {
+                loadFragment(new MiraTransferFragment(), "Transfers");
+                return true;
+            }
+            
+            return false;
+        });
+        
+        // ✅ 3) تحميل القائمة الافتراضية
+        secondaryToolbarManager.setMenuForTag("Dashboard");
+        
+        // ✅ 4) إعداد custom views بعد أن تكتمل القائمة (post)
+        mainHandler.post(this::setupCustomViewsForCurrentMenu);
+    }
+
+    /**
+     * ✅ إعداد Custom Views في القائمة الحالية
+     * - action_device_status (Dashboard)
+     * - action_inventory_power (Inventory)
+     */
+    private void setupCustomViewsForCurrentMenu() {
+        try {
+            MaterialToolbar toolbar = findViewById(R.id.secondaryToolbar);
+            if (toolbar == null) return;
+            
+            Menu menu = toolbar.getMenu();
+            
+            // ✅ Dashboard: action_device_status
+            MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
+            if (deviceStatusItem != null) {
+                View actionView = deviceStatusItem.getActionView();
+                if (actionView != null) {
+                    View statusDot = actionView.findViewById(R.id.deviceStatusDot);
+                    TextView statusText = actionView.findViewById(R.id.deviceStatusText);
+                    
+                    if (statusDot != null && statusText != null) {
+                        actionView.setOnClickListener(v -> showHardwareOptionsDialog());
+                        updateDeviceStatusUI(statusDot, statusText);
+                    }
+                }
+            }
+            
+            // ✅ Inventory: action_inventory_power (نفس الـ layout)
+            MenuItem powerItem = menu.findItem(R.id.action_inventory_power);
+            if (powerItem != null) {
+                View actionView = powerItem.getActionView();
+                if (actionView != null) {
+                    View statusDot = actionView.findViewById(R.id.deviceStatusDot);
+                    TextView statusText = actionView.findViewById(R.id.deviceStatusText);
+                    
+                    if (statusDot != null && statusText != null) {
+                        actionView.setOnClickListener(v -> showHardwareOptionsDialog());
+                        updateDeviceStatusUI(statusDot, statusText);
+                    }
+                }
+            }
+            
         } catch (Exception e) {
-            Log.e(TAG, "setupDeviceStatusButton error: " + e.getMessage());
+            Log.e(TAG, "setupCustomViewsForCurrentMenu error: " + e.getMessage(), e);
         }
     }
 
+    /**
+     * ✅ تحديث التولبار الثانوي عند التنقل
+     */
+    private void updateSecondaryToolbar(String tag) {
+        if (secondaryToolbarManager == null) return;
+        
+        try {
+            // ✅ 1) تغيير القائمة
+            secondaryToolbarManager.setMenuForTag(tag);
+            
+            // ✅ 2) تطبيق الصلاحيات
+            Menu menu = secondaryToolbarManager.getCurrentMenu();
+            if (menu != null) {
+                applyToolbarMenuPermissions(menu);
+            }
+            
+            // ✅ 3) إعادة إعداد custom views
+            setupCustomViewsForCurrentMenu();
+            
+            Log.d(TAG, "✅ Secondary toolbar updated for: " + tag);
+        } catch (Exception e) {
+            Log.e(TAG, "updateSecondaryToolbar error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ تحديث حالة الأجهزة في custom view
+     */
     private void updateDeviceStatusUI(View statusDot, TextView statusText) {
         try {
             if (statusDot == null || statusText == null) return;
@@ -412,7 +529,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // ✅ صفير العداد لمنع استمرار تجميد الشاشة لو حدث إغلاق مفاجئ أثناء التحميل
         loadingCounter = 0;
         forceHideLoadingImmediate();
         
@@ -490,10 +606,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void setupOrgProfileListener() {
-    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-    orgProfileManager.addListener(orgProfileListener);  // ✅ orgProfileListener
-    updateAppTitle();
-}
+        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+        orgProfileManager.addListener(orgProfileListener);
+        updateAppTitle();
+    }
 
     private void updateAppTitle() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -545,7 +661,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         currentFragment = navigationManager.getCurrentFragment();
         currentFragmentTag = tag;
         updateBottomNavSelectionByTag(tag);
-        // ✅ استخدام مهلة زمنيّة كافية للإطارات المزدوجة تجنباً للاختفاء السريع
+        updateSecondaryToolbar(tag);  // ✅ جديد
         mainHandler.postDelayed(this::hideLoading, 350);
     }
 
@@ -556,6 +672,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         currentFragment = navigationManager.getCurrentFragment();
         currentFragmentTag = tag;
         updateBottomNavSelectionByTag(tag);
+        updateSecondaryToolbar(tag);  // ✅ جديد
         mainHandler.postDelayed(this::hideLoading, 350);
     }
 
@@ -566,6 +683,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         currentFragment = navigationManager.getCurrentFragment();
         currentFragmentTag = tag;
         updateBottomNavSelectionByTag(tag);
+        updateSecondaryToolbar(tag);  // ✅ جديد
         mainHandler.postDelayed(this::hideLoading, 350);
     }
 
@@ -611,7 +729,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ✅ إعادة توجيه قراءة RFID دائماً إلى خيط الواجهة الرئيسي (Main Thread) مع فحص الحالة العميقة
     public void onTagRead(String epc) {
         mainHandler.post(() -> {
             try {
@@ -746,9 +863,67 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         return true;
     }
 
+    /**
+     * ✅ تطبيق الصلاحيات على القوائم (رئيسية + ثانوية)
+     */
     private void applyToolbarMenuPermissions(Menu menu) {
+        if (menu == null || permissionManager == null) return;
+        
         PermissionManager pm = permissionManager;
 
+        // ==================== Dashboard Menu ====================
+        MenuItem deviceStatus = menu.findItem(R.id.action_device_status);
+        if (deviceStatus != null) deviceStatus.setVisible(true);
+        
+        MenuItem search = menu.findItem(R.id.action_search);
+        if (search != null) search.setVisible(true);
+        
+        MenuItem sync = menu.findItem(R.id.action_sync);
+        if (sync != null) sync.setVisible(true);
+        
+        MenuItem quickAccess = menu.findItem(R.id.action_quick_access_settings);
+        if (quickAccess != null) quickAccess.setVisible(pm.canManageQuickAccess());
+
+        // ==================== Inventory Menu ====================
+        MenuItem invPower = menu.findItem(R.id.action_inventory_power);
+        if (invPower != null) invPower.setVisible(true);
+        
+        MenuItem invSearch = menu.findItem(R.id.action_inventory_search);
+        if (invSearch != null) invSearch.setVisible(true);
+        
+        MenuItem invStats = menu.findItem(R.id.action_inventory_stats);
+        if (invStats != null) invStats.setVisible(true);
+        
+        MenuItem invSettings = menu.findItem(R.id.action_inventory_settings);
+        if (invSettings != null) invSettings.setVisible(pm.canEditInventory());
+
+        // ==================== POS Menu ====================
+        MenuItem posCart = menu.findItem(R.id.action_pos_cart);
+        if (posCart != null) posCart.setVisible(true);
+        
+        MenuItem posSearch = menu.findItem(R.id.action_pos_search);
+        if (posSearch != null) posSearch.setVisible(true);
+        
+        MenuItem posDiscount = menu.findItem(R.id.action_pos_discount);
+        if (posDiscount != null) posDiscount.setVisible(pm.isManager() || pm.isAdmin());
+        
+        MenuItem posReceipt = menu.findItem(R.id.action_pos_receipt);
+        if (posReceipt != null) posReceipt.setVisible(true);
+
+        // ==================== Transfers Menu ====================
+        MenuItem trSync = menu.findItem(R.id.action_transfers_sync);
+        if (trSync != null) trSync.setVisible(true);
+        
+        MenuItem trExport = menu.findItem(R.id.action_transfers_export);
+        if (trExport != null) trExport.setVisible(pm.canExportReports());
+        
+        MenuItem trImport = menu.findItem(R.id.action_transfers_import);
+        if (trImport != null) trImport.setVisible(pm.canAccessTransfers());
+        
+        MenuItem trHistory = menu.findItem(R.id.action_transfers_history);
+        if (trHistory != null) trHistory.setVisible(true);
+
+        // ==================== Main Menu (ActionBar الرئيسي) ====================
         MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
         if (actionGoldRates != null) actionGoldRates.setVisible(pm.canViewGoldRates());
 
@@ -758,16 +933,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
         if (toggleLanguage != null) toggleLanguage.setTitle(isArabic ? "English" : "العربية");
 
-        MenuItem actionQuickAccess = menu.findItem(R.id.action_quick_access_settings);
-        if (actionQuickAccess != null) actionQuickAccess.setVisible(pm.canManageQuickAccess());
-
         MenuItem actionBranches = menu.findItem(R.id.action_branches);
-        if (actionBranches != null) actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
+        if (actionBranches != null) 
+            actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
 
         MenuItem actionExport = menu.findItem(R.id.export);
         if (actionExport != null) actionExport.setVisible(pm.canExportReports());
 
-        MenuItem uhfVer = menu.findItem(R.id.UHF_ver);
+        MenuItem uhfVer = menu.findItem(R.id.UHF_Ver);
         if (uhfVer != null) uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
     }
 
@@ -877,6 +1050,54 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .setTitle(isArabic ? "حول النظام | System Info" : "About System")
                 .setMessage(message.toString())
                 .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
+                .show();
+    }
+
+    // ==================== حوارات التولبار الثانوي ====================
+
+    private void showInventoryStatsDialog() {
+        try {
+            int scannedCount = tagList != null ? tagList.size() : 0;
+            
+            String message = isArabic 
+                ? "📊 الأصناف الممسوحة: " + scannedCount + "\n" +
+                  "⏱️ آخر تحديث: الآن"
+                : "📊 Scanned items: " + scannedCount + "\n" +
+                  "⏱️ Last updated: just now";
+            
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(isArabic ? "📊 إحصائيات الجلسة" : "📊 Live Stats")
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showInventoryStatsDialog error: " + e.getMessage());
+        }
+    }
+
+    private void showPOSCartDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "🛒 السلة" : "🛒 Cart")
+                .setMessage(isArabic ? "السلة فارغة" : "Cart is empty")
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .show();
+    }
+
+    private void showPOSDiscountDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "💰 تطبيق خصم" : "💰 Apply Discount")
+                .setMessage(isArabic ? "سيتم تطبيق الخصم على السلة الحالية" : 
+                                      "Discount will be applied to current cart")
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
+    }
+
+    private void showPOSReceiptDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "🧾 آخر إيصال" : "🧾 Last Receipt")
+                .setMessage(isArabic ? "لا يوجد إيصال حديث" : "No recent receipt")
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
                 .show();
     }
 
@@ -1435,6 +1656,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     if (tag != null) {
                         currentFragmentTag = tag;
                         saveFragmentTagToPrefs(tag);
+                        updateBottomNavSelectionByTag(tag);
+                        updateSecondaryToolbar(tag);  // ✅ جديد
                     }
                 }
                 return;
@@ -1479,7 +1702,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 loadingCounter++;
                 View loadingOverlay = findViewById(R.id.successOverlayMain);
                 if (loadingOverlay != null && loadingCounter == 1) {
-                    loadingOverlay.animate().cancel(); // إلغاء أي أنيميشن إخفاء سابق
+                    loadingOverlay.animate().cancel();
                     loadingOverlay.setVisibility(View.VISIBLE);
                     loadingOverlay.setAlpha(1.0f);
                 }
@@ -1493,7 +1716,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         mainHandler.post(() -> {
             try {
                 loadingCounter = Math.max(0, loadingCounter - 1);
-                if (loadingCounter > 0) return; // ✅ تجنب الإخفاء إذا كانت هناك طلبات تنقل أخرى معلقة
+                if (loadingCounter > 0) return;
 
                 View loadingOverlay = findViewById(R.id.successOverlayMain);
                 if (loadingOverlay != null && loadingOverlay.getVisibility() == View.VISIBLE) {
@@ -1556,7 +1779,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ==================== التنظيف والتدمير الجراحي ====================
+    // ==================== التنظيف والتدمير ====================
 
     @Override
     protected void onDestroy() {
@@ -1570,7 +1793,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             forceHideLoadingImmediate();
             stopActiveInventory();
 
-            // ✅ تفريغ وتنظيف خافق الواجهات لمنع تراكم الشاشات القديمة وإرهاق ה-Memory
             if (getSupportFragmentManager() != null && !isChangingConfigurations()) {
                 FragmentManager fm = getSupportFragmentManager();
                 fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
@@ -1584,8 +1806,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             if (orgProfileManager != null) {
-    orgProfileManager.removeListener(orgProfileListener);  // ✅ orgProfileListener
-}
+                orgProfileManager.removeListener(orgProfileListener);
+            }
 
             SessionMonitorManager.getInstance(this).stopMonitoring();
 
