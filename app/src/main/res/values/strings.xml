@@ -1698,7 +1698,7 @@
     <string name="uhf_msg_set_filter_succ">تم ضبط الفلتر بنجاح</string>
     <string name="uhf_msg_set_protocol_fail">فشل ضبط البروتوكول</string>
     <string name="uhf_msg_set_protocol_succ">تم ضبط البروتوكول بنجاح</string>
-
+    <string name="filter">فلترة</string>
     <string name="uhf_msg_set_frehop_succ">تم ضبط القفز الترددي بنجاح</string>
     <string name="uhf_msg_set_frehop_fail">فشل ضبط القفز الترددي</string>
 
