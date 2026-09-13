@@ -453,16 +453,20 @@ public class MiraPosFragment extends MiraBaseFragment {
      * ✅ تفعيل حقل البحث (يُستدعى من الشريط الثانوي)
      */
     public void focusSearchField() {
-        try {
-            if (etManualEpc != null) {
-                etManualEpc.requestFocus();
-                etManualEpc.performClick();
-                UIHelper.showKeyboard(getActivity());
+    try {
+        if (etManualEpc != null) {
+            etManualEpc.requestFocus();
+            etManualEpc.performClick();
+            
+            // ✅ فحص إضافي
+            if (getActivity() != null) {
+                UIHelper.showKeyboard(getActivity(), etManualEpc);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "focusSearchField error: " + e.getMessage());
         }
+    } catch (Exception e) {
+        Log.e(TAG, "focusSearchField error: " + e.getMessage());
     }
+}
 
     // ==================== أدوات مساعدة ====================
 
