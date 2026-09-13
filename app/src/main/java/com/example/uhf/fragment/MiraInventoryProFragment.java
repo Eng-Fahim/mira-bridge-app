@@ -44,6 +44,7 @@ import com.example.uhf.utils.SoundManager;
 import com.example.uhf.utils.PrintUtils;
 import com.example.uhf.utils.RFIDCodeUtils;
 import com.example.uhf.utils.InventoryAnimationHelper;
+import com.example.uhf.manager.inventory.InventorySessionManager;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -222,6 +223,8 @@ private ImageView btnLiveFilter;  // ✅ جديد
     private MiraBranchesManager branchesManager;
     private PermissionManager permissionManager;
     private int expectedCount = 0;
+    // ✅ Animation tracking
+    private int lastScannedForAnimation = 0;
     
     // ==================== معالجة زر الرجوع ====================
     private OnBackPressedCallback backPressedCallback;
@@ -3418,117 +3421,67 @@ private void confirmResetSession() {
 
 // ==================== Session Persistence ====================
 
+
 /**
- * ✅ حفظ الجلسة الحالية
+ * ✅ فحص واسترجاع الجلسة السابقة
  */
-private void saveCurrentSession() {
-    try {
-        if (!isAdded() || getContext() == null) return;
-        
-        JSONObject sessionData = new JSONObject();
-        sessionData.put("expectedCount", expectedCount);
-        sessionData.put("scanStartTime", scanStartTime);
-        sessionData.put("category", selectedCategoryFilter != null ? selectedCategoryFilter : "");
-        
-        JSONArray items = new JSONArray();
-        synchronized (scannedItemsDisplayList) {
-            for (ScannedItemDisplay item : scannedItemsDisplayList) {
-                JSONObject itemObj = new JSONObject();
-                itemObj.put("epc", item.epc);
-                itemObj.put("title", item.title);
-                itemObj.put("karat", item.karat);
-                itemObj.put("count", item.count);
-                itemObj.put("rssi", item.rssi);
-                itemObj.put("time", item.time);
-                itemObj.put("weight", item.weight);
-                itemObj.put("price", item.price);
-                items.put(itemObj);
-            }
-        }
-        sessionData.put("items", items);
-        
-        getContext().getSharedPreferences(PREFS_INVENTORY, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_SESSION_DATA, sessionData.toString())
-            .putLong(KEY_SESSION_TIME, System.currentTimeMillis())
-            .apply();
+private void checkAndRestoreSession() {
+    if (sessionManager == null || !isAdded() || isFragmentDestroyed) return;
+    
+    sessionManager.tryRestoreSession(new InventorySessionManager.SessionCallback() {
+        @Override
+        public void onSessionFound(JSONArray items, int expectedCount, 
+                                    String category, long timeAgoMillis) {
+            if (!isAdded() || isFragmentDestroyed) return;
             
-        Log.d(TAG, "✅ Session saved: " + scannedItemsDisplayList.size() + " items");
+            // ✅ عرض حوار الاسترجاع
+            showRestoreSessionDialog(items, expectedCount, category, timeAgoMillis);
+        }
         
-    } catch (Exception e) {
-        Log.e(TAG, "saveCurrentSession error: " + e.getMessage());
-    }
+        @Override
+        public void onNoSession() {
+            // لا شيء — لا توجد جلسة سابقة
+            Log.d(TAG, "No previous session found");
+        }
+    });
 }
 
 /**
- * ✅ استرجاع الجلسة السابقة
+ * ✅ عرض حوار استرجاع الجلسة
  */
-private void restorePreviousSession() {
-    try {
-        if (!isAdded() || getContext() == null) return;
-        
-        android.content.SharedPreferences prefs = 
-            getContext().getSharedPreferences(PREFS_INVENTORY, Context.MODE_PRIVATE);
-        
-        String sessionDataStr = prefs.getString(KEY_SESSION_DATA, null);
-        long sessionTime = prefs.getLong(KEY_SESSION_TIME, 0);
-        
-        if (sessionDataStr == null) return;
-        
-        // ✅ التحقق من الصلاحية
-        long timeDiff = System.currentTimeMillis() - sessionTime;
-        if (timeDiff > SESSION_EXPIRY_MS) {
-            clearSavedSession();
-            return;
-        }
-        
-        JSONObject sessionData = new JSONObject(sessionDataStr);
-        int savedExpectedCount = sessionData.optInt("expectedCount", 0);
-        String savedCategory = sessionData.optString("category", "");
-        JSONArray items = sessionData.optJSONArray("items");
-        
-        if (items == null || items.length() == 0) {
-            clearSavedSession();
-            return;
-        }
-        
-        final int fExpectedCount = savedExpectedCount;
-        final String fCategory = savedCategory;
-        final JSONArray fItems = items;
-        
-        // ✅ عرض حوار الاسترجاع
-        new MaterialAlertDialogBuilder(requireContext())
+private void showRestoreSessionDialog(JSONArray items, 
+                                       int expectedCount, 
+                                       String category, 
+                                       long timeAgoMillis) {
+    if (!isAdded() || isFragmentDestroyed) return;
+    
+    String message = sessionManager.buildRestoreMessage(items, timeAgoMillis);
+    
+    new MaterialAlertDialogBuilder(requireContext())
             .setTitle(isArabic ? "🔄 استرجاع الجلسة" : "🔄 Restore Session")
-            .setMessage(isArabic ? 
-                "تم العثور على جلسة سابقة من " + 
-                formatTimeAgo(timeDiff) + " تحتوي على " + items.length() + " قطعة.\n\n" +
-                "هل تريد استرجاعها؟" :
-                "Found a previous session from " + 
-                formatTimeAgo(timeDiff) + " with " + items.length() + " items.\n\n" +
-                "Restore it?")
+            .setMessage(message)
             .setPositiveButton(isArabic ? "استرجاع" : "Restore", (d, w) -> {
-                performRestore(fItems, fExpectedCount, fCategory);
+                applyRestoredSession(items, expectedCount, category);
             })
             .setNegativeButton(isArabic ? "بدء جديد" : "Start New", (d, w) -> {
-                clearSavedSession();
+                if (sessionManager != null) {
+                    sessionManager.clearSession();
+                }
             })
             .setNeutralButton(isArabic ? "معاينة" : "Preview", (d, w) -> {
-                showSessionPreview(fItems, fExpectedCount, fCategory);
+                showSessionPreviewDialog(items, expectedCount, category);
                 // إعادة عرض الحوار بعد المعاينة
-                mainThreadHandler.postDelayed(this::restorePreviousSession, 500);
+                mainThreadHandler.postDelayed(() -> 
+                        showRestoreSessionDialog(items, expectedCount, category, timeAgoMillis), 500);
             })
             .setCancelable(false)
             .show();
-            
-    } catch (Exception e) {
-        Log.e(TAG, "restorePreviousSession error: " + e.getMessage());
-    }
 }
 
 /**
- * ✅ تنفيذ الاسترجاع
+ * ✅ تطبيق الجلسة المسترجعة
  */
-private void performRestore(JSONArray items, int savedExpectedCount, String savedCategory) {
+private void applyRestoredSession(JSONArray items, int expectedCount, String category) {
     try {
         synchronized (scannedItemsDisplayList) {
             scannedItemsDisplayList.clear();
@@ -3553,12 +3506,20 @@ private void performRestore(JSONArray items, int savedExpectedCount, String save
             updateAdapterList();
         }
         
-        expectedCount = savedExpectedCount;
+        this.expectedCount = expectedCount;
         if (tvExpectedCount != null) {
             tvExpectedCount.setText(String.valueOf(expectedCount));
         }
         
-        selectedCategoryFilter = savedCategory.isEmpty() ? null : savedCategory;
+        selectedCategoryFilter = category.isEmpty() ? null : category;
+        
+        // ✅ إعادة تعيين عدّاد الـ animation
+        lastScannedForAnimation = items.length();
+        
+        // ✅ إعادة تعيين Animation tracker
+        if (modernAdapter != null) {
+            modernAdapter.resetAnimationTracker();
+        }
         
         updateUI();
         updateTotalWeightAndValue();
@@ -3575,78 +3536,23 @@ private void performRestore(JSONArray items, int savedExpectedCount, String save
             Toast.LENGTH_LONG).show();
             
     } catch (Exception e) {
-        Log.e(TAG, "performRestore error: " + e.getMessage());
+        Log.e(TAG, "applyRestoredSession error: " + e.getMessage());
     }
 }
 
 /**
  * ✅ عرض معاينة الجلسة
  */
-private void showSessionPreview(JSONArray items, int expected, String category) {
-    try {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(isArabic ? "📊 ملخص الجلسة:\n\n" : "📊 Session Summary:\n\n");
-        sb.append(isArabic ? "• المتوقع: " : "• Expected: ").append(expected).append("\n");
-        sb.append(isArabic ? "• الممسوح: " : "• Scanned: ").append(items.length()).append("\n");
-        
-        if (!category.isEmpty()) {
-            sb.append(isArabic ? "• الفئة: " : "• Category: ").append(category).append("\n");
-        }
-        
-        sb.append("\n").append(isArabic ? "📋 القطع المحفوظة:\n\n" : "📋 Saved items:\n\n");
-        
-        int max = Math.min(items.length(), 10);
-        for (int i = 0; i < max; i++) {
-            JSONObject item = items.getJSONObject(i);
-            String title = item.optString("title", "");
-            if (title.isEmpty() || title.equals("—")) {
-                title = item.optString("epc");
-            }
-            sb.append("• ").append(title)
-              .append(" ×").append(item.optInt("count", 1)).append("\n");
-        }
-        
-        if (items.length() > max) {
-            sb.append("\n... +").append(items.length() - max)
-              .append(isArabic ? " قطعة" : " more");
-        }
-        
-        new MaterialAlertDialogBuilder(requireContext())
+private void showSessionPreviewDialog(JSONArray items, int expected, String category) {
+    if (sessionManager == null || !isAdded() || isFragmentDestroyed) return;
+    
+    String preview = sessionManager.buildSessionPreview(items, expected, category);
+    
+    new MaterialAlertDialogBuilder(requireContext())
             .setTitle(isArabic ? "معاينة الجلسة" : "Session Preview")
-            .setMessage(sb.toString())
+            .setMessage(preview)
             .setPositiveButton(isArabic ? "موافق" : "OK", null)
             .show();
-            
-    } catch (Exception e) {
-        Log.e(TAG, "showSessionPreview error: " + e.getMessage());
-    }
-}
-
-/**
- * ✅ مسح الجلسة المحفوظة
- */
-private void clearSavedSession() {
-    try {
-        if (getContext() == null) return;
-        getContext().getSharedPreferences(PREFS_INVENTORY, Context.MODE_PRIVATE)
-            .edit()
-            .clear()
-            .apply();
-    } catch (Exception e) {
-        Log.e(TAG, "clearSavedSession error: " + e.getMessage());
-    }
-}
-
-/**
- * ✅ تنسيق الوقت المنقضي
- */
-private String formatTimeAgo(long millis) {
-    long minutes = millis / 60000;
-    if (minutes < 1) return isArabic ? "أقل من دقيقة" : "less than a minute";
-    if (minutes < 60) return minutes + (isArabic ? " دقيقة" : " min");
-    long hours = minutes / 60;
-    return hours + (isArabic ? " ساعة" : " hour");
 }
 
 } // ✅ نهاية الكلاس MiraInventoryProFragment
