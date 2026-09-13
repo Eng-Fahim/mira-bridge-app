@@ -843,142 +843,170 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== القوائم ====================
 
     @SuppressLint("RestrictedApi")
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
+@Override
+public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.main_menu, menu);
 
-        MenuItem notificationItem = menu.findItem(R.id.action_notifications);
-        if (notificationItem != null) {
-            View actionView = notificationItem.getActionView();
-            if (actionView != null) {
-                txtBadgeCount = actionView.findViewById(R.id.txtBadgeCount);
-                notificationManager.setBadgeView(txtBadgeCount);
-                actionView.setOnClickListener(v -> handleNotificationButtonClick());
-            }
+    // ✅ إعداد زر الإشعارات (Custom View)
+    MenuItem notificationItem = menu.findItem(R.id.action_notifications);
+    if (notificationItem != null) {
+        View actionView = notificationItem.getActionView();
+        if (actionView != null) {
+            txtBadgeCount = actionView.findViewById(R.id.txtBadgeCount);
+            notificationManager.setBadgeView(txtBadgeCount);
+            actionView.setOnClickListener(v -> handleNotificationButtonClick());
         }
-
-        notificationManager.init(sessionManager.getUserId());
-        applyToolbarMenuPermissions(menu);
-
-        return true;
     }
 
+    notificationManager.init(sessionManager.getUserId());
+    applyToolbarMenuPermissions(menu);
+
+    return true;
+}
     /**
      * ✅ تطبيق الصلاحيات على القوائم (رئيسية + ثانوية)
      */
-    private void applyToolbarMenuPermissions(Menu menu) {
-        if (menu == null || permissionManager == null) return;
-        
-        PermissionManager pm = permissionManager;
+    /**
+ * ✅ تطبيق الصلاحيات على القوائم (رئيسية + ثانوية)
+ */
+private void applyToolbarMenuPermissions(Menu menu) {
+    if (menu == null || permissionManager == null) return;
+    
+    PermissionManager pm = permissionManager;
 
-        // ==================== Dashboard Menu ====================
-        MenuItem deviceStatus = menu.findItem(R.id.action_device_status);
-        if (deviceStatus != null) deviceStatus.setVisible(true);
-        
-        MenuItem search = menu.findItem(R.id.action_search);
-        if (search != null) search.setVisible(true);
-        
-        MenuItem sync = menu.findItem(R.id.action_sync);
-        if (sync != null) sync.setVisible(true);
-        
-        MenuItem quickAccess = menu.findItem(R.id.action_quick_access_settings);
-        if (quickAccess != null) quickAccess.setVisible(pm.canManageQuickAccess());
+    // ==================== 🏢 الشريط الرئيسي (main_menu.xml) ====================
+    
+    MenuItem goldRates = menu.findItem(R.id.action_gold_rates);
+    if (goldRates != null) goldRates.setVisible(pm.canViewGoldRates());
 
-        // ==================== Inventory Menu ====================
-        MenuItem invPower = menu.findItem(R.id.action_inventory_power);
-        if (invPower != null) invPower.setVisible(true);
-        
-        MenuItem invSearch = menu.findItem(R.id.action_inventory_search);
-        if (invSearch != null) invSearch.setVisible(true);
-        
-        MenuItem invStats = menu.findItem(R.id.action_inventory_stats);
-        if (invStats != null) invStats.setVisible(true);
-        
-        MenuItem invSettings = menu.findItem(R.id.action_inventory_settings);
-        if (invSettings != null) invSettings.setVisible(pm.canEditInventory());
+    MenuItem profile = menu.findItem(R.id.action_profile);
+    if (profile != null) profile.setVisible(pm.canViewProfile());
 
-        // ==================== POS Menu ====================
-        MenuItem posCart = menu.findItem(R.id.action_pos_cart);
-        if (posCart != null) posCart.setVisible(true);
-        
-        MenuItem posSearch = menu.findItem(R.id.action_pos_search);
-        if (posSearch != null) posSearch.setVisible(true);
-        
-        MenuItem posDiscount = menu.findItem(R.id.action_pos_discount);
-        if (posDiscount != null) posDiscount.setVisible(pm.isManager() || pm.isAdmin());
-        
-        MenuItem posReceipt = menu.findItem(R.id.action_pos_receipt);
-        if (posReceipt != null) posReceipt.setVisible(true);
+    MenuItem notifications = menu.findItem(R.id.action_notifications);
+    if (notifications != null) notifications.setVisible(true);
 
-        // ==================== Transfers Menu ====================
-        MenuItem trSync = menu.findItem(R.id.action_transfers_sync);
-        if (trSync != null) trSync.setVisible(true);
-        
-        MenuItem trExport = menu.findItem(R.id.action_transfers_export);
-        if (trExport != null) trExport.setVisible(pm.canExportReports());
-        
-        MenuItem trImport = menu.findItem(R.id.action_transfers_import);
-        if (trImport != null) trImport.setVisible(pm.canAccessTransfers());
-        
-        MenuItem trHistory = menu.findItem(R.id.action_transfers_history);
-        if (trHistory != null) trHistory.setVisible(true);
+    MenuItem quickAccess = menu.findItem(R.id.action_quick_access_settings);
+    if (quickAccess != null) quickAccess.setVisible(pm.canManageQuickAccess());
 
-        // ==================== Main Menu (ActionBar الرئيسي) ====================
-        MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
-        if (actionGoldRates != null) actionGoldRates.setVisible(pm.canViewGoldRates());
+    MenuItem soundSettings = menu.findItem(R.id.action_sound_settings);
+    if (soundSettings != null) soundSettings.setVisible(true);
 
-        MenuItem actionProfile = menu.findItem(R.id.action_profile);
-        if (actionProfile != null) actionProfile.setVisible(pm.canViewProfile());
-
-        MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
-        if (toggleLanguage != null) toggleLanguage.setTitle(isArabic ? "English" : "العربية");
-
-        MenuItem actionBranches = menu.findItem(R.id.action_branches);
-        if (actionBranches != null) 
-            actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
-
-        MenuItem actionExport = menu.findItem(R.id.export);
-        if (actionExport != null) actionExport.setVisible(pm.canExportReports());
-
-        MenuItem uhfVer = menu.findItem(R.id.UHF_Ver);
-        if (uhfVer != null) uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
+    MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
+    if (toggleLanguage != null) {
+        toggleLanguage.setVisible(true);
+        toggleLanguage.setTitle(isArabic ? "English" : "العربية");
     }
+
+    MenuItem branches = menu.findItem(R.id.action_branches);
+    if (branches != null) {
+        branches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
+    }
+
+    MenuItem exportData = menu.findItem(R.id.action_export_data);           // ✅ صحيح
+    if (exportData != null) exportData.setVisible(pm.canExportReports());
+
+    MenuItem deviceVersion = menu.findItem(R.id.action_device_version);     // ✅ صحيح
+    if (deviceVersion != null) {
+        deviceVersion.setVisible(pm.isAdmin() || pm.isSystemAdmin());
+    }
+
+    MenuItem logout = menu.findItem(R.id.action_logout);
+    if (logout != null) logout.setVisible(true);
+
+    // ==================== 📊 الشريط الثانوي - Dashboard ====================
+    
+    MenuItem deviceStatus = menu.findItem(R.id.action_device_status);
+    if (deviceStatus != null) deviceStatus.setVisible(true);
+    
+    MenuItem search = menu.findItem(R.id.action_search);
+    if (search != null) search.setVisible(true);
+    
+    MenuItem sync = menu.findItem(R.id.action_sync);
+    if (sync != null) sync.setVisible(true);
+
+    // ==================== 📊 الشريط الثانوي - Inventory ====================
+    
+    MenuItem invPower = menu.findItem(R.id.action_inventory_power);
+    if (invPower != null) invPower.setVisible(true);
+    
+    MenuItem invSearch = menu.findItem(R.id.action_inventory_search);
+    if (invSearch != null) invSearch.setVisible(true);
+    
+    MenuItem invStats = menu.findItem(R.id.action_inventory_stats);
+    if (invStats != null) invStats.setVisible(true);
+    
+    MenuItem invSettings = menu.findItem(R.id.action_inventory_settings);
+    if (invSettings != null) invSettings.setVisible(pm.canEditInventory());
+
+    // ==================== 📊 الشريط الثانوي - POS ====================
+    
+    MenuItem posCart = menu.findItem(R.id.action_pos_cart);
+    if (posCart != null) posCart.setVisible(true);
+    
+    MenuItem posSearch = menu.findItem(R.id.action_pos_search);
+    if (posSearch != null) posSearch.setVisible(true);
+    
+    MenuItem posDiscount = menu.findItem(R.id.action_pos_discount);
+    if (posDiscount != null) posDiscount.setVisible(pm.isManager() || pm.isAdmin());
+    
+    MenuItem posReceipt = menu.findItem(R.id.action_pos_receipt);
+    if (posReceipt != null) posReceipt.setVisible(true);
+
+    // ==================== 📊 الشريط الثانوي - Transfers ====================
+    
+    MenuItem trSync = menu.findItem(R.id.action_transfers_sync);
+    if (trSync != null) trSync.setVisible(true);
+    
+    MenuItem trExport = menu.findItem(R.id.action_transfers_export);
+    if (trExport != null) trExport.setVisible(pm.canExportReports());
+    
+    MenuItem trImport = menu.findItem(R.id.action_transfers_import);
+    if (trImport != null) trImport.setVisible(pm.canAccessTransfers());
+    
+    MenuItem trHistory = menu.findItem(R.id.action_transfers_history);
+    if (trHistory != null) trHistory.setVisible(true);
+}
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
 
-        if (id == R.id.action_gold_rates) {
-            loadFragment(new MiraGoldCurrencyFragment(), "GoldRates");
-            return true;
-        } else if (id == R.id.action_profile) {
-            loadFragment(new MiraProfileFragment(), "Profile");
-            return true;
-        } else if (id == R.id.action_quick_access_settings) {
-            loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
-            return true;
-        } else if (id == R.id.action_branches) {
-            loadFragment(new MiraBranchesManagementFragment(), "Branches");
-            return true;
-        } else if (id == R.id.export) {
-            loadFragment(new MiraReportsProFragment(), "Reports");
-            return true;
-        } else if (id == R.id.action_toggle_language) {
-            toggleLanguage();
-            return true;
-        } else if (id == R.id.nav_sound_settings) {
-            loadFragment(new MiraSoundSettingsFragment(), "SoundSettings");
-            return true;
-        } else if (id == R.id.UHF_ver) {
-            showSystemVersionDialog();
-            return true;
-        } else if (id == R.id.action_logout) {
-            confirmLogout();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+    // ==================== 🏢 الشريط الرئيسي ====================
+    
+    if (id == R.id.action_gold_rates) {
+        loadFragment(new MiraGoldCurrencyFragment(), "GoldRates");
+        return true;
+    } else if (id == R.id.action_profile) {
+        loadFragment(new MiraProfileFragment(), "Profile");
+        return true;
+    } else if (id == R.id.action_notifications) {
+        handleNotificationButtonClick();
+        return true;
+    } else if (id == R.id.action_quick_access_settings) {
+        loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+        return true;
+    } else if (id == R.id.action_sound_settings) {                         // ✅ صحيح
+        loadFragment(new MiraSoundSettingsFragment(), "SoundSettings");
+        return true;
+    } else if (id == R.id.action_toggle_language) {
+        toggleLanguage();
+        return true;
+    } else if (id == R.id.action_branches) {
+        loadFragment(new MiraBranchesManagementFragment(), "Branches");
+        return true;
+    } else if (id == R.id.action_export_data) {                            // ✅ صحيح
+        loadFragment(new MiraReportsProFragment(), "Reports");
+        return true;
+    } else if (id == R.id.action_device_version) {                         // ✅ صحيح
+        showSystemVersionDialog();
+        return true;
+    } else if (id == R.id.action_logout) {
+        confirmLogout();
+        return true;
     }
+
+    return super.onOptionsItemSelected(item);
+}
 
     private void toggleLanguage() {
         try {
@@ -1009,12 +1037,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void handleNotificationButtonClick() {
-        if (permissionManager.isAdmin() || permissionManager.isManager()) {
-            showNotificationsAndChatDialog();
-        } else {
-            showNotificationsAndMessagingDialog();
-        }
+    if (permissionManager.isAdmin() || permissionManager.isManager()) {
+        showNotificationsAndChatDialog();
+    } else {
+        showNotificationsAndMessagingDialog();
     }
+}
 
     // ==================== الحوارات ====================
 
