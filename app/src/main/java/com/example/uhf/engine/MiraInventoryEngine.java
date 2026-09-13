@@ -33,7 +33,24 @@ public class MiraInventoryEngine {
     private final AtomicInteger duplicateCount = new AtomicInteger(0);
 
     private long sessionStartTime = 0;
-
+    
+    /**
+ * ✅ إعادة تعيين الجلسة الحالية
+ * يمسح كل ما تم مسحه، لكن يحتفظ بالكتالوج
+ */
+public void clearSession() {
+    try {
+        scannedByEpcMap.clear();
+        totalReads.set(0);
+        uniqueCount.set(0);
+        duplicateCount.set(0);
+        sessionStartTime = SystemClock.elapsedRealtime();
+        
+        Log.d(TAG, "✅ Session cleared: " + clientSessionId);
+    } catch (Exception e) {
+        Log.e(TAG, "clearSession error: " + e.getMessage(), e);
+    }
+}
     public MiraInventoryEngine(Context context, String clientSessionId, String deviceId) {
         this.clientSessionId = clientSessionId;
         this.deviceId = deviceId;
