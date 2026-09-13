@@ -94,6 +94,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraIdentityStudio";
     private static final long RFID_TIMEOUT_MS = 30000;
+    private final Runnable autoSyncRunnable = this::performAutoSync;
 
     private FragmentMiraIdentityStudioBinding binding;
     private MiraApiClient apiClient;
@@ -139,6 +140,12 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     super.onViewCreated(view, savedInstanceState);
 
     try {
+    if (savedInstanceState != null) {
+    isFormLocked = savedInstanceState.getBoolean("is_form_locked", false);
+    isRfidScanning = savedInstanceState.getBoolean("is_rfid_scanning", false);
+    currentPhotoPath = savedInstanceState.getString("camera_photo_path", null);
+}
+    
         initializeComponents();
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         setupPhotoLaunchers();
@@ -196,149 +203,67 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     // ==================== إدارة النموذج ====================
 
     private void restoreDraftIfExists() {
-    // ✅ فحص أولي: لا نُكمل إذا كان binding أو formManager غير جاهز
     if (binding == null || formManager == null) {
         Log.w(TAG, "restoreDraftIfExists skipped: binding or formManager is null");
         return;
     }
 
-    boolean restored;
     try {
-        restored = formManager.restoreDraft(new IdentityFormManager.FormData() {
+        boolean restored = formManager.restoreDraft(
+            new IdentityFormManager.FormData() {
 
-            // ==================== Getters ====================
-
-            @Override
-            public String getEpc() {
-                return (binding != null && binding.etEpc != null)
-                        ? binding.etEpc.getText().toString()
-                        : "";
-            }
-
-            @Override
-            public String getTitle() {
-                return (binding != null && binding.etTitle != null)
-                        ? binding.etTitle.getText().toString()
-                        : "";
-            }
-
-            @Override
-            public String getGrossWeight() {
-                return (binding != null && binding.etGrossWeight != null)
-                        ? binding.etGrossWeight.getText().toString()
-                        : "";
-            }
-
-            @Override
-            public boolean isHasStones() {
-                return binding != null
-                        && binding.switchHasStones != null
-                        && binding.switchHasStones.isChecked();
-            }
-
-            @Override
-            public String getStoneType() {
-                return (binding != null && binding.etStoneType != null)
-                        ? binding.etStoneType.getText().toString()
-                        : "";
-            }
-
-            @Override
-            public String getStoneWeight() {
-                return (binding != null && binding.etStoneWeight != null)
-                        ? binding.etStoneWeight.getText().toString()
-                        : "";
-            }
-
-            @Override
-            public String getStoneCount() {
-                return (binding != null && binding.etStoneCount != null)
-                        ? binding.etStoneCount.getText().toString()
-                        : "";
-            }
-
-            @Override
-            public String getStoneValue() {
-                return (binding != null && binding.etStoneValue != null)
-                        ? binding.etStoneValue.getText().toString()
-                        : "";
-            }
-
-            // ==================== Setters ====================
-
-            @Override
-            public void setEpc(String value) {
-                if (binding != null && binding.etEpc != null && value != null) {
-                    binding.etEpc.setText(value);
+                // ==================== Getters (تُقرأ من main thread) ====================
+                @Override public String getEpc() { return safeGet(binding != null ? binding.etEpc : null); }
+                @Override public String getTitle() { return safeGet(binding != null ? binding.etTitle : null); }
+                @Override public String getGrossWeight() { return safeGet(binding != null ? binding.etGrossWeight : null); }
+                @Override public boolean isHasStones() {
+                    return binding != null && binding.switchHasStones != null && binding.switchHasStones.isChecked();
                 }
-            }
+                @Override public String getStoneType() { return safeGet(binding != null ? binding.etStoneType : null); }
+                @Override public String getStoneWeight() { return safeGet(binding != null ? binding.etStoneWeight : null); }
+                @Override public String getStoneCount() { return safeGet(binding != null ? binding.etStoneCount : null); }
+                @Override public String getStoneValue() { return safeGet(binding != null ? binding.etStoneValue : null); }
 
-            @Override
-            public void setTitle(String value) {
-                if (binding != null && binding.etTitle != null && value != null) {
-                    binding.etTitle.setText(value);
+                // ==================== Setters (تُنفَّذ في main thread عبر safeRun) ====================
+                @Override public void setEpc(String value) {
+                    safeRun(() -> { if (binding != null && binding.etEpc != null && value != null) binding.etEpc.setText(value); });
                 }
-            }
-
-            @Override
-            public void setGrossWeight(String value) {
-                if (binding != null && binding.etGrossWeight != null && value != null) {
-                    binding.etGrossWeight.setText(value);
+                @Override public void setTitle(String value) {
+                    safeRun(() -> { if (binding != null && binding.etTitle != null && value != null) binding.etTitle.setText(value); });
                 }
-            }
-
-            @Override
-            public void setStoneType(String value) {
-                if (binding != null && binding.etStoneType != null && value != null) {
-                    binding.etStoneType.setText(value);
+                @Override public void setGrossWeight(String value) {
+                    safeRun(() -> { if (binding != null && binding.etGrossWeight != null && value != null) binding.etGrossWeight.setText(value); });
                 }
-            }
-
-            @Override
-            public void setStoneWeight(String value) {
-                if (binding != null && binding.etStoneWeight != null && value != null) {
-                    binding.etStoneWeight.setText(value);
+                @Override public void setStoneType(String value) {
+                    safeRun(() -> { if (binding != null && binding.etStoneType != null && value != null) binding.etStoneType.setText(value); });
                 }
-            }
-
-            @Override
-            public void setStoneCount(String value) {
-                if (binding != null && binding.etStoneCount != null && value != null) {
-                    binding.etStoneCount.setText(value);
+                @Override public void setStoneWeight(String value) {
+                    safeRun(() -> { if (binding != null && binding.etStoneWeight != null && value != null) binding.etStoneWeight.setText(value); });
                 }
-            }
-
-            @Override
-            public void setStoneValue(String value) {
-                if (binding != null && binding.etStoneValue != null && value != null) {
-                    binding.etStoneValue.setText(value);
+                @Override public void setStoneCount(String value) {
+                    safeRun(() -> { if (binding != null && binding.etStoneCount != null && value != null) binding.etStoneCount.setText(value); });
                 }
-            }
-
-            @Override
-            public void setHasStones(boolean value) {
-                if (binding != null && binding.switchHasStones != null) {
-                    binding.switchHasStones.setChecked(value);
+                @Override public void setStoneValue(String value) {
+                    safeRun(() -> { if (binding != null && binding.etStoneValue != null && value != null) binding.etStoneValue.setText(value); });
                 }
-            }
-        }, photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
+                @Override public void setHasStones(boolean value) {
+                    safeRun(() -> { if (binding != null && binding.switchHasStones != null) binding.switchHasStones.setChecked(value); });
+                }
+            },
+            photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>()
+        );
 
+        if (restored) {
+            safeRun(() -> {
+                if (!isAdded() || binding == null) return;
+                showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
+                onPhotosUpdated();
+            });
+        }
     } catch (Exception e) {
         Log.e(TAG, "restoreDraftIfExists error: " + e.getMessage(), e);
-        return;
-    }
-
-    // ==================== تطبيق النتيجة ====================
-
-    if (restored) {
-        safeRun(() -> {
-            if (!isAdded() || binding == null) return;
-            showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
-            onPhotosUpdated();
-        });
     }
 }
-
     private void saveCurrentDraftAsync() {
     final FragmentMiraIdentityStudioBinding b = binding;   // ← احتفظ بمرجع محلي
     if (formManager == null || b == null) return;
@@ -912,10 +837,18 @@ private File createImageFile() throws IOException {
 
 private void openBarcodeScannerForEPC() {
     try {
-        if (!isAdded()) return;
+        if (!isAdded() || getActivity() == null) return;
 
         FragmentManager fm = getParentFragmentManager();
-        if (fm.isStateSaved()) return;
+        if (fm.isStateSaved()) {
+            Log.w(TAG, "State saved, cannot open scanner");
+            return;
+        }
+        // ✅ منع التراكم
+        if (fm.findFragmentByTag("barcode_scanner_tag") != null) {
+            Log.w(TAG, "Scanner already open");
+            return;
+        }
 
         MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
         sf.setOnBarcodeScannedListener((data, format) -> {
@@ -923,9 +856,7 @@ private void openBarcodeScannerForEPC() {
                 binding.etEpc.setText(data);
                 binding.tvStatusBadge.setText("BOUND");
             }
-            if (fm.getBackStackEntryCount() > 0) {
-                fm.popBackStack();
-            }
+            if (fm.getBackStackEntryCount() > 0) fm.popBackStack();
         });
 
         View view = getView();
@@ -934,10 +865,11 @@ private void openBarcodeScannerForEPC() {
                 : android.R.id.content;
 
         fm.beginTransaction()
+                .setReorderingAllowed(true)   // ✅ مهم
                 .setCustomAnimations(
                         android.R.anim.fade_in, android.R.anim.fade_out,
                         android.R.anim.fade_in, android.R.anim.fade_out)
-                .add(cid, sf, "barcode_scanner_tag")    // ← add
+                .replace(cid, sf, "barcode_scanner_tag")
                 .addToBackStack("barcode_scanner_encode")
                 .commit();
 
@@ -947,7 +879,6 @@ private void openBarcodeScannerForEPC() {
     }
 }
 
-// ==================== [يتبع في المرحلة 3] ====================
 
 
     // ==================== الحفظ والتكويد ====================
@@ -1329,10 +1260,9 @@ private void openBarcodeScannerForEPC() {
         if (!isAdded() || getActivity() == null) return;
 
         FragmentManager fm = getParentFragmentManager();
-        if (fm.isStateSaved()) {
-            Log.w(TAG, "State saved, cannot commit transaction");
-            return;
-        }
+        if (fm.isStateSaved()) return;
+        // ✅ منع التراكم
+        if (fm.findFragmentByTag("sync_log_tag") != null) return;
 
         View view = getView();
         int cid = (view != null && view.getParent() instanceof View)
@@ -1342,15 +1272,15 @@ private void openBarcodeScannerForEPC() {
         SyncLogFragment syncLogFragment = new SyncLogFragment();
 
         fm.beginTransaction()
+                .setReorderingAllowed(true)
                 .setCustomAnimations(
                         android.R.anim.fade_in, android.R.anim.fade_out,
                         android.R.anim.fade_in, android.R.anim.fade_out)
-                .add(cid, syncLogFragment, "sync_log_tag")    // ← add
+                .replace(cid, syncLogFragment, "sync_log_tag")
                 .addToBackStack("sync_log")
                 .commit();
 
         Log.i(TAG, "✅ Opened SyncLogFragment");
-
     } catch (Exception e) {
         Log.e(TAG, "openSyncLogFragment error: " + e.getMessage(), e);
         showToast(isArabic ? "❌ خطأ في فتح السجل" : "❌ Error opening log");
@@ -1361,18 +1291,12 @@ private void openBarcodeScannerForEPC() {
      * ✅ جدولة مزامنة تلقائية بعد حفظ Offline
      */
     private void scheduleAutoSync() {
-        try {
-            if (syncManager == null) return;
-            
-            // جدولة المزامنة بعد 3 ثوانٍ
-            handler.postDelayed(this::performAutoSync, 3000);
-            
-            Log.d(TAG, "🔄 Auto-sync scheduled in 3s");
-        } catch (Exception e) {
-            Log.e(TAG, "scheduleAutoSync error: " + e.getMessage());
-        }
-    }
-
+    if (syncManager == null || !isAdded()) return;
+    // ✅ إزالة أي جدولة سابقة
+    handler.removeCallbacks(autoSyncRunnable);
+    handler.postDelayed(autoSyncRunnable, 3000);
+    Log.d(TAG, "🔄 Auto-sync scheduled in 3s");
+}
     /**
      * ✅ تنفيذ المزامنة التلقائية
      */
@@ -1809,17 +1733,24 @@ private void openBarcodeScannerForEPC() {
     }
 
     private void safeRun(Runnable r) {
-        try {
-            if (isAdded() && getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (isAdded()) r.run();
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "safeRun error: " + e.getMessage());
+    try {
+        if (isAdded() && getActivity() != null && !isRemoving() && !isDetached()) {
+            getActivity().runOnUiThread(() -> {
+                // ✅ فحص صارم ثلاثي
+                if (isAdded() && !isRemoving() && !isDetached() 
+                    && binding != null && getView() != null) {
+                    try {
+                        r.run();
+                    } catch (Exception e) {
+                        Log.e(TAG, "safeRun inner error: " + e.getMessage(), e);
+                    }
+                }
+            });
         }
+    } catch (Exception e) {
+        Log.e(TAG, "safeRun error: " + e.getMessage());
     }
-
+}
     // ==================== دورة الحياة ====================
 
     
@@ -1827,28 +1758,22 @@ private void openBarcodeScannerForEPC() {
 @Override
 public void onResume() {
     super.onResume();
-    View v = getView();
-    if (v == null) return;
+    if (!isAdded() || binding == null || getView() == null) return;
 
-    onResumeRunnable = () -> {
-        if (!isAdded() || binding == null) return;
-        try {
-            if (priceManager != null) {
-                priceManager.refreshNow();
-                // ✅ لا داعي للتأخير 300ms — refreshNow() يجب أن يعمل بشكل متزامن أو مع callback
-                calculateEstimatedGoldValue();
-            }
-
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-            }
-
-            scheduleAutoSync();
-        } catch (Exception e) {
-            Log.e(TAG, "onResume runnable error: " + e.getMessage(), e);
+    try {
+        if (priceManager != null) {
+            priceManager.refreshNow();
+            calculateEstimatedGoldValue();
         }
-    };
-    v.post(onResumeRunnable);
+
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+        }
+
+        scheduleAutoSync();
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage(), e);
+    }
 }
 
 @Override
@@ -1868,21 +1793,28 @@ public void onPause() {
 }
 
     @Override
-    public void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (currentPhotoPath != null) {
-            outState.putString("camera_photo_path", currentPhotoPath);
-        }
+public void onSaveInstanceState(@NonNull Bundle outState) {
+    super.onSaveInstanceState(outState);
+    outState.putBoolean("is_form_locked", isFormLocked);
+    outState.putBoolean("is_rfid_scanning", isRfidScanning);
+    if (currentPhotoPath != null) {
+        outState.putString("camera_photo_path", currentPhotoPath);
     }
+}
 
-    @Override
+@Override
 public void onDestroyView() {
+    Log.d(TAG, "onDestroyView: cleaning up");
+
     // 1) إيقاف RFID
     stopRfidScanningMode();
 
-    // 2) إزالة callbacks
+    // 2) إزالة كل callbacks من handler
     if (handler != null) {
         handler.removeCallbacksAndMessages(null);
+    }
+    if (rfidTimeoutRunnable != null) {
+        rfidTimeoutRunnable = null;
     }
 
     // 3) فصل مرجع النشاط
@@ -1894,16 +1826,29 @@ public void onDestroyView() {
         }
     }
 
-    // 4) تنظيف RecyclerView
+    // 4) ✅ تنظيف RecyclerView بالكامل
     if (binding != null && binding.rvPhotosPreview != null) {
         binding.rvPhotosPreview.setAdapter(null);
+        binding.rvPhotosPreview.setLayoutManager(null);
+        binding.rvPhotosPreview.clearOnScrollListeners();
     }
 
-    // 5) إلغاء binding
+    // 5) ✅ تفريغ الـ Adapter
+    if (photosAdapter != null) {
+        photosAdapter.clearListeners();  // سنضيف هذه الدالة في الـ Adapter
+        photosAdapter = null;
+    }
+
+    // 6) إلغاء الـ Runnable المعلّق في onResume
+    View v = getView();
+    if (v != null && onResumeRunnable != null) {
+        v.removeCallbacks(onResumeRunnable);
+        onResumeRunnable = null;
+    }
+
+    // 7) أخيراً: إلغاء binding
     binding = null;
 
-    // 6) أخيراً super
     super.onDestroyView();
 }
-
 } // ✅ نهاية الكلاس MiraIdentityStudioFragment
