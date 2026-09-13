@@ -7,32 +7,44 @@
     android:padding="16dp"
     android:background="?attr/colorSurface">
 
-    <!-- المفتاح الرئيسي لتفعيل الأصوات -->
-    <com.google.android.material.switchmaterial.SwitchMaterial
+    <!-- ================== العنوان الرئيسي ================== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚙️ إعدادات الأصوات والاهتزاز"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        android:paddingBottom="16dp" />
+
+    <!-- ================== المفتاح الرئيسي لتفعيل الأصوات ================== -->
+    <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/switchMasterSound"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="تفعيل الأصوات العامة"
+        android:text="🔊 تفعيل الأصوات العامة"
         android:textSize="16sp"
-        android:paddingBottom="12dp"/>
+        android:paddingBottom="12dp" />
 
-    <!-- المفتاح الرئيسي للاهتزاز -->
-    <com.google.android.material.switchmaterial.SwitchMaterial
+    <!-- ================== المفتاح الرئيسي للاهتزاز ================== -->
+    <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/switchMasterVibration"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="تفعيل الاهتزاز مع التنبيهات"
+        android:text="📳 تفعيل الاهتزاز مع التنبيهات"
         android:textSize="16sp"
-        android:paddingBottom="16dp"/>
+        android:paddingBottom="16dp" />
 
-    <!-- شريط التحكم بمستوى الصدمة أو الصوت -->
+    <!-- ================== عنوان مستوى الصوت ================== -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="مستوى الصوتي والتنبيه"
+        android:text="🔉 مستوى الصوت"
         android:textColor="?attr/colorPrimary"
-        android:paddingBottom="8dp"/>
+        android:textStyle="bold"
+        android:paddingBottom="8dp" />
 
+    <!-- ================== شريط مستوى الصوت ================== -->
     <com.google.android.material.slider.Slider
         android:id="@+id/sliderVolume"
         android:layout_width="match_parent"
@@ -41,22 +53,33 @@
         android:valueTo="100"
         android:stepSize="10"
         android:value="80"
-        android:paddingBottom="16dp"/>
+        android:paddingBottom="16dp" />
 
-    <!-- قائمة أحداث الأصوات -->
+    <!-- ================== عنوان قائمة الأحداث ================== -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🎵 تخصيص أصوات الأحداث"
+        android:textColor="?attr/colorPrimary"
+        android:textStyle="bold"
+        android:paddingBottom="8dp" />
+
+    <!-- ================== قائمة أحداث الأصوات ================== -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvSoundEvents"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingBottom="16dp"/>
+        android:clipToPadding="false"
+        android:paddingBottom="16dp" />
 
-    <!-- زر الحفظ -->
+    <!-- ================== زر الحفظ ================== -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnSaveSoundSettings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="حفظ الإعدادات"
-        app:cornerRadius="8dp"/>
+        android:text="💾 حفظ الإعدادات"
+        android:textSize="15sp"
+        app:cornerRadius="12dp" />
 
 </LinearLayout>
