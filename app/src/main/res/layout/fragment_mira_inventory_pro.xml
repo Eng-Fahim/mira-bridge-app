@@ -517,15 +517,15 @@
         android:layout_marginHorizontal="8dp"
         android:background="?attr/colorOutlineVariant" />
 
-    <ImageView
-        android:id="@+id/btnLiveFilter"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/filter"
-        android:padding="4dp"
-        android:src="@android:drawable/ic_menu_sort_by_size"
-        app:tint="?attr/colorPrimary" />
+   <ImageView
+    android:id="@+id/btnLiveFilter"
+    android:layout_width="28dp"
+    android:layout_height="28dp"
+    android:background="?attr/selectableItemBackgroundBorderless"
+    android:contentDescription="@string/filter"
+    android:padding="4dp"
+    android:src="@drawable/ic_filter"      
+    app:tint="?attr/colorPrimary" />
 </LinearLayout>
 
             <!-- ==================== 7. LIVE SCAN LOG HEADER ==================== -->
