@@ -37,7 +37,6 @@ import androidx.fragment.app.FragmentTransaction;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 
-import com.example.uhf.activity.LoginActivity;
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
@@ -96,6 +95,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
     
+    // ✅ العداد المرجعي لحماية طبقة التحميل من التسابق الزمني (Race Conditions)
+    private int loadingCounter = 0;
+    
     // ✅ المديرين والمكونات
     private NavigationManager navigationManager;
     private HardwareManager hardwareManager;
@@ -110,6 +112,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraOrgProfileManager orgProfileManager;
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    
+    // ✅ إسناد مراجع الـ Observers لحمايتها من الـ Memory Leak
+    private final Runnable orgProfileRunnable = this::updateAppTitle;
     
     // ✅ إدارة RFID
     private MiraPosFragment activePOSFragment = null;
@@ -147,7 +152,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         this.activePOSFragment = fragment;
     }
 
-    private void clearActiveListeners() {
+    public void clearActiveListeners() {
         this.activePOSFragment = null;
         this.activeEncodingFragment = null;
         this.activeRfidListener = null;
@@ -185,14 +190,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
             if (toolbar != null) {
                 setSupportActionBar(toolbar);
-                
-                // ✅ إخفاء العنوان الافتراضي للـ ActionBar
                 if (getSupportActionBar() != null) {
                     getSupportActionBar().setDisplayShowTitleEnabled(false);
                 }
-                
                 updateToolbarTitle();
             }
+
             // ✅ مراقبة استجابة الـ UI Thread
             AppWatchdog.getInstance().startMonitoring(() -> {
                 Log.e(TAG, "UI Thread FROZEN! Restarting app...");
@@ -275,7 +278,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (secondaryToolbar != null) {
             secondaryToolbar.setOnMenuItemClickListener(item -> {
                 int id = item.getItemId();
-                
                 if (id == R.id.action_sync) {
                     performDataSync();
                     return true;
@@ -286,66 +288,45 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
                     return true;
                 } else if (id == R.id.action_device_status) {
-                    // ⚠️ لن يتم استدعاؤها لأن actionLayout يتعامل معها
                     return true;
                 }
-                
                 return false;
             });
             
-            // ✅ إعداد زر حالة الأجهزة (actionLayout)
             setupDeviceStatusButton(secondaryToolbar);
         }
     }
 
-    /**
-     * ✅ إعداد زر حالة الأجهزة (متصل/غير متصل)
-     */
     private void setupDeviceStatusButton(MaterialToolbar toolbar) {
         try {
-            // البحث عن MenuItem بواسطة ID
             Menu menu = toolbar.getMenu();
             MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
-            
             if (deviceStatusItem == null) return;
             
             View actionView = deviceStatusItem.getActionView();
             if (actionView == null) return;
             
-            // ✅ ربط العناصر
             View statusDot = actionView.findViewById(R.id.deviceStatusDot);
             TextView statusText = actionView.findViewById(R.id.deviceStatusText);
             
-            // ✅ عند الضغط على الزر
             actionView.setOnClickListener(v -> showHardwareOptionsDialog());
-            
-            // ✅ تحديث الحالة الأولية
             updateDeviceStatusUI(statusDot, statusText);
             
-            // ✅ الاستماع لتغيرات حالة الجهاز
             if (hardwareManager != null) {
                 hardwareManager.setStatusChangeCallback(status -> {
                     mainHandler.post(() -> updateDeviceStatusUI(statusDot, statusText));
                 });
             }
-            
         } catch (Exception e) {
             Log.e(TAG, "setupDeviceStatusButton error: " + e.getMessage());
         }
     }
 
-    /**
-     * ✅ تحديث واجهة حالة الأجهزة
-     */
     private void updateDeviceStatusUI(View statusDot, TextView statusText) {
         try {
             if (statusDot == null || statusText == null) return;
             
-            boolean isConnected = false;
-            
-            if (hardwareManager != null) {
-                isConnected = hardwareManager.isConnected();
-            }
+            boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
             
             if (isConnected) {
                 statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
@@ -356,49 +337,41 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 statusText.setText(isArabic ? "غير متصل" : "Disconnected");
                 statusText.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
             }
-            
         } catch (Exception e) {
             Log.e(TAG, "updateDeviceStatusUI error: " + e.getMessage());
         }
     }
-
 
     private void showHardwareOptionsDialog() {
         PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
         List<String> optionsList = new ArrayList<>();
         List<Runnable> actionsList = new ArrayList<>();
         
-        // 1. إعدادات قارئ RFID
         if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
             optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
             actionsList.add(() -> loadFragment(new MiraReaderSetupFragment(), "ReaderSetup"));
         }
         
-        // 2. إعدادات البوابات الأمنية
         if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
             optionsList.add(isArabic ? "🚧 تهيئة البوابات الأمنية" : "🚧 Gate Security Setup");
             actionsList.add(() -> loadFragment(new MiraGateSettingsFragment(), "GateSettings"));
         }
         
-        // 3. إعدادات السيرفر
         if (pm.canViewServerConfig()) {
             optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
             actionsList.add(() -> loadFragment(new MiraServerConfigFragment(), "ServerConfig"));
         }
         
-        // 4. إدارة الشرائح المبرمجة
         if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
             optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
             actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
         }
         
-        // 5. ⚙️ إعدادات تخصيص الوصول السريع (جديد!)
         if (pm.canManageQuickAccess() || pm.isManager() || pm.isAdmin()) {
             optionsList.add(isArabic ? "⚙️ إعدادات الوصول السريع" : "⚙️ Quick Access Settings");
             actionsList.add(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
         }
         
-        // 6. اختبار التوصيل
         optionsList.add(isArabic ? "🔄 اختبار التوصيل والربط" : "🔄 Connection Test");
         actionsList.add(this::performConnectionTest);
         
@@ -415,15 +388,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
-    /**
-     * ✅ اختبار التوصيل والربط
-     */
     private void performConnectionTest() {
         showLoading();
-        
         mainHandler.postDelayed(() -> {
             hideLoading();
-            
             boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
             
             String message = isConnected 
@@ -443,15 +411,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public void onResume() {
         super.onResume();
+        // ✅ صفير العداد لمنع استمرار تجميد الشاشة لو حدث إغلاق مفاجئ أثناء التحميل
+        loadingCounter = 0;
+        forceHideLoadingImmediate();
+        
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
-        mainHandler.postDelayed(this::hideLoading, 100);
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        hideLoading();
+        forceHideLoadingImmediate();
         AppWatchdog.getInstance().stopMonitoring();
         if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
 
@@ -467,10 +438,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-
         try {
             isArabic = newConfig.locale.getLanguage().equals("ar");
-
             getWindow().getDecorView().setLayoutDirection(
                     isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
             );
@@ -483,7 +452,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (bottomNav != null) {
                 bottomNav.refreshDrawableState();
             }
-
         } catch (Exception e) {
             Log.e(TAG, "Configuration change error: " + e.getMessage());
         }
@@ -522,7 +490,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void setupOrgProfileListener() {
         orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-        orgProfileManager.addListener(this::updateAppTitle);
+        orgProfileManager.addListener(orgProfileRunnable);
         updateAppTitle();
     }
 
@@ -531,7 +499,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             mainHandler.post(this::updateAppTitle);
             return;
         }
-
         try {
             updateToolbarTitle();
         } catch (Exception e) {
@@ -541,7 +508,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void updateToolbarTitle() {
         try {
-            // ✅ تحديث TextView مباشرة (وليس ActionBar)
             TextView tvTitle = findViewById(R.id.tvTitle);
             TextView tvSubtitle = findViewById(R.id.tvSubtitle);
             
@@ -572,30 +538,34 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== التنقل ====================
 
     public void loadFragment(Fragment fragment, String tag) {
-        showLoading();  // ✅ عرض شاشة التحميل
+        if (isFinishing() || isDestroyed()) return;
+        showLoading();
         navigationManager.loadFragment(fragment, tag, true);
         currentFragment = navigationManager.getCurrentFragment();
         currentFragmentTag = tag;
         updateBottomNavSelectionByTag(tag);
-        mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء بعد 250ms
+        // ✅ استخدام مهلة زمنيّة كافية للإطارات المزدوجة تجنباً للاختفاء السريع
+        mainHandler.postDelayed(this::hideLoading, 350);
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        showLoading();  // ✅ عرض شاشة التحميل
+        if (isFinishing() || isDestroyed()) return;
+        showLoading();
         navigationManager.loadFragment(fragment, tag, addToBackStack);
         currentFragment = navigationManager.getCurrentFragment();
         currentFragmentTag = tag;
         updateBottomNavSelectionByTag(tag);
-        mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء
+        mainHandler.postDelayed(this::hideLoading, 350);
     }
 
     public void loadFragmentDirectly(Fragment fragment, String tag) {
-        showLoading();  // ✅ عرض شاشة التحميل
+        if (isFinishing() || isDestroyed()) return;
+        showLoading();
         navigationManager.loadFragmentDirectly(fragment, tag);
         currentFragment = navigationManager.getCurrentFragment();
         currentFragmentTag = tag;
         updateBottomNavSelectionByTag(tag);
-        mainHandler.postDelayed(this::hideLoading, 250);  // ✅ إخفاء
+        mainHandler.postDelayed(this::hideLoading, 350);
     }
 
     public Fragment createFragmentByTag(String tag) {
@@ -604,6 +574,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public void openReceiptFragment(String rawJson) {
         try {
+            if (isFinishing() || isDestroyed()) return;
             MiraReceiptFragment fragment = MiraReceiptFragment.newInstance(rawJson);
             fragment.show(getSupportFragmentManager(), "Receipt");
         } catch (Exception e) {
@@ -619,7 +590,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    
     public void playSoundDelayed(int value) {
         if (soundManager != null) {
             soundManager.playDelayedSound(this, value);
@@ -640,26 +610,43 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
+    // ✅ إعادة توجيه قراءة RFID دائماً إلى خيط الواجهة الرئيسي (Main Thread) مع فحص الحالة العميقة
     public void onTagRead(String epc) {
-        try {
-            if (activeEncodingFragment != null && activeEncodingFragment.isAdded() && activeEncodingFragment.isResumed()) {
-                activeEncodingFragment.onRfidScanned(epc);
-                return;
+        mainHandler.post(() -> {
+            try {
+                if (isFinishing() || isDestroyed()) return;
+
+                if (activeEncodingFragment != null 
+                        && activeEncodingFragment.isAdded() 
+                        && activeEncodingFragment.isResumed()
+                        && !activeEncodingFragment.isRemoving()) {
+                    activeEncodingFragment.onRfidScanned(epc);
+                    return;
+                }
+                
+                if (activeRfidListener != null) {
+                    activeRfidListener.onRfidScanned(epc);
+                    return;
+                }
+                
+                if (activePOSFragment != null 
+                        && activePOSFragment.isAdded() 
+                        && !activePOSFragment.isRemoving() 
+                        && activePOSFragment.isVisible()) {
+                    activePOSFragment.onRingScanned(epc);
+                    return;
+                }
+                
+                if (currentFragment instanceof MiraUHFReadTagFragment 
+                        && currentFragment.isAdded() 
+                        && !currentFragment.isRemoving() 
+                        && currentFragment.isVisible()) {
+                    ((MiraUHFReadTagFragment) currentFragment).onTagScanned(epc, -50.0);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Tag Read Dispatch Error: " + e.getMessage(), e);
             }
-            if (activeRfidListener != null) {
-                activeRfidListener.onRfidScanned(epc);
-                return;
-            }
-            if (activePOSFragment != null && activePOSFragment.isAdded() && activePOSFragment.isVisible()) {
-                activePOSFragment.onRingScanned(epc);
-                return;
-            }
-            if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isAdded() && currentFragment.isVisible()) {
-                ((MiraUHFReadTagFragment) currentFragment).onTagScanned(epc, -50.0);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Tag Read Processing Error: " + e.getMessage());
-        }
+        });
     }
 
     // ==================== التنقل السريع ====================
@@ -964,6 +951,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             @Override
             public void onNotificationsLoaded(List<NotificationModel> notifications) {
                 runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
                     listContainer.removeAllViews();
                     if (notifications.isEmpty()) {
                         TextView emptyView = new TextView(UHFMainActivity.this);
@@ -1017,6 +1005,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     @Override
                     public void onSuccess(MessageModel sentMessage) {
                         runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
                             Toast.makeText(UHFMainActivity.this,
                                     isArabic ? "تم إرسال الرسالة بنجاح ✅" : "Message sent successfully ✅",
                                     Toast.LENGTH_LONG).show();
@@ -1027,6 +1016,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     @Override
                     public void onError(String error) {
                         runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
                             Toast.makeText(UHFMainActivity.this,
                                     isArabic ? "فشل الإرسال: " + error : "Failed: " + error,
                                     Toast.LENGTH_SHORT).show();
@@ -1080,6 +1070,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             @Override
             public void onMessagesLoaded(List<MessageModel> messages) {
                 runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
                     messagesContainer.removeAllViews();
 
                     if (messages.isEmpty()) {
@@ -1120,6 +1111,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             @Override
             public void onError(String error) {
                 runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
                     messagesContainer.removeAllViews();
                     TextView errorText = new TextView(UHFMainActivity.this);
                     errorText.setText(isArabic ? "فشل تحميل الرسائل: " + error : "Failed to load messages: " + error);
@@ -1161,6 +1153,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     @Override
                     public void onSuccess(MessageModel message) {
                         runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
                             Toast.makeText(UHFMainActivity.this,
                                     isArabic ? "تم إرسال الرسالة بنجاح" : "Message Sent",
                                     Toast.LENGTH_SHORT).show();
@@ -1174,6 +1167,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     @Override
                     public void onError(String error) {
                         runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
                             Toast.makeText(UHFMainActivity.this,
                                     isArabic ? "فشل إرسال الرسالة: " + error : "Failed to send message: " + error,
                                     Toast.LENGTH_SHORT).show();
@@ -1262,6 +1256,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         mainHandler.postDelayed(() -> {
             hideLoading();
+            if (isFinishing() || isDestroyed()) return;
             new MaterialAlertDialogBuilder(this)
                     .setTitle(isArabic ? "✅ تمت المزامنة بنجاح" : "✅ Sync Completed")
                     .setMessage(isArabic ? "تم تحديث كافة السجلات، المخزون، والأسعار مع السيرفر السحابي بنجاح." : "All records, inventory, and prices have been successfully synced with the cloud server.")
@@ -1475,13 +1470,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         return super.onKeyDown(keyCode, event);
     }
 
-    // ==================== التحميل والعرض ====================
+    // ==================== التحميل والعرض (مؤمنة بالعداد) ====================
 
     public void showLoading() {
         mainHandler.post(() -> {
             try {
+                loadingCounter++;
                 View loadingOverlay = findViewById(R.id.successOverlayMain);
-                if (loadingOverlay != null) {
+                if (loadingOverlay != null && loadingCounter == 1) {
+                    loadingOverlay.animate().cancel(); // إلغاء أي أنيميشن إخفاء سابق
                     loadingOverlay.setVisibility(View.VISIBLE);
                     loadingOverlay.setAlpha(1.0f);
                 }
@@ -1494,16 +1491,38 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void hideLoading() {
         mainHandler.post(() -> {
             try {
+                loadingCounter = Math.max(0, loadingCounter - 1);
+                if (loadingCounter > 0) return; // ✅ تجنب الإخفاء إذا كانت هناك طلبات تنقل أخرى معلقة
+
                 View loadingOverlay = findViewById(R.id.successOverlayMain);
                 if (loadingOverlay != null && loadingOverlay.getVisibility() == View.VISIBLE) {
                     loadingOverlay.animate()
                             .alpha(0.0f)
                             .setDuration(200)
-                            .withEndAction(() -> loadingOverlay.setVisibility(View.GONE))
+                            .withEndAction(() -> {
+                                if (loadingCounter == 0) {
+                                    loadingOverlay.setVisibility(View.GONE);
+                                }
+                            })
                             .start();
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error hiding loading: " + e.getMessage());
+            }
+        });
+    }
+
+    private void forceHideLoadingImmediate() {
+        mainHandler.post(() -> {
+            try {
+                loadingCounter = 0;
+                View loadingOverlay = findViewById(R.id.successOverlayMain);
+                if (loadingOverlay != null) {
+                    loadingOverlay.animate().cancel();
+                    loadingOverlay.setVisibility(View.GONE);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error forcing hide loading: " + e.getMessage());
             }
         });
     }
@@ -1521,7 +1540,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void navigateToLogin() {
         try {
-            hideLoading();
+            forceHideLoadingImmediate();
             if (mReader != null) {
                 mReader.free();
                 mReader = null;
@@ -1536,7 +1555,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ==================== تنظيف ====================
+    // ==================== التنظيف والتدمير الجراحي ====================
 
     @Override
     protected void onDestroy() {
@@ -1547,20 +1566,30 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (hardwareManager != null) hardwareManager.cleanup();
 
             AppWatchdog.getInstance().stopMonitoring();
-            hideLoading();
+            forceHideLoadingImmediate();
             stopActiveInventory();
 
-            if (getSupportFragmentManager() != null) {
-                navigationManager.clearBackStack();
+            // ✅ تفريغ وتنظيف خافق الواجهات لمنع تراكم الشاشات القديمة وإرهاق ה-Memory
+            if (getSupportFragmentManager() != null && !isChangingConfigurations()) {
+                FragmentManager fm = getSupportFragmentManager();
+                fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+                
+                List<Fragment> fragments = new ArrayList<>(fm.getFragments());
+                FragmentTransaction tx = fm.beginTransaction();
+                for (Fragment f : fragments) {
+                    if (f != null) tx.remove(f);
+                }
+                tx.commitNowAllowingStateLoss();
             }
 
             if (orgProfileManager != null) {
-                orgProfileManager.removeListener(this::updateAppTitle);
+                orgProfileManager.removeListener(orgProfileRunnable);
             }
 
             SessionMonitorManager.getInstance(this).stopMonitoring();
 
             clearActiveListeners();
+            currentFragment = null;
 
             if (tagList != null) {
                 tagList.clear();
@@ -1568,7 +1597,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
+            Log.e(TAG, "onDestroy cleanup error: " + e.getMessage(), e);
         }
 
         super.onDestroy();
