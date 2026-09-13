@@ -3042,7 +3042,6 @@ private boolean matchesCategory(InventoryItem item, String category) {
     }
 
     // ==================== دورة الحياة - التنظيف ====================
-
 @Override
 public void onResume() {
     super.onResume();
@@ -3050,6 +3049,12 @@ public void onResume() {
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setActiveInventoryFragment(this);
         }
+        
+        // ✅ استرجاع الجلسة السابقة إذا وُجدت
+        if (scannedItemsDisplayList.isEmpty() && !isScanning) {
+            mainThreadHandler.postDelayed(this::restorePreviousSession, 600);
+        }
+        
     } catch (Exception e) {
         Log.e(TAG, "onResume error: " + e.getMessage());
     }
@@ -3059,6 +3064,11 @@ public void onResume() {
 public void onPause() {
     super.onPause();
     try {
+        // ✅ حفظ الجلسة قبل الإيقاف
+        if (isScanning || !scannedItemsDisplayList.isEmpty()) {
+            saveCurrentSession();
+        }
+        
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setActiveInventoryFragment(null);
         }
@@ -3066,61 +3076,70 @@ public void onPause() {
         Log.e(TAG, "onPause error: " + e.getMessage());
     }
 }
-    /**
-     * تنظيف عند تدمير العرض
-     */
-    @Override
-    public void onDestroyView() {
-        if (backPressedCallback != null) {
-            backPressedCallback.remove();
-            backPressedCallback = null;
+
+@Override
+public void onDestroyView() {
+    try {
+        // ✅ حفظ الجلسة قبل التدمير
+        if (isScanning || !scannedItemsDisplayList.isEmpty()) {
+            saveCurrentSession();
         }
-        
-        isFragmentDestroyed = true;
-        isScanning = false;
-        
-        stopSimulationLoop();
-        mainThreadHandler.removeCallbacksAndMessages(null);
-        simulationHandler.removeCallbacksAndMessages(null);
-        
-        if (rfidManager != null) {
-            try {
-                rfidManager.stopScan();
-                rfidManager.setListener(null);
-            } catch (Exception e) {
-                Log.e(TAG, "Error stopping scanner on destroy", e);
-            }
-        }
-        
-        if (soundManager != null) {
-            soundManager.release();
-            soundManager = null;
-        }
-        
-        // تنظيف المجموعات
-        scannedItemsDisplayList.clear();
-        recentTagReads.clear();
-        catalogEpcs.clear();
-        catalogItemsMap.clear();
-        barcodeToEpcMap.clear();
-        epcToBarcodeMap.clear();
-        
-        super.onDestroyView();
+    } catch (Exception e) {
+        Log.e(TAG, "save on destroy error: " + e.getMessage());
     }
+    
+    if (backPressedCallback != null) {
+        backPressedCallback.remove();
+        backPressedCallback = null;
+    }
+    
+    isFragmentDestroyed = true;
+    isScanning = false;
+    
+    stopSimulationLoop();
+    mainThreadHandler.removeCallbacksAndMessages(null);
+    simulationHandler.removeCallbacksAndMessages(null);
+    
+    if (rfidManager != null) {
+        try {
+            rfidManager.stopScan();
+            rfidManager.setListener(null);
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping scanner on destroy", e);
+        }
+    }
+    
+    if (soundManager != null) {
+        soundManager.release();
+        soundManager = null;
+    }
+    
+    // ⚠️ لا تمسح القائمة هنا — تُحفظ في onPause/onDestroyView
+    // المسح الكامل في onDestroy()
+    
+    super.onDestroyView();
+}
 
     /**
      * تنظيف عند التدمير الكامل
      */
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        
-        shutdownExecutor();
-        
-        // قاعدة البيانات تُدار على مستوى Application
-        inventoryDatabase = null;
+public void onDestroy() {
+    super.onDestroy();
+    
+    // ✅ الآن نمسح كل شيء بعد الحفظ
+    synchronized (scannedItemsDisplayList) {
+        scannedItemsDisplayList.clear();
     }
-
+    recentTagReads.clear();
+    catalogEpcs.clear();
+    catalogItemsMap.clear();
+    barcodeToEpcMap.clear();
+    epcToBarcodeMap.clear();
+    
+    shutdownExecutor();
+    inventoryDatabase = null;
+}
     /**
      * إغلاق ExecutorService
      */
@@ -3306,6 +3325,25 @@ private void confirmResetSession() {
                     if (modernAdapter != null) {
                         modernAdapter.submitList(new ArrayList<>());
                     }
+                    
+                    // ✅ امسح الجلسة المحفوظة أيضاً
+                    clearSavedSession();
+                    
+                    // ✅ إعادة تعيين الواجهة
+                    expectedCount = 0;
+                    selectedCategoryFilter = null;
+                    recentTagReads.clear();
+                    
+                    if (tvScannedCount != null) tvScannedCount.setText("0");
+                    if (tvItemCount != null) tvItemCount.setText("0");
+                    if (tvExpectedCount != null) tvExpectedCount.setText("0");
+                    if (progressScanned != null) progressScanned.setProgress(0);
+                    if (tvProgressPercent != null) tvProgressPercent.setText("0%");
+                    if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
+                    
+                    updateUI();
+                    updateTotalWeightAndValue();
+                    
                     Toast.makeText(requireContext(), 
                         isArabic ? "✅ تم إعادة التعيين" : "✅ Reset successfully", 
                         Toast.LENGTH_SHORT).show();
