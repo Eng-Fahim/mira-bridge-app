@@ -25,6 +25,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.graphics.Typeface;
 
+import android.widget.ImageView;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
@@ -321,8 +323,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 showInventoryStatsDialog();
                 return true;
             } else if (id == R.id.action_inventory_settings) {
-                loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
-                return true;
+            loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+            return true;
+            } else if (id == R.id.action_inventory_archive) {
+            showInventoryArchiveDialog();
+            return true;
             }
             
             // ==================== POS ====================
@@ -371,94 +376,112 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
      * - action_inventory_power (Inventory)
      */
     private void setupCustomViewsForCurrentMenu() {
-        try {
-            MaterialToolbar toolbar = findViewById(R.id.secondaryToolbar);
-            if (toolbar == null) return;
+    try {
+        MaterialToolbar toolbar = findViewById(R.id.secondaryToolbar);
+        if (toolbar == null) return;
+        
+        Menu menu = toolbar.getMenu();
+        
+        // ✅ Dashboard: action_device_status
+        MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
+        if (deviceStatusItem != null && deviceStatusItem.getActionView() != null) {
+            View actionView = deviceStatusItem.getActionView();
+            View dot = actionView.findViewById(R.id.deviceStatusDot);
+            TextView text = actionView.findViewById(R.id.deviceStatusText);
+            ImageView icon = actionView.findViewById(R.id.deviceStatusIcon);
             
-            Menu menu = toolbar.getMenu();
-            
-            // ✅ Dashboard: action_device_status
-            MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
-            if (deviceStatusItem != null) {
-                View actionView = deviceStatusItem.getActionView();
-                if (actionView != null) {
-                    View statusDot = actionView.findViewById(R.id.deviceStatusDot);
-                    TextView statusText = actionView.findViewById(R.id.deviceStatusText);
-                    
-                    if (statusDot != null && statusText != null) {
-                        actionView.setOnClickListener(v -> showHardwareOptionsDialog());
-                        updateDeviceStatusUI(statusDot, statusText);
-                    }
-                }
+            if (dot != null && text != null) {
+                actionView.setOnClickListener(v -> showHardwareOptionsDialog());
+                updateDeviceStatusUI(dot, text, icon);
             }
-            
-            // ✅ Inventory: action_inventory_power (نفس الـ layout)
-            MenuItem powerItem = menu.findItem(R.id.action_inventory_power);
-            if (powerItem != null) {
-                View actionView = powerItem.getActionView();
-                if (actionView != null) {
-                    View statusDot = actionView.findViewById(R.id.deviceStatusDot);
-                    TextView statusText = actionView.findViewById(R.id.deviceStatusText);
-                    
-                    if (statusDot != null && statusText != null) {
-                        actionView.setOnClickListener(v -> showHardwareOptionsDialog());
-                        updateDeviceStatusUI(statusDot, statusText);
-                    }
-                }
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "setupCustomViewsForCurrentMenu error: " + e.getMessage(), e);
         }
+        
+        // ✅ Inventory: action_inventory_power
+        MenuItem powerItem = menu.findItem(R.id.action_inventory_power);
+        if (powerItem != null && powerItem.getActionView() != null) {
+            View actionView = powerItem.getActionView();
+            View dot = actionView.findViewById(R.id.deviceStatusDot);
+            TextView text = actionView.findViewById(R.id.deviceStatusText);
+            ImageView icon = actionView.findViewById(R.id.deviceStatusIcon);
+            
+            if (dot != null && text != null) {
+                actionView.setOnClickListener(v -> showHardwareOptionsDialog());
+                updateDeviceStatusUI(dot, text, icon);
+            }
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "setupCustomViewsForCurrentMenu error: " + e.getMessage(), e);
     }
+}
 
     /**
      * ✅ تحديث التولبار الثانوي عند التنقل
      */
     private void updateSecondaryToolbar(String tag) {
-        if (secondaryToolbarManager == null) return;
+    if (secondaryToolbarManager == null) return;
+    
+    try {
+        secondaryToolbarManager.setMenuForTag(tag);
         
-        try {
-            // ✅ 1) تغيير القائمة
-            secondaryToolbarManager.setMenuForTag(tag);
-            
-            // ✅ 2) تطبيق الصلاحيات
-            Menu menu = secondaryToolbarManager.getCurrentMenu();
-            if (menu != null) {
-                applyToolbarMenuPermissions(menu);
-            }
-            
-            // ✅ 3) إعادة إعداد custom views
-            setupCustomViewsForCurrentMenu();
-            
-            Log.d(TAG, "✅ Secondary toolbar updated for: " + tag);
-        } catch (Exception e) {
-            Log.e(TAG, "updateSecondaryToolbar error: " + e.getMessage(), e);
+        Menu menu = secondaryToolbarManager.getCurrentMenu();
+        if (menu != null) {
+            applyToolbarMenuPermissions(menu);
         }
+        
+        // ✅ إعادة إعداد custom views بعد تغيير القائمة
+        mainHandler.post(this::setupCustomViewsForCurrentMenu);
+        
+        Log.d(TAG, "✅ Secondary toolbar updated for: " + tag);
+    } catch (Exception e) {
+        Log.e(TAG, "updateSecondaryToolbar error: " + e.getMessage(), e);
     }
+}
+
+
+private void showInventoryArchiveDialog() {
+    new MaterialAlertDialogBuilder(this)
+            .setTitle(isArabic ? "📁 أرشيف الجلسات" : "📁 Sessions Archive")
+            .setMessage(isArabic ? "لا توجد جلسات سابقة" : "No previous sessions")
+            .setPositiveButton(isArabic ? "موافق" : "OK", null)
+            .show();
+}
 
     /**
      * ✅ تحديث حالة الأجهزة في custom view
      */
-    private void updateDeviceStatusUI(View statusDot, TextView statusText) {
-        try {
-            if (statusDot == null || statusText == null) return;
+    private void updateDeviceStatusUI(View statusDot, TextView statusText, ImageView statusIcon) {
+    try {
+        if (statusDot == null || statusText == null) return;
+        
+        boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
+        
+        int greenColor = getResources().getColor(android.R.color.holo_green_dark);
+        int redColor = getResources().getColor(android.R.color.holo_red_dark);
+        
+        if (isConnected) {
+            statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
+            statusText.setText(isArabic ? "متصل" : "Connected");
+            statusText.setTextColor(greenColor);
             
-            boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
-            
-            if (isConnected) {
-                statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
-                statusText.setText(isArabic ? "متصل" : "Connected");
-                statusText.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-            } else {
-                statusDot.setBackgroundResource(R.drawable.bg_status_dot_red);
-                statusText.setText(isArabic ? "غير متصل" : "Disconnected");
-                statusText.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+            if (statusIcon != null) {
+                statusIcon.setImageResource(R.drawable.ic_device_connected);
+                statusIcon.setColorFilter(greenColor);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "updateDeviceStatusUI error: " + e.getMessage());
+        } else {
+            statusDot.setBackgroundResource(R.drawable.bg_status_dot_red);
+            statusText.setText(isArabic ? "غير متصل" : "Disconnected");
+            statusText.setTextColor(redColor);
+            
+            if (statusIcon != null) {
+                statusIcon.setImageResource(R.drawable.ic_device_disconnected);
+                statusIcon.setColorFilter(redColor);
+            }
         }
+    } catch (Exception e) {
+        Log.e(TAG, "updateDeviceStatusUI error: " + e.getMessage());
     }
+}
 
     private void showHardwareOptionsDialog() {
         PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
@@ -881,7 +904,9 @@ private void applyToolbarMenuPermissions(Menu menu) {
 
     MenuItem profile = menu.findItem(R.id.action_profile);
     if (profile != null) profile.setVisible(pm.canViewProfile());
-
+    
+    
+    
     MenuItem notifications = menu.findItem(R.id.action_notifications);
     if (notifications != null) notifications.setVisible(true);
 
