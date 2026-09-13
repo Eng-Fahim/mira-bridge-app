@@ -2,18 +2,18 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 📶 قوة الإشارة (Custom View - نشط) -->
+    <!-- 📶 حالة الجرد (يمين - Custom View) -->
     <item
         android:id="@+id/action_inventory_power"
-        android:title="@string/menu_power"
+        android:title="@string/menu_inventory_status"
         app:actionLayout="@layout/action_device_status"
         app:showAsAction="always" />
 
-    <!-- 🔍 البحث في الممسوحات -->
+    <!-- ⚙️ إعدادات الجلسة -->
     <item
-        android:id="@+id/action_inventory_search"
-        android:icon="@drawable/ic_search"
-        android:title="@string/menu_search"
+        android:id="@+id/action_inventory_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/menu_session_settings"
         app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
 
@@ -23,14 +23,14 @@
         android:icon="@drawable/ic_stats"
         android:title="@string/menu_live_stats"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
-    <!-- ⚙️ إعدادات الجلسة -->
+    <!-- 📁 أرشيف -->
     <item
-        android:id="@+id/action_inventory_settings"
-        android:icon="@drawable/ic_settings"
-        android:title="@string/menu_session_settings"
+        android:id="@+id/action_inventory_archive"
+        android:icon="@drawable/ic_history"
+        android:title="@string/menu_archive"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
 </menu>
