@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.database.InventoryDatabase;
 import com.example.uhf.database.InventoryTransactionDao;
 import com.example.uhf.database.InventoryTransactionEntity;
@@ -2613,6 +2614,29 @@ private void showCategorySelectionDialog() {
 
     // ==================== دورة الحياة - التنظيف ====================
 
+@Override
+public void onResume() {
+    super.onResume();
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActiveInventoryFragment(this);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage());
+    }
+}
+
+@Override
+public void onPause() {
+    super.onPause();
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActiveInventoryFragment(null);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onPause error: " + e.getMessage());
+    }
+}
     /**
      * تنظيف عند تدمير العرض
      */
@@ -2687,5 +2711,182 @@ private void showCategorySelectionDialog() {
             backgroundExecutor = null;
         }
     }
+    
+    // ==================== واجهات عامة للشريط الثانوي ====================
+
+/**
+ * ✅ عرض إعدادات الماسح الخاصة بالجرد
+ */
+public void showInventoryScannerSettings() {
+    try {
+        if (!isAdded() || isFragmentDestroyed) return;
+        showPowerControlSheet();
+    } catch (Exception e) {
+        Log.e(TAG, "showInventoryScannerSettings error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ عرض إعدادات الجلسة (Session Settings)
+ */
+public void showInventorySessionSettings() {
+    try {
+        if (!isAdded() || isFragmentDestroyed) return;
+        showSessionSettingsDialog();
+    } catch (Exception e) {
+        Log.e(TAG, "showInventorySessionSettings error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ عرض إعدادات التصفير والصوت
+ */
+public void showInventoryBuzzerSettings() {
+    try {
+        if (!isAdded() || isFragmentDestroyed) return;
+        showBuzzerSettingsDialog();
+    } catch (Exception e) {
+        Log.e(TAG, "showInventoryBuzzerSettings error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ عدد الأصناف الممسوحة (للشريط الثانوي)
+ */
+public int getScannedCount() {
+    try {
+        if (inventoryEngine != null) {
+            return inventoryEngine.getUniqueCount();
+        }
+        return scannedItemsDisplayList != null ? scannedItemsDisplayList.size() : 0;
+    } catch (Exception e) {
+        return 0;
+    }
+}
+
+/**
+ * ✅ هل الجرد قيد التشغيل؟
+ */
+public boolean isCurrentlyScanning() {
+    return isScanning;
+}
+// ==================== حوارات إعدادات الماسح ====================
+
+/**
+ * ✅ حوار إعدادات الجلسة
+ */
+private void showSessionSettingsDialog() {
+    try {
+        if (!isAdded() || isFragmentDestroyed) return;
+        
+        String[] options = isArabic ? new String[]{
+            "⏱️ مهلة الجلسة: 5 دقائق",
+            "📊 عدد المتوقع: " + expectedCount,
+            "🔊 تفعيل الصوت: نعم",
+            "🎯 وضع القراءة: Fast",
+            "🔄 إعادة تعيين الجلسة"
+        } : new String[]{
+            "⏱️ Session Timeout: 5 min",
+            "📊 Expected Count: " + expectedCount,
+            "🔊 Buzzer: Enabled",
+            "🎯 Read Mode: Fast",
+            "🔄 Reset Session"
+        };
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "⚙️ إعدادات جلسة الجرد" : "⚙️ Session Settings")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            Toast.makeText(requireContext(), 
+                                isArabic ? "⏱️ قيد التطوير" : "⏱️ In development", 
+                                Toast.LENGTH_SHORT).show();
+                            break;
+                        case 4:
+                            confirmResetSession();
+                            break;
+                        default:
+                            Toast.makeText(requireContext(), 
+                                isArabic ? "قيد التطوير" : "In development", 
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showSessionSettingsDialog error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ حوار إعدادات Buzzer
+ */
+private void showBuzzerSettingsDialog() {
+    try {
+        if (!isAdded() || isFragmentDestroyed) return;
+        
+        String[] options = isArabic ? new String[]{
+            "🔊 تشغيل/إيقاف الصوت",
+            "🎵 تغيير نغمة النجاح",
+            "⚠️ تغيير نغمة الخطأ",
+            "📢 اختبار الصوت"
+        } : new String[]{
+            "🔊 Toggle Buzzer",
+            "🎵 Change Success Sound",
+            "⚠️ Change Error Sound",
+            "📢 Test Buzzer"
+        };
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "🔊 إعدادات الصوت" : "🔊 Buzzer Settings")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 3) {
+                        if (soundManager != null) {
+                            soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+                        }
+                    } else {
+                        Toast.makeText(requireContext(), 
+                            isArabic ? "قيد التطوير" : "In development", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showBuzzerSettingsDialog error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ تأكيد إعادة تعيين الجلسة
+ */
+private void confirmResetSession() {
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "⚠️ تأكيد" : "⚠️ Confirm")
+            .setMessage(isArabic ? 
+                "هل أنت متأكد من إعادة تعيين الجلسة؟\nسيتم حذف كل البيانات غير المعتمدة." : 
+                "Are you sure you want to reset the session?\nAll uncommitted data will be lost.")
+            .setPositiveButton(isArabic ? "إعادة تعيين" : "Reset", (dialog, which) -> {
+                try {
+                    if (inventoryEngine != null) {
+                        inventoryEngine.clearSession();
+                    }
+                    synchronized (scannedItemsDisplayList) {
+                        scannedItemsDisplayList.clear();
+                    }
+                    if (modernAdapter != null) {
+                        modernAdapter.submitList(new ArrayList<>());
+                    }
+                    Toast.makeText(requireContext(), 
+                        isArabic ? "✅ تم إعادة التعيين" : "✅ Reset successfully", 
+                        Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Log.e(TAG, "Reset error: " + e.getMessage());
+                }
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+}
+
 
 } // ✅ نهاية الكلاس MiraInventoryProFragment
