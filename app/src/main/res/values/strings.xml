@@ -2049,7 +2049,8 @@
 
     <string name="blind_inventory">⚡ جرد أعمى</string>
     <string name="stop_inventory">🛑 إيقاف</string>
-    
+    <string name="menu_inventory_status">حالة الجرد</string>
+    <string name="menu_archive">الأرشيف</string>
     <string name="last_scan_none">آخر قراءة: لا يوجد</string>
     <string name="expected_count">المتوقع</string>
     <string name="scanned_count">الممسوح</string>
@@ -2189,4 +2190,3 @@
 <string name="menu_export">تصدير</string>
 <string name="menu_import">استيراد</string>
 </resources>
-
