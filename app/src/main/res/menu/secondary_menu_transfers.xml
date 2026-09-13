@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 🔄 المزامنة (مهم) -->
+    <!-- 🔄 مزامنة (يمين) -->
     <item
         android:id="@+id/action_transfers_sync"
         android:icon="@drawable/ic_sync"
@@ -16,7 +16,7 @@
         android:icon="@drawable/ic_export"
         android:title="@string/menu_export"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <!-- 📥 استيراد -->
     <item
@@ -24,7 +24,7 @@
         android:icon="@drawable/ic_import"
         android:title="@string/menu_import"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <!-- 📋 السجل -->
     <item
@@ -32,6 +32,6 @@
         android:icon="@drawable/ic_history"
         android:title="@string/menu_history"
         app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
 </menu>
