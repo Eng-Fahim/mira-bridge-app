@@ -131,6 +131,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public Fragment currentFragment;
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
+    
+ 
 
     public interface OnRfidScannedListener {
         void onRfidScanned(String epc);
@@ -155,11 +157,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void clearActiveListeners() {
-        this.activePOSFragment = null;
-        this.activeEncodingFragment = null;
-        this.activeRfidListener = null;
-        this.activeInventoryFragment = null;
-    }
+    this.activePOSFragment = null;
+    this.activeEncodingFragment = null;
+    this.activeRfidListener = null;
+    this.activeInventoryFragment = null;  // ✅ أضف
+}
 
     // ==================== دورة الحياة ====================
 
@@ -328,19 +330,43 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             // ==================== Inventory ====================
-            else if (id == R.id.action_inventory_power) {
-                showHardwareOptionsDialog();
-                return true;
-            } else if (id == R.id.action_inventory_stats) {
-                showInventoryStatsDialog();
-                return true;
-            } else if (id == R.id.action_inventory_settings) {
-                loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
-                return true;
-            } else if (id == R.id.action_inventory_archive) {
-                showInventoryArchiveDialog();
-                return true;
+else if (id == R.id.action_inventory_power) {
+    // ✅ Power Control خاص بالماسح
+    if (activeInventoryFragment != null 
+            && activeInventoryFragment.isAdded() 
+            && !activeInventoryFragment.isRemoving()) {
+        activeInventoryFragment.showInventoryScannerSettings();
+    } else {
+        loadFragment(new MiraInventoryProFragment(), "Scan");
+        mainHandler.postDelayed(() -> {
+            if (activeInventoryFragment != null) {
+                activeInventoryFragment.showInventoryScannerSettings();
             }
+        }, 500);
+    }
+    return true;
+} else if (id == R.id.action_inventory_stats) {
+    showInventoryStatsDialog();
+    return true;
+} else if (id == R.id.action_inventory_settings) {
+    // ✅ إعدادات الجلسة/البوزر
+    if (activeInventoryFragment != null 
+            && activeInventoryFragment.isAdded() 
+            && !activeInventoryFragment.isRemoving()) {
+        activeInventoryFragment.showInventorySessionSettings();
+    } else {
+        loadFragment(new MiraInventoryProFragment(), "Scan");
+        mainHandler.postDelayed(() -> {
+            if (activeInventoryFragment != null) {
+                activeInventoryFragment.showInventorySessionSettings();
+            }
+        }, 500);
+    }
+    return true;
+} else if (id == R.id.action_inventory_archive) {
+    showInventoryArchiveDialog();
+    return true;
+}
 
             // ==================== POS ====================
             else if (id == R.id.action_pos_cart) {
@@ -1085,32 +1111,40 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
      * ✅ إحصائيات الجرد - يقرأ من activeInventoryFragment
      */
     private void showInventoryStatsDialog() {
-        try {
-            int scannedCount = 0;
+    try {
+        int scannedCount = 0;
+        boolean isScanningNow = false;
 
-            if (activeInventoryFragment != null 
-                    && activeInventoryFragment.isAdded() 
-                    && !activeInventoryFragment.isRemoving()) {
-                scannedCount = activeInventoryFragment.getScannedCount();
-            } else if (tagList != null) {
-                scannedCount = tagList.size();
-            }
-
-            String message = isArabic
-                    ? "📊 الأصناف الممسوحة: " + scannedCount + "\n" +
-                      "⏱️ آخر تحديث: الآن"
-                    : "📊 Scanned items: " + scannedCount + "\n" +
-                      "⏱️ Last updated: just now";
-
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle(isArabic ? "📊 إحصائيات الجلسة" : "📊 Live Stats")
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "موافق" : "OK", null)
-                    .show();
-        } catch (Exception e) {
-            Log.e(TAG, "showInventoryStatsDialog error: " + e.getMessage());
+        if (activeInventoryFragment != null 
+                && activeInventoryFragment.isAdded() 
+                && !activeInventoryFragment.isRemoving()) {
+            scannedCount = activeInventoryFragment.getScannedCount();
+            isScanningNow = activeInventoryFragment.isCurrentlyScanning();
+        } else if (tagList != null) {
+            scannedCount = tagList.size();
         }
+
+        String status = isScanningNow 
+            ? (isArabic ? "🟢 قيد التشغيل" : "🟢 Running") 
+            : (isArabic ? "🔴 متوقف" : "🔴 Stopped");
+
+        String message = isArabic
+                ? "📊 الأصناف الممسوحة: " + scannedCount + "\n" +
+                  "📡 الحالة: " + status + "\n" +
+                  "⏱️ آخر تحديث: الآن"
+                : "📊 Scanned items: " + scannedCount + "\n" +
+                  "📡 Status: " + status + "\n" +
+                  "⏱️ Last updated: just now";
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "📊 إحصائيات الجلسة" : "📊 Live Stats")
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showInventoryStatsDialog error: " + e.getMessage());
     }
+}
 
     /**
      * ✅ أرشيف الجلسات
@@ -2013,4 +2047,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-}
+                }
