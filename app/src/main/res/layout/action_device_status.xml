@@ -2,31 +2,41 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:paddingHorizontal="12dp"
-    android:paddingVertical="8dp"
+    android:layout_height="match_parent"
+    android:background="?attr/selectableItemBackgroundBorderless"
     android:clickable="true"
     android:focusable="true"
-    android:background="?attr/selectableItemBackgroundBorderless">
+    android:gravity="center_vertical"
+    android:minWidth="80dp"
+    android:orientation="horizontal"
+    android:paddingHorizontal="12dp">
 
-    <!-- 🟢 نقطة الحالة -->
-    <View
-        android:id="@+id/deviceStatusDot"
-        android:layout_width="10dp"
-        android:layout_height="10dp"
-        android:background="@drawable/bg_status_dot_green" />
+    <!-- 📡 أيقونة الجهاز -->
+    <ImageView
+        android:id="@+id/deviceStatusIcon"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:contentDescription="@string/menu_device_status"
+        android:src="@drawable/ic_device_connected"
+        app:tint="?attr/colorOnSurface" />
 
-    <!-- 📝 نص الحالة -->
+    <!-- 📝 النص -->
     <TextView
         android:id="@+id/deviceStatusText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="6dp"
-        android:text="متصل"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:textColor="?attr/colorOnSurface" />
+        android:text="@string/status_connected"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <!-- 🟢/🔴 نقطة الحالة -->
+    <View
+        android:id="@+id/deviceStatusDot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_status_dot_green" />
 
 </LinearLayout>
