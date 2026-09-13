@@ -8,7 +8,6 @@
     android:background="?attr/colorSurface"
     android:layoutDirection="rtl">
 
-    <!-- ==================== APP BAR ==================== -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/inventoryAppBar"
         android:layout_width="match_parent"
@@ -16,7 +15,7 @@
         android:background="?attr/colorSurface"
         app:elevation="0dp">
 
-        <!-- ==================== 1. STATUS BAR (Compact + Settings Icon) ==================== -->
+        <!-- ==================== 1. STATUS HEADER (ثابت) ==================== -->
         <LinearLayout
             android:id="@+id/statusBar"
             android:layout_width="match_parent"
@@ -24,24 +23,24 @@
             android:background="?attr/colorPrimaryContainer"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp">
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp">
 
             <View
                 android:id="@+id/statusDot"
-                android:layout_width="8dp"
-                android:layout_height="8dp"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
                 android:background="@drawable/bg_status_dot_green" />
 
             <TextView
                 android:id="@+id/tvInventoryStatus"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:text="@string/inventory_ready"
                 android:textColor="?attr/colorOnPrimaryContainer"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
                 android:fontFamily="@font/cairo" />
 
@@ -50,51 +49,85 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_chip_status"
-                android:paddingHorizontal="6dp"
+                android:paddingHorizontal="8dp"
                 android:paddingVertical="2dp"
                 android:text="📶 -45"
                 android:textColor="?attr/colorOnPrimaryContainer"
-                android:textSize="10sp"
+                android:textSize="11sp"
+                android:textStyle="bold"
                 android:fontFamily="monospace" />
 
             <TextView
                 android:id="@+id/tvElapsedTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/bg_chip_status"
-                android:paddingHorizontal="8dp"
+                android:paddingHorizontal="10dp"
                 android:paddingVertical="2dp"
                 android:text="00:00:00"
                 android:textColor="?attr/colorPrimary"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
                 android:fontFamily="monospace" />
-
-            <!-- ⚙️ أيقونة الإعدادات - تفتح Bottom Sheet -->
-            <ImageView
-                android:id="@+id/btnSettings"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="4dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="6dp"
-                android:src="@android:drawable/ic_menu_preferences"
-                app:tint="?attr/colorOnPrimaryContainer" />
-
         </LinearLayout>
 
-        <!-- ==================== 2. HERO CARD (بدون Segmented) ==================== -->
+        <!-- ==================== 2. SEGMENTED CONTROL (ثابت) ==================== -->
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/segmentedModes"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="8dp"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:checkedButton="@id/btnModeFull">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnModeFull"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="⚡ شامل"
+                android:textSize="12sp"
+                android:fontFamily="@font/cairo"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnModeCategory"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="📂 فئوي"
+                android:textSize="12sp"
+                android:fontFamily="@font/cairo"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnModeBlind"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="👁 أعمى"
+                android:textSize="12sp"
+                android:fontFamily="@font/cairo"
+                app:cornerRadius="12dp" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <!-- ==================== 3. HERO CIRCLE (يتقلص عند السحب) ==================== -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/heroCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="10dp"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="1dp"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="2dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp"
             app:layout_scrollFlags="scroll|exitUntilCollapsed">
@@ -103,19 +136,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="14dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="14dp"
                 android:gravity="center">
 
-                <!-- Hero Progress Circle -->
+                <!-- دائرة التقدم (تصغير إلى 160dp) -->
                 <FrameLayout
-                    android:layout_width="150dp"
-                    android:layout_height="150dp">
+                    android:layout_width="160dp"
+                    android:layout_height="160dp">
 
                     <ProgressBar
                         android:id="@+id/progressScanned"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:layout_gravity="center"
                         android:max="100"
                         android:progress="0"
                         android:progressDrawable="@drawable/circular_progress_drawable" />
@@ -132,7 +167,7 @@
                             android:layout_height="wrap_content"
                             android:text="0%"
                             android:textColor="?attr/colorPrimary"
-                            android:textSize="32sp"
+                            android:textSize="36sp"
                             android:textStyle="bold"
                             android:fontFamily="@font/cairo" />
 
@@ -157,7 +192,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="0"
                                 android:textColor="?attr/colorPrimary"
-                                android:textSize="16sp"
+                                android:textSize="18sp"
                                 android:textStyle="bold"
                                 android:fontFamily="@font/cairo" />
 
@@ -166,7 +201,7 @@
                                 android:layout_height="wrap_content"
                                 android:text=" / "
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp" />
+                                android:textSize="14sp" />
 
                             <TextView
                                 android:id="@+id/tvExpectedCount"
@@ -174,7 +209,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="0"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp"
+                                android:textSize="14sp"
                                 android:fontFamily="@font/cairo" />
                         </LinearLayout>
                     </LinearLayout>
@@ -184,12 +219,12 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ==================== SCROLLABLE CONTENT ==================== -->
+    <!-- ==================== المحتوى القابل للتمرير ==================== -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:paddingBottom="110dp"
+        android:paddingBottom="140dp"
         android:overScrollMode="never"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
@@ -198,16 +233,15 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- ==================== 3. COMPACT METRICS (مؤشران فقط) ==================== -->
+            <!-- ==================== 4. STATS STRIP ==================== -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="4dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="10dp"
                 android:orientation="horizontal"
-                android:weightSum="2">
+                android:weightSum="3">
 
-                <!-- العجز -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -221,49 +255,34 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:orientation="horizontal"
+                        android:orientation="vertical"
                         android:padding="10dp">
+
+                        <TextView
+                            android:id="@+id/tvVariance"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="?attr/colorOnErrorContainer"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:fontFamily="@font/cairo" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="⚠️"
-                            android:textSize="16sp" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="العجز"
-                                android:textColor="?attr/colorOnErrorContainer"
-                                android:textSize="10sp"
-                                android:fontFamily="@font/cairo" />
-
-                            <TextView
-                                android:id="@+id/tvVariance"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0"
-                                android:textColor="?attr/colorOnErrorContainer"
-                                android:textSize="18sp"
-                                android:textStyle="bold"
-                                android:fontFamily="@font/cairo" />
-                        </LinearLayout>
+                            android:text="@string/variance_count"
+                            android:textColor="?attr/colorOnErrorContainer"
+                            android:textSize="10sp"
+                            android:fontFamily="@font/cairo" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- الدقة -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="4dp"
+                    android:layout_marginHorizontal="4dp"
                     app:cardBackgroundColor="?attr/colorTertiaryContainer"
                     app:cardCornerRadius="14dp"
                     app:cardElevation="0dp">
@@ -272,59 +291,199 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:orientation="horizontal"
+                        android:orientation="vertical"
                         android:padding="10dp">
+
+                        <TextView
+                            android:id="@+id/tvAccuracy"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0%"
+                            android:textColor="?attr/colorOnTertiaryContainer"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:fontFamily="@font/cairo" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="✅"
-                            android:textSize="16sp" />
+                            android:text="@string/accuracy"
+                            android:textColor="?attr/colorOnTertiaryContainer"
+                            android:textSize="10sp"
+                            android:fontFamily="@font/cairo" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="10dp">
+
+                        <TextView
+                            android:id="@+id/tvItemCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:fontFamily="@font/cairo" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="قطعة فريدة"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp"
+                            android:fontFamily="@font/cairo" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- ==================== 5. GOLD METRICS CARD ==================== -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="10dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
 
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
                             android:layout_weight="1"
                             android:orientation="vertical">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="الدقة"
-                                android:textColor="?attr/colorOnTertiaryContainer"
-                                android:textSize="10sp"
+                                android:text="⚖️ الوزن الإجمالي"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="11sp"
                                 android:fontFamily="@font/cairo" />
 
                             <TextView
-                                android:id="@+id/tvAccuracy"
+                                android:id="@+id/tvTotalWeight"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="0%"
-                                android:textColor="?attr/colorOnTertiaryContainer"
+                                android:layout_marginTop="2dp"
+                                android:text="0.00 g"
+                                android:textColor="?attr/colorPrimary"
+                                android:textSize="18sp"
+                                android:textStyle="bold"
+                                android:fontFamily="@font/cairo" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="end"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="💎 القيمة التقديرية"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="11sp"
+                                android:fontFamily="@font/cairo" />
+
+                            <TextView
+                                android:id="@+id/tvTotalValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="$0.00"
+                                android:textColor="?attr/colorPrimary"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
                                 android:fontFamily="@font/cairo" />
                         </LinearLayout>
                     </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-            </LinearLayout>
 
-            <!-- ==================== 4. SEARCH BAR ==================== -->
+                    <!-- Action Dock -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPowerControl"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="42dp"
+                            android:layout_weight="1"
+                            android:text="⚡ 26 dBm"
+                            android:textSize="12sp"
+                            android:fontFamily="@font/cairo"
+                            app:cornerRadius="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnGenerateReport"
+                            android:layout_width="0dp"
+                            android:layout_height="42dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:enabled="false"
+                            android:text="@string/commit_report"
+                            android:textSize="12sp"
+                            android:fontFamily="@font/cairo"
+                            app:cornerRadius="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnArchiveReports"
+                            style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                            android:layout_width="42dp"
+                            android:layout_height="42dp"
+                            android:layout_marginStart="6dp"
+                            app:cornerRadius="12dp"
+                            app:icon="@android:drawable/ic_menu_agenda"
+                            app:iconSize="18dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ==================== 6. SEARCH BAR ==================== -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/bg_search_bar"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp">
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp">
 
                 <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:src="@android:drawable/ic_menu_search"
                     app:tint="?attr/colorOnSurfaceVariant" />
 
@@ -332,7 +491,7 @@
                     android:id="@+id/etSearchItems"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:background="@null"
                     android:hint="ابحث في الممسوحات..."
@@ -340,30 +499,30 @@
                     android:inputType="text"
                     android:textColor="?attr/colorOnSurface"
                     android:textColorHint="?attr/colorOnSurfaceVariant"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:fontFamily="@font/cairo" />
 
                 <ImageView
                     android:id="@+id/btnClearSearch"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:src="@android:drawable/ic_menu_close_clear_cancel"
                     android:visibility="gone"
                     app:tint="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
 
-            <!-- ==================== 5. LIVE SCAN LOG HEADER ==================== -->
+            <!-- ==================== 7. LIVE SCAN LOG HEADER ==================== -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <View
                     android:layout_width="4dp"
-                    android:layout_height="16dp"
+                    android:layout_height="18dp"
                     android:background="?attr/colorPrimary" />
 
                 <TextView
@@ -373,37 +532,24 @@
                     android:layout_weight="1"
                     android:text="@string/live_scan_log"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:fontFamily="@font/cairo" />
-
-                <TextView
-                    android:id="@+id/tvItemCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_count_badge"
-                    android:paddingHorizontal="10dp"
-                    android:paddingVertical="3dp"
-                    android:text="0"
-                    android:textColor="?attr/colorOnPrimary"
-                    android:textSize="11sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
                     android:fontFamily="@font/cairo" />
             </LinearLayout>
 
-            <!-- ==================== 6. RECYCLER VIEW ==================== -->
+            <!-- ==================== 8. RECYCLER VIEW ==================== -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvInventoryItems"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:nestedScrollingEnabled="false"
                 android:clipToPadding="false"
-                android:paddingHorizontal="12dp"
+                android:paddingHorizontal="16dp"
                 android:paddingBottom="8dp"
                 android:overScrollMode="never" />
 
-            <!-- ==================== 7. EMPTY STATE ==================== -->
+            <!-- ==================== 9. EMPTY STATE ==================== -->
             <LinearLayout
                 android:id="@+id/tvEmptyState"
                 android:layout_width="match_parent"
@@ -441,15 +587,15 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- ==================== 8. FIXED BOTTOM DOCK (زران فقط - نظيف) ==================== -->
+    <!-- ==================== 10. FLOATING ACTION DOCK ==================== -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginBottom="10dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="16dp"
         app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="28dp"
+        app:cardCornerRadius="32dp"
         app:cardElevation="8dp"
         app:strokeColor="#40D9A736"
         app:strokeWidth="1dp">
@@ -457,40 +603,36 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="6dp">
+            android:orientation="horizontal"
+            android:padding="8dp">
 
-            <!-- زر البدء/الإيقاف الرئيسي -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnMainToggleScan"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
                 android:text="▶️ بدء جرد RFID"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:fontFamily="@font/cairo"
-                app:cornerRadius="22dp"
+                app:cornerRadius="24dp"
                 app:icon="@android:drawable/ic_media_play"
                 app:iconGravity="textStart"
-                app:iconSize="22dp" />
+                app:iconSize="20dp" />
 
-            <!-- زر الاعتماد (يفتح Dialog فاخر) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCommitSession"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="wrap_content"
                 android:layout_height="52dp"
-                android:layout_marginStart="6dp"
-                android:text="✅ اعتماد"
+                android:layout_marginStart="8dp"
+                android:text="اعتماد"
                 android:textSize="13sp"
-                android:textStyle="bold"
                 android:fontFamily="@font/cairo"
-                app:cornerRadius="22dp"
+                app:cornerRadius="24dp"
                 app:icon="@android:drawable/ic_menu_save"
-                app:iconSize="20dp" />
-
+                app:iconSize="18dp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
