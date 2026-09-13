@@ -116,8 +116,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener = 
         this::updateAppTitle;
     
-    // ✅ إسناد مراجع الـ Observers لحمايتها من الـ Memory Leak
-    private final Runnable orgProfileRunnable = this::updateAppTitle;
     
     // ✅ إدارة RFID
     private MiraPosFragment activePOSFragment = null;
@@ -492,10 +490,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void setupOrgProfileListener() {
-        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-        orgProfileManager.addListener(orgProfileRunnable);
-        updateAppTitle();
-    }
+    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+    orgProfileManager.addListener(orgProfileListener);  // ✅ orgProfileListener
+    updateAppTitle();
+}
 
     private void updateAppTitle() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -1586,8 +1584,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             if (orgProfileManager != null) {
-                orgProfileManager.removeListener(orgProfileRunnable);
-            }
+    orgProfileManager.removeListener(orgProfileListener);  // ✅ orgProfileListener
+}
 
             SessionMonitorManager.getInstance(this).stopMonitoring();
 
