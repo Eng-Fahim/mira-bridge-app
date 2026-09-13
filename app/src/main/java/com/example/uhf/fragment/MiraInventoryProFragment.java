@@ -43,6 +43,8 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.utils.SoundManager;
 import com.example.uhf.utils.PrintUtils;
 import com.example.uhf.utils.RFIDCodeUtils;
+import com.example.uhf.utils.InventoryAnimationHelper;
+
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
@@ -104,7 +106,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private ProgressBar progressScanned;
     private TextView tvScannedCount;
     private TextView tvExpectedCount;
-    
+    // ==================== Animation Helper ====================
+    private InventoryAnimationHelper animationHelper;
     // ==================== Status Header ====================
     private View statusDot;
     private View statusBar;
@@ -289,6 +292,12 @@ private static final long SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 دقيقة
             soundManager = new SoundManager(requireContext()); 
         } catch (Exception e) { 
             Log.e(TAG, "Sound: " + e.getMessage()); 
+        }
+        // ✅ تهيئة AnimationHelper
+        try {
+        animationHelper = new InventoryAnimationHelper(isArabic);
+        } catch (Exception e) {
+        Log.e(TAG, "AnimationHelper error: " + e.getMessage());
         }
         
         try { 
@@ -1431,6 +1440,10 @@ public void onConnectionChanged(boolean isConnected) {
                 soundManager.playBeep(isConnected ? 
                     SoundManager.FeedbackType.COMPLETED : SoundManager.FeedbackType.ERROR);
             }
+            // ✅ تحديث خلفية الشريط
+if (animationHelper != null) {
+    animationHelper.updateStatusBarBackground(statusBar, isConnected, isScanning);
+}
         });
     }
 }
@@ -1440,13 +1453,21 @@ public void onConnectionChanged(boolean isConnected) {
 /**
  * تحديث الواجهة مع حساب الفروقات الحي
  */
+/**
+ * تحديث الواجهة مع Animation
+ */
 private void updateUI() {
     if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
     
     int scanned = inventoryEngine.getUniqueCount();
-
+    
+    // ✅ Animation على عدد القطع
     if (tvScannedCount != null) {
-        tvScannedCount.setText(String.valueOf(scanned));
+        if (animationHelper != null) {
+            animationHelper.animateNumberChange(tvScannedCount, lastScannedForAnimation, scanned);
+        } else {
+            tvScannedCount.setText(String.valueOf(scanned));
+        }
     }
     
     if (tvItemCount != null) {
@@ -1456,11 +1477,20 @@ private void updateUI() {
     if (expectedCount > 0) {
         int progress = Math.min((int) (((float) scanned / expectedCount) * 100), 100);
         
-        if (progressScanned != null) {
+        // ✅ Animation على ProgressBar
+        if (progressScanned != null && animationHelper != null) {
+            int previousProgress = progressScanned.getProgress();
+            if (progress != previousProgress) {
+                animationHelper.animateProgressBar(progressScanned, previousProgress, progress);
+            }
+        } else if (progressScanned != null) {
             progressScanned.setProgress(progress);
         }
         
-        if (tvProgressPercent != null) {
+        // ✅ Animation على نص النسبة
+        if (tvProgressPercent != null && animationHelper != null) {
+            animationHelper.animateProgressText(tvProgressPercent, progress);
+        } else if (tvProgressPercent != null) {
             tvProgressPercent.setText(progress + "%");
         }
         
@@ -1475,6 +1505,12 @@ private void updateUI() {
         if (scanned >= expectedCount && isScanning) {
             stopScanning();
             if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+            
+            // ✅ الاحتفال بالاكتمال
+            if (animationHelper != null) {
+                animationHelper.celebrateCompletion(tvProgressPercent, progressScanned, tvScannedCount);
+            }
+            
             if (isAdded() && !isFragmentDestroyed) {
                 Toast.makeText(requireContext(), 
                     isArabic ? "🎉 اكتمل جرد جميع المواد المتوقعة!" : 
@@ -1483,7 +1519,6 @@ private void updateUI() {
             }
         }
     } else if (tvProgressPercent != null) {
-        // جرد أعمى - نظهر العدد الممسوح فقط
         tvProgressPercent.setText("—");
     }
     
@@ -1495,6 +1530,9 @@ private void updateUI() {
         tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (" : 
             "📡 Scanning... (") + scanned + ")");
     }
+    
+    // ✅ تحديث آخر قيمة
+    lastScannedForAnimation = scanned;
 }
 
 /**
@@ -1542,6 +1580,11 @@ private void startScanning() {
     if (tvProgressPercent != null) tvProgressPercent.setText("0%");
     if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
     
+    // ✅ تحديث خلفية الشريط
+if (animationHelper != null) {
+    animationHelper.updateStatusBarBackground(statusBar, true, true);
+}
+    
     // ✅ امسح recentTagReads لمنع تجاهل الوسوم من الجلسة السابقة
     recentTagReads.clear();
     
@@ -1576,7 +1619,12 @@ private void startBlindInventory() {
     if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
     recentTagReads.clear();
     
+    
     isScanning = true;
+    // ✅ تحديث خلفية الشريط
+if (animationHelper != null) {
+    animationHelper.updateStatusBarBackground(statusBar, true, true);
+}
     scanStartTime = SystemClock.elapsedRealtime();
     mainThreadHandler.post(timerRunnable);
     
@@ -1818,7 +1866,16 @@ public void stopScanning() {
     if (backgroundExecutor == null || backgroundExecutor.isShutdown()) {
         backgroundExecutor = Executors.newSingleThreadExecutor();
     }
-    
+    // ✅ تحديث خلفية الشريط
+    boolean isConnected = false;
+    try {
+    isConnected = rfidManager != null && rfidManager.getActiveDevice() != null;
+    } catch (Exception e) {
+    isConnected = false;
+    }
+    if (animationHelper != null) {
+    animationHelper.updateStatusBarBackground(statusBar, isConnected, false);
+    }
     backgroundExecutor.execute(() -> {
         try {
             if (inventoryEngine != null) {
@@ -2018,6 +2075,10 @@ private void startCategoryInventory(String category) {
         recentTagReads.clear();
         
         isScanning = true;
+        // ✅ تحديث خلفية الشريط
+if (animationHelper != null) {
+    animationHelper.updateStatusBarBackground(statusBar, true, true);
+}
         scanStartTime = SystemClock.elapsedRealtime();
         mainThreadHandler.post(timerRunnable);
         
