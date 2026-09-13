@@ -14,16 +14,7 @@ import com.example.uhf.R;
 /**
  * ✅ InventoryAnimationHelper
  * 
- * مسؤول عن كل الرسوم المتحركة في شاشة الجرد:
- * - Animation على الأرقام
- * - Animation على ProgressBar
- * - Animation على Status Bar
- * - احتفال عند الاكتمال
- * 
- * الميزات:
- * - آمن للاستخدام من أي خيط
- * - لا يحتوي على مراجع للـ Fragment (لا تسريبات)
- * - يمكن استخدامه من أي مكان
+ * مسؤول عن كل الرسوم المتحركة في شاشة الجرد.
  */
 public class InventoryAnimationHelper {
 
@@ -57,17 +48,24 @@ public class InventoryAnimationHelper {
                 return;
             }
             
+            final TextView finalTextView = textView;
+            final int finalNewValue = newValue;
+            
             textView.animate()
                     .scaleX(1.2f)
                     .scaleY(1.2f)
                     .setDuration(NUMBER_SCALE_DURATION)
-                    .withEndAction(() -> {
-                        textView.setText(String.valueOf(newValue));
-                        textView.animate()
-                                .scaleX(1f)
-                                .scaleY(1f)
-                                .setDuration(NUMBER_RETURN_DURATION)
-                                .start();
+                    .withEndAction(new Runnable() {
+                        @Override
+                        public void run() {
+                            finalTextView.setText(String.valueOf(finalNewValue));
+                            
+                            finalTextView.animate()
+                                    .scaleX(1f)
+                                    .scaleY(1f)
+                                    .setDuration(NUMBER_RETURN_DURATION)
+                                    .start();
+                        }
                     })
                     .start();
         } catch (Exception e) {
@@ -86,10 +84,11 @@ public class InventoryAnimationHelper {
         
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                ObjectAnimator.ofInt(progressBar, "progress", from, to)
-                        .setDuration(PROGRESS_ANIMATION_DURATION)
-                        .setInterpolator(new DecelerateInterpolator())
-                        .start();
+                ObjectAnimator animator = ObjectAnimator.ofInt(
+                        progressBar, "progress", from, to);
+                animator.setDuration(PROGRESS_ANIMATION_DURATION);
+                animator.setInterpolator(new DecelerateInterpolator());
+                animator.start();
             } else {
                 progressBar.setProgress(to);
             }
@@ -97,16 +96,20 @@ public class InventoryAnimationHelper {
             // نبض خفيف على الحاوية
             View parent = (View) progressBar.getParent();
             if (parent != null) {
+                final View finalParent = parent;
                 parent.animate()
                         .scaleX(1.05f)
                         .scaleY(1.05f)
                         .setDuration(150)
-                        .withEndAction(() -> {
-                            parent.animate()
-                                    .scaleX(1f)
-                                    .scaleY(1f)
-                                    .setDuration(150)
-                                    .start();
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                finalParent.animate()
+                                        .scaleX(1f)
+                                        .scaleY(1f)
+                                        .setDuration(150)
+                                        .start();
+                            }
                         })
                         .start();
             }
@@ -127,15 +130,21 @@ public class InventoryAnimationHelper {
         try {
             String newText = progress + "%";
             if (!newText.equals(textView.getText().toString())) {
+                final TextView finalTextView = textView;
+                final String finalNewText = newText;
+                
                 textView.animate()
                         .alpha(0.3f)
                         .setDuration(TEXT_FADE_DURATION)
-                        .withEndAction(() -> {
-                            textView.setText(newText);
-                            textView.animate()
-                                    .alpha(1f)
-                                    .setDuration(TEXT_APPEAR_DURATION)
-                                    .start();
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                finalTextView.setText(finalNewText);
+                                finalTextView.animate()
+                                        .alpha(1f)
+                                        .setDuration(TEXT_APPEAR_DURATION)
+                                        .start();
+                            }
                         })
                         .start();
             }
@@ -149,10 +158,6 @@ public class InventoryAnimationHelper {
     
     /**
      * ✅ تحديث خلفية الشريط حسب الحالة
-     * 
-     * @param statusBar  الـ View (LinearLayout)
-     * @param isConnected  هل الجهاز متصل
-     * @param isScanning  هل الجرد قيد التشغيل
      */
     public void updateStatusBarBackground(View statusBar, 
                                           boolean isConnected, 
@@ -171,15 +176,18 @@ public class InventoryAnimationHelper {
             
             statusBar.setBackgroundResource(bgRes);
             
-            // Flash animation خفيفة
+            final View finalStatusBar = statusBar;
             statusBar.animate()
                     .alpha(0.85f)
                     .setDuration(STATUS_BAR_FLASH_DURATION)
-                    .withEndAction(() -> {
-                        statusBar.animate()
-                                .alpha(1f)
-                                .setDuration(150)
-                                .start();
+                    .withEndAction(new Runnable() {
+                        @Override
+                        public void run() {
+                            finalStatusBar.animate()
+                                    .alpha(1f)
+                                    .setDuration(150)
+                                    .start();
+                        }
                     })
                     .start();
         } catch (Exception e) {
@@ -198,47 +206,58 @@ public class InventoryAnimationHelper {
         try {
             // نبض كبير على النسبة
             if (progressText != null) {
+                final TextView finalProgressText = progressText;
                 progressText.animate()
                         .scaleX(1.5f)
                         .scaleY(1.5f)
                         .setDuration(300)
-                        .setInterpolator(new OvershootInterpolator(1.5f))
-                        .withEndAction(() -> {
-                            progressText.animate()
-                                    .scaleX(1f)
-                                    .scaleY(1f)
-                                    .setDuration(300)
-                                    .start();
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                finalProgressText.animate()
+                                        .scaleX(1f)
+                                        .scaleY(1f)
+                                        .setDuration(300)
+                                        .start();
+                            }
                         })
                         .start();
             }
             
             // وميض على ProgressBar
             if (progressBar != null) {
+                final ProgressBar finalProgressBar = progressBar;
                 progressBar.animate()
                         .alpha(0.3f)
                         .setDuration(150)
-                        .withEndAction(() -> {
-                            progressBar.animate()
-                                    .alpha(1f)
-                                    .setDuration(150)
-                                    .start();
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                finalProgressBar.animate()
+                                        .alpha(1f)
+                                        .setDuration(150)
+                                        .start();
+                            }
                         })
                         .start();
             }
             
             // نبض على العدد
             if (scannedCount != null) {
+                final TextView finalScannedCount = scannedCount;
                 scannedCount.animate()
                         .scaleX(1.4f)
                         .scaleY(1.4f)
                         .setDuration(CELEBRATE_DURATION)
-                        .withEndAction(() -> {
-                            scannedCount.animate()
-                                    .scaleX(1f)
-                                    .scaleY(1f)
-                                    .setDuration(CELEBRATE_DURATION)
-                                    .start();
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                finalScannedCount.animate()
+                                        .scaleX(1f)
+                                        .scaleY(1f)
+                                        .setDuration(CELEBRATE_DURATION)
+                                        .start();
+                            }
                         })
                         .start();
             }
