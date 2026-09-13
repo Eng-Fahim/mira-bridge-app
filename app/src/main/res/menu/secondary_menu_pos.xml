@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 🛒 السلة (مهم) -->
+    <!-- 🛒 السلة (يمين) -->
     <item
         android:id="@+id/action_pos_cart"
         android:icon="@drawable/ic_shopping_cart"
@@ -10,28 +10,28 @@
         app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
 
-    <!-- 🔍 البحث عن قطعة -->
+    <!-- 💰 خصم -->
+    <item
+        android:id="@+id/action_pos_discount"
+        android:icon="@drawable/ic_discount"
+        android:title="@string/menu_discount"
+        app:iconTint="?attr/colorOnSurface"
+        app:showAsAction="always" />
+
+    <!-- 🧾 إيصال -->
+    <item
+        android:id="@+id/action_pos_receipt"
+        android:icon="@drawable/ic_receipt"
+        android:title="@string/menu_receipt"
+        app:iconTint="?attr/colorOnSurface"
+        app:showAsAction="always" />
+
+    <!-- 🔍 بحث -->
     <item
         android:id="@+id/action_pos_search"
         android:icon="@drawable/ic_search"
         android:title="@string/menu_search_item"
         app:iconTint="?attr/colorOnSurface"
         app:showAsAction="always" />
-
-    <!-- 💰 الخصم -->
-    <item
-        android:id="@+id/action_pos_discount"
-        android:icon="@drawable/ic_discount"
-        android:title="@string/menu_discount"
-        app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="ifRoom" />
-
-    <!-- 🧾 الإيصال -->
-    <item
-        android:id="@+id/action_pos_receipt"
-        android:icon="@drawable/ic_receipt"
-        android:title="@string/menu_receipt"
-        app:iconTint="?attr/colorOnSurface"
-        app:showAsAction="ifRoom" />
 
 </menu>
