@@ -1234,6 +1234,10 @@ private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
                     options.setOrientationLocked(true);
                     refundBarcodeLauncher.launch(options);
                 }
+                @Override
+    public void onCodeChanged(String code) {
+        searchItemForRefund(code);
+    }
             });
             refundDialog.show();
         } catch (Exception e) {
