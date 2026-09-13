@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.graphics.Rect;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
@@ -147,64 +148,105 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+   @Override
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
 
-        try {
-            Context ctx = requireContext();
+    try {
+        Context ctx = requireContext();
 
-            // ✅ تهيئة المديرين
-            branchesManager = MiraBranchesManager.getInstance(ctx);
-            priceManager = MiraPriceManager.getInstance(ctx);
-            permissionManager = PermissionManager.getInstance(ctx);
-            isArabic = Locale.getDefault().getLanguage().equals("ar");
-            sessionManager = new SessionManager(ctx);
-            posManager = new POSManager(ctx);
-            pendingSalesManager = new PendingSalesManager(ctx);
+        // ✅ تهيئة المديرين
+        branchesManager = MiraBranchesManager.getInstance(ctx);
+        priceManager = MiraPriceManager.getInstance(ctx);
+        permissionManager = PermissionManager.getInstance(ctx);
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        sessionManager = new SessionManager(ctx);
+        posManager = new POSManager(ctx);
+        pendingSalesManager = new PendingSalesManager(ctx);
 
-            // ✅ مدير الخيوط المشترك
-            miraExecutor = MiraExecutorService.getInstance();
+        // ✅ مدير الخيوط المشترك
+        miraExecutor = MiraExecutorService.getInstance();
 
-            // ✅ تهيئة RFID
-            rfidManager = RFIDManager.getInstance(ctx);
-            if (rfidManager != null) {
-                rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
-                    @Override
-                    public void onTagRead(String epc, int rssi) {
-                        if (isRFIDScanActive) onRingScanned(epc);
-                    }
-                    @Override
-                    public void onScanStarted() {}
-                    @Override
-                    public void onScanStopped() {}
-                    @Override
-                    public void onConnectionChanged(boolean connected) {
-                        safeRun(() -> {
-                            if (btnPosRFIDMode != null && isRFIDModeActive) {
-                                btnPosRFIDMode.setAlpha(connected ? 1.0f : 0.5f);
-                            }
-                        });
-                    }
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, "RFID Error: " + error);
-                    }
-                });
-            }
-
-            apiClient = MiraApiClient.getInstance(ctx);
-            bindViews(view);
-            setupRecyclerView();
-            setupListeners();
-            applyPermissions();
-            initSmartScale();
-            updateCartSummary();
-
-        } catch (Exception e) {
-            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+        // ✅ تهيئة RFID
+        rfidManager = RFIDManager.getInstance(ctx);
+        if (rfidManager != null) {
+            rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
+                @Override
+                public void onTagRead(String epc, int rssi) {
+                    if (isRFIDScanActive) onRingScanned(epc);
+                }
+                @Override
+                public void onScanStarted() {}
+                @Override
+                public void onScanStopped() {}
+                @Override
+                public void onConnectionChanged(boolean connected) {
+                    safeRun(() -> {
+                        if (btnPosRFIDMode != null && isRFIDModeActive) {
+                            btnPosRFIDMode.setAlpha(connected ? 1.0f : 0.5f);
+                        }
+                    });
+                }
+                @Override
+                public void onError(String error) {
+                    Log.e(TAG, "RFID Error: " + error);
+                }
+            });
         }
+
+        apiClient = MiraApiClient.getInstance(ctx);
+        bindViews(view);
+        setupRecyclerView();
+        setupListeners();
+        applyPermissions();
+        initSmartScale();
+        updateCartSummary();
+
+        // ✅ مراقبة الكيبورد (داخل try)
+        setupKeyboardVisibilityListener(view);
+
+    } catch (Exception e) {
+        Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
     }
+}
+
+/**
+ * ✅ مراقبة ظهور الكيبورد + تعديل الواجهة
+ */
+private void setupKeyboardVisibilityListener(View view) {
+    try {
+        final View rootView = view.getRootView();
+        rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            try {
+                Rect r = new Rect();
+                rootView.getWindowVisibleDisplayFrame(r);
+                int screenHeight = rootView.getHeight();
+                int keypadHeight = screenHeight - r.bottom;
+                
+                boolean isKeyboardVisible = keypadHeight > screenHeight * 0.15;
+                
+                // ✅ 1) إخفاء الـ EmptyState عند الكيبورد
+                if (layoutCartEmptyState != null) {
+                    layoutCartEmptyState.setVisibility(
+                        (cartList.isEmpty() && !isKeyboardVisible) ? View.VISIBLE : View.GONE
+                    );
+                }
+                
+                // ✅ 2) تمرير RecyclerView للأعلى عند ظهور الكيبورد
+                if (rvCartItems != null && isKeyboardVisible && !cartList.isEmpty()) {
+                    rvCartItems.scrollToPosition(0);
+                }
+                
+                // ✅ 3) طيّ الـ Keyboard عند الضغط على زر Done (تلقائي عبر imeOptions)
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Keyboard listener error: " + e.getMessage());
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "setupKeyboardVisibilityListener error: " + e.getMessage());
+    }
+}
 
     @Override
     public void onResume() {
