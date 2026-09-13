@@ -314,21 +314,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             
             // ==================== Inventory ====================
             else if (id == R.id.action_inventory_power) {
-                showHardwareOptionsDialog();
-                return true;
-            } else if (id == R.id.action_inventory_search) {
-                showGlobalSearchDialog();
-                return true;
-            } else if (id == R.id.action_inventory_stats) {
-                showInventoryStatsDialog();
-                return true;
-            } else if (id == R.id.action_inventory_settings) {
-            loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
-            return true;
-            } else if (id == R.id.action_inventory_archive) {
-            showInventoryArchiveDialog();
-            return true;
-            }
+    showHardwareOptionsDialog();
+    return true;
+} else if (id == R.id.action_inventory_stats) {
+    showInventoryStatsDialog();
+    return true;
+} else if (id == R.id.action_inventory_settings) {
+    loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+    return true;
+} else if (id == R.id.action_inventory_archive) {
+    showInventoryArchiveDialog();
+    return true;
+}
             
             // ==================== POS ====================
             else if (id == R.id.action_pos_cart) {
@@ -951,17 +948,19 @@ private void applyToolbarMenuPermissions(Menu menu) {
 
     // ==================== 📊 الشريط الثانوي - Inventory ====================
     
-    MenuItem invPower = menu.findItem(R.id.action_inventory_power);
-    if (invPower != null) invPower.setVisible(true);
-    
-    MenuItem invSearch = menu.findItem(R.id.action_inventory_search);
-    if (invSearch != null) invSearch.setVisible(true);
-    
-    MenuItem invStats = menu.findItem(R.id.action_inventory_stats);
-    if (invStats != null) invStats.setVisible(true);
-    
-    MenuItem invSettings = menu.findItem(R.id.action_inventory_settings);
-    if (invSettings != null) invSettings.setVisible(pm.canEditInventory());
+    // ==================== 📊 الشريط الثانوي - Inventory ====================
+
+MenuItem invPower = menu.findItem(R.id.action_inventory_power);
+if (invPower != null) invPower.setVisible(true);
+
+MenuItem invStats = menu.findItem(R.id.action_inventory_stats);
+if (invStats != null) invStats.setVisible(true);
+
+MenuItem invSettings = menu.findItem(R.id.action_inventory_settings);
+if (invSettings != null) invSettings.setVisible(pm.canEditInventory());
+
+MenuItem invArchive = menu.findItem(R.id.action_inventory_archive);
+if (invArchive != null) invArchive.setVisible(true);
 
     // ==================== 📊 الشريط الثانوي - POS ====================
     
