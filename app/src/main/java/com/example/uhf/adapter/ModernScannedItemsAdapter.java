@@ -3,6 +3,7 @@ package com.example.uhf.adapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -16,13 +17,12 @@ import com.example.uhf.model.ScannedItemDisplay;
 import java.util.Locale;
 
 /**
- * ✅ ModernScannedItemsAdapter - محسّن بالأداء
- * يستخدم ListAdapter + DiffUtil لتحديث سلس بدون تجمد الواجهة
+ * ✅ ModernScannedItemsAdapter - محسّن بالأداء + Animations
  * 
  * الميزات:
- * - تحديث سلس (Smooth Updates)
- * - لا مزيد من notifyItemInserted اليدوي
- * - أداء محسن مع RFID سريع (50+ tag/sec)
+ * - ListAdapter + DiffUtil لتحديث سلس
+ * - Animation على العناصر الجديدة
+ * - Ripple effect عند الضغط
  */
 public class ModernScannedItemsAdapter 
         extends ListAdapter<ScannedItemDisplay, ModernScannedItemsAdapter.ViewHolder> {
@@ -33,6 +33,9 @@ public class ModernScannedItemsAdapter
 
     private final boolean isArabic;
     private final OnItemClickListener listener;
+    
+    // ✅ تتبع آخر position لعرضه (لمنع animation عند التمرير)
+    private int lastAnimatedPosition = -1;
 
     private static final DiffUtil.ItemCallback<ScannedItemDisplay> DIFF_CALLBACK = 
         new DiffUtil.ItemCallback<ScannedItemDisplay>() {
@@ -73,7 +76,40 @@ public class ModernScannedItemsAdapter
             holder.itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onItemClick(item);
             });
+            
+            // ✅ Animation على العناصر الجديدة
+            applyEntryAnimation(holder.itemView, position);
         }
+    }
+
+    /**
+     * ✅ Animation عند عرض العنصر لأول مرة
+     */
+    private void applyEntryAnimation(View view, int position) {
+        if (position > lastAnimatedPosition) {
+            view.setAlpha(0f);
+            view.setTranslationY(-30f);
+            view.setScaleX(0.9f);
+            view.setScaleY(0.9f);
+            
+            view.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(320)
+                    .setInterpolator(new DecelerateInterpolator(1.5f))
+                    .start();
+            
+            lastAnimatedPosition = position;
+        }
+    }
+
+    /**
+     * ✅ إعادة تعيين التتبع (عند إعادة تحميل القائمة)
+     */
+    public void resetAnimationTracker() {
+        lastAnimatedPosition = -1;
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
@@ -92,26 +128,22 @@ public class ModernScannedItemsAdapter
         }
 
         void bind(ScannedItemDisplay item, boolean isArabic) {
-            // العنوان
             if (tvItemTitle != null) {
                 tvItemTitle.setText(item.title != null && !item.title.isEmpty() 
                     ? item.title 
                     : (isArabic ? "قطعة غير معروفة" : "Unknown item"));
             }
 
-            // EPC
             if (tvItemEpc != null) {
                 tvItemEpc.setText(item.epc != null ? item.epc : "—");
             }
 
-            // العيار
             if (tvItemKarat != null) {
                 tvItemKarat.setText(item.karat != null && !item.karat.isEmpty() 
                     ? item.karat 
                     : "—");
             }
 
-            // الوزن
             if (tvItemWeight != null) {
                 if (item.weight > 0) {
                     tvItemWeight.setText(String.format(Locale.US, "%.2fg", item.weight));
@@ -121,7 +153,6 @@ public class ModernScannedItemsAdapter
                 }
             }
 
-            // السعر
             if (tvItemPrice != null) {
                 if (item.price > 0) {
                     tvItemPrice.setText(String.format(Locale.US, "$%.0f", item.price));
@@ -131,12 +162,10 @@ public class ModernScannedItemsAdapter
                 }
             }
 
-            // العداد
             if (tvItemCount != null) {
                 tvItemCount.setText("x" + item.count);
             }
 
-            // الوقت
             if (tvItemTime != null) {
                 tvItemTime.setText(item.time != null ? item.time : "");
             }
