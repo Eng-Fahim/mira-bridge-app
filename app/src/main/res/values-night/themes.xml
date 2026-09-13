@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ==================== الثيم الأساسي للوضع الداكن ==================== -->
+    <!-- ==================== الثيم الأساسي للوضع الداكن (Material 3 Enterprise Dark) ==================== -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
 
+        <!-- 🔗 ربط مكونات الماتيريال 3 الرئيسية -->
         <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
         <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
         <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
@@ -30,7 +31,7 @@
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- 🔤 المكونات -->
+        <!-- 🔤 إجبار المكونات -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
         <item name="buttonStyle">@style/AppButtonStyle</item>
@@ -38,7 +39,7 @@
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🎨 لوحة الألوان للوضع الداكن -->
+        <!-- 🎨 لوحة الألوان الفاخرة للوضع الداكن (Enterprise Gold & Dark Slate) -->
         <item name="colorPrimary">#D4AF37</item>
         <item name="colorOnPrimary">#111827</item>
         <item name="colorPrimaryContainer">#2A2413</item>
@@ -49,23 +50,27 @@
         <item name="colorSecondaryContainer">#1E1C14</item>
         <item name="colorOnSecondaryContainer">#F9F4E9</item>
 
+        <!-- 🖼️ خلفية داكنة فاخرة -->
         <item name="android:colorBackground">#0B0B0C</item>
         <item name="colorOnBackground">#F3F4F6</item>
 
+        <!-- 🗂️ الأسطح والبطاقات الداكنة -->
         <item name="colorSurface">#161618</item>
         <item name="colorOnSurface">#F9FAFB</item>
         <item name="colorSurfaceVariant">#1E1E22</item>
         <item name="colorOnSurfaceVariant">#CBD5E1</item>
 
+        <!-- 🔲 الحدود والإطارات -->
         <item name="colorOutline">#2D2D32</item>
         <item name="colorOutlineVariant">#3F3F46</item>
 
-        <!-- ✅ الحوارات -->
+        <!-- ✅ توحيد النوافذ الحوارية -->
         <item name="android:alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
+    <!-- ==================== تحويل الستايلات التابعة ==================== -->
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
     <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
     <style name="AppTheme" parent="Theme.Uhfuartdemo" />
@@ -104,8 +109,8 @@
         <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
     </style>
 
-    <!-- ✅ تم إزالة parent="" -->
-    <style name="MiraDialogShape" parent="ShapeAppearance.Material3.Corner.Medium">
+    <style name="MiraDialogShape" parent="">
+        <item name="cornerFamily">rounded</item>
         <item name="cornerSize">20dp</item>
     </style>
 
@@ -139,8 +144,8 @@
         <item name="shapeAppearanceOverlay">@style/MiraBottomSheetShape</item>
     </style>
 
-    <!-- ✅ تم إزالة parent="" -->
- <style name="MiraBottomSheetShape" parent="ShapeAppearance.Material3.Corner.Medium">
+    <style name="MiraBottomSheetShape" parent="">
+        <item name="cornerFamily">rounded</item>
         <item name="cornerSizeTopLeft">24dp</item>
         <item name="cornerSizeTopRight">24dp</item>
         <item name="cornerSizeBottomLeft">0dp</item>
@@ -180,12 +185,12 @@
         <item name="cornerRadius">12dp</item>
     </style>
 
-    <style name="AppRadioButtonStyle" parent="Widget.Material3.CompoundButton.RadioButton">
+    <style name="AppRadioButtonStyle" parent="Widget.AppCompat.CompoundButton.RadioButton">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <style name="AppCheckBoxStyle" parent="Widget.Material3.CompoundButton.CheckBox">
+    <style name="AppCheckBoxStyle" parent="Widget.AppCompat.CompoundButton.CheckBox">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
