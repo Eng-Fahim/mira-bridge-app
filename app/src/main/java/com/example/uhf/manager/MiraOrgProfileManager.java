@@ -10,7 +10,9 @@ import com.example.uhf.api.MiraApiClient;
 
 import org.json.JSONObject;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -21,9 +23,9 @@ import java.util.List;
  * - حفظ واسترجاع بيانات المستخدم الأساسية
  * - المزامنة من السيرفر (/profile/get)
  * 
- * ❌ ليس مسؤولاً عن:
- * - إدارة قائمة الفروع (→ MiraBranchesManager)
- * - حفظ الفرع النشط (→ MiraBranchesManager)
+ * 🛡️ الحماية من التسريبات:
+ * - استخدام WeakReference للمستمعين
+ * - تنظيف تلقائي للمراجع الميتة
  */
 public class MiraOrgProfileManager {
 
@@ -37,7 +39,8 @@ public class MiraOrgProfileManager {
     private final SharedPreferences prefs;
     private final Context context;
     
-    private final List<OnProfileChangedListener> listeners = new ArrayList<>();
+    // ✅ استخدام WeakReference لمنع التسريبات
+    private final List<WeakReference<OnProfileChangedListener>> listeners = new ArrayList<>();
 
     public interface OnProfileChangedListener {
         void onProfileChanged();
@@ -60,36 +63,80 @@ public class MiraOrgProfileManager {
         return instance;
     }
 
-    // ==================== المستمعون ====================
+    // ==================== المستمعون (آمن ضد التسريبات) ====================
 
     public void addListener(OnProfileChangedListener listener) {
+        if (listener == null) return;
+        
         synchronized (listeners) {
-            if (listener != null && !listeners.contains(listener)) {
-                listeners.add(listener);
+            // ✅ أولاً: نظّف المراجع الميتة
+            cleanupDeadListeners();
+            
+            // ✅ ثانياً: تحقق أن المستمع غير موجود (بمقارنة الـ reference الفعلي)
+            for (WeakReference<OnProfileChangedListener> ref : listeners) {
+                OnProfileChangedListener existing = ref.get();
+                if (existing != null && existing == listener) {
+                    Log.d(TAG, "Listener already registered, skipping");
+                    return;
+                }
             }
+            
+            // ✅ ثالثاً: أضف المستمع الجديد
+            listeners.add(new WeakReference<>(listener));
+            Log.d(TAG, "Listener added. Total: " + listeners.size());
         }
     }
 
     public void removeListener(OnProfileChangedListener listener) {
+        if (listener == null) return;
+        
         synchronized (listeners) {
-            listeners.remove(listener);
+            Iterator<WeakReference<OnProfileChangedListener>> it = listeners.iterator();
+            while (it.hasNext()) {
+                OnProfileChangedListener existing = it.next().get();
+                if (existing == null || existing == listener) {
+                    it.remove();
+                }
+            }
+            Log.d(TAG, "Listener removed. Remaining: " + listeners.size());
+        }
+    }
+
+    /**
+     * ✅ تنظيف المستمعين الذين تم تدميرهم من قبل GC
+     */
+    private void cleanupDeadListeners() {
+        Iterator<WeakReference<OnProfileChangedListener>> it = listeners.iterator();
+        while (it.hasNext()) {
+            if (it.next().get() == null) {
+                it.remove();
+            }
         }
     }
 
     public void notifyListeners() {
         mainHandler.post(() -> {
-            List<OnProfileChangedListener> listenersCopy;
+            List<OnProfileChangedListener> aliveListeners = new ArrayList<>();
+            
             synchronized (listeners) {
-                listenersCopy = new ArrayList<>(listeners);
+                // ✅ 1) نظّف الميت
+                cleanupDeadListeners();
+                
+                // ✅ 2) اجمع الأحياء
+                for (WeakReference<OnProfileChangedListener> ref : listeners) {
+                    OnProfileChangedListener listener = ref.get();
+                    if (listener != null) {
+                        aliveListeners.add(listener);
+                    }
+                }
             }
             
-            for (OnProfileChangedListener listener : listenersCopy) {
-                if (listener != null) {
-                    try {
-                        listener.onProfileChanged();
-                    } catch (Exception e) {
-                        Log.e(TAG, "Listener error: " + e.getMessage());
-                    }
+            // ✅ 3) أبلغهم (خارج القفل لتجنب deadlock)
+            for (OnProfileChangedListener listener : aliveListeners) {
+                try {
+                    listener.onProfileChanged();
+                } catch (Exception e) {
+                    Log.e(TAG, "Listener error: " + e.getMessage());
                 }
             }
         });
@@ -97,20 +144,12 @@ public class MiraOrgProfileManager {
 
     // ==================== المزامنة من السيرفر ====================
 
-    /**
-     * ✅ جلب بيانات المؤسسة من السيرفر (/profile/get)
-     * 
-     * @param apiClient  كائن MiraApiClient
-     * @param force      إذا true، يتجاهل فترة الانتظار
-     * @param callback   رد النداء
-     */
     public void syncFromServer(MiraApiClient apiClient, boolean force, SyncCallback callback) {
         if (apiClient == null) {
             if (callback != null) callback.onError("apiClient is null");
             return;
         }
         
-        // ✅ فحص cooldown
         if (!force) {
             long lastSync = prefs.getLong("last_server_sync", 0);
             long now = System.currentTimeMillis();
@@ -137,29 +176,24 @@ public class MiraOrgProfileManager {
                     return;
                 }
                 
-                // ✅ 1) حفظ organization
                 JSONObject organization = response.data.optJSONObject("organization");
                 if (organization != null) {
                     saveOrganizationFromServer(organization);
                     Log.i(TAG, "✅ Organization saved: " + organization.optString("name_ar", ""));
                 }
                 
-                // ✅ 2) تحديث الفرع النشط (عبر MiraBranchesManager — ليس هنا)
                 JSONObject user = response.data.optJSONObject("user");
                 if (user != null) {
                     syncBranchToBranchesManager(user);
                 }
                 
-                // ✅ 3) حفظ system_config
                 JSONObject systemConfig = response.data.optJSONObject("system_config");
                 if (systemConfig != null) {
                     saveSystemConfigFromServer(systemConfig);
                 }
                 
-                // ✅ 4) حفظ وقت المزامنة
                 prefs.edit().putLong("last_server_sync", System.currentTimeMillis()).apply();
                 
-                // ✅ 5) إشعار المستمعين
                 notifyListeners();
                 
                 mainHandler.post(() -> {
@@ -207,10 +241,6 @@ public class MiraOrgProfileManager {
         Log.d(TAG, "Organization saved: ar=" + nameAr + ", en=" + nameEn);
     }
 
-    /**
-     * ✅ تحديث الفرع النشط عبر MiraBranchesManager
-     * (لا نحفظ الفرع في SharedPreferences الخاصة بنا — المسؤولية لـ MiraBranchesManager)
-     */
     private void syncBranchToBranchesManager(JSONObject user) {
         if (user == null) return;
         
