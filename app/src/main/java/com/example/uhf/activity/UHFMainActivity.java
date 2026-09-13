@@ -113,6 +113,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
+    private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener = 
+        this::updateAppTitle;
+    
     // ✅ إسناد مراجع الـ Observers لحمايتها من الـ Memory Leak
     private final Runnable orgProfileRunnable = this::updateAppTitle;
     
