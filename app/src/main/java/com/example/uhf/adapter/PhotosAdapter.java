@@ -1,9 +1,7 @@
 package com.example.uhf.adapter;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.os.Handler;
-import android.os.Looper;
+import android.net.Uri;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,106 +10,108 @@ import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.uhf.R;
 
+import java.io.File;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 
+/**
+ * ✅ PhotosAdapter — عرض صور القطعة مع دعم الحذف
+ * 
+ * الميزات:
+ * - تحميل الصور عبر Glide (Async + Cache)
+ * - زر حذف على كل صورة
+ * - clearListeners() لتنظيف المراجع عند onDestroyView
+ */
 public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewHolder> {
 
-    public interface OnPhotoDeleteListener {
-        void onDelete(int position);
+    private static final String TAG = "PhotosAdapter";
+
+    // ✅ واجهة المستمع
+    public interface OnPhotoRemoveListener {
+        void onRemove(int position);
     }
 
-    private final List<String> paths;
-    private final ExecutorService executor;
-    private final OnPhotoDeleteListener deleteListener;
+    private final List<String> photoPaths;
+    private final Executor imageExecutor;
+    private OnPhotoRemoveListener onRemoveListener;
 
-    public PhotosAdapter(List<String> paths, ExecutorService executor, OnPhotoDeleteListener deleteListener) {
-        this.paths = paths;
-        this.executor = executor;
-        this.deleteListener = deleteListener;
+    public PhotosAdapter(List<String> photoPaths,
+                         Executor imageExecutor,
+                         OnPhotoRemoveListener onRemoveListener) {
+        this.photoPaths = photoPaths;
+        this.imageExecutor = imageExecutor;
+        this.onRemoveListener = onRemoveListener;
     }
 
     @NonNull
     @Override
     public PhotoViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_photo_preview, parent, false);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_photo_preview, parent, false);
         return new PhotoViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
-        String path = paths.get(position);
-        holder.imgThumbnail.setTag(path);
-        holder.imgThumbnail.setImageResource(R.drawable.ic_photo);
+        if (position < 0 || position >= photoPaths.size()) return;
 
-        executor.execute(() -> {
-            Bitmap thumbnail = decodeSampledBitmapFromFile(path, 100, 100);
-            if (thumbnail != null) {
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    if (path.equals(holder.imgThumbnail.getTag())) {
-                        holder.imgThumbnail.setImageBitmap(thumbnail);
-                    }
-                });
-            }
-        });
+        String path = photoPaths.get(position);
+        if (path == null || path.isEmpty()) return;
 
-        holder.btnDelete.setOnClickListener(v -> {
-            if (deleteListener != null) {
-                int adapterPosition = holder.getAdapterPosition();
-                if (adapterPosition != RecyclerView.NO_POSITION) {
-                    deleteListener.onDelete(adapterPosition);
-                }
+        // ✅ تحميل الصورة (يدعم المسار العادي و content://)
+        try {
+            Object source = path.startsWith("content://") ? Uri.parse(path) : new File(path);
+            Glide.with(holder.ivPhoto.getContext())
+                    .load(source)
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .placeholder(android.R.drawable.ic_menu_gallery)
+                    .error(android.R.drawable.ic_menu_report_image)
+                    .centerCrop()
+                    .into(holder.ivPhoto);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to load image: " + path, e);
+        }
+
+        // ✅ زر الحذف
+        holder.btnDeletePhoto.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
+            if (onRemoveListener != null) {
+                onRemoveListener.onRemove(pos);
             }
         });
     }
 
     @Override
     public int getItemCount() {
-        return paths.size();
+        return photoPaths != null ? photoPaths.size() : 0;
     }
 
-    private Bitmap decodeSampledBitmapFromFile(String path, int reqWidth, int reqHeight) {
-        try {
-            final BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inJustDecodeBounds = true;
-            BitmapFactory.decodeFile(path, options);
+    // ==================== ✅ دالة التنظيف ====================
 
-            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
-            options.inJustDecodeBounds = false;
-            return BitmapFactory.decodeFile(path, options);
-        } catch (Exception e) {
-            return null;
-        }
+    /**
+     * ✅ تنظيف المستمع لمنع التسريبات
+     * يُستدعى من Fragment.onDestroyView
+     */
+    public void clearListeners() {
+        this.onRemoveListener = null;
+        Log.d(TAG, "Photo listeners cleared");
     }
-    
-    
 
-    private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
-        final int height = options.outHeight;
-        final int width = options.outWidth;
-        int inSampleSize = 1;
-
-        if (height > reqHeight || width > reqWidth) {
-            final int halfHeight = height / 2;
-            final int halfWidth = width / 2;
-
-            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
-                inSampleSize *= 2;
-            }
-        }
-        return inSampleSize;
-    }
+    // ==================== ViewHolder ====================
 
     static class PhotoViewHolder extends RecyclerView.ViewHolder {
-        ImageView imgThumbnail;
-        ImageView btnDelete;
+        ImageView ivPhoto;
+        ImageView btnDeletePhoto;
 
-        public PhotoViewHolder(@NonNull View itemView) {
+        PhotoViewHolder(@NonNull View itemView) {
             super(itemView);
-            imgThumbnail = itemView.findViewById(R.id.imgThumbnail);
-            btnDelete = itemView.findViewById(R.id.btnDeletePhoto);
+            ivPhoto = itemView.findViewById(R.id.imgThumbnail);
+            btnDeletePhoto = itemView.findViewById(R.id.btnDeletePhoto);
         }
     }
 }
