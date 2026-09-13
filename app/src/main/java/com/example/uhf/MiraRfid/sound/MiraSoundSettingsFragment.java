@@ -67,12 +67,10 @@ public class MiraSoundSettingsFragment extends Fragment {
     }
 
     private void setupMasterControls() {
-        // ضبط الحالات الأولية
         switchMasterSound.setChecked(soundManager.isMasterSoundEnabled());
         switchMasterVibration.setChecked(soundManager.isMasterVibrationEnabled());
         sliderVolume.setValue(soundManager.getVolumeLevel());
 
-        // المستمعين للتغيرات الرئيسية
         switchMasterSound.setOnCheckedChangeListener((buttonView, isChecked) -> {
             soundManager.setMasterSoundEnabled(isChecked);
             if (isChecked) {
@@ -110,7 +108,7 @@ public class MiraSoundSettingsFragment extends Fragment {
     // Adapter لتوليد كروت التحكم بالحدث ودعم المعاينة والتجربة المباشرة
     // =========================================================================
 
-        private static class SoundEventAdapter extends RecyclerView.Adapter<SoundEventAdapter.EventViewHolder> {
+    private static class SoundEventAdapter extends RecyclerView.Adapter<SoundEventAdapter.EventViewHolder> {
 
         private final Context context;
         private final List<MiraSoundManager.SoundEvent> eventList;
@@ -178,7 +176,8 @@ public class MiraSoundSettingsFragment extends Fragment {
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
             spinnerTone.setLayoutParams(spinnerParams);
 
-            MaterialButton btnTest = new MaterialButton(context, null, com.google.android.material.R.attr.borderlessButtonStyle);
+            // ✅ الحل: بدون R من المكتبة
+            MaterialButton btnTest = new MaterialButton(context);
             btnTest.setId(View.generateViewId());
             btnTest.setText("🔊 معاينة");
 
@@ -192,91 +191,84 @@ public class MiraSoundSettingsFragment extends Fragment {
             return container;
         }
 
-      @Override
-public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
-    MiraSoundManager.SoundEvent event = eventList.get(position);
-
-    holder.tvName.setText(event.displayName);
-
-    // 1. إزالة المستمعين لتفادي التفعيل الوهمي
-    holder.switchSound.setOnCheckedChangeListener(null);
-    holder.switchVibe.setOnCheckedChangeListener(null);
-    holder.spinnerTone.setOnItemSelectedListener(null);
-    holder.spinnerTone.setOnTouchListener(null);
-
-    // 2. ضبط السويتشات
-    holder.switchSound.setChecked(soundManager.isEventSoundEnabled(event));
-    holder.switchSound.setOnCheckedChangeListener((btn, isChecked) -> {
-        if (btn.isPressed()) {
-            soundManager.setEventSoundEnabled(event, isChecked);
-            if (isChecked) soundManager.play(event);
-        }
-    });
-
-    holder.switchVibe.setChecked(soundManager.isEventVibrationEnabled(event));
-    holder.switchVibe.setOnCheckedChangeListener((btn, isChecked) -> {
-        if (btn.isPressed()) {
-            soundManager.setEventVibrationEnabled(event, isChecked);
-        }
-    });
-
-    // 3. خيارات النغمات
-    String[] tones = new String[]{"نغمة افتراضية", "تنبيه تأكيد", "تنبيه خطأ", "نغمة قصيرة", "تنبيه مرتفع"};
-    Integer[] toneValues = new Integer[]{
-            event.defaultTone,
-            android.media.ToneGenerator.TONE_PROP_ACK,
-            android.media.ToneGenerator.TONE_SUP_ERROR,
-            android.media.ToneGenerator.TONE_PROP_BEEP,
-            android.media.ToneGenerator.TONE_CDMA_HIGH_L
-    };
-
-    ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, tones);
-    holder.spinnerTone.setAdapter(spinnerAdapter);
-
-    int currentTone = soundManager.getEventTone(event);
-    int selectedIndex = 0;
-    for (int i = 0; i < toneValues.length; i++) {
-        if (toneValues[i] == currentTone) {
-            selectedIndex = i;
-            break;
-        }
-    }
-    
-    holder.spinnerTone.setSelection(selectedIndex, false);
-
-    // إعادة تعيين حالة التفاعل للمستخدم
-    holder.spinnerTone.setTag(false);
-
-    holder.spinnerTone.setOnTouchListener((v, eventTouch) -> {
-        v.setTag(true);
-        return false;
-    });
-
-    holder.spinnerTone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         @Override
-        public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-            Object tag = holder.spinnerTone.getTag();
-            boolean isUserTouched = tag instanceof Boolean && (Boolean) tag;
-            
-            if (isUserTouched) {
-                if (toneValues[pos] != soundManager.getEventTone(event)) {
-                    soundManager.setEventTone(event, toneValues[pos]);
+        public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
+            MiraSoundManager.SoundEvent event = eventList.get(position);
+
+            holder.tvName.setText(event.displayName);
+
+            holder.switchSound.setOnCheckedChangeListener(null);
+            holder.switchVibe.setOnCheckedChangeListener(null);
+            holder.spinnerTone.setOnItemSelectedListener(null);
+            holder.spinnerTone.setOnTouchListener(null);
+
+            holder.switchSound.setChecked(soundManager.isEventSoundEnabled(event));
+            holder.switchSound.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (btn.isPressed()) {
+                    soundManager.setEventSoundEnabled(event, isChecked);
+                    if (isChecked) soundManager.play(event);
                 }
-                // إعادة تعيين العلامة بعد المعالجة
-                holder.spinnerTone.setTag(false);
+            });
+
+            holder.switchVibe.setChecked(soundManager.isEventVibrationEnabled(event));
+            holder.switchVibe.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (btn.isPressed()) {
+                    soundManager.setEventVibrationEnabled(event, isChecked);
+                }
+            });
+
+            String[] tones = new String[]{"نغمة افتراضية", "تنبيه تأكيد", "تنبيه خطأ", "نغمة قصيرة", "تنبيه مرتفع"};
+            Integer[] toneValues = new Integer[]{
+                    event.defaultTone,
+                    android.media.ToneGenerator.TONE_PROP_ACK,
+                    android.media.ToneGenerator.TONE_SUP_ERROR,
+                    android.media.ToneGenerator.TONE_PROP_BEEP,
+                    android.media.ToneGenerator.TONE_CDMA_HIGH_L
+            };
+
+            ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, tones);
+            holder.spinnerTone.setAdapter(spinnerAdapter);
+
+            int currentTone = soundManager.getEventTone(event);
+            int selectedIndex = 0;
+            for (int i = 0; i < toneValues.length; i++) {
+                if (toneValues[i] == currentTone) {
+                    selectedIndex = i;
+                    break;
+                }
             }
+
+            holder.spinnerTone.setSelection(selectedIndex, false);
+            holder.spinnerTone.setTag(false);
+
+            holder.spinnerTone.setOnTouchListener((v, eventTouch) -> {
+                v.setTag(true);
+                return false;
+            });
+
+            holder.spinnerTone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+                    Object tag = holder.spinnerTone.getTag();
+                    boolean isUserTouched = tag instanceof Boolean && (Boolean) tag;
+
+                    if (isUserTouched) {
+                        if (toneValues[pos] != soundManager.getEventTone(event)) {
+                            soundManager.setEventTone(event, toneValues[pos]);
+                        }
+                        holder.spinnerTone.setTag(false);
+                    }
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {}
+            });
+
+            holder.btnTest.setOnClickListener(v -> {
+                int toneToPlay = soundManager.getEventTone(event);
+                soundManager.playPreview(toneToPlay, event.defaultDuration);
+            });
         }
-
-        @Override
-        public void onNothingSelected(AdapterView<?> parent) {}
-    });
-
-    // 4. زر المعاينة
-    holder.btnTest.setOnClickListener(v -> {
-        int toneToPlay = soundManager.getEventTone(event);
-        soundManager.playPreview(toneToPlay, event.defaultDuration);
-    });
-}
 
         @Override
         public int getItemCount() {
