@@ -48,6 +48,8 @@ import com.example.uhf.manager.inventory.InventorySessionManager;
 import com.example.uhf.manager.inventory.InventoryCatalogManager;
 import com.example.uhf.manager.inventory.InventoryFilterManager;
 import com.example.uhf.dialog.inventory.InventoryDialogsManager;
+import com.example.uhf.manager.inventory.InventoryPersistenceManager;
+
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -171,8 +173,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private volatile boolean isArabic = true;
     private long scanStartTime = 0;
     
-    private final AtomicBoolean isSyncing = new AtomicBoolean(false);
-    private final AtomicBoolean isCommitting = new AtomicBoolean(false);
+   
     
     // ==================== مكونات RFID ====================
     private RFIDManager rfidManager;
@@ -193,9 +194,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         "A000006", "A000007", "A000008", "A000009", "A000010"
     };
     
-    // ==================== قاعدة البيانات ====================
-    private InventoryDatabase inventoryDatabase;
-    private InventoryTransactionDao transactionDao;
     
     // ==================== تحديث الواجهة ====================
     private final Runnable uiUpdateRunnable = new Runnable() {
@@ -234,7 +232,8 @@ private InventoryAnimationHelper animationHelper;
 private InventorySessionManager sessionManager;
 private InventoryCatalogManager catalogManager;
 private InventoryFilterManager filterManager;
-private InventoryDialogsManager dialogsManager;   // ✅ جديد
+private InventoryDialogsManager dialogsManager;
+private InventoryPersistenceManager persistenceManager;   // ✅ جديد
     // ==================== معالجة زر الرجوع ====================
     private OnBackPressedCallback backPressedCallback;
     
@@ -395,6 +394,14 @@ try {
 } catch (Exception e) {
     Log.e(TAG, "DialogsManager error: " + e.getMessage());
 }
+// ✅ تهيئة PersistenceManager
+try {
+    persistenceManager = new InventoryPersistenceManager(
+            requireContext(), isArabic, backgroundExecutor);
+} catch (Exception e) {
+    Log.e(TAG, "PersistenceManager error: " + e.getMessage());
+}
+
         try { 
             initViews(view); 
         } catch (Exception e) { 
@@ -464,14 +471,10 @@ try {
      * تهيئة قاعدة البيانات بأمان
      */
     private void initDatabase() {
-        try {
-            inventoryDatabase = InventoryDatabase.getInstance(requireContext().getApplicationContext());
-            transactionDao = inventoryDatabase.inventoryTransactionDao();
-        } catch (Exception e) {
-            Log.e(TAG, "Error initializing inventory database", e);
-        }
-    }
-
+    // ✅ تم نقلها إلى InventoryPersistenceManager
+    // لا حاجة لفعل شيء هنا
+    Log.d(TAG, "initDatabase: handled by PersistenceManager");
+}
     /**
      * الحصول على معرف الجهاز بأمان
      */
@@ -1028,98 +1031,60 @@ private void cleanOldTagReads(long currentTime) {
 /**
  * حفظ المعاملة محلياً
  */
+/**
+ * ✅ حفظ المعاملة محلياً
+ */
 private void saveTransactionLocally(String epc, int rssi) {
+    if (persistenceManager == null || inventoryEngine == null) return;
+    
     try {
-        if (inventoryEngine == null || transactionDao == null) return;
+        int branchId = branchesManager != null ? 
+                branchesManager.getActiveBranchId() : 0;
         
-        InventoryTransactionEntity transaction = new InventoryTransactionEntity();
-        transaction.sessionId = inventoryEngine.getClientSessionId();
-        transaction.epcCode = epc;
-        transaction.rssi = rssi;
-        transaction.timestamp = System.currentTimeMillis();
-        transaction.deviceId = getDeviceId();
-        transaction.userId = getCurrentUserId();
-        transaction.synced = false;
-        
-        if (branchesManager != null) {
-            transaction.branchId = branchesManager.getActiveBranchId();
-        }
-        
-        if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
-            backgroundExecutor.execute(() -> {
-                try {
-                    transactionDao.insertTransaction(transaction);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error saving transaction locally", e);
-                }
-            });
-        }
+        persistenceManager.saveTransactionLocally(
+                inventoryEngine.getClientSessionId(),
+                epc,
+                rssi,
+                persistenceManager.getDeviceId(),
+                persistenceManager.getCurrentUserId(),
+                branchId
+        );
     } catch (Exception e) {
-        Log.e(TAG, "Error creating transaction entity", e);
+        Log.e(TAG, "saveTransactionLocally error: " + e.getMessage());
     }
 }
-
 /**
  * مزامنة المعاملات مع منع التزامن المتوازي
  */
+/**
+ * ✅ مزامنة المعاملات الأوفلاين
+ */
 private void syncOfflineTransactions() {
-    if (!isSyncing.compareAndSet(false, true)) {
-        return;
-    }
+    if (persistenceManager == null || apiClient == null) return;
     
-    if (backgroundExecutor == null || backgroundExecutor.isShutdown() || 
-        transactionDao == null || apiClient == null) {
-        isSyncing.set(false);
-        return;
-    }
-    
-    backgroundExecutor.execute(() -> {
-        try {
-            List<InventoryTransactionEntity> unsynced = 
-                transactionDao.getUnsyncedTransactions();
-            
-            if (unsynced.isEmpty()) {
-                isSyncing.set(false);
-                return;
+    persistenceManager.syncOfflineTransactions(apiClient, 
+            new InventoryPersistenceManager.SyncCallback() {
+        @Override
+        public void onSyncComplete(int syncedCount) {
+            if (syncedCount > 0) {
+                Log.i(TAG, "✅ Synced " + syncedCount + " transactions");
+                mainThreadHandler.post(() -> {
+                    if (isAdded() && !isFragmentDestroyed) {
+                        Toast.makeText(requireContext(),
+                                isArabic ? "✅ تمت مزامنة " + syncedCount + " معاملة" :
+                                          "✅ Synced " + syncedCount + " transactions",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
-            
-            JSONArray transactionsArray = new JSONArray();
-            List<Long> successfulIds = new ArrayList<>();
-            
-            for (InventoryTransactionEntity transaction : unsynced) {
-                try {
-                    JSONObject transactionJson = new JSONObject();
-                    transactionJson.put("session_id", transaction.sessionId);
-                    transactionJson.put("epc", transaction.epcCode);
-                    transactionJson.put("rssi", transaction.rssi);
-                    transactionJson.put("timestamp", transaction.timestamp);
-                    transactionJson.put("device_id", transaction.deviceId);
-                    transactionJson.put("user_id", transaction.userId);
-                    transactionJson.put("branch_id", transaction.branchId);
-                    
-                    transactionsArray.put(transactionJson);
-                    successfulIds.add((long) transaction.id);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error preparing transaction for sync", e);
-                }
-            }
-            
-            if (transactionsArray.length() > 0) {
-                MiraApiClient.ApiResponse response = 
-                    apiClient.syncOfflineTransactions(transactionsArray);
-                
-                if (response != null && response.isSuccess) {
-                    transactionDao.markAsSynced(successfulIds);
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error syncing offline transactions", e);
-        } finally {
-            isSyncing.set(false);
+        }
+        
+        @Override
+        public void onSyncError(String error) {
+            Log.w(TAG, "⚠️ Sync error: " + error);
         }
     });
 }
-
 /**
  * الحصول على معرف المستخدم
  */
@@ -2110,177 +2075,135 @@ private void startCategoryInventory(String category) {
     /**
      * إرسال الجرد للخادم
      */
-    private void commitInventoryToServer() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        
-        if (!isCommitting.compareAndSet(false, true)) {
-            Toast.makeText(requireContext(), 
-                isArabic ? "⏳ جاري إرسال البيانات بالفعل..." : "⏳ Already sending...", 
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        Toast.makeText(requireContext(), 
-            isArabic ? "⏳ جاري إرسال البيانات..." : "⏳ Sending...", 
-            Toast.LENGTH_SHORT).show();
-        
-        Log.d(TAG, "Commit inventory - Session: " + 
-            (inventoryEngine != null ? inventoryEngine.getClientSessionId() : "null"));
-        
-        if (backgroundExecutor == null || backgroundExecutor.isShutdown()) {
-            backgroundExecutor = Executors.newSingleThreadExecutor();
-        }
-        
-        backgroundExecutor.execute(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                
-                String sessionId = inventoryEngine != null ? 
-                    inventoryEngine.getClientSessionId() : "SESS-UNKNOWN";
-                payload.put("session_id", sessionId);
-                payload.put("client_session_id", sessionId);
-                
-                int branchId = branchesManager != null ? 
-                    branchesManager.getActiveBranchId() : 0;
-                payload.put("branch_id", branchId);
-                payload.put("location", "Main Showroom");
-                
-                int scanned = inventoryEngine != null ? 
-                    inventoryEngine.getUniqueCount() : 0;
-                int totalReads = inventoryEngine != null ? 
-                    inventoryEngine.getTotalReads() : 0;
-                
-                payload.put("expected_count", expectedCount);
-                payload.put("total_scanned", totalReads);
-                payload.put("unique_count", scanned);
-                payload.put("found_count", scanned);
-                payload.put("missing_count", Math.max(0, expectedCount - scanned));
-                payload.put("unexpected_count", 0);
-                
-                JSONArray itemsArray = new JSONArray();
-                JSONArray epcsArray = new JSONArray();
-                
-                List<ScannedItemDisplay> snapshotList;
-                synchronized (scannedItemsDisplayList) {
-                    snapshotList = new ArrayList<>(scannedItemsDisplayList);
-                }
-                
-                for (ScannedItemDisplay item : snapshotList) {
-                    JSONObject itemObj = new JSONObject();
-                    itemObj.put("code", item.epc);
-                    itemObj.put("serial", item.epc);
-                    itemObj.put("rssi", String.valueOf(item.rssi));
-                    itemsArray.put(itemObj);
-                    
-                    epcsArray.put(item.epc);
-                }
-                
-                payload.put("items", itemsArray);
-                payload.put("scanned_epcs", epcsArray);
-                
-                MiraApiClient.ApiResponse response = apiClient != null ? 
-                    apiClient.closeInventorySession(payload) : null;
-                
-                mainThreadHandler.post(() -> {
-                    if (!isAdded() || isFragmentDestroyed) {
-                        isCommitting.set(false);
-                        return;
-                    }
-                    
-                    if (response != null && response.isSuccess) {
-                        Toast.makeText(requireContext(), 
-                            isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير بنجاح" : 
-                            "✅ Inventory committed successfully", 
-                            Toast.LENGTH_LONG).show();
-                        if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-                        if (btnCommitSession != null) btnCommitSession.setEnabled(false);
-                        showCommitSuccessDialog(response);
-                    } else {
-                        String errorMsg = response != null ? response.error : "Unknown error";
-                        Log.e(TAG, "Commit failed: " + errorMsg);
-                        Toast.makeText(requireContext(), 
-                            (isArabic ? "❌ خطأ: " : "❌ Error: ") + errorMsg, 
-                            Toast.LENGTH_LONG).show();
-                    }
-                    isCommitting.set(false);
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error committing inventory", e);
-                isCommitting.set(false);
-                mainThreadHandler.post(() -> {
-                    if (isAdded() && !isFragmentDestroyed) {
-                        Toast.makeText(requireContext(), 
-                            (isArabic ? "❌ خطأ في إرسال البيانات: " : "❌ Error: ") + e.getMessage(), 
-                            Toast.LENGTH_LONG).show();
-                    }
-                });
-            }
-        });
+    /**
+ * ✅ اعتماد الجرد
+ */
+private void commitInventoryToServer() {
+    if (!isAdded() || isFragmentDestroyed) return;
+    
+    if (persistenceManager == null || inventoryEngine == null || apiClient == null) {
+        Toast.makeText(requireContext(), "⚠️ غير جاهز", Toast.LENGTH_SHORT).show();
+        return;
     }
+    
+    if (persistenceManager.isCommittingNow()) {
+        Toast.makeText(requireContext(), 
+            isArabic ? "⏳ جاري الإرسال بالفعل..." : "⏳ Already sending...", 
+            Toast.LENGTH_SHORT).show();
+        return;
+    }
+    
+    Toast.makeText(requireContext(), 
+        isArabic ? "⏳ جاري إرسال البيانات..." : "⏳ Sending...", 
+        Toast.LENGTH_SHORT).show();
+    
+    int scanned = inventoryEngine.getUniqueCount();
+    int totalReads = inventoryEngine.getTotalReads();
+    int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+    
+    persistenceManager.commitInventory(
+            inventoryEngine.getClientSessionId(),
+            branchId,
+            expectedCount,
+            totalReads,
+            scanned,
+            scannedItemsDisplayList,
+            apiClient,
+            new InventoryPersistenceManager.CommitCallback() {
+        @Override
+        public void onCommitSuccess(JSONObject report) {
+            mainThreadHandler.post(() -> {
+                if (!isAdded() || isFragmentDestroyed) return;
+                
+                Toast.makeText(requireContext(), 
+                    isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير بنجاح" : 
+                    "✅ Inventory committed successfully", 
+                    Toast.LENGTH_LONG).show();
+                
+                if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
+                if (btnCommitSession != null) btnCommitSession.setEnabled(false);
+                
+                showCommitSuccessDialog(report);
+            });
+        }
+        
+        @Override
+        public void onCommitError(String error) {
+            mainThreadHandler.post(() -> {
+                if (!isAdded() || isFragmentDestroyed) return;
+                
+                Log.e(TAG, "Commit failed: " + error);
+                Toast.makeText(requireContext(), 
+                    (isArabic ? "❌ خطأ: " : "❌ Error: ") + error, 
+                    Toast.LENGTH_LONG).show();
+            });
+        }
+    });
+}
 
     /**
      * عرض نجاح الالتزام
      */
-    private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
-        if (!isAdded() || isFragmentDestroyed || response.data == null) return;
+    /**
+ * ✅ عرض نجاح الاعتماد
+ */
+private void showCommitSuccessDialog(JSONObject report) {
+    if (!isAdded() || isFragmentDestroyed || report == null) return;
+    
+    try {
+        String accuracy = report.optString("accuracy", "0");
+        String riskLevel = report.optString("risk_level", "unknown");
+        String recommendation = report.optString("recommendation", "");
         
-        try {
-            JSONObject report = response.data.optJSONObject("report");
-            if (report == null) report = response.data;
-            
-            String accuracy = report.optString("accuracy", "0");
-            String riskLevel = report.optString("risk_level", "unknown");
-            String recommendation = report.optString("recommendation", "");
-            
-            String message = isArabic ? 
-                String.format(
-                    "✅ تم اعتماد الجرد بنجاح:\n\n" +
-                    "• الدقة: %s%%\n" +
-                    "• مستوى الخطورة: %s\n" +
-                    "• التوصية: %s",
-                    accuracy, riskLevel, recommendation
-                ) :
-                String.format(
-                    "✅ Inventory committed successfully:\n\n" +
-                    "• Accuracy: %s%%\n" +
-                    "• Risk Level: %s\n" +
-                    "• Recommendation: %s",
-                    accuracy, riskLevel, recommendation
-                );
-            
-            new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "🎉 نجاح العملية" : "🎉 Success")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "🖨️ طباعة التقرير" : "🖨️ Print Report", 
-                    (dialog, which) -> {
-                        int scanned = inventoryEngine != null ? 
-                            inventoryEngine.getUniqueCount() : 0;
-                        InventoryReport committedReport = new InventoryReport(
-                            0,
-                            inventoryEngine != null ? 
-                                inventoryEngine.getClientSessionId() : "SESS-COMMITTED",
-                            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                                .format(new Date()),
-                            expectedCount,
-                            scanned,
-                            Math.max(0, expectedCount - scanned),
-                            isArabic ? "معتمد" : "Committed"
-                        );
-                        
-                        List<ScannedItemDisplay> snapshotList;
-                        synchronized (scannedItemsDisplayList) {
-                            snapshotList = new ArrayList<>(scannedItemsDisplayList);
-                        }
-                        
-                        PrintUtils.printReportWithQRCode(requireContext(), committedReport, 
-                            snapshotList, isArabic, null);
-                    })
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing success dialog", e);
-        }
+        String message = isArabic ? 
+            String.format(
+                "✅ تم اعتماد الجرد بنجاح:\n\n" +
+                "• الدقة: %s%%\n" +
+                "• مستوى الخطورة: %s\n" +
+                "• التوصية: %s",
+                accuracy, riskLevel, recommendation
+            ) :
+            String.format(
+                "✅ Inventory committed successfully:\n\n" +
+                "• Accuracy: %s%%\n" +
+                "• Risk Level: %s\n" +
+                "• Recommendation: %s",
+                accuracy, riskLevel, recommendation
+            );
+        
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🎉 نجاح العملية" : "🎉 Success")
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "🖨️ طباعة التقرير" : "🖨️ Print Report", 
+                (dialog, which) -> {
+                    int scanned = inventoryEngine != null ? 
+                        inventoryEngine.getUniqueCount() : 0;
+                    InventoryReport committedReport = new InventoryReport(
+                        0,
+                        inventoryEngine != null ? 
+                            inventoryEngine.getClientSessionId() : "SESS-COMMITTED",
+                        new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                            .format(new Date()),
+                        expectedCount,
+                        scanned,
+                        Math.max(0, expectedCount - scanned),
+                        isArabic ? "معتمد" : "Committed"
+                    );
+                    
+                    List<ScannedItemDisplay> snapshotList;
+                    synchronized (scannedItemsDisplayList) {
+                        snapshotList = new ArrayList<>(scannedItemsDisplayList);
+                    }
+                    
+                    PrintUtils.printReportWithQRCode(requireContext(), committedReport, 
+                        snapshotList, isArabic, null);
+                })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showCommitSuccessDialog error: " + e.getMessage());
     }
+}
 
     // ==================== الأرشيف واللقطات ====================
 
@@ -2327,52 +2250,43 @@ private void startCategoryInventory(String category) {
     /**
      * جلب تقارير الأرشيف
      */
-    private List<InventoryReport> fetchArchiveReports() {
-        List<InventoryReport> reports = new ArrayList<>();
-        
-        try {
-            if (apiClient != null && branchesManager != null) {
-                int branchId = branchesManager.getActiveBranchId();
-                MiraApiClient.ApiResponse response = 
-                    apiClient.getInventoryReports(branchId, 1, 50);
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject dataObj = response.data.optJSONObject("data");
-                    JSONArray sessions = null;
-                    
-                    if (dataObj != null) {
-                        sessions = dataObj.optJSONArray("sessions");
-                    } else {
-                        sessions = response.data.optJSONArray("sessions");
-                    }
-                    
-                    if (sessions != null) {
-                        for (int i = 0; i < sessions.length(); i++) {
-                            JSONObject obj = sessions.getJSONObject(i);
-                            
-                            InventoryReport report = new InventoryReport(
-                                obj.optInt("id", i + 1),
-                                obj.optString("client_session_id", 
-                                    obj.optString("session_id", "SESS-" + (i + 1))),
-                                obj.optString("started_at", 
-                                    obj.optString("created_at", "")),
-                                obj.optInt("expected_count", 0),
-                                obj.optInt("unique_items_found", 
-                                    obj.optInt("scanned_count", 0)),
-                                obj.optInt("missing_count", 0),
-                                obj.optString("status", "completed")
-                            );
-                            reports.add(report);
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching archive reports", e);
+private List<InventoryReport> fetchArchiveReports() {
+    if (persistenceManager == null || apiClient == null || branchesManager == null) {
+        return new ArrayList<>();
+    }
+    
+    // ⚠️ ملاحظة: هذه دالة متزامنة — تُنفَّذ في backgroundExecutor
+    final List<InventoryReport>[] result = new List[1];
+    result[0] = new ArrayList<>();
+    
+    final java.util.concurrent.CountDownLatch latch = 
+            new java.util.concurrent.CountDownLatch(1);
+    
+    int branchId = branchesManager.getActiveBranchId();
+    
+    persistenceManager.fetchArchiveReports(apiClient, branchId,
+            new InventoryPersistenceManager.ArchiveCallback() {
+        @Override
+        public void onArchiveLoaded(List<InventoryReport> reports) {
+            result[0] = reports;
+            latch.countDown();
         }
         
-        return reports;
+        @Override
+        public void onArchiveError(String error) {
+            Log.e(TAG, "Archive fetch error: " + error);
+            latch.countDown();
+        }
+    });
+    
+    try {
+        latch.await(30, java.util.concurrent.TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
     }
+    
+    return result[0];
+}
     
     /**
      * عرض مربع الأرشيف
@@ -3069,7 +2983,11 @@ public void onDestroy() {
 if (catalogManager != null) {
     catalogManager.clear();
 }
-    
+
+    // ✅ تنظيف PersistenceManager
+if (persistenceManager != null) {
+    persistenceManager.cleanup();
+}
     shutdownExecutor();
     inventoryDatabase = null;
 }
