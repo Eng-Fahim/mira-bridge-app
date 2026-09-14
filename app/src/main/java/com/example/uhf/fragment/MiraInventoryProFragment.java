@@ -49,7 +49,7 @@ import com.example.uhf.manager.inventory.InventoryCatalogManager;
 import com.example.uhf.manager.inventory.InventoryFilterManager;
 import com.example.uhf.dialog.inventory.InventoryDialogsManager;
 import com.example.uhf.manager.inventory.InventoryPersistenceManager;
-
+import com.example.uhf.manager.inventory.InventoryScanController;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -233,7 +233,8 @@ private InventorySessionManager sessionManager;
 private InventoryCatalogManager catalogManager;
 private InventoryFilterManager filterManager;
 private InventoryDialogsManager dialogsManager;
-private InventoryPersistenceManager persistenceManager;   // ✅ جديد
+private InventoryPersistenceManager persistenceManager;
+private InventoryScanController scanController;   // ✅ جديد
     // ==================== معالجة زر الرجوع ====================
     private OnBackPressedCallback backPressedCallback;
     
@@ -402,6 +403,52 @@ try {
     Log.e(TAG, "PersistenceManager error: " + e.getMessage());
 }
 
+// ✅ تهيئة ScanController
+try {
+    scanController = new InventoryScanController(
+            requireContext(), isArabic, backgroundExecutor);
+    scanController.setSoundManager(soundManager);
+    scanController.setRfidManager(rfidManager);
+    scanController.setCallback(new InventoryScanController.ScanCallback() {
+        @Override
+        public void onScanStarted() {
+            // UI update handled elsewhere
+        }
+        
+        @Override
+        public void onScanStopped() {
+            // UI update handled elsewhere
+        }
+        
+        @Override
+        public void onTagRead(String normalizedEpc, int rssi) {
+            // Tag processing handled in onTagRead()
+        }
+        
+        @Override
+        public void onDuplicateTag(String epc) {
+            // Sound handled separately
+        }
+        
+        @Override
+        public void onError(String error) {
+            Log.e(TAG, "Scan error: " + error);
+        }
+        
+        @Override
+        public void onConnectionChanged(boolean isConnected) {
+            // Handled in onConnectionChanged()
+        }
+        
+        @Override
+        public void onTagDebounced(String epc) {
+            // Debounced — ignore
+        }
+    });
+} catch (Exception e) {
+    Log.e(TAG, "ScanController error: " + e.getMessage());
+}
+
         try { 
             initViews(view); 
         } catch (Exception e) { 
@@ -420,6 +467,8 @@ try {
         } catch (Exception e) {
             Log.e(TAG, "Engine error", e);
         }
+        
+        
         
         try { 
             apiClient = MiraApiClient.getInstance(requireContext()); 
@@ -2988,8 +3037,13 @@ if (catalogManager != null) {
 if (persistenceManager != null) {
     persistenceManager.cleanup();
 }
+
+// ✅ تنظيف ScanController
+if (scanController != null) {
+    scanController.cleanup();
+}
     shutdownExecutor();
-    inventoryDatabase = null;
+    
 }
     /**
      * إغلاق ExecutorService
