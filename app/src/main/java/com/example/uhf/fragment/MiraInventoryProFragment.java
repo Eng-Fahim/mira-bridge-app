@@ -46,6 +46,9 @@ import com.example.uhf.utils.RFIDCodeUtils;
 import com.example.uhf.utils.InventoryAnimationHelper;
 import com.example.uhf.manager.inventory.InventorySessionManager;
 import com.example.uhf.manager.inventory.InventoryCatalogManager;
+import com.example.uhf.manager.inventory.InventoryFilterManager;
+
+
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -321,6 +324,13 @@ try {
     catalogManager = new InventoryCatalogManager(requireContext(), isArabic);
 } catch (Exception e) {
     Log.e(TAG, "CatalogManager error: " + e.getMessage());
+}
+
+// ✅ تهيئة FilterManager
+try {
+    filterManager = new InventoryFilterManager(isArabic);
+} catch (Exception e) {
+    Log.e(TAG, "FilterManager error: " + e.getMessage());
 }
         try { 
             initViews(view); 
@@ -694,28 +704,17 @@ if (btnLiveFilter != null) {
 /**
  * ✅ عرض شريط الفلترة الحية (Chips)
  */
+/**
+ * ✅ عرض شريط الفلترة (Chips)
+ */
 private void showLiveFilterChips() {
     try {
-        if (!isAdded() || isFragmentDestroyed) return;
+        if (!isAdded() || isFragmentDestroyed || filterManager == null) return;
         
-        String[] filters = isArabic ? new String[]{
-            "📋 الكل",
-            "✅ موجود",
-            "❌ مفقود",
-            "⚠️ إضافي",
-            "🆕 جديد",
-            "📊 مكرر"
-        } : new String[]{
-            "📋 All",
-            "✅ Found",
-            "❌ Missing",
-            "⚠️ Unexpected",
-            "🆕 New",
-            "📊 Duplicate"
-        };
+        String[] filters = filterManager.getFilterOptions();
         
         new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "🔍 فلترة النتائج" : "🔍 Filter Results")
+            .setTitle(filterManager.buildFilterDialogTitle())
             .setItems(filters, (dialog, which) -> {
                 applyLiveFilter(which);
             })
@@ -725,98 +724,79 @@ private void showLiveFilterChips() {
         Log.e(TAG, "showLiveFilterChips error: " + e.getMessage());
     }
 }
-
 /**
  * ✅ تطبيق الفلتر الحي
  */
 private int currentLiveFilter = 0; // 0=All, 1=Found, 2=Missing, 3=Unexpected, 4=New, 5=Duplicate
-
+/**
+ * ✅ تطبيق الفلتر الحي
+ */
 private void applyLiveFilter(int filterType) {
     try {
-        currentLiveFilter = filterType;
+        if (filterManager == null || !isAdded() || isFragmentDestroyed) return;
         
-        List<ScannedItemDisplay> filtered;
-        synchronized (scannedItemsDisplayList) {
-            filtered = new ArrayList<>(scannedItemsDisplayList);
+        // ✅ تعيين الفلتر
+        filterManager.setCurrentFilter(filterType);
+        
+        // ✅ المفقود له سلوك خاص
+        if (filterType == InventoryFilterManager.FILTER_MISSING) {
+            showMissingItemsDialog();
+            return;
         }
         
-        switch (filterType) {
-            case 0: // All
-                break;
-            case 1: // Found (in catalog)
-                filtered.removeIf(item -> !catalogEpcs.contains(item.epc));
-                break;
-            case 2: // Missing - handled differently
-                showMissingItemsDialog();
-                return;
-            case 3: // Unexpected (not in catalog)
-                filtered.removeIf(item -> catalogEpcs.contains(item.epc));
-                break;
-            case 4: // New
-                filtered.removeIf(item -> item.count != 1);
-                break;
-            case 5: // Duplicate
-                filtered.removeIf(item -> item.count <= 1);
-                break;
-        }
+        // ✅ تطبيق الفلتر
+        List<ScannedItemDisplay> filtered = filterManager.applyFilter(
+                scannedItemsDisplayList, catalogEpcs);
         
         if (modernAdapter != null) {
             modernAdapter.submitList(filtered);
         }
         
-        String filterName = isArabic ? 
-            new String[]{"الكل", "موجود", "مفقود", "إضافي", "جديد", "مكرر"}[filterType] :
-            new String[]{"All", "Found", "Missing", "Unexpected", "New", "Duplicate"}[filterType];
-        
+        // ✅ إشعار
         Toast.makeText(requireContext(),
-            isArabic ? "🎯 الفلتر: " + filterName : "🎯 Filter: " + filterName,
-            Toast.LENGTH_SHORT).show();
-            
+                isArabic ? "🎯 الفلتر: " + filterManager.getCurrentFilterName() : 
+                          "🎯 Filter: " + filterManager.getCurrentFilterName(),
+                Toast.LENGTH_SHORT).show();
+                
     } catch (Exception e) {
         Log.e(TAG, "applyLiveFilter error: " + e.getMessage());
     }
 }
-
 /**
  * ✅ عرض القطع المفقودة (في الكتالوج لكن لم تُمسح)
  */
+/**
+ * ✅ عرض القطع المفقودة
+ */
 private void showMissingItemsDialog() {
     try {
-        if (catalogManager == null || catalogManager.isEmpty()) {
-            Toast.makeText(requireContext(),
-                isArabic ? "⚠️ لا يوجد كتالوج محمّل" : "⚠️ No catalog loaded",
-                Toast.LENGTH_SHORT).show();
+        if (filterManager == null || catalogManager == null 
+                || !isAdded() || isFragmentDestroyed) return;
+        
+        if (catalogManager.isEmpty()) {
+            Toast.makeText(requireContext(), 
+                    filterManager.buildNoCatalogMessage(), 
+                    Toast.LENGTH_SHORT).show();
             return;
         }
         
-        List<String> missingEpcs = new ArrayList<>();
-        for (String epc : catalogEpcs) {
-            if (!isScanned(epc)) {
-                missingEpcs.add(epc);
-            }
-        }
+        // ✅ الحصول على المفقودين
+        List<String> missingEpcs = filterManager.getMissingItems(
+                catalogEpcs, scannedItemsDisplayList);
         
         if (missingEpcs.isEmpty()) {
-            Toast.makeText(requireContext(),
-                isArabic ? "✅ لا توجد قطع مفقودة" : "✅ No missing items",
-                Toast.LENGTH_LONG).show();
+            Toast.makeText(requireContext(), 
+                    filterManager.buildNoMissingMessage(), 
+                    Toast.LENGTH_LONG).show();
             return;
         }
         
-        // عرض قائمة المفقودين
-        String[] missingTitles = new String[missingEpcs.size()];
-        for (int i = 0; i < missingEpcs.size(); i++) {
-            String epc = missingEpcs.get(i);
-            InventoryItem item = catalogManager != null ? catalogManager.getItemByEpc(epc) : null;
-            String title = item != null && item.getTitle() != null ? 
-                item.getTitle() : epc;
-            missingTitles[i] = "❌ " + title + "\n" + epc;
-        }
+        // ✅ بناء قائمة العرض
+        String[] missingTitles = filterManager.buildMissingItemsList(
+                missingEpcs, catalogManager.getCatalogItemsMap());
         
         new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? 
-                "❌ المفقود (" + missingEpcs.size() + ")" : 
-                "❌ Missing (" + missingEpcs.size() + ")")
+            .setTitle(filterManager.buildMissingItemsTitle(missingEpcs.size()))
             .setItems(missingTitles, null)
             .setPositiveButton(isArabic ? "موافق" : "OK", null)
             .show();
@@ -825,11 +805,14 @@ private void showMissingItemsDialog() {
         Log.e(TAG, "showMissingItemsDialog error: " + e.getMessage());
     }
 }
-
 /**
  * ✅ فحص إذا كانت القطعة ممسوحة
  */
 private boolean isScanned(String epc) {
+    if (filterManager != null) {
+        return filterManager.isItemScanned(epc, scannedItemsDisplayList);
+    }
+    
     if (epc == null) return false;
     synchronized (scannedItemsDisplayList) {
         for (ScannedItemDisplay item : scannedItemsDisplayList) {
@@ -1182,40 +1165,44 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
 /**
  * ✅ تحديث قائمة الـ Adapter باستخدام DiffUtil
  */
+/**
+ * ✅ تحديث قائمة الـ Adapter (مع الفلترة والبحث)
+ */
 private void updateAdapterList() {
-    if (modernAdapter == null || isFragmentDestroyed) return;
-    
-    List<ScannedItemDisplay> snapshot;
-    synchronized (scannedItemsDisplayList) {
-        snapshot = new ArrayList<>(scannedItemsDisplayList);
+    if (modernAdapter == null || isFragmentDestroyed || filterManager == null) {
+        return;
     }
     
-    // تطبيق الفلترة الحالية إن وجدت
-    if (currentSearchQuery != null && !currentSearchQuery.isEmpty()) {
-        List<ScannedItemDisplay> filtered = new ArrayList<>();
-        for (ScannedItemDisplay item : snapshot) {
-            if (item.epc != null && item.epc.toLowerCase().contains(currentSearchQuery)) {
-                filtered.add(item);
-            } else if (item.title != null && item.title.toLowerCase().contains(currentSearchQuery)) {
-                filtered.add(item);
-            } else if (item.karat != null && item.karat.toLowerCase().contains(currentSearchQuery)) {
-                filtered.add(item);
-            }
-        }
-        modernAdapter.submitList(filtered);
-    } else {
-        modernAdapter.submitList(snapshot);
-    }
+    // ✅ تطبيق الفلتر الحالي + البحث
+    List<ScannedItemDisplay> filtered = filterManager.applyFilter(
+            scannedItemsDisplayList, catalogEpcs);
+    
+    modernAdapter.submitList(filtered);
 }
-
 /**
  * ✅ الفلترة حسب البحث
  */
+/**
+ * ✅ الفلترة حسب البحث النصي
+ */
 private void filterItems(String query) {
-    currentSearchQuery = query != null ? query.toLowerCase().trim() : "";
-    updateAdapterList();
+    try {
+        if (filterManager == null) return;
+        
+        filterManager.setSearchQuery(query);
+        
+        // ✅ تطبيق الفلتر الكامل (نوع + بحث)
+        List<ScannedItemDisplay> filtered = filterManager.applyFilter(
+                scannedItemsDisplayList, catalogEpcs);
+        
+        if (modernAdapter != null) {
+            modernAdapter.submitList(filtered);
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "filterItems error: " + e.getMessage());
+    }
 }
-
 /**
  * ✅ عرض خيارات القطعة عند الضغط عليها
  */
@@ -2047,6 +2034,9 @@ private void applyCategoryFilter(String category, int index) {
 /**
  * ✅ بدء جرد فئوي فعلي
  */
+/**
+ * ✅ بدء جرد فئوي فعلي
+ */
 private void startCategoryInventory(String category) {
     try {
         if (isScanning || isFragmentDestroyed) return;
@@ -2061,10 +2051,6 @@ private void startCategoryInventory(String category) {
         recentTagReads.clear();
         
         isScanning = true;
-        // ✅ تحديث خلفية الشريط
-if (animationHelper != null) {
-    animationHelper.updateStatusBarBackground(statusBar, true, true);
-}
         scanStartTime = SystemClock.elapsedRealtime();
         mainThreadHandler.post(timerRunnable);
         
@@ -2080,25 +2066,28 @@ if (animationHelper != null) {
             Map<String, InventoryItem> fullCatalog = fetchCatalogFromServer();
             
             // ✅ فلترة حسب الفئة
-            Map<String, InventoryItem> filteredCatalog = new ConcurrentHashMap<>();
-            // ✅ استخدام catalogManager للفلترة
-if (catalogManager != null) {
-    filteredCatalog = catalogManager.filterByCategory(fullCatalog, selectedCategory);
-} else {
-    filteredCatalog = fullCatalog;
-}
+            Map<String, InventoryItem> filteredCatalog;
+            
+            if (catalogManager != null) {
+                filteredCatalog = catalogManager.filterByCategory(fullCatalog, selectedCategory);
+            } else {
+                filteredCatalog = fullCatalog;
+            }
+            
+            // ✅ استخدم final للإصلاح
+            final Map<String, InventoryItem> finalCatalog = filteredCatalog;
             
             mainThreadHandler.post(() -> {
                 if (!isAdded() || isFragmentDestroyed) return;
                 
                 if (inventoryEngine != null) {
-                    inventoryEngine.startSession(filteredCatalog);
+                    inventoryEngine.startSession(finalCatalog);
                 }
                 
                 catalogEpcs.clear();
-                catalogEpcs.addAll(filteredCatalog.keySet());
+                catalogEpcs.addAll(finalCatalog.keySet());
                 
-                expectedCount = filteredCatalog.size();
+                expectedCount = finalCatalog.size();
                 
                 if (tvExpectedCount != null) {
                     tvExpectedCount.setText(String.valueOf(expectedCount));
@@ -2126,7 +2115,6 @@ if (catalogManager != null) {
         isScanning = false;
     }
 }
-
 
 
     // ==================== اعتماد الجرد وإرسال البيانات ====================
@@ -3114,6 +3102,11 @@ public void onDestroyView() {
         soundManager.release();
         soundManager = null;
     }
+    
+    // ✅ إعادة تعيين الفلتر
+if (filterManager != null) {
+    filterManager.reset();
+}
     
     // ⚠️ لا تمسح القائمة هنا — تُحفظ في onPause/onDestroyView
     // المسح الكامل في onDestroy()
