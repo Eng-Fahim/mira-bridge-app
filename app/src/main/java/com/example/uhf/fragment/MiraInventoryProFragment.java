@@ -219,8 +219,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
     };
     
-    // ==================== مكونات الأعمال ====================
-    // ==================== مكونات الأعمال ====================
 // ==================== مكونات الأعمال ====================
 private MiraInventoryEngine inventoryEngine;
 private MiraApiClient apiClient;
@@ -235,7 +233,7 @@ private int lastScannedForAnimation = 0;
 private InventoryAnimationHelper animationHelper;
 private InventorySessionManager sessionManager;
 private InventoryCatalogManager catalogManager;
-    
+private InventoryFilterManager filterManager;   // ✅ جديد
     // ==================== معالجة زر الرجوع ====================
     private OnBackPressedCallback backPressedCallback;
     
