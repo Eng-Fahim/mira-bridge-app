@@ -47,8 +47,7 @@ import com.example.uhf.utils.InventoryAnimationHelper;
 import com.example.uhf.manager.inventory.InventorySessionManager;
 import com.example.uhf.manager.inventory.InventoryCatalogManager;
 import com.example.uhf.manager.inventory.InventoryFilterManager;
-
-
+import com.example.uhf.dialog.inventory.InventoryDialogsManager;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -229,11 +228,13 @@ private int expectedCount = 0;
 // ✅ Animation tracking
 private int lastScannedForAnimation = 0;
 
+
 // ==================== Managers ====================
 private InventoryAnimationHelper animationHelper;
 private InventorySessionManager sessionManager;
 private InventoryCatalogManager catalogManager;
-private InventoryFilterManager filterManager;   // ✅ جديد
+private InventoryFilterManager filterManager;
+private InventoryDialogsManager dialogsManager;   // ✅ جديد
     // ==================== معالجة زر الرجوع ====================
     private OnBackPressedCallback backPressedCallback;
     
@@ -329,6 +330,70 @@ try {
     filterManager = new InventoryFilterManager(isArabic);
 } catch (Exception e) {
     Log.e(TAG, "FilterManager error: " + e.getMessage());
+}
+
+// ✅ تهيئة DialogsManager
+try {
+    dialogsManager = new InventoryDialogsManager(requireContext(), isArabic);
+    dialogsManager.setSoundManager(soundManager);
+    dialogsManager.setCurrentPowerDbm(currentPowerDbm);
+    dialogsManager.setCallback(new InventoryDialogsManager.DialogsCallback() {
+        @Override
+        public void onPowerChanged(int newPowerDbm) {
+            currentPowerDbm = newPowerDbm;
+            applyAntennaPower(currentPowerDbm);
+            if (btnPowerControl != null) {
+                btnPowerControl.setText("⚡ " + currentPowerDbm + " dBm");
+            }
+        }
+        
+        @Override
+        public void onSessionReset() {
+            confirmResetSession();
+        }
+        
+        @Override
+        public void onBuzzerTest() {
+            // تم في Manager
+        }
+        
+        @Override
+        public void onCommitConfirmed() {
+            commitInventoryToServer();
+        }
+        
+        @Override
+        public void onPrintCurrentReport() {
+            printCurrentReport();
+        }
+        
+        @Override
+        public void onPrintSingleItem(ScannedItemDisplay item) {
+            printSingleItemLabel(item);
+        }
+        
+        @Override
+        public void onItemStatusChange(ScannedItemDisplay item, String newStatus) {
+            updateItemStatus(item.epc, newStatus);
+        }
+        
+        @Override
+        public void onItemDamageRegister(ScannedItemDisplay item, String damageType) {
+            registerItemDamage(item.epc, damageType);
+        }
+        
+        @Override
+        public void onShowArchive() {
+            showArchiveReports();
+        }
+        
+        @Override
+        public void onShowSnapshots() {
+            // قيد التطوير
+        }
+    });
+} catch (Exception e) {
+    Log.e(TAG, "DialogsManager error: " + e.getMessage());
 }
         try { 
             initViews(view); 
@@ -1205,52 +1270,10 @@ private void filterItems(String query) {
  * ✅ عرض خيارات القطعة عند الضغط عليها
  */
 private void showItemOptionsDialog(ScannedItemDisplay item) {
-    if (!isAdded() || isFragmentDestroyed || item == null) return;
-    
-    String[] options = isArabic ? new String[]{
-        "✏️ تعديل الحالة",
-        "⚠️ تسجيل تلف",
-        "📍 تحديث الموقع",
-        "📝 إضافة ملاحظات",
-        "🖨️ طباعة الملصق",
-        "🔍 تفاصيل كاملة"
-    } : new String[]{
-        "✏️ Edit Status",
-        "⚠️ Register Damage",
-        "📍 Update Location",
-        "📝 Add Notes",
-        "🖨️ Print Label",
-        "🔍 Full Details"
-    };
-    
-    new MaterialAlertDialogBuilder(requireContext())
-        .setTitle(item.epc)
-        .setItems(options, (dialog, which) -> {
-            switch (which) {
-                case 0: showEditStatusDialog(item); break;
-                case 1: showDamageDialog(item); break;
-                case 2: 
-                    Toast.makeText(requireContext(), 
-                        isArabic ? "📍 قيد التطوير" : "📍 In development", 
-                        Toast.LENGTH_SHORT).show();
-                    break;
-                case 3: 
-                    Toast.makeText(requireContext(), 
-                        isArabic ? "📝 قيد التطوير" : "📝 In development", 
-                        Toast.LENGTH_SHORT).show();
-                    break;
-                case 4:
-                    printSingleItemLabel(item);
-                    break;
-                case 5:
-                    showItemFullDetails(item);
-                    break;
-            }
-        })
-        .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-        .show();
+    if (dialogsManager != null) {
+        dialogsManager.showItemOptionsDialog(item);
+    }
 }
-
 /**
  * طباعة ملصق قطعة واحدة
  */
@@ -1280,28 +1303,10 @@ private void printSingleItemLabel(ScannedItemDisplay item) {
  * عرض التفاصيل الكاملة للقطعة
  */
 private void showItemFullDetails(ScannedItemDisplay item) {
-    if (!isAdded() || isFragmentDestroyed) return;
-    
-    StringBuilder sb = new StringBuilder();
-    sb.append("📋 ").append(isArabic ? "تفاصيل القطعة" : "Item Details").append("\n\n");
-    sb.append("🔖 EPC: ").append(item.epc).append("\n");
-    sb.append("📝 ").append(isArabic ? "الاسم: " : "Title: ").append(item.title).append("\n");
-    sb.append("💎 ").append(isArabic ? "العيار: " : "Karat: ").append(item.karat).append("\n");
-    sb.append("⚖️ ").append(isArabic ? "الوزن: " : "Weight: ")
-      .append(String.format(Locale.US, "%.2f g", item.weight)).append("\n");
-    sb.append("💰 ").append(isArabic ? "السعر: " : "Price: ")
-      .append(String.format(Locale.US, "$%.2f", item.price)).append("\n");
-    sb.append("🔢 ").append(isArabic ? "مرات القراءة: " : "Read Count: ").append(item.count).append("\n");
-    sb.append("📶 RSSI: ").append(item.rssi).append(" dBm\n");
-    sb.append("⏰ ").append(isArabic ? "آخر قراءة: " : "Last Read: ").append(item.time);
-    
-    new MaterialAlertDialogBuilder(requireContext())
-        .setTitle(isArabic ? "تفاصيل القطعة" : "Item Details")
-        .setMessage(sb.toString())
-        .setPositiveButton(isArabic ? "موافق" : "OK", null)
-        .show();
+    if (dialogsManager != null) {
+        dialogsManager.showItemFullDetails(item);
+    }
 }
-
 /**
  * تحديث الوزن والقيمة الإجمالية
  */
@@ -1333,43 +1338,51 @@ private void updateTotalWeightAndValue() {
  * تحديث حالة العنصر
  */
 private void showEditStatusDialog(ScannedItemDisplay item) {
-    String[] statuses = isArabic ? 
-        new String[]{"متوفر", "محجوز", "قيد الصيانة", "غير متوفر"} :
-        new String[]{"Available", "Reserved", "Maintenance", "Unavailable"};
-    
-    new MaterialAlertDialogBuilder(requireContext())
-        .setTitle((isArabic ? "تعديل حالة - " : "Edit status - ") + item.epc)
-        .setItems(statuses, (dialog, which) -> {
-            String newStatus = statuses[which];
-            updateItemStatus(item.epc, newStatus);
-            if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-            Toast.makeText(requireContext(), 
-                (isArabic ? "تم تحديث الحالة: " : "Status updated: ") + newStatus, 
-                Toast.LENGTH_SHORT).show();
-        })
-        .show();
+    if (dialogsManager != null) {
+        dialogsManager.showEditStatusDialog(item);
+    }
 }
 
 /**
  * عرض حوار التلف
  */
 private void showDamageDialog(ScannedItemDisplay item) {
-    String[] damageTypes = isArabic ?
-        new String[]{"خدش بسيط", "كسر", "فقدان جزء", "تلف كامل"} :
-        new String[]{"Minor scratch", "Breakage", "Lost part", "Complete damage"};
-    
-    new MaterialAlertDialogBuilder(requireContext())
-        .setTitle((isArabic ? "تسجيل تلف - " : "Register damage - ") + item.epc)
-        .setItems(damageTypes, (dialog, which) -> {
-            String damageType = damageTypes[which];
-            registerItemDamage(item.epc, damageType);
-            if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.ERROR);
-            Toast.makeText(requireContext(), 
-                (isArabic ? "تم تسجيل التلف: " : "Damage registered: ") + damageType, 
-                Toast.LENGTH_SHORT).show();
-        })
-        .show();
+    if (dialogsManager != null) {
+        dialogsManager.showDamageDialog(item);
+    }
 }
+/**
+ * ✅ طباعة التقرير الحالي
+ */
+private void printCurrentReport() {
+    try {
+        if (inventoryEngine == null) return;
+        
+        int scanned = inventoryEngine.getUniqueCount();
+        int missing = Math.max(0, expectedCount - scanned);
+        
+        InventoryReport currentReport = new InventoryReport(
+            0,
+            inventoryEngine.getClientSessionId(),
+            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()),
+            expectedCount,
+            scanned,
+            missing,
+            isArabic ? "جارية" : "In progress"
+        );
+        
+        List<ScannedItemDisplay> snapshotList;
+        synchronized (scannedItemsDisplayList) {
+            snapshotList = new ArrayList<>(scannedItemsDisplayList);
+        }
+        
+        PrintUtils.printReportWithQRCode(requireContext(), currentReport, 
+            snapshotList, isArabic, null);
+    } catch (Exception e) {
+        Log.e(TAG, "printCurrentReport error: " + e.getMessage());
+    }
+}
+
 
 /**
  * تحديث حالة العنصر (placeholder للتوسع المستقبلي)
@@ -1887,51 +1900,11 @@ public void stopScanning() {
  * عرض BottomSheet للتحكم بقدرة الهوائي
  */
 private void showPowerControlSheet() {
-    if (!isAdded() || isFragmentDestroyed) return;
-    
-    try {
-        BottomSheetDialog dialog = new BottomSheetDialog(
-            requireContext(), R.style.LuxuryBottomSheetDialog);
-        
-        View sheetView = getLayoutInflater().inflate(
-            R.layout.bottom_sheet_power_control, null);
-        dialog.setContentView(sheetView);
-        
-        Slider sliderPower = sheetView.findViewById(R.id.sliderPower);
-        TextView tvPowerValue = sheetView.findViewById(R.id.tvPowerValue);
-        MaterialButton btnApply = sheetView.findViewById(R.id.btnApplyPower);
-        
-        if (sliderPower != null) {
-            sliderPower.setValue(currentPowerDbm);
-            
-            sliderPower.addOnChangeListener((slider, value, fromUser) -> {
-                currentPowerDbm = (int) value;
-                if (tvPowerValue != null) {
-                    tvPowerValue.setText(currentPowerDbm + " dBm");
-                }
-            });
-        }
-        
-        if (tvPowerValue != null) {
-            tvPowerValue.setText(currentPowerDbm + " dBm");
-        }
-        
-        if (btnApply != null) {
-            btnApply.setOnClickListener(v -> {
-                applyAntennaPower(currentPowerDbm);
-                if (btnPowerControl != null) {
-                    btnPowerControl.setText("⚡ " + currentPowerDbm + " dBm");
-                }
-                dialog.dismiss();
-            });
-        }
-        
-        dialog.show();
-    } catch (Exception e) {
-        Log.e(TAG, "Error showing power sheet", e);
+    if (dialogsManager != null) {
+        dialogsManager.setCurrentPowerDbm(currentPowerDbm);
+        dialogsManager.showPowerControlSheet();
     }
 }
-
 /**
  * تطبيق قدرة الهوائي
  */
@@ -2120,52 +2093,19 @@ private void startCategoryInventory(String category) {
     /**
      * عرض تأكيد الالتزام
      */
-    private void showCommitConfirmationDialog() {
-        if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
-        if (permissionManager != null && 
-            !(permissionManager.canEdit("inventory") || permissionManager.isManager())) {
-            showAccessDenied();
-            return;
-        }
-        
-        int scanned = inventoryEngine.getUniqueCount();
-        int missing = Math.max(0, expectedCount - scanned);
-
-        String message = isArabic ? 
-            String.format("📊 ملخص عمليات الجرد:\n\n• المتوقع: %d\n• الممسوح: %d\n• المفقود: %d\n\nهل تريد اعتماد العملية وإرسالها لقاعدة البيانات؟",
-                expectedCount, scanned, missing) :
-            String.format("📊 Inventory Summary:\n\n• Expected: %d\n• Scanned: %d\n• Missing: %d\n\nDo you want to commit and send to database?",
-                expectedCount, scanned, missing);
-
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "حفظ واكتمال الجرد" : "Save and Complete Inventory")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "إرسال واعتماد" : "Send and Commit", 
-                    (dialog, which) -> commitInventoryToServer())
-                .setNeutralButton(isArabic ? "🖨️ طباعة التقرير الحالي" : "🖨️ Print current report", 
-                    (dialog, which) -> {
-                        InventoryReport currentReport = new InventoryReport(
-                            0,
-                            inventoryEngine.getClientSessionId(),
-                            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                                .format(new Date()),
-                            expectedCount,
-                            scanned,
-                            missing,
-                            isArabic ? "جارية" : "In progress"
-                        );
-                        
-                        List<ScannedItemDisplay> snapshotList;
-                        synchronized (scannedItemsDisplayList) {
-                            snapshotList = new ArrayList<>(scannedItemsDisplayList);
-                        }
-                        
-                        PrintUtils.printReportWithQRCode(requireContext(), currentReport, 
-                            snapshotList, isArabic, null);
-                    })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                .show();
+  private void showCommitConfirmationDialog() {
+    if (dialogsManager == null || inventoryEngine == null) return;
+    
+    if (permissionManager != null && 
+        !(permissionManager.canEdit("inventory") || permissionManager.isManager())) {
+        showAccessDenied();
+        return;
     }
+    
+    int scanned = inventoryEngine.getUniqueCount();
+    dialogsManager.setExpectedCount(expectedCount);
+    dialogsManager.showCommitConfirmationDialog(scanned);
+}
 
     /**
      * إرسال الجرد للخادم
@@ -3217,84 +3157,17 @@ public boolean isCurrentlyScanning() {
  * ✅ حوار إعدادات الجلسة
  */
 private void showSessionSettingsDialog() {
-    try {
-        if (!isAdded() || isFragmentDestroyed) return;
-        
-        String[] options = isArabic ? new String[]{
-            "⏱️ مهلة الجلسة: 5 دقائق",
-            "📊 عدد المتوقع: " + expectedCount,
-            "🔊 تفعيل الصوت: نعم",
-            "🎯 وضع القراءة: Fast",
-            "🔄 إعادة تعيين الجلسة"
-        } : new String[]{
-            "⏱️ Session Timeout: 5 min",
-            "📊 Expected Count: " + expectedCount,
-            "🔊 Buzzer: Enabled",
-            "🎯 Read Mode: Fast",
-            "🔄 Reset Session"
-        };
-        
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "⚙️ إعدادات جلسة الجرد" : "⚙️ Session Settings")
-                .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0:
-                            Toast.makeText(requireContext(), 
-                                isArabic ? "⏱️ قيد التطوير" : "⏱️ In development", 
-                                Toast.LENGTH_SHORT).show();
-                            break;
-                        case 4:
-                            confirmResetSession();
-                            break;
-                        default:
-                            Toast.makeText(requireContext(), 
-                                isArabic ? "قيد التطوير" : "In development", 
-                                Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
-    } catch (Exception e) {
-        Log.e(TAG, "showSessionSettingsDialog error: " + e.getMessage());
+    if (dialogsManager != null) {
+        dialogsManager.setExpectedCount(expectedCount);
+        dialogsManager.showSessionSettingsDialog();
     }
 }
-
 /**
  * ✅ حوار إعدادات Buzzer
  */
 private void showBuzzerSettingsDialog() {
-    try {
-        if (!isAdded() || isFragmentDestroyed) return;
-        
-        String[] options = isArabic ? new String[]{
-            "🔊 تشغيل/إيقاف الصوت",
-            "🎵 تغيير نغمة النجاح",
-            "⚠️ تغيير نغمة الخطأ",
-            "📢 اختبار الصوت"
-        } : new String[]{
-            "🔊 Toggle Buzzer",
-            "🎵 Change Success Sound",
-            "⚠️ Change Error Sound",
-            "📢 Test Buzzer"
-        };
-        
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "🔊 إعدادات الصوت" : "🔊 Buzzer Settings")
-                .setItems(options, (dialog, which) -> {
-                    if (which == 3) {
-                        if (soundManager != null) {
-                            soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-                        }
-                    } else {
-                        Toast.makeText(requireContext(), 
-                            isArabic ? "قيد التطوير" : "In development", 
-                            Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
-    } catch (Exception e) {
-        Log.e(TAG, "showBuzzerSettingsDialog error: " + e.getMessage());
+    if (dialogsManager != null) {
+        dialogsManager.showBuzzerSettingsDialog();
     }
 }
 
