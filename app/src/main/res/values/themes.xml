@@ -3,14 +3,17 @@
 
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
 
+        <!-- 🔗 ربط مكونات Material 3 الرئيسية -->
         <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
         <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
         <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
         <item name="textInputStyle">@style/AppTextInputStyle</item>
 
+        <!-- 🔤 الخطوط -->
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
 
+        <!-- 🔤 أوزان Typography -->
         <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplaySmall">@style/AppTextAppearance</item>
@@ -27,12 +30,15 @@
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
+        <!-- ✅ إجبار المكونات (نفس الموجود في الداكن) -->
+        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
         <item name="buttonStyle">@style/AppButtonStyle</item>
         <item name="radioButtonStyle">@style/AppRadioButtonStyle</item>
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
 
+        <!-- 🎨 لوحة الألوان الفاخرة للوضع الفاتح (Enterprise Gold & Light Slate) -->
         <item name="colorPrimary">#B8860B</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#FFF6E5</item>
@@ -43,26 +49,45 @@
         <item name="colorSecondaryContainer">#F1F5F9</item>
         <item name="colorOnSecondaryContainer">#0F172A</item>
 
+        <item name="colorTertiary">#D4AF37</item>
+        <item name="colorOnTertiary">#FFFFFF</item>
+        <item name="colorTertiaryContainer">#FEF9E7</item>
+        <item name="colorOnTertiaryContainer">#3D2A00</item>
+
+        <item name="colorError">#DC2626</item>
+        <item name="colorOnError">#FFFFFF</item>
+        <item name="colorErrorContainer">#FEE2E2</item>
+        <item name="colorOnErrorContainer">#7F1D1D</item>
+
+        <!-- 🖼️ خلفية فاتحة فاخرة -->
         <item name="android:colorBackground">#F8F9FA</item>
         <item name="colorOnBackground">#0F172A</item>
 
+        <!-- 🗂️ الأسطح والبطاقات -->
         <item name="colorSurface">#FFFFFF</item>
         <item name="colorOnSurface">#0F172A</item>
         <item name="colorSurfaceVariant">#F1F3F5</item>
         <item name="colorOnSurfaceVariant">#475569</item>
+        <item name="colorSurfaceContainer">#F8FAFC</item>
+        <item name="colorSurfaceContainerHigh">#F1F5F9</item>
+        <item name="colorSurfaceContainerHighest">#E2E8F0</item>
 
+        <!-- 🔲 الحدود والإطارات -->
         <item name="colorOutline">#E2E8F0</item>
         <item name="colorOutlineVariant">#CBD5E1</item>
 
+        <!-- ✅ توحيد النوافذ الحوارية -->
         <item name="android:alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="alertDialogTheme">@style/MiraDialogTheme</item>
         <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
+    <!-- ==================== تحويل الستايلات التابعة ==================== -->
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
     <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
     <style name="AppTheme" parent="Theme.Uhfuartdemo" />
 
+    <!-- ==================== SplashTheme للوضع الفاتح ==================== -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_background_gradient</item>
         <item name="android:windowFullscreen">true</item>
@@ -75,6 +100,7 @@
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
+    <!-- ==================== MiraDialogTheme للوضع الفاتح ==================== -->
     <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
         <item name="android:backgroundDimAmount">0.5</item>
@@ -116,7 +142,8 @@
         <item name="android:textSize">14sp</item>
     </style>
 
-    <style name="MiraBottomSheetDialogTheme" parent="Theme.Material3.DayNight.BottomSheetDialog">
+    <!-- ==================== BottomSheet للوضع الفاتح ==================== -->
+    <style name="MiraBottomSheetDialogTheme" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/MiraBottomSheetStyle</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
@@ -134,6 +161,7 @@
         <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
+    <!-- ==================== الأنماط المساعدة للوضع الفاتح ==================== -->
     <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -154,6 +182,11 @@
         <item name="android:textFontWeight">700</item>
     </style>
 
+    <style name="AppTextViewStyle" parent="Widget.AppCompat.TextView">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
+
     <style name="AppButtonStyle" parent="Widget.Material3.Button">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -161,12 +194,12 @@
         <item name="cornerRadius">12dp</item>
     </style>
 
-    <style name="AppRadioButtonStyle" parent="Widget.Material3.CompoundButton.RadioButton">
+    <style name="AppRadioButtonStyle" parent="Widget.AppCompat.CompoundButton.RadioButton">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <style name="AppCheckBoxStyle" parent="Widget.Material3.CompoundButton.CheckBox">
+    <style name="AppCheckBoxStyle" parent="Widget.AppCompat.CompoundButton.CheckBox">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
@@ -180,6 +213,14 @@
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textFontWeight">700</item>
+    </style>
+
+    <style name="CustomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">#252196F3</item>
+        <item name="android:width">48dp</item>
+        <item name="android:height">32dp</item>
+        <item name="marginHorizontal">4dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
     </style>
 
     <style name="AppTextInputStyle" parent="Widget.Material3.TextInputLayout.OutlinedBox">
