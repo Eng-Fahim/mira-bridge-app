@@ -10,7 +10,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 
 import com.example.uhf.R;
-import com.example.uhf.manager.MiraApiClient;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.InventoryReport;
 import com.example.uhf.model.ScannedItemDisplay;
