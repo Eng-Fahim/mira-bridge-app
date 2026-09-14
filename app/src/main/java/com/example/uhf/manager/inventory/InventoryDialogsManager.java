@@ -463,4 +463,3 @@ public class InventoryDialogsManager {
         }
     }
 }
-}
