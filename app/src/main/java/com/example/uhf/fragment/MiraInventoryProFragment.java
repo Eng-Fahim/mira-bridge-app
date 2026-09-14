@@ -911,7 +911,9 @@ public void onTagRead(String epc, int rssi) {
     // ✅ تحقق من الـ session ID لمنع القراءات القديمة
     // (اختياري — فقط إذا كنت ترى تأخيراً)
     
-    final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(epc, barcodeToEpcMap);
+    final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(epc, 
+        catalogManager != null ? catalogManager.getBarcodeToEpcMap() : 
+                new java.util.concurrent.ConcurrentHashMap<>());
     final int finalRssi = rssi;
     
     // ✅ إذا كنا في وضع الجرد الفئوي، تجاهل الوسوم غير المطابقة
@@ -3044,7 +3046,7 @@ public void onResume() {
         
         // ✅ استرجاع الجلسة السابقة إذا وُجدت
         if (scannedItemsDisplayList.isEmpty() && !isScanning) {
-            mainThreadHandler.postDelayed(this::restorePreviousSession, 600);
+            mainThreadHandler.postDelayed(this::checkAndRestoreSession, 600);
         }
         
     } catch (Exception e) {
@@ -3057,9 +3059,13 @@ public void onPause() {
     super.onPause();
     try {
         // ✅ حفظ الجلسة قبل الإيقاف
-        if (isScanning || !scannedItemsDisplayList.isEmpty()) {
-            saveCurrentSession();
-        }
+        // ✅ حفظ الجلسة قبل الإيقاف
+if (isScanning || !scannedItemsDisplayList.isEmpty()) {
+    if (sessionManager != null) {
+        sessionManager.saveSession(expectedCount, scanStartTime, 
+                selectedCategoryFilter, scannedItemsDisplayList);
+    }
+}
         
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setActiveInventoryFragment(null);
@@ -3072,13 +3078,16 @@ public void onPause() {
 @Override
 public void onDestroyView() {
     try {
-        // ✅ حفظ الجلسة قبل التدمير
-        if (isScanning || !scannedItemsDisplayList.isEmpty()) {
-            saveCurrentSession();
+    // ✅ حفظ الجلسة قبل التدمير
+    if (isScanning || !scannedItemsDisplayList.isEmpty()) {
+        if (sessionManager != null) {
+            sessionManager.saveSession(expectedCount, scanStartTime, 
+                    selectedCategoryFilter, scannedItemsDisplayList);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "save on destroy error: " + e.getMessage());
     }
+} catch (Exception e) {
+    Log.e(TAG, "save on destroy error: " + e.getMessage());
+}
     
     if (backPressedCallback != null) {
         backPressedCallback.remove();
@@ -3320,7 +3329,10 @@ private void confirmResetSession() {
                     }
                     
                     // ✅ امسح الجلسة المحفوظة أيضاً
-                    clearSavedSession();
+                    // ✅ امسح الجلسة المحفوظة
+if (sessionManager != null) {
+    sessionManager.clearSession();
+}
                     
                     // ✅ إعادة تعيين الواجهة
                     expectedCount = 0;
