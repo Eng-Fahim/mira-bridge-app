@@ -109,7 +109,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private TextView tvScannedCount;
     private TextView tvExpectedCount;
     // ==================== Animation Helper ====================
-    private InventoryAnimationHelper animationHelper;
+    
     // ==================== Status Header ====================
     private View statusDot;
     private View statusBar;
@@ -142,9 +142,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private ImageView btnClearSearch;
     private ImageView btnLiveFilter;  // ✅ جديد
     
-    // ==================== Catalog Manager ====================
-    private InventoryCatalogManager catalogManager;
-    
+ 
     // ==================== RecyclerView ====================
     private RecyclerView rvInventoryItems;
     private ModernScannedItemsAdapter modernAdapter;
@@ -219,22 +217,26 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     };
     
     // ==================== مكونات الأعمال ====================
-    private MiraInventoryEngine inventoryEngine;
-    private MiraApiClient apiClient;
-    private MiraBranchesManager branchesManager;
-    private PermissionManager permissionManager;
-    private int expectedCount = 0;
-    // ✅ Animation tracking
-    private int lastScannedForAnimation = 0;
+    // ==================== مكونات الأعمال ====================
+// ==================== مكونات الأعمال ====================
+private MiraInventoryEngine inventoryEngine;
+private MiraApiClient apiClient;
+private MiraBranchesManager branchesManager;
+private PermissionManager permissionManager;
+private int expectedCount = 0;
+
+// ✅ Animation tracking
+private int lastScannedForAnimation = 0;
+
+// ==================== Managers ====================
+private InventoryAnimationHelper animationHelper;
+private InventorySessionManager sessionManager;
+private InventoryCatalogManager catalogManager;
     
     // ==================== معالجة زر الرجوع ====================
     private OnBackPressedCallback backPressedCallback;
     
-    // ==================== Session Persistence ====================
-private static final String PREFS_INVENTORY = "inventory_session";
-private static final String KEY_SESSION_DATA = "session_data";
-private static final String KEY_SESSION_TIME = "session_time";
-private static final long SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 دقيقة
+   
     // ==================== Factory Methods ====================
     
     public static MiraInventoryProFragment newInstance() {
@@ -297,19 +299,29 @@ private static final long SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 دقيقة
         } catch (Exception e) { 
             Log.e(TAG, "Sound: " + e.getMessage()); 
         }
-        // ✅ تهيئة CatalogManager
+        
+        // ==================== تهيئة Managers ====================
+
+// ✅ تهيئة AnimationHelper
+try {
+    animationHelper = new InventoryAnimationHelper(isArabic);
+} catch (Exception e) {
+    Log.e(TAG, "AnimationHelper error: " + e.getMessage());
+}
+
+// ✅ تهيئة SessionManager
+try {
+    sessionManager = new InventorySessionManager(requireContext(), isArabic);
+} catch (Exception e) {
+    Log.e(TAG, "SessionManager error: " + e.getMessage());
+}
+
+// ✅ تهيئة CatalogManager
 try {
     catalogManager = new InventoryCatalogManager(requireContext(), isArabic);
 } catch (Exception e) {
     Log.e(TAG, "CatalogManager error: " + e.getMessage());
 }
-        // ✅ تهيئة AnimationHelper
-        try {
-        animationHelper = new InventoryAnimationHelper(isArabic);
-        } catch (Exception e) {
-        Log.e(TAG, "AnimationHelper error: " + e.getMessage());
-        }
-        
         try { 
             initViews(view); 
         } catch (Exception e) { 
