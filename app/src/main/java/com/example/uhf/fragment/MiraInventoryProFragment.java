@@ -45,6 +45,7 @@ import com.example.uhf.utils.PrintUtils;
 import com.example.uhf.utils.RFIDCodeUtils;
 import com.example.uhf.utils.InventoryAnimationHelper;
 import com.example.uhf.manager.inventory.InventorySessionManager;
+import com.example.uhf.manager.inventory.InventoryCatalogManager;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -139,7 +140,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     // ==================== Search ====================
     private EditText etSearchItems;
     private ImageView btnClearSearch;
-private ImageView btnLiveFilter;  // ✅ جديد
+    private ImageView btnLiveFilter;  // ✅ جديد
+    
+    // ==================== Catalog Manager ====================
+    private InventoryCatalogManager catalogManager;
     
     // ==================== RecyclerView ====================
     private RecyclerView rvInventoryItems;
@@ -157,9 +161,6 @@ private ImageView btnLiveFilter;  // ✅ جديد
     private final Set<String> catalogEpcs = 
         Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<String, Long> recentTagReads = new ConcurrentHashMap<>();
-    private final Map<String, InventoryItem> catalogItemsMap = new ConcurrentHashMap<>();
-    private final Map<String, String> barcodeToEpcMap = new ConcurrentHashMap<>();
-    private final Map<String, String> epcToBarcodeMap = new ConcurrentHashMap<>();
     
     // ==================== إدارة الخيوط ====================
     private ExecutorService backgroundExecutor;
@@ -296,6 +297,12 @@ private static final long SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 دقيقة
         } catch (Exception e) { 
             Log.e(TAG, "Sound: " + e.getMessage()); 
         }
+        // ✅ تهيئة CatalogManager
+try {
+    catalogManager = new InventoryCatalogManager(requireContext(), isArabic);
+} catch (Exception e) {
+    Log.e(TAG, "CatalogManager error: " + e.getMessage());
+}
         // ✅ تهيئة AnimationHelper
         try {
         animationHelper = new InventoryAnimationHelper(isArabic);
@@ -763,7 +770,7 @@ private void applyLiveFilter(int filterType) {
  */
 private void showMissingItemsDialog() {
     try {
-        if (catalogItemsMap.isEmpty()) {
+        if (catalogManager == null || catalogManager.isEmpty()) {
             Toast.makeText(requireContext(),
                 isArabic ? "⚠️ لا يوجد كتالوج محمّل" : "⚠️ No catalog loaded",
                 Toast.LENGTH_SHORT).show();
@@ -788,7 +795,7 @@ private void showMissingItemsDialog() {
         String[] missingTitles = new String[missingEpcs.size()];
         for (int i = 0; i < missingEpcs.size(); i++) {
             String epc = missingEpcs.get(i);
-            InventoryItem item = catalogItemsMap.get(epc);
+            InventoryItem item = catalogManager != null ? catalogManager.getItemByEpc(epc) : null;
             String title = item != null && item.getTitle() != null ? 
                 item.getTitle() : epc;
             missingTitles[i] = "❌ " + title + "\n" + epc;
@@ -1102,7 +1109,8 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
             double weight = 0;
             double price = 0;
 
-            InventoryItem catalogItem = catalogItemsMap.get(epc);
+            InventoryItem catalogItem = catalogManager != null ? 
+        catalogManager.getItemByEpc(epc) : null;
             
             if (catalogItem != null) {
                 title = catalogItem.getTitle() != null && !catalogItem.getTitle().isEmpty() 
@@ -1703,85 +1711,46 @@ private void loadCatalogAndStart() {
 /**
  * جلب الكتالوج من الخادم مع بناء الخريطة العكسية
  */
+/**
+ * ✅ جلب الكتالوج من الخادم باستخدام CatalogManager
+ */
 private Map<String, InventoryItem> fetchCatalogFromServer() {
-    Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
-    
-    try {
-        if (apiClient == null || branchesManager == null) {
-            return catalog;
-        }
-        
-        int branchId = branchesManager.getActiveBranchId();
-        MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
-        
-        if (response != null && response.isSuccess && response.data != null) {
-            JSONArray items = response.data.optJSONArray("items");
-            
-            if (items == null) {
-                JSONObject dataObj = response.data.optJSONObject("data");
-                if (dataObj != null) {
-                    items = dataObj.optJSONArray("items");
-                }
-            }
-            
-            if (items != null) {
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject obj = items.getJSONObject(i);
-                    
-                    String gtin13 = obj.optString("gtin13", "").trim();
-                    String serialNumber = obj.optString("serial_number", "").trim();
-                    String epcCode = obj.optString("epc", obj.optString("rfid_epc", "")).trim();
-                    
-                    String title = obj.optString("item_title", 
-                        obj.optString("title", isArabic ? "قطعة ذهبية" : "Gold Item"));
-                    String karat = obj.optString("gold_karat", 
-                        obj.optString("karat", "21K"));
-                    double weight = obj.optDouble("gross_weight_grams", 
-                        obj.optDouble("weight", 0));
-                    double price = obj.optDouble("retail_price_usd", 
-                        obj.optDouble("retail_price", obj.optDouble("price", 0)));
-                    
-                    String primaryEpc;
-                    if (!epcCode.isEmpty()) {
-                        primaryEpc = epcCode.toUpperCase();
-                    } else if (!serialNumber.isEmpty()) {
-                        primaryEpc = serialNumber.toUpperCase();
-                    } else if (!gtin13.isEmpty()) {
-                        primaryEpc = "EAN13:" + gtin13;
-                    } else {
-                        continue;
-                    }
-                    
-                    String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(primaryEpc, barcodeToEpcMap);
-                    
-                    InventoryItem item = new InventoryItem(
-                        normalizedEpc, gtin13, serialNumber, title, karat
-                    );
-                    item.setWeight(weight);
-                    item.setPrice(price);
-                    
-                    catalog.put(normalizedEpc, item);
-                    catalogItemsMap.put(normalizedEpc, item);
-                    
-                    if (!gtin13.isEmpty()) {
-                        barcodeToEpcMap.put(gtin13, normalizedEpc);
-                        epcToBarcodeMap.put(normalizedEpc, gtin13);
-                    }
-                    if (!serialNumber.isEmpty()) {
-                        barcodeToEpcMap.put(serialNumber, normalizedEpc);
-                        epcToBarcodeMap.put(normalizedEpc, serialNumber);
-                    }
-                    if (!epcCode.isEmpty()) {
-                        barcodeToEpcMap.put(epcCode.toUpperCase(), normalizedEpc);
-                    }
-                }
-            }
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Error fetching catalog from server", e);
+    if (catalogManager == null) {
+        return new ConcurrentHashMap<>();
     }
     
-    return catalog;
+    // ملاحظة: هذه دالة متزامنة (synchronous).
+    // استخدم fetchCatalogAsync للاستدعاء اللاتزامني.
+    final Map<String, InventoryItem>[] resultHolder = new Map[1];
+    resultHolder[0] = new ConcurrentHashMap<>();
+    
+    final java.util.concurrent.CountDownLatch latch = 
+        new java.util.concurrent.CountDownLatch(1);
+    
+    catalogManager.fetchCatalog(apiClient, branchesManager, 
+        new InventoryCatalogManager.CatalogCallback() {
+            @Override
+            public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
+                resultHolder[0] = catalog;
+                latch.countDown();
+            }
+            
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Catalog fetch error: " + error);
+                latch.countDown();
+            }
+        });
+    
+    // ✅ انتظر حتى 30 ثانية
+    try {
+        latch.await(30, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+        Log.e(TAG, "fetchCatalogFromServer interrupted");
+        Thread.currentThread().interrupt();
+    }
+    
+    return resultHolder[0];
 }
 
 /**
@@ -2098,12 +2067,12 @@ if (animationHelper != null) {
             
             // ✅ فلترة حسب الفئة
             Map<String, InventoryItem> filteredCatalog = new ConcurrentHashMap<>();
-            for (Map.Entry<String, InventoryItem> entry : fullCatalog.entrySet()) {
-                InventoryItem item = entry.getValue();
-                if (item != null && matchesCategory(item, selectedCategory)) {
-                    filteredCatalog.put(entry.getKey(), item);
-                }
-            }
+            // ✅ استخدام catalogManager للفلترة
+if (catalogManager != null) {
+    filteredCatalog = catalogManager.filterByCategory(fullCatalog, selectedCategory);
+} else {
+    filteredCatalog = fullCatalog;
+}
             
             mainThreadHandler.post(() -> {
                 if (!isAdded() || isFragmentDestroyed) return;
@@ -2144,59 +2113,6 @@ if (animationHelper != null) {
     }
 }
 
-/**
- * ✅ فحص إذا كانت القطعة تنتمي للفئة المطلوبة
- */
-private boolean matchesCategory(InventoryItem item, String category) {
-    if (item == null || category == null) return false;
-    
-    String itemKarat = item.getKarat();
-    if (itemKarat == null) itemKarat = "";
-    itemKarat = itemKarat.toUpperCase().trim();
-    
-    String cat = category.trim();
-    
-    // ✅ مطابقة العيار
-    if (cat.equals("عيار 24") || cat.equalsIgnoreCase("24K")) {
-        return itemKarat.equals("24K") || itemKarat.equals("24");
-    }
-    if (cat.equals("عيار 22") || cat.equalsIgnoreCase("22K")) {
-        return itemKarat.equals("22K") || itemKarat.equals("22");
-    }
-    if (cat.equals("عيار 21") || cat.equalsIgnoreCase("21K")) {
-        return itemKarat.equals("21K") || itemKarat.equals("21");
-    }
-    if (cat.equals("عيار 18") || cat.equalsIgnoreCase("18K")) {
-        return itemKarat.equals("18K") || itemKarat.equals("18");
-    }
-    if (cat.equals("عيار 14") || cat.equalsIgnoreCase("14K")) {
-        return itemKarat.equals("14K") || itemKarat.equals("14");
-    }
-    
-    // ✅ مطابقة الفئات الأخرى
-    if (cat.equals("سبائك") || cat.equalsIgnoreCase("Bullion")) {
-        return itemKarat.contains("BULLION") || itemKarat.contains("BAR");
-    }
-    if (cat.equals("أونصة") || cat.equalsIgnoreCase("Ounce")) {
-        return itemKarat.contains("OUNCE") || itemKarat.contains("OZ");
-    }
-    if (cat.equals("فضة") || cat.equalsIgnoreCase("Silver")) {
-        return itemKarat.contains("SILVER") || itemKarat.contains("AG");
-    }
-    if (cat.equals("ألماس") || cat.equalsIgnoreCase("Diamond")) {
-        return itemKarat.contains("DIAMOND") || itemKarat.contains("DIA");
-    }
-    if (cat.equals("أخرى") || cat.equalsIgnoreCase("Other")) {
-        // أي شيء لا ينتمي للفئات السابقة
-        return !itemKarat.matches("^(24K|22K|21K|18K|14K|24|22|21|18|14)$")
-            && !itemKarat.contains("BULLION")
-            && !itemKarat.contains("OUNCE")
-            && !itemKarat.contains("SILVER")
-            && !itemKarat.contains("DIAMOND");
-    }
-    
-    return false;
-}
 
 
     // ==================== اعتماد الجرد وإرسال البيانات ====================
@@ -3197,9 +3113,10 @@ public void onDestroy() {
     }
     recentTagReads.clear();
     catalogEpcs.clear();
-    catalogItemsMap.clear();
-    barcodeToEpcMap.clear();
-    epcToBarcodeMap.clear();
+    // ✅ مسح الكتالوج عبر Manager
+if (catalogManager != null) {
+    catalogManager.clear();
+}
     
     shutdownExecutor();
     inventoryDatabase = null;
