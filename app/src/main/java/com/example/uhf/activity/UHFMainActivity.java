@@ -276,29 +276,40 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
      * ✅ إدارة سلوك الكيبورد على مستوى التطبيق
      */
     private void setupKeyboardBehavior() {
-        try {
-            final View rootView = findViewById(android.R.id.content);
-            if (rootView == null) return;
+    try {
+        final View rootView = findViewById(android.R.id.content);
+        if (rootView == null) return;
 
-            ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-                Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
-                boolean isKeyboardVisible = imeInsets.bottom > 0;
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+            Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
+            boolean isKeyboardVisible = imeInsets.bottom > 0;
 
-                View bottomNavContainer = findViewById(R.id.bottomNavContainer);
-                if (bottomNavContainer != null) {
-                    bottomNavContainer.setVisibility(
-                            isKeyboardVisible ? View.GONE : View.VISIBLE
-                    );
-                }
+            // ✅ إخفاء BottomNav
+            View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+            if (bottomNavContainer != null) {
+                bottomNavContainer.setVisibility(
+                        isKeyboardVisible ? View.GONE : View.VISIBLE
+                );
+            }
 
-                return insets;
-            });
+            // ✅ تعديل ارتفاع fragment_container
+            View fragmentContainer = findViewById(R.id.fragment_container);
+            if (fragmentContainer != null) {
+                fragmentContainer.setPadding(
+                    fragmentContainer.getPaddingLeft(),
+                    fragmentContainer.getPaddingTop(),
+                    fragmentContainer.getPaddingRight(),
+                    isKeyboardVisible ? 8 : 90   // ← تقليل padding عند الكيبورد
+                );
+            }
 
-        } catch (Exception e) {
-            Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage(), e);
-        }
+            return insets;
+        });
+
+    } catch (Exception e) {
+        Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage(), e);
     }
-
+}
     // ==================== التولبار الثانوي الديناميكي ====================
 
     private void setupSecondaryToolbar() {
