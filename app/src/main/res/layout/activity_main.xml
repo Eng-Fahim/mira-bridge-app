@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout 
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorSurface"
+    android:fitsSystemWindows="false"
     tools:context=".activity.UHFMainActivity">
 
-    <!-- 1. TOOLBAR / APP BAR -->
+    <!-- ==================== 1. TOOLBAR / APP BAR ==================== -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
@@ -16,7 +19,7 @@
         android:background="?attr/colorPrimaryContainer"
         app:elevation="2dp">
 
-        <!-- الشريط الرئيسي (ثابت في كل الواجهات) -->
+        <!-- الشريط الرئيسي -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
@@ -78,10 +81,9 @@
                         android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
-
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- الشريط الثانوي (ديناميكي حسب الواجهة) -->
+        <!-- الشريط الثانوي -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
@@ -92,49 +94,23 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- 2. MAIN CONTENT -->
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <!-- ==================== 2. حاوية الفراغمنت (تأخذ المساحة المتبقية) ==================== -->
+    <!-- ✅ layout_weight=1 تجعلها تتمدد لتملأ المساحة المتاحة -->
+    <!-- ✅ عند ظهور الكيبورد مع adjustResize، هذه الحاوية تتقلص تلقائياً -->
+    <FrameLayout
+        android:id="@+id/fragment_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="90dp" />
 
-        <FrameLayout
-            android:id="@+id/fragment_container"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:clipToPadding="false"
-            android:paddingBottom="90dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <FrameLayout
-            android:id="@+id/successOverlayMain"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:alpha="0.5"
-            android:background="?attr/colorOnSurface"
-            android:clickable="true"
-            android:focusable="true"
-            android:visibility="gone">
-
-            <com.google.android.material.progressindicator.CircularProgressIndicator
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:indeterminate="true"
-                app:indicatorColor="?attr/colorPrimary" />
-        </FrameLayout>
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <!-- 3+4. FLOATING NAV + FAB -->
+    <!-- ==================== 3. BottomNav + FAB (أسفل Fragment) ==================== -->
+    <!-- ✅ عند ظهور الكيبورد، تُدفع للأعلى مع باقي الواجهة أو تُخفى -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
         android:layoutDirection="locale"
         android:clipToPadding="false"
         android:paddingHorizontal="20dp"
@@ -181,4 +157,23 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+    <!-- ==================== 4. Overlay التحميل (فوق كل شيء) ==================== -->
+    <FrameLayout
+        android:id="@+id/successOverlayMain"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.5"
+        android:background="?attr/colorOnSurface"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            app:indicatorColor="?attr/colorPrimary" />
+    </FrameLayout>
+
+</LinearLayout>
