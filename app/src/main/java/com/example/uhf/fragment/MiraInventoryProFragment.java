@@ -734,45 +734,69 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
 @Override
 public void onTagRead(String epc, int rssi) {
+    onTagReadInternal(epc, rssi, false);
+}
+
+/**
+ * ✅ دالة داخلية موحّدة
+ * @param fromCatalog  true = EPC جاهز من الكتالوج (لا يحتاج تحويل)
+ */
+private void onTagReadInternal(String epc, int rssi, boolean fromCatalog) {
     if (!isScanning || isFragmentDestroyed || epc == null || epc.isEmpty()) return;
-    
+
     try {
-        final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(epc,
-                catalogManager != null ? catalogManager.getBarcodeToEpcMap() :
-                        new ConcurrentHashMap<>());
+        final String normalizedEpc;
+
+        if (fromCatalog) {
+            // ✅ EPC جاهز → استخدمه مباشرة
+            normalizedEpc = epc;
+        } else {
+            // ✅ من قارئ RFID → يحتاج تحويل
+            normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(epc,
+                    catalogManager != null ? catalogManager.getBarcodeToEpcMap() :
+                            new ConcurrentHashMap<>());
+        }
+
+        Log.d(TAG, "📖 EPC: " + epc
+                + " | normalized: " + normalizedEpc
+                + " | fromCatalog: " + fromCatalog
+                + " | catalogSize: " + catalogEpcs.size()
+                + " | inCatalog: " + catalogEpcs.contains(normalizedEpc));
+
         final int finalRssi = rssi;
-        
-        // ✅ تجاهل الوسوم خارج الفئة المختارة
+
+        // ✅ تجاهل خارج الفئة (مع حماية إذا كانت الكتالوج فارغة)
         if (selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty()
+                && !catalogEpcs.isEmpty()
                 && !catalogEpcs.contains(normalizedEpc)) {
+            Log.w(TAG, "⛔ Ignored (out of category): " + normalizedEpc);
             return;
         }
-        
+
         // ✅ Debounce
         long currentTime = System.currentTimeMillis();
         Long lastReadTime = recentTagReads.get(normalizedEpc);
-        
+
         if (lastReadTime != null && (currentTime - lastReadTime) < TAG_READ_DEBOUNCE_MS) {
             return;
         }
-        
+
         recentTagReads.put(normalizedEpc, currentTime);
         if (recentTagReads.size() > MAX_CACHE_ITEMS) {
             cleanOldTagReads(currentTime);
         }
-        
-        // ✅ معالجة غير متزامنة
+
         if (backgroundExecutor == null || backgroundExecutor.isShutdown()) {
             backgroundExecutor = Executors.newSingleThreadExecutor();
         }
-        
+
         backgroundExecutor.execute(() -> {
             try {
                 if (inventoryEngine != null) {
                     inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
                 }
                 saveTransactionLocally(normalizedEpc, finalRssi);
-                
+
                 mainThreadHandler.post(() -> {
                     if (!isFragmentDestroyed && isAdded()) {
                         addScannedItemToDisplay(normalizedEpc, finalRssi, null);
@@ -785,7 +809,7 @@ public void onTagRead(String epc, int rssi) {
             }
         });
     } catch (Exception e) {
-        Log.e(TAG, "onTagRead error: " + e.getMessage());
+        Log.e(TAG, "onTagReadInternal error: " + e.getMessage());
     }
 }
 
@@ -1404,6 +1428,14 @@ private void startScanning() {
         recentTagReads.clear();
         lastScannedForAnimation = 0;
         
+        // ✅✅✅ مسح الكتالوج القديم
+catalogEpcs.clear();
+expectedCount = 0;
+
+if (tvExpectedCount != null) tvExpectedCount.setText("—");
+if (tvProgressPercent != null) tvProgressPercent.setText("—");
+
+
         // ✅ تعيين الحالة
         isScanning = true;
         scanStartTime = SystemClock.elapsedRealtime();
@@ -1494,59 +1526,99 @@ private void startBlindInventory() {
 
 private void loadCatalogAndStart() {
     if (!isAdded() || isFragmentDestroyed) return;
-    
+
+    // ✅ تحديث apiClient
+    try {
+        MiraApiClient.reloadInstance(requireContext());
+        apiClient = MiraApiClient.getInstance(requireContext());
+    } catch (Exception e) {
+        Log.e(TAG, "apiClient reload error: " + e.getMessage());
+    }
+
     Toast.makeText(requireContext(),
             isArabic ? "🔄 جاري تحميل البيانات..." : "🔄 Loading data...",
             Toast.LENGTH_SHORT).show();
-    
+
     if (catalogManager == null) {
-        Log.e(TAG, "catalogManager is null");
+        Log.e(TAG, "❌ catalogManager is null");
         isScanning = false;
         return;
     }
-    
-    // ✅ استخدام callback بدل CountDownLatch
+
+    // ✅ Timeout
+    final java.util.concurrent.atomic.AtomicBoolean responded =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    mainThreadHandler.postDelayed(() -> {
+        if (!responded.get() && isScanning && isAdded() && !isFragmentDestroyed) {
+            Log.e(TAG, "⏱️ TIMEOUT - catalog not loaded in 15s");
+            Toast.makeText(requireContext(),
+                    isArabic ? "⚠️ انتهت المهلة" : "⚠️ Timeout",
+                    Toast.LENGTH_LONG).show();
+            startReadingSource();
+        }
+    }, 15000);
+
     catalogManager.fetchCatalog(apiClient, branchesManager,
             new InventoryCatalogManager.CatalogCallback() {
         @Override
         public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
+            responded.set(true);
+
             mainThreadHandler.post(() -> {
                 if (!isAdded() || isFragmentDestroyed) return;
-                
+
                 try {
-                    Map<String, InventoryItem> finalCatalog = 
+                    Map<String, InventoryItem> finalCatalog =
                             catalog != null ? catalog : new ConcurrentHashMap<>();
-                    
+
+                    Log.d(TAG, "✅ onCatalogLoaded: " + finalCatalog.size() + " items");
+
+                    if (finalCatalog.isEmpty()) {
+                        Log.e(TAG, "❌❌❌ CATALOG IS EMPTY - using fallback");
+                        Toast.makeText(requireContext(),
+                                isArabic ? "⚠️ الكتالوج فارغ - وضع المحاكاة الافتراضي" :
+                                        "⚠️ Catalog empty - fallback simulation",
+                                Toast.LENGTH_LONG).show();
+                    }
+
                     if (inventoryEngine != null) {
                         inventoryEngine.startSession(finalCatalog);
                     }
-                    
+
                     catalogEpcs.clear();
                     catalogEpcs.addAll(finalCatalog.keySet());
-                    
                     expectedCount = finalCatalog.size();
-                    
+
+                    // ✅ اطبع العينات
+                    int count = 0;
+                    Log.d(TAG, "📋 Catalog EPCs (first 10):");
+                    for (String k : catalogEpcs) {
+                        Log.d(TAG, "   [" + count + "] " + k);
+                        if (++count >= 10) break;
+                    }
+
                     if (tvExpectedCount != null) {
                         tvExpectedCount.setText(String.valueOf(expectedCount));
                     }
-                    
                     if (progressScanned != null) {
                         progressScanned.setMax(100);
                         progressScanned.setProgress(0);
                     }
-                    
                     if (tvProgressPercent != null) {
                         tvProgressPercent.setText("0%");
                     }
-                    
-                    // ✅ تحديث ScanController
+
                     if (scanController != null) {
                         scanController.setCatalogEpcs(catalogEpcs);
                         scanController.setInventoryEngine(inventoryEngine);
                     }
-                    
-                    Log.d(TAG, "✅ Catalog loaded: " + expectedCount + " items");
-                    
+
+                    Toast.makeText(requireContext(),
+                            isArabic ? "✅ تم تحميل " + expectedCount + " قطعة" :
+                                    "✅ Loaded " + expectedCount + " items",
+                            Toast.LENGTH_SHORT).show();
+
                     startReadingSource();
                 } catch (Exception e) {
                     Log.e(TAG, "onCatalogLoaded error: " + e.getMessage(), e);
@@ -1554,33 +1626,33 @@ private void loadCatalogAndStart() {
                 }
             });
         }
-        
+
         @Override
         public void onError(String error) {
+            responded.set(true);
+
             mainThreadHandler.post(() -> {
                 if (!isAdded() || isFragmentDestroyed) return;
-                
-                Log.e(TAG, "Catalog fetch error: " + error);
-                
+
+                Log.e(TAG, "❌ Catalog error: " + error);
+
                 Toast.makeText(requireContext(),
-                        isArabic ? "⚠️ فشل تحميل الكتالوج: " + error :
-                                "⚠️ Failed to load catalog: " + error,
+                        isArabic ? "⚠️ فشل: " + error : "⚠️ Failed: " + error,
                         Toast.LENGTH_LONG).show();
-                
-                // ✅ متابعة بالجرد بدون كتالوج
+
                 expectedCount = 0;
                 if (tvExpectedCount != null) tvExpectedCount.setText("0");
                 catalogEpcs.clear();
-                
+
                 if (inventoryEngine != null) {
                     inventoryEngine.startSession(new ConcurrentHashMap<>());
                 }
-                
+
                 if (scanController != null) {
                     scanController.setCatalogEpcs(catalogEpcs);
                     scanController.setInventoryEngine(inventoryEngine);
                 }
-                
+
                 startReadingSource();
             });
         }
@@ -1938,35 +2010,41 @@ private void startCategoryInventory(String category) {
 
 private void startSimulationLoop() {
     simulationIndex = 0;
-    
+
     simulationRunnable = new Runnable() {
         @Override
         public void run() {
             if (!isScanning || isFragmentDestroyed) return;
-            
+
             String epc;
-            
+            boolean fromCatalog = false;
+
             if (expectedCount > 0 && !catalogEpcs.isEmpty()) {
                 List<String> epcList = new ArrayList<>(catalogEpcs);
                 epc = epcList.get(simulationIndex % epcList.size());
+                fromCatalog = true;
+                Log.d(TAG, "🎯 Simulation from catalog: " + epc);
             } else {
                 epc = simulationTags[simulationIndex % simulationTags.length];
+                Log.w(TAG, "⚠️ Simulation fallback tag: " + epc 
+                        + " (catalogSize=" + catalogEpcs.size() + ")");
             }
-            
+
             int rssi = -40 - (int) (Math.random() * 40);
-            
-            onTagRead(epc, rssi);
-            
+
+            // ✅ استخدم الدالة الداخلية
+            onTagReadInternal(epc, rssi, fromCatalog);
+
             simulationIndex++;
             long delay = SIMULATION_MIN_DELAY_MS +
                     (long) (Math.random() * SIMULATION_MAX_ADDITIONAL_DELAY_MS);
-            
+
             if (isScanning && !isFragmentDestroyed) {
                 simulationHandler.postDelayed(this, delay);
             }
         }
     };
-    
+
     simulationHandler.postDelayed(simulationRunnable, SIMULATION_INITIAL_DELAY_MS);
 }
 
