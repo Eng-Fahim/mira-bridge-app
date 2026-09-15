@@ -2238,7 +2238,7 @@ private void stopSimulationLoop() {
     
     // ==================== Archive ====================
     
-    private void showArchiveReports() {
+    public void showArchiveReports() {
         if (!isAdded() || isFragmentDestroyed) return;
         
         AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
@@ -2280,6 +2280,28 @@ private void stopSimulationLoop() {
             }
         });
     }
+    
+    /**
+ * ✅ نسخة عامة من showArchiveReports للاستدعاء من UHFMainActivity
+ */
+public void showArchiveReportsPublic() {
+    if (!isAdded() || isFragmentDestroyed) {
+        Log.w(TAG, "showArchiveReportsPublic: fragment not attached");
+        return;
+    }
+    
+    // ✅ تحقق من وجود context صالح
+    if (getContext() == null) {
+        Log.e(TAG, "showArchiveReportsPublic: context is null");
+        return;
+    }
+    
+    try {
+        showArchiveReports();
+    } catch (Exception e) {
+        Log.e(TAG, "showArchiveReportsPublic error: " + e.getMessage(), e);
+    }
+}
     
     private List<InventoryReport> fetchArchiveReports() {
     if (persistenceManager == null || apiClient == null || branchesManager == null) {
