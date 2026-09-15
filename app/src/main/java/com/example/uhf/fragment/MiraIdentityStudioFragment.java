@@ -628,7 +628,7 @@ private void activateRFIDModeForEncoding() {
                 // ✅ المرحلة 1: قراءة TID + التحقق من مخزون SunlandRFID
                 miraExecutor.getBackgroundExecutor().execute(() -> {
                     MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
-                    final String tid = rfidService.readTid("00000000");
+                    final String tid = rfidService.readTid(null);
                     final boolean isSim = rfidService.isSimulationMode();
 
                     // ✅ التحقق من أن الشريحة معتمدة
@@ -718,17 +718,40 @@ private void stopRfidScanningMode() {
 
 public void onRfidScanned(String epc) {
     if (!isAdded() || getActivity() == null) return;
-    final String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
+    final String normalizedEpc = epc != null ? 
+            epc.trim().toUpperCase(Locale.US) : "";
 
     miraExecutor.getBackgroundExecutor().execute(() -> {
+        // ✅ قراءة TID + التحقق من مخزون SunlandRFID
+        MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
+        final String tid = rfidService.readTid(null);  // ✅ null
+        final boolean isSim = rfidService.isSimulationMode();
+        
+        boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(tid);
         boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedEpc);
+
         safeRun(() -> {
             if (binding == null) return;
+            
+            // ✅ تحقق أول: شريحة معتمدة
+            if (!isTagAllowed) {
+                playErrorSound();
+                showErrorDialog(
+                    isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
+                    isArabic ? "هذه الشريحة (TID: " + tid + ") غير مسجلة." :
+                               "This tag (TID: " + tid + ") is not authorized."
+                );
+                stopRfidScanningMode();
+                return;
+            }
+            
+            // ✅ تحقق ثاني: عدم التكرار
             if (isDuplicate) {
                 playErrorSound();
                 showErrorDialog(
                     isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag",
-                    isArabic ? "هذه الشريحة مسجلة بالفعل." : "This tag is already registered."
+                    isArabic ? "هذه الشريحة مسجلة بالفعل." : 
+                               "This tag is already registered."
                 );
                 stopRfidScanningMode();
                 return;
@@ -1022,11 +1045,11 @@ private void finalizeItemIdentity() {
         final int currentUserId = getCurrentUserId();
 
         MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
-        final String tid = rfidService.readTid("00000000");
+        final String tid = rfidService.readTid(null);
         final boolean isSim = rfidService.isSimulationMode();
 
         // ✅ كلمة المرور الافتراضية للشريحة (بديل null)
-        final String DEFAULT_PWD = "00000000";
+        //final String DEFAULT_PWD = "00000000";
 
         // ==================== 4) إرسال البيانات للسيرفر ====================
         miraExecutor.getBackgroundExecutor().execute(() -> {
@@ -1111,13 +1134,13 @@ private void finalizeItemIdentity() {
                 Log.i(TAG, "🎯 Generated new EPC: " + newEpc + " (from mira_id=" + miraId + ")");
 
                 // ──────── 6.1: كتابة EPC ────────
-                boolean writeOk = rfidService.writeEpc(newEpc, DEFAULT_PWD);
+                boolean writeOk = rfidService.writeEpc(newEpc, null);
                 boolean alreadyEncoded = false;
 
                 // ✅ اكتشاف الشرائح المبرمجة مسبقاً (Pre-encoded)
                 if (!writeOk) {
                     Log.w(TAG, "⚠️ writeEpc failed — checking if tag is pre-encoded...");
-                    String existingEpc = rfidService.readEpc(DEFAULT_PWD);
+                    String existingEpc = rfidService.readEpc(null);
                     if (existingEpc != null && !existingEpc.trim().isEmpty()) {
                         Log.i(TAG, "✅ Tag is pre-encoded with EPC: " + existingEpc);
                         newEpc = existingEpc.trim().toUpperCase(Locale.US);
@@ -1129,7 +1152,7 @@ private void finalizeItemIdentity() {
                 }
 
                 // ──────── 6.2: التحقق من الكتابة ────────
-                boolean verifyOk = writeOk && rfidService.verifyWrite(newEpc, DEFAULT_PWD);
+                boolean verifyOk = writeOk && rfidService.verifyWrite(newEpc, null);
                 if (verifyOk) {
                     Log.i(TAG, "✅ verifyWrite OK — EPC confirmed on tag: " + newEpc);
                 } else if (writeOk) {
@@ -1139,7 +1162,7 @@ private void finalizeItemIdentity() {
                 // ──────── 6.3: قفل EPC Bank ────────
                 boolean lockOk = false;
                 if (verifyOk && !alreadyEncoded) {
-                    lockOk = rfidService.setTagLockState(DEFAULT_PWD, 1, true);
+                    lockOk = rfidService.setTagLockState(null, 1, true);
                     if (lockOk) {
                         Log.i(TAG, "🔒 EPC Bank locked successfully");
                     } else {
@@ -1460,6 +1483,35 @@ private void finalizeItemIdentity() {
         showToast(isArabic ? "❌ خطأ في فتح السجل" : "❌ Error opening log");
     }
 }
+
+private void openRfidSettings() {
+    try {
+        if (!isAdded() || getActivity() == null) return;
+
+        FragmentManager fm = getParentFragmentManager();
+        if (fm.isStateSaved()) return;
+        if (fm.findFragmentByTag("rfid_settings_tag") != null) return;
+
+        MiraRfidSettingsFragment settingsFragment = new MiraRfidSettingsFragment();
+
+        View view = getView();
+        int cid = (view != null && view.getParent() instanceof View)
+                ? ((View) view.getParent()).getId()
+                : android.R.id.content;
+
+        fm.beginTransaction()
+                .setReorderingAllowed(true)
+                .setCustomAnimations(
+                        android.R.anim.fade_in, android.R.anim.fade_out,
+                        android.R.anim.fade_in, android.R.anim.fade_out)
+                .replace(cid, settingsFragment, "rfid_settings_tag")
+                .addToBackStack("rfid_settings")
+                .commit();
+    } catch (Exception e) {
+        Log.e(TAG, "openRfidSettings error: " + e.getMessage(), e);
+    }
+}
+
 
     /**
      * ✅ جدولة مزامنة تلقائية بعد حفظ Offline
