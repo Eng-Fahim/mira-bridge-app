@@ -11,13 +11,13 @@ import android.util.Log;
 
 /**
  * نظام إدارة الأصوات والاهتزازات المركزية لمنظومة Mira Smart Systems.
- * يدعم تخصيص الأصوات لكل حدث في النظام بشكل مستقل مع التخزين الداخلي.
  *
- * ✅ محسّن لـ:
- *  - Thread-Safety (synchronized على ToneGenerator)
- *  - منع تسريب الموارد (release قبل إعادة التهيئة)
+ * ✅ يدعم:
+ *  - ToneGenerator (نغمات جاهزة)
+ *  - Thread-Safety
+ *  - منع تسريب الموارد
  *  - Reset to defaults
- *  - Fallback للنغمات غير المدعومة
+ *  - Fallback آمن
  */
 public class MiraSoundManager {
 
@@ -42,9 +42,8 @@ public class MiraSoundManager {
     /** ✅ قفل لحماية ToneGenerator من الوصول المتزامن */
     private final Object toneLock = new Object();
 
-    /**
-     * مصفوفة الأحداث والخصائص المتاحة في كامل النظام
-     */
+    // ==================== الأحداث ====================
+
     public enum SoundEvent {
         // أحداث النظام والتسجيل
         LOGIN_SUCCESS("sys_login_success", "تسجيل الدخول الناجح",
@@ -53,40 +52,66 @@ public class MiraSoundManager {
                 ToneGenerator.TONE_PROP_BEEP2, 300, new long[]{0, 100, 100, 100}),
         LOGOUT("sys_logout", "تسجيل الخروج",
                 ToneGenerator.TONE_PROP_NACK, 200, new long[]{0, 50}),
+        SESSION_EXPIRED("sys_session_expired", "انتهاء الجلسة",
+                ToneGenerator.TONE_PROP_NACK, 250, new long[]{0, 80, 80}),
+        ACCOUNT_LOCKED("sys_account_locked", "قفل الحساب",
+                ToneGenerator.TONE_SUP_ERROR, 500, new long[]{0, 200, 100, 200}),
 
         // عمليات الجرد و RFID
         TAG_READ_NEW("rfid_tag_new", "قراءة عنصر جديد (RFID)",
                 ToneGenerator.TONE_PROP_BEEP, 80, new long[]{0, 30}),
         TAG_READ_DUPLICATE("rfid_tag_dup", "قراءة عنصر مكرر",
                 ToneGenerator.TONE_CDMA_KEYPAD_VOLUME_KEY_LITE, 40, new long[]{}),
+        TAG_READ_UNKNOWN("rfid_tag_unknown", "قراءة عنصر غير معروف",
+                ToneGenerator.TONE_PROP_BEEP2, 120, new long[]{0, 50, 50}),
         SCAN_STARTED("rfid_scan_start", "بدء مسح الجرد",
                 ToneGenerator.TONE_CDMA_PIP, 100, new long[]{0, 40}),
         SCAN_STOPPED("rfid_scan_stop", "إيقاف مسح الجرد",
                 ToneGenerator.TONE_PROP_BEEP, 150, new long[]{0, 80}),
+        SCAN_COMPLETED("rfid_scan_complete", "اكتمال الجرد",
+                ToneGenerator.TONE_CDMA_CONFIRM, 300, new long[]{0, 100, 80, 100}),
 
-        // عمليات المبيعات (Mira Lite)
+        // عمليات المبيعات
         SALE_SUCCESS("sale_success", "إتمام عملية بيع بنجاح",
                 ToneGenerator.TONE_PROP_ACK, 250, new long[]{0, 60, 40, 60}),
         SALE_FAILED("sale_failed", "فشل أو إلغاء البيع",
                 ToneGenerator.TONE_SUP_ERROR, 400, new long[]{0, 150, 50, 150}),
 
-        // عمليات التوكيد والتحقق (Tawkid)
+        // التوكيد والتحقق
         TAWKID_VERIFIED("tawkid_verified", "توكيد ومطابقة ناجحة",
                 ToneGenerator.TONE_CDMA_CONFIRM, 200, new long[]{0, 80, 40, 80}),
         TAWKID_REJECTED("tawkid_rejected", "رفض التوكيد أو عدم تطابق",
                 ToneGenerator.TONE_SUP_BUSY, 350, new long[]{0, 200}),
 
-        // عمليات البحث والاستعلام
+        // البحث
         SEARCH_FOUND("search_found", "العثور على نتيجة البحث",
                 ToneGenerator.TONE_PROP_BEEP, 100, new long[]{0, 40}),
         SEARCH_NOT_FOUND("search_not_found", "لم يتم العثور على نتائج",
                 ToneGenerator.TONE_SUP_RADIO_NOTAVAIL, 250, new long[]{0, 100}),
 
-        // التنبيهات العامة والأخطاء
+        // الأمان
+        SECURITY_BREACH("security_breach", "🚨 اختراق أمني",
+                ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 800,
+                new long[]{0, 200, 100, 200, 100, 200}),
+        SOLD_ITEM_DETECTED("security_sold_item", "💰 قطعة مبيعة تم اكتشافها",
+                ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 600,
+                new long[]{0, 150, 50, 150}),
+
+        // الشبكة
+        NETWORK_CONNECTED("net_connected", "متصل بالشبكة",
+                ToneGenerator.TONE_PROP_ACK, 100, new long[]{0, 30}),
+        NETWORK_LOST("net_lost", "انقطع الاتصال",
+                ToneGenerator.TONE_PROP_NACK, 200, new long[]{0, 80}),
+
+        // عام
         GENERAL_SUCCESS("gen_success", "عملية ناجحة عامة",
                 ToneGenerator.TONE_PROP_ACK, 150, new long[]{0, 50}),
         GENERAL_ERROR("gen_error", "خطأ عام في النظام",
-                ToneGenerator.TONE_SUP_ERROR, 300, new long[]{0, 100, 100, 100});
+                ToneGenerator.TONE_SUP_ERROR, 300, new long[]{0, 100, 100, 100}),
+        GENERAL_WARNING("gen_warning", "تحذير عام",
+                ToneGenerator.TONE_PROP_NACK, 200, new long[]{0, 60, 60}),
+        GENERAL_INFO("gen_info", "معلومة عامة",
+                ToneGenerator.TONE_PROP_PROMPT, 100, new long[]{0, 30});
 
         public final String key;
         public final String displayName;
@@ -104,6 +129,8 @@ public class MiraSoundManager {
         }
     }
 
+    // ==================== Singleton ====================
+
     private MiraSoundManager(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -117,7 +144,7 @@ public class MiraSoundManager {
         return instance;
     }
 
-    // ==================== التهيئة والتحرير ====================
+    // ==================== التهيئة ====================
 
     private void initAudioAndVibrator() {
         synchronized (toneLock) {
@@ -133,7 +160,7 @@ public class MiraSoundManager {
         }
     }
 
-    /** ✅ تحرير ToneGenerator بشكل آمن لمنع تسريب الموارد */
+    /** ✅ تحرير ToneGenerator بشكل آمن */
     private void releaseToneGenerator() {
         synchronized (toneLock) {
             if (toneGenerator != null) {
@@ -147,9 +174,7 @@ public class MiraSoundManager {
         }
     }
 
-    /**
-     * ✅ إعادة تحميل الإعدادات (يحرر القديم ويعيد التهيئة)
-     */
+    /** ✅ إعادة تحميل الإعدادات */
     public void reloadSettings() {
         releaseToneGenerator();
         initAudioAndVibrator();
@@ -158,36 +183,25 @@ public class MiraSoundManager {
 
     // ==================== التشغيل ====================
 
-    /**
-     * تشغيل الصوت والاهتزاز الخاص بحدث معين بناءً على إعدادات المستخدم
-     */
     public void play(SoundEvent event) {
         if (event == null) return;
 
         boolean masterSound = isMasterSoundEnabled();
         boolean masterVibration = isMasterVibrationEnabled();
 
-        // 1. تشغيل الصوت إذا كان مفعلاً كلياً وجزئياً
         if (masterSound && isEventSoundEnabled(event)) {
             playTone(getEventTone(event), event.defaultDuration);
         }
 
-        // 2. تشغيل الاهتزاز إذا كان مفعلاً كلياً وجزئياً
         if (masterVibration && isEventVibrationEnabled(event)) {
             vibratePattern(event.defaultVibePattern);
         }
     }
 
-    /**
-     * تشغيل نغمة محددة مباشرة (مفيد لمعاينة الأصوات في واجهة الإعدادات)
-     */
     public void playPreview(int toneType, int durationMs) {
         playTone(toneType, durationMs);
     }
 
-    /**
-     * ✅ تشغيل مخصص - صوت + اهتزاز مع نمط مخصص
-     */
     public void playCustomTone(int toneType, int durationMs, long[] vibePattern) {
         if (isMasterSoundEnabled()) {
             playTone(toneType, durationMs);
@@ -198,7 +212,8 @@ public class MiraSoundManager {
     }
 
     /**
-     * ✅ Thread-safe + Fallback للنغمات غير المدعومة
+     * ✅ Thread-safe + Fallback
+     * ملاحظة: ToneGenerator.startTone() تُرجع boolean (true = نجاح)
      */
     private void playTone(int toneType, int duration) {
         synchronized (toneLock) {
@@ -207,10 +222,12 @@ public class MiraSoundManager {
                     initAudioAndVibrator();
                 }
                 if (toneGenerator != null) {
-                    int result = toneGenerator.startTone(toneType, duration);
-                    if (result == ToneGenerator.TONE_UNKNOWN) {
-                        Log.w(TAG, "نغمة غير مدعومة: " + toneType + " — استخدام الافتراضي");
-                        toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, duration);
+                    boolean success = toneGenerator.startTone(toneType, duration);
+                    if (!success) {
+                        Log.w(TAG, "⚠️ نغمة غير مدعومة: " + toneType + " — استخدام الافتراضي");
+                        try {
+                            toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, duration);
+                        } catch (Exception ignored) {}
                     }
                 }
             } catch (Exception e) {
@@ -221,7 +238,8 @@ public class MiraSoundManager {
 
     private void vibratePattern(long[] pattern) {
         try {
-            if (vibrator != null && vibrator.hasVibrator() && pattern != null && pattern.length > 0) {
+            if (vibrator != null && vibrator.hasVibrator()
+                    && pattern != null && pattern.length > 0) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     VibrationEffect effect = VibrationEffect.createWaveform(pattern, -1);
                     vibrator.vibrate(effect);
@@ -234,7 +252,7 @@ public class MiraSoundManager {
         }
     }
 
-    // ==================== إعدادات التحكم والحفظ ====================
+    // ==================== إعدادات التحكم ====================
 
     public boolean isMasterSoundEnabled() {
         return prefs.getBoolean(PREF_MASTER_SOUND, true);
@@ -289,9 +307,7 @@ public class MiraSoundManager {
 
     // ==================== إعادة الضبط ====================
 
-    /**
-     * ✅ إعادة كل الإعدادات للوضع الافتراضي
-     */
+    /** ✅ إعادة كل الإعدادات للوضع الافتراضي */
     public void resetToDefaults() {
         prefs.edit().clear().apply();
         releaseToneGenerator();
@@ -301,18 +317,14 @@ public class MiraSoundManager {
 
     // ==================== التحرير النهائي ====================
 
-    /**
-     * ✅ استخدم هذا فقط عند إغلاق التطبيق بالكامل (لا تستدعيه أثناء التشغيل)
-     */
+    /** ✅ استخدمه عند إغلاق التطبيق */
     public void shutdown() {
         releaseToneGenerator();
         vibrator = null;
         Log.d(TAG, "✅ Shutdown complete");
     }
 
-    /**
-     * ✅ متوافق مع الكود القديم — لا يحرر ToneGenerator لأن Singleton يبقى حياً
-     */
+    /** ✅ متوافق مع الكود القديم */
     public void release() {
         Log.d(TAG, "release() called — ignoring (Singleton)");
     }
