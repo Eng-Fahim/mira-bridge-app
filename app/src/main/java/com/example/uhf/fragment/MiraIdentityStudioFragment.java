@@ -622,27 +622,59 @@ private void activateRFIDModeForEncoding() {
             }
 
             activity.setActiveRfidListener(epc -> {
-                final String normalizedEpc = epc != null ? 
+                final String normalizedEpc = epc != null ?
                         epc.trim().toUpperCase(Locale.US) : "";
 
+                // ✅ المرحلة 1: قراءة TID + التحقق من مخزون SunlandRFID
                 miraExecutor.getBackgroundExecutor().execute(() -> {
+                    MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
+                    final String tid = rfidService.readTid("00000000");
+                    final boolean isSim = rfidService.isSimulationMode();
+
+                    // ✅ التحقق من أن الشريحة معتمدة
+                    boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(tid);
+
+                    // ✅ التحقق من عدم التكرار
                     boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedEpc);
+
                     safeRun(() -> {
-                        if (isDuplicate) {
+                        // فحص أول: شريحة غير معتمدة
+                        if (!isTagAllowed) {
                             playErrorSound();
                             showErrorDialog(
-                                isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag",
-                                isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل." : 
-                                           "This tag (" + normalizedEpc + ") is already registered."
+                                isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
+                                isArabic ?
+                                    "هذه الشريحة (TID: " + tid + ") غير مسجلة في مخزون الشرائح المعتمدة.\n\n" +
+                                    "يرجى استخدام شريحة من مورد معتمد (SunlandRFID)." :
+                                    "This tag (TID: " + tid + ") is not in the authorized inventory.\n\n" +
+                                    "Please use a tag from an approved supplier."
                             );
                             stopRfidScanningMode();
                             return;
                         }
 
+                        // فحص ثانٍ: شريحة مكررة محلياً
+                        if (isDuplicate) {
+                            playErrorSound();
+                            showErrorDialog(
+                                isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag",
+                                isArabic ?
+                                    "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل." :
+                                    "This tag (" + normalizedEpc + ") is already registered."
+                            );
+                            stopRfidScanningMode();
+                            return;
+                        }
+
+                        // ✅ نجاح: تعبئة EPC و TID
                         if (binding != null && binding.etEpc != null) {
                             binding.etEpc.setText(normalizedEpc);
                             binding.tvStatusBadge.setText("BOUND");
                         }
+
+                        // ✅ إخفاء TID في مكان ما (اختياري)
+                        Log.i(TAG, "✅ Tag verified: EPC=" + normalizedEpc + " TID=" + tid);
+
                         playSuccessSound();
                         stopRfidScanningMode();
                     });
@@ -883,222 +915,178 @@ private void openBarcodeScannerForEPC() {
 
     // ==================== الحفظ والتكويد ====================
 
-    private void finalizeItemIdentity() {
-        if (isFormLocked) {
-            showToast(isArabic ? "⛔ العملية قيد التنفيذ، يرجى الانتظار..." : 
-                               "⛔ Operation in progress...");
+    // ==================== الحفظ والتكويد ====================
+
+private void finalizeItemIdentity() {
+    if (isFormLocked) {
+        showToast(isArabic ? "⛔ العملية قيد التنفيذ..." : "⛔ Operation in progress...");
+        return;
+    }
+
+    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
+    }
+
+    isFormLocked = true;
+    if (binding != null && binding.btnSaveIdentity != null) {
+        binding.btnSaveIdentity.setEnabled(false);
+        binding.btnSaveIdentity.setAlpha(0.5f);
+    }
+
+    try {
+        if (binding == null) {
+            unlockFormFast();
             return;
         }
 
-        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        // ==================== 1) قراءة البيانات من النموذج ====================
+        String epc = binding.etEpc.getText() != null ?
+                binding.etEpc.getText().toString().trim() : "";
+        String title = binding.etTitle.getText() != null ?
+                binding.etTitle.getText().toString().trim() : "";
+        String weightStr = binding.etGrossWeight.getText() != null ?
+                binding.etGrossWeight.getText().toString().trim() : "";
+
+        if (!validateInputData(epc, title, weightStr)) {
+            unlockFormFast();
             return;
         }
 
-        isFormLocked = true;
-        if (binding != null && binding.btnSaveIdentity != null) {
-            binding.btnSaveIdentity.setEnabled(false);
-            binding.btnSaveIdentity.setAlpha(0.5f);
+        double grossWeight = Double.parseDouble(weightStr);
+        String stoneType = "";
+        double stoneWeightCarats = 0;
+        int stoneCount = 0;
+        double stoneValue = 0;
+
+        if (binding.switchHasStones.isChecked()) {
+            stoneType = binding.etStoneType.getText() != null ?
+                    binding.etStoneType.getText().toString().trim() : "";
+            String stoneWeightStr = binding.etStoneWeight.getText() != null ?
+                    binding.etStoneWeight.getText().toString().trim() : "";
+            String stoneCountStr = binding.etStoneCount.getText() != null ?
+                    binding.etStoneCount.getText().toString().trim() : "";
+            String stoneValueStr = binding.etStoneValue.getText() != null ?
+                    binding.etStoneValue.getText().toString().trim() : "";
+
+            if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
+            if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
+            if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
         }
 
-        try {
-            if (binding == null) {
-                unlockFormFast();
-                return;
-            }
+        double stoneWeightGrams = PricingCalculator.caratsToGrams(stoneWeightCarats);
+        if (stoneWeightGrams >= grossWeight) {
+            showValidationError(isArabic ?
+                    "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي!" :
+                    "❌ Stone weight cannot exceed gross weight!");
+            unlockFormFast();
+            return;
+        }
 
-            String epc = binding.etEpc.getText() != null ? 
-                    binding.etEpc.getText().toString().trim() : "";
-            String title = binding.etTitle.getText() != null ? 
-                    binding.etTitle.getText().toString().trim() : "";
-            String weightStr = binding.etGrossWeight.getText() != null ? 
-                    binding.etGrossWeight.getText().toString().trim() : "";
+        // ==================== 2) حساب التسعير ====================
+        int selectedKaratNum = getSelectedKaratNumber();
+        double[] pricing = PricingCalculator.calculatePricingDetails(
+                grossWeight, stoneWeightCarats, stoneValue, selectedKaratNum, priceManager);
+        final double netGoldWeight = pricing[6];
 
-            if (!validateInputData(epc, title, weightStr)) {
-                unlockFormFast();
-                return;
-            }
+        MiraPriceManager.PricingDetails details =
+                priceManager.calculatePricingDetails(selectedKaratNum, netGoldWeight);
 
-            double grossWeight = Double.parseDouble(weightStr);
-            String stoneType = "";
-            double stoneWeightCarats = 0;
-            int stoneCount = 0;
-            double stoneValue = 0;
+        final String localCurrency = priceManager.getDefaultCurrency();
+        final double finalPriceUSD = details.finalPrice + stoneValue;
+        final double finalPriceLocal = priceManager.convertFromUSD(finalPriceUSD, localCurrency);
+        final double exchangeRate = priceManager.getExchangeRate(localCurrency);
 
-            if (binding.switchHasStones.isChecked()) {
-                stoneType = binding.etStoneType.getText() != null ? 
-                        binding.etStoneType.getText().toString().trim() : "";
-                String stoneWeightStr = binding.etStoneWeight.getText() != null ? 
-                        binding.etStoneWeight.getText().toString().trim() : "";
-                String stoneCountStr = binding.etStoneCount.getText() != null ? 
-                        binding.etStoneCount.getText().toString().trim() : "";
-                String stoneValueStr = binding.etStoneValue.getText() != null ? 
-                        binding.etStoneValue.getText().toString().trim() : "";
+        setFormEnabled(false);
 
-                if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
-                if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
-                if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
-            }
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog(
+                isArabic ? "🔄 جاري التكويد وإنشاء الأكواد المجهرية..." :
+                           "🔄 Encoding & Generating Micro-Codes...",
+                isArabic ? "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات" :
+                           "Please wait - saving item in database"
+        );
 
-            double stoneWeightGrams = PricingCalculator.caratsToGrams(stoneWeightCarats);
-            if (stoneWeightGrams >= grossWeight) {
-                showValidationError(isArabic ? 
-                        "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي للقطعة!" : 
-                        "❌ Stone weight cannot exceed gross weight!");
-                unlockFormFast();
-                return;
-            }
+        // ==================== 3) تثبيت المتغيرات للمعالجة الخلفية ====================
+        final String finalEpc = epc;
+        final String finalTitle = title;
+        final double fGrossWeight = grossWeight;
+        final double fStoneWeightCarats = stoneWeightCarats;
+        final int fStoneCount = stoneCount;
+        final double fStoneValue = stoneValue;
+        final String fStoneType = stoneType;
+        final String selectedKarat = getSelectedKaratCode();
+        final String selectedCategory = getSelectedCategory();
+        final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+        final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
+        final List<String> finalPhotoPaths = new ArrayList<>(photoManager.getPhotoPaths());
+        final int currentUserId = getCurrentUserId();
 
-            int selectedKaratNum = getSelectedKaratNumber();
-            double[] pricing = PricingCalculator.calculatePricingDetails(
-                    grossWeight, stoneWeightCarats, stoneValue, selectedKaratNum, priceManager);
-            final double netGoldWeight = pricing[6];
+        MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
+        final String tid = rfidService.readTid("00000000");
+        final boolean isSim = rfidService.isSimulationMode();
 
-            MiraPriceManager.PricingDetails details = 
-                    priceManager.calculatePricingDetails(selectedKaratNum, netGoldWeight);
+        // ✅ كلمة المرور الافتراضية للشريحة (بديل null)
+        final String DEFAULT_PWD = "00000000";
 
-            final String localCurrency = priceManager.getDefaultCurrency();
-            final double finalPriceUSD = details.finalPrice + stoneValue;
-            final double finalPriceLocal = priceManager.convertFromUSD(finalPriceUSD, localCurrency);
-            final double exchangeRate = priceManager.getExchangeRate(localCurrency);
+        // ==================== 4) إرسال البيانات للسيرفر ====================
+        miraExecutor.getBackgroundExecutor().execute(() -> {
+            try {
+                JSONObject payload = buildPayload(
+                    finalEpc, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
+                    fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
+                    details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
+                    localCurrency, exchangeRate, selectedCategory, location,
+                    branchId, currentUserId, tid, isSim, finalPhotoPaths
+                );
 
-            setFormEnabled(false);
+                boolean apiSuccess = false;
+                int serverItemId = 0;
+                String errorMessage = null;
+                boolean isNetworkError = false;
+                JSONObject responseDataObj = null;
 
-            final AlertDialog loadingDialog = showProfessionalLoadingDialog(
-                    isArabic ? "🔄 جاري التكويد وإنشاء الأكواد المجهرية..." : 
-                               "🔄 Encoding & Generating Micro-Codes...",
-                    isArabic ? "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات" : 
-                               "Please wait - saving item in database"
-            );
-
-            final String finalEpc = epc;
-            final String finalTitle = title;
-            final double fGrossWeight = grossWeight;
-            final double fStoneWeightCarats = stoneWeightCarats;
-            final int fStoneCount = stoneCount;
-            final double fStoneValue = stoneValue;
-            final String fStoneType = stoneType;
-            final String selectedKarat = getSelectedKaratCode();
-            final String selectedCategory = getSelectedCategory();
-            final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
-            final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-            final List<String> finalPhotoPaths = new ArrayList<>(photoManager.getPhotoPaths());
-            final int currentUserId = getCurrentUserId();
-
-            MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
-            final String tid = rfidService.readTid("00000000");
-            final boolean isSim = rfidService.isSimulationMode();
-
-            // ✅ استخدام backgroundExecutor للمعالجة الثقيلة
-            miraExecutor.getBackgroundExecutor().execute(() -> {
-                try {
-                    JSONObject payload = buildPayload(
-                        finalEpc, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
-                        fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
-                        details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
-                        localCurrency, exchangeRate, selectedCategory, location,
-                        branchId, currentUserId, tid, isSim, finalPhotoPaths
-                    );
-
-                    boolean apiSuccess = false;
-                    int serverItemId = 0;
-                    String errorMessage = null;
-                    boolean isNetworkError = false;
-                    JSONObject responseDataObj = null;
-
-                    if (apiClient != null) {
-                        try {
-                            MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                            if (response != null) {
-                                apiSuccess = response.isSuccess;
-                                responseDataObj = response.data;
-                                if (response.isSuccess) {
-                                    if (response.data != null) {
-                                        serverItemId = response.data.optInt("item_id", 0);
-                                    }
-                                } else {
-                                    errorMessage = extractErrorMessage(response);
-                                    isNetworkError = response.isNetworkError;
-                                }
+                if (apiClient != null) {
+                    try {
+                        MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
+                        if (response != null) {
+                            apiSuccess = response.isSuccess;
+                            responseDataObj = response.data;
+                            if (response.isSuccess && response.data != null) {
+                                serverItemId = response.data.optInt("item_id", 0);
+                            } else if (!response.isSuccess) {
+                                errorMessage = extractErrorMessage(response);
+                                isNetworkError = response.isNetworkError;
                             }
-                        } catch (Exception e) {
-                            Log.e(TAG, "API call exception", e);
-                            errorMessage = e.getMessage();
-                            isNetworkError = true;
                         }
+                    } catch (Exception e) {
+                        Log.e(TAG, "API call exception", e);
+                        errorMessage = e.getMessage();
+                        isNetworkError = true;
                     }
+                }
 
-                    final boolean success = apiSuccess;
-                    final int finalServerItemId = serverItemId;
-                    final String finalErrorMessage = errorMessage;
-                    final boolean networkError = isNetworkError;
-                    final JSONObject finalResponseData = responseDataObj;
+                final boolean success = apiSuccess;
+                final int finalServerItemId = serverItemId;
+                final String finalErrorMessage = errorMessage;
+                final boolean networkError = isNetworkError;
+                final JSONObject finalResponseData = responseDataObj;
 
+                // ==================== 5) حالة الفشل ====================
+                if (!success) {
                     safeRun(() -> {
                         dismissDialog(loadingDialog);
 
-                        if (success) {
-                            playSuccessSound();
-                            
-                            // ✅ إزالة المسودة بعد النجاح
-                            miraExecutor.getSingleThreadExecutor().execute(() -> 
-                                    syncManager.removePendingEncode(finalEpc));
-                            
-                            // ✅ مسح المسودة المحفوظة
-                            if (formManager != null) {
-                                formManager.clearDraft();
-                            }
-                            
-                            notifyDashboardUpdate("encode_success");
-
-                            if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
-                                uploadItemImages(finalServerItemId, finalPhotoPaths);
-                            }
-
-                            String activeEpc = finalEpc;
-                            String gs1Code = "(01)0729000000" + 
-                                    (finalServerItemId > 0 ? 
-                                            String.format(Locale.US, "%05d", finalServerItemId) : 
-                                            "00000") + 
-                                    "(21)" + activeEpc;
-                            String qrUrl = "https://ibreg.org/id/" + 
-                                    (finalServerItemId > 0 ? finalServerItemId : activeEpc);
-
-                            if (finalResponseData != null) {
-                                activeEpc = finalResponseData.optString("epc", activeEpc);
-                                JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
-                                if (gs1Obj != null) {
-                                    gs1Code = gs1Obj.optString("raw_fnc1", gs1Code);
-                                    qrUrl = gs1Obj.optString("digital_link", qrUrl);
-                                }
-                            }
-
-                            if (binding != null && binding.etEpc != null) {
-                                binding.etEpc.setText("");
-                            }
-
-                            showEncodingSuccessDialogEnhanced(
-                                    finalTitle, activeEpc, tid, gs1Code, qrUrl,
-                                    String.valueOf(fGrossWeight), selectedKarat,
-                                    finalPriceLocal, localCurrency, finalPhotoPaths
-                            );
-
-                        } else if (networkError) {
-                            // ✅ حفظ Offline مع مزامنة احترافية
+                        if (networkError) {
+                            // حفظ offline
                             miraExecutor.getSingleThreadExecutor().execute(() -> {
                                 syncManager.saveEncodeOffline(payload);
                                 safeRun(this::updatePendingSyncBadge);
                             });
-                            
-                            showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : 
+                            showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" :
                                                "💾 Saved locally (Offline)");
-                            
-                            // ✅ محاولة مزامنة تلقائية
                             scheduleAutoSync();
-                            
                             unlockFormFast();
                             setFormEnabled(true);
-                            
                         } else {
                             String errorMsg = finalErrorMessage != null ? finalErrorMessage :
                                 (isArabic ? "❌ فشل التكويد" : "❌ Encoding failed");
@@ -1107,26 +1095,195 @@ private void openBarcodeScannerForEPC() {
                             setFormEnabled(true);
                         }
                     });
-                } catch (Exception e) {
-                    Log.e(TAG, "Background execution error: " + e.getMessage(), e);
-                    safeRun(() -> {
-                        dismissDialog(loadingDialog);
-                        unlockFormFast();
-                        setFormEnabled(true);
-                        showErrorDialog(isArabic ? "خطأ للنظام" : "System Error", e.getMessage());
-                    });
+                    return;
                 }
-            });
-        } catch (NumberFormatException e) {
-            showValidationError(isArabic ? "❌ خطأ في الأرقام المدخلة" : "❌ Invalid number format");
-            unlockFormFast();
-        } catch (Exception e) {
-            Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage(), e);
-            unlockFormFast();
-            setFormEnabled(true);
-            showToast("❌ " + e.getMessage());
-        }
+
+                // ==================== 6) نجاح السيرفر → كتابة EPC على الشريحة ====================
+                Log.i(TAG, "✅ Server OK — Starting hardware encoding sequence");
+                Log.i(TAG, "📡 TID=" + tid + " | EPC_original=" + finalEpc + " | SIM=" + isSim);
+
+                // استخراج mira_id من الاستجابة
+                String miraId = (finalResponseData != null) ?
+                        finalResponseData.optString("mira_id", finalEpc) : finalEpc;
+
+                // توليد EPC الجديد
+                String newEpc = rfidService.generateEpcFromMiraId(miraId);
+                Log.i(TAG, "🎯 Generated new EPC: " + newEpc + " (from mira_id=" + miraId + ")");
+
+                // ──────── 6.1: كتابة EPC ────────
+                boolean writeOk = rfidService.writeEpc(newEpc, DEFAULT_PWD);
+                boolean alreadyEncoded = false;
+
+                // ✅ اكتشاف الشرائح المبرمجة مسبقاً (Pre-encoded)
+                if (!writeOk) {
+                    Log.w(TAG, "⚠️ writeEpc failed — checking if tag is pre-encoded...");
+                    String existingEpc = rfidService.readEpc(DEFAULT_PWD);
+                    if (existingEpc != null && !existingEpc.trim().isEmpty()) {
+                        Log.i(TAG, "✅ Tag is pre-encoded with EPC: " + existingEpc);
+                        newEpc = existingEpc.trim().toUpperCase(Locale.US);
+                        writeOk = true;
+                        alreadyEncoded = true;
+                    } else {
+                        Log.e(TAG, "❌ Tag is blank AND write failed — hardware issue");
+                    }
+                }
+
+                // ──────── 6.2: التحقق من الكتابة ────────
+                boolean verifyOk = writeOk && rfidService.verifyWrite(newEpc, DEFAULT_PWD);
+                if (verifyOk) {
+                    Log.i(TAG, "✅ verifyWrite OK — EPC confirmed on tag: " + newEpc);
+                } else if (writeOk) {
+                    Log.w(TAG, "⚠️ verifyWrite failed — EPC may not be stable");
+                }
+
+                // ──────── 6.3: قفل EPC Bank ────────
+                boolean lockOk = false;
+                if (verifyOk && !alreadyEncoded) {
+                    lockOk = rfidService.setTagLockState(DEFAULT_PWD, 1, true);
+                    if (lockOk) {
+                        Log.i(TAG, "🔒 EPC Bank locked successfully");
+                    } else {
+                        Log.w(TAG, "⚠️ setTagLockState failed — tag remains writable");
+                    }
+                } else if (alreadyEncoded) {
+                    Log.i(TAG, "ℹ️ Skipped lock — tag was pre-encoded (may already be locked)");
+                    lockOk = true; // اعتبرها محمية ضمنياً
+                }
+
+                // ──────── 6.4: إبلاغ السيرفر بنجاح البرمجة ────────
+                if (lockOk || verifyOk) {
+                    try {
+                        boolean marked = rfidService.markTagProgrammed(tid, miraId, newEpc);
+                        Log.i(TAG, "📤 markTagProgrammed: " + (marked ? "OK" : "FAILED"));
+                    } catch (Exception e) {
+                        Log.w(TAG, "markTagProgrammed exception", e);
+                    }
+                }
+
+                final boolean finalWrite = writeOk;
+                final boolean finalVerify = verifyOk;
+                final boolean finalLock = lockOk;
+                final boolean finalWasPreEncoded = alreadyEncoded;
+                final String finalNewEpc = newEpc;
+
+                // ==================== 7) تحديث السيرفر بـ RFID النهائي ====================
+                if (finalWrite) {
+                    try {
+                        JSONObject updatePayload = new JSONObject();
+                        updatePayload.put("item_id", finalServerItemId);
+                        updatePayload.put("rfid_epc_final", finalNewEpc);
+                        updatePayload.put("rfid_tid", tid);
+                        updatePayload.put("rfid_locked", finalLock);
+                        updatePayload.put("rfid_verified", finalVerify);
+                        updatePayload.put("rfid_pre_encoded", finalWasPreEncoded);
+
+                        MiraApiClient.ApiResponse updateResp =
+                                apiClient.postWithAuth("/items/update-rfid", updatePayload);
+                        if (updateResp != null && updateResp.isSuccess) {
+                            Log.i(TAG, "✅ RFID metadata synced to server");
+                        } else {
+                            Log.w(TAG, "⚠️ RFID metadata sync failed");
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to update RFID metadata", e);
+                    }
+                }
+
+                // ==================== 8) عرض النتائج ====================
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    playSuccessSound();
+
+                    // إزالة المسودة
+                    miraExecutor.getSingleThreadExecutor().execute(() ->
+                            syncManager.removePendingEncode(finalEpc));
+                    if (formManager != null) formManager.clearDraft();
+
+                    notifyDashboardUpdate("encode_success");
+
+                    // رفع الصور
+                    if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
+                        uploadItemImages(finalServerItemId, finalPhotoPaths);
+                    }
+
+                    // EPC النهائي للعرض
+                    String displayEpc = finalWrite ? finalNewEpc : finalEpc;
+
+                    // توليد GS1 و QR
+                    String gs1Code = "(01)0729000000" +
+                            (finalServerItemId > 0 ?
+                                    String.format(Locale.US, "%05d", finalServerItemId) :
+                                    "00000") +
+                            "(21)" + displayEpc;
+                    String qrUrl = "https://ibreg.org/id/" +
+                            (finalServerItemId > 0 ? finalServerItemId : displayEpc);
+
+                    if (finalResponseData != null) {
+                        JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
+                        if (gs1Obj != null) {
+                            gs1Code = gs1Obj.optString("raw_fnc1", gs1Code);
+                            qrUrl = gs1Obj.optString("digital_link", qrUrl);
+                        }
+                    }
+
+                    if (binding != null && binding.etEpc != null) {
+                        binding.etEpc.setText("");
+                    }
+
+                    // ✅ رسائل الحالة الدقيقة
+                    if (finalWrite && finalVerify && finalLock) {
+                        if (finalWasPreEncoded) {
+                            showToast(isArabic ?
+                                "ℹ️ تم ربط شريحة مبرمجة مسبقاً بنجاح" :
+                                "ℹ️ Pre-encoded tag bound successfully");
+                        } else {
+                            showToast(isArabic ?
+                                "🔒 تم التكويد والقفل بنجاح" :
+                                "🔒 Encoded & locked successfully");
+                        }
+                    } else if (finalWrite && finalVerify && !finalLock) {
+                        showToast(isArabic ?
+                            "⚠️ تم التكويد لكن القفل فشل — الشريحة غير محمية" :
+                            "⚠️ Encoded but lock failed — tag unprotected");
+                    } else if (finalWrite && !finalVerify) {
+                        showToast(isArabic ?
+                            "⚠️ تمت الكتابة لكن التحقق فشل — يرجى إعادة المسح" :
+                            "⚠️ Written but verification failed — re-scan needed");
+                    } else {
+                        showToast(isArabic ?
+                            "❌ فشلت كتابة EPC — الشريحة تحمل الرمز القديم" :
+                            "❌ EPC write failed — tag has old code");
+                    }
+
+                    showEncodingSuccessDialogEnhanced(
+                            finalTitle, displayEpc, tid, gs1Code, qrUrl,
+                            String.valueOf(fGrossWeight), selectedKarat,
+                            finalPriceLocal, localCurrency, finalPhotoPaths
+                    );
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Background execution error", e);
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    unlockFormFast();
+                    setFormEnabled(true);
+                    showErrorDialog(isArabic ? "خطأ للنظام" : "System Error", e.getMessage());
+                });
+            }
+        });
+
+    } catch (NumberFormatException e) {
+        showValidationError(isArabic ? "❌ خطأ في الأرقام المدخلة" : "❌ Invalid number format");
+        unlockFormFast();
+    } catch (Exception e) {
+        Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage(), e);
+        unlockFormFast();
+        setFormEnabled(true);
+        showToast("❌ " + e.getMessage());
     }
+}
+
 
     private void unlockFormFast() {
         isFormLocked = false;
@@ -1199,56 +1356,73 @@ private void openBarcodeScannerForEPC() {
     }
 
     private JSONObject buildPayload(
-        String epc, String title, String karat, double grossWeight, double netWeight,
-        double stoneWeightCarats, int stoneCount, double stoneValue, String stoneType,
-        MiraPriceManager.PricingDetails details, int karatNum, double priceUSD,
-        double priceLocal, String currency, double exchangeRate, String category,
-        String location, int branchId, int userId, String tid, boolean isSim,
-        List<String> photoPathsList) throws Exception {
+    String epc, String title, String karat, double grossWeight, double netWeight,
+    double stoneWeightCarats, int stoneCount, double stoneValue, String stoneType,
+    MiraPriceManager.PricingDetails details, int karatNum, double priceUSD,
+    double priceLocal, String currency, double exchangeRate, String category,
+    String location, int branchId, int userId, String tid, boolean isSim,
+    List<String> photoPathsList) throws Exception {
 
-        JSONObject payload = new JSONObject();
-        if (epc != null && !epc.isEmpty()) payload.put("epc", epc);
+    JSONObject payload = new JSONObject();
 
-        payload.put("title", title);
-        payload.put("purity_code", karat);
-        payload.put("gross_weight", grossWeight);
-        payload.put("net_weight", netWeight);
-        payload.put("stone_weight", stoneWeightCarats);
-        payload.put("stone_count", stoneCount);
-        payload.put("stone_value", stoneValue);
-        payload.put("stone_type", stoneType);
-
-        payload.put("gold_price_per_gram", details.gramPrice);
-        payload.put("gold_value", details.baseGoldCost);
-        payload.put("making_per_gram", priceManager.getMakingCharge(karatNum));
-        payload.put("making_charge", details.totalMakingCost);
-        payload.put("total_cost", details.baseGoldCost + details.totalMakingCost);
-        payload.put("profit_margin", priceManager.getProfitMargin(karatNum));
-        payload.put("profit_amount", details.profitAmount);
-
-        payload.put("retail_price_usd", priceUSD);
-        payload.put("retail_price", priceUSD);
-        payload.put("retail_price_local", priceLocal);
-        payload.put("currency", "USD");
-        payload.put("local_currency", currency);
-        payload.put("exchange_rate", exchangeRate);
-        payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
-
-        payload.put("category", category);
-        payload.put("location", location);
-        payload.put("branch_id", branchId);
-        payload.put("user_id", userId);
-
-        if (tid != null && !tid.isEmpty()) payload.put("rfid_tid", tid);
-
-        if (!photoPathsList.isEmpty()) {
-            JSONArray imagesArray = new JSONArray();
-            for (String path : photoPathsList) imagesArray.put(path);
-            payload.put("image_paths", imagesArray);
-        }
-
-        return payload;
+    // ==================== 1) البيانات الأساسية للقطعة ====================
+    if (epc != null && !epc.isEmpty()) {
+        payload.put("epc", epc);
     }
+    payload.put("title", title);
+    payload.put("purity_code", karat);
+    payload.put("category", category);
+    payload.put("location", location);
+    payload.put("branch_id", branchId);
+    payload.put("user_id", userId);
+
+    // ==================== 2) الأوزان ====================
+    payload.put("gross_weight", grossWeight);
+    payload.put("net_weight", netWeight);
+    payload.put("stone_weight", stoneWeightCarats);
+    payload.put("stone_count", stoneCount);
+    payload.put("stone_value", stoneValue);
+    payload.put("stone_type", stoneType);
+
+    // ==================== 3) تفاصيل التسعير ====================
+    payload.put("gold_price_per_gram", details.gramPrice);
+    payload.put("gold_value", details.baseGoldCost);
+    payload.put("making_per_gram", priceManager.getMakingCharge(karatNum));
+    payload.put("making_charge", details.totalMakingCost);
+    payload.put("total_cost", details.baseGoldCost + details.totalMakingCost);
+    payload.put("profit_margin", priceManager.getProfitMargin(karatNum));
+    payload.put("profit_amount", details.profitAmount);
+
+    // ==================== 4) الأسعار النهائية والعملة ====================
+    payload.put("retail_price_usd", priceUSD);
+    payload.put("retail_price", priceUSD);
+    payload.put("retail_price_local", priceLocal);
+    payload.put("currency", "USD");
+    payload.put("local_currency", currency);
+    payload.put("exchange_rate", exchangeRate);
+    payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
+
+    // ==================== 5) بيانات RFID (مُوحَّدة) ====================
+    if (tid != null && !tid.isEmpty()) {
+        payload.put("rfid_tid", tid);
+    }
+    payload.put("rfid_sim_mode", isSim);
+    payload.put("rfid_epc_original", epc);   // EPC الأصلي على الشريحة قبل الكتابة
+    payload.put("rfid_epc_final", "");       // سيُحدَّث لاحقاً عبر /items/update-rfid
+    payload.put("rfid_locked", false);       // سيُحدَّث بعد القفل
+    payload.put("rfid_verified", false);     // سيُحدَّث بعد التحقق
+
+    // ==================== 6) صور القطعة ====================
+    if (!photoPathsList.isEmpty()) {
+        JSONArray imagesArray = new JSONArray();
+        for (String path : photoPathsList) {
+            imagesArray.put(path);
+        }
+        payload.put("image_paths", imagesArray);
+    }
+
+    return payload;
+}
 
     // ==================== ✅ المزامنة الاحترافية ====================
 
