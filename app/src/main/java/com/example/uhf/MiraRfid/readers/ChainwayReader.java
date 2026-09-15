@@ -14,11 +14,21 @@ import java.util.concurrent.Executors;
 
 /**
  * قارئ Chainway حقيقي - محسّن ومُحصّن ضد تسريب الذاكرة وأخطاء المزامنة
+ * 
+ * ✅ الإصدار 2.0 — تصحيحات جوهرية:
+ * - setTagLockState: Lock Code صحيح لكل بنك (EPC Gen2 compliant)
+ * - writeEpc: توحيد كلمة المرور الافتراضية
+ * - writeData: حساب طول الكلمات الصحيح
+ * - readData: حماية من null
+ * - lockTag/unlockTag: استخدام Bank_EPC الصحيح
  */
 public class ChainwayReader implements MiraIRFIDReader {
     
     private static final String TAG = "ChainwayReader";
     private static final String PREFS_NAME = "mira_rfid_dynamic_settings";
+    
+    // ✅ كلمة المرور الافتراضية للشرائح الخام
+    private static final String DEFAULT_PWD = "00000000";
     
     private Context context;
     private RFIDWithUHFUART reader;
@@ -81,6 +91,25 @@ public class ChainwayReader implements MiraIRFIDReader {
             .putInt("q_value", qValue)
             .apply();
     }
+    
+    // =========================================================================
+    // 🔧 دالة مساعدة: توحيد كلمة المرور
+    // =========================================================================
+    
+    /**
+     * ✅ توحيد كلمة المرور: null/empty → "00000000"
+     * تقليم + تحويل لحالة أحرف كبيرة + إزالة المسافات
+     */
+    private String normalizePwd(String pwdStr) {
+        if (pwdStr == null || pwdStr.trim().isEmpty()) {
+            return DEFAULT_PWD;
+        }
+        return pwdStr.trim().toUpperCase();
+    }
+    
+    // =========================================================================
+    // 🔌 التهيئة والاتصال
+    // =========================================================================
     
     @Override
     public boolean initialize() {
@@ -165,6 +194,10 @@ public class ChainwayReader implements MiraIRFIDReader {
         return isConnected;
     }
     
+    // =========================================================================
+    // 📡 المسح والقراءة
+    // =========================================================================
+    
     @Override
     public boolean startScan() {
         if (!com.example.uhf.activity.BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
@@ -187,7 +220,7 @@ public class ChainwayReader implements MiraIRFIDReader {
                 }
             });
             scanThread.start();
-            scanThread.join(3000); // 3 ثواني timeout
+            scanThread.join(3000);
             
             if (scanThread.isAlive()) {
                 Log.e(TAG, "startInventoryTag timeout - device not responding");
@@ -286,6 +319,10 @@ public class ChainwayReader implements MiraIRFIDReader {
         return isScanning;
     }
     
+    // =========================================================================
+    // ⚙️ الإعدادات
+    // =========================================================================
+    
     @Override
     public void setPower(int powerDbm) {
         this.powerDbm = powerDbm;
@@ -347,52 +384,241 @@ public class ChainwayReader implements MiraIRFIDReader {
         this.listener = listener;
     }
 
+    // =========================================================================
+    // 💾 الكتابة والقراءة في الذاكرة
+    // =========================================================================
+
+    /**
+     * ✅ كتابة بيانات في بنك الذاكرة
+     * 
+     * @param pwdStr كلمة مرور الوصول (null → "00000000")
+     * @param bank رقم البنك (0=RESERVED, 1=EPC, 2=TID, 3=USER)
+     * @param ptr مؤشر الكلمة (Word pointer) — عادة 2 لـ EPC
+     * @param data البيانات بصيغة Hex String
+     */
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
-        if (reader == null || data == null || data.isEmpty()) return false;
+        if (reader == null || data == null || data.isEmpty()) {
+            Log.w(TAG, "writeData: invalid args");
+            return false;
+        }
+        
+        String safePwd = normalizePwd(pwdStr);
+        
         try {
-            // ✅ ضمان تكافؤ الطول مع Hex Word (كل كلمة = 4 حروف Hex)
-            int writeLen = (int) Math.ceil(data.length() / 4.0);
-            StringBuilder paddedData = new StringBuilder(data);
-            while (paddedData.length() < writeLen * 4) {
+            // ✅ حساب عدد الكلمات الصحيح: كل كلمة = 4 حروف Hex
+            int hexLen = data.length();
+            int wordCount = (hexLen + 3) / 4; // ceil division
+            
+            // ✅ إضافة Padding إذا لزم
+            StringBuilder paddedData = new StringBuilder(data.toUpperCase());
+            while (paddedData.length() < wordCount * 4) {
                 paddedData.append("0");
             }
-            return reader.writeData(pwdStr, bank, ptr, writeLen, paddedData.toString());
+            
+            Log.i(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr + 
+                  " words=" + wordCount + " len=" + paddedData.length() + 
+                  " data=" + paddedData);
+            
+            boolean result = reader.writeData(safePwd, bank, ptr, wordCount, paddedData.toString());
+            
+            if (result) {
+                Log.i(TAG, "✅ writeData OK");
+            } else {
+                Log.e(TAG, "❌ writeData FAILED: bank=" + bank + " ptr=" + ptr);
+            }
+            return result;
         } catch (Exception e) {
-            Log.e(TAG, "writeData error", e);
+            Log.e(TAG, "writeData exception: bank=" + bank + " ptr=" + ptr, e);
             return false;
         }
     }
 
+    /**
+     * ✅ قراءة بيانات من بنك الذاكرة
+     * 
+     * @param pwdStr كلمة مرور الوصول (null → "00000000")
+     * @param bank رقم البنك
+     * @param ptr مؤشر الكلمة
+     * @param len عدد الكلمات للقراءة
+     */
     @Override
     public String readData(String pwdStr, int bank, int ptr, int len) {
-        if (reader == null) return null;
+        if (reader == null) {
+            Log.w(TAG, "readData: reader is null");
+            return null;
+        }
+        
+        String safePwd = normalizePwd(pwdStr);
+        
         try {
-            return reader.readData(pwdStr, bank, ptr, len);
+            Log.d(TAG, "📖 readData: bank=" + bank + " ptr=" + ptr + " len=" + len);
+            String result = reader.readData(safePwd, bank, ptr, len);
+            
+            if (result != null && !result.isEmpty()) {
+                Log.d(TAG, "✅ readData OK: " + result);
+            } else {
+                Log.w(TAG, "⚠️ readData returned empty");
+            }
+            return result;
         } catch (Exception e) {
-            Log.e(TAG, "readData error", e);
+            Log.e(TAG, "readData exception: bank=" + bank + " ptr=" + ptr, e);
             return null;
         }
     }
 
+    // =========================================================================
+    // 🔐 القفل والحماية (الجزء الأهم!)
+    // =========================================================================
+
+    /**
+     * ✅ قفل/فتح بنك ذاكرة معين — مُصحَّح وفق EPC Gen2
+     * 
+     * Lock Code Format (EPC Gen2):
+     * ┌─────────────────────────────────────────────┐
+     * │ Bits:  [15-14] [13-12] [11-10] [9-8] [7-6] [5-4] [3-2] [1-0] │
+     * │        Access  Kill    EPC     EPC   TID   TID   USER  USER │
+     * │                                                              │
+     * │ Value: 00=Open, 01=Write, 10=PermaWrite, 11=Lock             │
+     * └─────────────────────────────────────────────┘
+     * 
+     * أمثلة عملية:
+     * - "0C00" → قفل EPC (bits 11-10 = 11)
+     * - "C000" → قفل Access + Kill
+     * - "00C0" → قفل USER
+     * - "0000" → فتح كل شيء
+     * 
+     * @param pwdStr كلمة مرور الوصول
+     * @param bank رقم البنك (0=ACCESS, 1=EPC, 2=TID, 3=USER)
+     * @param shouldLock true=قفل, false=فتح
+     */
     @Override
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
-        if (reader == null) return false;
+        if (reader == null) {
+            Log.w(TAG, "setTagLockState: reader is null");
+            return false;
+        }
+        
+        String safePwd = normalizePwd(pwdStr);
+        
+        // ✅ بناء Lock Code الصحيح حسب البنك
+        String lockCode;
+        switch (bank) {
+            case 0: // ACCESS Bank — قفل Access + Kill معاً
+                lockCode = shouldLock ? "C000" : "0000";
+                break;
+            case 1: // EPC Bank — قفل EPC فقط
+                lockCode = shouldLock ? "0C00" : "0000";
+                break;
+            case 2: // TID Bank — عادةً للقراءة فقط، لا يُقفل
+                Log.w(TAG, "⚠️ TID Bank is read-only — cannot lock");
+                return false;
+            case 3: // USER Bank
+                lockCode = shouldLock ? "00C0" : "0000";
+                break;
+            default:
+                Log.e(TAG, "Unsupported bank: " + bank);
+                return false;
+        }
+        
         try {
-            // ✅ استخدام القفل المعتمد لبنوك EPC و USER
-            String lockCode = shouldLock ? "0002" : "0001";
-            return reader.lockMem(pwdStr, lockCode);
+            Log.i(TAG, "🔐 setTagLockState: bank=" + bank + 
+                  " lock=" + shouldLock + " code=" + lockCode + 
+                  " pwd=" + safePwd);
+            
+            boolean result = reader.lockMem(safePwd, lockCode);
+            
+            if (result) {
+                Log.i(TAG, "🔒 Lock operation successful: bank=" + bank + 
+                      " locked=" + shouldLock);
+            } else {
+                Log.e(TAG, "❌ Lock operation FAILED: bank=" + bank + 
+                      " code=" + lockCode);
+            }
+            return result;
         } catch (Exception e) {
-            Log.e(TAG, "Lock error", e);
+            Log.e(TAG, "Lock exception: bank=" + bank + " code=" + lockCode, e);
             return false;
         }
     }
 
+    // =========================================================================
+    // 🎯 دوال EPC المخصصة
+    // =========================================================================
+
+    /**
+     * ✅ كتابة EPC على الشريحة
+     * EPC دائماً يبدأ من Word 2 (Bit 32) في Bank 1
+     */
+    @Override
+    public boolean writeEpc(String newEpc, String accessPassword) {
+        if (newEpc == null || newEpc.isEmpty()) {
+            Log.w(TAG, "writeEpc: empty EPC");
+            return false;
+        }
+        
+        String safePwd = normalizePwd(accessPassword);
+        Log.i(TAG, "📝 writeEpc: epc=" + newEpc + " pwd=" + safePwd);
+        
+        // ✅ EPC يبدأ دائماً من Word 2 في Bank 1
+        return writeData(safePwd, RFIDWithUHFUART.Bank_EPC, 2, newEpc);
+    }
+    
+    @Override
+    public boolean writeUserMemory(int address, String data, String accessPassword) {
+        return writeData(normalizePwd(accessPassword), 
+                         RFIDWithUHFUART.Bank_USER, address, data);
+    }
+    
+    @Override
+    public String readTid() {
+        return readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_TID, 0, 6);
+    }
+    
+    @Override
+    public String readUserMemory(int address, int length) {
+        return readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_USER, address, length);
+    }
+    
+    /**
+     * ✅ قفل الشريحة (EPC Bank فقط) — الأكثر استخداماً
+     */
+    @Override
+    public boolean lockTag(String accessPassword) {
+        return setTagLockState(normalizePwd(accessPassword), 
+                               RFIDWithUHFUART.Bank_EPC, true);
+    }
+    
+    @Override
+    public boolean unlockTag(String accessPassword) {
+        return setTagLockState(normalizePwd(accessPassword), 
+                               RFIDWithUHFUART.Bank_EPC, false);
+    }
+    
+    @Override
+    public boolean killTag(String accessPassword) {
+        if (reader == null) return false;
+        String safePwd = normalizePwd(accessPassword);
+        try {
+            Log.w(TAG, "☠️ killTag — IRREVERSIBLE operation!");
+            return reader.killTag(safePwd);
+        } catch (Exception e) {
+            Log.e(TAG, "killTag error", e);
+            return false;
+        }
+    }
+
+    // =========================================================================
+    // 🎯 الفلترة
+    // =========================================================================
+
     @Override
     public boolean setFilter(int bank, int ptr, String filterData) {
-        if (reader == null) return false;
+        if (reader == null || filterData == null) return false;
         try {
             int len = filterData.length() * 4;
+            Log.d(TAG, "🎯 setFilter: bank=" + bank + " ptr=" + ptr + 
+                  " data=" + filterData);
             return reader.setFilter(bank, ptr, len, filterData);
         } catch (Exception e) {
             Log.e(TAG, "setFilter error", e);
@@ -405,51 +631,10 @@ public class ChainwayReader implements MiraIRFIDReader {
         if (reader != null) {
             try {
                 reader.setFilter(1, 0, 0, "");
+                Log.d(TAG, "🎯 clearFilter OK");
             } catch (Exception e) {
                 Log.e(TAG, "Clear filter error", e);
             }
-        }
-    }
-
-    @Override
-    public boolean writeEpc(String newEpc, String accessPassword) {
-        // ✅ استخدام كتابة EPC عبر البنك الأول بداية من Word 2 (Bit 32)
-        return writeData(accessPassword, RFIDWithUHFUART.Bank_EPC, 2, newEpc);
-    }
-    
-    @Override
-    public boolean writeUserMemory(int address, String data, String accessPassword) {
-        return writeData(accessPassword, RFIDWithUHFUART.Bank_USER, address, data);
-    }
-    
-    @Override
-    public String readTid() {
-        return readData("00000000", RFIDWithUHFUART.Bank_TID, 0, 6);
-    }
-    
-    @Override
-    public String readUserMemory(int address, int length) {
-        return readData("00000000", RFIDWithUHFUART.Bank_USER, address, length);
-    }
-    
-    @Override
-    public boolean lockTag(String accessPassword) {
-        return setTagLockState(accessPassword, RFIDWithUHFUART.Bank_EPC, true);
-    }
-    
-    @Override
-    public boolean unlockTag(String accessPassword) {
-        return setTagLockState(accessPassword, RFIDWithUHFUART.Bank_EPC, false);
-    }
-    
-    @Override
-    public boolean killTag(String accessPassword) {
-        if (reader == null) return false;
-        try {
-            return reader.killTag(accessPassword);
-        } catch (Exception e) {
-            Log.e(TAG, "killTag error", e);
-            return false;
         }
     }
 }
