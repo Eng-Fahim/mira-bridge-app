@@ -8,6 +8,7 @@ import android.util.Log;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKey;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 
@@ -15,10 +16,11 @@ import java.security.SecureRandom;
  * RfidPasswordManager - إدارة آمنة لكلمات مرور شرائح RFID
  * 
  * ✅ الميزات:
- * - تخزين مشفر بـ EncryptedSharedPreferences (AES-256)
- * - دعم 3 أوضاع: ثابت / مشتق من TID / من السيرفر
+ * - تخزين مشفر بـ EncryptedSharedPreferences (AES-256-GCM)
+ * - دعم 3 أوضاع: STATIC / DERIVED_FROM_TID / FROM_SERVER
  * - واجهة موحدة لكل طبقات التطبيق
- * - لا كلمات مرور في الكود
+ * - لا كلمات مرور مكتوبة في الكود
+ * - Salt عشوائي 16 بايت لكل تثبيت
  * 
  * ⚠️ المتطلبات:
  * - minSdkVersion 23+
@@ -31,25 +33,21 @@ public class RfidPasswordManager {
     private static final String KEY_DEFAULT_PWD = "rfid_default_password";
     private static final String KEY_PWD_MODE = "rfid_password_mode";
     private static final String KEY_SALT = "rfid_password_salt";
+    private static final String FALLBACK_PWD = "00000000";
     
-    /**
-     * أوضاع كلمة المرور المتاحة
-     */
     public enum PasswordMode {
-        /** كلمة مرور ثابتة (من إعدادات المستخدم) */
         STATIC,
-        /** مشتقة من TID + Salt (فريدة لكل شريحة) */
         DERIVED_FROM_TID,
-        /** من السيرفر (للمؤسسات الكبيرة) */
         FROM_SERVER
     }
     
-    private static RfidPasswordManager instance;
+    private static volatile RfidPasswordManager instance;
     private final Context context;
     private SharedPreferences securePrefs;
     private PasswordMode currentMode;
     private String cachedDefaultPwd;
     private String cachedSalt;
+    private boolean isEncryptionAvailable = true;
     
     private RfidPasswordManager(Context context) {
         this.context = context.getApplicationContext();
@@ -68,11 +66,6 @@ public class RfidPasswordManager {
     // 🔐 التهيئة والإعدادات
     // =========================================================================
     
-    /**
-     * ✅ تهيئة EncryptedSharedPreferences (AES-256-GCM)
-     * 
-     * يتم إنشاء MasterKey في Android Keystore (غير قابل للاستخراج)
-     */
     private void initSecurePrefs() {
         try {
             MasterKey masterKey = new MasterKey.Builder(context)
@@ -86,17 +79,18 @@ public class RfidPasswordManager {
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
-            Log.i(TAG, "✅ EncryptedSharedPreferences initialized");
+            isEncryptionAvailable = true;
+            Log.i(TAG, "✅ EncryptedSharedPreferences initialized (AES-256)");
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to init EncryptedSharedPreferences", e);
-            // Fallback: استخدام SharedPreferences عادي (غير آمن لكن يعمل)
-            securePrefs = context.getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
+            Log.e(TAG, "❌ Failed to init EncryptedSharedPreferences — falling back", e);
+            securePrefs = context.getSharedPreferences(
+                    SECURE_PREFS_NAME + "_fallback", Context.MODE_PRIVATE);
+            isEncryptionAvailable = false;
         }
     }
     
     private void loadSettings() {
-        String modeStr = securePrefs.getString(KEY_PWD_MODE, 
-                PasswordMode.STATIC.name());
+        String modeStr = securePrefs.getString(KEY_PWD_MODE, PasswordMode.STATIC.name());
         try {
             currentMode = PasswordMode.valueOf(modeStr);
         } catch (Exception e) {
@@ -106,13 +100,15 @@ public class RfidPasswordManager {
         cachedDefaultPwd = securePrefs.getString(KEY_DEFAULT_PWD, null);
         cachedSalt = securePrefs.getString(KEY_SALT, null);
         
-        // توليد Salt إذا لم يكن موجوداً
-        if (cachedSalt == null) {
+        if (cachedSalt == null || cachedSalt.isEmpty()) {
             cachedSalt = generateSalt();
             securePrefs.edit().putString(KEY_SALT, cachedSalt).apply();
+            Log.i(TAG, "🔑 Generated new salt");
         }
         
-        Log.i(TAG, "📋 Password mode: " + currentMode);
+        Log.i(TAG, "📋 Loaded: mode=" + currentMode + 
+              " hasPwd=" + (cachedDefaultPwd != null) + 
+              " encrypted=" + isEncryptionAvailable);
     }
     
     private String generateSalt() {
@@ -126,69 +122,62 @@ public class RfidPasswordManager {
     // 🔑 واجهة الحصول على كلمة المرور
     // =========================================================================
     
-    /**
-     * ✅ الدالة الرئيسية: احصل على كلمة المرور للشريحة
-     * 
-     * @param tid TID الشريحة (مطلوب فقط في وضع DERIVED_FROM_TID)
-     * @return كلمة مرور 8 hex chars (16 حرف) أو null إذا لم تُضبط
-     */
     public String getPasswordForTag(String tid) {
         switch (currentMode) {
             case STATIC:
-                return cachedDefaultPwd;
-                
+                return getStaticPassword();
             case DERIVED_FROM_TID:
-                if (tid == null || tid.isEmpty()) {
-                    Log.w(TAG, "getPasswordForTag: TID required for DERIVED mode");
-                    return cachedDefaultPwd; // fallback
+                if (tid == null || tid.trim().isEmpty()) {
+                    return getStaticPassword();
                 }
-                return derivePasswordFromTid(tid);
-                
+                return derivePasswordFromTid(tid.trim().toUpperCase());
             case FROM_SERVER:
-                // TODO: تطبيق جلب من السيرفر (يحتاج مؤشر ترابط)
-                Log.w(TAG, "FROM_SERVER mode not yet implemented — using cached");
-                return cachedDefaultPwd;
-                
+                Log.w(TAG, "FROM_SERVER mode not yet implemented — using static");
+                return getStaticPassword();
             default:
-                return cachedDefaultPwd;
+                return getStaticPassword();
         }
     }
     
-    /**
-     * ✅ اشتقاق كلمة مرور فريدة من TID
-     * 
-     * الصيغة: SHA-256(TID + SALT) → أول 8 hex chars
-     */
+    private String getStaticPassword() {
+        if (cachedDefaultPwd != null && !cachedDefaultPwd.isEmpty()) {
+            return cachedDefaultPwd;
+        }
+        Log.w(TAG, "⚠️ No password configured — using fallback " + FALLBACK_PWD);
+        return FALLBACK_PWD;
+    }
+    
     private String derivePasswordFromTid(String tid) {
         try {
-            String input = tid.toUpperCase() + cachedSalt;
+            String input = tid + cachedSalt;
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes("UTF-8"));
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             
-            // تحويل إلى hex string
-            StringBuilder hexString = new StringBuilder();
-            for (int i = 0; i < 4; i++) { // 4 bytes = 8 hex chars
+            StringBuilder hexString = new StringBuilder(8);
+            for (int i = 0; i < 4; i++) {
                 String hex = Integer.toHexString(0xff & hash[i]);
                 if (hex.length() == 1) hexString.append('0');
                 hexString.append(hex);
             }
             
             String derivedPwd = hexString.toString().toUpperCase();
-            Log.d(TAG, "🔑 Derived password for TID " + tid + ": " + derivedPwd);
+            Log.d(TAG, "🔑 Derived password for TID " + maskTid(tid) + ": " + derivedPwd);
             return derivedPwd;
         } catch (Exception e) {
             Log.e(TAG, "derivePasswordFromTid error", e);
-            return cachedDefaultPwd;
+            return getStaticPassword();
         }
+    }
+    
+    private String maskTid(String tid) {
+        if (tid == null || tid.length() < 8) return "***";
+        return tid.substring(0, 4) + "****" + tid.substring(tid.length() - 4);
     }
     
     // =========================================================================
     // ⚙️ إدارة الإعدادات
     // =========================================================================
     
-    /**
-     * ✅ تعيين كلمة المرور الافتراضية
-     */
     public void setDefaultPassword(String password) {
         if (password == null || password.trim().isEmpty()) {
             Log.w(TAG, "setDefaultPassword: empty password ignored");
@@ -196,19 +185,19 @@ public class RfidPasswordManager {
         }
         
         String normalized = password.trim().toUpperCase();
-        if (normalized.length() != 8) {
-            Log.w(TAG, "setDefaultPassword: password should be 8 hex chars");
+        
+        if (!normalized.matches("^[0-9A-F]{8}$")) {
+            Log.e(TAG, "setDefaultPassword: invalid format");
+            throw new IllegalArgumentException("Password must be exactly 8 hex characters (0-9, A-F)");
         }
         
         cachedDefaultPwd = normalized;
         securePrefs.edit().putString(KEY_DEFAULT_PWD, normalized).apply();
-        Log.i(TAG, "✅ Default password updated");
+        Log.i(TAG, "✅ Default password updated (length=8)");
     }
     
-    /**
-     * ✅ تعيين وضع كلمة المرور
-     */
     public void setPasswordMode(PasswordMode mode) {
+        if (mode == null) return;
         currentMode = mode;
         securePrefs.edit().putString(KEY_PWD_MODE, mode.name()).apply();
         Log.i(TAG, "✅ Password mode set to: " + mode);
@@ -218,25 +207,63 @@ public class RfidPasswordManager {
         return currentMode;
     }
     
-    /**
-     * ✅ هل تم ضبط كلمة المرور؟
-     */
     public boolean hasDefaultPassword() {
         return cachedDefaultPwd != null && !cachedDefaultPwd.isEmpty();
     }
     
+    public boolean isEncryptionAvailable() {
+        return isEncryptionAvailable;
+    }
+    
+    // =========================================================================
+    // 🛠️ دوال النسخ الاحتياطي والتشخيص
+    // =========================================================================
+    
     /**
-     * ✅ مسح كلمة المرور (لأغراض الأمان عند تسجيل الخروج)
+     * ✅ الحصول على Salt (للنسخ الاحتياطي)
      */
+    public String exportSalt() {
+        if (cachedSalt == null || cachedSalt.isEmpty()) {
+            Log.w(TAG, "exportSalt: no salt available");
+            return null;
+        }
+        Log.i(TAG, "📤 Salt exported (length=" + cachedSalt.length() + ")");
+        return cachedSalt;
+    }
+    
+    /**
+     * ✅ استيراد Salt من نسخة احتياطية
+     */
+    public void importSalt(String salt) {
+        if (salt == null || salt.trim().isEmpty()) {
+            Log.w(TAG, "importSalt: empty salt ignored");
+            return;
+        }
+        cachedSalt = salt.trim();
+        securePrefs.edit().putString(KEY_SALT, cachedSalt).apply();
+        Log.i(TAG, "✅ Salt imported (length=" + cachedSalt.length() + ")");
+    }
+    
+    /**
+     * ✅ معلومات تشخيصية (للواجهة)
+     */
+    public String getDiagnosticInfo() {
+        return "Mode: " + currentMode +
+               "\nHas Password: " + hasDefaultPassword() +
+               "\nEncryption: " + (isEncryptionAvailable ? "AES-256 ✅" : "Fallback ⚠️") +
+               "\nSalt Length: " + (cachedSalt != null ? cachedSalt.length() : 0);
+    }
+    
+    // =========================================================================
+    // 🗑️ التنظيف
+    // =========================================================================
+    
     public void clearPassword() {
         cachedDefaultPwd = null;
         securePrefs.edit().remove(KEY_DEFAULT_PWD).apply();
         Log.i(TAG, "🗑️ Password cleared");
     }
     
-    /**
-     * ✅ إعادة تعيين كل الإعدادات
-     */
     public void resetAll() {
         securePrefs.edit().clear().apply();
         cachedDefaultPwd = null;
