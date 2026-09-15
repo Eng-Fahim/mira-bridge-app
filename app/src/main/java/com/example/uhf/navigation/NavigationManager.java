@@ -7,12 +7,12 @@ import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.fragment.*;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.R;
 import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 
 import java.util.ArrayList;
@@ -20,13 +20,14 @@ import java.util.List;
 
 /**
  * NavigationManager — النسخة النهائية المستقرة
- * 
+ *
  * ✅ يستخدم replace() بدلاً من hide/show
  * ✅ يمسح Back Stack عند الانتقال بين التبويبات الرئيسية
  * ✅ يقرأ الحالة الحقيقية من FragmentManager
  * ✅ يحفظ lastRootTag للرجوع الصحيح
  * ✅ logs تفصيلية للتشخيص
  * ✅ آمن ضد Process Death و Configuration Change
+ * ✅ يدعم BackPressInterceptor (للجرد النشط)
  */
 public class NavigationManager {
 
@@ -72,6 +73,19 @@ public class NavigationManager {
     private String lastRootTag = TAG_DASHBOARD;
     private boolean loggingEnabled = true;
 
+    // ✅ مرجع الـ Fragment الحالي (للتوافق مع UHFMainActivity)
+    public Fragment currentFragment;
+
+    // ✅ مرجع الـ Activity (للـ OnBackPressedDispatcher)
+    private FragmentActivity activityRef;
+
+    // ✅ Interceptor لمعالجة حدث الرجوع (مثل الجرد النشط)
+    public interface BackPressInterceptor {
+        boolean onBackPressed();
+    }
+
+    private BackPressInterceptor backPressInterceptor;
+
     // ==================== Constructor ====================
 
     public NavigationManager(@NonNull FragmentManager fragmentManager,
@@ -82,22 +96,28 @@ public class NavigationManager {
         this.containerId = containerId;
     }
 
+    // ==================== Attach ====================
+
+    public void attachToActivity(@NonNull FragmentActivity activity) {
+        this.activityRef = activity;
+    }
+
+    public void setBackPressInterceptor(BackPressInterceptor interceptor) {
+        this.backPressInterceptor = interceptor;
+    }
+
+    private FragmentActivity getActivity() {
+        return activityRef;
+    }
+
     // ==================== التنقل الرئيسي ====================
 
-    /**
-     * الانتقال إلى Fragment.
-     * - إذا كان root: يمسح الـ Back Stack بالكامل
-     * - إذا كان فرعي: يُضاف إلى Back Stack
-     */
     public void loadFragment(@NonNull Fragment fragment,
                              @NonNull String tag,
                              boolean addToBackStack) {
         loadFragment(fragment, tag, addToBackStack, false);
     }
 
-    /**
-     * نسخة موسّعة مع إمكانية فرض إعادة التحميل.
-     */
     public void loadFragment(@NonNull Fragment fragment,
                              @NonNull String tag,
                              boolean addToBackStack,
@@ -135,12 +155,9 @@ public class NavigationManager {
 
             FragmentTransaction tx = fragmentManager.beginTransaction();
             tx.setReorderingAllowed(true);
-            tx.setCustomAnimations(0, 0, 0, 0); // يمكنك تغييرها لانتقالات
+            tx.setCustomAnimations(0, 0, 0, 0);
 
-            // ✅ replace بدل hide/show
             tx.replace(containerId, target, tag);
-
-            // ✅ تعيين كـ Primary Navigation Fragment
             tx.setPrimaryNavigationFragment(target);
 
             if (addToBackStack) {
@@ -150,6 +167,7 @@ public class NavigationManager {
             tx.commit();
 
             currentFragmentTag = tag;
+            currentFragment = target;   // ✅ جديد
 
             log("✅ Navigated to: " + tag + " (backStack=" + addToBackStack + ")");
 
@@ -160,9 +178,6 @@ public class NavigationManager {
         }
     }
 
-    /**
-     * الانتقال المباشر (بدون Back Stack) — يُستخدم عند العودة للرئيسية.
-     */
     public void loadFragmentDirectly(@NonNull Fragment fragment, @NonNull String tag) {
         if (fragmentManager.isStateSaved()) {
             log("loadFragmentDirectly skipped - state saved: " + tag);
@@ -172,10 +187,8 @@ public class NavigationManager {
         try {
             logState("BEFORE loadFragmentDirectly: " + tag);
 
-            // ✅ امسح كل الـ Back Stack
             clearBackStackInternal();
 
-            // ✅ احفظ root tag إذا كان من التبويبات الرئيسية
             if (isRootTag(tag)) {
                 lastRootTag = tag;
             }
@@ -188,6 +201,7 @@ public class NavigationManager {
             tx.commit();
 
             currentFragmentTag = tag;
+            currentFragment = fragment;   // ✅ جديد
 
             log("✅ Direct load: " + tag);
 
@@ -200,12 +214,13 @@ public class NavigationManager {
 
     // ==================== الرجوع ====================
 
-    /**
-     * التعامل مع زر الرجوع.
-     * @return true إذا تم التعامل مع الحدث، false إذا يجب على Activity إنهاء نفسه.
-     */
     public boolean handleBackPress() {
-        // ✅ الحالة 1: هناك Back Stack → ارجع خطوة واحدة
+        // ✅ 0) استدعِ الـ Interceptor أولاً (للجرد النشط مثلاً)
+        if (backPressInterceptor != null && backPressInterceptor.onBackPressed()) {
+            return true;
+        }
+
+        // ✅ 1) هناك Back Stack → ارجع خطوة واحدة
         if (fragmentManager.getBackStackEntryCount() > 0) {
             fragmentManager.popBackStackImmediate();
             updateCurrentTagFromBackStack();
@@ -213,7 +228,7 @@ public class NavigationManager {
             return true;
         }
 
-        // ✅ الحالة 2: لسنا على آخر root tag → اذهب إليه
+        // ✅ 2) لسنا على آخر root tag → اذهب إليه
         if (!lastRootTag.equals(currentFragmentTag)) {
             log("⬅️ Going back to last root: " + lastRootTag);
             Fragment rootFragment = createFragmentByTag(lastRootTag);
@@ -221,21 +236,16 @@ public class NavigationManager {
             return true;
         }
 
-        // ✅ الحالة 3: نحن على root tag ولا يوجد Back Stack → اترك النظام يقرر
+        // ✅ 3) نحن على root tag ولا يوجد Back Stack → اترك النظام يقرر
         return false;
     }
 
-    /**
-     * تسجيل OnBackPressedCallback على Activity.
-     * استخدم هذه الدالة بدلاً من onBackPressed() القديمة.
-     */
     @NonNull
     public OnBackPressedCallback createBackPressedCallback() {
         return new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
                 if (!handleBackPress()) {
-                    // اترك النظام يتعامل معه (خروج من التطبيق)
                     setEnabled(false);
                     if (getActivity() != null) {
                         getActivity().getOnBackPressedDispatcher().onBackPressed();
@@ -245,7 +255,6 @@ public class NavigationManager {
         };
     }
 
-    /** الانتقال المباشر للرئيسية (Dashboard) */
     public void goToDashboard() {
         loadFragmentDirectly(createFragmentByTag(TAG_DASHBOARD), TAG_DASHBOARD);
     }
@@ -270,8 +279,13 @@ public class NavigationManager {
             FragmentManager.BackStackEntry entry = fragmentManager.getBackStackEntryAt(count - 1);
             currentFragmentTag = entry.getName();
         } else {
-            // ✅ الرجوع إلى آخر root tag محفوظ
             currentFragmentTag = lastRootTag;
+        }
+
+        // ✅ حدّث currentFragment أيضاً
+        Fragment f = fragmentManager.findFragmentByTag(currentFragmentTag);
+        if (f != null) {
+            currentFragment = f;
         }
     }
 
@@ -330,7 +344,16 @@ public class NavigationManager {
 
     @Nullable
     public Fragment getCurrentFragment() {
-        return fragmentManager.findFragmentByTag(currentFragmentTag);
+        if (fragmentManager == null) return currentFragment;
+
+        // أولاً: ابحث بالـ tag الحالي
+        Fragment f = fragmentManager.findFragmentByTag(currentFragmentTag);
+        if (f != null && f.isAdded()) {
+            return f;
+        }
+
+        // ثانياً: fallback
+        return currentFragment;
     }
 
     public String getLastRootTag() {
@@ -373,17 +396,5 @@ public class NavigationManager {
         sb.append("═══════════════════════════════════════");
 
         Log.d(TAG, sb.toString());
-    }
-
-    // ==================== Helper مؤقت للـ Callback ====================
-
-    private androidx.fragment.app.FragmentActivity activityRef;
-
-    public void attachToActivity(@NonNull androidx.fragment.app.FragmentActivity activity) {
-        this.activityRef = activity;
-    }
-
-    private androidx.fragment.app.FragmentActivity getActivity() {
-        return activityRef;
     }
 }
