@@ -4,8 +4,12 @@ import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
+// احذف:
+// import android.media.AudioManager;
+// import android.media.ToneGenerator;
+
+// أضف:
+import com.example.uhf.MiraRfid.sound.MiraSoundManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -86,9 +90,10 @@ public class LoginActivity extends AppCompatActivity {
     private View loadingContainer, loginCard, logoContainer, successOverlay;
 
     private SessionManager sessionManager;
-    private MiraApiClient apiClient;
-    private MiraOrgProfileManager orgProfileManager;
-    private MiraOrgProfileManager.OnProfileChangedListener profileListener;
+private MiraApiClient apiClient;
+private MiraOrgProfileManager orgProfileManager;
+private MiraSoundManager soundManager;   
+private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     private BiometricPrompt biometricPrompt;
     private BiometricPrompt.PromptInfo promptInfo;
 
@@ -125,7 +130,7 @@ public class LoginActivity extends AppCompatActivity {
         isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
 
         sessionManager = new SessionManager(getApplicationContext());
-
+        soundManager = MiraSoundManager.getInstance(getApplicationContext());  // ✅ أُضيف
         // 3. التحقق المباشر من الجلسة
         if (sessionManager.isLoggedIn()) {
             if (sessionManager.hasValidToken()) {
@@ -138,9 +143,13 @@ public class LoginActivity extends AppCompatActivity {
 
         // 4. معالجة انتهاء الجلسة إن وجدت
         if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
-            Toast.makeText(this,
-                    isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again",
-                    Toast.LENGTH_LONG).show();
+    Toast.makeText(this,
+            isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again",
+            Toast.LENGTH_LONG).show();
+    // ✅ صوت تسجيل الخروج
+    if (soundManager != null) {
+        soundManager.play(MiraSoundManager.SoundEvent.LOGOUT);
+    }
         }
 
         orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
@@ -902,14 +911,17 @@ public class LoginActivity extends AppCompatActivity {
         return salt;
     }
 
-    private void playTone(boolean isSuccess) {
-        try {
-            ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
-            toneGen.startTone(isSuccess ? ToneGenerator.TONE_PROP_ACK : ToneGenerator.TONE_SUP_ERROR, 150);
-        } catch (Exception e) {
-            Log.e(TAG, "Tone error: " + e.getMessage());
-        }
-    }
+    /**
+ * ✅ Wrapper حول MiraSoundManager
+ *    isSuccess=true  → LOGIN_SUCCESS
+ *    isSuccess=false → LOGIN_FAILED
+ */
+private void playTone(boolean isSuccess) {
+    if (soundManager == null) return;
+    soundManager.play(isSuccess
+            ? MiraSoundManager.SoundEvent.LOGIN_SUCCESS
+            : MiraSoundManager.SoundEvent.LOGIN_FAILED);
+}
 
     private String getErrorMessage(int errorCode, String fallbackMessage) {
         switch (errorCode) {
