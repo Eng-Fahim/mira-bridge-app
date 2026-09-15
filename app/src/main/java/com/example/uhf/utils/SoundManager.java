@@ -1,28 +1,27 @@
 package com.example.uhf.utils;
 
 import android.content.Context;
-import android.media.AudioAttributes;
-import android.media.SoundPool;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 
-import com.example.uhf.R;
-import com.example.uhf.tools.SoundGenerator;
+import com.example.uhf.MiraRfid.sound.MiraSoundManager;
+import com.example.uhf.MiraRfid.sound.MiraSoundManager.SoundEvent;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
+/**
+ * ✅ SoundManager - Wrapper للتوافق مع الكود القديم
+ * 
+ * يحوّل FeedbackType (القديم) → SoundEvent (الجديد)
+ * ثم يستدعي MiraSoundManager (المصدر الوحيد)
+ * 
+ * الفائدة:
+ * - الكود القديم (playBeep) يعمل بدون تغيير
+ * - إعدادات MiraSoundSettingsFragment تُطبَّق تلقائياً
+ * - لا تكرار في المنطق
+ */
 public class SoundManager {
 
-    private static final String TAG = "SoundManager";
-    private static final int MAX_SOUND_STREAMS = 5;
-    private static final float BEEP_VOLUME = 0.7f;
-    private static final float BEEP_RATE = 1.0f;
-    private static final int BEEP_PRIORITY = 0;
-    private static final int BEEP_LOOP = 0;
-    private static final long BEEP_THROTTLE_MS = 60;
+    private static final String TAG = "SoundManager (Wrapper)";
 
+    // ✅ الاحتفاظ بـ enum القديم للتوافق
     public enum FeedbackType {
         KNOWN_ITEM,
         UNKNOWN_ITEM,
@@ -32,151 +31,120 @@ public class SoundManager {
         ERROR
     }
 
-    private SoundPool soundPool;
-    private int beepSoundId;
-    private int successSoundId;
-    private int errorSoundId;
-    private int duplicateSoundId;
-    private boolean soundLoaded = false;
-    private long lastBeepTime = 0;
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private final ExecutorService soundExecutor = Executors.newSingleThreadExecutor();
+    private final MiraSoundManager miraSoundManager;
 
+    // ==================== Constructor ====================
 
     public SoundManager(Context context) {
-        initSoundPool(context);
+        // ✅ استخدام Singleton من MiraSoundManager
+        this.miraSoundManager = MiraSoundManager.getInstance(context);
+        Log.d(TAG, "SoundManager (wrapper) initialized");
     }
 
-    private void initSoundPool(Context context) {
-        AudioAttributes attributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
+    // ==================== playBeep (الواجهة القديمة) ====================
 
-        soundPool = new SoundPool.Builder()
-                .setMaxStreams(MAX_SOUND_STREAMS)
-                .setAudioAttributes(attributes)
-                .build();
-
-        beepSoundId = soundPool.load(context, R.raw.barcodebeep, 1);
-        successSoundId = soundPool.load(context, R.raw.barcodebeep, 1);
-        errorSoundId = soundPool.load(context, R.raw.barcodebeep, 1);
-        duplicateSoundId = soundPool.load(context, R.raw.barcodebeep, 1);
-
-        soundPool.setOnLoadCompleteListener((sp, sampleId, status) -> {
-            soundLoaded = (status == 0);
-            if (!soundLoaded) {
-                Log.w(TAG, "Failed to load sounds, status: " + status);
-            }
-        });
-    }
-
+    /**
+     * ✅ تحويل FeedbackType → SoundEvent + التشغيل
+     */
     public void playBeep(FeedbackType feedbackType) {
-        long now = System.currentTimeMillis();
-        if (!soundLoaded || (now - lastBeepTime <= BEEP_THROTTLE_MS)) {
-            return;
-        }
-
-        float rate = BEEP_RATE;
-        float volume = BEEP_VOLUME;
-        int soundId = beepSoundId;
-
-        switch (feedbackType) {
-            case KNOWN_ITEM:
-                rate = 1.0f;
-                volume = 0.8f;
-                soundId = successSoundId;
-                break;
-            case UNKNOWN_ITEM:
-                rate = 0.7f;
-                volume = 0.6f;
-                soundId = errorSoundId;
-                break;
-            case DUPLICATE_ITEM:
-                rate = 1.5f;
-                volume = 0.5f;
-                soundId = duplicateSoundId;
-                break;
-            case MISSING_ITEM:
-                rate = 0.5f;
-                volume = 0.9f;
-                soundId = errorSoundId;
-                break;
-            case COMPLETED:
-                final float completedRate = 1.2f;
-                final float completedVolume = 1.0f;
-                final int completedSoundId = successSoundId;
-
-                soundPool.play(completedSoundId, completedVolume, completedVolume,
-                        BEEP_PRIORITY, BEEP_LOOP, completedRate);
-                handler.postDelayed(() -> {
-                    if (soundPool != null) {
-                        soundPool.play(completedSoundId, completedVolume, completedVolume,
-                                BEEP_PRIORITY, BEEP_LOOP, completedRate);
-                    }
-                }, 200);
-                lastBeepTime = now;
-                return;
-            case ERROR:
-                rate = 0.6f;
-                volume = 0.8f;
-                soundId = errorSoundId;
-                break;
-        }
-
-        final float finalRate = rate;
-        final float finalVolume = volume;
-        final int finalSoundId = soundId;
-
+        if (feedbackType == null) return;
+        
         try {
-            if (soundPool != null) {
-                soundPool.play(finalSoundId, finalVolume, finalVolume,
-                        BEEP_PRIORITY, BEEP_LOOP, finalRate);
-                lastBeepTime = now;
+            SoundEvent event = mapFeedbackToEvent(feedbackType);
+            if (event != null) {
+                miraSoundManager.play(event);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error playing sound", e);
+            Log.e(TAG, "playBeep error: " + e.getMessage());
         }
     }
 
-    public void playSound(Context context, int id) {
-        soundExecutor.execute(() -> {
-            try {
-                String soundName = (id == 1) ? "beep_success" : "beep_error";
-                SoundGenerator.playSound(soundName);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+    /**
+     * ✅ التحويل بين الأنظمة
+     */
+    private SoundEvent mapFeedbackToEvent(FeedbackType feedbackType) {
+        switch (feedbackType) {
+            case KNOWN_ITEM:
+                // قراءة قطعة معروفة (في الكتالوج)
+                return SoundEvent.TAG_READ_NEW;
+            
+            case UNKNOWN_ITEM:
+                // قراءة قطعة غير معروفة
+                return SoundEvent.SEARCH_NOT_FOUND;
+            
+            case DUPLICATE_ITEM:
+                // قراءة قطعة مكررة
+                return SoundEvent.TAG_READ_DUPLICATE;
+            
+            case MISSING_ITEM:
+                // قطعة مفقودة (لم تُمسح)
+                return SoundEvent.TAWKID_REJECTED;
+            
+            case COMPLETED:
+                // اكتمال الجرد
+                return SoundEvent.GENERAL_SUCCESS;
+            
+            case ERROR:
+                // خطأ عام
+                return SoundEvent.GENERAL_ERROR;
+            
+            default:
+                return SoundEvent.TAG_READ_NEW;
+        }
     }
 
+    // ==================== الواجهات القديمة الأخرى ====================
+
+    /**
+     * ✅ playSound — متوافق مع الكود القديم
+     */
+    public void playSound(Context context, int id) {
+        try {
+            SoundEvent event = (id == 1) ? SoundEvent.GENERAL_SUCCESS : SoundEvent.GENERAL_ERROR;
+            miraSoundManager.play(event);
+        } catch (Exception e) {
+            Log.e(TAG, "playSound error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ playSuccessSound — متوافق
+     */
     public void playSuccessSound(Context context) {
         playSound(context, 1);
     }
 
+    /**
+     * ✅ playErrorSound — متوافق
+     */
     public void playErrorSound(Context context) {
         playSound(context, 2);
     }
 
+    /**
+     * ✅ playDelayedSound — متوافق
+     */
     public void playDelayedSound(Context context, int value) {
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             playSound(context, 1);
         }, Math.max(10, 1000 - (value * 10)));
     }
 
+    // ==================== Cleanup ====================
+
+    /**
+     * ✅ release — متوافق (لكن لا يفعل شيئاً — Singleton يبقى)
+     */
     public void release() {
-        if (soundPool != null) {
-            try {
-                soundPool.release();
-                soundPool = null;
-            } catch (Exception e) {
-                Log.e(TAG, "Error releasing sound pool", e);
-            }
-        }
+        // ✅ لا نفعل شيئاً — MiraSoundManager Singleton يبقى حياً
+        Log.d(TAG, "release called — ignoring (MiraSoundManager is Singleton)");
     }
 
+    /**
+     * ✅ cleanup — متوافق
+     */
     public void cleanup() {
-        soundExecutor.shutdown();
-        release();
+        // ✅ لا نفعل شيئاً
+        Log.d(TAG, "cleanup called — ignoring (MiraSoundManager is Singleton)");
     }
 }
