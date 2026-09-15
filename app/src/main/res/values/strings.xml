@@ -2189,4 +2189,69 @@
 <!-- شاشة التحويلات -->
 <string name="menu_export">تصدير</string>
 <string name="menu_import">استيراد</string>
+
+
+<!-- ==================== RFID Password Settings ==================== -->
+<string name="pwd_settings_title">إعدادات أمان شرائح RFID</string>
+<string name="pwd_settings_subtitle">إدارة كلمات المرور المستخدمة لكتابة وقفل شرائح UHF</string>
+
+<!-- أوضاع كلمة المرور -->
+<string name="pwd_mode_label">وضع كلمة المرور</string>
+<string name="pwd_mode_static">ثابتة (من الإعدادات)</string>
+<string name="pwd_mode_static_desc">كلمة واحدة لكل الشرائح — مناسبة للبداية</string>
+<string name="pwd_mode_derived">مشتقة من TID (موصى به)</string>
+<string name="pwd_mode_derived_desc">كلمة فريدة لكل شريحة = SHA-256(TID + Salt)</string>
+<string name="pwd_mode_server">من السيرفر (للمؤسسات)</string>
+<string name="pwd_mode_server_desc">جلب كلمة المرور من سيرفر MIRA عند الطلب</string>
+
+<!-- كلمة المرور -->
+<string name="pwd_field_hint">كلمة المرور (8 حروف Hex)</string>
+<string name="pwd_hint_8_hex">مثال: 00000000 أو ABCD1234</string>
+<string name="pwd_saved_encrypted">محفوظة ومشفرة بـ AES-256 — اضغط لإعادة التعيين</string>
+
+<!-- الأزرار -->
+<string name="pwd_save">حفظ</string>
+<string name="pwd_test_on_tag">اختبار على شريحة</string>
+
+<!-- النسخ الاحتياطي -->
+<string name="pwd_backup_title">النسخ الاحتياطي للـ Salt</string>
+<string name="pwd_backup_desc">في وضع "مشتقة من TID"، الـ Salt ضروري لاسترجاع كلمات المرور. احفظه في مكان آمن.</string>
+<string name="pwd_export_salt">تصدير</string>
+<string name="pwd_import_salt">استيراد</string>
+
+<!-- إعادة التعيين -->
+<string name="pwd_reset_all">إعادة تعيين كل الإعدادات</string>
+<string name="pwd_reset_title">⚠️ تأكيد إعادة التعيين</string>
+<string name="pwd_reset_warning">سيتم حذف كلمة المرور والـ Salt نهائياً.\n\n⚠️ إذا كنت تستخدم وضع "مشتقة من TID"، لن تتمكن من استرجاع كلمات مرور الشرائح المقفلة!</string>
+<string name="pwd_reset_confirm">تأكيد</string>
+<string name="pwd_reset_done">تمت إعادة التعيين</string>
+
+<!-- الرسائل -->
+<string name="pwd_enter_password">يرجى إدخال كلمة المرور</string>
+<string name="pwd_must_be_8_hex">كلمة المرور يجب أن تكون 8 حروف Hex</string>
+<string name="pwd_must_be_hex">يُسمح فقط بحروف: 0-9 و A-F</string>
+<string name="pwd_saved_securely">✅ تم حفظ الإعدادات بأمان</string>
+<string name="pwd_save_first">⚠️ يرجى حفظ كلمة المرور أولاً</string>
+<string name="pwd_reading_tag">📡 جاري قراءة الشريحة...</string>
+<string name="pwd_no_tag_found">⚠️ لم يتم قراءة شريحة — قرّب شريحة من القارئ</string>
+<string name="pwd_test_result">نتيجة الاختبار</string>
+<string name="pwd_tid_label">TID:</string>
+<string name="pwd_password_label">كلمة المرور:</string>
+<string name="pwd_mode_label_result">الوضع:</string>
+<string name="pwd_copy">نسخ</string>
+<string name="pwd_close">إغلاق</string>
+<string name="pwd_cancel">إلغاء</string>
+<string name="pwd_copied">✅ تم النسخ</string>
+
+<!-- Salt -->
+<string name="pwd_no_salt">⚠️ لا يوجد Salt محفوظ</string>
+<string name="pwd_export_salt_title">📤 تصدير Salt</string>
+<string name="pwd_export_salt_warning">⚠️ احفظ هذا النص في مكان آمن — بدونه لا يمكن استرجاع كلمات المرور</string>
+<string name="pwd_salt_copied">✅ تم نسخ Salt</string>
+<string name="pwd_import_salt_title">📥 استيراد Salt</string>
+<string name="pwd_import_salt_warning">الصق Salt من نسخة احتياطية:</string>
+<string name="pwd_paste_salt_hint">الصق Salt هنا...</string>
+<string name="pwd_import">استيراد</string>
+<string name="pwd_empty_salt">⚠️ Salt فارغ</string>
+<string name="pwd_salt_imported">✅ تم استيراد Salt</string>
 </resources>
