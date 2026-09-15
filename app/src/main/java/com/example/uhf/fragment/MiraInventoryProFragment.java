@@ -2282,41 +2282,47 @@ private void stopSimulationLoop() {
     }
     
     private List<InventoryReport> fetchArchiveReports() {
-        if (persistenceManager == null || apiClient == null || branchesManager == null) {
-            return new ArrayList<>();
-        }
-        
-        final List<InventoryReport>[] result = new List[1];
-        result[0] = new ArrayList<>();
-        
-        final java.util.concurrent.CountDownLatch latch =
-                new java.util.concurrent.CountDownLatch(1);
-        
-        int branchId = branchesManager.getActiveBranchId();
-        
-        persistenceManager.fetchArchiveReports(apiClient, branchId,
-                new InventoryPersistenceManager.ArchiveCallback() {
-            @Override
-            public void onArchiveLoaded(List<InventoryReport> reports) {
-                result[0] = reports != null ? reports : new ArrayList<>();
-                latch.countDown();
-            }
-            
-            @Override
-            public void onArchiveError(String error) {
-                Log.e(TAG, "Archive fetch error: " + error);
-                latch.countDown();
-            }
-        });
-        
-        try {
-            latch.await(30, java.util.concurrent.TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        
-        return result[0];
+    if (persistenceManager == null || apiClient == null || branchesManager == null) {
+        Log.e(TAG, "fetchArchiveReports: missing dependencies");
+        return new ArrayList<>();
     }
+    
+    final java.util.concurrent.atomic.AtomicReference<List<InventoryReport>> 
+            resultHolder = new java.util.concurrent.atomic.AtomicReference<>(
+                    new ArrayList<>());
+    
+    final java.util.concurrent.CountDownLatch latch =
+            new java.util.concurrent.CountDownLatch(1);
+    
+    int branchId = branchesManager.getActiveBranchId();
+    
+    persistenceManager.fetchArchiveReports(apiClient, branchId,
+            new InventoryPersistenceManager.ArchiveCallback() {
+        @Override
+        public void onArchiveLoaded(List<InventoryReport> reports) {
+            resultHolder.set(reports != null ? reports : new ArrayList<>());
+            latch.countDown();
+        }
+        
+        @Override
+        public void onArchiveError(String error) {
+            Log.e(TAG, "Archive fetch error: " + error);
+            latch.countDown();
+        }
+    });
+    
+    try {
+        // ✅ 5 ثوان فقط
+        boolean completed = latch.await(5, TimeUnit.SECONDS);
+        if (!completed) {
+            Log.e(TAG, "fetchArchiveReports: TIMEOUT after 5s");
+        }
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    }
+    
+    return resultHolder.get();
+}
     
     private void displayArchiveDialog(List<InventoryReport> reports) {
         if (!isAdded() || isFragmentDestroyed) return;
