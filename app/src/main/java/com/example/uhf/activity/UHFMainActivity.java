@@ -91,6 +91,8 @@ import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.fragment.MiraGateSettingsFragment;
+import com.example.uhf.fragment.MiraRfidSettingsFragment;
+
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
@@ -530,6 +532,10 @@ else if (id == R.id.action_inventory_power) {
             optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
             actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
         }
+        if (pm.isAdmin() || pm.isSystemAdmin()) {
+        optionsList.add(isArabic ? "🔐 إعدادات أمان الشرائح" : "🔐 RFID Security Settings");
+        actionsList.add(() -> loadFragment(new MiraRfidSettingsFragment(), "RfidSettings"));
+    }
 
         if (pm.canManageQuickAccess() || pm.isManager() || pm.isAdmin()) {
             optionsList.add(isArabic ? "⚙️ إعدادات الوصول السريع" : "⚙️ Quick Access Settings");
