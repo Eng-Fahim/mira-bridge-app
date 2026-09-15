@@ -1527,139 +1527,67 @@ private void startBlindInventory() {
 
 private void loadCatalogAndStart() {
     if (!isAdded() || isFragmentDestroyed) return;
-
-    // ✅ تحديث apiClient
-    try {
-        MiraApiClient.reloadInstance(requireContext());
-        apiClient = MiraApiClient.getInstance(requireContext());
-    } catch (Exception e) {
-        Log.e(TAG, "apiClient reload error: " + e.getMessage());
+    
+    // ✅ Log التشخيص
+    Log.e("MIRA_LOAD", "═══════════════════════════");
+    Log.e("MIRA_LOAD", "apiClient: " + (apiClient != null ? "OK" : "NULL"));
+    Log.e("MIRA_LOAD", "catalogManager: " + (catalogManager != null ? "OK" : "NULL"));
+    Log.e("MIRA_LOAD", "branchesManager: " + (branchesManager != null ? "OK" : "NULL"));
+    
+    if (apiClient != null) {
+        Log.e("MIRA_LOAD", "apiUrl: " + apiClient.getApiUrl());
+        Log.e("MIRA_LOAD", "hasValidCredentials: " + apiClient.hasValidCredentials());
     }
-
-    Toast.makeText(requireContext(),
-            isArabic ? "🔄 جاري تحميل البيانات..." : "🔄 Loading data...",
-            Toast.LENGTH_SHORT).show();
-
-    if (catalogManager == null) {
-        Log.e(TAG, "❌ catalogManager is null");
-        isScanning = false;
-        return;
+    
+    if (branchesManager != null) {
+        Log.e("MIRA_LOAD", "branchId: " + branchesManager.getActiveBranchId());
     }
+    Log.e("MIRA_LOAD", "═══════════════════════════");
+    
+    Toast.makeText(requireContext(), 
+        isArabic ? "🔄 جاري تحميل البيانات..." : "🔄 Loading data...", 
+        Toast.LENGTH_SHORT).show();
+    
+    if (backgroundExecutor == null || backgroundExecutor.isShutdown()) {
+        backgroundExecutor = Executors.newSingleThreadExecutor();
+    }
+    
+    // ✅ استخدم الطريقة القديمة (المتزامنة)
+    backgroundExecutor.execute(() -> {
+        Map<String, InventoryItem> catalog = fetchCatalogFromServer();
+        
+        mainThreadHandler.post(() -> {
+            if (!isAdded() || isFragmentDestroyed) return;
+            
+            Log.e("MIRA_LOAD", "Catalog size: " + (catalog != null ? catalog.size() : 0));
+            
+            if (inventoryEngine != null) {
+                inventoryEngine.startSession(catalog);
+            }
+            
+            catalogEpcs.clear();
+            if (catalog != null) {
+                catalogEpcs.addAll(catalog.keySet());
+            }
+            
+            expectedCount = catalog != null ? catalog.size() : 0;
+            if (tvExpectedCount != null) {
+                tvExpectedCount.setText(String.valueOf(expectedCount));
+            }
+            
+            if (progressScanned != null) {
+                progressScanned.setMax(100);
+                progressScanned.setProgress(0);
+            }
+            
+            if (tvProgressPercent != null) {
+                tvProgressPercent.setText("0%");
+            }
 
-    // ✅ Timeout
-    final java.util.concurrent.atomic.AtomicBoolean responded =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
-
-    mainThreadHandler.postDelayed(() -> {
-        if (!responded.get() && isScanning && isAdded() && !isFragmentDestroyed) {
-            Log.e(TAG, "⏱️ TIMEOUT - catalog not loaded in 15s");
-            Toast.makeText(requireContext(),
-                    isArabic ? "⚠️ انتهت المهلة" : "⚠️ Timeout",
-                    Toast.LENGTH_LONG).show();
             startReadingSource();
-        }
-    }, 15000);
-
-    catalogManager.fetchCatalog(apiClient, branchesManager,
-            new InventoryCatalogManager.CatalogCallback() {
-        @Override
-        public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
-            responded.set(true);
-
-            mainThreadHandler.post(() -> {
-                if (!isAdded() || isFragmentDestroyed) return;
-
-                try {
-                    Map<String, InventoryItem> finalCatalog =
-                            catalog != null ? catalog : new ConcurrentHashMap<>();
-
-                    Log.d(TAG, "✅ onCatalogLoaded: " + finalCatalog.size() + " items");
-
-                    if (finalCatalog.isEmpty()) {
-                        Log.e(TAG, "❌❌❌ CATALOG IS EMPTY - using fallback");
-                        Toast.makeText(requireContext(),
-                                isArabic ? "⚠️ الكتالوج فارغ - وضع المحاكاة الافتراضي" :
-                                        "⚠️ Catalog empty - fallback simulation",
-                                Toast.LENGTH_LONG).show();
-                    }
-
-                    if (inventoryEngine != null) {
-                        inventoryEngine.startSession(finalCatalog);
-                    }
-
-                    catalogEpcs.clear();
-                    catalogEpcs.addAll(finalCatalog.keySet());
-                    expectedCount = finalCatalog.size();
-
-                    // ✅ اطبع العينات
-                    int count = 0;
-                    Log.d(TAG, "📋 Catalog EPCs (first 10):");
-                    for (String k : catalogEpcs) {
-                        Log.d(TAG, "   [" + count + "] " + k);
-                        if (++count >= 10) break;
-                    }
-
-                    if (tvExpectedCount != null) {
-                        tvExpectedCount.setText(String.valueOf(expectedCount));
-                    }
-                    if (progressScanned != null) {
-                        progressScanned.setMax(100);
-                        progressScanned.setProgress(0);
-                    }
-                    if (tvProgressPercent != null) {
-                        tvProgressPercent.setText("0%");
-                    }
-
-                    if (scanController != null) {
-                        scanController.setCatalogEpcs(catalogEpcs);
-                        scanController.setInventoryEngine(inventoryEngine);
-                    }
-
-                    Toast.makeText(requireContext(),
-                            isArabic ? "✅ تم تحميل " + expectedCount + " قطعة" :
-                                    "✅ Loaded " + expectedCount + " items",
-                            Toast.LENGTH_SHORT).show();
-
-                    startReadingSource();
-                } catch (Exception e) {
-                    Log.e(TAG, "onCatalogLoaded error: " + e.getMessage(), e);
-                    isScanning = false;
-                }
-            });
-        }
-
-        @Override
-        public void onError(String error) {
-            responded.set(true);
-
-            mainThreadHandler.post(() -> {
-                if (!isAdded() || isFragmentDestroyed) return;
-
-                Log.e(TAG, "❌ Catalog error: " + error);
-
-                Toast.makeText(requireContext(),
-                        isArabic ? "⚠️ فشل: " + error : "⚠️ Failed: " + error,
-                        Toast.LENGTH_LONG).show();
-
-                expectedCount = 0;
-                if (tvExpectedCount != null) tvExpectedCount.setText("0");
-                catalogEpcs.clear();
-
-                if (inventoryEngine != null) {
-                    inventoryEngine.startSession(new ConcurrentHashMap<>());
-                }
-
-                if (scanController != null) {
-                    scanController.setCatalogEpcs(catalogEpcs);
-                    scanController.setInventoryEngine(inventoryEngine);
-                }
-
-                startReadingSource();
-            });
-        }
+        });
     });
 }
-
 // ==================== Reading Source ====================
 
 private void startReadingSource() {
