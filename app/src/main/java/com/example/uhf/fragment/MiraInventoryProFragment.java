@@ -391,7 +391,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         
         // 6) DialogsManager
         try {
-            dialogsManager = new InventoryDialogsManager(requireContext(), isArabic);
+        dialogsManager = new InventoryDialogsManager(requireActivity(), isArabic);
+           // dialogsManager = new InventoryDialogsManager(requireContext(), isArabic);
             dialogsManager.setSoundManager(soundManager);
             dialogsManager.setCurrentPowerDbm(currentPowerDbm);
             dialogsManager.setCallback(createDialogsCallback());
