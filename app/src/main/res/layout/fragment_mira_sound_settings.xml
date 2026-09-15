@@ -73,12 +73,12 @@
         android:clipToPadding="false"
         android:paddingBottom="16dp" />
 
-    <!-- ================== زر الحفظ ================== -->
+    <!-- ================== زر استعادة الافتراضي ================== -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnSaveSoundSettings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="💾 حفظ الإعدادات"
+        android:text="🔄 استعادة الافتراضي"
         android:textSize="15sp"
         app:cornerRadius="12dp" />
 
