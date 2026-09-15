@@ -67,6 +67,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -1521,6 +1522,50 @@ private void startBlindInventory() {
         Log.e(TAG, "startBlindInventory error: " + e.getMessage(), e);
         isScanning = false;
     }
+}
+
+/**
+ * ✅ جلب الكتالوج من الخادم (متزامن)
+ * تستخدم CountDownLatch للانتظار حتى انتهاء الجلب
+ */
+private Map<String, InventoryItem> fetchCatalogFromServer() {
+    if (catalogManager == null) {
+        Log.e(TAG, "fetchCatalogFromServer: catalogManager is null");
+        return new ConcurrentHashMap<>();
+    }
+    
+    final Map<String, InventoryItem>[] resultHolder = new Map[1];
+    resultHolder[0] = new ConcurrentHashMap<>();
+    
+    final java.util.concurrent.CountDownLatch latch = 
+            new java.util.concurrent.CountDownLatch(1);
+    
+    catalogManager.fetchCatalog(apiClient, branchesManager, 
+            new InventoryCatalogManager.CatalogCallback() {
+        @Override
+        public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
+            resultHolder[0] = catalog != null ? catalog : new ConcurrentHashMap<>();
+            latch.countDown();
+        }
+        
+        @Override
+        public void onError(String error) {
+            Log.e(TAG, "fetchCatalogFromServer error: " + error);
+            latch.countDown();
+        }
+    });
+    
+    try {
+        boolean completed = latch.await(30, TimeUnit.SECONDS);
+        if (!completed) {
+            Log.e(TAG, "fetchCatalogFromServer: TIMEOUT after 30s");
+        }
+    } catch (InterruptedException e) {
+        Log.e(TAG, "fetchCatalogFromServer interrupted");
+        Thread.currentThread().interrupt();
+    }
+    
+    return resultHolder[0];
 }
 
 // ==================== Load Catalog (Async) ====================
