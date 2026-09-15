@@ -1164,29 +1164,47 @@ else if (id == R.id.action_inventory_power) {
 }
 
     /**
-     * ✅ أرشيف الجلسات
-     */
-    private void showInventoryArchiveDialog() {
-        String message = isArabic 
-            ? "📁 أرشيف جلسات الجرد\n\n" +
-              "سيتم عرض جميع جلسات الجرد السابقة مع إمكانية:\n" +
-              "• مراجعة النتائج السابقة\n" +
-              "• مقارنة مع الجلسات الحالية\n" +
-              "• تصدير التقارير\n\n" +
-              "🚧 قيد التطوير"
-            : "📁 Sessions Archive\n\n" +
-              "Will display all previous inventory sessions:\n" +
-              "• Review past results\n" +
-              "• Compare with current session\n" +
-              "• Export reports\n\n" +
-              "🚧 Under Development";
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic ? "📁 أرشيف الجلسات" : "📁 Sessions Archive")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "موافق" : "OK", null)
-                .show();
+ * ✅ أرشيف الجلسات — يربط بـ MiraInventoryProFragment
+ */
+private void showInventoryArchiveDialog() {
+    try {
+        // ✅ 1) إذا كان الـ Fragment النشط متاحاً، استخدمه مباشرة
+        if (activeInventoryFragment != null 
+                && activeInventoryFragment.isAdded() 
+                && !activeInventoryFragment.isRemoving()) {
+            activeInventoryFragment.showArchiveReportsPublic();
+            return;
+        }
+        
+        // ✅ 2) ابحث عن الـ Fragment في الـ FragmentManager
+        Fragment fragment = getSupportFragmentManager()
+                .findFragmentByTag("Scan");
+        
+        if (fragment instanceof MiraInventoryProFragment) {
+            ((MiraInventoryProFragment) fragment).showArchiveReportsPublic();
+            return;
+        }
+        
+        // ✅ 3) إذا لم يوجد، اذهب إلى شاشة الجرد أولاً ثم اعرض الأرشيف
+        loadFragment(new MiraInventoryProFragment(), "Scan");
+        mainHandler.postDelayed(() -> {
+            if (activeInventoryFragment != null 
+                    && activeInventoryFragment.isAdded()) {
+                activeInventoryFragment.showArchiveReportsPublic();
+            } else {
+                Toast.makeText(this, 
+                        isArabic ? "افتح شاشة الجرد أولاً" : "Open inventory screen first",
+                        Toast.LENGTH_SHORT).show();
+            }
+        }, 700);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "showInventoryArchiveDialog error: " + e.getMessage(), e);
+        Toast.makeText(this, 
+                isArabic ? "خطأ في فتح الأرشيف" : "Error opening archive",
+                Toast.LENGTH_SHORT).show();
     }
+}
 
     /**
      * ✅ عرض السلة - يربط بـ activePOSFragment
@@ -2064,4 +2082,4 @@ else if (id == R.id.action_inventory_power) {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-                }
+            }
