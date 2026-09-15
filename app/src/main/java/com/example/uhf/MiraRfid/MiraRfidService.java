@@ -6,16 +6,31 @@ import android.util.Log;
 import com.example.uhf.MiraRfid.readers.ChainwayReader;
 import com.example.uhf.MiraRfid.readers.SimulatorReader;
 import com.example.uhf.api.MiraApiClient;
+import com.rscja.deviceapi.RFIDWithUHFUART;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
  * خدمة RFID موحدة لربط القارئات وواجهات التطبيق
+ * 
+ * ✅ الإصدار 2.0 — تصحيحات جوهرية:
+ * - توحيد كلمة المرور الافتراضية "00000000" على مستوى الخدمة
+ * - normalizePwd() لحماية من null في كل دوال الذاكرة
+ * - تصحيح ptr من Bit(32) إلى Word(2) لـ EPC
+ * - استخدام ثوابت Bank_* بدل الأرقام السحرية
+ * - Logging تفصيلي لكل عملية
  */
 public class MiraRfidService {
     private static final String TAG = "MiraRfidService";
     private static volatile MiraRfidService instance;
+    
+    // ✅ كلمة المرور الافتراضية للشرائح الخام
+    private static final String DEFAULT_PWD = "00000000";
+    
+    // ✅ Word pointer حيث يبدأ EPC (Word 2 = Bit 32)
+    private static final int EPC_START_WORD = 2;
+    private static final int EPC_READ_LENGTH = 6;  // 6 words = 96 bits = 24 hex chars
     
     private final Context context;
     private MiraIRFIDReader activeReader;
@@ -102,22 +117,76 @@ public class MiraRfidService {
     public String getLastReadTid() { return lastReadTid; }
 
     // =========================================================================
+    // 🔐 دالة مساعدة: توحيد كلمة المرور
+    // =========================================================================
+
+    /**
+     * ✅ توحيد كلمة المرور: null/empty → "00000000"
+     * 
+     * ملاحظة: هذا الحماية على مستوى الخدمة تعمل كطبقة ثانية (Defense in Depth)
+     * بغض النظر عن القارئ النشط (Chainway / Simulator / مستقبلي).
+     */
+    private String normalizePwd(String pwdStr) {
+        if (pwdStr == null || pwdStr.trim().isEmpty()) {
+            return DEFAULT_PWD;
+        }
+        return pwdStr.trim().toUpperCase();
+    }
+
+    // =========================================================================
     // 🛠️ دوال الوصول للذاكرة والفلترة
     // =========================================================================
 
+    /**
+     * ✅ كتابة بيانات في بنك الذاكرة — مع توحيد كلمة المرور
+     */
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
-        if (activeReader == null) return false;
-        return activeReader.writeData(pwdStr, bank, ptr, data);
+        if (activeReader == null) {
+            Log.w(TAG, "writeData: activeReader is null");
+            return false;
+        }
+        if (data == null || data.isEmpty()) {
+            Log.w(TAG, "writeData: empty data");
+            return false;
+        }
+        
+        String safePwd = normalizePwd(pwdStr);
+        Log.d(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr + 
+              " len=" + data.length() + " pwd=" + safePwd);
+        
+        return activeReader.writeData(safePwd, bank, ptr, data);
     }
 
+    /**
+     * ✅ قراءة بيانات من بنك الذاكرة — مع توحيد كلمة المرور
+     */
     public String readData(String pwdStr, int bank, int ptr, int len) {
-        if (activeReader == null) return null;
-        return activeReader.readData(pwdStr, bank, ptr, len);
+        if (activeReader == null) {
+            Log.w(TAG, "readData: activeReader is null");
+            return null;
+        }
+        
+        String safePwd = normalizePwd(pwdStr);
+        Log.d(TAG, "📖 readData: bank=" + bank + " ptr=" + ptr + 
+              " len=" + len + " pwd=" + safePwd);
+        
+        return activeReader.readData(safePwd, bank, ptr, len);
     }
 
+    /**
+     * ✅ قفل/فتح بنك الذاكرة — مع توحيد كلمة المرور
+     */
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
-        if (activeReader == null) return false;
-        return activeReader.setTagLockState(pwdStr, bank, shouldLock);
+        if (activeReader == null) {
+            Log.w(TAG, "setTagLockState: activeReader is null");
+            return false;
+        }
+        
+        String safePwd = normalizePwd(pwdStr);
+        Log.i(TAG, "🔐 setTagLockState: bank=" + bank + 
+              " lock=" + shouldLock + " pwd=" + safePwd);
+        
+        return activeReader.setTagLockState(safePwd, bank, shouldLock);
     }
 
     public boolean setFilter(int bank, int ptr, String filterData) {
@@ -144,54 +213,101 @@ public class MiraRfidService {
     // =========================================================================
     // 🟢 العمليات المتقدمة
     // =========================================================================
-    
+
+    /**
+     * ✅ قراءة EPC — مع ptr صحيح (Word 2)
+     */
     public String readEpc(String accessPassword) {
         currentState = OperationState.READING;
-        String epc = readData(accessPassword, 1, 32, 6);
+        String safePwd = normalizePwd(accessPassword);
+        
+        // ✅ EPC يبدأ من Word 2 في Bank 1
+        String epc = readData(safePwd, RFIDWithUHFUART.Bank_EPC, 
+                              EPC_START_WORD, EPC_READ_LENGTH);
+        
         if (epc != null && !epc.isEmpty()) {
             lastReadEpc = epc;
             currentState = OperationState.COMPLETED;
+            Log.i(TAG, "✅ readEpc OK: " + epc);
             return epc;
         }
         currentState = OperationState.FAILED;
+        Log.e(TAG, "❌ readEpc FAILED");
         return null;
     }
-    
+
+    /**
+     * ✅ قراءة TID — من Bank 2 من Word 0
+     */
     public String readTid(String accessPassword) {
         currentState = OperationState.READING;
-        String tid = readData(accessPassword, 2, 0, 6);
+        String safePwd = normalizePwd(accessPassword);
+        
+        // ✅ TID يبدأ من Word 0 في Bank 2
+        String tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 6);
+        
         if (tid != null && !tid.isEmpty()) {
             lastReadTid = tid;
             currentState = OperationState.COMPLETED;
+            Log.i(TAG, "✅ readTid OK: " + tid);
             return tid;
         }
         currentState = OperationState.FAILED;
+        Log.e(TAG, "❌ readTid FAILED");
         return null;
     }
-    
+
+    /**
+     * ✅ كتابة EPC — مع ptr صحيح (Word 2) + normalizePwd
+     */
     public boolean writeEpc(String newEpc, String accessPassword) {
         currentState = OperationState.WRITING;
-        boolean success = writeData(accessPassword, 1, 32, newEpc);
+        
+        if (newEpc == null || newEpc.isEmpty()) {
+            Log.w(TAG, "writeEpc: empty EPC");
+            currentState = OperationState.FAILED;
+            return false;
+        }
+        
+        String safePwd = normalizePwd(accessPassword);
+        Log.i(TAG, "📝 writeEpc: epc=" + newEpc + " pwd=" + safePwd);
+        
+        // ✅ EPC يبدأ من Word 2 في Bank 1
+        boolean success = writeData(safePwd, RFIDWithUHFUART.Bank_EPC, 
+                                    EPC_START_WORD, newEpc);
+        
         if (success) {
             lastReadEpc = newEpc;
             currentState = OperationState.COMPLETED;
+            Log.i(TAG, "✅ writeEpc OK");
             return true;
         }
         currentState = OperationState.FAILED;
+        Log.e(TAG, "❌ writeEpc FAILED");
         return false;
     }
-    
+
+    /**
+     * ✅ التحقق من الكتابة — قراءة ومقارنة
+     */
     public boolean verifyWrite(String expectedEpc, String accessPassword) {
         currentState = OperationState.VERIFYING;
-        String readBack = readEpc(accessPassword);
+        String safePwd = normalizePwd(accessPassword);
+        
+        String readBack = readEpc(safePwd);
+        
         if (readBack != null && readBack.equalsIgnoreCase(expectedEpc)) {
             currentState = OperationState.COMPLETED;
+            Log.i(TAG, "✅ verifyWrite OK: " + readBack);
             return true;
         }
+        
         currentState = OperationState.FAILED;
+        Log.e(TAG, "❌ verifyWrite FAILED: expected=" + expectedEpc + 
+              " read=" + readBack);
         return false;
     }
-    
+
     /**
      * ✅ تسجيل ربط RFID في قاعدة البيانات
      */
@@ -236,7 +352,7 @@ public class MiraRfidService {
         currentState = OperationState.FAILED;
         return false;
     }
-    
+
     /**
      * ✅ البحث عن قطعة في MIRA
      */
@@ -284,7 +400,7 @@ public class MiraRfidService {
             return null;
         }
     }
-    
+
     /**
      * ✅ إنشاء نتيجة بحث محاكاة - مع قيم فريدة لكل قطعة
      */
@@ -326,7 +442,7 @@ public class MiraRfidService {
             return new JSONObject();
         }
     }
-    
+
     private String generateGtinFromIdentifier(String identifier) {
         String numbers = identifier.replaceAll("[^0-9]", "");
         
@@ -341,7 +457,12 @@ public class MiraRfidService {
         
         return numbers;
     }
-    
+
+    /**
+     * ✅ توليد EPC من mira_id
+     * 
+     * الصيغة: "3008" + 12 حرف hex من mira_id + padding = 24 حرف
+     */
     public String generateEpcFromMiraId(String miraId) {
         StringBuilder epc = new StringBuilder("3008");
         String cleanId = miraId.replaceAll("[^0-9A-Fa-f]", "");
@@ -357,12 +478,12 @@ public class MiraRfidService {
         
         return epc.substring(0, 24).toUpperCase();
     }
-    
+
     public String getDeviceName() {
         if (activeReader == null) return "لا يوجد جهاز";
         return activeReader.getDeviceName() + (isSimulationMode ? " (محاكي)" : "");
     }
-    
+
     public String getStateDescription() {
         switch (currentState) {
             case IDLE: return "جاهز";
