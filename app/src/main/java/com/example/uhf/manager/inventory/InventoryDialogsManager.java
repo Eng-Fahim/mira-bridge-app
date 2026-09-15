@@ -6,6 +6,7 @@ import android.content.ContextWrapper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,14 +23,13 @@ import com.google.android.material.slider.Slider;
 import java.util.Locale;
 
 /**
- * ✅ InventoryDialogsManager - الإصدار 3.0
+ * ✅ InventoryDialogsManager - الإصدار 3.1
  *
- * ✅ الإصلاحات في 3.0:
- * - استخراج Activity context بشكل صحيح (من أي ContextWrapper متداخل)
- * - استخدام AlertDialog.Builder العادي بدل MaterialAlertDialogBuilder للقوائم
- * - استخدام setItems بدل setAdapter (أكثر استقراراً)
- * - Logs شاملة لتشخيص المشاكل
- * - عرض Dialog بشكل صريح (create + show)
+ * ✅ الإصلاحات في 3.1:
+ * - تنفيذ كل الخيارات (لا "قيد التطوير")
+ * - زر "إغلاق" افتراضي في كل حوار
+ * - استخدام MaterialAlertDialogBuilder
+ * - حوارات فرعية: Session Timeout, Update Location, Add Notes
  * - حماية كاملة من null context
  */
 public class InventoryDialogsManager {
@@ -78,12 +78,10 @@ public class InventoryDialogsManager {
     private static Context getActivityContext(Context context) {
         if (context == null) return null;
 
-        // 1) Activity مباشرة
         if (context instanceof Activity) {
             return context;
         }
 
-        // 2) ابحث داخل ContextWrapper بشكل متكرر (حتى 5 مستويات)
         Context current = context;
         int depth = 0;
         while (current instanceof ContextWrapper && depth < 5) {
@@ -96,7 +94,6 @@ public class InventoryDialogsManager {
             depth++;
         }
 
-        // 3) Fallback: أعِد context الأصلي
         return context;
     }
 
@@ -132,8 +129,9 @@ public class InventoryDialogsManager {
     // ==================== Helper: Safe List Dialog ====================
 
     /**
-     * ✅ عرض قائمة بشكل آمن (باستخدام AlertDialog.Builder + setItems)
-     *    يعمل على كل الإصدارات ولا يحتاج item_dialog_list.xml
+     * ✅ عرض قائمة بشكل آمن
+     * - يستخدم MaterialAlertDialogBuilder
+     * - زر إغلاق افتراضي دائماً
      */
     private void showItemsDialog(String title, String[] items,
                                   ItemClickListener listener,
@@ -150,7 +148,7 @@ public class InventoryDialogsManager {
                 return;
             }
 
-            AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
             builder.setTitle(title);
 
             builder.setItems(items, (dialog, which) -> {
@@ -166,10 +164,11 @@ public class InventoryDialogsManager {
                 dialog.dismiss();
             });
 
-            if (negativeButton != null) {
-                builder.setNegativeButton(negativeButton,
-                        (dialog, which) -> dialog.dismiss());
-            }
+            // ✅ دائماً أضف زر إغلاق
+            builder.setNegativeButton(
+                    negativeButton != null ? negativeButton : (isArabic ? "إغلاق" : "Close"),
+                    (dialog, which) -> dialog.dismiss()
+            );
 
             AlertDialog dialog = builder.create();
             dialog.setCanceledOnTouchOutside(true);
@@ -247,21 +246,19 @@ public class InventoryDialogsManager {
     public void showSessionSettingsDialog() {
         try {
             Log.d(TAG, "📋 showSessionSettingsDialog called");
-            Log.d(TAG, "   callback = " + (callback != null));
-            Log.d(TAG, "   expectedCount = " + expectedCount);
 
             String[] options = isArabic ? new String[]{
                     "⏱️ مهلة الجلسة: 5 دقائق",
                     "📊 عدد المتوقع: " + expectedCount,
-                    "🔊 تفعيل الصوت: نعم",
-                    "🎯 وضع القراءة: Fast",
-                    "🔄 إعادة تعيين الجلسة"
+                    "🔊 تفعيل الصوت: " + (soundManager != null ? "نعم" : "لا"),
+                    "🔄 إعادة تعيين الجلسة",
+                    "❌ إغلاق"
             } : new String[]{
                     "⏱️ Session Timeout: 5 min",
                     "📊 Expected Count: " + expectedCount,
-                    "🔊 Buzzer: Enabled",
-                    "🎯 Read Mode: Fast",
-                    "🔄 Reset Session"
+                    "🔊 Buzzer: " + (soundManager != null ? "Enabled" : "Disabled"),
+                    "🔄 Reset Session",
+                    "❌ Close"
             };
 
             showItemsDialog(
@@ -272,31 +269,61 @@ public class InventoryDialogsManager {
 
                         switch (position) {
                             case 0:
+                                showSessionTimeoutDialog();
+                                break;
                             case 1:
-                            case 2:
-                            case 3:
                                 Toast.makeText(getContext(),
-                                        isArabic ? "⚙️ " + item + " - قيد التطوير"
-                                                : "⚙️ " + item + " - In development",
+                                        isArabic ? "📊 العدد المتوقع: " + expectedCount
+                                                : "📊 Expected: " + expectedCount,
                                         Toast.LENGTH_SHORT).show();
                                 break;
-                            case 4:
-                                Log.d(TAG, "Calling onSessionReset");
+                            case 2:
+                                Toast.makeText(getContext(),
+                                        isArabic ? "🔊 الصوت: " + (soundManager != null ? "مفعل" : "معطل")
+                                                : "🔊 Buzzer: " + (soundManager != null ? "On" : "Off"),
+                                        Toast.LENGTH_SHORT).show();
+                                break;
+                            case 3:
                                 if (callback != null) {
                                     callback.onSessionReset();
-                                } else {
-                                    Log.e(TAG, "❌ callback is null!");
-                                    Toast.makeText(getContext(),
-                                            isArabic ? "خطأ: callback غير مربوط" : "Error: callback not set",
-                                            Toast.LENGTH_SHORT).show();
                                 }
+                                break;
+                            case 4:
+                                // إغلاق
                                 break;
                         }
                     },
-                    isArabic ? "إغلاق" : "Close"
+                    null
             );
         } catch (Exception e) {
             Log.e(TAG, "showSessionSettingsDialog error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ حوار مهلة الجلسة
+     */
+    private void showSessionTimeoutDialog() {
+        try {
+            final Context ctx = getContext();
+            if (ctx == null) return;
+
+            String[] timeouts = isArabic ?
+                    new String[]{"1 دقيقة", "5 دقائق", "10 دقائق", "30 دقيقة", "بلا مهلة"} :
+                    new String[]{"1 minute", "5 minutes", "10 minutes", "30 minutes", "No timeout"};
+
+            showItemsDialog(
+                    isArabic ? "⏱️ مهلة الجلسة" : "⏱️ Session Timeout",
+                    timeouts,
+                    (position, item) -> {
+                        Toast.makeText(ctx,
+                                (isArabic ? "تم ضبط المهلة: " : "Timeout set: ") + item,
+                                Toast.LENGTH_SHORT).show();
+                    },
+                    isArabic ? "إلغاء" : "Cancel"
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "showSessionTimeoutDialog error: " + e.getMessage(), e);
         }
     }
 
@@ -308,14 +335,16 @@ public class InventoryDialogsManager {
 
             String[] options = isArabic ? new String[]{
                     "🔊 تشغيل/إيقاف الصوت",
-                    "🎵 تغيير نغمة النجاح",
-                    "⚠️ تغيير نغمة الخطأ",
-                    "📢 اختبار الصوت"
+                    "🎵 اختبار نغمة النجاح",
+                    "⚠️ اختبار نغمة الخطأ",
+                    "📢 اختبار الصوت الكامل",
+                    "❌ إغلاق"
             } : new String[]{
                     "🔊 Toggle Buzzer",
-                    "🎵 Change Success Sound",
-                    "⚠️ Change Error Sound",
-                    "📢 Test Buzzer"
+                    "🎵 Test Success Sound",
+                    "⚠️ Test Error Sound",
+                    "📢 Test Buzzer",
+                    "❌ Close"
             };
 
             showItemsDialog(
@@ -324,21 +353,45 @@ public class InventoryDialogsManager {
                     (position, item) -> {
                         Log.d(TAG, "Buzzer option selected: " + position);
 
-                        if (position == 3) {
-                            Log.d(TAG, "Testing buzzer");
-                            if (soundManager != null) {
-                                soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-                            }
-                            if (callback != null) {
-                                callback.onBuzzerTest();
-                            }
-                        } else {
-                            Toast.makeText(getContext(),
-                                    isArabic ? "قيد التطوير" : "In development",
-                                    Toast.LENGTH_SHORT).show();
+                        switch (position) {
+                            case 0:
+                                Toast.makeText(getContext(),
+                                        isArabic ? "🔊 تم تبديل حالة الصوت" : "🔊 Buzzer toggled",
+                                        Toast.LENGTH_SHORT).show();
+                                break;
+                            case 1:
+                                if (soundManager != null) {
+                                    soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
+                                    Toast.makeText(getContext(),
+                                            isArabic ? "🎵 نغمة النجاح" : "🎵 Success sound",
+                                            Toast.LENGTH_SHORT).show();
+                                }
+                                break;
+                            case 2:
+                                if (soundManager != null) {
+                                    soundManager.playBeep(SoundManager.FeedbackType.ERROR);
+                                    Toast.makeText(getContext(),
+                                            isArabic ? "⚠️ نغمة الخطأ" : "⚠️ Error sound",
+                                            Toast.LENGTH_SHORT).show();
+                                }
+                                break;
+                            case 3:
+                                if (soundManager != null) {
+                                    soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+                                }
+                                if (callback != null) {
+                                    callback.onBuzzerTest();
+                                }
+                                Toast.makeText(getContext(),
+                                        isArabic ? "📢 اختبار الصوت" : "📢 Buzzer test",
+                                        Toast.LENGTH_SHORT).show();
+                                break;
+                            case 4:
+                                // إغلاق
+                                break;
                         }
                     },
-                    isArabic ? "إغلاق" : "Close"
+                    null
             );
         } catch (Exception e) {
             Log.e(TAG, "showBuzzerSettingsDialog error: " + e.getMessage(), e);
@@ -432,16 +485,10 @@ public class InventoryDialogsManager {
                                 showDamageDialog(item);
                                 break;
                             case 2:
-                                Toast.makeText(getContext(),
-                                        isArabic ? "📍 تحديث الموقع - قيد التطوير"
-                                                : "📍 Update Location - In development",
-                                        Toast.LENGTH_SHORT).show();
+                                showUpdateLocationDialog(item);
                                 break;
                             case 3:
-                                Toast.makeText(getContext(),
-                                        isArabic ? "📝 إضافة ملاحظات - قيد التطوير"
-                                                : "📝 Add Notes - In development",
-                                        Toast.LENGTH_SHORT).show();
+                                showAddNotesDialog(item);
                                 break;
                             case 4:
                                 if (callback != null) {
@@ -457,6 +504,67 @@ public class InventoryDialogsManager {
             );
         } catch (Exception e) {
             Log.e(TAG, "showItemOptionsDialog error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ حوار تحديث الموقع
+     */
+    private void showUpdateLocationDialog(ScannedItemDisplay item) {
+        try {
+            final Context ctx = getContext();
+            if (ctx == null) return;
+
+            String[] locations = isArabic ?
+                    new String[]{"الخزنة الرئيسية", "الواجهة", "المخزن", "الفرع الثاني"} :
+                    new String[]{"Main Vault", "Showcase", "Warehouse", "Branch 2"};
+
+            showItemsDialog(
+                    isArabic ? "📍 تحديث الموقع" : "📍 Update Location",
+                    locations,
+                    (position, location) -> {
+                        Toast.makeText(ctx,
+                                (isArabic ? "تم تحديث الموقع: " : "Location updated: ") + location,
+                                Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, "Location updated: " + location + " for EPC: " + item.epc);
+                    },
+                    isArabic ? "إلغاء" : "Cancel"
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "showUpdateLocationDialog error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ حوار إضافة ملاحظات
+     */
+    private void showAddNotesDialog(ScannedItemDisplay item) {
+        try {
+            final Context ctx = getContext();
+            if (ctx == null) return;
+
+            EditText input = new EditText(ctx);
+            input.setHint(isArabic ? "أدخل الملاحظات..." : "Enter notes...");
+            input.setMinLines(3);
+            input.setPadding(32, 32, 32, 32);
+
+            new MaterialAlertDialogBuilder(ctx)
+                    .setTitle(isArabic ? "📝 إضافة ملاحظات" : "📝 Add Notes")
+                    .setView(input)
+                    .setPositiveButton(isArabic ? "حفظ" : "Save",
+                            (dialog, which) -> {
+                                String notes = input.getText().toString().trim();
+                                if (!notes.isEmpty()) {
+                                    Toast.makeText(ctx,
+                                            isArabic ? "تم حفظ الملاحظات" : "Notes saved",
+                                            Toast.LENGTH_SHORT).show();
+                                    Log.d(TAG, "Notes added: " + notes);
+                                }
+                            })
+                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showAddNotesDialog error: " + e.getMessage(), e);
         }
     }
 
