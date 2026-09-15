@@ -11,7 +11,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- العنوان -->
+        <!-- ==================== العنوان ==================== -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -56,6 +56,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
+                    <!-- الوضع 1: ثابتة -->
                     <RadioButton
                         android:id="@+id/rbModeStatic"
                         android:layout_width="match_parent"
@@ -72,6 +73,7 @@
                         android:layout_marginStart="32dp"
                         android:layout_marginBottom="8dp" />
 
+                    <!-- الوضع 2: مشتقة من TID -->
                     <RadioButton
                         android:id="@+id/rbModeDerived"
                         android:layout_width="match_parent"
@@ -88,6 +90,7 @@
                         android:layout_marginStart="32dp"
                         android:layout_marginBottom="8dp" />
 
+                    <!-- الوضع 3: من السيرفر -->
                     <RadioButton
                         android:id="@+id/rbModeServer"
                         android:layout_width="match_parent"
@@ -109,7 +112,7 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== كلمة المرور ==================== -->
+        <!-- ==================== حقل كلمة المرور ==================== -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilPassword"
             android:layout_width="match_parent"
@@ -138,6 +141,7 @@
             android:orientation="horizontal"
             android:layout_marginBottom="16dp">
 
+            <!-- ✅ أيقونة الحفظ: ic_menu_save (موجودة في @android) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSavePassword"
                 android:layout_width="0dp"
@@ -147,6 +151,7 @@
                 android:text="@string/pwd_save"
                 app:icon="@android:drawable/ic_menu_save" />
 
+            <!-- ✅ أيقونة البحث: ic_menu_search (موجودة في @android) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnTestPassword"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -158,7 +163,7 @@
 
         </LinearLayout>
 
-        <!-- ==================== إدارة Salt ==================== -->
+        <!-- ==================== إدارة Salt (نسخ احتياطي) ==================== -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -193,6 +198,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
+                    <!-- ✅ تصدير: ic_menu_upload (موجودة في @android) -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnExportSalt"
                         style="@style/Widget.MaterialComponents.Button.TextButton"
@@ -202,6 +208,7 @@
                         android:text="@string/pwd_export_salt"
                         app:icon="@android:drawable/ic_menu_upload" />
 
+                    <!-- ✅ استيراد: ic_menu_save (بديل ic_menu_download غير الموجود) -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnImportSalt"
                         style="@style/Widget.MaterialComponents.Button.TextButton"
@@ -209,7 +216,7 @@
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:text="@string/pwd_import_salt"
-                        app:icon="@android:drawable/ic_menu_download" />
+                        app:icon="@android:drawable/ic_menu_save" />
 
                 </LinearLayout>
 
@@ -217,7 +224,8 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== منطقة الخطر ==================== -->
+        <!-- ==================== منطقة الخطر (إعادة تعيين) ==================== -->
+        <!-- ✅ ic_menu_close_clear_cancel (موجودة في @android) -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnResetAll"
             style="@style/Widget.MaterialComponents.Button.TextButton"
