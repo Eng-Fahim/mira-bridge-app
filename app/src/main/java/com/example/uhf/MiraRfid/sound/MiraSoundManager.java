@@ -101,6 +101,20 @@ public class MiraSoundManager {
     }
 
     /**
+ * ✅ إعادة تحميل الإعدادات (اختياري — SharedPreferences محدّثة تلقائياً)
+ */
+public void reloadSettings() {
+    try {
+        // SharedPreferences يُحدّث فوراً عند use .apply()
+        // لكن لو أردنا إعادة تهيئة ToneGenerator مع مستوى الصوت الجديد:
+        initAudioAndVibrator();
+        Log.d(TAG, "✅ Settings reloaded");
+    } catch (Exception e) {
+        Log.e(TAG, "reloadSettings error: " + e.getMessage());
+    }
+}
+
+    /**
      * تشغيل الصوت والاهتزاز الخاص بحدث معين بناءً على إعدادات المستخدم
      */
     public void play(SoundEvent event) {
