@@ -23,7 +23,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 /**
- * RfidSettingsFragment - واجهة إعدادات أمان شرائح RFID
+ * MiraRfidSettingsFragment - واجهة إعدادات أمان شرائح RFID
  * 
  * ✅ الميزات:
  * - اختيار وضع كلمة المرور (STATIC / DERIVED / SERVER)
@@ -31,10 +31,12 @@ import com.google.android.material.textfield.TextInputLayout;
  * - اختبار فعلي على شريحة قريبة
  * - تصدير/استيراد Salt (للنسخ الاحتياطي)
  * - عرض معلومات تشخيصية
+ * 
+ * ✅ التسمية: MiraRfidSettingsFragment متسقة مع باقي ملفات المشروع
  */
 public class MiraRfidSettingsFragment extends Fragment {
 
-    private static final String TAG = "RfidSettingsFragment";
+    private static final String TAG = "MiraRfidSettingsFragment";
 
     private RfidPasswordManager pwdManager;
     private MiraRfidService rfidService;
@@ -98,7 +100,6 @@ public class MiraRfidSettingsFragment extends Fragment {
             }
         });
 
-        // تحميل الإعدادات الحالية
         loadCurrentSettings();
 
         // ==================== المستمعون ====================
@@ -130,7 +131,6 @@ public class MiraRfidSettingsFragment extends Fragment {
         updateUIMode(mode);
 
         if (pwdManager.hasDefaultPassword()) {
-            // إظهار قناع بدل الكلمة الحقيقية
             etPassword.setText("••••••••");
             etPassword.setEnabled(false);
             tilPassword.setHelperText(getString(R.string.pwd_saved_encrypted));
@@ -178,7 +178,6 @@ public class MiraRfidSettingsFragment extends Fragment {
             String pwd = etPassword.getText() != null ?
                     etPassword.getText().toString().trim() : "";
 
-            // إذا كانت مخفية ولم يُغيّرها المستخدم → احتفظ بالقديمة
             if (pwd.equals("••••••••")) {
                 if (!pwdManager.hasDefaultPassword()) {
                     showToast(getString(R.string.pwd_enter_password));
@@ -234,7 +233,6 @@ public class MiraRfidSettingsFragment extends Fragment {
 
         showToast(getString(R.string.pwd_reading_tag));
 
-        // قراءة TID في خيط منفصل
         new Thread(() -> {
             try {
                 String tid = rfidService.readTid(null);
@@ -267,7 +265,7 @@ public class MiraRfidSettingsFragment extends Fragment {
                 .setMessage(
                     getString(R.string.pwd_tid_label) + " " + maskTid(tid) + "\n\n" +
                     getString(R.string.pwd_password_label) + " " + pwd + "\n\n" +
-                    getString(R.string.pwd_mode_label) + " " + pwdManager.getPasswordMode()
+                    getString(R.string.pwd_mode_label_result) + " " + pwdManager.getPasswordMode()
                 )
                 .setPositiveButton(getString(R.string.pwd_copy), (d, w) -> {
                     android.content.ClipboardManager cm = 
@@ -303,8 +301,7 @@ public class MiraRfidSettingsFragment extends Fragment {
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(getString(R.string.pwd_export_salt_title))
                 .setMessage(
-                    getString(R.string.pwd_export_salt_warning) + "\n\n" +
-                    salt
+                    getString(R.string.pwd_export_salt_warning) + "\n\n" + salt
                 )
                 .setPositiveButton(getString(R.string.pwd_copy), (d, w) -> {
                     android.content.ClipboardManager cm = 
