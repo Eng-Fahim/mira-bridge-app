@@ -1,13 +1,30 @@
 package com.example.uhf.fragment;
 
+import android.view.KeyEvent;
+
 import androidx.fragment.app.Fragment;
 
 /**
- * Created by Administrator on 2015-03-10.
+ * ✅ KeyDwonFragment — النسخة المحدّثة
+ *
+ * يدعم كلا النسختين:
+ * - myOnKeyDwon()                    [القديمة — للتوافق العكسي]
+ * - myOnKeyDwon(int, KeyEvent)       [الجديدة — تُمرر keyCode + event]
  */
 public class KeyDwonFragment extends Fragment {
 
-    public void myOnKeyDwon() {
+    /**
+     * النسخة القديمة — للتوافق العكسي
+     */
+    public boolean myOnKeyDwon() {
+        return false;
+    }
 
+    /**
+     * ✅ النسخة الجديدة — تُمرر keyCode + event
+     * الافتراضي: يعتمد على النسخة القديمة
+     */
+    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+        return myOnKeyDwon();
     }
 }
