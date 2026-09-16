@@ -10,33 +10,35 @@ import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.engine.MiraInventoryEngine;
 import com.example.uhf.model.InventoryItem;
+import com.example.uhf.utils.RFIDCodeUtils;
 import com.example.uhf.utils.SoundManager;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * ✅ InventoryScanController
+ * ✅ InventoryScanController v2.0
  * 
- * مسؤول عن:
- * - بدء/إيقاف المسح العادي
- * - بدء/إيقاف الجرد الأعمى
- * - بدء/إيقاف الجرد الفئوي
- * - تشغيل/إيقاف Simulation Loop
- * - معالجة قراءة الوسم (onTagRead)
+ * المسؤول الوحيد عن كل منطق المسح:
+ * - استقبال onTagRead من RFID Reader
+ * - Normalize + Debounce
+ * - تمرير إلى Engine
+ * - تشغيل المحاكاة
+ * - إدارة generation counter لمنع callbacks القديمة
  * 
- * لا يحتوي على مراجع للـ UI → آمن من التسريبات
- * يستخدم Callbacks لتحديث الـ UI
+ * Fragment = UI فقط، يستقبل callbacks.
  */
-public class InventoryScanController {
+public class InventoryScanController implements MiraIRFIDReader.OnTagReadListener {
 
     private static final String TAG = "InventoryScanCtrl";
 
-    // ✅ ثوابت الأداء
     private static final long SIMULATION_INITIAL_DELAY_MS = 500;
     private static final long SIMULATION_MIN_DELAY_MS = 150;
     private static final long SIMULATION_MAX_ADDITIONAL_DELAY_MS = 350;
@@ -45,7 +47,8 @@ public class InventoryScanController {
 
     private final Context context;
     private final boolean isArabic;
-    private final ExecutorService backgroundExecutor;
+    private final ExecutorService processingExecutor;
+    private final ExecutorService ioExecutor;
     private final Handler mainHandler;
     private final Handler simulationHandler;
 
@@ -53,11 +56,13 @@ public class InventoryScanController {
     private RFIDManager rfidManager;
     private SoundManager soundManager;
     private MiraInventoryEngine inventoryEngine;
+    private Map<String, String> barcodeToEpcMap = new ConcurrentHashMap<>();
 
-    // ✅ الحالة
-    private volatile boolean isScanning = false;
-    private long scanStartTime = 0;
-    private int currentPowerDbm = 26;
+    // ✅ حالة ذرية
+    private final AtomicBoolean isScanning = new AtomicBoolean(false);
+    private final AtomicInteger scanGeneration = new AtomicInteger(0);
+    private volatile long scanStartTime = 0;
+    private volatile int currentPowerDbm = 26;
 
     // ✅ Simulation
     private Runnable simulationRunnable;
@@ -68,466 +73,324 @@ public class InventoryScanController {
     };
 
     // ✅ Caches
-    private final Set<String> catalogEpcs = 
-        java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<String> catalogEpcs =
+        Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<String, Long> recentTagReads = new ConcurrentHashMap<>();
 
     // ==================== Callbacks ====================
 
     public interface ScanCallback {
-        /**
-         * بدأ المسح (UI should update)
-         */
         void onScanStarted();
-        
-        /**
-         * توقف المسح
-         */
         void onScanStopped();
-        
-        /**
-         * تم قراءة وسم جديد
-         */
         void onTagRead(String normalizedEpc, int rssi);
-        
-        /**
-         * تم قراءة وسم مكرر
-         */
         void onDuplicateTag(String epc);
-        
-        /**
-         * خطأ في القارئ
-         */
         void onError(String error);
-        
-        /**
-         * تغيّرت حالة الاتصال
-         */
         void onConnectionChanged(boolean isConnected);
-        
-        /**
-         * تم تجاوز حد الـ debounce
-         */
         void onTagDebounced(String epc);
+        void onExpectedCountChanged(int expectedCount);
     }
 
     private ScanCallback callback;
 
     // ==================== Constructor ====================
 
-    public InventoryScanController(Context context, 
+    public InventoryScanController(Context context,
                                     boolean isArabic,
-                                    ExecutorService backgroundExecutor) {
+                                    ExecutorService processingExecutor,
+                                    ExecutorService ioExecutor) {
         this.context = context.getApplicationContext();
         this.isArabic = isArabic;
-        this.backgroundExecutor = backgroundExecutor;
+        this.processingExecutor = processingExecutor;
+        this.ioExecutor = ioExecutor;
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.simulationHandler = new Handler(Looper.getMainLooper());
     }
 
-    public void setCallback(ScanCallback callback) {
-        this.callback = callback;
+    public void setCallback(ScanCallback callback) { this.callback = callback; }
+    public void setSoundManager(SoundManager sm) { this.soundManager = sm; }
+    public void setInventoryEngine(MiraInventoryEngine engine) { this.inventoryEngine = engine; }
+    public void setBarcodeToEpcMap(Map<String, String> map) {
+        this.barcodeToEpcMap = map != null ? map : new ConcurrentHashMap<>();
     }
 
-    public void setSoundManager(SoundManager soundManager) {
-        this.soundManager = soundManager;
-    }
-
-    public void setInventoryEngine(MiraInventoryEngine engine) {
-        this.inventoryEngine = engine;
-    }
-
-    public void setRfidManager(RFIDManager rfidManager) {
+    /**
+     * ✅ ربط RFID Manager + تسجيل الـ listener هنا (لا في Fragment)
+     */
+    public void attachRfidManager(RFIDManager rfidManager) {
         this.rfidManager = rfidManager;
+        if (rfidManager != null) {
+            rfidManager.setListener(this);
+            Log.d(TAG, "✅ RFID listener attached to ScanController");
+        }
     }
 
-    public void setCatalogEpcs(Set<String> epcs) {
-        catalogEpcs.clear();
-        if (epcs != null) {
-            catalogEpcs.addAll(epcs);
+    public void detachRfidManager() {
+        if (rfidManager != null) {
+            rfidManager.setListener(null);
+            rfidManager = null;
         }
     }
 
     // ==================== Getters ====================
 
-    public boolean isScanning() {
-        return isScanning;
-    }
+    public boolean isScanning() { return isScanning.get(); }
+    public long getScanStartTime() { return scanStartTime; }
+    public int getCurrentPowerDbm() { return currentPowerDbm; }
+    public void setCurrentPowerDbm(int p) { this.currentPowerDbm = p; }
 
-    public long getScanStartTime() {
-        return scanStartTime;
-    }
+    // ==================== Start ====================
 
-    public int getCurrentPowerDbm() {
-        return currentPowerDbm;
-    }
+    public boolean startScanning(Map<String, InventoryItem> catalog) {
+        if (!isScanning.compareAndSet(false, true)) {
+            Log.w(TAG, "startScanning ignored: already scanning");
+            return false;
+        }
 
-    public void setCurrentPowerDbm(int power) {
-        this.currentPowerDbm = power;
-    }
-    
-    // ==================== Start Scan ====================
-    
-    /**
-     * ✅ بدء المسح
-     * 
-     * @param catalog كتالوج القطع المتوقعة
-     * @param onReady callback بعد تحميل الكتالوج
-     */
-    public void startScanning(Map<String, InventoryItem> catalog, Runnable onReady) {
+        final int generation = scanGeneration.incrementAndGet();
+        Log.d(TAG, "▶️ Start scanning [gen=" + generation + "]");
+
         try {
-            if (isScanning) return;
-            
-            // ✅ إعادة تعيين
-            isScanning = true;
             scanStartTime = SystemClock.elapsedRealtime();
             recentTagReads.clear();
-            
-            // ✅ تعيين الكتالوج
+
             catalogEpcs.clear();
-            if (catalog != null) {
+            if (catalog != null && !catalog.isEmpty()) {
                 catalogEpcs.addAll(catalog.keySet());
             }
-            
-            // ✅ بدء الجلسة في الـ Engine
+
             if (inventoryEngine != null) {
                 inventoryEngine.startSession(catalog);
             }
-            
-            // ✅ بدء مصدر القراءة
-            startReadingSource();
-            
-            // ✅ Callback
+
+            startReadingSource(generation);
+
             if (callback != null) {
-                mainHandler.post(callback::onScanStarted);
+                mainHandler.post(() -> {
+                    if (generation == scanGeneration.get()) {
+                        callback.onScanStarted();
+                        callback.onExpectedCountChanged(catalogEpcs.size());
+                    }
+                });
             }
-            
-            if (onReady != null) {
-                mainHandler.post(onReady);
-            }
-            
-            Log.d(TAG, "✅ Scanning started");
-            
+            return true;
+
         } catch (Exception e) {
             Log.e(TAG, "startScanning error: " + e.getMessage(), e);
-            isScanning = false;
+            isScanning.set(false);
+            return false;
         }
     }
-    
-    /**
-     * ✅ بدء الجرد الأعمى
-     */
-    public void startBlindInventory() {
-        try {
-            if (isScanning) return;
-            
-            isScanning = true;
-            scanStartTime = SystemClock.elapsedRealtime();
-            recentTagReads.clear();
-            catalogEpcs.clear();
-            
-            // ✅ بدء جلسة فارغة
-            if (inventoryEngine != null) {
-                inventoryEngine.startSession(new ConcurrentHashMap<>());
-            }
-            
-            startReadingSource();
-            
-            if (callback != null) {
-                mainHandler.post(callback::onScanStarted);
-            }
-            
-            Log.d(TAG, "✅ Blind inventory started");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "startBlindInventory error: " + e.getMessage(), e);
-            isScanning = false;
-        }
-    }
-    
-    /**
-     * ✅ بدء الجرد الفئوي
-     */
-    public void startCategoryInventory(Map<String, InventoryItem> filteredCatalog) {
-        try {
-            if (isScanning) return;
-            
-            isScanning = true;
-            scanStartTime = SystemClock.elapsedRealtime();
-            recentTagReads.clear();
-            
-            catalogEpcs.clear();
-            if (filteredCatalog != null) {
-                catalogEpcs.addAll(filteredCatalog.keySet());
-            }
-            
-            if (inventoryEngine != null) {
-                inventoryEngine.startSession(filteredCatalog);
-            }
-            
-            startReadingSource();
-            
-            if (callback != null) {
-                mainHandler.post(callback::onScanStarted);
-            }
-            
-            Log.d(TAG, "✅ Category inventory started: " + catalogEpcs.size() + " items");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "startCategoryInventory error: " + e.getMessage(), e);
-            isScanning = false;
-        }
-    }
-    
-    // ==================== Stop Scan ====================
-    
-    /**
-     * ✅ إيقاف المسح
-     */
+
+    // ==================== Stop ====================
+
     public void stopScanning() {
-        if (!isScanning) return;
-        
+        if (!isScanning.compareAndSet(true, false)) return;
+
+        final int generation = scanGeneration.incrementAndGet();
+        Log.d(TAG, "⏹️ Stop scanning [gen=" + generation + "]");
+
         try {
-            isScanning = false;
             stopSimulationLoop();
-            
-            // ✅ إيقاف القارئ
+
             if (rfidManager != null) {
-                try {
-                    rfidManager.stopScan();
-                } catch (Exception e) {
-                    Log.e(TAG, "stopScan error: " + e.getMessage());
-                }
+                try { rfidManager.stopScan(); }
+                catch (Exception e) { Log.e(TAG, "stopScan error", e); }
             }
-            
-            // ✅ إغلاق الجلسة في الـ Engine
-            if (inventoryEngine != null) {
-                inventoryEngine.processSessionClose();
+
+            if (inventoryEngine != null && processingExecutor != null
+                    && !processingExecutor.isShutdown()) {
+                processingExecutor.execute(() -> {
+                    try {
+                        inventoryEngine.processSessionClose();
+                    } catch (Exception e) {
+                        Log.e(TAG, "processSessionClose error", e);
+                    }
+                });
             }
-            
+
             if (callback != null) {
-                mainHandler.post(callback::onScanStopped);
+                mainHandler.post(() -> {
+                    if (generation == scanGeneration.get()) {
+                        callback.onScanStopped();
+                    }
+                });
             }
-            
-            Log.d(TAG, "✅ Scanning stopped");
-            
         } catch (Exception e) {
             Log.e(TAG, "stopScanning error: " + e.getMessage(), e);
         }
     }
-    
+
     // ==================== Reading Source ====================
-    
-    /**
-     * ✅ بدء مصدر القراءة (جهاز أو محاكاة)
-     */
-    private void startReadingSource() {
+
+    private void startReadingSource(int generation) {
         boolean hardwareStarted = false;
-        
+
         if (rfidManager != null) {
             try {
                 if (rfidManager.getActiveDevice() != null) {
-                    MiraIRFIDReader.ReaderType deviceType = 
+                    MiraIRFIDReader.ReaderType type =
                             rfidManager.getActiveDevice().getType();
-                    
-                    if (deviceType != MiraIRFIDReader.ReaderType.SIMULATOR) {
+                    if (type != MiraIRFIDReader.ReaderType.SIMULATOR) {
                         hardwareStarted = rfidManager.startScan();
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error starting hardware scanner", e);
+                Log.e(TAG, "hardware start error", e);
             }
         }
-        
+
         if (!hardwareStarted) {
-            startSimulationLoop();
-            Log.d(TAG, "✅ Simulation mode started");
+            startSimulationLoop(generation);
+            Log.d(TAG, "🎯 Simulation mode started");
         }
-        
+
         if (soundManager != null) {
             soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
         }
     }
-    
-    // ==================== onTagRead ====================
-    
-    /**
-     * ✅ معالجة قراءة الوسم
-     * 
-     * @param rawEpc   EPC الخام من القارئ
-     * @param rssi     قوة الإشارة
-     * @param normalizedEpc  EPC بعد التطبيع (من الـ Fragment)
-     */
-    public void onTagRead(String rawEpc, int rssi, String normalizedEpc) {
-        try {
-            if (!isScanning || normalizedEpc == null || normalizedEpc.isEmpty()) {
+
+    // ==================== onTagRead (from RFID) ====================
+
+    @Override
+    public void onTagRead(String rawEpc, int rssi) {
+        if (!isScanning.get() || rawEpc == null || rawEpc.isEmpty()) return;
+
+        final int generation = scanGeneration.get();
+
+        // ✅ Normalize على processingExecutor
+        if (processingExecutor == null || processingExecutor.isShutdown()) return;
+
+        processingExecutor.execute(() -> {
+            if (generation != scanGeneration.get()) return;
+
+            final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(
+                    rawEpc, barcodeToEpcMap);
+
+            // ✅ فلترة الفئة
+            if (!catalogEpcs.isEmpty() && !catalogEpcs.contains(normalizedEpc)) {
                 return;
             }
-            
-            // ✅ فحص الفئة
-            if (!catalogEpcs.isEmpty() && !catalogEpcs.contains(normalizedEpc)) {
-                // ليس في الكتالوج — تجاهل بصمت في الجرد الفئوي
-                // (لكن اسمح بالجرد الكامل)
-            }
-            
-            // ✅ debounce
-            long currentTime = System.currentTimeMillis();
-            Long lastReadTime = recentTagReads.get(normalizedEpc);
-            
-            if (lastReadTime != null && 
-                (currentTime - lastReadTime) < TAG_READ_DEBOUNCE_MS) {
+
+            // ✅ Debounce
+            long now = System.currentTimeMillis();
+            Long last = recentTagReads.get(normalizedEpc);
+            if (last != null && (now - last) < TAG_READ_DEBOUNCE_MS) {
                 if (callback != null) {
-                    mainHandler.post(() -> callback.onTagDebounced(normalizedEpc));
+                    mainHandler.post(() -> {
+                        if (generation == scanGeneration.get()) {
+                            callback.onTagDebounced(normalizedEpc);
+                        }
+                    });
                 }
                 return;
             }
-            
-            recentTagReads.put(normalizedEpc, currentTime);
-            
-            // ✅ تنظيف cache
+            recentTagReads.put(normalizedEpc, now);
+
             if (recentTagReads.size() > MAX_CACHE_ITEMS) {
-                cleanOldTagReads(currentTime);
+                cleanOldTagReads(now);
             }
-            
-            // ✅ معالجة غير متزامنة
-            if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
-                final String finalEpc = normalizedEpc;
+
+            // ✅ إلى Engine
+            try {
+                if (inventoryEngine != null) {
+                    inventoryEngine.onTagScanned(normalizedEpc, rssi);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "engine error", e);
+            }
+
+            // ✅ Callback للـ UI
+            if (callback != null) {
                 final int finalRssi = rssi;
-                
-                backgroundExecutor.execute(() -> {
-                    try {
-                        if (inventoryEngine != null) {
-                            inventoryEngine.onTagScanned(finalEpc, finalRssi);
-                        }
-                        
-                        if (callback != null) {
-                            mainHandler.post(() -> 
-                                callback.onTagRead(finalEpc, finalRssi));
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error processing tag: " + finalEpc, e);
+                mainHandler.post(() -> {
+                    if (generation == scanGeneration.get()) {
+                        callback.onTagRead(normalizedEpc, finalRssi);
                     }
                 });
             }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "onTagRead error: " + e.getMessage(), e);
-        }
+        });
     }
-    
-    /**
-     * ✅ تنظيف القراءات القديمة
-     */
-    private void cleanOldTagReads(long currentTime) {
+
+    private void cleanOldTagReads(long now) {
         try {
-            java.util.Iterator<Map.Entry<String, Long>> iterator = 
+            java.util.Iterator<Map.Entry<String, Long>> it =
                     recentTagReads.entrySet().iterator();
-            
-            while (iterator.hasNext()) {
-                Map.Entry<String, Long> entry = iterator.next();
-                if (currentTime - entry.getValue() > TAG_READ_DEBOUNCE_MS * 2) {
-                    iterator.remove();
-                }
+            while (it.hasNext()) {
+                Map.Entry<String, Long> e = it.next();
+                if (now - e.getValue() > TAG_READ_DEBOUNCE_MS * 2) it.remove();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "cleanOldTagReads error: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
     }
-    
-    // ==================== RFID Callbacks ====================
-    
-    /**
-     * ✅ إشعار بتغيير حالة الاتصال
-     */
-    public void notifyConnectionChanged(boolean isConnected) {
-        if (callback != null) {
-            mainHandler.post(() -> callback.onConnectionChanged(isConnected));
-        }
-    }
-    
-    /**
-     * ✅ إشعار بخطأ
-     */
-    public void notifyError(String error) {
-        if (callback != null) {
-            mainHandler.post(() -> callback.onError(error));
-        }
-    }
-    
+
     // ==================== Simulation ====================
-    
-    /**
-     * ✅ بدء المحاكاة
-     */
-    private void startSimulationLoop() {
+
+    private void startSimulationLoop(int generation) {
         simulationIndex = 0;
-        
+
         simulationRunnable = new Runnable() {
             @Override
             public void run() {
-                if (!isScanning) return;
-                
+                if (generation != scanGeneration.get() || !isScanning.get()) return;
+
                 String epc;
-                
                 if (!catalogEpcs.isEmpty()) {
-                    List<String> epcList = new ArrayList<>(catalogEpcs);
-                    epc = epcList.get(simulationIndex % epcList.size());
+                    List<String> list = new ArrayList<>(catalogEpcs);
+                    epc = list.get(simulationIndex % list.size());
                 } else {
                     epc = simulationTags[simulationIndex % simulationTags.length];
                 }
-                
+
                 int rssi = -40 - (int) (Math.random() * 40);
-                
-                onTagRead(epc, rssi, epc);
-                
+
+                // ✅ نمرر عبر onTagRead المعياري (لا تجاوز)
+                onTagRead(epc, rssi);
+
                 simulationIndex++;
-                long delay = SIMULATION_MIN_DELAY_MS + 
+                long delay = SIMULATION_MIN_DELAY_MS +
                         (long) (Math.random() * SIMULATION_MAX_ADDITIONAL_DELAY_MS);
-                
-                if (isScanning) {
+
+                if (isScanning.get() && generation == scanGeneration.get()) {
                     simulationHandler.postDelayed(this, delay);
                 }
             }
         };
-        
+
         simulationHandler.postDelayed(simulationRunnable, SIMULATION_INITIAL_DELAY_MS);
     }
-    
-    /**
-     * ✅ إيقاف المحاكاة
-     */
+
     private void stopSimulationLoop() {
         try {
             if (simulationHandler != null && simulationRunnable != null) {
                 simulationHandler.removeCallbacks(simulationRunnable);
                 simulationRunnable = null;
             }
-        } catch (Exception e) {
-            Log.e(TAG, "stopSimulationLoop error: " + e.getMessage());
+        } catch (Exception ignored) {}
+    }
+
+    // ==================== Connection Notify ====================
+
+    public void notifyConnectionChanged(boolean isConnected) {
+        if (callback != null) {
+            mainHandler.post(() -> callback.onConnectionChanged(isConnected));
         }
     }
-    
+
+    public void notifyError(String error) {
+        if (callback != null) {
+            mainHandler.post(() -> callback.onError(error));
+        }
+    }
+
     // ==================== Cleanup ====================
-    
-    /**
-     * ✅ تنظيف كامل
-     */
+
     public void cleanup() {
         try {
             stopScanning();
-            
-            if (simulationHandler != null) {
-                simulationHandler.removeCallbacksAndMessages(null);
-            }
-            
-            if (mainHandler != null) {
-                mainHandler.removeCallbacksAndMessages(null);
-            }
-            
+            detachRfidManager();
+            if (simulationHandler != null) simulationHandler.removeCallbacksAndMessages(null);
+            if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
             recentTagReads.clear();
             catalogEpcs.clear();
-            
-            Log.d(TAG, "✅ Cleanup complete");
         } catch (Exception e) {
             Log.e(TAG, "cleanup error: " + e.getMessage());
         }
