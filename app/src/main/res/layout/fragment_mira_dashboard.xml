@@ -1,11 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<androidx.constraintlayout.motion.widget.MotionLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/motionLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/android:colorBackground">
+    android:background="?attr/android:colorBackground"
+    app:layoutDescription="@xml/dashboard_scene">
+
+    <!-- ==================== SHIMMER LOADING (SKELETON MATCHED) ==================== -->
+    <LinearLayout
+        android:id="@+id/shimmerLayout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="gone">
+
+        <!-- Header Skeleton -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/shimmer_background" />
+
+        <!-- Greeting Card Skeleton -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="90dp"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/shimmer_background" />
+
+        <!-- 3 Metrics Cards Skeleton -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="88dp"
+            android:layout_marginBottom="14dp"
+            android:orientation="horizontal"
+            android:weightSum="3">
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/shimmer_background" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="2dp"
+                android:background="@drawable/shimmer_background" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/shimmer_background" />
+        </LinearLayout>
+
+        <!-- Gold Price Card Skeleton -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/shimmer_background" />
+
+        <!-- Quick Access Grid Skeleton -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="@drawable/shimmer_background" />
+    </LinearLayout>
+
+    <!-- ==================== LOADING OVERLAY ==================== -->
+    <LinearLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="?attr/colorSurface"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:alpha="0.95">
+
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminate="true"
+            android:indeterminateTint="?attr/colorPrimary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/loading_data"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp"
+            android:layout_marginTop="12dp" />
+    </LinearLayout>
 
     <!-- ==================== MAIN CONTENT ==================== -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -17,7 +116,8 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:visibility="visible">
 
         <androidx.core.widget.NestedScrollView
             android:id="@+id/nestedScroll"
@@ -34,7 +134,7 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- 1. HEADER SECTION -->
+                <!-- ==================== 1. HEADER ==================== -->
                 <RelativeLayout
                     android:id="@+id/headerSection"
                     android:layout_width="match_parent"
@@ -55,7 +155,8 @@
                             android:text="@string/app_brand_name"
                             android:textColor="?attr/colorPrimary"
                             android:textSize="18sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="MIRA" />
 
                         <Space
                             android:layout_width="6dp"
@@ -67,7 +168,9 @@
                             android:text="@string/app_brand_tagline"
                             android:textColor="?attr/colorSecondary"
                             android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            android:letterSpacing="0.05"
+                            tools:text="JEWELRY ID™" />
                     </LinearLayout>
 
                     <TextView
@@ -85,7 +188,7 @@
                         tools:text="🟢 متصل" />
                 </RelativeLayout>
 
-                <!-- 2. GREETING CARD -->
+                <!-- ==================== 2. GREETING CARD ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/greetingCard"
                     android:layout_width="match_parent"
@@ -177,7 +280,7 @@
                     </androidx.constraintlayout.widget.ConstraintLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 3. INVENTORY METRICS -->
+                <!-- ==================== 3. INVENTORY METRICS ==================== -->
                 <LinearLayout
                     android:id="@+id/inventoryMetrics"
                     android:layout_width="match_parent"
@@ -299,7 +402,7 @@
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <!-- 4. GOLD PRICES -->
+                <!-- ==================== 4. GOLD PRICES ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGoldPrices"
                     android:layout_width="match_parent"
@@ -383,6 +486,7 @@
                                 tools:text="-0.00%" />
                         </LinearLayout>
 
+                        <!-- Ounce Price Card -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -476,7 +580,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 5. QUICK ACCESS -->
+                <!-- ==================== 5. QUICK ACCESS ==================== -->
                 <TextView
                     android:id="@+id/quickAccessTitle"
                     android:layout_width="match_parent"
@@ -496,7 +600,212 @@
                     app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
                     app:spanCount="3" />
 
+                <!-- ==================== 6. SALES SUMMARY ==================== -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/salesSummaryCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="14dp"
+                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="?attr/colorOutline"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="12dp"
+                        android:baselineAligned="false"
+                        android:weightSum="3">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/sales_today"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="10sp" />
+
+                            <TextView
+                                android:id="@+id/tvSalesToday"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                tools:text="0" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="?attr/colorOutline" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/sales_month"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="10sp" />
+
+                            <TextView
+                                android:id="@+id/tvSalesMonth"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                tools:text="0" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="?attr/colorOutline" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/sales_year"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="10sp" />
+
+                            <TextView
+                                android:id="@+id/tvSalesYear"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                tools:text="0" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- ==================== 7. FIELD OPERATIONS ==================== -->
+                <TextView
+                    android:id="@+id/fieldOpsTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/field_operations"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/fieldOps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false"
+                    android:weightSum="2">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/btnGateSecurity"
+                        android:layout_width="0dp"
+                        android:layout_height="88dp"
+                        android:layout_marginEnd="5dp"
+                        android:layout_weight="1"
+                        android:clickable="true"
+                        android:focusable="true"
+                        app:cardBackgroundColor="?attr/colorSurface"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="2dp"
+                        app:strokeColor="?attr/colorOutline"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="8dp">
+
+                            <ImageView
+                                android:layout_width="26dp"
+                                android:layout_height="26dp"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_security"
+                                app:tint="?attr/colorPrimary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/gate_security"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/btnRfidAudit"
+                        android:layout_width="0dp"
+                        android:layout_height="88dp"
+                        android:layout_marginStart="5dp"
+                        android:layout_weight="1"
+                        android:clickable="true"
+                        android:focusable="true"
+                        app:cardBackgroundColor="?attr/colorSurface"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="2dp"
+                        app:strokeColor="?attr/colorOutline"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="8dp">
+
+                            <ImageView
+                                android:layout_width="26dp"
+                                android:layout_height="26dp"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_search"
+                                app:tint="?attr/colorPrimary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/rfid_audit"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.motion.widget.MotionLayout>
