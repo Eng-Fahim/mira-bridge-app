@@ -312,8 +312,8 @@ public boolean onKeyDown(int keyCode, KeyEvent event) {
     if (isScanKey(keyCode)) {
         if (event.getRepeatCount() == 0
                 && currentFragment instanceof KeyDwonFragment) {
-            return ((KeyDwonFragment) currentFragment)
-                    .myOnKeyDwon(keyCode, event);
+            KeyDwonFragment kdf = (KeyDwonFragment) currentFragment;
+            kdf.myOnKeyDwon(keyCode, event);
         }
         return true;
     }
