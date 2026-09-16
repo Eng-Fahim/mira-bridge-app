@@ -73,17 +73,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * MiraInventoryProFragment v4.0 — النسخة النهائية
- * 
- * ✅ كل الإصلاحات:
+ * MiraInventoryProFragment v4.0 — النسخة النهائية الكاملة
+ *
+ * ✅ إصلاحات v4.0:
+ *  - setupBackPressHandler() + showExitWarning() مضافان
+ *  - stopScanning() public
  *  - Fragment = UI فقط
  *  - ScanController = منطق المسح
- *  - Catalog/Persistence/Filter/Session = مسؤوليات منفصلة
  *  - Executors: ioExecutor + processingExecutor
  *  - AtomicBoolean + generation counter
  *  - UI Batching كل 250ms
  *  - CopyOnWriteArrayList
- *  - لا CountDownLatch
  */
 public class MiraInventoryProFragment extends KeyDwonFragment {
 
@@ -319,8 +319,58 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             if (scanController != null) {
                 scanController.attachRfidManager(rfidManager);
             }
-            // ✅ لا نسجل listener هنا — ScanController يفعل ذلك
         } catch (Exception e) { Log.e(TAG, "rfid error", e); }
+    }
+
+    // ==================== Back Press Handler ====================
+    private void setupBackPressHandler() {
+        try {
+            backPressedCallback = new OnBackPressedCallback(true) {
+                @Override
+                public void handleOnBackPressed() {
+                    if (isScanning()) {
+                        showExitWarning(() -> {
+                            stopScanning();
+                            setEnabled(false);
+                            requireActivity().getOnBackPressedDispatcher().onBackPressed();
+                        });
+                    } else {
+                        setEnabled(false);
+                        requireActivity().getOnBackPressedDispatcher().onBackPressed();
+                    }
+                }
+            };
+
+            requireActivity().getOnBackPressedDispatcher().addCallback(
+                    getViewLifecycleOwner(), backPressedCallback);
+        } catch (Exception e) {
+            Log.e(TAG, "setupBackPressHandler error: " + e.getMessage());
+        }
+    }
+
+    private void showExitWarning(Runnable onConfirm) {
+        if (!isAdded() || isFragmentDestroyed) return;
+
+        String title = isArabic ? "⚠️ تحذير مهم" : "⚠️ Important Warning";
+        String message = isArabic ?
+                "الجرد ما زال قيد التشغيل!\n\nإذا قمت بتغيير الواجهة، سيتوقف الجرد.\n\nهل تريد المتابعة؟" :
+                "Inventory is still running!\n\nIf you change the screen, the inventory will stop.\n\nContinue?";
+
+        try {
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "إيقاف والمتابعة" : "Stop and Continue",
+                            (dialog, which) -> {
+                                if (onConfirm != null) onConfirm.run();
+                            })
+                    .setNegativeButton(isArabic ? "البقاء" : "Stay",
+                            (dialog, which) -> dialog.dismiss())
+                    .setCancelable(false)
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showExitWarning error: " + e.getMessage());
+        }
     }
 
     // ==================== Callbacks ====================
@@ -371,7 +421,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 syncOfflineTransactions();
             }
             @Override public void onTagRead(String normalizedEpc, int rssi) {
-                // ✅ المزامنة مع Display List + Buffer UI
                 addScannedItemToDisplay(normalizedEpc, rssi);
                 updateLastScan(normalizedEpc, rssi);
             }
@@ -497,6 +546,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     // ==================== Key Events ====================
+    @Override
     public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
         if ((keyCode == KEYCODE_RFID_TRIGGER_1
                 || keyCode == KEYCODE_RFID_TRIGGER_2
@@ -514,11 +564,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (isFragmentDestroyed || isScanning()) return;
         if (!canEdit()) { showAccessDenied(); return; }
 
-        // ✅ Reset UI
         resetUiForNewScan();
         scanController.setBarcodeToEpcMap(catalogManager.getBarcodeToEpcMap());
 
-        // ✅ إبلاغ UI بحالة التحميل
         if (tvInventoryStatus != null) {
             tvInventoryStatus.setText(isArabic ?
                     "🔄 جاري تحميل الكتالوج..." : "🔄 Loading catalog...");
@@ -527,7 +575,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...",
                 Toast.LENGTH_SHORT).show();
 
-        // ✅ Async fetch — بدون CountDownLatch
         catalogManager.fetchCatalog(apiClient, branchesManager,
                 new InventoryCatalogManager.CatalogCallback() {
             @Override
@@ -576,7 +623,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         lastScannedForAnimation = 0;
     }
 
-    private void stopScanning() {
+    public void stopScanning() {
         if (scanController != null) scanController.stopScanning();
     }
 
@@ -611,7 +658,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         });
     }
 
-    // ==================== Add Scanned Item (UI Buffer) ====================
+    // ==================== Add Scanned Item ====================
     private void addScannedItemToDisplay(String epc, int rssi) {
         if (!isAdded() || isFragmentDestroyed || epc == null) return;
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -1399,6 +1446,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     @Override public void onResume() {
         super.onResume();
         try {
+            if (!isAdded() || isFragmentDestroyed || isRemoving() || getActivity() == null) {
+                return;
+            }
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActiveInventoryFragment(this);
             }
@@ -1411,14 +1461,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     @Override public void onPause() {
         super.onPause();
         try {
-            if ((isScanning() || !scannedItemsDisplayList.isEmpty())
-                    && sessionManager != null) {
-                sessionManager.saveSession(expectedCount,
-                        scanController != null ? scanController.getScanStartTime() : 0,
-                        selectedCategoryFilter, scannedItemsDisplayList);
-            }
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActiveInventoryFragment(null);
+            if (isAdded() && !isRemoving()) {
+                if ((isScanning() || !scannedItemsDisplayList.isEmpty())
+                        && sessionManager != null) {
+                    sessionManager.saveSession(expectedCount,
+                            scanController != null ? scanController.getScanStartTime() : 0,
+                            selectedCategoryFilter, scannedItemsDisplayList);
+                }
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).setActiveInventoryFragment(null);
+                }
             }
         } catch (Exception e) { Log.e(TAG, "onPause error", e); }
     }
