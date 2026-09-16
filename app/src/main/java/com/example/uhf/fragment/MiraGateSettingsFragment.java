@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -59,7 +60,7 @@ public class MiraGateSettingsFragment extends Fragment {
     private static final Object EXECUTOR_LOCK = new Object();
 
     private RecyclerView rvGates;
-    private Spinner spSoundPass, spSoundDeny, spSoundAlarm;
+    private AutoCompleteTextView spSoundPass, spSoundDeny, spSoundAlarm;
     private SwitchMaterial switchVibration, switchFlash;
     private EditText etAlarmDuration;
     private SeekBar seekRfidPower;
@@ -72,6 +73,11 @@ public class MiraGateSettingsFragment extends Fragment {
     private final List<BranchItem> branchesList = new ArrayList<>();
     private Runnable statusRefreshRunnable;
     private boolean isArabic = true;
+
+    // متغيّرات الاحتفاظ بالقيم المختارة للأصوات
+    private int selectedPassPos = 0;
+    private int selectedDenyPos = 0;
+    private int selectedAlarmPos = 0;
 
     @Nullable
     @Override
@@ -255,24 +261,27 @@ public class MiraGateSettingsFragment extends Fragment {
         if (context == null) return;
 
         if (spSoundPass != null) {
+            String[] passNames = getSoundNames(MiraGatesSettings.SoundOptions.PASS_SOUNDS);
             ArrayAdapter<String> passAdapter = new ArrayAdapter<>(context,
-                    android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.PASS_SOUNDS));
-            passAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    android.R.layout.simple_dropdown_item_1line, passNames);
             spSoundPass.setAdapter(passAdapter);
+            spSoundPass.setOnItemClickListener((parent, view, position, id) -> selectedPassPos = position);
         }
 
         if (spSoundDeny != null) {
+            String[] denyNames = getSoundNames(MiraGatesSettings.SoundOptions.DENY_SOUNDS);
             ArrayAdapter<String> denyAdapter = new ArrayAdapter<>(context,
-                    android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.DENY_SOUNDS));
-            denyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    android.R.layout.simple_dropdown_item_1line, denyNames);
             spSoundDeny.setAdapter(denyAdapter);
+            spSoundDeny.setOnItemClickListener((parent, view, position, id) -> selectedDenyPos = position);
         }
 
         if (spSoundAlarm != null) {
+            String[] alarmNames = getSoundNames(MiraGatesSettings.SoundOptions.ALARM_SOUNDS);
             ArrayAdapter<String> alarmAdapter = new ArrayAdapter<>(context,
-                    android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.ALARM_SOUNDS));
-            alarmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    android.R.layout.simple_dropdown_item_1line, alarmNames);
             spSoundAlarm.setAdapter(alarmAdapter);
+            spSoundAlarm.setOnItemClickListener((parent, view, position, id) -> selectedAlarmPos = position);
         }
     }
 
@@ -314,9 +323,19 @@ public class MiraGateSettingsFragment extends Fragment {
         String soundDeny = settings.getSoundDeny();
         String soundAlarm = settings.getSoundAlarm();
 
-        if (spSoundPass != null) spSoundPass.setSelection(findIndex(MiraGatesSettings.SoundOptions.PASS_SOUNDS, soundPass));
-        if (spSoundDeny != null) spSoundDeny.setSelection(findIndex(MiraGatesSettings.SoundOptions.DENY_SOUNDS, soundDeny));
-        if (spSoundAlarm != null) spSoundAlarm.setSelection(findIndex(MiraGatesSettings.SoundOptions.ALARM_SOUNDS, soundAlarm));
+        selectedPassPos = findIndex(MiraGatesSettings.SoundOptions.PASS_SOUNDS, soundPass);
+        selectedDenyPos = findIndex(MiraGatesSettings.SoundOptions.DENY_SOUNDS, soundDeny);
+        selectedAlarmPos = findIndex(MiraGatesSettings.SoundOptions.ALARM_SOUNDS, soundAlarm);
+
+        if (spSoundPass != null) {
+            spSoundPass.setText(getSoundDisplayName(soundPass), false);
+        }
+        if (spSoundDeny != null) {
+            spSoundDeny.setText(getSoundDisplayName(soundDeny), false);
+        }
+        if (spSoundAlarm != null) {
+            spSoundAlarm.setText(getSoundDisplayName(soundAlarm), false);
+        }
 
         if (switchVibration != null) switchVibration.setChecked(settings.isVibrationEnabled());
         if (switchFlash != null) switchFlash.setChecked(settings.isFlashEnabled());
@@ -340,8 +359,8 @@ public class MiraGateSettingsFragment extends Fragment {
 
         if (btnTestSound != null) {
             btnTestSound.setOnClickListener(v -> {
-                if (spSoundAlarm != null && spSoundAlarm.getSelectedItemPosition() >= 0) {
-                    String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
+                if (selectedAlarmPos >= 0 && selectedAlarmPos < MiraGatesSettings.SoundOptions.ALARM_SOUNDS.length) {
+                    String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[selectedAlarmPos];
                     SoundGenerator.playSound(selectedSound);
                     if (isAdded()) {
                         Toast.makeText(getContext(), "🔊 تشغيل: " + getSoundDisplayName(selectedSound), Toast.LENGTH_SHORT).show();
@@ -358,14 +377,14 @@ public class MiraGateSettingsFragment extends Fragment {
             btnSaveSounds.setOnClickListener(v -> {
                 if (settings == null) return;
                 
-                if (spSoundPass != null) {
-                    settings.setSoundPass(MiraGatesSettings.SoundOptions.PASS_SOUNDS[spSoundPass.getSelectedItemPosition()]);
+                if (selectedPassPos >= 0 && selectedPassPos < MiraGatesSettings.SoundOptions.PASS_SOUNDS.length) {
+                    settings.setSoundPass(MiraGatesSettings.SoundOptions.PASS_SOUNDS[selectedPassPos]);
                 }
-                if (spSoundDeny != null) {
-                    settings.setSoundDeny(MiraGatesSettings.SoundOptions.DENY_SOUNDS[spSoundDeny.getSelectedItemPosition()]);
+                if (selectedDenyPos >= 0 && selectedDenyPos < MiraGatesSettings.SoundOptions.DENY_SOUNDS.length) {
+                    settings.setSoundDeny(MiraGatesSettings.SoundOptions.DENY_SOUNDS[selectedDenyPos]);
                 }
-                if (spSoundAlarm != null) {
-                    settings.setSoundAlarm(MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()]);
+                if (selectedAlarmPos >= 0 && selectedAlarmPos < MiraGatesSettings.SoundOptions.ALARM_SOUNDS.length) {
+                    settings.setSoundAlarm(MiraGatesSettings.SoundOptions.ALARM_SOUNDS[selectedAlarmPos]);
                 }
 
                 if (isAdded()) {
