@@ -156,30 +156,27 @@
         <item name="android:textStyle">bold</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
-        <!-- ==================== ستايل التولبار بدون هوامش ==================== -->
-    <style name="DenseToolbarStyle" parent="Widget.Material3.Toolbar">
-        <item name="contentInsetStart">0dp</item>
-        <item name="contentInsetEnd">0dp</item>
-        <item name="contentInsetStartWithNavigation">0dp</item>
-        <item name="contentInsetEndWithActions">0dp</item>
-        <item name="paddingStart">0dp</item>
-        <item name="paddingEnd">0dp</item>
-        <item name="actionButtonStyle">@style/DenseActionButtonStyle</item>
+
+    <!-- ==================== الأنماط المساعدة المحدثة لمنع التعارض ==================== -->
+    <style name="AppTextViewStyle" parent="Widget.Material3.TextView">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- تصفير الحشوة الداخلية لأزرار القائمة (Action Buttons) -->
-    <style name="DenseActionButtonStyle" parent="Widget.Material3.Button.TextButton">
-        <item name="android:minWidth">0dp</item>
-        <item name="android:paddingStart">0dp</item>
-        <item name="android:paddingEnd">0dp</item>
-        <item name="android:layout_margin">0dp</item>
+    <style name="AppRadioButtonStyle" parent="Widget.Material3.CompoundButton.RadioButton">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
     </style>
 
+    <style name="AppCheckBoxStyle" parent="Widget.Material3.CompoundButton.CheckBox">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
 
     <declare-styleable name="RadarView">
-    <attr name="center_image" format="reference" />
-    <attr name="image_width" format="dimension" />
-    <attr name="image_height" format="dimension" />
+        <attr name="center_image" format="reference" />
+        <attr name="image_width" format="dimension" />
+        <attr name="image_height" format="dimension" />
     </declare-styleable>
 
 </resources>
