@@ -23,14 +23,13 @@ import com.google.android.material.slider.Slider;
 import java.util.Locale;
 
 /**
- * ✅ InventoryDialogsManager - الإصدار 3.1
- *
- * ✅ الإصلاحات في 3.1:
- * - تنفيذ كل الخيارات (لا "قيد التطوير")
- * - زر "إغلاق" افتراضي في كل حوار
- * - استخدام MaterialAlertDialogBuilder
- * - حوارات فرعية: Session Timeout, Update Location, Add Notes
- * - حماية كاملة من null context
+ * ✅ InventoryDialogsManager v2.0
+ * 
+ * إصلاحات v2.0:
+ * - getActivityContext: حماية من حلقة لا نهائية
+ * - كل الحوارات تستخدم getContext() الآمن
+ * - لا "قيد التطوير"
+ * - إدارة أفضل للأخطاء
  */
 public class InventoryDialogsManager {
 
@@ -67,33 +66,30 @@ public class InventoryDialogsManager {
         this.currentPowerDbm = 26;
         this.expectedCount = 0;
 
-        Log.d(TAG, "✅ InventoryDialogsManager created");
-        Log.d(TAG, "   Context type: " + (context != null ? context.getClass().getName() : "null"));
-        Log.d(TAG, "   Resolved context: " + (this.context != null ? this.context.getClass().getName() : "null"));
+        Log.d(TAG, "✅ InventoryDialogsManager v2.0 created");
+        Log.d(TAG, "   Input context: "
+                + (context != null ? context.getClass().getName() : "null"));
+        Log.d(TAG, "   Resolved context: "
+                + (this.context != null ? this.context.getClass().getName() : "null"));
     }
 
     /**
-     * ✅ استخراج Activity context من أي Context متداخل
+     * ✅ استخراج Activity context — مع حماية من حلقة لا نهائية
      */
     private static Context getActivityContext(Context context) {
         if (context == null) return null;
-
-        if (context instanceof Activity) {
-            return context;
-        }
+        if (context instanceof Activity) return context;
 
         Context current = context;
         int depth = 0;
-        while (current instanceof ContextWrapper && depth < 5) {
+        while (current instanceof ContextWrapper && depth < 10) {
             Context base = ((ContextWrapper) current).getBaseContext();
             if (base == null) break;
-            if (base instanceof Activity) {
-                return base;
-            }
+            if (base instanceof Activity) return base;
+            if (base == current) break;  // ✅ حماية من حلقة
             current = base;
             depth++;
         }
-
         return context;
     }
 
@@ -107,7 +103,6 @@ public class InventoryDialogsManager {
 
     public void setCallback(DialogsCallback callback) {
         this.callback = callback;
-        Log.d(TAG, "✅ Callback set: " + (callback != null));
     }
 
     public void setSoundManager(SoundManager soundManager) {
@@ -128,10 +123,12 @@ public class InventoryDialogsManager {
 
     // ==================== Helper: Safe List Dialog ====================
 
+    public interface ItemClickListener {
+        void onItemClick(int position, String item);
+    }
+
     /**
-     * ✅ عرض قائمة بشكل آمن
-     * - يستخدم MaterialAlertDialogBuilder
-     * - زر إغلاق افتراضي دائماً
+     * ✅ عرض قائمة بشكل آمن — دائماً مع زر إغلاق
      */
     private void showItemsDialog(String title, String[] items,
                                   ItemClickListener listener,
@@ -148,27 +145,23 @@ public class InventoryDialogsManager {
                 return;
             }
 
-            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
-            builder.setTitle(title);
-
-            builder.setItems(items, (dialog, which) -> {
-                Log.d(TAG, "✅ Item clicked: [" + which + "] " + items[which]);
-
-                if (listener != null && which >= 0 && which < items.length) {
-                    try {
-                        listener.onItemClick(which, items[which]);
-                    } catch (Exception e) {
-                        Log.e(TAG, "onItemClick error: " + e.getMessage(), e);
-                    }
-                }
-                dialog.dismiss();
-            });
-
-            // ✅ دائماً أضف زر إغلاق
-            builder.setNegativeButton(
-                    negativeButton != null ? negativeButton : (isArabic ? "إغلاق" : "Close"),
-                    (dialog, which) -> dialog.dismiss()
-            );
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx)
+                    .setTitle(title)
+                    .setItems(items, (dialog, which) -> {
+                        Log.d(TAG, "✅ Item clicked: [" + which + "] " + items[which]);
+                        if (listener != null && which >= 0 && which < items.length) {
+                            try {
+                                listener.onItemClick(which, items[which]);
+                            } catch (Exception e) {
+                                Log.e(TAG, "onItemClick error: " + e.getMessage(), e);
+                            }
+                        }
+                        dialog.dismiss();
+                    })
+                    .setNegativeButton(
+                            negativeButton != null ? negativeButton
+                                    : (isArabic ? "إغلاق" : "Close"),
+                            (dialog, which) -> dialog.dismiss());
 
             AlertDialog dialog = builder.create();
             dialog.setCanceledOnTouchOutside(true);
@@ -184,10 +177,6 @@ public class InventoryDialogsManager {
                         Toast.LENGTH_LONG).show();
             } catch (Exception ignored) {}
         }
-    }
-
-    public interface ItemClickListener {
-        void onItemClick(int position, String item);
     }
 
     // ==================== 1. Power Control Sheet ====================
@@ -210,7 +199,6 @@ public class InventoryDialogsManager {
 
             if (sliderPower != null) {
                 sliderPower.setValue(currentPowerDbm);
-
                 sliderPower.addOnChangeListener((slider, value, fromUser) -> {
                     currentPowerDbm = (int) value;
                     if (tvPowerValue != null) {
@@ -226,9 +214,7 @@ public class InventoryDialogsManager {
             if (btnApply != null) {
                 btnApply.setOnClickListener(v -> {
                     Log.d(TAG, "Power applied: " + currentPowerDbm);
-                    if (callback != null) {
-                        callback.onPowerChanged(currentPowerDbm);
-                    }
+                    if (callback != null) callback.onPowerChanged(currentPowerDbm);
                     dialog.dismiss();
                 });
             }
@@ -266,7 +252,6 @@ public class InventoryDialogsManager {
                     options,
                     (position, item) -> {
                         Log.d(TAG, "Session option selected: " + position);
-
                         switch (position) {
                             case 0:
                                 showSessionTimeoutDialog();
@@ -284,12 +269,9 @@ public class InventoryDialogsManager {
                                         Toast.LENGTH_SHORT).show();
                                 break;
                             case 3:
-                                if (callback != null) {
-                                    callback.onSessionReset();
-                                }
+                                if (callback != null) callback.onSessionReset();
                                 break;
                             case 4:
-                                // إغلاق
                                 break;
                         }
                     },
@@ -300,9 +282,6 @@ public class InventoryDialogsManager {
         }
     }
 
-    /**
-     * ✅ حوار مهلة الجلسة
-     */
     private void showSessionTimeoutDialog() {
         try {
             final Context ctx = getContext();
@@ -315,11 +294,9 @@ public class InventoryDialogsManager {
             showItemsDialog(
                     isArabic ? "⏱️ مهلة الجلسة" : "⏱️ Session Timeout",
                     timeouts,
-                    (position, item) -> {
-                        Toast.makeText(ctx,
-                                (isArabic ? "تم ضبط المهلة: " : "Timeout set: ") + item,
-                                Toast.LENGTH_SHORT).show();
-                    },
+                    (position, item) -> Toast.makeText(ctx,
+                            (isArabic ? "تم ضبط المهلة: " : "Timeout set: ") + item,
+                            Toast.LENGTH_SHORT).show(),
                     isArabic ? "إلغاء" : "Cancel"
             );
         } catch (Exception e) {
@@ -352,7 +329,6 @@ public class InventoryDialogsManager {
                     options,
                     (position, item) -> {
                         Log.d(TAG, "Buzzer option selected: " + position);
-
                         switch (position) {
                             case 0:
                                 Toast.makeText(getContext(),
@@ -379,15 +355,12 @@ public class InventoryDialogsManager {
                                 if (soundManager != null) {
                                     soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
                                 }
-                                if (callback != null) {
-                                    callback.onBuzzerTest();
-                                }
+                                if (callback != null) callback.onBuzzerTest();
                                 Toast.makeText(getContext(),
                                         isArabic ? "📢 اختبار الصوت" : "📢 Buzzer test",
                                         Toast.LENGTH_SHORT).show();
                                 break;
                             case 4:
-                                // إغلاق
                                 break;
                         }
                     },
@@ -429,16 +402,12 @@ public class InventoryDialogsManager {
                     .setPositiveButton(isArabic ? "إرسال واعتماد" : "Send and Commit",
                             (dialog, which) -> {
                                 Log.d(TAG, "Commit confirmed");
-                                if (callback != null) {
-                                    callback.onCommitConfirmed();
-                                }
+                                if (callback != null) callback.onCommitConfirmed();
                             })
                     .setNeutralButton(isArabic ? "🖨️ طباعة التقرير الحالي" : "🖨️ Print current report",
                             (dialog, which) -> {
                                 Log.d(TAG, "Print current report");
-                                if (callback != null) {
-                                    callback.onPrintCurrentReport();
-                                }
+                                if (callback != null) callback.onPrintCurrentReport();
                             })
                     .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                     .show();
@@ -476,28 +445,15 @@ public class InventoryDialogsManager {
                     options,
                     (position, text) -> {
                         Log.d(TAG, "Item option selected: " + position);
-
                         switch (position) {
-                            case 0:
-                                showEditStatusDialog(item);
-                                break;
-                            case 1:
-                                showDamageDialog(item);
-                                break;
-                            case 2:
-                                showUpdateLocationDialog(item);
-                                break;
-                            case 3:
-                                showAddNotesDialog(item);
-                                break;
+                            case 0: showEditStatusDialog(item); break;
+                            case 1: showDamageDialog(item); break;
+                            case 2: showUpdateLocationDialog(item); break;
+                            case 3: showAddNotesDialog(item); break;
                             case 4:
-                                if (callback != null) {
-                                    callback.onPrintSingleItem(item);
-                                }
+                                if (callback != null) callback.onPrintSingleItem(item);
                                 break;
-                            case 5:
-                                showItemFullDetails(item);
-                                break;
+                            case 5: showItemFullDetails(item); break;
                         }
                     },
                     isArabic ? "إغلاق" : "Close"
@@ -507,9 +463,6 @@ public class InventoryDialogsManager {
         }
     }
 
-    /**
-     * ✅ حوار تحديث الموقع
-     */
     private void showUpdateLocationDialog(ScannedItemDisplay item) {
         try {
             final Context ctx = getContext();
@@ -535,9 +488,6 @@ public class InventoryDialogsManager {
         }
     }
 
-    /**
-     * ✅ حوار إضافة ملاحظات
-     */
     private void showAddNotesDialog(ScannedItemDisplay item) {
         try {
             final Context ctx = getContext();
@@ -622,15 +572,10 @@ public class InventoryDialogsManager {
             showItemsDialog(title, statuses,
                     (position, newStatus) -> {
                         Log.d(TAG, "Status selected: " + newStatus);
-
-                        if (callback != null) {
-                            callback.onItemStatusChange(item, newStatus);
-                        }
-
+                        if (callback != null) callback.onItemStatusChange(item, newStatus);
                         if (soundManager != null) {
                             soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
                         }
-
                         Toast.makeText(getContext(),
                                 (isArabic ? "تم تحديث الحالة: " : "Status updated: ") + newStatus,
                                 Toast.LENGTH_SHORT).show();
@@ -660,15 +605,10 @@ public class InventoryDialogsManager {
             showItemsDialog(title, damageTypes,
                     (position, damageType) -> {
                         Log.d(TAG, "Damage selected: " + damageType);
-
-                        if (callback != null) {
-                            callback.onItemDamageRegister(item, damageType);
-                        }
-
+                        if (callback != null) callback.onItemDamageRegister(item, damageType);
                         if (soundManager != null) {
                             soundManager.playBeep(SoundManager.FeedbackType.ERROR);
                         }
-
                         Toast.makeText(getContext(),
                                 (isArabic ? "تم تسجيل التلف: " : "Damage registered: ") + damageType,
                                 Toast.LENGTH_SHORT).show();
