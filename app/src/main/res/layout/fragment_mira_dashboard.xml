@@ -9,7 +9,7 @@
     android:background="?attr/android:colorBackground"
     app:layoutDescription="@xml/dashboard_scene">
 
-    <!-- ==================== SHIMMER LOADING (SKELETON MATCHED) ==================== -->
+   <!-- ==================== SHIMMER LOADING ==================== -->
     <LinearLayout
         android:id="@+id/shimmerLayout"
         android:layout_width="0dp"
@@ -23,55 +23,24 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:visibility="gone">
 
-        <!-- Header Skeleton -->
         <View
             android:layout_width="match_parent"
-            android:layout_height="32dp"
+            android:layout_height="48dp"
             android:layout_marginBottom="16dp"
             android:background="@drawable/shimmer_background" />
 
-        <!-- Greeting Card Skeleton -->
         <View
             android:layout_width="match_parent"
-            android:layout_height="90dp"
-            android:layout_marginBottom="14dp"
+            android:layout_height="100dp"
+            android:layout_marginBottom="16dp"
             android:background="@drawable/shimmer_background" />
 
-        <!-- 3 Metrics Cards Skeleton -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="88dp"
-            android:layout_marginBottom="14dp"
-            android:orientation="horizontal"
-            android:weightSum="3">
-            <View
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/shimmer_background" />
-            <View
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginHorizontal="2dp"
-                android:background="@drawable/shimmer_background" />
-            <View
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:background="@drawable/shimmer_background" />
-        </LinearLayout>
-
-        <!-- Gold Price Card Skeleton -->
         <View
             android:layout_width="match_parent"
-            android:layout_height="180dp"
-            android:layout_marginBottom="14dp"
+            android:layout_height="160dp"
+            android:layout_marginBottom="16dp"
             android:background="@drawable/shimmer_background" />
 
-        <!-- Quick Access Grid Skeleton -->
         <View
             android:layout_width="match_parent"
             android:layout_height="120dp"
@@ -125,7 +94,6 @@
             android:layout_height="match_parent"
             android:clipToPadding="false"
             android:fillViewport="true"
-            android:nestedScrollingEnabled="true"
             android:paddingBottom="32dp">
 
             <LinearLayout
@@ -486,7 +454,7 @@
                                 tools:text="-0.00%" />
                         </LinearLayout>
 
-                        <!-- Ounce Price Card -->
+                        <!-- بطاقة تبرز سعر الأونصة -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
