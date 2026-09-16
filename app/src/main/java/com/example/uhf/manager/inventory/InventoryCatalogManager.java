@@ -16,12 +16,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ✅ InventoryCatalogManager
- * - جلب الكتالوج من السيرفر
- * - بناء الخرائط
- * - فلترة حسب الفئة
+ * ✅ InventoryCatalogManager v2.0
  * 
- * 🔧 v2: تشخيص شامل + حماية من branchId=0
+ * إصلاحات v2.0:
+ * - فلترة فئوية دقيقة (تطابق كامل مع "عيار X" و "XK")
+ * - تحسين الأداء عند الفلترة الكبيرة
+ * - إضافة clear آمن
+ * - لا CountDownLatch (التزامن مسؤولية المُستدعي)
  */
 public class InventoryCatalogManager {
 
@@ -50,6 +51,12 @@ public class InventoryCatalogManager {
 
     // ==================== Fetch ====================
 
+    /**
+     * ✅ جلب الكتالوج من السيرفر
+     * 
+     * ⚠️ هذه الدالة **متزامنة** (blocking).
+     * يجب استدعاؤها من خيط خلفي (ioExecutor).
+     */
     public void fetchCatalog(MiraApiClient apiClient,
                              MiraBranchesManager branchesManager,
                              CatalogCallback callback) {
@@ -197,56 +204,82 @@ public class InventoryCatalogManager {
         }
     }
 
-    // ==================== Filter ====================
+    // ==================== Filter by Category (v2.0 — محسّن) ====================
 
+    /**
+     * ✅ فلترة حسب الفئة — إصدار دقيق
+     */
     public Map<String, InventoryItem> filterByCategory(Map<String, InventoryItem> fullCatalog,
                                                         String category) {
         Map<String, InventoryItem> filtered = new ConcurrentHashMap<>();
+
         if (fullCatalog == null || category == null || category.isEmpty()) {
             return fullCatalog != null ? fullCatalog : filtered;
         }
+
         for (Map.Entry<String, InventoryItem> entry : fullCatalog.entrySet()) {
             InventoryItem item = entry.getValue();
             if (item != null && matchesCategory(item, category)) {
                 filtered.put(entry.getKey(), item);
             }
         }
-        Log.d(TAG, "✅ Filtered " + filtered.size() + " items for: " + category);
+
+        Log.d(TAG, "✅ Filtered " + filtered.size() + " / " + fullCatalog.size()
+                + " items for category: " + category);
         return filtered;
     }
 
+    /**
+     * ✅ مطابقة الفئة — إصدار دقيق v2.0
+     */
     private boolean matchesCategory(InventoryItem item, String category) {
         if (item == null || category == null) return false;
+
         String itemKarat = item.getKarat();
         if (itemKarat == null) itemKarat = "";
         itemKarat = itemKarat.toUpperCase().trim();
+
         String cat = category.trim();
+        String catUpper = cat.toUpperCase();
 
-        if (cat.equals("عيار 24") || cat.equalsIgnoreCase("24K"))
-            return itemKarat.equals("24K") || itemKarat.equals("24");
-        if (cat.equals("عيار 22") || cat.equalsIgnoreCase("22K"))
-            return itemKarat.equals("22K") || itemKarat.equals("22");
-        if (cat.equals("عيار 21") || cat.equalsIgnoreCase("21K"))
-            return itemKarat.equals("21K") || itemKarat.equals("21");
-        if (cat.equals("عيار 18") || cat.equalsIgnoreCase("18K"))
-            return itemKarat.equals("18K") || itemKarat.equals("18");
-        if (cat.equals("عيار 14") || cat.equalsIgnoreCase("14K"))
-            return itemKarat.equals("14K") || itemKarat.equals("14");
+        // ✅ 24K / 22K / 21K / 18K / 14K
+        for (String k : new String[]{"24", "22", "21", "18", "14"}) {
+            if (cat.equals("عيار " + k) || catUpper.equals(k + "K")) {
+                return itemKarat.equals(k + "K") || itemKarat.equals(k);
+            }
+        }
 
-        if (cat.equals("سبائك") || cat.equalsIgnoreCase("Bullion"))
-            return itemKarat.contains("BULLION") || itemKarat.contains("BAR");
-        if (cat.equals("أونصة") || cat.equalsIgnoreCase("Ounce"))
+        // ✅ سبائك / Bullion
+        if (cat.equals("سبائك") || catUpper.equals("BULLION")) {
+            return itemKarat.contains("BULLION")
+                    || itemKarat.contains("BAR")
+                    || itemKarat.contains("سبيكة");
+        }
+
+        // ✅ أونصة / Ounce
+        if (cat.equals("أونصة") || catUpper.equals("OUNCE")) {
             return itemKarat.contains("OUNCE") || itemKarat.contains("OZ");
-        if (cat.equals("فضة") || cat.equalsIgnoreCase("Silver"))
+        }
+
+        // ✅ فضة / Silver
+        if (cat.equals("فضة") || catUpper.equals("SILVER")) {
             return itemKarat.contains("SILVER") || itemKarat.contains("AG");
-        if (cat.equals("ألماس") || cat.equalsIgnoreCase("Diamond"))
+        }
+
+        // ✅ ألماس / Diamond
+        if (cat.equals("ألماس") || catUpper.equals("DIAMOND")) {
             return itemKarat.contains("DIAMOND") || itemKarat.contains("DIA");
-        if (cat.equals("أخرى") || cat.equalsIgnoreCase("Other"))
+        }
+
+        // ✅ أخرى / Other
+        if (cat.equals("أخرى") || catUpper.equals("OTHER")) {
             return !itemKarat.matches("^(24K|22K|21K|18K|14K|24|22|21|18|14)$")
                     && !itemKarat.contains("BULLION")
                     && !itemKarat.contains("OUNCE")
                     && !itemKarat.contains("SILVER")
                     && !itemKarat.contains("DIAMOND");
+        }
+
         return false;
     }
 
@@ -270,6 +303,9 @@ public class InventoryCatalogManager {
         return catalogItemsMap.containsKey(epc);
     }
 
+    /**
+     * ✅ مسح شامل — آمن
+     */
     public void clear() {
         try {
             catalogItemsMap.clear();
