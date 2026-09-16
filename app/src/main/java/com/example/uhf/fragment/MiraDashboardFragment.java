@@ -1,8 +1,8 @@
 package com.example.uhf.fragment;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
@@ -28,7 +28,6 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.QuickActionsAdapter;
 import com.example.uhf.api.MiraApiClient;
-
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
@@ -55,12 +54,10 @@ public class MiraDashboardFragment extends Fragment {
     private static final String TAG = "MiraDashboardFragment";
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
     private static final double OUNCE_TO_GRAM = 31.1035;
-    private static final int MAX_QUICK_ACTIONS = 9;
     private static final long CACHE_VALIDITY_MS = 2 * 60 * 1000;
     private static final long GOLD_CACHE_VALIDITY_MS = 12 * 60 * 60 * 1000;
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-    private static final int MAX_CONSECUTIVE_FAILURES = 3;
 
     // UI Elements
     private TextView tvOrgName, tvGreeting, tvDate, tvLocation, tvLiveStatus;
@@ -102,7 +99,6 @@ public class MiraDashboardFragment extends Fragment {
     private final AtomicBoolean isGoldRefreshing = new AtomicBoolean(false);
     private boolean isDataLoaded = false;
     private long lastDataFetchTime = 0, lastGoldFetchTime = 0, lastPingTime = 0;
-    private int consecutiveFailures = 0;
 
     private SimpleDateFormat getDateFormatter() {
         return isArabic
@@ -157,7 +153,6 @@ public class MiraDashboardFragment extends Fragment {
 
                 mainHandler.post(() -> {
                     if (isAdded() && isViewInitialized) {
-                        Log.d(TAG, "Refreshing dashboard from broadcast");
                         isDataLoaded = false;
                         lastDataFetchTime = 0;
                         isLoading.set(false);
@@ -189,25 +184,22 @@ public class MiraDashboardFragment extends Fragment {
             initializeManagers();
             initViews(view);
             setupProfileListener();
-            setupBranchListener();      // ← جديد
+            setupBranchListener();
             setupQuickAccessGrid();
             setupListeners();
 
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
 
-            updateHeader();              // عرض فوري من الكاش
+            // عرض فوري وتدريجي من الكاش المحلي لمنع الشاشة الفارغة
+            updateHeader();
+            loadOfflineData();
             showShimmer(false);
 
             isViewInitialized = true;
 
-            // ✅ مزامنة اسم المؤسسة والفرع من السيرفر
             syncOrgProfileFromServer(false);
-
-            // ✅ ثم جلب بيانات Dashboard الكاملة
             fetchData();
-
-            startAutoRefresh();
         } catch (Throwable e) {
             logNonFatal("onViewCreated", e);
         }
@@ -225,14 +217,10 @@ public class MiraDashboardFragment extends Fragment {
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
             permissionManager = PermissionManager.getInstance(context);
             isArabic = Locale.getDefault().getLanguage().equals("ar");
-            // ✅ لم نعد نحتاج branchPrefs — نستخدم مستمع MiraBranchesManager
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
-
-            boolean isLoggedIn = sessionManager != null && sessionManager.isLoggedIn();
-            Log.d(TAG, "Dashboard Initialized. Logged in: " + isLoggedIn);
         } catch (Exception e) {
-            logNonFatal("MiraDashboardFragment.initializeManagers", e);
+            logNonFatal("initializeManagers", e);
         }
     }
 
@@ -281,7 +269,9 @@ public class MiraDashboardFragment extends Fragment {
 
             rvQuickActions = v.findViewById(R.id.rvQuickActions);
             if (rvQuickActions != null) {
-                rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
+                // تجاوب عدد الأعمدة حسب الشاشة (تأطير استجابي)
+                int spanCount = getResources().getConfiguration().screenWidthDp >= 600 ? 4 : 3;
+                rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), spanCount));
                 rvQuickActions.setHasFixedSize(true);
                 quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
                 rvQuickActions.setAdapter(quickAdapter);
@@ -319,8 +309,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    // ==================== ✅ مستمعو المزامنة (جديد) ====================
-
     private void setupProfileListener() {
         try {
             if (orgProfile == null) return;
@@ -339,17 +327,13 @@ public class MiraDashboardFragment extends Fragment {
         try {
             if (branchesManager == null) return;
 
-            branchListener = new MiraBranchesManager.OnBranchChangedListener() {
-                @Override
-                public void onBranchChanged() {
-                    if (!isAdded()) return;
-                    Log.d(TAG, "🔄 Branch changed via listener");
-                    mainHandler.post(() -> {
-                        if (isAdded() && isViewInitialized) {
-                            updateHeader();
-                        }
-                    });
-                }
+            branchListener = () -> {
+                if (!isAdded()) return;
+                mainHandler.post(() -> {
+                    if (isAdded() && isViewInitialized) {
+                        updateHeader();
+                    }
+                });
             };
 
             branchesManager.addListener(branchListener);
@@ -358,35 +342,24 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ مزامنة اسم المؤسسة + الفرع النشط من السيرفر
-     */
     private void syncOrgProfileFromServer(boolean force) {
         try {
-            if (orgProfile == null || apiClient == null) {
-                Log.w(TAG, "syncOrgProfileFromServer: managers not ready");
-                return;
-            }
-
-            Log.d(TAG, "🔄 Syncing org profile (force=" + force + ")");
+            if (orgProfile == null || apiClient == null) return;
 
             orgProfile.syncFromServer(apiClient, force, new MiraOrgProfileManager.SyncCallback() {
                 @Override
                 public void onSuccess() {
-                    Log.i(TAG, "✅ Org profile synced");
                     mainHandler.post(() -> {
                         if (isAdded() && isViewInitialized) {
                             updateHeader();
                         }
                     });
-
-                    // ✅ بعد نجاح المزامنة → زامن قائمة الفروع
                     syncBranchesListFromServer();
                 }
 
                 @Override
                 public void onError(String error) {
-                    Log.w(TAG, "⚠️ Org sync failed: " + error);
+                    Log.w(TAG, "Org sync warning: " + error);
                 }
             });
         } catch (Exception e) {
@@ -394,31 +367,20 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ مزامنة قائمة الفروع فقط (بدون تكرار /profile/get)
-     */
     private void syncBranchesListFromServer() {
         try {
             if (branchesManager == null) return;
-
             branchesManager.syncFromServer(new MiraBranchesManager.SyncCallback() {
                 @Override
-                public void onSuccess() {
-                    Log.i(TAG, "✅ Branches list synced");
-                    // notifyListeners في MiraBranchesManager سيُحدِّث الهيدر تلقائياً
-                }
+                public void onSuccess() { }
 
                 @Override
-                public void onError(String error) {
-                    Log.w(TAG, "⚠️ Branches sync failed: " + error);
-                }
+                public void onError(String error) { }
             });
         } catch (Exception e) {
             logNonFatal("syncBranchesListFromServer", e);
         }
     }
-
-    // ==================== Quick Actions ====================
 
     private void setupQuickAccessGrid() {
         try {
@@ -459,33 +421,13 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    private void loadDataIfNeeded() {
-        try {
-            long now = System.currentTimeMillis();
-            if (!isDataLoaded || (now - lastDataFetchTime) > CACHE_VALIDITY_MS) {
-                fetchData();
-            }
-
-            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
-                if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                    fetchLiveGoldPrices(false);
-                } else {
-                    displayGoldPricesFromCache();
-                }
-            }
-
-            if ((now - lastPingTime) > PING_VALIDITY_MS) {
-                updateLiveStatus();
-                lastPingTime = now;
-            }
-        } catch (Exception e) {
-            logNonFatal("loadDataIfNeeded", e);
-        }
-    }
-
     private void updateLiveStatus() {
         try {
             if (tvLiveStatus == null || apiClient == null) return;
+
+            // تغيير فوري للحالة إلى "جاري الفحص" لتحسين تجربة المستخدم أثناء البطء
+            tvLiveStatus.setText(isArabic ? "⏳ جاري الفحص..." : "⏳ Checking...");
+            tvLiveStatus.setTextColor(0xFFF59E0B);
 
             cancelFuture(pingFuture);
             pingFuture = sharedExecutor.submit(() -> {
@@ -507,7 +449,7 @@ public class MiraDashboardFragment extends Fragment {
                 tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
                 tvLiveStatus.setTextColor(ContextCompat.getColor(context, R.color.status_online_green));
             } else {
-                tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
+                tvLiveStatus.setText(isArabic ? "🟡 اتصال ضعيف (كاش)" : "🟡 Weak Connection");
                 tvLiveStatus.setTextColor(ContextCompat.getColor(context, R.color.status_offline_red));
             }
         } catch (Exception e) {
@@ -565,14 +507,8 @@ public class MiraDashboardFragment extends Fragment {
                         if (priceData != null) {
                             lastGoldFetchTime = System.currentTimeMillis();
                             displayGoldPrices(priceData);
-                            Toast.makeText(getContext(),
-                                    isArabic ? "✅ تم تحديث أسعار الذهب" : "✅ Gold prices updated",
-                                    Toast.LENGTH_SHORT).show();
                         } else {
                             displayGoldPricesFromCache();
-                            Toast.makeText(getContext(),
-                                    isArabic ? "⚠️ تعذر التحديث - عرض الكاش" : "⚠️ Update failed - showing cache",
-                                    Toast.LENGTH_SHORT).show();
                         }
                     });
                 } catch (Exception e) {
@@ -670,17 +606,7 @@ public class MiraDashboardFragment extends Fragment {
             }
 
             if (tvPriceSource != null) {
-                long now = System.currentTimeMillis();
-                long timeRemaining = GOLD_CACHE_VALIDITY_MS - (now - lastGoldFetchTime);
-                if (timeRemaining > 0) {
-                    long hours = timeRemaining / (60 * 60 * 1000);
-                    long minutes = (timeRemaining % (60 * 60 * 1000)) / (60 * 1000);
-                    tvPriceSource.setText(isArabic
-                            ? "📡 كاش محلي - التحديث بعد " + hours + " س " + minutes + " د"
-                            : "📡 Cache - update in " + hours + "h " + minutes + "m");
-                } else {
-                    tvPriceSource.setText(isArabic ? "📡 جاهز للتحديث" : "📡 Ready to update");
-                }
+                tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local Cache");
             }
 
             if (tvLastUpdate != null && offlineCache != null) {
@@ -717,9 +643,7 @@ public class MiraDashboardFragment extends Fragment {
                     setText(tvSalesMonth, formatCurrency(salesMonth));
                     setText(tvSalesYear, formatCurrency(salesYear));
 
-                    if (priceManager != null) {
-                        displayGoldPricesFromCache();
-                    }
+                    displayGoldPricesFromCache();
                 });
             } catch (Exception e) {
                 logNonFatal("loadOfflineData", e);
@@ -796,6 +720,7 @@ public class MiraDashboardFragment extends Fragment {
             if (apiClient == null || !isAdded()) return;
 
             isLoading.set(true);
+            updateLiveStatus();
 
             boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
 
@@ -839,6 +764,7 @@ public class MiraDashboardFragment extends Fragment {
                     mainHandler.post(() -> {
                         isLoading.set(false);
                         loadOfflineData();
+                        updateLiveStatusText(false);
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
@@ -903,7 +829,6 @@ public class MiraDashboardFragment extends Fragment {
             ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter,
                     ContextCompat.RECEIVER_NOT_EXPORTED);
             isReceiverRegistered = true;
-            Log.d(TAG, "DataRefreshReceiver registered");
         } catch (Exception e) {
             Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
         }
@@ -914,7 +839,6 @@ public class MiraDashboardFragment extends Fragment {
             if (getContext() != null && isReceiverRegistered) {
                 requireContext().unregisterReceiver(dataRefreshReceiver);
                 isReceiverRegistered = false;
-                Log.d(TAG, "DataRefreshReceiver unregistered");
             }
         } catch (Exception e) {
             Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
@@ -950,7 +874,6 @@ public class MiraDashboardFragment extends Fragment {
                 } else {
                     displayGoldPricesFromCache();
                     if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    updateLiveStatusText(true);
                 }
             } else {
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
@@ -1050,11 +973,6 @@ public class MiraDashboardFragment extends Fragment {
 
         } catch (Exception e) {
             logNonFatal("handleQuickAction", e);
-            try {
-                Toast.makeText(getContext(),
-                        isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen",
-                        Toast.LENGTH_SHORT).show();
-            } catch (Exception ignored) {}
         }
     }
 
@@ -1098,8 +1016,6 @@ public class MiraDashboardFragment extends Fragment {
         if (tv != null) tv.setText(text);
     }
 
-    // ==================== دورة الحياة ====================
-
     public void onBranchChanged() {
         try {
             if (!isAdded()) return;
@@ -1108,13 +1024,9 @@ public class MiraDashboardFragment extends Fragment {
                 currentBranchId = newBranchId;
                 initBranchCache(currentBranchId);
 
-                updateHeader();   // عرض فوري
-
-                // ✅ مزامنة قوية (force) بعد تغيير الفرع
+                updateHeader();
                 syncOrgProfileFromServer(true);
-
                 loadOfflineData();
-                showShimmer(true);
                 fetchData();
             }
         } catch (Exception e) {
@@ -1127,7 +1039,6 @@ public class MiraDashboardFragment extends Fragment {
         super.onResume();
         try {
             registerDataRefreshReceiver();
-            // ✅ لم نعد نحتاج branchPrefs — نستخدم branchListener
 
             isDataLoaded = false;
             lastDataFetchTime = 0;
@@ -1138,10 +1049,7 @@ public class MiraDashboardFragment extends Fragment {
             } else if (isViewInitialized) {
                 setupQuickAccessGrid();
                 updateHeader();
-
-                // ✅ مزامنة خفيفة (تحترم الـ cooldown 15 دقيقة)
                 syncOrgProfileFromServer(false);
-
                 refreshInternalData();
             }
             startAutoRefresh();
@@ -1155,8 +1063,7 @@ public class MiraDashboardFragment extends Fragment {
         super.onPause();
         try {
             unregisterDataRefreshReceiver();
-            stopAutoRefresh();
-            // ✅ لم نعد نحتاج branchPrefs
+            stopAutoRefresh(); // حماية البطارية وإلغاء المؤقت التلقائي أثناء التوقف
         } catch (Exception e) {
             logNonFatal("onPause", e);
         }
@@ -1169,13 +1076,11 @@ public class MiraDashboardFragment extends Fragment {
             unregisterDataRefreshReceiver();
             stopAutoRefresh();
 
-            // ✅ إزالة مستمع الفرع
             if (branchesManager != null && branchListener != null) {
                 branchesManager.removeListener(branchListener);
                 branchListener = null;
             }
 
-            // ✅ إزالة مستمع البروفايل
             if (orgProfile != null && profileListener != null) {
                 orgProfile.removeListener(profileListener);
             }
