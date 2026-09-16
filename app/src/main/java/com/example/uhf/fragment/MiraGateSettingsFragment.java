@@ -84,7 +84,9 @@ public class MiraGateSettingsFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        Context ctx = requireContext();
+        Context ctx = getContext();
+        if (ctx == null) return;
+
         settings = MiraGatesSettings.getInstance(ctx);
         permissionManager = PermissionManager.getInstance(ctx);
         branchesManager = MiraBranchesManager.getInstance(ctx);
@@ -144,13 +146,16 @@ public class MiraGateSettingsFragment extends Fragment {
         tvOfflineGates = view.findViewById(R.id.tvOfflineGates);
         tvLastEvent = view.findViewById(R.id.tvLastEvent);
 
-        rvGates.setLayoutManager(new LinearLayoutManager(getContext()));
-        // ربط النقر بالحدث المزدوج لتعديل البوابة أو حذفها
-        gateAdapter = new GateAdapter(gatesList, this::removeGate, this::toggleGateStatus, this::showEditGateDialog);
-        rvGates.setAdapter(gateAdapter);
+        if (rvGates != null) {
+            rvGates.setLayoutManager(new LinearLayoutManager(getContext()));
+            gateAdapter = new GateAdapter(gatesList, this::removeGate, this::toggleGateStatus, this::showEditGateDialog);
+            rvGates.setAdapter(gateAdapter);
+        }
     }
 
     private void applyPermissions() {
+        if (permissionManager == null) return;
+
         boolean canManageGates = permissionManager.isAdmin() || 
                                   permissionManager.isBranchManager() ||
                                   permissionManager.canEdit("gates");
@@ -161,7 +166,6 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void loadBranches() {
-        // إعداد الفرع الافتراضي أولاً لمنع الفراغ
         int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
         String activeBranchName = branchesManager != null ? branchesManager.getActiveBranchName() : "الفرع الرئيسي";
         
@@ -247,23 +251,33 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void setupSpinners() {
-        ArrayAdapter<String> passAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.PASS_SOUNDS));
-        passAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spSoundPass.setAdapter(passAdapter);
+        Context context = getContext();
+        if (context == null) return;
 
-        ArrayAdapter<String> denyAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.DENY_SOUNDS));
-        denyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spSoundDeny.setAdapter(denyAdapter);
+        if (spSoundPass != null) {
+            ArrayAdapter<String> passAdapter = new ArrayAdapter<>(context,
+                    android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.PASS_SOUNDS));
+            passAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spSoundPass.setAdapter(passAdapter);
+        }
 
-        ArrayAdapter<String> alarmAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.ALARM_SOUNDS));
-        alarmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spSoundAlarm.setAdapter(alarmAdapter);
+        if (spSoundDeny != null) {
+            ArrayAdapter<String> denyAdapter = new ArrayAdapter<>(context,
+                    android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.DENY_SOUNDS));
+            denyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spSoundDeny.setAdapter(denyAdapter);
+        }
+
+        if (spSoundAlarm != null) {
+            ArrayAdapter<String> alarmAdapter = new ArrayAdapter<>(context,
+                    android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.ALARM_SOUNDS));
+            alarmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spSoundAlarm.setAdapter(alarmAdapter);
+        }
     }
 
     private String[] getSoundNames(String[] soundKeys) {
+        if (soundKeys == null) return new String[0];
         String[] names = new String[soundKeys.length];
         for (int i = 0; i < soundKeys.length; i++) {
             names[i] = getSoundDisplayName(soundKeys[i]);
@@ -272,6 +286,7 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private String getSoundDisplayName(String soundKey) {
+        if (soundKey == null) return "";
         switch (soundKey) {
             case "beep_success": return "🔔 نجاح قصير";
             case "beep_soft": return "🔔 ناعم";
@@ -293,22 +308,25 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void loadSettings() {
+        if (settings == null) return;
+
         String soundPass = settings.getSoundPass();
         String soundDeny = settings.getSoundDeny();
         String soundAlarm = settings.getSoundAlarm();
 
-        spSoundPass.setSelection(findIndex(MiraGatesSettings.SoundOptions.PASS_SOUNDS, soundPass));
-        spSoundDeny.setSelection(findIndex(MiraGatesSettings.SoundOptions.DENY_SOUNDS, soundDeny));
-        spSoundAlarm.setSelection(findIndex(MiraGatesSettings.SoundOptions.ALARM_SOUNDS, soundAlarm));
+        if (spSoundPass != null) spSoundPass.setSelection(findIndex(MiraGatesSettings.SoundOptions.PASS_SOUNDS, soundPass));
+        if (spSoundDeny != null) spSoundDeny.setSelection(findIndex(MiraGatesSettings.SoundOptions.DENY_SOUNDS, soundDeny));
+        if (spSoundAlarm != null) spSoundAlarm.setSelection(findIndex(MiraGatesSettings.SoundOptions.ALARM_SOUNDS, soundAlarm));
 
-        switchVibration.setChecked(settings.isVibrationEnabled());
-        switchFlash.setChecked(settings.isFlashEnabled());
-        etAlarmDuration.setText(String.valueOf(settings.getAlarmDuration()));
-        seekRfidPower.setProgress(settings.getRfidPower());
-        tvRfidPowerValue.setText(settings.getRfidPower() + " dBm");
+        if (switchVibration != null) switchVibration.setChecked(settings.isVibrationEnabled());
+        if (switchFlash != null) switchFlash.setChecked(settings.isFlashEnabled());
+        if (etAlarmDuration != null) etAlarmDuration.setText(String.valueOf(settings.getAlarmDuration()));
+        if (seekRfidPower != null) seekRfidPower.setProgress(settings.getRfidPower());
+        if (tvRfidPowerValue != null) tvRfidPowerValue.setText(settings.getRfidPower() + " dBm");
     }
 
     private int findIndex(String[] array, String value) {
+        if (array == null || value == null) return 0;
         for (int i = 0; i < array.length; i++) {
             if (array[i].equals(value)) return i;
         }
@@ -322,10 +340,12 @@ public class MiraGateSettingsFragment extends Fragment {
 
         if (btnTestSound != null) {
             btnTestSound.setOnClickListener(v -> {
-                String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
-                SoundGenerator.playSound(selectedSound);
-                if (isAdded()) {
-                    Toast.makeText(getContext(), "🔊 تشغيل: " + getSoundDisplayName(selectedSound), Toast.LENGTH_SHORT).show();
+                if (spSoundAlarm != null && spSoundAlarm.getSelectedItemPosition() >= 0) {
+                    String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
+                    SoundGenerator.playSound(selectedSound);
+                    if (isAdded()) {
+                        Toast.makeText(getContext(), "🔊 تشغيل: " + getSoundDisplayName(selectedSound), Toast.LENGTH_SHORT).show();
+                    }
                 }
             });
         }
@@ -336,13 +356,17 @@ public class MiraGateSettingsFragment extends Fragment {
 
         if (btnSaveSounds != null) {
             btnSaveSounds.setOnClickListener(v -> {
-                String soundPass = MiraGatesSettings.SoundOptions.PASS_SOUNDS[spSoundPass.getSelectedItemPosition()];
-                String soundDeny = MiraGatesSettings.SoundOptions.DENY_SOUNDS[spSoundDeny.getSelectedItemPosition()];
-                String soundAlarm = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
-
-                settings.setSoundPass(soundPass);
-                settings.setSoundDeny(soundDeny);
-                settings.setSoundAlarm(soundAlarm);
+                if (settings == null) return;
+                
+                if (spSoundPass != null) {
+                    settings.setSoundPass(MiraGatesSettings.SoundOptions.PASS_SOUNDS[spSoundPass.getSelectedItemPosition()]);
+                }
+                if (spSoundDeny != null) {
+                    settings.setSoundDeny(MiraGatesSettings.SoundOptions.DENY_SOUNDS[spSoundDeny.getSelectedItemPosition()]);
+                }
+                if (spSoundAlarm != null) {
+                    settings.setSoundAlarm(MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()]);
+                }
 
                 if (isAdded()) {
                     Toast.makeText(getContext(), "✅ تم حفظ الأصوات", Toast.LENGTH_SHORT).show();
@@ -354,7 +378,9 @@ public class MiraGateSettingsFragment extends Fragment {
             seekRfidPower.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    tvRfidPowerValue.setText(progress + " dBm");
+                    if (tvRfidPowerValue != null) {
+                        tvRfidPowerValue.setText(progress + " dBm");
+                    }
                 }
                 @Override public void onStartTrackingTouch(SeekBar seekBar) {}
                 @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -363,17 +389,23 @@ public class MiraGateSettingsFragment extends Fragment {
 
         if (btnSaveAll != null) {
             btnSaveAll.setOnClickListener(v -> {
-                settings.setVibrationEnabled(switchVibration.isChecked());
-                settings.setFlashEnabled(switchFlash.isChecked());
+                if (settings == null) return;
+
+                if (switchVibration != null) settings.setVibrationEnabled(switchVibration.isChecked());
+                if (switchFlash != null) settings.setFlashEnabled(switchFlash.isChecked());
                 
-                String durationInput = etAlarmDuration.getText().toString().trim();
-                int duration = 10;
-                try {
-                    if (!durationInput.isEmpty()) duration = Integer.parseInt(durationInput);
-                } catch (NumberFormatException ignored) {}
-                settings.setAlarmDuration(duration);
+                if (etAlarmDuration != null) {
+                    String durationInput = etAlarmDuration.getText().toString().trim();
+                    int duration = 10;
+                    try {
+                        if (!durationInput.isEmpty()) duration = Integer.parseInt(durationInput);
+                    } catch (NumberFormatException ignored) {}
+                    settings.setAlarmDuration(duration);
+                }
                 
-                settings.setRfidPower(seekRfidPower.getProgress());
+                if (seekRfidPower != null) {
+                    settings.setRfidPower(seekRfidPower.getProgress());
+                }
 
                 if (isAdded()) {
                     Toast.makeText(getContext(), "✅ تم حفظ جميع الإعدادات العامة", Toast.LENGTH_SHORT).show();
@@ -383,6 +415,7 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void loadGatesFromLocal() {
+        if (settings == null) return;
         gatesList.clear();
         gatesList.addAll(settings.getGates());
         if (gateAdapter != null) {
@@ -391,42 +424,45 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void showAddGateDialog() {
-        if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
-            Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+        Context context = getContext();
+        if (context == null) return;
+
+        if (permissionManager != null && !(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
+            Toast.makeText(context, "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
             return;
         }
         
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle("➕ إضافة بوابة جديدة");
 
-        LinearLayout layout = new LinearLayout(requireContext());
+        LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 20, 40, 10);
 
-        final EditText etGateName = new EditText(requireContext());
+        final EditText etGateName = new EditText(context);
         etGateName.setHint("اسم البوابة (مثال: البوابة الرئيسية)");
         etGateName.setSingleLine(true);
         layout.addView(etGateName);
 
-        final EditText etLocation = new EditText(requireContext());
+        final EditText etLocation = new EditText(context);
         etLocation.setHint("الموقع (مثال: المدخل الرئيسي)");
         etLocation.setSingleLine(true);
         layout.addView(etLocation);
 
-        TextView tvBranchLabel = new TextView(requireContext());
+        TextView tvBranchLabel = new TextView(context);
         tvBranchLabel.setText("🏢 الفرع التابع له:");
         tvBranchLabel.setTextSize(14);
         tvBranchLabel.setPadding(0, 20, 0, 5);
         layout.addView(tvBranchLabel);
 
-        final Spinner spBranch = new Spinner(requireContext());
-        ArrayAdapter<BranchItem> branchAdapter = new ArrayAdapter<>(requireContext(),
+        final Spinner spBranch = new Spinner(context);
+        ArrayAdapter<BranchItem> branchAdapter = new ArrayAdapter<>(context,
                 android.R.layout.simple_spinner_item, branchesList);
         branchAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spBranch.setAdapter(branchAdapter);
         layout.addView(spBranch);
 
-        final EditText etIpAddress = new EditText(requireContext());
+        final EditText etIpAddress = new EditText(context);
         etIpAddress.setHint("عنوان IP (اختياري)");
         etIpAddress.setSingleLine(true);
         layout.addView(etIpAddress);
@@ -453,22 +489,28 @@ public class MiraGateSettingsFragment extends Fragment {
                 gate.branchId = branchId;
                 gate.branchName = branchName;
                 
-                // الاعتماد على القيم العامة الافتراضية لضمان التناسق
-                gate.rfidPower = settings.getRfidPower();
-                gate.vibrationEnabled = settings.isVibrationEnabled();
-                gate.flashEnabled = settings.isFlashEnabled();
-                gate.soundPass = settings.getSoundPass();
-                gate.soundDeny = settings.getSoundDeny();
-                gate.soundAlarm = settings.getSoundAlarm();
-                gate.alarmDuration = settings.getAlarmDuration();
+                if (settings != null) {
+                    gate.rfidPower = settings.getRfidPower();
+                    gate.vibrationEnabled = settings.isVibrationEnabled();
+                    gate.flashEnabled = settings.isFlashEnabled();
+                    gate.soundPass = settings.getSoundPass();
+                    gate.soundDeny = settings.getSoundDeny();
+                    gate.soundAlarm = settings.getSoundAlarm();
+                    gate.alarmDuration = settings.getAlarmDuration();
 
-                settings.addGate(gate);
+                    settings.addGate(gate);
+                }
+                
                 loadGatesFromLocal();
                 syncGateToServer(gate, branchId);
 
-                Toast.makeText(getContext(), "✅ تمت إضافة البوابة لفرع: " + branchName, Toast.LENGTH_SHORT).show();
+                if (isAdded()) {
+                    Toast.makeText(getContext(), "✅ تمت إضافة البوابة لفرع: " + branchName, Toast.LENGTH_SHORT).show();
+                }
             } else {
-                Toast.makeText(getContext(), "⚠️ اسم البوابة مطلوب", Toast.LENGTH_SHORT).show();
+                if (isAdded()) {
+                    Toast.makeText(getContext(), "⚠️ اسم البوابة مطلوب", Toast.LENGTH_SHORT).show();
+                }
             }
         });
         builder.setNegativeButton("إلغاء", null);
@@ -476,41 +518,44 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void showEditGateDialog(int position) {
-        if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
-            Toast.makeText(getContext(), "⛔ غير مصرح بالتعديل", Toast.LENGTH_SHORT).show();
+        Context context = getContext();
+        if (context == null) return;
+
+        if (permissionManager != null && !(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
+            Toast.makeText(context, "⛔ غير مصرح بالتعديل", Toast.LENGTH_SHORT).show();
             return;
         }
         
         if (position < 0 || position >= gatesList.size()) return;
         MiraGatesSettings.GateDevice existingGate = gatesList.get(position);
         
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle("✏️ تعديل بوابة: " + existingGate.gateName);
 
-        LinearLayout layout = new LinearLayout(requireContext());
+        LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 20, 40, 10);
 
-        final EditText etGateName = new EditText(requireContext());
+        final EditText etGateName = new EditText(context);
         etGateName.setHint("اسم البوابة");
         etGateName.setSingleLine(true);
         etGateName.setText(existingGate.gateName);
         layout.addView(etGateName);
 
-        final EditText etLocation = new EditText(requireContext());
+        final EditText etLocation = new EditText(context);
         etLocation.setHint("الموقع");
         etLocation.setSingleLine(true);
         etLocation.setText(existingGate.location);
         layout.addView(etLocation);
 
-        TextView tvBranchLabel = new TextView(requireContext());
+        TextView tvBranchLabel = new TextView(context);
         tvBranchLabel.setText("🏢 الفرع التابع له:");
         tvBranchLabel.setTextSize(14);
         tvBranchLabel.setPadding(0, 20, 0, 5);
         layout.addView(tvBranchLabel);
 
-        final Spinner spBranch = new Spinner(requireContext());
-        ArrayAdapter<BranchItem> branchAdapter = new ArrayAdapter<>(requireContext(),
+        final Spinner spBranch = new Spinner(context);
+        ArrayAdapter<BranchItem> branchAdapter = new ArrayAdapter<>(context,
                 android.R.layout.simple_spinner_item, branchesList);
         branchAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spBranch.setAdapter(branchAdapter);
@@ -523,7 +568,7 @@ public class MiraGateSettingsFragment extends Fragment {
         }
         layout.addView(spBranch);
 
-        final EditText etIpAddress = new EditText(requireContext());
+        final EditText etIpAddress = new EditText(context);
         etIpAddress.setHint("عنوان IP");
         etIpAddress.setSingleLine(true);
         etIpAddress.setText(existingGate.ipAddress);
@@ -546,13 +591,20 @@ public class MiraGateSettingsFragment extends Fragment {
                 existingGate.branchId = branchId;
                 existingGate.branchName = branchName;
                 
-                settings.updateGate(existingGate.gateId, existingGate);
+                if (settings != null) {
+                    settings.updateGate(existingGate.gateId, existingGate);
+                }
+                
                 loadGatesFromLocal();
                 updateGateOnServer(existingGate);
 
-                Toast.makeText(getContext(), "✅ تم تحديث البوابة", Toast.LENGTH_SHORT).show();
+                if (isAdded()) {
+                    Toast.makeText(getContext(), "✅ تم تحديث البوابة", Toast.LENGTH_SHORT).show();
+                }
             } else {
-                Toast.makeText(getContext(), "⚠️ اسم البوابة مطلوب", Toast.LENGTH_SHORT).show();
+                if (isAdded()) {
+                    Toast.makeText(getContext(), "⚠️ اسم البوابة مطلوب", Toast.LENGTH_SHORT).show();
+                }
             }
         });
         builder.setNegativeButton("إلغاء", null);
@@ -635,14 +687,18 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void removeGate(int position) {
-        if (!(permissionManager.canDelete("gates") || permissionManager.isAdmin())) {
-            Toast.makeText(getContext(), "⛔ غير مصرح بالحذف", Toast.LENGTH_SHORT).show();
+        if (permissionManager != null && !(permissionManager.canDelete("gates") || permissionManager.isAdmin())) {
+            if (isAdded()) {
+                Toast.makeText(getContext(), "⛔ غير مصرح بالحذف", Toast.LENGTH_SHORT).show();
+            }
             return;
         }
         
         if (position >= 0 && position < gatesList.size()) {
             MiraGatesSettings.GateDevice gate = gatesList.get(position);
-            settings.removeGate(gate.gateId);
+            if (settings != null) {
+                settings.removeGate(gate.gateId);
+            }
             loadGatesFromLocal();
             if (isAdded()) {
                 Toast.makeText(getContext(), "🗑 تم حذف: " + gate.gateName, Toast.LENGTH_SHORT).show();
@@ -651,8 +707,10 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void toggleGateStatus(int position, boolean open) {
-        if (!permissionManager.isAdmin() && !permissionManager.isBranchManager()) {
-            Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+        if (permissionManager != null && !permissionManager.isAdmin() && !permissionManager.isBranchManager()) {
+            if (isAdded()) {
+                Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+            }
             return;
         }
         
@@ -701,6 +759,8 @@ public class MiraGateSettingsFragment extends Fragment {
 
     private void updateGateStats(JSONObject data) {
         try {
+            if (data == null) return;
+
             JSONObject statsObj = data.optJSONObject("data");
             if (statsObj == null) statsObj = data;
             
@@ -728,7 +788,7 @@ public class MiraGateSettingsFragment extends Fragment {
                         String status = gateJson.optString("status", "offline");
                         
                         for (MiraGatesSettings.GateDevice gate : gatesList) {
-                            if (gate.gateId.equals(gateId)) {
+                            if (gate.gateId != null && gate.gateId.equals(gateId)) {
                                 gate.status = status;
                                 gate.passCount = gateJson.optInt("pass_count", gateJson.optInt("scan_count", 0));
                                 gate.denyCount = gateJson.optInt("deny_count", 0);
@@ -797,7 +857,9 @@ public class MiraGateSettingsFragment extends Fragment {
                         }
 
                         if (!serverGates.isEmpty()) {
-                            settings.saveGates(serverGates);
+                            if (settings != null) {
+                                settings.saveGates(serverGates);
+                            }
                             mainHandler.post(() -> {
                                 if (isAdded()) {
                                     loadGatesFromLocal();
@@ -893,20 +955,27 @@ public class MiraGateSettingsFragment extends Fragment {
         public void onBindViewHolder(@NonNull GateViewHolder holder, int position) {
             MiraGatesSettings.GateDevice gate = gates.get(position);
 
-            holder.tvGateName.setText(gate.gateName);
-            holder.tvGateLocation.setText("📍 " + (gate.location != null && !gate.location.isEmpty() ? gate.location : "غير محدد"));
+            if (holder.tvGateName != null) {
+                holder.tvGateName.setText(gate.gateName != null ? gate.gateName : "");
+            }
+            
+            if (holder.tvGateLocation != null) {
+                holder.tvGateLocation.setText("📍 " + (gate.location != null && !gate.location.isEmpty() ? gate.location : "غير محدد"));
+            }
             
             if (holder.tvGateBranch != null) {
                 holder.tvGateBranch.setText("🏢 " + (gate.branchName != null && !gate.branchName.isEmpty() ? gate.branchName : "غير محدد"));
             }
             
             boolean isOnline = "online".equals(gate.status) || "armed".equals(gate.status);
-            if (isOnline) {
-                holder.tvGateStatus.setText("🟢 متصل");
-                holder.tvGateStatus.setTextColor(0xFF2E7D32);
-            } else {
-                holder.tvGateStatus.setText("⚪ غير متصل");
-                holder.tvGateStatus.setTextColor(0xFF9E9E9E);
+            if (holder.tvGateStatus != null) {
+                if (isOnline) {
+                    holder.tvGateStatus.setText("🟢 متصل");
+                    holder.tvGateStatus.setTextColor(0xFF2E7D32);
+                } else {
+                    holder.tvGateStatus.setText("⚪ غير متصل");
+                    holder.tvGateStatus.setTextColor(0xFF9E9E9E);
+                }
             }
 
             if (holder.tvGateStats != null) {
@@ -921,7 +990,7 @@ public class MiraGateSettingsFragment extends Fragment {
                 holder.btnToggleGate.setText(isOnline ? "🔒" : "🔓");
                 holder.btnToggleGate.setOnClickListener(v -> {
                     int pos = holder.getAdapterPosition();
-                    if (pos != RecyclerView.NO_POSITION) {
+                    if (pos != RecyclerView.NO_POSITION && toggleListener != null) {
                         toggleListener.onToggle(pos, !isOnline);
                     }
                 });
@@ -930,16 +999,15 @@ public class MiraGateSettingsFragment extends Fragment {
             if (holder.btnRemove != null) {
                 holder.btnRemove.setOnClickListener(v -> {
                     int pos = holder.getAdapterPosition();
-                    if (pos != RecyclerView.NO_POSITION) {
+                    if (pos != RecyclerView.NO_POSITION && removeListener != null) {
                         removeListener.onRemove(pos);
                     }
                 });
             }
 
-            // النقر على العنصر نفسه يفتح حوار التعديل
             holder.itemView.setOnClickListener(v -> {
                 int pos = holder.getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION) {
+                if (pos != RecyclerView.NO_POSITION && editListener != null) {
                     editListener.onEdit(pos);
                 }
             });
@@ -947,7 +1015,7 @@ public class MiraGateSettingsFragment extends Fragment {
 
         @Override
         public int getItemCount() {
-            return gates.size();
+            return gates != null ? gates.size() : 0;
         }
 
         static class GateViewHolder extends RecyclerView.ViewHolder {
