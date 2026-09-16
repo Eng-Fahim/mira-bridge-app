@@ -7,188 +7,189 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
 
-    <!-- شريط علوي -->
+    <!-- الشريط العلوي مع الفلاتر (قابلة للتمرير والاختفاء الذكي) -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/colorPrimaryContainer"
         app:elevation="2dp">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
+        <com.google.android.material.appbar.CollapsingToolbarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="12dp">
+            app:layout_scrollFlags="scroll|exitUntilCollapsed">
 
-            <TextView
-                android:id="@+id/tvReportDialogTitle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toStartOf="@id/btnReportClose"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                tools:text="نتائج التقرير المالي والجرام" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnReportClose"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                app:icon="@android:drawable/ic_menu_close_clear_cancel"
-                app:iconTint="?attr/colorOnPrimaryContainer"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
-        <!-- الفلاتر -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:paddingBottom="8dp">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnReportDateFrom"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="38dp"
-                android:layout_weight="1"
-                android:padding="0dp"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="11sp"
-                app:cornerRadius="8dp"
-                app:strokeColor="?attr/colorPrimary"
-                tools:text="من: 2026-08-01" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnReportDateTo"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="38dp"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:padding="0dp"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="11sp"
-                app:cornerRadius="8dp"
-                app:strokeColor="?attr/colorPrimary"
-                tools:text="إلى: 2026-08-30" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnReportApplyFilter"
-                android:layout_width="wrap_content"
-                android:layout_height="38dp"
-                android:layout_marginStart="6dp"
-                android:textColor="?attr/colorOnPrimary"
-                android:textSize="11sp"
-                app:backgroundTint="?attr/colorPrimary"
-                app:cornerRadius="8dp"
-                tools:text="تحديث" />
-        </LinearLayout>
-
-        <!-- أزرار الإجراءات -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:paddingBottom="8dp">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnAdvancedFilter"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:textColor="?attr/colorOnSecondaryContainer"
-                android:textSize="10sp"
-                app:backgroundTint="?attr/colorSecondaryContainer"
-                app:cornerRadius="8dp"
-                tools:text="فلترة خيارات" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnReportExport"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:textColor="?attr/colorOnSecondaryContainer"
-                android:textSize="10sp"
-                app:backgroundTint="?attr/colorSecondaryContainer"
-                app:cornerRadius="8dp"
-                tools:text="تصدير Excel/PDF" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnReportPrint"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:textColor="?attr/colorOnSecondaryContainer"
-                android:textSize="10sp"
-                app:backgroundTint="?attr/colorSecondaryContainer"
-                app:cornerRadius="8dp"
-                tools:text="طباعة" />
-
-        </LinearLayout>
-
-    </com.google.android.material.appbar.AppBarLayout>
-    
-    <!-- NestedScrollView يحتوي على الرسم + البيانات -->
-    <androidx.core.widget.NestedScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="?attr/colorSurface"
-        android:fillViewport="true"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <!-- الرسم البياني -->
-            <FrameLayout
-                android:id="@+id/scrollChart"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:visibility="gone">
+                android:orientation="vertical">
 
-                <ImageView
-                    android:id="@+id/ivChart"
+                <!-- العنوان وزر الإغلاق -->
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:adjustViewBounds="true"
-                    android:importantForAccessibility="no" />
-            </FrameLayout>
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp">
 
-            <!-- البيانات -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvReportData"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clipToPadding="false"
-                android:nestedScrollingEnabled="false"
-                android:padding="8dp" />
+                    <TextView
+                        android:id="@+id/tvReportDialogTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorOnPrimaryContainer"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/btnReportClose"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        tools:text="نتائج التقرير المالي والجرام" />
 
-        </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReportClose"
+                        style="@style/Widget.Material3.Button.IconButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                        app:iconTint="?attr/colorOnPrimaryContainer"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
-    </androidx.core.widget.NestedScrollView>
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- التحميل -->
+                <!-- أزرار اختيار التواريخ -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReportDateFrom"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="38dp"
+                        android:layout_weight="1"
+                        android:padding="0dp"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="11sp"
+                        app:cornerRadius="8dp"
+                        app:strokeColor="?attr/colorPrimary"
+                        tools:text="من: 2026-08-01" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReportDateTo"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:padding="0dp"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="11sp"
+                        app:cornerRadius="8dp"
+                        app:strokeColor="?attr/colorPrimary"
+                        tools:text="إلى: 2026-08-30" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReportApplyFilter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="6dp"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textSize="11sp"
+                        app:backgroundTint="?attr/colorPrimary"
+                        app:cornerRadius="8dp"
+                        tools:text="تحديث" />
+                </LinearLayout>
+
+                <!-- أزرار الإجراءات والتصدير -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAdvancedFilter"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:textColor="?attr/colorOnSecondaryContainer"
+                        android:textSize="10sp"
+                        app:backgroundTint="?attr/colorSecondaryContainer"
+                        app:cornerRadius="8dp"
+                        tools:text="فلترة خيارات" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReportExport"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:textColor="?attr/colorOnSecondaryContainer"
+                        android:textSize="10sp"
+                        app:backgroundTint="?attr/colorSecondaryContainer"
+                        app:cornerRadius="8dp"
+                        tools:text="تصدير Excel/PDF" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReportPrint"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:textColor="?attr/colorOnSecondaryContainer"
+                        android:textSize="10sp"
+                        app:backgroundTint="?attr/colorSecondaryContainer"
+                        app:cornerRadius="8dp"
+                        tools:text="طباعة" />
+
+                </LinearLayout>
+
+                <!-- الرسم البياني (إن وجد) -->
+                <FrameLayout
+                    android:id="@+id/scrollChart"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/ivChart"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:adjustViewBounds="true"
+                        android:importantForAccessibility="no" />
+                </FrameLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- قائمة البيانات: تأخذ الارتفاع الكامل مباشرة تحت AppBarLayout -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvReportData"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingHorizontal="8dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="24dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        tools:listitem="@layout/item_report_inventory" />
+
+    <!-- شاشة التحميل -->
     <FrameLayout
         android:id="@+id/layoutLoadingContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.8"
+        android:alpha="0.9"
         android:background="?attr/colorSurface"
         android:clickable="true"
         android:focusable="true"
