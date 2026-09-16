@@ -308,16 +308,17 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (isScanKey(keyCode)) {
-            if (event.getRepeatCount() == 0 && currentFragment instanceof KeyDwonFragment) {
-                ((KeyDwonFragment) currentFragment).myOnKeyDwon();
-            }
-            return true;
+public boolean onKeyDown(int keyCode, KeyEvent event) {
+    if (isScanKey(keyCode)) {
+        if (event.getRepeatCount() == 0
+                && currentFragment instanceof KeyDwonFragment) {
+            return ((KeyDwonFragment) currentFragment)
+                    .myOnKeyDwon(keyCode, event);
         }
-        return super.onKeyDown(keyCode, event);
+        return true;
     }
-
+    return super.onKeyDown(keyCode, event);
+}
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
