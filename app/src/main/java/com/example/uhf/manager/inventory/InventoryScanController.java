@@ -24,15 +24,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * ✅ InventoryScanController v2.0
- * 
+ * ✅ InventoryScanController v2.0 — النسخة النهائية
+ *
  * المسؤول الوحيد عن كل منطق المسح:
  * - استقبال onTagRead من RFID Reader
  * - Normalize + Debounce
  * - تمرير إلى Engine
  * - تشغيل المحاكاة
- * - إدارة generation counter لمنع callbacks القديمة
- * 
+ * - إدارة generation counter
+ *
  * Fragment = UI فقط، يستقبل callbacks.
  */
 public class InventoryScanController implements MiraIRFIDReader.OnTagReadListener {
@@ -114,7 +114,7 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     }
 
     /**
-     * ✅ ربط RFID Manager + تسجيل الـ listener هنا (لا في Fragment)
+     * ✅ ربط RFID Manager + تسجيل الـ listener هنا
      */
     public void attachRfidManager(RFIDManager rfidManager) {
         this.rfidManager = rfidManager;
@@ -249,15 +249,17 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         }
     }
 
-    // ==================== onTagRead (from RFID) ====================
+    // ==================== RFID Listener Overrides ====================
 
+    /**
+     * ✅ يُستدعى من RFID Reader عند قراءة وسم
+     */
     @Override
     public void onTagRead(String rawEpc, int rssi) {
         if (!isScanning.get() || rawEpc == null || rawEpc.isEmpty()) return;
 
         final int generation = scanGeneration.get();
 
-        // ✅ Normalize على processingExecutor
         if (processingExecutor == null || processingExecutor.isShutdown()) return;
 
         processingExecutor.execute(() -> {
@@ -311,6 +313,23 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         });
     }
 
+    /**
+     * ✅ يُستدعى من RFID Reader عند حدوث خطأ
+     */
+    @Override
+    public void onError(String error) {
+        Log.e(TAG, "RFID Error: " + error);
+        if (callback != null) {
+            mainHandler.post(() -> {
+                try {
+                    callback.onError(error);
+                } catch (Exception e) {
+                    Log.e(TAG, "callback.onError error: " + e.getMessage());
+                }
+            });
+        }
+    }
+
     private void cleanOldTagReads(long now) {
         try {
             java.util.Iterator<Map.Entry<String, Long>> it =
@@ -342,7 +361,7 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
 
                 int rssi = -40 - (int) (Math.random() * 40);
 
-                // ✅ نمرر عبر onTagRead المعياري (لا تجاوز)
+                // ✅ نمرر عبر onTagRead المعياري
                 onTagRead(epc, rssi);
 
                 simulationIndex++;
@@ -367,7 +386,7 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         } catch (Exception ignored) {}
     }
 
-    // ==================== Connection Notify ====================
+    // ==================== Notifications ====================
 
     public void notifyConnectionChanged(boolean isConnected) {
         if (callback != null) {
