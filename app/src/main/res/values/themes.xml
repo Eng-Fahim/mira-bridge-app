@@ -3,9 +3,9 @@
 
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
 
-        <!-- 🔗 ربط مكونات Material 3 الرئيسية -->
+        <!-- 🔗 ربط مكونات Material 3 الرئيسية (تم تحديث toolbarStyle لتصفير الهوامش) -->
         <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
-        <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
+        <item name="toolbarStyle">@style/DenseToolbarStyle</item>
         <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
         <item name="textInputStyle">@style/AppTextInputStyle</item>
 
@@ -30,7 +30,7 @@
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- ✅ إجبار المكونات (نفس الموجود في الداكن) -->
+        <!-- ✅ إجبار المكونات -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
         <item name="buttonStyle">@style/AppButtonStyle</item>
@@ -86,6 +86,24 @@
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
     <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
     <style name="AppTheme" parent="Theme.Uhfuartdemo" />
+
+    <!-- ==================== ستايل التولبار المدمج بدون هوامش خفية ==================== -->
+    <style name="DenseToolbarStyle" parent="Widget.Material3.Toolbar">
+        <item name="contentInsetStart">0dp</item>
+        <item name="contentInsetEnd">0dp</item>
+        <item name="contentInsetStartWithNavigation">0dp</item>
+        <item name="contentInsetEndWithActions">0dp</item>
+        <item name="paddingStart">0dp</item>
+        <item name="paddingEnd">0dp</item>
+        <item name="actionButtonStyle">@style/DenseActionButtonStyle</item>
+    </style>
+
+    <style name="DenseActionButtonStyle" parent="Widget.Material3.Button.TextButton">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+        <item name="android:layout_margin">0dp</item>
+    </style>
 
     <!-- ==================== SplashTheme للوضع الفاتح ==================== -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
