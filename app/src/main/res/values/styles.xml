@@ -157,8 +157,8 @@
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- ==================== الأنماط المساعدة المحدثة لمنع التعارض ==================== -->
-    <style name="AppTextViewStyle" parent="Widget.Material3.TextView">
+    <!-- ==================== تصحيح وراثة الأنماط المساعدة ==================== -->
+    <style name="AppTextViewStyle" parent="Widget.MaterialComponents.TextView">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
