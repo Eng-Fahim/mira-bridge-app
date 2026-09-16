@@ -2,7 +2,7 @@
 <MotionScene xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:motion="http://schemas.android.com/apk/res-auto">
 
-    <!-- الانتقال من حالة التحميل (shimmer) إلى ظهور المحتوى الأصلي -->
+    <!-- الانتقال وانسيابية ظهور العناصر -->
     <Transition
         motion:constraintSetStart="@+id/start"
         motion:constraintSetEnd="@+id/end"
@@ -10,69 +10,73 @@
 
         <KeyFrameSet>
             <KeyAttribute
-                motion:motionTarget="@+id/swipeRefresh"
+                motion:motionTarget="@+id/greetingCard"
                 motion:framePosition="0"
                 android:alpha="0"
-                android:translationY="20dp" />
+                android:translationY="40dp" />
 
             <KeyAttribute
-                motion:motionTarget="@+id/swipeRefresh"
+                motion:motionTarget="@+id/greetingCard"
                 motion:framePosition="100"
                 android:alpha="1"
                 android:translationY="0dp" />
 
             <KeyAttribute
-                motion:motionTarget="@+id/shimmerLayout"
+                motion:motionTarget="@+id/inventoryMetrics"
                 motion:framePosition="0"
-                android:alpha="1" />
+                android:alpha="0"
+                android:translationY="60dp" />
 
             <KeyAttribute
-                motion:motionTarget="@+id/shimmerLayout"
+                motion:motionTarget="@+id/inventoryMetrics"
                 motion:framePosition="100"
-                android:alpha="0" />
+                android:alpha="1"
+                android:translationY="0dp" />
+
+            <KeyAttribute
+                motion:motionTarget="@+id/cardGoldPrices"
+                motion:framePosition="0"
+                android:alpha="0"
+                android:translationY="80dp" />
+
+            <KeyAttribute
+                motion:motionTarget="@+id/cardGoldPrices"
+                motion:framePosition="100"
+                android:alpha="1"
+                android:translationY="0dp" />
+
+            <KeyAttribute
+                motion:motionTarget="@+id/salesSummaryCard"
+                motion:framePosition="0"
+                android:alpha="0"
+                android:translationY="100dp" />
+
+            <KeyAttribute
+                motion:motionTarget="@+id/salesSummaryCard"
+                motion:framePosition="100"
+                android:alpha="1"
+                android:translationY="0dp" />
         </KeyFrameSet>
     </Transition>
 
-    <!-- حالة البداية (Loading / Shimmer Active) -->
     <ConstraintSet android:id="@+id/start">
         <Constraint
             android:id="@+id/shimmerLayout"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:visibility="visible"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintEnd_toEndOf="parent"
-            motion:layout_constraintStart_toStartOf="parent"
-            motion:layout_constraintTop_toTopOf="parent" />
-
-        <Constraint
-            android:id="@+id/swipeRefresh"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone"
+            android:alpha="1"
             motion:layout_constraintBottom_toBottomOf="parent"
             motion:layout_constraintEnd_toEndOf="parent"
             motion:layout_constraintStart_toStartOf="parent"
             motion:layout_constraintTop_toTopOf="parent" />
     </ConstraintSet>
 
-    <!-- حالة النهاية (Content Loaded) -->
     <ConstraintSet android:id="@+id/end">
         <Constraint
             android:id="@+id/shimmerLayout"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:visibility="gone"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintEnd_toEndOf="parent"
-            motion:layout_constraintStart_toStartOf="parent"
-            motion:layout_constraintTop_toTopOf="parent" />
-
-        <Constraint
-            android:id="@+id/swipeRefresh"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="visible"
+            android:alpha="0"
             motion:layout_constraintBottom_toBottomOf="parent"
             motion:layout_constraintEnd_toEndOf="parent"
             motion:layout_constraintStart_toStartOf="parent"
