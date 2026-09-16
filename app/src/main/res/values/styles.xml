@@ -157,22 +157,6 @@
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- ==================== تصحيح وراثة الأنماط المساعدة ==================== -->
-    <style name="AppTextViewStyle" parent="Widget.MaterialComponents.TextView">
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:fontFamily">@font/cairo</item>
-    </style>
-
-    <style name="AppRadioButtonStyle" parent="Widget.Material3.CompoundButton.RadioButton">
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:fontFamily">@font/cairo</item>
-    </style>
-
-    <style name="AppCheckBoxStyle" parent="Widget.Material3.CompoundButton.CheckBox">
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:fontFamily">@font/cairo</item>
-    </style>
-
     <declare-styleable name="RadarView">
         <attr name="center_image" format="reference" />
         <attr name="image_width" format="dimension" />
