@@ -79,7 +79,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="?attr/android:colorBackground"
+        android:background="?attr/colorSurface"
         android:visibility="visible"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -105,7 +105,9 @@
                     android:id="@+id/headerSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp">
+                    android:layout_marginBottom="14dp"
+                    android:background="?attr/colorSurface"
+                    android:elevation="0dp">
 
                     <!-- ✅ الشعار — LTR مفروض لمنع الانعكاس -->
                     <LinearLayout
@@ -187,7 +189,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="20dp">
+                        android:padding="16dp">
 
                         <!-- Header: Label + Eye + Trend -->
                         <LinearLayout
@@ -237,10 +239,10 @@
                             android:id="@+id/tvHeroBalance"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
+                            android:layout_marginTop="8dp"
                             android:text="••••••••"
                             android:textColor="?attr/colorOnPrimaryContainer"
-                            android:textSize="34sp"
+                            android:textSize="30sp"
                             android:textStyle="bold"
                             android:textDirection="ltr"
                             android:letterSpacing="-0.02"
@@ -262,7 +264,7 @@
                             android:id="@+id/heroSparkline"
                             android:layout_width="match_parent"
                             android:layout_height="40dp"
-                            android:layout_marginTop="12dp"
+                            android:layout_marginTop="10dp"
                             android:background="@drawable/bg_sparkline_placeholder" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -322,7 +324,7 @@
                     <!-- Total Items -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="96dp"
                         android:layout_marginEnd="4dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="?attr/colorSurface"
@@ -338,18 +340,26 @@
                             android:orientation="vertical"
                             android:padding="6dp">
 
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_inventory_items"
+                                app:tint="?attr/colorPrimary" />
+
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
                                 android:text="@string/total_items"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="11sp" />
+                                android:textSize="10sp" />
 
                             <TextView
                                 android:id="@+id/tvTotalItems"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
+                                android:layout_marginTop="2dp"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
@@ -360,7 +370,7 @@
                     <!-- Total Weight -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="96dp"
                         android:layout_marginHorizontal="2dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="?attr/colorSurface"
@@ -376,18 +386,26 @@
                             android:orientation="vertical"
                             android:padding="6dp">
 
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_weight_scale"
+                                app:tint="?attr/colorPrimary" />
+
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
                                 android:text="@string/total_weight"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="11sp" />
+                                android:textSize="10sp" />
 
                             <TextView
                                 android:id="@+id/tvTotalWeight"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
+                                android:layout_marginTop="2dp"
                                 android:textColor="?attr/colorPrimary"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
@@ -399,7 +417,7 @@
                     <!-- Sold Today -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="96dp"
                         android:layout_marginStart="4dp"
                         android:layout_weight="1"
                         app:cardBackgroundColor="?attr/colorSurface"
@@ -415,18 +433,26 @@
                             android:orientation="vertical"
                             android:padding="6dp">
 
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_sold_today"
+                                app:tint="?attr/colorPrimary" />
+
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
                                 android:text="@string/sold_today"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="11sp" />
+                                android:textSize="10sp" />
 
                             <TextView
                                 android:id="@+id/tvSoldToday"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
+                                android:layout_marginTop="2dp"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
@@ -812,7 +838,7 @@
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/btnGateSecurity"
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="96dp"
                         android:layout_marginEnd="5dp"
                         android:layout_weight="1"
                         android:clickable="true"
@@ -851,7 +877,7 @@
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/btnRfidAudit"
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="96dp"
                         android:layout_marginStart="5dp"
                         android:layout_weight="1"
                         android:clickable="true"
