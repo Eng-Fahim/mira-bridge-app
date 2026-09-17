@@ -367,9 +367,7 @@ public class MiraDashboardFragment extends Fragment {
             // ✅ SwipeRefreshLayout
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
-                swipeRefresh.setColorSchemeResources(
-                        R.color.colorPrimary,
-                        R.color.colorAccent);
+                swipeRefresh.setColorSchemeResources(R.color.colorPrimary,R.color.gray1);
             }
 
             // تحميل حالة الإخفاء
@@ -952,7 +950,53 @@ public class MiraDashboardFragment extends Fragment {
             logNonFatal("displayGoldPricesFromCache", e);
         }
     }
+    
+    
+    /**
+ * ✅ حساب اتجاه تغير سعر الذهب ومقارنته بالسعر السابق
+ */
+private void calculateTrend(double currentPrice) {
+    if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
 
+    sharedExecutor.execute(() -> {
+        try {
+            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
+
+            if (previousPrice > 0 && currentPrice > 0) {
+                double change = currentPrice - previousPrice;
+                double changePercent = (change / previousPrice) * 100;
+
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    if (change > 0) {
+                        tvGoldTrend.setText("📈");
+                        tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
+                        tvGoldChange.setTextColor(0xFF16A34A);
+                    } else if (change < 0) {
+                        tvGoldTrend.setText("📉");
+                        tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
+                        tvGoldChange.setTextColor(0xFFDC2626);
+                    } else {
+                        tvGoldTrend.setText("➡️");
+                        tvGoldChange.setText("0.00%");
+                        tvGoldChange.setTextColor(0xFF6B7280);
+                    }
+
+                    if (tvHeroTrend != null) {
+                        String trendText = String.format(Locale.US, "%.2f%%", changePercent);
+                        tvHeroTrend.setText((change > 0 ? "📈 " : change < 0 ? "📉 " : "➡️ ") + trendText);
+                    }
+                });
+            }
+
+            if (currentPrice > 0) {
+                offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
+            }
+        } catch (Exception e) {
+            logNonFatal("calculateTrend", e);
+        }
+    });
+}
     // ═══════════════════════════════════════════════════════
     // Offline Data
     // ═══════════════════════════════════════════════════════
