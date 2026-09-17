@@ -77,6 +77,14 @@ public class MiraDashboardFragment extends Fragment {
     private RecyclerView rvQuickActions;
     private QuickActionsAdapter quickAdapter;
 
+    // ✅ Hero + Alerts + LiveStatus Views
+    private View heroBalanceCard, heroSparkline;
+    private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
+    private View alertsStrip;
+    private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
+    private View liveStatusDot;
+    private TextView tvLiveStatusText;
+
     // Managers & State
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
@@ -103,6 +111,11 @@ public class MiraDashboardFragment extends Fragment {
     private boolean isDataLoaded = false;
     private long lastDataFetchTime = 0, lastGoldFetchTime = 0, lastPingTime = 0;
     private int consecutiveFailures = 0;
+
+    // ✅ بيانات Hero Balance
+    private double currentInventoryValue = 0;
+    private int currentItemCount = 0;
+    private double currentTotalWeight = 0;
 
     private SimpleDateFormat getDateFormatter() {
         return isArabic
@@ -189,22 +202,19 @@ public class MiraDashboardFragment extends Fragment {
             initializeManagers();
             initViews(view);
             setupProfileListener();
-            setupBranchListener();      // ← جديد
+            setupBranchListener();
             setupQuickAccessGrid();
             setupListeners();
 
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
 
-            updateHeader();              // عرض فوري من الكاش
+            updateHeader();
             showShimmer(false);
 
             isViewInitialized = true;
 
-            // ✅ مزامنة اسم المؤسسة والفرع من السيرفر
             syncOrgProfileFromServer(false);
-
-            // ✅ ثم جلب بيانات Dashboard الكاملة
             fetchData();
 
             startAutoRefresh();
@@ -225,7 +235,6 @@ public class MiraDashboardFragment extends Fragment {
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
             permissionManager = PermissionManager.getInstance(context);
             isArabic = Locale.getDefault().getLanguage().equals("ar");
-            // ✅ لم نعد نحتاج branchPrefs — نستخدم مستمع MiraBranchesManager
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
 
@@ -238,11 +247,11 @@ public class MiraDashboardFragment extends Fragment {
 
     private void initViews(View v) {
         try {
+            // ✅ Original views
             tvOrgName = v.findViewById(R.id.tvOrgName);
             tvGreeting = v.findViewById(R.id.tvGreeting);
             tvDate = v.findViewById(R.id.tvDate);
             tvLocation = v.findViewById(R.id.tvLocation);
-            tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
             tvTotalItems = v.findViewById(R.id.tvTotalItems);
             tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
             tvSoldToday = v.findViewById(R.id.tvSoldToday);
@@ -265,6 +274,26 @@ public class MiraDashboardFragment extends Fragment {
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
             loadingOverlay = v.findViewById(R.id.loadingOverlay);
             pbGoldLoading = v.findViewById(R.id.pbGoldLoading);
+
+            // ✅ Hero Balance views
+            heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
+            heroSparkline = v.findViewById(R.id.heroSparkline);
+            tvHeroBalance = v.findViewById(R.id.tvHeroBalance);
+            tvHeroTrend = v.findViewById(R.id.tvHeroTrend);
+            tvHeroSubtitle = v.findViewById(R.id.tvHeroSubtitle);
+
+            // ✅ Alerts views
+            alertsStrip = v.findViewById(R.id.alertsStrip);
+            tvAlertIcon = v.findViewById(R.id.tvAlertIcon);
+            tvAlertMessage = v.findViewById(R.id.tvAlertMessage);
+            tvAlertAction = v.findViewById(R.id.tvAlertAction);
+
+            // ✅ Live Status views
+            liveStatusDot = v.findViewById(R.id.liveStatusDot);
+            tvLiveStatusText = v.findViewById(R.id.tvLiveStatusText);
+
+            // ✅ tvLiveStatus هو LinearLayout — نحفظه كـ View فقط
+            tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
 
             if (btnRefreshGold != null) {
                 btnRefreshGold.setOnClickListener(v2 -> {
@@ -290,6 +319,36 @@ public class MiraDashboardFragment extends Fragment {
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
             }
+
+            if (tvAlertAction != null) {
+                tvAlertAction.setOnClickListener(v2 -> {
+                    navigateToFragment(new MiraUHFReadTagFragment(), "Scan");
+                });
+            }
+            
+            // ═══════════════════════════════════════════════════════
+// 🧪 TEST: عرض حالة كل view على الشاشة مباشرة
+// احذف هذا القسم بعد التشخيص
+// ═══════════════════════════════════════════════════════
+
+StringBuilder diag = new StringBuilder();
+diag.append("🔍 فحص views:\n");
+diag.append("HeroBalance: ").append(tvHeroBalance != null ? "✅" : "❌ NULL").append("\n");
+diag.append("HeroSubtitle: ").append(tvHeroSubtitle != null ? "✅" : "❌ NULL").append("\n");
+diag.append("HeroTrend: ").append(tvHeroTrend != null ? "✅" : "❌ NULL").append("\n");
+diag.append("TotalItems: ").append(tvTotalItems != null ? "✅" : "❌ NULL").append("\n");
+diag.append("TotalWeight: ").append(tvTotalWeight != null ? "✅" : "❌ NULL").append("\n");
+diag.append("SoldToday: ").append(tvSoldToday != null ? "✅" : "❌ NULL").append("\n");
+diag.append("Karat24: ").append(tvKarat24 != null ? "✅" : "❌ NULL").append("\n");
+diag.append("OuncePrice: ").append(tvOuncePrice != null ? "✅" : "❌ NULL").append("\n");
+diag.append("SalesToday: ").append(tvSalesToday != null ? "✅" : "❌ NULL").append("\n");
+
+// ✅ عرض التشخيص في tvHeroBalance نفسه
+if (tvHeroBalance != null) {
+    tvHeroBalance.setTextSize(10);
+    tvHeroBalance.setText("🔍 VIEWS CHECK:\n" + diag.toString());
+    tvHeroBalance.setTextColor(0xFFFF0000); // أحمر
+}
         } catch (Exception e) {
             logNonFatal("initViews", e);
         }
@@ -319,7 +378,131 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    // ==================== ✅ مستمعو المزامنة (جديد) ====================
+    // ==================== ✅ Hero Balance ====================
+
+    private void updateHeroBalance() {
+        try {
+            if (tvHeroBalance == null) return;
+
+            double totalValue = currentInventoryValue;
+            int itemCount = currentItemCount;
+            double totalWeight = currentTotalWeight;
+
+            // ✅ إذا القيمة صفر → احسب من سعر الذهب الحالي
+            if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+                double price24 = priceManager.getGoldPricePerGram(24);
+                if (price24 > 0) {
+                    totalValue = totalWeight * price24;
+                    Log.d(TAG, "Hero Balance calculated: " + totalWeight 
+                            + "g × $" + price24 + " = $" + totalValue);
+                }
+            }
+
+            tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+
+            if (tvHeroSubtitle != null) {
+                tvHeroSubtitle.setText(String.format(
+                        "👑 %d قطعة • %.1fg", itemCount, totalWeight));
+            }
+        } catch (Exception e) {
+            logNonFatal("updateHeroBalance", e);
+        }
+    }
+
+    // ==================== ✅ Alerts ====================
+
+    private void updateAlerts(int count, String message) {
+        try {
+            if (alertsStrip == null) return;
+
+            if (count > 0) {
+                alertsStrip.setVisibility(View.VISIBLE);
+                if (tvAlertIcon != null) tvAlertIcon.setText("⚠️");
+                if (tvAlertMessage != null) tvAlertMessage.setText(message);
+                if (tvAlertAction != null) {
+                    tvAlertAction.setText(isArabic
+                            ? "عرض (" + count + ") →"
+                            : "View (" + count + ") →");
+                }
+            } else {
+                alertsStrip.setVisibility(View.GONE);
+            }
+        } catch (Exception e) {
+            logNonFatal("updateAlerts", e);
+        }
+    }
+
+    private void computeAndShowAlerts(JSONObject data) {
+        try {
+            if (data == null) {
+                updateAlerts(0, null);
+                return;
+            }
+
+            int alertsCount = 0;
+            StringBuilder message = new StringBuilder();
+
+            JSONObject inv = data.optJSONObject("inventory");
+            if (inv != null) {
+                int itemsWithoutWeight = inv.optInt("items_without_weight", -1);
+                int itemsWithoutPrice = inv.optInt("items_without_price", -1);
+
+                if (itemsWithoutWeight > 0) {
+                    alertsCount += itemsWithoutWeight;
+                    message.append(isArabic
+                            ? itemsWithoutWeight + " قطعة بدون وزن"
+                            : itemsWithoutWeight + " items without weight");
+                }
+
+                if (itemsWithoutPrice > 0) {
+                    if (message.length() > 0) message.append(" • ");
+                    alertsCount += itemsWithoutPrice;
+                    message.append(isArabic
+                            ? itemsWithoutPrice + " قطعة بدون سعر"
+                            : itemsWithoutPrice + " items without price");
+                }
+            }
+
+            if (alertsCount > 0) {
+                updateAlerts(alertsCount, message.toString());
+            } else {
+                updateAlerts(0, null);
+            }
+        } catch (Exception e) {
+            logNonFatal("computeAndShowAlerts", e);
+        }
+    }
+
+    // ==================== Live Status (مُصلح) ====================
+
+    private void updateLiveStatusText(boolean isOnline) {
+        try {
+            if (!isAdded()) return;
+            Context context = getContext();
+            if (context == null) return;
+
+            // ✅ استخدم tvLiveStatusText (TextView) — tvLiveStatus هو LinearLayout
+            if (tvLiveStatusText != null) {
+                tvLiveStatusText.setText(isOnline
+                        ? (isArabic ? "متصل" : "Online")
+                        : (isArabic ? "غير متصل" : "Offline"));
+                tvLiveStatusText.setTextColor(isOnline
+                        ? ContextCompat.getColor(context, R.color.status_online_green)
+                        : ContextCompat.getColor(context, R.color.status_offline_red));
+            }
+
+            // ✅ تحديث النقطة
+            if (liveStatusDot != null) {
+                liveStatusDot.setBackgroundResource(isOnline
+                        ? R.drawable.bg_status_dot_green
+                        : R.drawable.bg_status_dot_red);
+            }
+        } catch (Exception e) {
+            logNonFatal("updateLiveStatusText", e);
+        }
+    }
+
+    // ==================== Listeners ====================
 
     private void setupProfileListener() {
         try {
@@ -358,15 +541,9 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ مزامنة اسم المؤسسة + الفرع النشط من السيرفر
-     */
     private void syncOrgProfileFromServer(boolean force) {
         try {
-            if (orgProfile == null || apiClient == null) {
-                Log.w(TAG, "syncOrgProfileFromServer: managers not ready");
-                return;
-            }
+            if (orgProfile == null || apiClient == null) return;
 
             Log.d(TAG, "🔄 Syncing org profile (force=" + force + ")");
 
@@ -379,8 +556,6 @@ public class MiraDashboardFragment extends Fragment {
                             updateHeader();
                         }
                     });
-
-                    // ✅ بعد نجاح المزامنة → زامن قائمة الفروع
                     syncBranchesListFromServer();
                 }
 
@@ -394,9 +569,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ مزامنة قائمة الفروع فقط (بدون تكرار /profile/get)
-     */
     private void syncBranchesListFromServer() {
         try {
             if (branchesManager == null) return;
@@ -405,7 +577,6 @@ public class MiraDashboardFragment extends Fragment {
                 @Override
                 public void onSuccess() {
                     Log.i(TAG, "✅ Branches list synced");
-                    // notifyListeners في MiraBranchesManager سيُحدِّث الهيدر تلقائياً
                 }
 
                 @Override
@@ -418,7 +589,7 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    // ==================== Quick Actions ====================
+    // ==================== Quick Access (مُصلح بقائمة افتراضية) ====================
 
     private void setupQuickAccessGrid() {
         try {
@@ -428,7 +599,8 @@ public class MiraDashboardFragment extends Fragment {
                 try {
                     if (!isAdded()) return;
 
-                    List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+                    List<MiraQuickAccessSettings.QuickAction> enabledActions =
+                            quickAccessSettings.getEnabledActions();
                     List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
 
                     if (enabledActions != null && !enabledActions.isEmpty()) {
@@ -443,9 +615,17 @@ public class MiraDashboardFragment extends Fragment {
                         }
                     }
 
+                    // ✅ إذا فارغة → قائمة افتراضية
+                    if (filteredActions.isEmpty()) {
+                        Log.w(TAG, "⚠️ Quick actions empty — using defaults");
+                        filteredActions = getDefaultQuickActions();
+                    }
+
+                    final List<MiraQuickAccessSettings.QuickAction> finalList = filteredActions;
+
                     mainHandler.post(() -> {
                         if (isAdded() && quickAdapter != null) {
-                            quickAdapter.submitList(filteredActions);
+                            quickAdapter.submitList(finalList);
                         }
                     });
 
@@ -457,6 +637,56 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) {
             logNonFatal("setupQuickAccessGrid", e);
         }
+    }
+
+    /**
+     * ✅ قائمة افتراضية إذا لم تُحمَّل الإعدادات
+     */
+    private List<MiraQuickAccessSettings.QuickAction> getDefaultQuickActions() {
+        List<MiraQuickAccessSettings.QuickAction> defaults = new ArrayList<>();
+
+        String[] ids = {"identity", "radar", "gate", "reports",
+                        "accounting", "transfers", "sales_history",
+                        "admin_hub", "server_config"};
+
+        String[] labelsAr = {"الهوية", "الرادار", "البوابات",
+                             "التقارير", "المحاسبة", "التحويلات",
+                             "سجل البيع", "الإدارة", "السيرفر"};
+        String[] labelsEn = {"Identity", "Radar", "Gates",
+                             "Reports", "Accounting", "Transfers",
+                             "Sales", "Admin", "Server"};
+
+        int[] icons = {
+            R.drawable.ic_identity_studio,
+            R.drawable.ic_radar,
+            R.drawable.ic_security,
+            R.drawable.ic_reports,
+            R.drawable.ic_accounting,
+            R.drawable.ic_transfer,
+            R.drawable.ic_sales_history,
+            R.drawable.ic_admin_hub,
+            R.drawable.ic_server_config
+        };
+
+        for (int i = 0; i < ids.length && defaults.size() < MAX_QUICK_ACTIONS; i++) {
+            String tag = getFragmentTagForAction(ids[i]);
+
+            if (permissionManager != null
+                    && !permissionManager.canAccessFragment(tag)) {
+                continue;
+            }
+
+            MiraQuickAccessSettings.QuickAction action =
+                    new MiraQuickAccessSettings.QuickAction();
+            action.id = ids[i];
+            action.label = isArabic ? labelsAr[i] : labelsEn[i];
+            action.iconRes = icons[i];
+            action.enabled = true;
+            defaults.add(action);
+        }
+
+        Log.d(TAG, "Default quick actions: " + defaults.size());
+        return defaults;
     }
 
     private void loadDataIfNeeded() {
@@ -485,7 +715,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private void updateLiveStatus() {
         try {
-            if (tvLiveStatus == null || apiClient == null) return;
+            if (apiClient == null) return;
 
             cancelFuture(pingFuture);
             pingFuture = sharedExecutor.submit(() -> {
@@ -494,24 +724,6 @@ public class MiraDashboardFragment extends Fragment {
             });
         } catch (Exception e) {
             logNonFatal("updateLiveStatus", e);
-        }
-    }
-
-    private void updateLiveStatusText(boolean isOnline) {
-        try {
-            if (!isAdded() || tvLiveStatus == null) return;
-            Context context = getContext();
-            if (context == null) return;
-
-            if (isOnline) {
-                tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
-                tvLiveStatus.setTextColor(ContextCompat.getColor(context, R.color.status_online_green));
-            } else {
-                tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
-                tvLiveStatus.setTextColor(ContextCompat.getColor(context, R.color.status_offline_red));
-            }
-        } catch (Exception e) {
-            logNonFatal("updateLiveStatusText", e);
         }
     }
 
@@ -565,6 +777,7 @@ public class MiraDashboardFragment extends Fragment {
                         if (priceData != null) {
                             lastGoldFetchTime = System.currentTimeMillis();
                             displayGoldPrices(priceData);
+                            updateHeroBalance();
                             Toast.makeText(getContext(),
                                     isArabic ? "✅ تم تحديث أسعار الذهب" : "✅ Gold prices updated",
                                     Toast.LENGTH_SHORT).show();
@@ -633,7 +846,7 @@ public class MiraDashboardFragment extends Fragment {
             setGoldPrice(tvKarat18, "18K", data.price18);
 
             if (tvOuncePrice != null && data.ouncePrice > 0) {
-                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", data.ouncePrice));
+                tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", data.ouncePrice));
             }
             if (tvPriceSource != null) {
                 tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
@@ -666,7 +879,7 @@ public class MiraDashboardFragment extends Fragment {
             setGoldPrice(tvKarat18, "18K", price18);
 
             if (tvOuncePrice != null && price24 > 0) {
-                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", price24 * OUNCE_TO_GRAM));
+                tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", price24 * OUNCE_TO_GRAM));
             }
 
             if (tvPriceSource != null) {
@@ -691,6 +904,8 @@ public class MiraDashboardFragment extends Fragment {
                     tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
                 }
             }
+
+            updateHeroBalance();
         } catch (Exception e) {
             logNonFatal("displayGoldPricesFromCache", e);
         }
@@ -707,6 +922,7 @@ public class MiraDashboardFragment extends Fragment {
                 final float salesToday = offlineCache.getFloat("sales_today", 0.0f);
                 final float salesMonth = offlineCache.getFloat("sales_month", 0.0f);
                 final float salesYear = offlineCache.getFloat("sales_year", 0.0f);
+                final float inventoryValue = offlineCache.getFloat("inventory_value", 0.0f);
 
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
@@ -716,6 +932,11 @@ public class MiraDashboardFragment extends Fragment {
                     setText(tvSalesToday, formatCurrency(salesToday));
                     setText(tvSalesMonth, formatCurrency(salesMonth));
                     setText(tvSalesYear, formatCurrency(salesYear));
+
+                    currentItemCount = totalItems;
+                    currentTotalWeight = totalWeight;
+                    currentInventoryValue = inventoryValue;
+                    updateHeroBalance();
 
                     if (priceManager != null) {
                         displayGoldPricesFromCache();
@@ -753,6 +974,11 @@ public class MiraDashboardFragment extends Fragment {
                             tvGoldChange.setText("0.00%");
                             tvGoldChange.setTextColor(0xFF6B7280);
                         }
+
+                        if (tvHeroTrend != null) {
+                            String trendText = String.format(Locale.US, "%.2f%%", changePercent);
+                            tvHeroTrend.setText((change > 0 ? "📈 " : change < 0 ? "📉 " : "➡️ ") + trendText);
+                        }
                     });
                 }
 
@@ -776,6 +1002,7 @@ public class MiraDashboardFragment extends Fragment {
                     offlineCache.edit()
                             .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
                             .putFloat("total_weight", (float) (inv != null ? inv.optDouble("total_weight", 0.0) : 0.0))
+                            .putFloat("inventory_value", (float) (inv != null ? inv.optDouble("total_value", 0.0) : 0.0))
                             .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
                             .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
                             .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
@@ -823,6 +1050,7 @@ public class MiraDashboardFragment extends Fragment {
                         if (response != null && response.isSuccess && response.data != null) {
                             saveOfflineData(response.data);
                             processData(response.data);
+                            computeAndShowAlerts(response.data);
 
                             isDataLoaded = true;
                             updateLiveStatusText(true);
@@ -853,8 +1081,17 @@ public class MiraDashboardFragment extends Fragment {
         try {
             JSONObject inv = data.optJSONObject("inventory");
             if (inv != null) {
-                setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
-                setText(tvTotalWeight, formatWeight(inv.optDouble("total_weight", 0.0)));
+                int itemCount = inv.optInt("total_items", 0);
+                double weight = inv.optDouble("total_weight", 0.0);
+                double value = inv.optDouble("total_value", 0.0);
+
+                setText(tvTotalItems, String.valueOf(itemCount));
+                setText(tvTotalWeight, formatWeight(weight));
+
+                currentItemCount = itemCount;
+                currentTotalWeight = weight;
+                currentInventoryValue = value;
+                updateHeroBalance();
             }
 
             JSONObject sales = data.optJSONObject("sales");
@@ -921,6 +1158,9 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
+    /**
+     * ✅ مُصلح: يحمّل أسعار الذهب من السيرفر إذا لزم
+     */
     public void refreshInternalData() {
         try {
             if (!isAdded()) return;
@@ -928,7 +1168,18 @@ public class MiraDashboardFragment extends Fragment {
             lastDataFetchTime = 0;
             isLoading.set(false);
             fetchData();
-            displayGoldPricesFromCache();
+
+            // ✅ تحميل أسعار الذهب من السيرفر إذا انتهت مدة الكاش أو لم تُحمَّل
+            long now = System.currentTimeMillis();
+            if (permissionManager != null
+                    && permissionManager.canAccessFragment("GoldRates")) {
+                if (lastGoldFetchTime == 0
+                        || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    fetchLiveGoldPrices(false);
+                } else {
+                    displayGoldPricesFromCache();
+                }
+            }
         } catch (Exception e) {
             logNonFatal("refreshInternalData", e);
         }
@@ -936,9 +1187,9 @@ public class MiraDashboardFragment extends Fragment {
 
     private void refreshAllData() {
         try {
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-                tvLiveStatus.setTextColor(0xFFF59E0B);
+            if (tvLiveStatusText != null) {
+                tvLiveStatusText.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+                tvLiveStatusText.setTextColor(0xFFF59E0B);
             }
 
             fetchData();
@@ -1108,9 +1359,7 @@ public class MiraDashboardFragment extends Fragment {
                 currentBranchId = newBranchId;
                 initBranchCache(currentBranchId);
 
-                updateHeader();   // عرض فوري
-
-                // ✅ مزامنة قوية (force) بعد تغيير الفرع
+                updateHeader();
                 syncOrgProfileFromServer(true);
 
                 loadOfflineData();
@@ -1127,7 +1376,6 @@ public class MiraDashboardFragment extends Fragment {
         super.onResume();
         try {
             registerDataRefreshReceiver();
-            // ✅ لم نعد نحتاج branchPrefs — نستخدم branchListener
 
             isDataLoaded = false;
             lastDataFetchTime = 0;
@@ -1138,10 +1386,7 @@ public class MiraDashboardFragment extends Fragment {
             } else if (isViewInitialized) {
                 setupQuickAccessGrid();
                 updateHeader();
-
-                // ✅ مزامنة خفيفة (تحترم الـ cooldown 15 دقيقة)
                 syncOrgProfileFromServer(false);
-
                 refreshInternalData();
             }
             startAutoRefresh();
@@ -1156,7 +1401,6 @@ public class MiraDashboardFragment extends Fragment {
         try {
             unregisterDataRefreshReceiver();
             stopAutoRefresh();
-            // ✅ لم نعد نحتاج branchPrefs
         } catch (Exception e) {
             logNonFatal("onPause", e);
         }
@@ -1169,13 +1413,11 @@ public class MiraDashboardFragment extends Fragment {
             unregisterDataRefreshReceiver();
             stopAutoRefresh();
 
-            // ✅ إزالة مستمع الفرع
             if (branchesManager != null && branchListener != null) {
                 branchesManager.removeListener(branchListener);
                 branchListener = null;
             }
 
-            // ✅ إزالة مستمع البروفايل
             if (orgProfile != null && profileListener != null) {
                 orgProfile.removeListener(profileListener);
             }
