@@ -74,23 +74,24 @@ public class MiraProfileFragment extends Fragment {
     private MiraOrgProfileManager orgProfileManager;
     private PermissionManager permissionManager;
     private MiraBranchesManager branchesManager;
-    
+
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
-    private boolean isBindingTheme = false; // لمنع إعادة التكرار عند تغيير المظهر برمجيًا
-    
+    private boolean isBindingTheme = false;
+
     private boolean isArabic = true;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_mira_profile, container, false);
-        
+
         isDestroyed.set(false);
         isArabic = java.util.Locale.getDefault().getLanguage().equals("ar");
-        
+
         sessionManager = new SessionManager(requireContext());
         apiClient = MiraApiClient.getInstance(requireContext());
         orgProfileManager = MiraOrgProfileManager.getInstance(requireContext());
@@ -100,7 +101,7 @@ public class MiraProfileFragment extends Fragment {
         initViews(root);
         setupImagePicker();
         setupListeners(root);
-        
+
         loadLocalProfileData();
         fetchProfileFromServer();
 
@@ -129,12 +130,12 @@ public class MiraProfileFragment extends Fragment {
 
         switchBiometricLogin = root.findViewById(R.id.switchBiometricLogin);
         switchBiometricConfirm = root.findViewById(R.id.switchBiometricConfirm);
-        
+
         radioThemeGroup = root.findViewById(R.id.radioThemeGroup);
         radioThemeLight = root.findViewById(R.id.radioThemeLight);
         radioThemeDark = root.findViewById(R.id.radioThemeDark);
         radioThemeSystem = root.findViewById(R.id.radioThemeSystem);
-        
+
         btnEditOrgProfile = root.findViewById(R.id.btnEditOrgProfile);
         btnEditProfile = root.findViewById(R.id.btnEditProfile);
         btnChangePassword = root.findViewById(R.id.btnChangePassword);
@@ -148,9 +149,7 @@ public class MiraProfileFragment extends Fragment {
             result -> {
                 if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null) {
                     Uri imageUri = result.getData().getData();
-                    if (imageUri != null) {
-                        uploadProfileImage(imageUri);
-                    }
+                    if (imageUri != null) uploadProfileImage(imageUri);
                 }
             }
         );
@@ -176,22 +175,11 @@ public class MiraProfileFragment extends Fragment {
                 btnEditOrgProfile.setVisibility(View.GONE);
             }
         }
-        
-        if (btnEditProfile != null) {
-            btnEditProfile.setOnClickListener(v -> showEditUserDialog());
-        }
-        
-        if (btnChangePassword != null) {
-            btnChangePassword.setOnClickListener(v -> showChangePasswordDialog());
-        }
-        
-        if (btnChangePhoto != null) {
-            btnChangePhoto.setOnClickListener(v -> pickImage());
-        }
-        
-        if (btnLogout != null) {
-            btnLogout.setOnClickListener(v -> showLogoutDialog());
-        }
+
+        if (btnEditProfile != null) btnEditProfile.setOnClickListener(v -> showEditUserDialog());
+        if (btnChangePassword != null) btnChangePassword.setOnClickListener(v -> showChangePasswordDialog());
+        if (btnChangePhoto != null) btnChangePhoto.setOnClickListener(v -> pickImage());
+        if (btnLogout != null) btnLogout.setOnClickListener(v -> showLogoutDialog());
 
         View headerSecurity = root.findViewById(R.id.headerSecurity);
         if (headerSecurity != null) {
@@ -203,9 +191,7 @@ public class MiraProfileFragment extends Fragment {
             headerAppTheme.setOnClickListener(v -> toggleSection(layoutAppThemeExpandable, imgArrowTheme));
         }
 
-        if (imgUserAvatar != null) {
-            imgUserAvatar.setOnClickListener(v -> pickImage());
-        }
+        if (imgUserAvatar != null) imgUserAvatar.setOnClickListener(v -> pickImage());
 
         if (switchBiometricLogin != null) {
             switchBiometricLogin.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -213,18 +199,19 @@ public class MiraProfileFragment extends Fragment {
                 saveBiometricPreference("enable_biometric_login", isChecked);
             });
         }
-        
+
         if (switchBiometricConfirm != null) {
             switchBiometricConfirm.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 sessionManager.setBiometricConfirmEnabled(isChecked);
                 saveBiometricPreference("enable_biometric_confirm", isChecked);
             });
         }
-        
+
+        // ✅✅✅ إصلاح 1: تغيير الثيم فورياً
         if (radioThemeGroup != null) {
             radioThemeGroup.setOnCheckedChangeListener((group, checkedId) -> {
                 if (isDestroyed.get() || isBindingTheme) return;
-                
+
                 int mode;
                 if (checkedId == R.id.radioThemeDark) {
                     mode = AppCompatDelegate.MODE_NIGHT_YES;
@@ -233,10 +220,20 @@ public class MiraProfileFragment extends Fragment {
                 } else {
                     mode = AppCompatDelegate.MODE_NIGHT_NO;
                 }
-                
+
+                // إذا كان نفس الوضع الحالي، لا تفعل شيئاً
+                int currentMode = AppCompatDelegate.getDefaultNightMode();
+                if (currentMode == mode) return;
+
                 saveThemePreference(mode);
-                AppCompatDelegate.setDefaultNightMode(mode);
-                showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
+
+                // ✅ إعادة بناء الـ Activity لتطبيق الثيم فوراً
+                if (getActivity() != null && !getActivity().isFinishing()) {
+                    AppCompatDelegate.setDefaultNightMode(mode);
+                    // Toast قبل recreate لأن الـ Fragment سيُعاد إنشاؤه
+                    showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
+                    getActivity().recreate();
+                }
             });
         }
     }
@@ -245,9 +242,7 @@ public class MiraProfileFragment extends Fragment {
         if (layout == null) return;
         boolean isVisible = layout.getVisibility() == View.VISIBLE;
         layout.setVisibility(isVisible ? View.GONE : View.VISIBLE);
-        if (arrow != null) {
-            arrow.animate().rotation(isVisible ? 0 : 180).setDuration(200).start();
-        }
+        if (arrow != null) arrow.animate().rotation(isVisible ? 0 : 180).setDuration(200).start();
     }
 
     private void loadLocalProfileData() {
@@ -256,29 +251,17 @@ public class MiraProfileFragment extends Fragment {
             String username = sessionManager.getUsername();
             String phone = sessionManager.getPhone();
             String role = sessionManager.getRole();
-            
-            if (tvProfileName != null && !TextUtils.isEmpty(displayName)) {
-                tvProfileName.setText(displayName);
-            }
-            
-            if (tvUsername != null && !TextUtils.isEmpty(username)) {
-                tvUsername.setText("@" + username);
-            }
-            
-            if (tvRole != null) {
-                tvRole.setText(role != null ? role : (isArabic ? "موظف" : "Employee"));
-            }
-            
-            if (tvAccountNum != null && !TextUtils.isEmpty(phone)) {
-                tvAccountNum.setText(phone);
-            }
-            
+
+            if (tvProfileName != null && !TextUtils.isEmpty(displayName)) tvProfileName.setText(displayName);
+            if (tvUsername != null && !TextUtils.isEmpty(username)) tvUsername.setText("@" + username);
+            if (tvRole != null) tvRole.setText(role != null ? role : (isArabic ? "موظف" : "Employee"));
+            if (tvAccountNum != null && !TextUtils.isEmpty(phone)) tvAccountNum.setText(phone);
             if (tvBranchName != null && branchesManager != null) {
                 tvBranchName.setText("🏢 " + branchesManager.getActiveBranchDisplayName());
             }
-            
+
             loadUserAvatar();
-            
+
             if (tvOrgNameAr != null) tvOrgNameAr.setText(orgProfileManager.getOrgNameAr());
             if (tvOrgNameEn != null) tvOrgNameEn.setText(orgProfileManager.getOrgNameEn());
             if (tvPhone != null) tvPhone.setText(orgProfileManager.getOrgPhone());
@@ -289,12 +272,11 @@ public class MiraProfileFragment extends Fragment {
                     tvTaxNum.setText((isArabic ? "الرقم الضريبي: " : "Tax Number: ") + tax);
                 }
             }
-            
+
             if (switchBiometricLogin != null) switchBiometricLogin.setChecked(sessionManager.isBiometricLoginEnabled());
             if (switchBiometricConfirm != null) switchBiometricConfirm.setChecked(sessionManager.isBiometricConfirmEnabled());
-            
+
             loadThemePreference();
-            
         } catch (Exception e) {
             logNonFatal("loadLocalProfileData", e);
         }
@@ -305,7 +287,7 @@ public class MiraProfileFragment extends Fragment {
             if (getContext() == null) return;
             SharedPreferences prefs = requireContext().getSharedPreferences("app_theme", Context.MODE_PRIVATE);
             int mode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-            
+
             isBindingTheme = true;
             if (mode == AppCompatDelegate.MODE_NIGHT_NO && radioThemeLight != null) {
                 radioThemeLight.setChecked(true);
@@ -337,7 +319,7 @@ public class MiraProfileFragment extends Fragment {
                 if (getContext() == null) return;
                 SharedPreferences prefs = requireContext().getSharedPreferences("user_avatar", Context.MODE_PRIVATE);
                 String avatarPath = prefs.getString("avatar_path", "");
-                
+
                 if (!avatarPath.isEmpty()) {
                     File avatarFile = new File(avatarPath);
                     if (avatarFile.exists()) {
@@ -359,11 +341,11 @@ public class MiraProfileFragment extends Fragment {
 
     private void uploadProfileImage(Uri imageUri) {
         showLoading(true);
-        
+
         executeSafely(() -> {
             try {
                 if (getContext() == null) return;
-                
+
                 InputStream inputStream = requireContext().getContentResolver().openInputStream(imageUri);
                 Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
                 if (inputStream != null) inputStream.close();
@@ -383,41 +365,38 @@ public class MiraProfileFragment extends Fragment {
                     int height = Math.round(ratio * bitmap.getHeight());
                     bitmap = Bitmap.createScaledBitmap(bitmap, width, height, true);
                 }
-                
+
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 75, baos);
                 byte[] imageBytes = baos.toByteArray();
-                
+
                 File avatarFile = new File(requireContext().getFilesDir(), "user_avatar.jpg");
                 FileOutputStream fos = new FileOutputStream(avatarFile);
                 fos.write(imageBytes);
                 fos.close();
-                
+
                 SharedPreferences prefs = requireContext().getSharedPreferences("user_avatar", Context.MODE_PRIVATE);
                 prefs.edit().putString("avatar_path", avatarFile.getAbsolutePath()).apply();
-                
+
                 String base64Image = Base64.encodeToString(imageBytes, Base64.DEFAULT);
-                
+
                 JSONObject payload = new JSONObject();
                 payload.put("avatar_base64", base64Image);
-                
+
                 MiraApiClient.ApiResponse response = apiClient.uploadUserAvatar(payload);
-                
+
                 mainHandler.post(() -> {
                     if (isDestroyed.get() || !isAdded()) return;
                     showLoading(false);
-                    
+
                     if (response != null && response.isSuccess) {
                         String serverUrl = response.data != null ? response.data.optString("avatar_url", "") : "";
-                        if (!serverUrl.isEmpty()) {
-                            prefs.edit().putString("avatar_url", serverUrl).apply();
-                        }
+                        if (!serverUrl.isEmpty()) prefs.edit().putString("avatar_url", serverUrl).apply();
                         showToast(isArabic ? "✅ تم تحديث الصورة" : "✅ Photo updated");
-                        loadUserAvatar();
                     } else {
                         showToast(isArabic ? "💾 حفظ محلي فقط" : "💾 Local save only");
-                        loadUserAvatar();
                     }
+                    loadUserAvatar();
                 });
             } catch (Exception e) {
                 logNonFatal("uploadProfileImage", e);
@@ -437,30 +416,26 @@ public class MiraProfileFragment extends Fragment {
         executeSafely(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-                
+
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject user = response.data.optJSONObject("user");
                     JSONObject org = response.data.optJSONObject("organization");
-                    
-                    if (org != null) {
-                        orgProfileManager.saveFromServer(org);
-                    }
-                    
+
+                    if (org != null) orgProfileManager.saveFromServer(org);
+
                     if (user != null) {
                         String displayName = user.optString("display_name", "");
                         String phone = user.optString("phone", "");
-                        
+                        String email = user.optString("email", "");
                         if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
                         if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
                     }
-                    
+
                     final JSONObject finalUser = user;
                     final JSONObject finalOrg = org;
-                    
+
                     mainHandler.post(() -> {
-                        if (!isDestroyed.get() && isAdded()) {
-                            updateUIWithData(finalUser, finalOrg);
-                        }
+                        if (!isDestroyed.get() && isAdded()) updateUIWithData(finalUser, finalOrg);
                     });
                 }
             } catch (Exception e) {
@@ -476,14 +451,13 @@ public class MiraProfileFragment extends Fragment {
                 String username = user.optString("username", "");
                 if (!TextUtils.isEmpty(username)) tvUsername.setText("@" + username);
             }
-            
             if (tvAccountNum != null) tvAccountNum.setText(user.optString("phone", ""));
             if (tvBranchName != null) {
                 String branchName = user.optString("branch_name", "");
                 if (!TextUtils.isEmpty(branchName)) tvBranchName.setText("🏢 " + branchName);
             }
         }
-        
+
         if (org != null) {
             if (tvOrgNameAr != null) tvOrgNameAr.setText(org.optString("name_ar", ""));
             if (tvOrgNameEn != null) tvOrgNameEn.setText(org.optString("name_en", ""));
@@ -496,31 +470,39 @@ public class MiraProfileFragment extends Fragment {
         }
     }
 
+    // ✅✅✅ إصلاح 3: إضافة Slogan, Address, Website
     private void showEditOrgDialog() {
         if (getContext() == null || isDestroyed.get()) return;
         if (!permissionManager.isAdmin()) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
-        
+
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_mira_profile, null);
         EditText etNameAr = dialogView.findViewById(R.id.etEditNameAr);
         EditText etNameEn = dialogView.findViewById(R.id.etEditNameEn);
         EditText etPhone = dialogView.findViewById(R.id.etEditPhone);
         EditText etEmail = dialogView.findViewById(R.id.etEditEmail);
         EditText etTax = dialogView.findViewById(R.id.etEditTax);
-        
+        // حقول إضافية
+        EditText etSlogan = dialogView.findViewById(R.id.etEditSlogan);
+        EditText etAddress = dialogView.findViewById(R.id.etEditAddress);
+        EditText etWebsite = dialogView.findViewById(R.id.etEditWebsite);
+
         if (tvOrgNameAr != null && etNameAr != null) etNameAr.setText(tvOrgNameAr.getText());
         if (tvOrgNameEn != null && etNameEn != null) etNameEn.setText(tvOrgNameEn.getText());
         if (tvPhone != null && etPhone != null) etPhone.setText(tvPhone.getText());
         if (tvEmail != null && etEmail != null) etEmail.setText(tvEmail.getText());
-        
+        if (etSlogan != null) etSlogan.setText(orgProfileManager.getOrgSlogan());
+        if (etAddress != null) etAddress.setText(orgProfileManager.getOrgAddress());
+        if (etWebsite != null) etWebsite.setText(orgProfileManager.getOrgWebsite());
+
         if (etTax != null && tvTaxNum != null) {
             String taxText = tvTaxNum.getText().toString();
             String tax = taxText.replace(isArabic ? "الرقم الضريبي: " : "Tax Number: ", "").trim();
             etTax.setText(tax);
         }
-        
+
         new MaterialAlertDialogBuilder(getContext())
                 .setTitle(isArabic ? "✏️ تعديل بيانات المنظمة" : "✏️ Edit Organization")
                 .setView(dialogView)
@@ -530,8 +512,11 @@ public class MiraProfileFragment extends Fragment {
                     String phone = etPhone != null ? etPhone.getText().toString().trim() : "";
                     String email = etEmail != null ? etEmail.getText().toString().trim() : "";
                     String tax = etTax != null ? etTax.getText().toString().trim() : "";
-                    
-                    saveOrgProfileToServer(nameAr, nameEn, phone, email, tax);
+                    String slogan = etSlogan != null ? etSlogan.getText().toString().trim() : "";
+                    String address = etAddress != null ? etAddress.getText().toString().trim() : "";
+                    String website = etWebsite != null ? etWebsite.getText().toString().trim() : "";
+
+                    saveOrgProfileToServer(nameAr, nameEn, phone, email, tax, slogan, address, website);
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                 .show();
@@ -539,22 +524,30 @@ public class MiraProfileFragment extends Fragment {
 
     private void showEditUserDialog() {
         if (getContext() == null || isDestroyed.get()) return;
-        
+
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_user_profile, null);
         EditText etDisplayName = dialogView.findViewById(R.id.etEditDisplayName);
         EditText etPhone = dialogView.findViewById(R.id.etEditUserPhone);
-        
+        EditText etEmail = dialogView.findViewById(R.id.etEditUserEmail);
+        EditText etUsername = dialogView.findViewById(R.id.etEditUsername);
+
         if (tvProfileName != null && etDisplayName != null) etDisplayName.setText(tvProfileName.getText());
         if (tvAccountNum != null && etPhone != null) etPhone.setText(tvAccountNum.getText());
-        
+        if (tvUsername != null && etUsername != null) {
+            etUsername.setText(tvUsername.getText().toString().replace("@", ""));
+        }
+        if (etEmail != null) etEmail.setText(sessionManager.getEmail());
+
         new MaterialAlertDialogBuilder(getContext())
                 .setTitle(isArabic ? "👤 تعديل الملف الشخصي" : "👤 Edit Profile")
                 .setView(dialogView)
                 .setPositiveButton(isArabic ? "حفظ" : "Save", (dialog, which) -> {
                     String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
                     String phone = etPhone != null ? etPhone.getText().toString().trim() : "";
-                    
-                    saveUserProfileToServer(displayName, phone);
+                    String email = etEmail != null ? etEmail.getText().toString().trim() : "";
+                    String username = etUsername != null ? etUsername.getText().toString().trim() : "";
+
+                    saveUserProfileToServer(displayName, phone, email, username);
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                 .show();
@@ -562,12 +555,12 @@ public class MiraProfileFragment extends Fragment {
 
     private void showChangePasswordDialog() {
         if (getContext() == null || isDestroyed.get()) return;
-        
+
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_change_password, null);
         EditText etCurrentPassword = dialogView.findViewById(R.id.etCurrentPassword);
         EditText etNewPassword = dialogView.findViewById(R.id.etNewPassword);
         EditText etConfirmPassword = dialogView.findViewById(R.id.etConfirmPassword);
-        
+
         new MaterialAlertDialogBuilder(getContext())
                 .setTitle(isArabic ? "🔒 تغيير كلمة المرور" : "🔒 Change Password")
                 .setView(dialogView)
@@ -575,22 +568,19 @@ public class MiraProfileFragment extends Fragment {
                     String currentPassword = etCurrentPassword != null ? etCurrentPassword.getText().toString() : "";
                     String newPassword = etNewPassword != null ? etNewPassword.getText().toString() : "";
                     String confirmPassword = etConfirmPassword != null ? etConfirmPassword.getText().toString() : "";
-                    
+
                     if (currentPassword.isEmpty() || newPassword.isEmpty()) {
                         showToast(isArabic ? "⚠️ جميع الحقول مطلوبة" : "⚠️ All fields required");
                         return;
                     }
-                    
                     if (!newPassword.equals(confirmPassword)) {
                         showToast(isArabic ? "⚠️ كلمتا المرور غير متطابقتين" : "⚠️ Passwords do not match");
                         return;
                     }
-                    
                     if (newPassword.length() < 6) {
                         showToast(isArabic ? "⚠️ كلمة المرور قصيرة (6 أحرف على الأقل)" : "⚠️ Password too short (min 6)");
                         return;
                     }
-                    
                     changePassword(currentPassword, newPassword);
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
@@ -599,15 +589,15 @@ public class MiraProfileFragment extends Fragment {
 
     private void changePassword(String currentPassword, String newPassword) {
         showLoading(true);
-        
+
         executeSafely(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.changePassword(currentPassword, newPassword);
-                
+
                 mainHandler.post(() -> {
                     if (isDestroyed.get() || !isAdded()) return;
                     showLoading(false);
-                    
+
                     if (response != null && response.isSuccess) {
                         showToast(isArabic ? "✅ تم تغيير كلمة المرور" : "✅ Password changed");
                     } else {
@@ -629,7 +619,7 @@ public class MiraProfileFragment extends Fragment {
 
     private void showLogoutDialog() {
         if (getContext() == null || isDestroyed.get()) return;
-        
+
         new MaterialAlertDialogBuilder(getContext())
                 .setTitle(isArabic ? "🚪 تسجيل الخروج" : "🚪 Logout")
                 .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج؟" : "Are you sure you want to logout?")
@@ -638,33 +628,55 @@ public class MiraProfileFragment extends Fragment {
                 .show();
     }
 
+    // ✅✅✅ إصلاح 2: تسجيل خروج آمن بدون انهيار
     private void performLogout() {
-        executeSafely(() -> {
-            try {
-                String token = sessionManager.getAuthToken();
-                if (!TextUtils.isEmpty(token)) {
-                    apiClient.logout(token);
-                }
-            } catch (Exception e) {
-                logNonFatal("performLogout", e);
+        try {
+            // 1. إبلاغ الـ Activity أننا على وشك تسجيل الخروج
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).onPreLogout();
             }
-            
-            mainHandler.post(() -> {
-                if (isDestroyed.get() || !isAdded()) return;
-                sessionManager.logout();
-                if (getActivity() != null) {
-                    getActivity().finish();
-                }
-            });
-        });
+
+            // 2. إرسال طلب تسجيل الخروج للسيرفر (اختياري، في الخلفية)
+            String token = sessionManager.getAuthToken();
+            if (!TextUtils.isEmpty(token)) {
+                executeSafely(() -> {
+                    try {
+                        apiClient.logout(token);
+                    } catch (Exception e) {
+                        logNonFatal("performLogout.api", e);
+                    }
+                });
+            }
+
+            // 3. مسح بيانات الجلسة محلياً
+            sessionManager.logout();
+
+            // 4. حذف بيانات البروفايل من المدير
+            if (orgProfileManager != null) {
+                // لا نستدعي logout هنا لتجنب مسح بيانات المؤسسة (قد نحتاجها بعد إعادة الدخول)
+            }
+
+            // 5. العودة لشاشة تسجيل الدخول (بدون finish مباشر)
+            if (getActivity() != null && !getActivity().isFinishing()) {
+                Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                getActivity().finish();
+            }
+        } catch (Exception e) {
+            logNonFatal("performLogout", e);
+        }
     }
 
-    private void saveOrgProfileToServer(String nameAr, String nameEn, String phone, String email, String tax) {
+    // ✅✅✅ إصلاح 3: إرسال جميع الحقول
+    private void saveOrgProfileToServer(String nameAr, String nameEn, String phone,
+                                         String email, String tax, String slogan,
+                                         String address, String website) {
         if (!permissionManager.isAdmin()) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
-        
+
         showLoading(true);
 
         executeSafely(() -> {
@@ -675,22 +687,28 @@ public class MiraProfileFragment extends Fragment {
                 payload.put("org_phone", phone);
                 payload.put("org_email", email);
                 payload.put("tax_number", tax);
+                payload.put("org_slogan", slogan);
+                payload.put("org_address", address);
+                payload.put("org_website", website);
 
                 MiraApiClient.ApiResponse response = apiClient.saveOrgProfile(payload);
                 final boolean success = response != null && response.isSuccess;
-                
+
                 mainHandler.post(() -> {
                     if (isDestroyed.get() || !isAdded()) return;
                     showLoading(false);
-                    
+
                     if (success) {
                         if (tvOrgNameAr != null) tvOrgNameAr.setText(nameAr);
                         if (tvOrgNameEn != null) tvOrgNameEn.setText(nameEn);
                         if (tvPhone != null) tvPhone.setText(phone);
                         if (tvEmail != null) tvEmail.setText(email);
                         if (tvTaxNum != null) tvTaxNum.setText((isArabic ? "الرقم الضريبي: " : "Tax Number: ") + tax);
-                        
-                        orgProfileManager.saveFullProfile(nameAr, nameEn, phone, email, tax);
+
+                        // ✅ حفظ محلي كامل
+                        orgProfileManager.saveFullProfileExtended(
+                                nameAr, nameEn, phone, email, tax, slogan, address, website);
+
                         showToast(isArabic ? "✅ تم حفظ بيانات المنظمة" : "✅ Organization saved");
                     } else {
                         String error = response != null ? response.error : "Unknown error";
@@ -709,7 +727,7 @@ public class MiraProfileFragment extends Fragment {
         });
     }
 
-    private void saveUserProfileToServer(String displayName, String phone) {
+    private void saveUserProfileToServer(String displayName, String phone, String email, String username) {
         showLoading(true);
 
         executeSafely(() -> {
@@ -717,21 +735,27 @@ public class MiraProfileFragment extends Fragment {
                 JSONObject payload = new JSONObject();
                 payload.put("display_name", displayName);
                 payload.put("phone", phone);
+                payload.put("email", email);
+                payload.put("username", username);
 
                 MiraApiClient.ApiResponse response = apiClient.updateUserProfile(payload);
                 final boolean success = response != null && response.isSuccess;
-                
+
                 mainHandler.post(() -> {
                     if (isDestroyed.get() || !isAdded()) return;
                     showLoading(false);
-                    
+
                     if (success) {
                         if (tvProfileName != null) tvProfileName.setText(displayName);
                         if (tvAccountNum != null) tvAccountNum.setText(phone);
-                        
+                        if (tvUsername != null && !TextUtils.isEmpty(username)) {
+                            tvUsername.setText("@" + username);
+                        }
+
                         if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
                         if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
-                        
+                        if (!TextUtils.isEmpty(email)) sessionManager.setEmail(email);
+
                         showToast(isArabic ? "✅ تم تحديث الملف الشخصي" : "✅ Profile updated");
                     } else {
                         String error = response != null ? response.error : "Unknown error";
@@ -763,6 +787,7 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void executeSafely(Runnable task) {
+        if (isDestroyed.get()) return;
         if (executor != null && !executor.isShutdown() && !executor.isTerminated()) {
             try {
                 executor.execute(task);
@@ -811,7 +836,7 @@ public class MiraProfileFragment extends Fragment {
         super.onDestroyView();
         isDestroyed.set(true);
         mainHandler.removeCallbacksAndMessages(null);
-        
+
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).hideLoading();
@@ -820,4 +845,4 @@ public class MiraProfileFragment extends Fragment {
             Log.e(TAG, "hideLoading error: " + e.getMessage());
         }
     }
-}
+                        }
