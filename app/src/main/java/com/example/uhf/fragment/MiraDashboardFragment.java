@@ -639,55 +639,39 @@ if (tvHeroBalance != null) {
         }
     }
 
-    /**
-     * ✅ قائمة افتراضية إذا لم تُحمَّل الإعدادات
-     */
-    private List<MiraQuickAccessSettings.QuickAction> getDefaultQuickActions() {
-        List<MiraQuickAccessSettings.QuickAction> defaults = new ArrayList<>();
+   /**
+ * ✅ قائمة افتراضية إذا لم تُحمَّل الإعدادات
+ */
+private List<MiraQuickAccessSettings.QuickAction> getDefaultQuickActions() {
+    List<MiraQuickAccessSettings.QuickAction> defaults = new ArrayList<>();
 
-        String[] ids = {"identity", "radar", "gate", "reports",
-                        "accounting", "transfers", "sales_history",
-                        "admin_hub", "server_config"};
+    // ✅ استخدام الإجراءات الأساسية من MiraQuickAccessSettings
+    MiraQuickAccessSettings settings = 
+            MiraQuickAccessSettings.getInstance(requireContext());
 
-        String[] labelsAr = {"الهوية", "الرادار", "البوابات",
-                             "التقارير", "المحاسبة", "التحويلات",
-                             "سجل البيع", "الإدارة", "السيرفر"};
-        String[] labelsEn = {"Identity", "Radar", "Gates",
-                             "Reports", "Accounting", "Transfers",
-                             "Sales", "Admin", "Server"};
+    if (settings == null) return defaults;
 
-        int[] icons = {
-            R.drawable.ic_identity_studio,
-            R.drawable.ic_radar,
-            R.drawable.ic_security,
-            R.drawable.ic_reports,
-            R.drawable.ic_accounting,
-            R.drawable.ic_transfer,
-            R.drawable.ic_sales_history,
-            R.drawable.ic_admin_hub,
-            R.drawable.ic_server_config
-        };
+    List<MiraQuickAccessSettings.QuickAction> allActions = 
+            settings.getAllActions();
 
-        for (int i = 0; i < ids.length && defaults.size() < MAX_QUICK_ACTIONS; i++) {
-            String tag = getFragmentTagForAction(ids[i]);
+    if (allActions == null || allActions.isEmpty()) return defaults;
 
-            if (permissionManager != null
-                    && !permissionManager.canAccessFragment(tag)) {
-                continue;
-            }
+    for (MiraQuickAccessSettings.QuickAction action : allActions) {
+        // ✅ تحقق من الصلاحية
+        String fragmentTag = getFragmentTagForAction(action.id);
+        boolean hasPermission = permissionManager == null
+                || permissionManager.canAccessFragment(fragmentTag);
 
-            MiraQuickAccessSettings.QuickAction action =
-                    new MiraQuickAccessSettings.QuickAction();
-            action.id = ids[i];
-            action.label = isArabic ? labelsAr[i] : labelsEn[i];
-            action.iconRes = icons[i];
-            action.enabled = true;
+        if (hasPermission && defaults.size() < MAX_QUICK_ACTIONS) {
             defaults.add(action);
         }
 
-        Log.d(TAG, "Default quick actions: " + defaults.size());
-        return defaults;
+        if (defaults.size() >= MAX_QUICK_ACTIONS) break;
     }
+
+    return defaults;
+}
+
 
     private void loadDataIfNeeded() {
         try {
@@ -1453,4 +1437,4 @@ if (tvHeroBalance != null) {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-}
+                                                                         }
