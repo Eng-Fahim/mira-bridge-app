@@ -1,7 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- ==================== الألوان الأساسية للوضع الداكن ==================== -->
+    <!-- ═══════════════════════════════════════════════════
+         🌙 Luxury Jewelry Dark Palette v2.0
+         ═══════════════════════════════════════════════════ -->
+
+    <!-- الذهبي -->
+    <color name="gold_luxury">#E8C766</color>
+    <color name="gold_luxury_dark">#B8860B</color>
+    <color name="gold_luxury_light">#F5D77E</color>
+    <color name="gold_luxury_soft">#3D2F00</color>
+    <color name="gold_luxury_highlight">#FFE082</color>
+
+    <!-- بني شوكولاتة -->
+    <color name="chocolate">#D7CCC8</color>
+    <color name="chocolate_dark">#4E342E</color>
+    <color name="chocolate_light">#BCAAA4</color>
+    <color name="chocolate_soft">#221F1C</color>
+
+    <!-- أسود فاخر -->
+    <color name="black_luxury">#0B0B0C</color>
+    <color name="black_soft">#141210</color>
+    <color name="black_highlight">#1A1816</color>
+
+    <!-- رمادي داكن دافئ -->
+    <color name="gray_dark_warm">#161618</color>
+    <color name="gray_warm">#2C2A28</color>
+    <color name="gray_light_warm">#3F3325</color>
+
+    <!-- نصوص -->
+    <color name="text_light_primary">#F9FAFB</color>
+    <color name="text_light_secondary">#D7CCC8</color>
+    <color name="text_muted_warm">#A1887F</color>
+
+    <!-- حدود -->
+    <color name="border_dark_warm">#3F3325</color>
+    <color name="border_dark">#2E241B</color>
+
+    <!-- أخطاء وناجح -->
+    <color name="error_luxury">#F2B8B5</color>
+    <color name="error_container_luxury">#8C1D18</color>
+    <color name="success_luxury">#81C784</color>
+    <color name="warning_luxury">#FFB74D</color>
+    <color name="info_luxury">#64B5F6</color>
+
+    <!-- الألوان القديمة (للتوافق) -->
     <color name="lfile_colorPrimary">#92B4F4</color>
     <color name="white">#FFFFFF</color>
     <color name="white1">#1E1E1E</color>
@@ -17,9 +60,9 @@
     <color name="red3">#33FF0000</color>
     <color name="red4">#88FF0000</color>
     <color name="red5">#AAFF0000</color>
-    <color name="gold">#D4AF37</color>
+    <color name="gold">#E8C766</color>
     <color name="yellow">#FFFF00</color>
-    <color name="green">#4CAF50</color>
+    <color name="green">#81C784</color>
     <color name="green1">#33008000</color>
     <color name="green2">#88008000</color>
     <color name="green3">#AA008000</color>
@@ -40,27 +83,27 @@
     <color name="full_transparent">#00000000</color>
     <color name="half_transparent">#AAFFFFFF</color>
 
-    <!-- ==================== ألوان الهوية والعلامة التجارية ==================== -->
-    <color name="brand_primary">#D4AF37</color>
+    <!-- ألوان الهوية -->
+    <color name="brand_primary">#E8C766</color>
     <color name="brand_primary_dark">#9E8033</color>
-    
+
     <color name="nav_bar_background">#161618</color>
-    <color name="nav_item_selected">#D4AF37</color>
-    <color name="nav_item_unselected">#CBD5E1</color>
-    
+    <color name="nav_item_selected">#E8C766</color>
+    <color name="nav_item_unselected">#D7CCC8</color>
+
     <color name="action_sheet_bg">#12141A</color>
     <color name="action_sheet_card_bg">#1C2029</color>
     <color name="action_sheet_text_primary">#FFFFFF</color>
-    <color name="action_sheet_text_secondary">#CBD5E1</color>
-    <color name="action_sheet_divider">#272C38</color>
+    <color name="action_sheet_text_secondary">#D7CCC8</color>
+    <color name="action_sheet_divider">#2E241B</color>
     <color name="listitem_black">#FFFFFF</color>
-    <color name="listitem_gray">#CBD5E1</color>
+    <color name="listitem_gray">#D7CCC8</color>
 
     <color name="deep_gray">#E0E0E0</color>
     <color name="text_gray">#999999</color>
     <color name="red_qian">#FF8A80</color>
 
-    <!-- ==================== القائمة الجانبية ==================== -->
+    <!-- القائمة الجانبية -->
     <color name="sliding_menu_back">#FF1C1C1E</color>
     <color name="sliding_menu_title_text_color">#FF999999</color>
     <color name="sliding_menu_item_text_color">#FFB1B1B1</color>
@@ -68,7 +111,7 @@
     <color name="sliding_menu_item_pressed">#FF39393B</color>
     <color name="sliding_menu_item">#00000000</color>
 
-    <!-- ==================== ألوان ZXing ==================== -->
+    <!-- ZXing -->
     <color name="contents_text">#FFFFFFFF</color>
     <color name="encode_view">#FF000000</color>
     <color name="help_button_view">#FF333333</color>
@@ -88,55 +131,50 @@
     <color name="share_text">#FFFFFFFF</color>
     <color name="status_text">#FFFFFFFF</color>
     <color name="transparent">#00000000</color>
-    <color name="viewfinder_frame">#D4AF37</color>
+    <color name="viewfinder_frame">#E8C766</color>
     <color name="viewfinder_laser">#FF4444</color>
     <color name="viewfinder_mask">#60000000</color>
-    <color name="primary">#D4AF37</color>
-    <color name="on_surface_variant">#CBD5E1</color>
-    <color name="outline">#2D2D32</color>
+    <color name="primary">#E8C766</color>
+    <color name="on_surface_variant">#D7CCC8</color>
+    <color name="outline">#3F3325</color>
 
-    <!-- ==================== ألوان الداشبورد ==================== -->
+    <!-- الداشبورد -->
     <color name="primary_text">#FFFFFFFF</color>
     <color name="primary_text_variant">#FFE0E0E0</color>
-    
-    <color name="text_secondary">#FFCBD5E1</color>
-    <color name="text_secondary_variant">#FFA0AEC0</color>
+
+    <color name="text_secondary">#FFD7CCC8</color>
+    <color name="text_secondary_variant">#FFA1887F</color>
 
     <color name="background_dark">#FF0B0B0C</color>
     <color name="background_card">#FF161618</color>
-    <color name="background_card_variant">#FF1E1E22</color>
+    <color name="background_card_variant">#FF221F1C</color>
 
-    <color name="accent_color">#D4AF37</color>
-    <color name="accent_color_variant">#C5A059</color>
+    <color name="accent_color">#E8C766</color>
+    <color name="accent_color_variant">#D7CCC8</color>
 
-    <color name="shimmer_color">#FF1A1A1E</color>
-    <color name="shimmer_highlight">#FF2A2A30</color>
+    <color name="shimmer_color">#FF1A1816</color>
+    <color name="shimmer_highlight">#FF2C2A28</color>
 
     <color name="card_background">#FF161618</color>
-    <color name="card_stroke">#FF2D2D32</color>
+    <color name="card_stroke">#FF3F3325</color>
 
-    <color name="status_online">#FF4CAF50</color>
+    <color name="status_online">#FF81C784</color>
     <color name="status_offline">#FFEF5350</color>
     <color name="status_updating">#FFFFB74D</color>
 
     <color name="karat_text">#FFE0E0E0</color>
     <color name="karat_text_empty">#FF6B6B6B</color>
 
-    <!-- ═══════════════════════════════════════════════════
-         Material 3 Colors (Dark) — Aliases
-         ═══════════════════════════════════════════════════ -->
-    
-    <!-- 🔑 الأساسية -->
-    <color name="colorOnSurface">#FFFFFFFF</color>
+    <!-- Material 3 Aliases -->
+    <color name="colorOnSurface">#FFF9FAFB</color>
     <color name="colorSurface">#FF161618</color>
-    <color name="colorPrimary">#D4AF37</color>
-    <color name="colorOnPrimary">#FF1A1A1A</color>
-    <color name="colorSurfaceVariant">#FF1E1E22</color>
-    <color name="colorOnSurfaceVariant">#FFCBD5E1</color>
-    <color name="colorOutline">#FF2D2D32</color>
-    <color name="colorOutlineVariant">#FF38383D</color>
-    
-    <!-- ✅ Aliases مستخدمة في الكود -->
+    <color name="colorPrimary">#FFE8C766</color>
+    <color name="colorOnPrimary">#FF3E2723</color>
+    <color name="colorSurfaceVariant">#FF221F1C</color>
+    <color name="colorOnSurfaceVariant">#FFD7CCC8</color>
+    <color name="colorOutline">#FF3F3325</color>
+    <color name="colorOutlineVariant">#FF2E241B</color>
+
     <color name="on_surface">@color/colorOnSurface</color>
     <color name="on_surface_variant_alias">@color/colorOnSurfaceVariant</color>
     <color name="primary_alias">@color/colorPrimary</color>
@@ -145,15 +183,14 @@
     <color name="surface_variant_alias">@color/colorSurfaceVariant</color>
     <color name="outline_alias">@color/colorOutline</color>
     <color name="outline_variant_alias">@color/colorOutlineVariant</color>
-    
-    <!-- ✅ ألوان إضافية للتصميم الجديد -->
+
     <color name="bg_main">#FF0B0B0C</color>
     <color name="bg_card">#FF161618</color>
-    <color name="accent">#D4AF37</color>
-    <color name="accent_light">#E6C158</color>
+    <color name="accent">#E8C766</color>
+    <color name="accent_light">#F5D77E</color>
     <color name="accent_dark">#9E8033</color>
     <color name="text_primary">#FFFFFFFF</color>
     <color name="text_light">#FFFFFFFF</color>
-    <color name="text_muted">#FFCBD5E1</color>
+    <color name="text_muted">#FFD7CCC8</color>
 
 </resources>
