@@ -2254,4 +2254,8 @@
 <string name="pwd_import">استيراد</string>
 <string name="pwd_empty_salt">⚠️ Salt فارغ</string>
 <string name="pwd_salt_imported">✅ تم استيراد Salt</string>
+
+<string name="total_inventory_value">💰 إجمالي قيمة المخزون</string>
+<string name="no_alerts">لا توجد تنبيهات</string>
+<string name="alerts_count">%d تنبيهات</string>
 </resources>
