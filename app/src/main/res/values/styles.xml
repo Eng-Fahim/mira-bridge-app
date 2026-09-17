@@ -184,8 +184,8 @@
 </style>
 
 <!-- Divider فاخر -->
-<style name="LuxuryDivider" parent="Widget.Material3.Divider">
-    <item name="android:color">@color/border_warm</item>
+<style name="LuxuryDivider" parent="Widget.Material3.MaterialDivider">
+    <item name="dividerColor">@color/border_warm</item>
     <item name="dividerThickness">1dp</item>
 </style>
 
