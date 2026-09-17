@@ -651,10 +651,10 @@ public class MiraProfileFragment extends Fragment {
             // 3. مسح بيانات الجلسة محلياً
             sessionManager.logout();
 
-            // 4. حذف بيانات البروفايل من المدير
-            if (orgProfileManager != null) {
-                // لا نستدعي logout هنا لتجنب مسح بيانات المؤسسة (قد نحتاجها بعد إعادة الدخول)
-            }
+           // 4. تنظيف MiraOrgProfileManager (يزيل المستمعين + بيانات الجلسة)
+           if (orgProfileManager != null) {
+           orgProfileManager.logout();
+           }
 
             // 5. العودة لشاشة تسجيل الدخول (بدون finish مباشر)
             if (getActivity() != null && !getActivity().isFinishing()) {
