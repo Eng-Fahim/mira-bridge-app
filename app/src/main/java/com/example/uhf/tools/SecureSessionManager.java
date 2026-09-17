@@ -251,6 +251,9 @@ public class SecureSessionManager {
     }
     
     public void logoutUser() {
+    // ✅ تصفير Auto-Lock
+    setSessionLocked(false);
+    setLastAppActiveTime(0);
         boolean keepBiometric = isBiometricEnabled();
         String apiKey = getApiKey();
         String serverUrl = getServerUrl();
@@ -675,19 +678,121 @@ public class SecureSessionManager {
         }
     }
     
+    // ═══════════════════════════════════════════════════════
+// ✅ Auto-Lock Support (Inactivity Timeout)
+// ═══════════════════════════════════════════════════════
+
+private static final String KEY_LAST_ACTIVE_TIME = "last_app_active_time";
+private static final String KEY_SESSION_LOCKED = "session_locked";
+
+/**
+ * ✅ حفظ آخر وقت نشاط (يُستدعى عند أي تفاعل)
+ */
+public void setLastAppActiveTime(long timestamp) {
+    try {
+        userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "setLastAppActiveTime error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ الحصول على آخر وقت نشاط
+ */
+public long getLastAppActiveTime() {
+    try {
+        return userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0);
+    } catch (Exception e) {
+        return 0;
+    }
+}
+
+/**
+ * ✅ تحديث "آخر نشاط" (يُستدعى عند أي تفاعل)
+ */
+public void touchActivity() {
+    setLastAppActiveTime(System.currentTimeMillis());
+}
+
+/**
+ * ✅ قفل الجلسة (بدون إنهائها) — Lock ≠ Logout
+ */
+public void setSessionLocked(boolean locked) {
+    try {
+        userPrefs.edit().putBoolean(KEY_SESSION_LOCKED, locked).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "setSessionLocked error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ هل الجلسة مقفلة؟
+ */
+public boolean isSessionLocked() {
+    try {
+        return userPrefs.getBoolean(KEY_SESSION_LOCKED, false);
+    } catch (Exception e) {
+        return false;
+    }
+}
+
+/**
+ * ✅ هل انتهت مهلة عدم النشاط؟
+ * 
+ * @param timeoutMs المهلة بالمللي ثانية (مثلاً 15 * 60 * 1000)
+ */
+public boolean isInactivityTimeout(long timeoutMs) {
+    try {
+        long last = getLastAppActiveTime();
+        if (last <= 0) return false;
+        return (System.currentTimeMillis() - last) > timeoutMs;
+    } catch (Exception e) {
+        return false;
+    }
+}
+
+/**
+ * ✅ فك قفل الجلسة (بعد نجاح Biometric)
+ */
+public void unlockSession() {
+    try {
+        setSessionLocked(false);
+        touchActivity();
+        Log.d(TAG, "Session unlocked");
+    } catch (Exception e) {
+        Log.e(TAG, "unlockSession error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ تصفير Auto-Lock (يُستدعى عند login ناجح)
+ */
+public void resetAutoLock() {
+    try {
+        setSessionLocked(false);
+        touchActivity();
+        Log.d(TAG, "Auto-Lock reset");
+    } catch (Exception e) {
+        Log.e(TAG, "resetAutoLock error: " + e.getMessage());
+    }
+}
+    
     // ==================== وظائف مساعدة ====================
     
     public void clearAll() {
-        securePrefs.edit().clear().apply();
-        userPrefs.edit().clear().apply();
-        // ✅ مسح التخزين المؤقت
-        cachedAuthToken = null;
-        cachedApiKey = null;
-        cachedLoggedIn = false;
-        cachedUsername = null;
-        cachedServerUrl = null;
-        deleteBiometricKey();
-    }
+    securePrefs.edit().clear().apply();
+    userPrefs.edit().clear().apply();
+    // ✅ مسح التخزين المؤقت
+    cachedAuthToken = null;
+    cachedApiKey = null;
+    cachedLoggedIn = false;
+    cachedUsername = null;
+    cachedServerUrl = null;
+    deleteBiometricKey();
+    // ✅ تصفير Auto-Lock (مُضاف)
+    setSessionLocked(false);
+    setLastAppActiveTime(0);
+}
     
     public String getSessionSummary() {
         return "isLoggedIn=" + isLoggedIn() +
