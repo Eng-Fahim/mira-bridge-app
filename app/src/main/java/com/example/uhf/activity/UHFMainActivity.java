@@ -952,35 +952,28 @@ public void onPause() {
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed()) return;
-        if (navigationManager == null) return;
+    if (isFinishing() || isDestroyed()) return;
+    if (navigationManager == null) return;
 
-        showLoading();
+    // ✅ لا showLoading() — التنقل فوري
+    navigationManager.loadFragment(fragment, tag, addToBackStack);
+    this.currentFragment = fragment;
 
-        navigationManager.loadFragment(fragment, tag, addToBackStack);
+    updateBottomNavSelectionByTag(tag);
+    updateSecondaryToolbar(tag);
+}
 
-        // ✅ مزامنة الواجهة فقط
-        updateBottomNavSelectionByTag(tag);
-        updateSecondaryToolbar(tag);
+public void loadFragmentDirectly(Fragment fragment, String tag) {
+    if (isFinishing() || isDestroyed()) return;
+    if (navigationManager == null) return;
 
-        mainHandler.postDelayed(this::hideLoading, 350);
-    }
+    // ✅ لا showLoading() — التنقل فوري
+    navigationManager.loadFragmentDirectly(fragment, tag);
+    this.currentFragment = fragment;
 
-    public void loadFragmentDirectly(Fragment fragment, String tag) {
-        if (isFinishing() || isDestroyed()) return;
-        if (navigationManager == null) return;
-
-        showLoading();
-
-        navigationManager.loadFragmentDirectly(fragment, tag);
-
-        // ✅ مزامنة الواجهة فقط
-        updateBottomNavSelectionByTag(tag);
-        updateSecondaryToolbar(tag);
-
-        mainHandler.postDelayed(this::hideLoading, 350);
-    }
-
+    updateBottomNavSelectionByTag(tag);
+    updateSecondaryToolbar(tag);
+}
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
     }
@@ -2219,4 +2212,4 @@ public void onPause() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-                        }
+                    }
