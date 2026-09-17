@@ -31,21 +31,21 @@ public class MiraOrgProfileManager {
 
     private static final String TAG = "MiraOrgProfile";
     private static final String PREFS_NAME = "MIRA_ORG_PROFILE";
-    private static final long SYNC_COOLDOWN_MS = 15 * 60 * 1000; // 15 دقيقة
+    private static final String AUTH_PREFS_NAME = "MIRA_AUTH";
+    private static final long SYNC_COOLDOWN_MS = 15 * 60 * 1000;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static MiraOrgProfileManager instance;
     private final SharedPreferences prefs;
     private final Context context;
-    
-    // ✅ استخدام WeakReference لمنع التسريبات
+
     private final List<WeakReference<OnProfileChangedListener>> listeners = new ArrayList<>();
 
     public interface OnProfileChangedListener {
         void onProfileChanged();
     }
-    
+
     public interface SyncCallback {
         void onSuccess();
         void onError(String error);
@@ -67,12 +67,10 @@ public class MiraOrgProfileManager {
 
     public void addListener(OnProfileChangedListener listener) {
         if (listener == null) return;
-        
+
         synchronized (listeners) {
-            // ✅ أولاً: نظّف المراجع الميتة
             cleanupDeadListeners();
-            
-            // ✅ ثانياً: تحقق أن المستمع غير موجود (بمقارنة الـ reference الفعلي)
+
             for (WeakReference<OnProfileChangedListener> ref : listeners) {
                 OnProfileChangedListener existing = ref.get();
                 if (existing != null && existing == listener) {
@@ -80,8 +78,7 @@ public class MiraOrgProfileManager {
                     return;
                 }
             }
-            
-            // ✅ ثالثاً: أضف المستمع الجديد
+
             listeners.add(new WeakReference<>(listener));
             Log.d(TAG, "Listener added. Total: " + listeners.size());
         }
@@ -89,7 +86,7 @@ public class MiraOrgProfileManager {
 
     public void removeListener(OnProfileChangedListener listener) {
         if (listener == null) return;
-        
+
         synchronized (listeners) {
             Iterator<WeakReference<OnProfileChangedListener>> it = listeners.iterator();
             while (it.hasNext()) {
@@ -102,9 +99,6 @@ public class MiraOrgProfileManager {
         }
     }
 
-    /**
-     * ✅ تنظيف المستمعين الذين تم تدميرهم من قبل GC
-     */
     private void cleanupDeadListeners() {
         Iterator<WeakReference<OnProfileChangedListener>> it = listeners.iterator();
         while (it.hasNext()) {
@@ -117,21 +111,15 @@ public class MiraOrgProfileManager {
     public void notifyListeners() {
         mainHandler.post(() -> {
             List<OnProfileChangedListener> aliveListeners = new ArrayList<>();
-            
+
             synchronized (listeners) {
-                // ✅ 1) نظّف الميت
                 cleanupDeadListeners();
-                
-                // ✅ 2) اجمع الأحياء
                 for (WeakReference<OnProfileChangedListener> ref : listeners) {
                     OnProfileChangedListener listener = ref.get();
-                    if (listener != null) {
-                        aliveListeners.add(listener);
-                    }
+                    if (listener != null) aliveListeners.add(listener);
                 }
             }
-            
-            // ✅ 3) أبلغهم (خارج القفل لتجنب deadlock)
+
             for (OnProfileChangedListener listener : aliveListeners) {
                 try {
                     listener.onProfileChanged();
@@ -149,24 +137,24 @@ public class MiraOrgProfileManager {
             if (callback != null) callback.onError("apiClient is null");
             return;
         }
-        
+
         if (!force) {
             long lastSync = prefs.getLong("last_server_sync", 0);
             long now = System.currentTimeMillis();
-            
+
             if (now - lastSync < SYNC_COOLDOWN_MS) {
                 Log.d(TAG, "syncFromServer skipped (cooldown active)");
                 if (callback != null) callback.onSuccess();
                 return;
             }
         }
-        
+
         Log.i(TAG, "🔄 Starting syncFromServer...");
-        
+
         new Thread(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-                
+
                 if (response == null || !response.isSuccess || response.data == null) {
                     String error = response != null ? response.error : "Unknown error";
                     Log.w(TAG, "⚠️ syncFromServer failed: " + error);
@@ -175,31 +163,29 @@ public class MiraOrgProfileManager {
                     });
                     return;
                 }
-                
+
                 JSONObject organization = response.data.optJSONObject("organization");
                 if (organization != null) {
                     saveOrganizationFromServer(organization);
-                    Log.i(TAG, "✅ Organization saved: " + organization.optString("name_ar", ""));
                 }
-                
+
                 JSONObject user = response.data.optJSONObject("user");
                 if (user != null) {
                     syncBranchToBranchesManager(user);
                 }
-                
+
                 JSONObject systemConfig = response.data.optJSONObject("system_config");
                 if (systemConfig != null) {
                     saveSystemConfigFromServer(systemConfig);
                 }
-                
+
                 prefs.edit().putLong("last_server_sync", System.currentTimeMillis()).apply();
-                
                 notifyListeners();
-                
+
                 mainHandler.post(() -> {
                     if (callback != null) callback.onSuccess();
                 });
-                
+
             } catch (Exception e) {
                 Log.e(TAG, "syncFromServer error: " + e.getMessage(), e);
                 mainHandler.post(() -> {
@@ -217,37 +203,43 @@ public class MiraOrgProfileManager {
 
     private void saveOrganizationFromServer(JSONObject org) {
         if (org == null) return;
-        
+
         SharedPreferences.Editor editor = prefs.edit();
-        
+
         String nameAr = org.optString("name_ar", "").trim();
         String nameEn = org.optString("name_en", "").trim();
-        String phone  = org.optString("phone", "").trim();
-        String email  = org.optString("email", "").trim();
-        String tax    = org.optString("tax_number", "").trim();
-        String logo   = org.optString("logo_url", "").trim();
-        
+        String phone = org.optString("phone", "").trim();
+        String email = org.optString("email", "").trim();
+        String tax = org.optString("tax_number", "").trim();
+        String logo = org.optString("logo_url", "").trim();
+        String slogan = org.optString("slogan", "").trim();
+        String address = org.optString("address", "").trim();
+        String website = org.optString("website", "").trim();
+
         if (!nameAr.isEmpty()) {
             editor.putString("org_name_ar", nameAr);
             editor.putString("org_name", nameAr);
         }
         if (!nameEn.isEmpty()) editor.putString("org_name_en", nameEn);
-        if (!phone.isEmpty())  editor.putString("org_phone", phone);
-        if (!email.isEmpty())  editor.putString("org_email", email);
-        if (!tax.isEmpty())    editor.putString("tax_number", tax);
-        if (!logo.isEmpty())   editor.putString("org_logo", logo);
-        
+        if (!phone.isEmpty()) editor.putString("org_phone", phone);
+        if (!email.isEmpty()) editor.putString("org_email", email);
+        if (!tax.isEmpty()) editor.putString("tax_number", tax);
+        if (!logo.isEmpty()) editor.putString("org_logo", logo);
+        if (!slogan.isEmpty()) editor.putString("org_slogan", slogan);
+        if (!address.isEmpty()) editor.putString("org_address", address);
+        if (!website.isEmpty()) editor.putString("org_website", website);
+
         editor.apply();
-        Log.d(TAG, "Organization saved: ar=" + nameAr + ", en=" + nameEn);
+        Log.d(TAG, "✅ Organization saved: ar=" + nameAr + ", en=" + nameEn);
     }
 
     private void syncBranchToBranchesManager(JSONObject user) {
         if (user == null) return;
-        
+
         try {
             int branchId = user.optInt("branch_id", 0);
             String branchName = user.optString("branch_name", "").trim();
-            
+
             if (branchId > 0 && !branchName.isEmpty()) {
                 MiraBranchesManager branchesMgr = MiraBranchesManager.getInstance(context);
                 branchesMgr.updateActiveBranchFromServer(branchId, branchName);
@@ -260,14 +252,14 @@ public class MiraOrgProfileManager {
 
     private void saveSystemConfigFromServer(JSONObject config) {
         if (config == null) return;
-        
+
         prefs.edit()
-            .putString("system_currency_ar", config.optString("currency_ar", "دولار"))
-            .putString("system_currency_en", config.optString("currency_en", "USD"))
-            .putBoolean("enable_rfid", config.optBoolean("enable_rfid", true))
-            .putBoolean("enable_barcode", config.optBoolean("enable_barcode", true))
-            .putBoolean("enable_biometric", config.optBoolean("enable_biometric", true))
-            .apply();
+                .putString("system_currency_ar", config.optString("currency_ar", "دولار"))
+                .putString("system_currency_en", config.optString("currency_en", "USD"))
+                .putBoolean("enable_rfid", config.optBoolean("enable_rfid", true))
+                .putBoolean("enable_barcode", config.optBoolean("enable_barcode", true))
+                .putBoolean("enable_biometric", config.optBoolean("enable_biometric", true))
+                .apply();
     }
 
     // ==================== Getters ====================
@@ -356,6 +348,28 @@ public class MiraOrgProfileManager {
         notifyListeners();
     }
 
+    /**
+     * ✅ حفظ كامل لبيانات المنظمة (جميع الحقول)
+     * يُستدعى من MiraProfileFragment بعد نجاح الحفظ على السيرفر
+     */
+    public void saveFullProfileExtended(String nameAr, String nameEn, String phone,
+                                        String email, String tax, String slogan,
+                                        String address, String website) {
+        prefs.edit()
+                .putString("org_name_ar", nameAr)
+                .putString("org_name_en", nameEn)
+                .putString("org_name", nameAr)
+                .putString("org_phone", phone)
+                .putString("org_email", email)
+                .putString("tax_number", tax)
+                .putString("org_slogan", slogan)
+                .putString("org_address", address)
+                .putString("org_website", website)
+                .apply();
+        notifyListeners();
+        Log.d(TAG, "✅ saveFullProfileExtended called");
+    }
+
     // ==================== دوال مساعدة ====================
 
     public String getDisplayName() {
@@ -382,7 +396,7 @@ public class MiraOrgProfileManager {
         String phone = getOrgPhone();
         String email = getOrgEmail();
         String address = getOrgAddress();
-        
+
         if (!phone.isEmpty()) sb.append("📞 ").append(phone);
         if (!email.isEmpty()) {
             if (sb.length() > 0) sb.append("\n");
@@ -396,15 +410,15 @@ public class MiraOrgProfileManager {
     }
 
     public boolean isProfileComplete() {
-        return !getOrgName().equals("MIRA Jewelry") 
-            && !getOrgName().isEmpty();
+        return !getOrgName().equals("MIRA Jewelry")
+                && !getOrgName().isEmpty();
     }
 
     // ==================== دوال المستخدم ====================
 
     public int getCurrentUserId() {
         try {
-            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            SharedPreferences authPrefs = context.getSharedPreferences(AUTH_PREFS_NAME, Context.MODE_PRIVATE);
             return authPrefs.getInt("user_id", 0);
         } catch (Exception e) {
             return 0;
@@ -413,7 +427,7 @@ public class MiraOrgProfileManager {
 
     public String getAuthToken() {
         try {
-            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            SharedPreferences authPrefs = context.getSharedPreferences(AUTH_PREFS_NAME, Context.MODE_PRIVATE);
             String token = authPrefs.getString("auth_token", "");
             if (token.isEmpty()) {
                 token = authPrefs.getString("session_token", "");
@@ -426,13 +440,57 @@ public class MiraOrgProfileManager {
 
     public void saveUserAuth(int userId, String token) {
         try {
-            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            SharedPreferences authPrefs = context.getSharedPreferences(AUTH_PREFS_NAME, Context.MODE_PRIVATE);
             authPrefs.edit()
                     .putInt("user_id", userId)
                     .putString("auth_token", token)
                     .apply();
         } catch (Exception e) {
             Log.e(TAG, "saveUserAuth error: " + e.getMessage());
+        }
+    }
+
+    // ==================== تنظيف الجلسة (Logout) ====================
+
+    /**
+     * ✅ تنظيف آمن عند تسجيل الخروج
+     * ⚠️ ملاحظة: لا يمسح بيانات المؤسسة (نحتاجها بعد إعادة الدخول)
+     * فقط يزيل المستمعين ويحذف بيانات الجلسة المؤقتة
+     */
+    public void logout() {
+        try {
+            Log.i(TAG, "🚪 MiraOrgProfileManager.logout() called");
+
+            // 1. إزالة جميع المستمعين
+            synchronized (listeners) {
+                listeners.clear();
+            }
+
+            // 2. مسح بيانات الجلسة المؤقتة (MIRA_AUTH)
+            SharedPreferences authPrefs = context.getSharedPreferences(AUTH_PREFS_NAME, Context.MODE_PRIVATE);
+            authPrefs.edit().clear().apply();
+
+            // 3. مسح cooldown المزامنة (ليتم المزامنة عند إعادة الدخول)
+            prefs.edit().remove("last_server_sync").apply();
+
+            Log.i(TAG, "✅ MiraOrgProfileManager logout complete");
+        } catch (Exception e) {
+            Log.e(TAG, "logout error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ مسح كامل (يُستخدم فقط عند إلغاء تثبيت التطبيق أو مسح البيانات)
+     */
+    public void clearAll() {
+        try {
+            synchronized (listeners) {
+                listeners.clear();
+            }
+            prefs.edit().clear().apply();
+            Log.i(TAG, "✅ clearAll complete");
+        } catch (Exception e) {
+            Log.e(TAG, "clearAll error: " + e.getMessage(), e);
         }
     }
 }
