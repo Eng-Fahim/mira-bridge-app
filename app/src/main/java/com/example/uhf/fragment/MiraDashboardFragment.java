@@ -80,7 +80,7 @@ private static final String KEY_HIDE_SALES = "hide_sales_value";
 private boolean isHeroHidden = true;   // ✅ مخفي افتراضياً
 private boolean isSalesHidden = true;  // ✅ مخفي افتراضياً
     // UI Elements
-    private TextView tvOrgName, tvGreeting, tvDate, tvLocation, tvLiveStatus;
+    private TextView, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
     private TextView tvKarat24, tvKarat21, tvKarat18;
@@ -263,136 +263,133 @@ private boolean isSalesHidden = true;  // ✅ مخفي افتراضياً
     }
 
     private void initViews(View v) {
-        try {
-            // ✅ Original views
-            tvOrgName = v.findViewById(R.id.tvOrgName);
-            tvGreeting = v.findViewById(R.id.tvGreeting);
-            tvDate = v.findViewById(R.id.tvDate);
-            tvLocation = v.findViewById(R.id.tvLocation);
-            tvTotalItems = v.findViewById(R.id.tvTotalItems);
-            tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
-            tvSoldToday = v.findViewById(R.id.tvSoldToday);
-            tvSalesToday = v.findViewById(R.id.tvSalesToday);
-            tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
-            tvSalesYear = v.findViewById(R.id.tvSalesYear);
-            tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
-            tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
-            tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-            btnGate = v.findViewById(R.id.btnGateSecurity);
-            btnInventory = v.findViewById(R.id.btnRfidAudit);
-            shimmerLayout = v.findViewById(R.id.shimmerLayout);
-            swipeRefresh = v.findViewById(R.id.swipeRefresh);
-            tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
-            tvPriceSource = v.findViewById(R.id.tvPriceSource);
-            tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
-            tvGoldTrend = v.findViewById(R.id.tvGoldTrend);
-            tvGoldChange = v.findViewById(R.id.tvGoldChange);
-            btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
-            cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
-            loadingOverlay = v.findViewById(R.id.loadingOverlay);
-            pbGoldLoading = v.findViewById(R.id.pbGoldLoading);
+    try {
+        // ✅ Views موجودة في XML الجديد
+        tvTotalItems = v.findViewById(R.id.tvTotalItems);
+        tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
+        tvSoldToday = v.findViewById(R.id.tvSoldToday);
+        tvSalesToday = v.findViewById(R.id.tvSalesToday);
+        tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
+        tvSalesYear = v.findViewById(R.id.tvSalesYear);
+        tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
+        tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
+        tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
+        btnGate = v.findViewById(R.id.btnGateSecurity);
+        btnInventory = v.findViewById(R.id.btnRfidAudit);
+        shimmerLayout = v.findViewById(R.id.shimmerLayout);
+        swipeRefresh = v.findViewById(R.id.swipeRefresh);
+        tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
+        tvPriceSource = v.findViewById(R.id.tvPriceSource);
+        tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
+        tvGoldTrend = v.findViewById(R.id.tvGoldTrend);
+        tvGoldChange = v.findViewById(R.id.tvGoldChange);
+        btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
+        cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+        loadingOverlay = v.findViewById(R.id.loadingOverlay);
+        pbGoldLoading = v.findViewById(R.id.pbGoldLoading);
 
-            // ✅ Hero Balance views
-            heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
-            heroSparkline = v.findViewById(R.id.heroSparkline);
-            tvHeroBalance = v.findViewById(R.id.tvHeroBalance);
-            tvHeroTrend = v.findViewById(R.id.tvHeroTrend);
-            tvHeroSubtitle = v.findViewById(R.id.tvHeroSubtitle);
+        // ✅ Hero Balance views
+        heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
+        heroSparkline = v.findViewById(R.id.heroSparkline);
+        tvHeroBalance = v.findViewById(R.id.tvHeroBalance);
+        tvHeroTrend = v.findViewById(R.id.tvHeroTrend);
+        tvHeroSubtitle = v.findViewById(R.id.tvHeroSubtitle);
 
-            // ✅ Alerts views
-            alertsStrip = v.findViewById(R.id.alertsStrip);
-            tvAlertIcon = v.findViewById(R.id.tvAlertIcon);
-            tvAlertMessage = v.findViewById(R.id.tvAlertMessage);
-            tvAlertAction = v.findViewById(R.id.tvAlertAction);
+        // ✅ Alerts views
+        alertsStrip = v.findViewById(R.id.alertsStrip);
+        tvAlertIcon = v.findViewById(R.id.tvAlertIcon);
+        tvAlertMessage = v.findViewById(R.id.tvAlertMessage);
+        tvAlertAction = v.findViewById(R.id.tvAlertAction);
 
-            // ✅ Live Status views
-            liveStatusDot = v.findViewById(R.id.liveStatusDot);
-            tvLiveStatusText = v.findViewById(R.id.tvLiveStatusText);
+        // ✅ Live Status views
+        liveStatusDot = v.findViewById(R.id.liveStatusDot);
+        tvLiveStatusText = v.findViewById(R.id.tvLiveStatusText);
+        tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
 
-            // ✅ tvLiveStatus هو LinearLayout — نحفظه كـ View فقط
-            tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
+        // ✅ Toggle buttons (إخفاء/إظهار القيم)
+        btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
+        btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
 
-            if (btnRefreshGold != null) {
-                btnRefreshGold.setOnClickListener(v2 -> {
-                    if (!isGoldRefreshing.get()) {
-                        fetchLiveGoldPrices(true);
-                    }
-                });
-            }
-
-            if (cardGoldPrices != null && permissionManager != null
-                    && !permissionManager.canAccessFragment("GoldRates")) {
-                cardGoldPrices.setVisibility(View.GONE);
-            }
-
-            rvQuickActions = v.findViewById(R.id.rvQuickActions);
-            if (rvQuickActions != null) {
-                rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
-                rvQuickActions.setHasFixedSize(true);
-                quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
-                rvQuickActions.setAdapter(quickAdapter);
-            }
-
-            if (swipeRefresh != null) {
-                swipeRefresh.setOnRefreshListener(this::refreshAllData);
-            }
-
-            if (tvAlertAction != null) {
-                tvAlertAction.setOnClickListener(v2 -> {
-                    navigateToFragment(new MiraUHFReadTagFragment(), "Scan");
-                });
-            }
-            
-            // ✅ زر إخفاء/إظهار قيمة المخزون
-btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
-if (btnToggleHeroVisibility != null) {
-    btnToggleHeroVisibility.setOnClickListener(v -> toggleHeroVisibility());
-}
-
-// ✅ زر إخفاء/إظهار المبيعات
-btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
-if (btnToggleSalesVisibility != null) {
-    btnToggleSalesVisibility.setOnClickListener(v -> toggleSalesVisibility());
-}
-
-// ✅ تحميل حالة الإخفاء من SharedPreferences
-android.content.SharedPreferences privacyPrefs = 
-        requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE);
-isHeroHidden = privacyPrefs.getBoolean(KEY_HIDE_HERO, true);
-isSalesHidden = privacyPrefs.getBoolean(KEY_HIDE_SALES, true);
-
-// ✅ تطبيق الحالة الأولية
-applyHeroVisibility();
-applySalesVisibility();
-
-        } catch (Exception e) {
-            logNonFatal("initViews", e);
+        // ═══════════════════════════════════════
+        // Listeners
+        // ═══════════════════════════════════════
+        
+        if (btnRefreshGold != null) {
+            btnRefreshGold.setOnClickListener(v2 -> {
+                if (!isGoldRefreshing.get()) {
+                    fetchLiveGoldPrices(true);
+                }
+            });
         }
+
+        if (btnToggleHeroVisibility != null) {
+            btnToggleHeroVisibility.setOnClickListener(v2 -> toggleHeroVisibility());
+        }
+
+        if (btnToggleSalesVisibility != null) {
+            btnToggleSalesVisibility.setOnClickListener(v2 -> toggleSalesVisibility());
+        }
+
+        if (tvAlertAction != null) {
+            tvAlertAction.setOnClickListener(v2 -> {
+                navigateToFragment(new MiraUHFReadTagFragment(), "Scan");
+            });
+        }
+
+        if (cardGoldPrices != null && permissionManager != null
+                && !permissionManager.canAccessFragment("GoldRates")) {
+            cardGoldPrices.setVisibility(View.GONE);
+        }
+
+        // ═══════════════════════════════════════
+        // Quick Access RecyclerView
+        // ═══════════════════════════════════════
+        
+        rvQuickActions = v.findViewById(R.id.rvQuickActions);
+        if (rvQuickActions != null) {
+            rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
+            rvQuickActions.setHasFixedSize(true);
+            quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
+            rvQuickActions.setAdapter(quickAdapter);
+        }
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(this::refreshAllData);
+        }
+
+        // ═══════════════════════════════════════
+        // تحميل حالة الإخفاء
+        // ═══════════════════════════════════════
+        
+        android.content.SharedPreferences privacyPrefs =
+                requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE);
+        isHeroHidden = privacyPrefs.getBoolean(KEY_HIDE_HERO, true);
+        isSalesHidden = privacyPrefs.getBoolean(KEY_HIDE_SALES, true);
+
+        // ✅ تطبيق الحالة الأولية
+        applyHeroVisibility();
+        applySalesVisibility();
+
+        // ✅ تحديث أيقونات العين
+        if (btnToggleHeroVisibility != null) {
+            btnToggleHeroVisibility.setImageResource(
+                    isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
+        if (btnToggleSalesVisibility != null) {
+            btnToggleSalesVisibility.setImageResource(
+                    isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
+
+    } catch (Exception e) {
+        logNonFatal("initViews", e);
     }
+}
+
 
     private void updateHeader() {
-        try {
-            if (tvDate != null) {
-                SimpleDateFormat formatter = getDateFormatter();
-                tvDate.setText(formatter.format(new Date()));
-            }
-            if (tvOrgName != null && orgProfile != null) {
-                String orgName = orgProfile.getDisplayName();
-                tvOrgName.setText((orgName == null || orgName.isEmpty()) ? "MIRA" : orgName);
-            }
-            if (tvGreeting != null && sessionManager != null) {
-                String name = sessionManager.getDisplayName();
-                if (name == null || name.isEmpty()) name = sessionManager.getUsername();
-                if (name == null) name = isArabic ? "المستخدم" : "User";
-                tvGreeting.setText(isArabic ? "مرحباً، " + name : "Welcome, " + name);
-            }
-            if (tvLocation != null && branchesManager != null) {
-                tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
-            }
-        } catch (Exception e) {
-            logNonFatal("updateHeader", e);
-        }
-    }
+    // ✅ Greeting Card محذوف — المعلومة موجودة في الـ Toolbar
+    // لا شيء لفعله هنا
+}
 
     // ==================== ✅ Hero Balance ====================
 
