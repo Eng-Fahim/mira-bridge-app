@@ -33,6 +33,7 @@
             android:layout_height="100dp"
             android:layout_marginBottom="16dp"
             android:background="@drawable/shimmer_background" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="160dp"
@@ -140,7 +141,7 @@
                             tools:text="JEWELRY ID™" />
                     </LinearLayout>
 
-                    <!-- ✅ Status chip مع نقطة حية -->
+                    <!-- ✅ Status chip -->
                     <LinearLayout
                         android:id="@+id/tvLiveStatus"
                         android:layout_width="wrap_content"
@@ -171,7 +172,7 @@
                     </LinearLayout>
                 </RelativeLayout>
 
-                <!-- ==================== 2. HERO BALANCE CARD (جديد) ==================== -->
+                <!-- ==================== 2. HERO BALANCE CARD — مع زر العين ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
                     android:layout_width="match_parent"
@@ -188,6 +189,7 @@
                         android:orientation="vertical"
                         android:padding="20dp">
 
+                        <!-- Header: Label + Eye + Trend -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -205,6 +207,18 @@
                                 android:letterSpacing="0.05"
                                 tools:text="💰 إجمالي قيمة المخزون" />
 
+                            <!-- ✅ زر إظهار/إخفاء قيمة المخزون -->
+                            <ImageButton
+                                android:id="@+id/btnToggleHeroVisibility"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginEnd="6dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/toggle_visibility"
+                                android:padding="4dp"
+                                android:src="@drawable/ic_eye_off"
+                                app:tint="?attr/colorOnPrimaryContainer" />
+
                             <TextView
                                 android:id="@+id/tvHeroTrend"
                                 android:layout_width="wrap_content"
@@ -218,18 +232,21 @@
                                 tools:text="📈 +2.4%" />
                         </LinearLayout>
 
+                        <!-- القيمة (مخفية افتراضياً) -->
                         <TextView
                             android:id="@+id/tvHeroBalance"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="10dp"
+                            android:text="••••••••"
                             android:textColor="?attr/colorOnPrimaryContainer"
                             android:textSize="34sp"
                             android:textStyle="bold"
                             android:textDirection="ltr"
                             android:letterSpacing="-0.02"
-                            tools:text="$127,450.00" />
+                            tools:text="$81,647.51" />
 
+                        <!-- Subtitle: عدد + وزن -->
                         <TextView
                             android:id="@+id/tvHeroSubtitle"
                             android:layout_width="wrap_content"
@@ -238,7 +255,7 @@
                             android:textColor="?attr/colorOnPrimaryContainer"
                             android:textSize="11sp"
                             android:alpha="0.8"
-                            tools:text="👑 6 قطع ذهبية • 594.0g" />
+                            tools:text="👑 7 قطع ذهبية • 615.0g" />
 
                         <!-- Sparkline placeholder -->
                         <View
@@ -250,7 +267,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 3. ALERTS STRIP (جديد) ==================== -->
+                <!-- ==================== 3. ALERTS STRIP ==================== -->
                 <LinearLayout
                     android:id="@+id/alertsStrip"
                     android:layout_width="match_parent"
@@ -292,100 +309,7 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- ==================== 4. GREETING CARD ==================== -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/greetingCard"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    app:cardBackgroundColor="?attr/colorSurface"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="2dp"
-                    app:strokeColor="?attr/colorOutline"
-                    app:strokeWidth="1dp">
-
-                    <androidx.constraintlayout.widget.ConstraintLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="16dp">
-
-                        <TextClock
-                            android:id="@+id/tcLiveTime"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:format12Hour="hh:mm:ss a"
-                            android:format24Hour="HH:mm:ss"
-                            android:textColor="?attr/colorSecondary"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:textDirection="ltr"
-                            app:layout_constraintEnd_toEndOf="parent"
-                            app:layout_constraintTop_toTopOf="parent" />
-
-                        <TextView
-                            android:id="@+id/tvOrgName"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="8dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorPrimary"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            app:layout_constrainedWidth="true"
-                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toTopOf="parent"
-                            tools:text="البوعاني للمجوهرات" />
-
-                        <TextView
-                            android:id="@+id/tvGreeting"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:layout_marginEnd="8dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold"
-                            app:layout_constrainedWidth="true"
-                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/tvOrgName"
-                            tools:text="مرحباً، سلمان" />
-
-                        <TextView
-                            android:id="@+id/tvLocation"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:layout_marginEnd="8dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp"
-                            app:layout_constrainedWidth="true"
-                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/tvGreeting"
-                            tools:text="📍 فرع حده" />
-
-                        <TextView
-                            android:id="@+id/tvDate"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="10sp"
-                            app:layout_constraintEnd_toEndOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/tcLiveTime"
-                            tools:text="الجمعة، 21 أغسطس 2026" />
-
-                    </androidx.constraintlayout.widget.ConstraintLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- ==================== 5. INVENTORY METRICS ==================== -->
+                <!-- ==================== 4. INVENTORY METRICS ==================== -->
                 <LinearLayout
                     android:id="@+id/inventoryMetrics"
                     android:layout_width="match_parent"
@@ -395,6 +319,7 @@
                     android:baselineAligned="false"
                     android:weightSum="3">
 
+                    <!-- Total Items -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="88dp"
@@ -428,10 +353,11 @@
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
-                                tools:text="2" />
+                                tools:text="7" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
+                    <!-- Total Weight -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="88dp"
@@ -466,10 +392,11 @@
                                 android:textSize="18sp"
                                 android:textStyle="bold"
                                 android:textDirection="ltr"
-                                tools:text="32.3 g" />
+                                tools:text="615.0 g" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
+                    <!-- Sold Today -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="88dp"
@@ -503,12 +430,12 @@
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
-                                tools:text="0" />
+                                tools:text="1" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <!-- ==================== 6. GOLD PRICES ==================== -->
+                <!-- ==================== 5. GOLD PRICES ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGoldPrices"
                     android:layout_width="match_parent"
@@ -526,6 +453,7 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
+                        <!-- Header: Title + Refresh -->
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -567,6 +495,7 @@
                             </FrameLayout>
                         </RelativeLayout>
 
+                        <!-- Trend -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -592,6 +521,7 @@
                                 tools:text="-0.00%" />
                         </LinearLayout>
 
+                        <!-- Ounce Price -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -616,9 +546,10 @@
                                 android:textSize="22sp"
                                 android:textStyle="bold"
                                 android:textDirection="ltr"
-                                tools:text="$4,623.83" />
+                                tools:text="$4,282.33" />
                         </LinearLayout>
 
+                        <!-- Karat Prices -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -636,7 +567,7 @@
                                 android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:textDirection="ltr"
-                                tools:text="18K: $111.49/g" />
+                                tools:text="18K: $103.26/g" />
 
                             <TextView
                                 android:id="@+id/tvGoldPrice21"
@@ -648,7 +579,7 @@
                                 android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:textDirection="ltr"
-                                tools:text="21K: $130.08/g" />
+                                tools:text="21K: $120.47/g" />
 
                             <TextView
                                 android:id="@+id/tvGoldPrice24"
@@ -660,9 +591,10 @@
                                 android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:textDirection="ltr"
-                                tools:text="24K: $148.66/g" />
+                                tools:text="24K: $137.68/g" />
                         </LinearLayout>
 
+                        <!-- Footer -->
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -689,7 +621,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 7. QUICK ACCESS ==================== -->
+                <!-- ==================== 6. QUICK ACCESS ==================== -->
                 <TextView
                     android:id="@+id/quickAccessTitle"
                     android:layout_width="match_parent"
@@ -709,7 +641,7 @@
                     app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
                     app:spanCount="3" />
 
-                <!-- ==================== 8. SALES SUMMARY ==================== -->
+                <!-- ==================== 7. SALES SUMMARY — مع زر العين ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/salesSummaryCard"
                     android:layout_width="match_parent"
@@ -724,99 +656,141 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:paddingVertical="12dp"
-                        android:baselineAligned="false"
-                        android:weightSum="3">
+                        android:orientation="vertical"
+                        android:padding="14dp">
 
+                        <!-- ✅ Header: Title + Eye -->
                         <LinearLayout
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:orientation="vertical">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:text="@string/sales_today"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
-
-                            <TextView
-                                android:id="@+id/tvSalesToday"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
+                                android:layout_weight="1"
+                                android:text="@string/sales_summary"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
-                                tools:text="0" />
+                                tools:text="📈 ملخص المبيعات" />
+
+                            <!-- ✅ زر إظهار/إخفاء المبيعات -->
+                            <ImageButton
+                                android:id="@+id/btnToggleSalesVisibility"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/toggle_visibility"
+                                android:padding="4dp"
+                                android:src="@drawable/ic_eye_off"
+                                app:tint="?attr/colorPrimary" />
                         </LinearLayout>
 
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="match_parent"
-                            android:background="?attr/colorOutline" />
-
+                        <!-- 3 خانات أفقية -->
                         <LinearLayout
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:orientation="vertical">
+                            android:layout_marginTop="10dp"
+                            android:baselineAligned="false"
+                            android:orientation="horizontal"
+                            android:weightSum="3">
 
-                            <TextView
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:text="@string/sales_month"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/tvSalesMonth"
-                                android:layout_width="wrap_content"
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/sales_today"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="10sp" />
+
+                                <TextView
+                                    android:id="@+id/tvSalesToday"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="••••••"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold"
+                                    tools:text="3,798,900 YER" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="match_parent"
+                                android:background="?attr/colorOutlineVariant"
+                                android:alpha="0.5" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="13sp"
-                                android:textStyle="bold"
-                                tools:text="0" />
-                        </LinearLayout>
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
 
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="match_parent"
-                            android:background="?attr/colorOutline" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/sales_month"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="10sp" />
 
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:orientation="vertical">
+                                <TextView
+                                    android:id="@+id/tvSalesMonth"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="••••••"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold"
+                                    tools:text="3,798,900 YER" />
+                            </LinearLayout>
 
-                            <TextView
-                                android:layout_width="wrap_content"
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="match_parent"
+                                android:background="?attr/colorOutlineVariant"
+                                android:alpha="0.5" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:text="@string/sales_year"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/tvSalesYear"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="13sp"
-                                android:textStyle="bold"
-                                tools:text="0" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/sales_year"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="10sp" />
+
+                                <TextView
+                                    android:id="@+id/tvSalesYear"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="••••••"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold"
+                                    tools:text="3,798,900 YER" />
+                            </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 9. FIELD OPERATIONS ==================== -->
+                <!-- ==================== 8. FIELD OPERATIONS ==================== -->
                 <TextView
                     android:id="@+id/fieldOpsTitle"
                     android:layout_width="match_parent"
