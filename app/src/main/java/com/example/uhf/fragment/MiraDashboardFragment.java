@@ -80,7 +80,7 @@ private static final String KEY_HIDE_SALES = "hide_sales_value";
 private boolean isHeroHidden = true;   // ✅ مخفي افتراضياً
 private boolean isSalesHidden = true;  // ✅ مخفي افتراضياً
     // UI Elements
-    private TextView, tvLiveStatus;
+    private TextView tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
     private TextView tvKarat24, tvKarat21, tvKarat18;
