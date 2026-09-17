@@ -55,6 +55,14 @@ import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
 import com.example.uhf.manager.SecondaryToolbarManager;
 
+
+import androidx.lifecycle.ProcessLifecycleOwner;
+import com.example.uhf.application.AppLifecycleObserver;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import java.util.concurrent.Executor;
+
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -138,7 +146,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
-
+    private static final long INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 دقيقة
+    
+    private AppLifecycleObserver appLifecycleObserver;
 
     public interface OnRfidScannedListener {
         void onRfidScanned(String epc);
@@ -293,6 +303,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
                 navigationManager.loadFragmentDirectly(savedFragment, savedTag);
             }
+            
+            // ✅ تسجيل AppLifecycleObserver (Process-Level)
+try {
+    if (sessionManager != null) {
+        appLifecycleObserver = new AppLifecycleObserver(sessionManager);
+        ProcessLifecycleOwner.get().getLifecycle().addObserver(appLifecycleObserver);
+    }
+} catch (Exception e) {
+    Log.e(TAG, "AppLifecycleObserver init error: " + e.getMessage());
+}
 
             // ✅ 5) مزامنة الواجهة مع NavigationManager
             syncUIWithNavigation();
@@ -626,33 +646,202 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        loadingCounter = 0;
-        forceHideLoadingImmediate();
+public void onResume() {
+    super.onResume();
+    loadingCounter = 0;
+    forceHideLoadingImmediate();
 
-        updateToolbarTitle();
-        if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
-
-        // ✅ مزامنة الواجهة (لأن FragmentManager قد استعاد حالة سابقة)
-        syncUIWithNavigation();
+    // ✅ 1. فحص Auto-Lock أولاً
+    if (!checkAutoLock()) {
+        return;  // تم عرض شاشة القفل
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        forceHideLoadingImmediate();
-        AppWatchdog.getInstance().stopMonitoring();
-        if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
+    updateToolbarTitle();
+    if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
 
-        try {
-            if (hardwareManager != null) {
-                hardwareManager.stopScan();
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Error stopping scan in onPause: " + e.getMessage());
+    // ✅ مزامنة الواجهة
+    syncUIWithNavigation();
+}
+
+/**
+ * ✅ فحص Auto-Lock
+ * @return true إذا كان التطبيق جاهزاً، false إذا تم عرض شاشة القفل
+ */
+private boolean checkAutoLock() {
+    try {
+        if (sessionManager == null) return true;
+        if (!sessionManager.isLoggedIn()) return true;
+
+        // إذا كانت الجلسة مقفلة أو انتهت المهلة
+        if (sessionManager.isSessionLocked()
+                || sessionManager.isInactivityTimeout(INACTIVITY_TIMEOUT_MS)) {
+
+            Log.d(TAG, "🔒 Auto-Lock triggered");
+            sessionManager.setSessionLocked(true);
+
+            // عرض شاشة القفل بعد تأخير بسيط (لضمان استقرار النشاط)
+            mainHandler.postDelayed(this::showAutoLockDialog, 300);
+            return false;
         }
+
+        // تحديث "آخر نشاط"
+        sessionManager.touchActivity();
+        return true;
+    } catch (Exception e) {
+        Log.e(TAG, "checkAutoLock error: " + e.getMessage());
+        return true;
     }
+}
+
+/**
+ * ✅ حوار القفل مع خيارين: بصمة / logout
+ */
+private void showAutoLockDialog() {
+    if (isFinishing() || isDestroyed()) return;
+    if (!isActivityAlive()) return;
+
+    try {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "🔒 الجلسة مقفلة" : "🔒 Session Locked")
+                .setMessage(isArabic
+                        ? "التطبيق كان في الخلفية لأكثر من 15 دقيقة.\n\nاستخدم بصمة الإصبع للمتابعة."
+                        : "App was in background for over 15 minutes.\n\nUse fingerprint to continue.")
+                .setPositiveButton(isArabic ? "🔓 فتح بالبصمة" : "🔓 Unlock",
+                        (dialog, which) -> {
+                            dialog.dismiss();
+                            triggerBiometricUnlock();
+                        })
+                .setNegativeButton(isArabic ? "تسجيل الخروج" : "Logout",
+                        (dialog, which) -> {
+                            dialog.dismiss();
+                            performFullLogout();
+                        })
+                .setCancelable(false)
+                .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showAutoLockDialog error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ Biometric Unlock
+ */
+private void triggerBiometricUnlock() {
+    try {
+        // التحقق من توفر البصمة
+        BiometricManager bm = BiometricManager.from(this);
+        int canAuth = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+
+        if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
+            Log.w(TAG, "Biometric not available, using password");
+            performFullLogout();
+            return;
+        }
+
+        Executor executor = ContextCompat.getMainExecutor(this);
+
+        BiometricPrompt prompt = new BiometricPrompt(this, executor,
+                new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(
+                            @NonNull BiometricPrompt.AuthenticationResult result) {
+                        Log.d(TAG, "✅ Biometric unlock success");
+                        sessionManager.unlockSession();
+                        Toast.makeText(UHFMainActivity.this,
+                                isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
+                                Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int code, @NonNull CharSequence msg) {
+                        Log.e(TAG, "Biometric error: " + code + " - " + msg);
+                        // إذا ألغى المستخدم → logout
+                        if (code == BiometricPrompt.ERROR_USER_CANCELED
+                                || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                                || code == BiometricPrompt.ERROR_CANCELED) {
+                            performFullLogout();
+                        }
+                    }
+
+                    @Override
+                    public void onAuthenticationFailed() {
+                        Log.w(TAG, "Biometric failed");
+                        Toast.makeText(UHFMainActivity.this,
+                                isArabic ? "❌ لم يتم التعرف على البصمة" : "❌ Fingerprint not recognized",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+        BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle(isArabic ? "فتح القفل" : "Unlock")
+                .setSubtitle(isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint")
+                .setNegativeButtonText(isArabic ? "تسجيل الخروج" : "Logout")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .build();
+
+        prompt.authenticate(info);
+
+    } catch (Exception e) {
+        Log.e(TAG, "triggerBiometricUnlock error: " + e.getMessage(), e);
+        performFullLogout();
+    }
+}
+
+/**
+ * ✅ Logout كامل
+ */
+private void performFullLogout() {
+    try {
+        if (sessionManager != null) {
+            sessionManager.logoutUser();
+        }
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra("session_expired", true);
+        startActivity(intent);
+        finish();
+    } catch (Exception e) {
+        Log.e(TAG, "performFullLogout error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ مساعد للتحقق من صحة النشاط
+ */
+private boolean isActivityAlive() {
+    return !isFinishing() && !isDestroyed();
+}
+
+@Override
+public void onUserInteraction() {
+    super.onUserInteraction();
+    // ✅ أي تفاعل = نشاط
+    if (sessionManager != null) {
+        sessionManager.touchActivity();
+    }
+}
+    
+    @Override
+public void onPause() {
+    super.onPause();
+
+    // ✅ حفظ آخر نشاط
+    if (sessionManager != null) {
+        sessionManager.touchActivity();
+    }
+
+    forceHideLoadingImmediate();
+    AppWatchdog.getInstance().stopMonitoring();
+    if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
+
+    try {
+        if (hardwareManager != null) {
+            hardwareManager.stopScan();
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "Error stopping scan in onPause: " + e.getMessage());
+    }
+}
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -1961,9 +2150,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ==================== التنظيف والتدمير ====================
 
+
+
     @Override
     protected void onDestroy() {
         try {
+        // ✅ إزالة AppLifecycleObserver
+        if (appLifecycleObserver != null) {
+            ProcessLifecycleOwner.get().getLifecycle()
+                    .removeObserver(appLifecycleObserver);
+            appLifecycleObserver = null;
+        }
             if (notificationManager != null) notificationManager.cleanup();
             if (soundManager != null) soundManager.cleanup();
             if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
@@ -2022,4 +2219,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-}
+                        }
