@@ -98,9 +98,8 @@
         <item name="colorOutlineVariant">#D2C7B6</item>
 
         <!-- 💫 Tint & Scrim -->
-        <item name="colorSurfaceTint">#B8860B</item>
+        <item name="android:colorControlActivated">#1AB8860B</item>
         <item name="android:colorControlHighlight">#14B8860B</item>
-        <item name="colorScrim">#000000</item>
 
         <!-- ═══════════════════════════════════════════════════
              🔗 عناصر الواجهة الموحّدة
