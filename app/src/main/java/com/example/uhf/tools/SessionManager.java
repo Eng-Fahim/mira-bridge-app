@@ -339,6 +339,42 @@ public void setBranchId(int branchId) {
     public void clearSessionCompletely() {
         secureManager.clearSessionCompletely();
     }
+    
+    // ═══════════════════════════════════════════════════════
+// ✅ Auto-Lock Wrappers
+// ═══════════════════════════════════════════════════════
+
+public void setLastAppActiveTime(long timestamp) {
+    secureManager.setLastAppActiveTime(timestamp);
+}
+
+public long getLastAppActiveTime() {
+    return secureManager.getLastAppActiveTime();
+}
+
+public void touchActivity() {
+    secureManager.touchActivity();
+}
+
+public void setSessionLocked(boolean locked) {
+    secureManager.setSessionLocked(locked);
+}
+
+public boolean isSessionLocked() {
+    return secureManager.isSessionLocked();
+}
+
+public boolean isInactivityTimeout(long timeoutMs) {
+    return secureManager.isInactivityTimeout(timeoutMs);
+}
+
+public void unlockSession() {
+    secureManager.unlockSession();
+}
+
+public void resetAutoLock() {
+    secureManager.resetAutoLock();
+}
 
     // ==================== إنشاء جلسة دخول ====================
 
