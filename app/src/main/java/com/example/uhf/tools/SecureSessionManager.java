@@ -406,6 +406,59 @@ public class SecureSessionManager {
                 Role.GATE_SECURITY.name().equals(role);
     }
     
+    
+    // ═══════════════════════════════════════════════════════
+// ✅ الحقول الإضافية للمستخدم (Email, Phone, Username)
+// ═══════════════════════════════════════════════════════
+
+private static final String KEY_USER_EMAIL = "user_email";
+private static final String KEY_USER_PHONE = "user_phone";
+
+/**
+ * ✅ الحصول على البريد الإلكتروني
+ */
+public String getEmail() {
+    return userPrefs.getString(KEY_USER_EMAIL, "");
+}
+
+/**
+ * ✅ حفظ البريد الإلكتروني
+ */
+public void setEmail(String email) {
+    if (email != null) {
+        userPrefs.edit().putString(KEY_USER_EMAIL, email).apply();
+    }
+}
+
+/**
+ * ✅ الحصول على رقم الهاتف
+ */
+public String getPhone() {
+    return userPrefs.getString(KEY_USER_PHONE, "");
+}
+
+/**
+ * ✅ حفظ رقم الهاتف
+ */
+public void setPhone(String phone) {
+    if (phone != null) {
+        userPrefs.edit().putString(KEY_USER_PHONE, phone).apply();
+    }
+}
+
+/**
+ * ✅ حفظ اسم المستخدم (Username)
+ * ملاحظة: يختلف عن getUsername() الذي يقرأ من KEY_USERNAME
+ */
+public void setUsername(String username) {
+    if (username != null && !username.isEmpty()) {
+        userPrefs.edit().putString(KEY_USERNAME, username).apply();
+        // ✅ تحديث التخزين المؤقت
+        cachedUsername = username;
+        usernameCacheTime = System.currentTimeMillis();
+    }
+}
+    
     // ==================== إدارة عنوان الخادم ====================
     
     public String getServerUrl() {
