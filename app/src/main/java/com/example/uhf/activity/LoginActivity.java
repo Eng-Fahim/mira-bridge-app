@@ -4,12 +4,6 @@ import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-// احذف:
-// import android.media.AudioManager;
-// import android.media.ToneGenerator;
-
-// أضف:
-import com.example.uhf.MiraRfid.sound.MiraSoundManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -44,6 +38,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.MiraRfid.sound.MiraSoundManager;
 import com.example.uhf.tools.MemoryManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
@@ -54,7 +49,6 @@ import com.google.android.material.textview.MaterialTextView;
 
 import org.json.JSONObject;
 
-import java.io.File;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
@@ -90,10 +84,10 @@ public class LoginActivity extends AppCompatActivity {
     private View loadingContainer, loginCard, logoContainer, successOverlay;
 
     private SessionManager sessionManager;
-private MiraApiClient apiClient;
-private MiraOrgProfileManager orgProfileManager;
-private MiraSoundManager soundManager;   
-private MiraOrgProfileManager.OnProfileChangedListener profileListener;
+    private MiraApiClient apiClient;
+    private MiraOrgProfileManager orgProfileManager;
+    private MiraSoundManager soundManager;
+    private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     private BiometricPrompt biometricPrompt;
     private BiometricPrompt.PromptInfo promptInfo;
 
@@ -130,7 +124,8 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
         isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
 
         sessionManager = new SessionManager(getApplicationContext());
-        soundManager = MiraSoundManager.getInstance(getApplicationContext());  // ✅ أُضيف
+        soundManager = MiraSoundManager.getInstance(getApplicationContext());
+
         // 3. التحقق المباشر من الجلسة
         if (sessionManager.isLoggedIn()) {
             if (sessionManager.hasValidToken()) {
@@ -143,13 +138,12 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
 
         // 4. معالجة انتهاء الجلسة إن وجدت
         if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
-    Toast.makeText(this,
-            isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again",
-            Toast.LENGTH_LONG).show();
-    // ✅ صوت تسجيل الخروج
-    if (soundManager != null) {
-        soundManager.play(MiraSoundManager.SoundEvent.LOGOUT);
-    }
+            Toast.makeText(this,
+                    isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again",
+                    Toast.LENGTH_LONG).show();
+            if (soundManager != null) {
+                soundManager.play(MiraSoundManager.SoundEvent.LOGOUT);
+            }
         }
 
         orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
@@ -160,10 +154,10 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
         setupServerConfigToggle();
         setupLanguageToggle();
 
-        // 6. تهيئة التشفير في الخلفية، ثم تشغيل الميزات التراكمية عند الانتهاء
+        // 6. تهيئة التشفير في الخلفية
         initializeEncryption();
 
-        // 7. تحريك الواجهة وتحميل البيانات الأوفلاين والسحابية
+        // 7. تحريك الواجهة وتحميل البيانات
         animateEntrance();
         setupProfileListener();
 
@@ -217,7 +211,6 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
                 encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
             }
 
-            // تحديث حالة الحظر والبصمة بأمان بعد اكتمال تهيئة التشفير
             mainHandler.post(() -> {
                 if (isActivityAlive()) {
                     checkLockoutStatus();
@@ -683,6 +676,11 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
         Log.d(TAG, "Login Success for user: " + username);
         playTone(true);
 
+        // ✅ تصفير Auto-Lock بعد login ناجح
+        if (sessionManager != null) {
+            sessionManager.resetAutoLock();
+        }
+
         Context appContext = getApplicationContext();
 
         String token = response.optString("token", "");
@@ -782,6 +780,9 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
                                 bm.setUserBranchLocked(true);
                             }
                         }
+
+                        // ✅ تصفير Auto-Lock بعد biometric login ناجح
+                        sessionManager.resetAutoLock();
 
                         resetFailedAttempts();
                         playTone(true);
@@ -883,6 +884,10 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
                     bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
                     bm.setUserBranchLocked(true);
                 }
+
+                // ✅ تصفير Auto-Lock بعد offline login ناجح
+                sessionManager.resetAutoLock();
+
                 return true;
             }
             return false;
@@ -912,16 +917,16 @@ private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     }
 
     /**
- * ✅ Wrapper حول MiraSoundManager
- *    isSuccess=true  → LOGIN_SUCCESS
- *    isSuccess=false → LOGIN_FAILED
- */
-private void playTone(boolean isSuccess) {
-    if (soundManager == null) return;
-    soundManager.play(isSuccess
-            ? MiraSoundManager.SoundEvent.LOGIN_SUCCESS
-            : MiraSoundManager.SoundEvent.LOGIN_FAILED);
-}
+     * ✅ Wrapper حول MiraSoundManager
+     *    isSuccess=true  → LOGIN_SUCCESS
+     *    isSuccess=false → LOGIN_FAILED
+     */
+    private void playTone(boolean isSuccess) {
+        if (soundManager == null) return;
+        soundManager.play(isSuccess
+                ? MiraSoundManager.SoundEvent.LOGIN_SUCCESS
+                : MiraSoundManager.SoundEvent.LOGIN_FAILED);
+    }
 
     private String getErrorMessage(int errorCode, String fallbackMessage) {
         switch (errorCode) {
