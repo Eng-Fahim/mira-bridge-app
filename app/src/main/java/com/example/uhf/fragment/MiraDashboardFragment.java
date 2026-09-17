@@ -14,7 +14,7 @@ import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import android.widget.ImageButton;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
@@ -61,7 +61,24 @@ public class MiraDashboardFragment extends Fragment {
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
+    
+    private JSONObject lastSalesData = null;
+    
+    // ═══════════════════════════════════════════════════════
+// ✅ إخفاء/إظهار القيم الحساسة
+// ═══════════════════════════════════════════════════════
+private ImageButton btnToggleHeroVisibility;
+private ImageButton btnToggleSalesVisibility;
 
+// ═══════════════════════════════════════════════════════
+// ✅ SharedPreferences لحفظ حالة الإخفاء
+// ═══════════════════════════════════════════════════════
+private static final String PREFS_PRIVACY = "mira_dashboard_privacy";
+private static final String KEY_HIDE_HERO = "hide_hero_value";
+private static final String KEY_HIDE_SALES = "hide_sales_value";
+
+private boolean isHeroHidden = true;   // ✅ مخفي افتراضياً
+private boolean isSalesHidden = true;  // ✅ مخفي افتراضياً
     // UI Elements
     private TextView tvOrgName, tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
@@ -326,29 +343,28 @@ public class MiraDashboardFragment extends Fragment {
                 });
             }
             
-            // ═══════════════════════════════════════════════════════
-// 🧪 TEST: عرض حالة كل view على الشاشة مباشرة
-// احذف هذا القسم بعد التشخيص
-// ═══════════════════════════════════════════════════════
-
-StringBuilder diag = new StringBuilder();
-diag.append("🔍 فحص views:\n");
-diag.append("HeroBalance: ").append(tvHeroBalance != null ? "✅" : "❌ NULL").append("\n");
-diag.append("HeroSubtitle: ").append(tvHeroSubtitle != null ? "✅" : "❌ NULL").append("\n");
-diag.append("HeroTrend: ").append(tvHeroTrend != null ? "✅" : "❌ NULL").append("\n");
-diag.append("TotalItems: ").append(tvTotalItems != null ? "✅" : "❌ NULL").append("\n");
-diag.append("TotalWeight: ").append(tvTotalWeight != null ? "✅" : "❌ NULL").append("\n");
-diag.append("SoldToday: ").append(tvSoldToday != null ? "✅" : "❌ NULL").append("\n");
-diag.append("Karat24: ").append(tvKarat24 != null ? "✅" : "❌ NULL").append("\n");
-diag.append("OuncePrice: ").append(tvOuncePrice != null ? "✅" : "❌ NULL").append("\n");
-diag.append("SalesToday: ").append(tvSalesToday != null ? "✅" : "❌ NULL").append("\n");
-
-// ✅ عرض التشخيص في tvHeroBalance نفسه
-if (tvHeroBalance != null) {
-    tvHeroBalance.setTextSize(10);
-    tvHeroBalance.setText("🔍 VIEWS CHECK:\n" + diag.toString());
-    tvHeroBalance.setTextColor(0xFFFF0000); // أحمر
+            // ✅ زر إخفاء/إظهار قيمة المخزون
+btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
+if (btnToggleHeroVisibility != null) {
+    btnToggleHeroVisibility.setOnClickListener(v -> toggleHeroVisibility());
 }
+
+// ✅ زر إخفاء/إظهار المبيعات
+btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
+if (btnToggleSalesVisibility != null) {
+    btnToggleSalesVisibility.setOnClickListener(v -> toggleSalesVisibility());
+}
+
+// ✅ تحميل حالة الإخفاء من SharedPreferences
+android.content.SharedPreferences privacyPrefs = 
+        requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE);
+isHeroHidden = privacyPrefs.getBoolean(KEY_HIDE_HERO, true);
+isSalesHidden = privacyPrefs.getBoolean(KEY_HIDE_SALES, true);
+
+// ✅ تطبيق الحالة الأولية
+applyHeroVisibility();
+applySalesVisibility();
+
         } catch (Exception e) {
             logNonFatal("initViews", e);
         }
@@ -381,33 +397,136 @@ if (tvHeroBalance != null) {
     // ==================== ✅ Hero Balance ====================
 
     private void updateHeroBalance() {
-        try {
-            if (tvHeroBalance == null) return;
+    try {
+        if (tvHeroBalance == null) return;
 
-            double totalValue = currentInventoryValue;
-            int itemCount = currentItemCount;
-            double totalWeight = currentTotalWeight;
+        double totalValue = currentInventoryValue;
+        int itemCount = currentItemCount;
+        double totalWeight = currentTotalWeight;
 
-            // ✅ إذا القيمة صفر → احسب من سعر الذهب الحالي
-            if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
-                double price24 = priceManager.getGoldPricePerGram(24);
-                if (price24 > 0) {
-                    totalValue = totalWeight * price24;
-                    Log.d(TAG, "Hero Balance calculated: " + totalWeight 
-                            + "g × $" + price24 + " = $" + totalValue);
-                }
+        // ✅ حساب من سعر الذهب إذا القيمة صفر
+        if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+            double price24 = priceManager.getGoldPricePerGram(24);
+            if (price24 > 0) {
+                totalValue = totalWeight * price24;
+                Log.d(TAG, "Hero Balance calculated: " + totalWeight 
+                        + "g × $" + price24 + " = $" + totalValue);
             }
+        }
 
+        // ✅ عرض القيمة — مع الإخفاء
+        if (isHeroHidden) {
+            tvHeroBalance.setText("••••••••");
+        } else {
             tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+        }
 
-            if (tvHeroSubtitle != null) {
-                tvHeroSubtitle.setText(String.format(
-                        "👑 %d قطعة • %.1fg", itemCount, totalWeight));
+        // ✅ Subtitle يظهر دائماً (عدد + وزن — ليس حساس)
+        if (tvHeroSubtitle != null) {
+            tvHeroSubtitle.setText(String.format(
+                    "👑 %d قطعة • %.1fg", itemCount, totalWeight));
+        }
+    } catch (Exception e) {
+        logNonFatal("updateHeroBalance", e);
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════
+// ✅ إخفاء/إظهار قيمة المخزون
+// ═══════════════════════════════════════════════════════
+
+private void toggleHeroVisibility() {
+if (!isAdded()) return;
+    isHeroHidden = !isHeroHidden;
+    
+    // حفظ في SharedPreferences
+    requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_HIDE_HERO, isHeroHidden).apply();
+    
+    // تحديث الزر
+    btnToggleHeroVisibility.setImageResource(
+            isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+    
+    // تحديث القيمة
+    applyHeroVisibility();
+    
+}
+
+private void applyHeroVisibility() {
+    if (tvHeroBalance == null) return;
+    
+    if (isHeroHidden) {
+        tvHeroBalance.setText("••••••••");
+        tvHeroBalance.setTextSize(34);
+    } else {
+        // استعادة القيمة الفعلية
+        double totalValue = currentInventoryValue;
+        if (totalValue <= 0 && priceManager != null && currentTotalWeight > 0) {
+            double price24 = priceManager.getGoldPricePerGram(24);
+            if (price24 > 0) {
+                totalValue = currentTotalWeight * price24;
             }
-        } catch (Exception e) {
-            logNonFatal("updateHeroBalance", e);
+        }
+        tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+        tvHeroBalance.setTextSize(34);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// ✅ إخفاء/إظهار المبيعات
+// ═══════════════════════════════════════════════════════
+private void toggleSalesVisibility() {
+if (!isAdded()) return;
+    isSalesHidden = !isSalesHidden;
+    
+    requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_HIDE_SALES, isSalesHidden).apply();
+    
+    btnToggleSalesVisibility.setImageResource(
+            isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+    
+    applySalesVisibility();
+    
+    
+}
+
+private void applySalesVisibility() {
+    // ⚠️ إذا كان مخفياً → نعرض ••••••
+    // ⚠️ إذا كان ظاهراً → نعرض القيم الفعلية
+    
+    if (isSalesHidden) {
+        setText(tvSalesToday, "••••••");
+        setText(tvSalesMonth, "••••••");
+        setText(tvSalesYear, "••••••");
+    } else {
+        // القيم ستُحدَّث من processData في المرة القادمة
+        // أو نستدعيها يدوياً
+        if (lastSalesData != null) {
+            applySalesData(lastSalesData);
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════
+// ✅ حفظ آخر بيانات المبيعات لاستخدامها عند الإظهار
+// ═══════════════════════════════════════════════════════
+
+
+private void applySalesData(JSONObject sales) {
+    if (sales == null || tvSalesToday == null) return;
+    
+    if (isSalesHidden) {
+        setText(tvSalesToday, "••••••");
+        setText(tvSalesMonth, "••••••");
+        setText(tvSalesYear, "••••••");
+        return;
+    }
+    
+    setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
+    setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
+    setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
+}
 
     // ==================== ✅ Alerts ====================
 
@@ -1062,33 +1181,36 @@ private List<MiraQuickAccessSettings.QuickAction> getDefaultQuickActions() {
     }
 
     private void processData(JSONObject data) {
-        try {
-            JSONObject inv = data.optJSONObject("inventory");
-            if (inv != null) {
-                int itemCount = inv.optInt("total_items", 0);
-                double weight = inv.optDouble("total_weight", 0.0);
-                double value = inv.optDouble("total_value", 0.0);
+    try {
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv != null) {
+            int itemCount = inv.optInt("total_items", 0);
+            double weight = inv.optDouble("total_weight", 0.0);
+            double value = inv.optDouble("total_value", 0.0);
 
-                setText(tvTotalItems, String.valueOf(itemCount));
-                setText(tvTotalWeight, formatWeight(weight));
+            setText(tvTotalItems, String.valueOf(itemCount));
+            setText(tvTotalWeight, formatWeight(weight));
 
-                currentItemCount = itemCount;
-                currentTotalWeight = weight;
-                currentInventoryValue = value;
-                updateHeroBalance();
-            }
-
-            JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) {
-                setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
-                setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
-                setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
-                setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
-            }
-        } catch (Exception e) {
-            logNonFatal("processData", e);
+            currentItemCount = itemCount;
+            currentTotalWeight = weight;
+            currentInventoryValue = value;
+            updateHeroBalance();
         }
+
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales != null) {
+            // ✅ حفظ للاستخدام لاحقاً
+            lastSalesData = sales;
+            
+            setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
+            
+            // ✅ المبيعات المالية — تخضع للإخفاء
+            applySalesData(sales);
+        }
+    } catch (Exception e) {
+        logNonFatal("processData", e);
     }
+}
 
     private void setupListeners() {
         try {
