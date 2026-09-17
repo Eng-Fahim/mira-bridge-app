@@ -117,6 +117,11 @@ dependencies {
     implementation 'androidx.gridlayout:gridlayout:1.0.0'
     implementation 'androidx.preference:preference:1.2.1'
     
+    // ✅ Lifecycle (لـ AppLifecycleObserver + ProcessLifecycleOwner)
+    implementation "androidx.lifecycle:lifecycle-process:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-common-java8:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-runtime:2.7.0"
+    
     implementation 'androidx.biometric:biometric:1.1.0'
     
     // Local Libraries
@@ -140,10 +145,10 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
     
-    // Barcode Scanning & Embedded (تم إزالة التكرار لـ zxing:core وتضمينه ضمن zxing-android-embedded)
+    // Barcode Scanning
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     
-    // Barcode Scanning (MLKit الخفيف لمسح الأكواد عبر الكاميرا)
+    // Barcode Scanning (MLKit)
     implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     
     // Charts
