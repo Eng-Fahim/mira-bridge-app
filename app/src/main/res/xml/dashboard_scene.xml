@@ -2,55 +2,68 @@
 <MotionScene xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:motion="http://schemas.android.com/apk/res-auto">
 
-    <!-- الانتقال وانسيابية ظهور العناصر -->
+    <!-- ✅ انتقال واحد: دخول لطيف من الأسفل للأعلى، يعمل تلقائياً مرة واحدة -->
     <Transition
         motion:constraintSetStart="@+id/start"
         motion:constraintSetEnd="@+id/end"
-        motion:duration="600">
+        motion:duration="500"
+        motion:autoTransition="animateToEnd">
 
         <KeyFrameSet>
+            <!-- ✅ Hero Balance Card -->
             <KeyAttribute
-                motion:motionTarget="@+id/greetingCard"
+                motion:motionTarget="@+id/heroBalanceCard"
+                motion:framePosition="0"
+                android:alpha="0"
+                android:translationY="30dp" />
+            <KeyAttribute
+                motion:motionTarget="@+id/heroBalanceCard"
+                motion:framePosition="100"
+                android:alpha="1"
+                android:translationY="0dp" />
+
+            <!-- ✅ Alerts Strip (يظهر فقط إذا كان مرئياً) -->
+            <KeyAttribute
+                motion:motionTarget="@+id/alertsStrip"
+                motion:framePosition="0"
+                android:alpha="0"
+                android:translationY="20dp" />
+            <KeyAttribute
+                motion:motionTarget="@+id/alertsStrip"
+                motion:framePosition="100"
+                android:alpha="1"
+                android:translationY="0dp" />
+
+            <!-- ✅ Inventory Metrics -->
+            <KeyAttribute
+                motion:motionTarget="@+id/inventoryMetrics"
                 motion:framePosition="0"
                 android:alpha="0"
                 android:translationY="40dp" />
-
-            <KeyAttribute
-                motion:motionTarget="@+id/greetingCard"
-                motion:framePosition="100"
-                android:alpha="1"
-                android:translationY="0dp" />
-
-            <KeyAttribute
-                motion:motionTarget="@+id/inventoryMetrics"
-                motion:framePosition="0"
-                android:alpha="0"
-                android:translationY="60dp" />
-
             <KeyAttribute
                 motion:motionTarget="@+id/inventoryMetrics"
                 motion:framePosition="100"
                 android:alpha="1"
                 android:translationY="0dp" />
 
+            <!-- ✅ Gold Prices Card -->
             <KeyAttribute
                 motion:motionTarget="@+id/cardGoldPrices"
                 motion:framePosition="0"
                 android:alpha="0"
-                android:translationY="80dp" />
-
+                android:translationY="50dp" />
             <KeyAttribute
                 motion:motionTarget="@+id/cardGoldPrices"
                 motion:framePosition="100"
                 android:alpha="1"
                 android:translationY="0dp" />
 
+            <!-- ✅ Sales Summary Card -->
             <KeyAttribute
                 motion:motionTarget="@+id/salesSummaryCard"
                 motion:framePosition="0"
                 android:alpha="0"
-                android:translationY="100dp" />
-
+                android:translationY="60dp" />
             <KeyAttribute
                 motion:motionTarget="@+id/salesSummaryCard"
                 motion:framePosition="100"
@@ -59,7 +72,10 @@
         </KeyFrameSet>
     </Transition>
 
+    <!-- ✅ حالة البداية: العناصر مخفية ومزاحة للأسفل -->
     <ConstraintSet android:id="@+id/start">
+
+        <!-- Shimmer Layout -->
         <Constraint
             android:id="@+id/shimmerLayout"
             android:layout_width="0dp"
@@ -69,9 +85,77 @@
             motion:layout_constraintEnd_toEndOf="parent"
             motion:layout_constraintStart_toStartOf="parent"
             motion:layout_constraintTop_toTopOf="parent" />
+
+        <!-- SwipeRefresh (الحاوية الرئيسية) -->
+        <Constraint
+            android:id="@+id/swipeRefresh"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            motion:layout_constraintBottom_toBottomOf="parent"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Hero Balance Card -->
+        <Constraint
+            android:id="@+id/heroBalanceCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="0"
+            android:translationY="30dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Alerts Strip -->
+        <Constraint
+            android:id="@+id/alertsStrip"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="0"
+            android:translationY="20dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/heroBalanceCard" />
+
+        <!-- Inventory Metrics -->
+        <Constraint
+            android:id="@+id/inventoryMetrics"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="0"
+            android:translationY="40dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/alertsStrip" />
+
+        <!-- Gold Prices Card -->
+        <Constraint
+            android:id="@+id/cardGoldPrices"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="0"
+            android:translationY="50dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/inventoryMetrics" />
+
+        <!-- Sales Summary Card -->
+        <Constraint
+            android:id="@+id/salesSummaryCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="0"
+            android:translationY="60dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/cardGoldPrices" />
     </ConstraintSet>
 
+    <!-- ✅ حالة النهاية: العناصر ظاهرة وفي موضعها الطبيعي -->
     <ConstraintSet android:id="@+id/end">
+
+        <!-- Shimmer Layout -->
         <Constraint
             android:id="@+id/shimmerLayout"
             android:layout_width="0dp"
@@ -81,5 +165,71 @@
             motion:layout_constraintEnd_toEndOf="parent"
             motion:layout_constraintStart_toStartOf="parent"
             motion:layout_constraintTop_toTopOf="parent" />
+
+        <!-- SwipeRefresh (الحاوية الرئيسية) -->
+        <Constraint
+            android:id="@+id/swipeRefresh"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            motion:layout_constraintBottom_toBottomOf="parent"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Hero Balance Card -->
+        <Constraint
+            android:id="@+id/heroBalanceCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="1"
+            android:translationY="0dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Alerts Strip -->
+        <Constraint
+            android:id="@+id/alertsStrip"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="1"
+            android:translationY="0dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/heroBalanceCard" />
+
+        <!-- Inventory Metrics -->
+        <Constraint
+            android:id="@+id/inventoryMetrics"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="1"
+            android:translationY="0dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/alertsStrip" />
+
+        <!-- Gold Prices Card -->
+        <Constraint
+            android:id="@+id/cardGoldPrices"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="1"
+            android:translationY="0dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/inventoryMetrics" />
+
+        <!-- Sales Summary Card -->
+        <Constraint
+            android:id="@+id/salesSummaryCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:alpha="1"
+            android:translationY="0dp"
+            motion:layout_constraintEnd_toEndOf="parent"
+            motion:layout_constraintStart_toStartOf="parent"
+            motion:layout_constraintTop_toBottomOf="@id/cardGoldPrices" />
     </ConstraintSet>
+
 </MotionScene>
