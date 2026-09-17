@@ -806,6 +806,49 @@ private void performFullLogout() {
 }
 
 /**
+ * ✅ تُستدعى قبل تسجيل الخروج لتنظيف الموارد
+ * تستدعيها MiraProfileFragment.performLogout()
+ */
+public void onPreLogout() {
+    try {
+        Log.d(TAG, "🔓 onPreLogout: cleaning up resources...");
+
+        // 1. إخفاء الـ Loading فوراً
+        forceHideLoadingImmediate();
+
+        // 2. إيقاف أي جرد نشط
+        stopActiveInventory();
+
+        // 3. إيقاف الـ Hardware
+        if (hardwareManager != null) {
+            try {
+                hardwareManager.stopScan();
+            } catch (Exception e) {
+                Log.w(TAG, "stopScan error: " + e.getMessage());
+            }
+        }
+
+        // 4. تنظيف الـ Fragments النشطة
+        clearActiveListeners();
+
+        // 5. إلغاء جميع المهام المؤجلة
+        if (mainHandler != null) {
+            mainHandler.removeCallbacksAndMessages(null);
+        }
+
+        // 6. إزالة مستمعي البروفايل
+        if (orgProfileManager != null && orgProfileListener != null) {
+            orgProfileManager.removeListener(orgProfileListener);
+        }
+
+        Log.d(TAG, "✅ onPreLogout: cleanup complete");
+    } catch (Exception e) {
+        Log.e(TAG, "onPreLogout error: " + e.getMessage(), e);
+    }
+}
+
+
+/**
  * ✅ مساعد للتحقق من صحة النشاط
  */
 private boolean isActivityAlive() {
