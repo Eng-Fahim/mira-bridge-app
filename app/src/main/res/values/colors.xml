@@ -252,4 +252,46 @@
     <color name="surface_variant_alias">@color/colorSurfaceVariant</color>
     <color name="outline_alias">@color/colorOutline</color>
     <color name="outline_variant_alias">@color/colorOutlineVariant</color>
+    <!-- ═══════════════════════════════════════════════════════
+     🎨 Luxury Jewelry Light Palette (v2.0)
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- الذهبي الفاخر -->
+<color name="gold_luxury">#B8860B</color>
+<color name="gold_luxury_dark">#8B6508</color>
+<color name="gold_luxury_light">#D4AF37</color>
+<color name="gold_luxury_soft">#FFF8E7</color>
+<color name="gold_luxury_highlight">#F5D77E</color>
+
+<!-- بني شوكولاتة -->
+<color name="chocolate">#6D4C41</color>
+<color name="chocolate_dark">#3E2723</color>
+<color name="chocolate_light">#A1887F</color>
+<color name="chocolate_soft">#F5EFE9</color>
+
+<!-- كريمي دافئ -->
+<color name="cream_warm">#FDFCF9</color>
+<color name="cream_soft">#F7F4EF</color>
+<color name="cream_highlight">#FFFCF5</color>
+
+<!-- أبيض نقي -->
+<color name="pure_white">#FFFFFF</color>
+
+<!-- حدود دافئة -->
+<color name="border_warm">#E5DDD0</color>
+<color name="border_warm_dark">#D2C7B6</color>
+
+<!-- نصوص -->
+<color name="text_dark_primary">#1A1A1A</color>
+<color name="text_dark_secondary">#5D4037</color>
+<color name="text_muted_warm">#8D7B6F</color>
+
+<!-- أخطاء وناجح -->
+<color name="error_luxury">#B3261E</color>
+<color name="error_container_luxury">#FCEEEE</color>
+<color name="success_luxury">#2E7D32</color>
+<color name="warning_luxury">#E65100</color>
+<color name="info_luxury">#0277BD</color>
+
+
 </resources>
