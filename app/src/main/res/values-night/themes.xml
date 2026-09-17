@@ -96,12 +96,9 @@
         <!-- 🔲 الحدود -->
         <item name="colorOutline">#3F3325</item>                 <!-- ← بني داكن ✅ -->
         <item name="colorOutlineVariant">#2E241B</item>
-
         <!-- 💫 Tint & Scrim -->
-        <item name="colorSurfaceTint">#E8C766</item>
         <item name="android:colorControlHighlight">#20E8C766</item>
-        <item name="colorScrim">#000000</item>
-
+        <item name="android:colorControlActivated">#25E8C766</item>
         <!-- ═══════════════════════════════════════════════════
              🔗 عناصر الواجهة الموحّدة
              ═══════════════════════════════════════════════════ -->
