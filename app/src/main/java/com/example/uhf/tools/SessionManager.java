@@ -106,32 +106,46 @@ public class SessionManager {
     public boolean isManager() {
         return secureManager.isManager();
     }
+// ==================== بيانات المستخدم ====================
 
-    // ==================== بيانات المستخدم ====================
-    
-    public String getDisplayName() {
-        return secureManager.getDisplayName();
-    }
+public String getDisplayName() {
+    return secureManager.getDisplayName();
+}
 
-    public void setDisplayName(String displayName) {
-        secureManager.setDisplayName(displayName);
-    }
+public void setDisplayName(String displayName) {
+    secureManager.setDisplayName(displayName);
+}
 
-    public int getUserId() {
-        return secureManager.getUserId();
-    }
+public int getUserId() {
+    return secureManager.getUserId();
+}
 
-    public void setUserId(int userId) {
-        secureManager.setUserId(userId);
-    }
+public void setUserId(int userId) {
+    secureManager.setUserId(userId);
+}
 
-    public String getPhone() {
-        return "";
-    }
+// ✅ Phone — يقرأ من SecureSessionManager الحقيقي
+public String getPhone() {
+    return secureManager.getPhone();
+}
 
-    public void setPhone(String phone) {
-        // يمكن إضافة التخزين إذا لزم
-    }
+public void setPhone(String phone) {
+    secureManager.setPhone(phone);
+}
+
+// ✅ Email — جديد
+public String getEmail() {
+    return secureManager.getEmail();
+}
+
+public void setEmail(String email) {
+    secureManager.setEmail(email);
+}
+
+// ✅ Username — لتعيين اسم المستخدم
+public void setUsername(String username) {
+    secureManager.setUsername(username);
+}
 
     // ==================== عنوان الخادم ====================
     
