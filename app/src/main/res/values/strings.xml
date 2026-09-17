@@ -2261,7 +2261,6 @@
 
 
 <!-- Dashboard -->
-<string name="total_inventory_value">💰 إجمالي قيمة المخزون</string>
 <string name="sales_summary">📈 ملخص المبيعات</string>
 <string name="toggle_visibility">إظهار / إخفاء</string>
 <string name="hidden_value">••••••</string>
