@@ -2,189 +2,175 @@ package com.example.uhf.tools;
 
 import android.util.Log;
 
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
- * Created by Administrator on 2019-1-23.
- * Modified to use Apache POI instead of jxl
+ * ✅ ExcelUtils — نسخة خفيفة تستخدم CSV بدلاً من Apache POI
+ * 
+ * ✅ المزايا:
+ * - توفير ~25 MB من حجم APK
+ * - لا مكتبات خارجية
+ * - Excel يفتح ملفات CSV مباشرة
+ * - دعم كامل للنصوص العربية (UTF-8 BOM)
+ * 
+ * ⚠️ العيب الوحيد:
+ * - لا يدعم التنسيقات (ألوان، خطوط عريضة)
+ * - لكن الكود الأصلي لم يستخدمها أصلاً
  */
 public class ExcelUtils {
-    private Workbook wb = null;
-    private File excelFile = null;
     public static String TAG = "ExcelUtils";
+
+    private File csvFile = null;
+    private boolean isFirstWrite = true;
 
     public ExcelUtils() {
     }
 
     /**
-     * إنشاء ملف Excel جديد مع العناوين
+     * ✅ تحويل المسار إلى .csv
+     */
+    private String toCsvPath(File file) {
+        String path = file.getAbsolutePath();
+        if (path.toLowerCase().endsWith(".xlsx")) {
+            return path.substring(0, path.length() - 5) + ".csv";
+        } else if (path.toLowerCase().endsWith(".xls")) {
+            return path.substring(0, path.length() - 4) + ".csv";
+        }
+        return path + ".csv";
+    }
+
+    /**
+     * ✅ إنشاء ملف جديد مع العناوين
      */
     public void createExcel(File file, String[] head) {
-        excelFile = file;
-        FileOutputStream fileOut = null;
-        
+        csvFile = new File(toCsvPath(file));
+        isFirstWrite = true;
+
+        Writer writer = null;
         try {
-            // حذف الملف القديم إذا كان موجوداً
-            if (file.exists()) {
-                file.delete();
+            // حذف الملف القديم
+            if (csvFile.exists()) {
+                csvFile.delete();
             }
-            
-            // إنشاء مصنف Excel جديد (XLSX)
-            wb = new XSSFWorkbook();
-            Sheet ws = wb.createSheet("sheet1");
-            
-            // إنشاء صف العناوين
-            Row headerRow = ws.createRow(0);
+
+            // كتابة العناوين
+            writer = new OutputStreamWriter(
+                    new FileOutputStream(csvFile),
+                    StandardCharsets.UTF_8);
+
+            // BOM لـ Excel العربي
+            writer.write('\ufeff');
+
+            // Headers
             for (int k = 0; k < head.length; k++) {
-                headerRow.createCell(k).setCellValue(head[k]);
-                // ضبط عرض العمود تلقائياً
-                ws.setColumnWidth(k, 20 * 256);
+                if (k > 0) writer.write(',');
+                writer.write(escapeCsv(head[k]));
             }
-            
-            // حفظ الملف
-            fileOut = new FileOutputStream(file);
-            wb.write(fileOut);
-            
-            Log.d(TAG, "تم إنشاء ملف Excel بنجاح: " + file.getAbsolutePath());
-            
+            writer.write('\n');
+
+            writer.flush();
+            Log.d(TAG, "✅ تم إنشاء ملف CSV: " + csvFile.getAbsolutePath());
+
         } catch (Exception e) {
-            Log.e(TAG, "خطأ في إنشاء ملف Excel: " + e.getMessage());
-            e.printStackTrace();
+            Log.e(TAG, "خطأ في إنشاء الملف: " + e.getMessage());
         } finally {
             try {
-                if (fileOut != null) {
-                    fileOut.flush();
-                    fileOut.close();
-                }
-                if (wb != null) {
-                    wb.close();
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "خطأ في إغلاق الملف: " + e.getMessage());
-            }
+                if (writer != null) writer.close();
+            } catch (IOException ignored) {}
         }
     }
 
     /**
-     * كتابة بيانات إلى ملف Excel
+     * ✅ كتابة صف واحد
      */
     public void writeToExcel(String[] args) {
         if (args == null || args.length == 0) {
-            Log.w(TAG, "writeToExcel: البيانات فارغة");
+            Log.w(TAG, "البيانات فارغة");
             return;
         }
-        
-        FileInputStream fileIn = null;
-        FileOutputStream fileOut = null;
-        
+        if (csvFile == null) {
+            Log.e(TAG, "لم يتم إنشاء الملف أولاً");
+            return;
+        }
+
+        Writer writer = null;
         try {
-            // فتح الملف الموجود
-            fileIn = new FileInputStream(excelFile);
-            wb = WorkbookFactory.create(fileIn);
-            fileIn.close();
-            
-            Sheet ws = wb.getSheetAt(0);
-            
-            // الحصول على الصف التالي
-            int rowIndex = ws.getLastRowNum() + 1;
-            Row row = ws.createRow(rowIndex);
-            
-            // كتابة البيانات
+            writer = new OutputStreamWriter(
+                    new FileOutputStream(csvFile, true),
+                    StandardCharsets.UTF_8);
+
             for (int k = 0; k < args.length; k++) {
-                row.createCell(k).setCellValue(args[k]);
+                if (k > 0) writer.write(',');
+                writer.write(escapeCsv(args[k]));
             }
-            
-            // حفظ الملف
-            fileOut = new FileOutputStream(excelFile);
-            wb.write(fileOut);
-            
-            Log.d(TAG, "تمت كتابة البيانات بنجاح");
-            
+            writer.write('\n');
+            writer.flush();
+
+            Log.d(TAG, "✅ تمت كتابة صف بنجاح");
+
         } catch (Exception e) {
-            Log.e(TAG, "خطأ في كتابة البيانات: " + e.getMessage());
-            e.printStackTrace();
+            Log.e(TAG, "خطأ في كتابة الصف: " + e.getMessage());
         } finally {
             try {
-                if (fileIn != null) fileIn.close();
-                if (fileOut != null) {
-                    fileOut.flush();
-                    fileOut.close();
-                }
-                if (wb != null) wb.close();
-            } catch (IOException e) {
-                Log.e(TAG, "خطأ في إغلاق الملف: " + e.getMessage());
-            }
+                if (writer != null) writer.close();
+            } catch (IOException ignored) {}
         }
     }
 
     /**
-     * كتابة قائمة بيانات إلى ملف Excel
+     * ✅ كتابة عدة صفوف
      */
     public void writeToExcel(List<String[]> listData) {
-        if (listData == null || listData.size() == 0) {
-            Log.w(TAG, "writeToExcel: القائمة فارغة");
+        if (listData == null || listData.isEmpty()) {
+            Log.w(TAG, "القائمة فارغة");
+            return;
+        }
+        if (csvFile == null) {
+            Log.e(TAG, "لم يتم إنشاء الملف أولاً");
             return;
         }
 
-        Log.d(TAG, "writeToExcel: " + listData.size());
-        
-        FileInputStream fileIn = null;
-        FileOutputStream fileOut = null;
-        
+        Writer writer = null;
         try {
-            // فتح الملف الموجود
-            fileIn = new FileInputStream(excelFile);
-            wb = WorkbookFactory.create(fileIn);
-            fileIn.close();
-            
-            Sheet ws = wb.getSheetAt(0);
-            
-            // الحصول على الصف التالي
-            int rowIndex = ws.getLastRowNum() + 1;
-            
-            // كتابة جميع البيانات
-            for (int s = 0; s < listData.size(); s++) {
-                String[] args = listData.get(s);
-                Row row = ws.createRow(rowIndex);
-                
+            writer = new OutputStreamWriter(
+                    new FileOutputStream(csvFile, true),
+                    StandardCharsets.UTF_8);
+
+            for (String[] args : listData) {
+                if (args == null) continue;
                 for (int k = 0; k < args.length; k++) {
-                    row.createCell(k).setCellValue(args[k]);
+                    if (k > 0) writer.write(',');
+                    writer.write(escapeCsv(args[k]));
                 }
-                
-                rowIndex++;
+                writer.write('\n');
             }
-            
-            // حفظ الملف
-            fileOut = new FileOutputStream(excelFile);
-            wb.write(fileOut);
-            
-            Log.d(TAG, "تمت كتابة " + listData.size() + " صفوف بنجاح");
-            
+            writer.flush();
+
+            Log.d(TAG, "✅ تمت كتابة " + listData.size() + " صفوف");
+
         } catch (Exception e) {
-            Log.e(TAG, "خطأ في كتابة البيانات: " + e.getMessage());
-            e.printStackTrace();
+            Log.e(TAG, "خطأ في كتابة الصفوف: " + e.getMessage());
         } finally {
             try {
-                if (fileIn != null) fileIn.close();
-                if (fileOut != null) {
-                    fileOut.flush();
-                    fileOut.close();
-                }
-                if (wb != null) wb.close();
-            } catch (IOException e) {
-                Log.e(TAG, "خطأ في إغلاق الملف: " + e.getMessage());
-            }
+                if (writer != null) writer.close();
+            } catch (IOException ignored) {}
         }
+    }
+
+    /**
+     * ✅ تهريب CSV
+     */
+    private String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }
