@@ -1841,26 +1841,43 @@ private void deleteReport(InventoryReport report) {
 
     final int[] selectedIndex = {0};
 
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(
-            requireContext(), R.layout.item_dialog_list,
-            android.R.id.text1, categories);
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "🎯 اختر الفئة للجرد" : "🎯 Select Inventory Category")
-            .setSingleChoiceItems(adapter, 0, (d, which) -> {
+    // ✅ استخدام AlertDialog.Builder مع create() + setOnShowListener
+    final AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🎯 اختر الفئة للجرد"
+                               : "🎯 Select Inventory Category")
+            .setSingleChoiceItems(categories, 0, (d, which) -> {
                 selectedIndex[0] = which;
             })
-            .setPositiveButton(isArabic ? "✅ تطبيق" : "✅ Apply", (d, w) -> {
-                d.dismiss();
-                applyCategoryFilter(categories[selectedIndex[0]], selectedIndex[0]);
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (d, w) -> {
-                d.dismiss();
-                if (segmentedModes != null && btnModeFull != null) {
-                    segmentedModes.check(R.id.btnModeFull);
-                }
-            })
-            .show();
+            .setPositiveButton(isArabic ? "✅ تطبيق" : "✅ Apply", null)
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .create();
+
+    dialog.setOnShowListener(d -> {
+        // ✅ ربط الأزرار يدوياً (يحل مشكلة عدم الاستجابة)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    int index = selectedIndex[0];
+                    String category = categories[index];
+                    dialog.dismiss();
+
+                    // ✅ تنفيذ بعد الإغلاق
+                    mainHandler.postDelayed(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+                        applyCategoryFilter(category, index);
+                    }, 150);
+                });
+
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+                .setOnClickListener(v -> {
+                    dialog.dismiss();
+                    if (segmentedModes != null && btnModeFull != null) {
+                        segmentedModes.check(R.id.btnModeFull);
+                    }
+                });
+    });
+
+    dialog.setCancelable(false);
+    dialog.show();
 }
 
     private void applyCategoryFilter(String category, int index) {
@@ -1891,65 +1908,12 @@ private void deleteReport(InventoryReport report) {
             (isArabic ? "🔄 تحميل " : "🔄 Loading ") + category,
             Toast.LENGTH_SHORT).show();
 
-    // ✅✅✅ فحص تشخيصي — استخدام SessionManager الصحيح
-    showDebugDialog(category);
 }
 
 /**
  * ✅ عرض Dialog تشخيصي قبل بدء الجرد
  * ثم بدء تحميل الكاتولوج
  */
-private void showDebugDialog(String category) {
-    try {
-        com.example.uhf.tools.SessionManager userSession =
-                new com.example.uhf.tools.SessionManager(requireContext());
-
-        String currentApiKey = userSession.getApiKey();
-        String currentGateId = userSession.getGateId();
-        String currentToken = userSession.getAuthToken();
-
-        if (currentApiKey == null) currentApiKey = "NULL";
-        if (currentGateId == null) currentGateId = "NULL";
-        if (currentToken == null) currentToken = "NULL";
-
-        final String debugInfo =
-                "🔑 Key: " + (currentApiKey.length() > 25
-                        ? currentApiKey.substring(0, 25) + "..." : currentApiKey) +
-                "\n🚪 Gate: " + currentGateId +
-                "\n🎫 Token: " + (currentToken.length() > 25
-                        ? currentToken.substring(0, 25) + "..." : currentToken) +
-                "\n📍 Branch: " + branchesManager.getActiveBranchId() +
-                "\n\n📋 Key Length: " + currentApiKey.length() +
-                "\n📋 Expected Prefix: mira_cmt7";
-
-        final String capturedCategory = category;
-
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle("🔍 بيانات التشخيص")
-                .setMessage(debugInfo)
-                .setPositiveButton("📋 نسخ", (d, w) -> {
-                    android.content.ClipboardManager clipboard =
-                            (android.content.ClipboardManager) requireContext()
-                                    .getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip =
-                            android.content.ClipData.newPlainText("API Debug", debugInfo);
-                    if (clipboard != null) clipboard.setPrimaryClip(clip);
-                    Toast.makeText(requireContext(),
-                            "✅ تم النسخ", Toast.LENGTH_SHORT).show();
-                })
-                .setNeutralButton("⏭️ متابعة", (d, w) -> {
-                    d.dismiss();
-                    loadCategoryCatalog(capturedCategory);
-                })
-                .setCancelable(false)
-                .show();
-
-    } catch (Exception e) {
-        Log.e(TAG, "Debug dialog error: " + e.getMessage());
-        // في حالة الخطأ، ابدأ الجرد مباشرة
-        loadCategoryCatalog(category);
-    }
-}
 
 /**
  * ✅ تحميل كاتولوج الفئة الفعلي
@@ -2194,4 +2158,4 @@ private void loadCategoryCatalog(String category) {
     public boolean isCurrentlyScanning() {
         return isScanning();
     }
-            }
+                    }
