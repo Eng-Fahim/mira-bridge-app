@@ -11,6 +11,7 @@
 -keep class com.example.uhf.fragment.MiraSalesHistoryFragment$** { *; }
 -keep class com.example.uhf.fragment.MiraPosFragment$** { *; }
 -keep class com.example.uhf.fragment.MiraIdentityStudioFragment$** { *; }
+-keep class com.example.uhf.fragment.MiraAllActivitiesFragment$** { *; }
 
 # ==================== حماية جميع Fragments ====================
 -keep class com.example.uhf.fragment.** { *; }
@@ -23,6 +24,7 @@
 -keep class com.example.uhf.tools.MemoryManager { *; }
 -keep class com.example.uhf.tools.UIHelper { *; }
 -keep class com.example.uhf.tools.CertificatePinningManager { *; }
+-keep class com.example.uhf.tools.RecentActivityCache { *; }
 
 # ==================== حماية MiraApiClient ====================
 -keep class com.example.uhf.api.MiraApiClient { *; }
@@ -142,14 +144,7 @@
 -keep class androidx.biometric.** { *; }
 -dontwarn androidx.biometric.**
 
-# ==================== Apache POI ====================
--keep class org.apache.poi.ss.usermodel.** { *; }
--keep class org.apache.poi.xssf.usermodel.** { *; }
--keep class org.apache.poi.hssf.usermodel.** { *; }
--keep class org.apache.poi.ss.SpreadsheetVersion { *; }
--dontwarn org.apache.poi.**
--dontwarn org.apache.xmlbeans.**
--dontwarn schemaorg_apache_xmlbeans.**
+# ✅ ✅ ✅ تم حذف قسم Apache POI بالكامل ✅ ✅ ✅
 
 # ==================== MPAndroidChart ====================
 -keep class com.github.mikephil.charting.** { *; }
