@@ -2264,4 +2264,9 @@
 <string name="sales_summary">📈 ملخص المبيعات</string>
 <string name="toggle_visibility">إظهار / إخفاء</string>
 <string name="hidden_value">••••••</string>
+
+<string name="current_inventory_value">القيمة الحالية للمخزون</string>
+<string name="items_label">قطعة</string>
+<string name="total_weight_label">وزن إجمالي</string>
+<string name="gold_24k_per_gram">24K / جرام</string>
 </resources>
