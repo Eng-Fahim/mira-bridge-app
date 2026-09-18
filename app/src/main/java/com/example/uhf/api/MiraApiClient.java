@@ -1874,6 +1874,11 @@ private boolean isArabicText() {
     public ApiResponse logActivity(JSONObject logEntry) {
         return postWithAuth("/activity/log", logEntry);
     }
+    public ApiResponse getUnifiedActivity(int branchId, int limit) {
+    String endpoint = "/activity/unified?limit=" + limit;
+    if (branchId > 0) endpoint += "&branch_id=" + branchId;
+    return getWithAuth(endpoint);
+    }
 
     public ApiResponse getUserPermissions(int userId) {
         return getWithAuth("/auth/users/" + userId + "/permissions");
