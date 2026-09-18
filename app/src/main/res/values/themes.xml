@@ -44,62 +44,62 @@
         <item name="chipStyle">@style/AppChipStyle</item>
 
         <!-- ═══════════════════════════════════════════════════
-             🎨 LUXURY GOLD PALETTE (Light)
+             🎨 LUXURY GOLD PALETTE (High Contrast Light Mode)
              ═══════════════════════════════════════════════════ -->
 
-        <!-- ✨ Primary — الذهبي -->
-        <item name="colorPrimary">#B8860B</item>
+        <!-- ✨ Primary — الذهبي المطور -->
+        <item name="colorPrimary">#C59B27</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#FFF8E7</item>
-        <item name="colorOnPrimaryContainer">#4A3000</item>
+        <item name="colorPrimaryContainer">#FFFBF0</item>
+        <item name="colorOnPrimaryContainer">#3D2E00</item>
         <item name="colorPrimaryInverse">#F5D77E</item>
 
-        <!-- 🍫 Secondary — بني شوكولاتة -->
-        <item name="colorSecondary">#6D4C41</item>
+        <!-- 🍫 Secondary — كحلي فاخر وموثوق -->
+        <item name="colorSecondary">#0F172A</item>
         <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="colorSecondaryContainer">#F5EFE9</item>
-        <item name="colorOnSecondaryContainer">#3E2723</item>
+        <item name="colorSecondaryContainer">#F1F5F9</item>
+        <item name="colorOnSecondaryContainer">#0F172A</item>
 
-        <!-- 🥃 Tertiary — بني فاتح (Accent) -->
-        <item name="colorTertiary">#A1887F</item>
+        <!-- 🥃 Tertiary — رمادي داكن ناعم -->
+        <item name="colorTertiary">#475569</item>
         <item name="colorOnTertiary">#FFFFFF</item>
-        <item name="colorTertiaryContainer">#F0EAE5</item>
-        <item name="colorOnTertiaryContainer">#3E2723</item>
+        <item name="colorTertiaryContainer">#F1F5F9</item>
+        <item name="colorOnTertiaryContainer">#0F172A</item>
 
-        <!-- 🚨 Error — أحمر راقٍ -->
-        <item name="colorError">#B3261E</item>
+        <!-- 🚨 Error — أحمر راقٍ واضح -->
+        <item name="colorError">#DC2626</item>
         <item name="colorOnError">#FFFFFF</item>
-        <item name="colorErrorContainer">#FCEEEE</item>
-        <item name="colorOnErrorContainer">#410E0B</item>
+        <item name="colorErrorContainer">#FEF2F2</item>
+        <item name="colorOnErrorContainer">#991B1B</item>
 
-        <!-- 🖼️ Background — دافئ كريمي -->
-        <item name="android:colorBackground">#FDFCF9</item>
-        <item name="colorOnBackground">#1A1A1A</item>
+        <!-- 🖼️ Background — رمادي بارد ونظيف جِداً -->
+        <item name="android:colorBackground">#F8FAFC</item>
+        <item name="colorOnBackground">#0F172A</item>
 
-        <!-- 🗂️ Surface — أبيض نقي -->
+        <!-- 🗂️ Surface — أبيض نقي مع نصوص عميقة -->
         <item name="colorSurface">#FFFFFF</item>
         <item name="colorOnSurface">#0F172A</item>
-        <item name="colorSurfaceVariant">#F7F4EF</item>
-        <item name="colorOnSurfaceVariant">#5D4037</item>
-        <item name="colorSurfaceInverse">#1A1A1A</item>
-        <item name="colorOnSurfaceInverse">#F5F5F5</item>
+        <item name="colorSurfaceVariant">#F1F5F9</item>
+        <item name="colorOnSurfaceVariant">#475569</item>
+        <item name="colorSurfaceInverse">#0F172A</item>
+        <item name="colorOnSurfaceInverse">#F8FAFC</item>
 
         <!-- 🎯 Surface Containers (Material 3) -->
         <item name="colorSurfaceBright">#FFFFFF</item>
-        <item name="colorSurfaceDim">#E8E3DA</item>
-        <item name="colorSurfaceContainer">#F7F4EF</item>
-        <item name="colorSurfaceContainerHigh">#F0EBE2</item>
-        <item name="colorSurfaceContainerHighest">#E8E2D8</item>
-        <item name="colorSurfaceContainerLow">#FBF9F5</item>
+        <item name="colorSurfaceDim">#E2E8F0</item>
+        <item name="colorSurfaceContainer">#FFFFFF</item>
+        <item name="colorSurfaceContainerHigh">#F8FAFC</item>
+        <item name="colorSurfaceContainerHighest">#F1F5F9</item>
+        <item name="colorSurfaceContainerLow">#FFFFFF</item>
         <item name="colorSurfaceContainerLowest">#FFFFFF</item>
 
         <!-- 🔲 الحدود -->
-        <item name="colorOutline">#E5DDD0</item>
-        <item name="colorOutlineVariant">#D2C7B6</item>
+        <item name="colorOutline">#CBD5E1</item>
+        <item name="colorOutlineVariant">#E2E8F0</item>
 
         <!-- 💫 Tint & Scrim -->
-        <item name="android:colorControlActivated">#1AB8860B</item>
-        <item name="android:colorControlHighlight">#14B8860B</item>
+        <item name="android:colorControlActivated">#1AC59B27</item>
+        <item name="android:colorControlHighlight">#14C59B27</item>
 
         <!-- ═══════════════════════════════════════════════════
              🔗 عناصر الواجهة الموحّدة
@@ -117,9 +117,9 @@
         <item name="android:textColor">@color/primary_text</item>
 
         <!-- Status Bar -->
-        <item name="android:statusBarColor">@color/brand_primary</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:navigationBarColor">@color/colorSurface</item>
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 
@@ -135,15 +135,15 @@
         <item name="android:windowBackground">@drawable/splash_background_gradient</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#B8860B</item>
-        <item name="android:navigationBarColor">#FDFCF9</item>
+        <item name="android:statusBarColor">#C59B27</item>
+        <item name="android:navigationBarColor">#F8FAFC</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
 
-        <item name="android:windowSplashScreenBackground" tools:targetApi="s">#FFF8E7</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="s">#FFFBF0</item>
         <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@android:color/transparent</item>
 
         <!-- ✅ موحّد مع Base.Theme -->
-        <item name="colorPrimary">#B8860B</item>
+        <item name="colorPrimary">#C59B27</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorSurface">#FFFFFF</item>
         <item name="colorOnSurface">#0F172A</item>
@@ -157,23 +157,23 @@
          ═══════════════════════════════════════════════════════ -->
     <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
-        <item name="android:backgroundDimAmount">0.6</item>
+        <item name="android:backgroundDimAmount">0.5</item>
 
         <!-- النصوص -->
-        <item name="android:textColorPrimary">#1A1A1A</item>
-        <item name="android:textColorSecondary">#5D4037</item>
-        <item name="android:titleTextColor">#B8860B</item>
+        <item name="android:textColorPrimary">#0F172A</item>
+        <item name="android:textColorSecondary">#475569</item>
+        <item name="android:titleTextColor">#C59B27</item>
 
         <!-- الخطوط -->
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
 
         <!-- الألوان -->
-        <item name="colorPrimary">#B8860B</item>
+        <item name="colorPrimary">#C59B27</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorSurface">#FFFFFF</item>
-        <item name="colorOnSurface">#1A1A1A</item>
-        <item name="colorAccent">#B8860B</item>
+        <item name="colorOnSurface">#0F172A</item>
+        <item name="colorAccent">#C59B27</item>
 
         <!-- الحواف -->
         <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
@@ -190,25 +190,25 @@
     </style>
 
     <style name="MiraDialogButton.Positive" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">#B8860B</item>
+        <item name="android:textColor">#C59B27</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="rippleColor">#1AB8860B</item>
+        <item name="rippleColor">#1AC59B27</item>
     </style>
 
     <style name="MiraDialogButton.Negative" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">#6D4C41</item>
+        <item name="android:textColor">#475569</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textSize">14sp</item>
-        <item name="rippleColor">#1A6D4C41</item>
+        <item name="rippleColor">#1A475569</item>
     </style>
 
     <style name="MiraDialogButton.Neutral" parent="Widget.Material3.Button.TextButton">
-        <item name="android:textColor">#A1887F</item>
+        <item name="android:textColor">#64748B</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textSize">14sp</item>
-        <item name="rippleColor">#1AA1887F</item>
+        <item name="rippleColor">#1A64748B</item>
     </style>
 
     <!-- ═══════════════════════════════════════════════════════
@@ -217,8 +217,8 @@
     <style name="MiraBottomSheetDialogTheme" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/MiraBottomSheetStyle</item>
         <item name="android:fontFamily">@font/cairo</item>
-        <item name="colorPrimary">#B8860B</item>
-        <item name="colorOnSurface">#1A1A1A</item>
+        <item name="colorPrimary">#C59B27</item>
+        <item name="colorOnSurface">#0F172A</item>
         <item name="colorSurface">#FFFFFF</item>
     </style>
 
@@ -241,6 +241,7 @@
     <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textColor">#0F172A</item>
         <item name="android:textFontWeight">400</item>
         <item name="android:lineSpacingMultiplier">1.15</item>
     </style>
@@ -248,6 +249,7 @@
     <style name="AppTextAppearance.Medium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textColor">#0F172A</item>
         <item name="android:textStyle">normal</item>
         <item name="android:textFontWeight">500</item>
         <item name="android:lineSpacingMultiplier">1.15</item>
@@ -256,6 +258,7 @@
     <style name="AppTextAppearance.Bold">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textColor">#0F172A</item>
         <item name="android:textStyle">bold</item>
         <item name="android:textFontWeight">700</item>
         <item name="android:lineSpacingMultiplier">1.1</item>
@@ -264,6 +267,7 @@
     <style name="AppTextViewStyle" parent="Widget.AppCompat.TextView">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textColor">#0F172A</item>
     </style>
 
     <!-- ═══════════════════════════════════════════════════════
@@ -274,6 +278,8 @@
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textAllCaps">false</item>
         <item name="cornerRadius">14dp</item>
+        <item name="backgroundTint">#C59B27</item>
+        <item name="android:textColor">#FFFFFF</item>
         <item name="android:letterSpacing">0.02</item>
         <item name="android:textStyle">bold</item>
     </style>
@@ -283,8 +289,8 @@
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textAllCaps">false</item>
         <item name="cornerRadius">14dp</item>
-        <item name="strokeColor">#B8860B</item>
-        <item name="android:textColor">#B8860B</item>
+        <item name="strokeColor">#C59B27</item>
+        <item name="android:textColor">#C59B27</item>
         <item name="android:textStyle">bold</item>
     </style>
 
@@ -293,8 +299,8 @@
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textAllCaps">false</item>
         <item name="cornerRadius">14dp</item>
-        <item name="backgroundTint">#FFF8E7</item>
-        <item name="android:textColor">#4A3000</item>
+        <item name="backgroundTint">#FFFBF0</item>
+        <item name="android:textColor">#3D2E00</item>
         <item name="android:textStyle">bold</item>
     </style>
 
@@ -302,7 +308,7 @@
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:textColor">#B8860B</item>
+        <item name="android:textColor">#C59B27</item>
         <item name="android:textStyle">bold</item>
     </style>
 
@@ -341,9 +347,9 @@
     <style name="AppTabStyle" parent="Widget.Material3.TabLayout">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
-        <item name="tabIndicatorColor">#B8860B</item>
+        <item name="tabIndicatorColor">#C59B27</item>
         <item name="tabTextColor">@color/selector_tab_text</item>
-        <item name="tabRippleColor">#1AB8860B</item>
+        <item name="tabRippleColor">#1AC59B27</item>
     </style>
 
     <!-- ═══════════════════════════════════════════════════════
@@ -352,6 +358,7 @@
     <style name="ToolbarTitleStyle" parent="TextAppearance.Material3.TitleLarge">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textColor">#0F172A</item>
         <item name="android:textFontWeight">700</item>
         <item name="android:letterSpacing">0.01</item>
     </style>
@@ -360,7 +367,7 @@
          🎯 Bottom Navigation
          ═══════════════════════════════════════════════════════ -->
     <style name="CustomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <item name="android:color">#1FB8860B</item>
+        <item name="android:color">#1AC59B27</item>
         <item name="android:width">48dp</item>
         <item name="android:height">32dp</item>
         <item name="marginHorizontal">4dp</item>
@@ -389,17 +396,17 @@
          ═══════════════════════════════════════════════════════ -->
     <style name="AppCardViewStyle" parent="Widget.Material3.CardView.Elevated">
         <item name="cardBackgroundColor">@color/colorSurface</item>
-        <item name="cardCornerRadius">16dp</item>
-        <item name="cardElevation">2dp</item>
-        <item name="strokeColor">@color/colorOutlineVariant</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">3dp</item>
+        <item name="strokeColor">@color/card_stroke</item>
         <item name="strokeWidth">1dp</item>
     </style>
 
     <style name="AppCardViewStyle.Outlined" parent="Widget.Material3.CardView.Outlined">
         <item name="cardBackgroundColor">@color/colorSurface</item>
-        <item name="cardCornerRadius">16dp</item>
+        <item name="cardCornerRadius">18dp</item>
         <item name="cardElevation">0dp</item>
-        <item name="strokeColor">@color/colorOutlineVariant</item>
+        <item name="strokeColor">@color/card_stroke</item>
         <item name="strokeWidth">1dp</item>
     </style>
 
