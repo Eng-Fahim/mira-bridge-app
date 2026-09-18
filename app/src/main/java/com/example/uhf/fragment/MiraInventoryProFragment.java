@@ -17,6 +17,8 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.content.Context;
+
 
 import android.os.Build;
 import android.os.VibrationEffect;
@@ -2123,4 +2125,4 @@ private void deleteReport(InventoryReport report) {
     public boolean isCurrentlyScanning() {
         return isScanning();
     }
-            }
+    }
