@@ -1,5 +1,8 @@
 package com.example.uhf.dialog;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -12,8 +15,16 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.fragment.MiraAllActivitiesFragment;
+import com.example.uhf.fragment.MiraInventoryProFragment;
+import com.example.uhf.fragment.MiraRfidBindingsFragment;
+import com.example.uhf.fragment.MiraSalesHistoryFragment;
+import com.example.uhf.fragment.MiraTransferFragment;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.button.MaterialButton;
 
@@ -26,6 +37,10 @@ import java.util.Locale;
 
 /**
  * ✅ Bottom Sheet احترافي لعرض تفاصيل العملية
+ * 
+ * ✅ v2.0:
+ *  - إجراءات حقيقية مرتبطة بالشاشات
+ *  - احترام كامل للثيمات (فاتح/داكن)
  */
 public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
 
@@ -68,7 +83,6 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // ✅ Views
         FrameLayout iconContainer = view.findViewById(R.id.iconContainer);
         TextView tvDetailIcon = view.findViewById(R.id.tvDetailIcon);
         TextView tvDetailTitle = view.findViewById(R.id.tvDetailTitle);
@@ -76,7 +90,6 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         LinearLayout detailsContainer = view.findViewById(R.id.detailsContainer);
         LinearLayout actionsContainer = view.findViewById(R.id.actionsContainer);
 
-        // ✅ البيانات
         String icon = activity.optString("icon", "⚙️");
         String title = isArabic ? activity.optString("title_ar", "") 
                                 : activity.optString("title_en", "");
@@ -87,38 +100,27 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         tvDetailTitle.setText(title);
         tvDetailTime.setText(formatFullTime(timestamp));
 
-        // ✅ لون الحالة
-        int statusColor;
-        switch (status) {
-            case "success": statusColor = Color.parseColor("#16A34A"); break;
-            case "warning": statusColor = Color.parseColor("#F59E0B"); break;
-            case "danger":  statusColor = Color.parseColor("#DC2626"); break;
-            default:        statusColor = Color.parseColor("#6B7280"); break;
-        }
+        int statusColor = getStatusColor(status);
         iconContainer.getBackground().setTint(adjustAlpha(statusColor, 0.15f));
         tvDetailIcon.setTextColor(statusColor);
 
-        // ✅ بناء الصفوف حسب نوع العملية
         buildDetails(detailsContainer, statusColor);
-
-        // ✅ بناء الإجراءات
         buildActions(actionsContainer);
     }
 
-    /**
-     * ✅ بناء صفوف التفاصيل
-     */
+    // ═══════════════════════════════════════════════════════
+    // ✅ التفاصيل
+    // ═══════════════════════════════════════════════════════
+
     private void buildDetails(LinearLayout container, int statusColor) {
         if (activity == null) return;
 
         String type = activity.optString("type", "");
 
-        // ✅ التفاصيل العامة
         addDetailRow(container, "📋 " + (isArabic ? "النوع" : "Type"), getTypeName(type));
         addDetailRow(container, "👤 " + (isArabic ? "المستخدم" : "User"), 
                 activity.optString("user", "—"));
 
-        // ✅ تفاصيل حسب النوع
         switch (type) {
             case "sale":
                 double amount = activity.optDouble("amount", 0);
@@ -149,29 +151,20 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
                 addDetailRow(container, "🏷️ " + (isArabic ? "الحالة" : "Status"),
                         activity.optString("rfid_status", "active"));
                 break;
-
-            case "system":
-                // لا شيء إضافي
-                break;
         }
 
-        // ✅ التفاصيل النصية
         String details = isArabic ? activity.optString("details_ar", "") 
                                   : activity.optString("details_en", "");
         if (!details.isEmpty()) {
             addDetailRow(container, "📝 " + (isArabic ? "التفاصيل" : "Details"), details);
         }
 
-        // ✅ Reference ID
         int refId = activity.optInt("reference_id", 0);
         if (refId > 0) {
             addDetailRow(container, "🔖 " + (isArabic ? "المعرف" : "Reference"), "#" + refId);
         }
     }
 
-    /**
-     * ✅ إضافة صف تفصيلي
-     */
     private void addDetailRow(LinearLayout container, String label, String value) {
         View row = getLayoutInflater().inflate(R.layout.item_detail_row, container, false);
         TextView tvLabel = row.findViewById(R.id.tvDetailLabel);
@@ -181,77 +174,109 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         container.addView(row);
     }
 
-    /**
-     * ✅ بناء الإجراءات حسب نوع العملية
-     */
+    // ═══════════════════════════════════════════════════════
+    // ✅ الإجراءات (مربوطة بالشاشات)
+    // ═══════════════════════════════════════════════════════
+
     private void buildActions(LinearLayout container) {
         if (activity == null) return;
 
         String type = activity.optString("type", "");
+        int refId = activity.optInt("reference_id", 0);
 
-        // ═══════════════════════════════════════════════════════
-        // Actions حسب النوع
-        // ═══════════════════════════════════════════════════════
+        switch (type) {
+            // ═══════════════════════════════════════
+            // 🛒 بيع
+            // ═══════════════════════════════════════
+            case "sale":
+                addActionButton(container, "📄 " + (isArabic ? "عرض سجل المبيعات" : "View Sales History"),
+                        v -> {
+                            dismiss();
+                            navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
+                        });
 
-        if ("sale".equals(type)) {
-            addActionButton(container, "🖨️ " + (isArabic ? "طباعة الفاتورة" : "Print Invoice"),
-                    v -> {
-                        Toast.makeText(getContext(),
-                                isArabic ? "🖨️ جاري الطباعة..." : "🖨️ Printing...",
-                                Toast.LENGTH_SHORT).show();
-                        dismiss();
-                    });
-            addActionButton(container, "↩️ " + (isArabic ? "استرجاع" : "Refund"),
-                    v -> {
-                        Toast.makeText(getContext(),
-                                isArabic ? "↩️ فتح شاشة الاسترجاع..." : "↩️ Opening refund...",
-                                Toast.LENGTH_SHORT).show();
-                        dismiss();
-                    });
-        } else if ("inventory".equals(type)) {
-            addActionButton(container, "📋 " + (isArabic ? "عرض التقرير الكامل" : "View Full Report"),
-                    v -> {
-                        Toast.makeText(getContext(),
-                                isArabic ? "📋 جاري فتح التقرير..." : "📋 Opening report...",
-                                Toast.LENGTH_SHORT).show();
-                        dismiss();
-                    });
-            addActionButton(container, "🖨️ " + (isArabic ? "طباعة التقرير" : "Print Report"),
-                    v -> {
-                        Toast.makeText(getContext(),
-                                isArabic ? "🖨️ جاري الطباعة..." : "🖨️ Printing...",
-                                Toast.LENGTH_SHORT).show();
-                        dismiss();
-                    });
-        } else if ("transfer".equals(type)) {
-            addActionButton(container, "🚚 " + (isArabic ? "تتبع التحويل" : "Track Transfer"),
-                    v -> {
-                        Toast.makeText(getContext(),
-                                isArabic ? "🚚 جاري التتبع..." : "🚚 Tracking...",
-                                Toast.LENGTH_SHORT).show();
-                        dismiss();
-                    });
-        } else if ("rfid".equals(type)) {
-            addActionButton(container, "🔍 " + (isArabic ? "فحص الشريحة" : "Verify Chip"),
-                    v -> {
-                        Toast.makeText(getContext(),
-                                isArabic ? "🔍 جاري الفحص..." : "🔍 Verifying...",
-                                Toast.LENGTH_SHORT).show();
-                        dismiss();
-                    });
+                addActionButton(container, "🖨️ " + (isArabic ? "طباعة الفاتورة" : "Print Invoice"),
+                        v -> {
+                            dismiss();
+                            Toast.makeText(getContext(),
+                                    isArabic ? "🖨️ جاري تحضير الفاتورة..." : "🖨️ Preparing invoice...",
+                                    Toast.LENGTH_SHORT).show();
+                            // TODO: استدعاء PrintUtils مع refId
+                            navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
+                        });
+
+                addActionButton(container, "↩️ " + (isArabic ? "فتح الاسترجاع" : "Open Refund"),
+                        v -> {
+                            dismiss();
+                            navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
+                            Toast.makeText(getContext(),
+                                    isArabic ? "↩️ اختر الفاتورة من السجل للاسترجاع" 
+                                             : "↩️ Select the invoice from history to refund",
+                                    Toast.LENGTH_LONG).show();
+                        });
+                break;
+
+            // ═══════════════════════════════════════
+            // 📦 جرد
+            // ═══════════════════════════════════════
+            case "inventory":
+                addActionButton(container, "📋 " + (isArabic ? "عرض شاشة الجرد" : "Open Inventory"),
+                        v -> {
+                            dismiss();
+                            navigateTo(new MiraInventoryProFragment(), "Scan");
+                        });
+
+                addActionButton(container, "📂 " + (isArabic ? "فتح الأرشيف" : "Open Archive"),
+                        v -> {
+                            dismiss();
+                            navigateTo(new MiraInventoryProFragment(), "Scan");
+                            // بعد الفتح، سيُعرض الأرشيف من داخل الشاشة
+                        });
+                break;
+
+            // ═══════════════════════════════════════
+            // 🔄 تحويل
+            // ═══════════════════════════════════════
+            case "transfer":
+                addActionButton(container, "🚚 " + (isArabic ? "فتح التحويلات" : "Open Transfers"),
+                        v -> {
+                            dismiss();
+                            navigateTo(new MiraTransferFragment(), "Transfers");
+                        });
+                break;
+
+            // ═══════════════════════════════════════
+            // 🏷️ RFID
+            // ═══════════════════════════════════════
+            case "rfid":
+                addActionButton(container, "🔍 " + (isArabic ? "فتح إدارة الشرائح" : "Open Bindings"),
+                        v -> {
+                            dismiss();
+                            navigateTo(new MiraRfidBindingsFragment(), "RfidBindings");
+                        });
+                break;
+
+            // ═══════════════════════════════════════
+            // ⚙️ نظام
+            // ═══════════════════════════════════════
+            case "system":
+                addActionButton(container, "📊 " + (isArabic ? "عرض كل العمليات" : "View All Activities"),
+                        v -> {
+                            dismiss();
+                            navigateTo(new MiraAllActivitiesFragment(), "AllActivities");
+                        });
+                break;
         }
 
-        // ═══════════════════════════════════════════════════════
-        // Actions عامة
-        // ═══════════════════════════════════════════════════════
+        // ═══════════════════════════════════════
+        // 📋 إجراء عام — نسخ
+        // ═══════════════════════════════════════
         addActionButton(container, "📋 " + (isArabic ? "نسخ التفاصيل" : "Copy Details"),
                 v -> {
                     String jsonStr = activity.toString();
-                    android.content.ClipboardManager clipboard =
-                            (android.content.ClipboardManager) requireContext()
-                                    .getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip =
-                            android.content.ClipData.newPlainText("Activity", jsonStr);
+                    ClipboardManager clipboard = (ClipboardManager) requireContext()
+                            .getSystemService(Context.CLIPBOARD_SERVICE);
+                    ClipData clip = ClipData.newPlainText("Activity", jsonStr);
                     if (clipboard != null) clipboard.setPrimaryClip(clip);
                     Toast.makeText(getContext(),
                             isArabic ? "✅ تم النسخ" : "✅ Copied",
@@ -261,8 +286,21 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
     }
 
     /**
-     * ✅ إضافة زر إجراء
+     * ✅ الانتقال إلى Fragment
      */
+    private void navigateTo(Fragment fragment, String tag) {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).loadFragment(fragment, tag);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(getContext(),
+                    isArabic ? "⚠️ تعذر فتح الشاشة" : "⚠️ Cannot open screen",
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void addActionButton(LinearLayout container, String text,
                                   View.OnClickListener listener) {
         MaterialButton btn = new MaterialButton(requireContext(), null,
@@ -280,9 +318,22 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         container.addView(btn);
     }
 
-    /**
-     * ✅ تنسيق التاريخ الكامل
-     */
+    // ═══════════════════════════════════════════════════════
+    // ✅ الألوان (تحترم الثيمات)
+    // ═══════════════════════════════════════════════════════
+
+    private int getStatusColor(String status) {
+        Context ctx = getContext();
+        if (ctx == null) return Color.GRAY;
+
+        switch (status) {
+            case "success": return ContextCompat.getColor(ctx, R.color.activity_success);
+            case "warning": return ContextCompat.getColor(ctx, R.color.activity_warning);
+            case "danger":  return ContextCompat.getColor(ctx, R.color.activity_danger);
+            default:        return ContextCompat.getColor(ctx, R.color.activity_neutral);
+        }
+    }
+
     private String formatFullTime(String timestamp) {
         if (timestamp == null || timestamp.isEmpty()) return "—";
         try {
@@ -297,9 +348,6 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
-    /**
-     * ✅ تنسيق المبلغ
-     */
     private String formatAmount(double amount, String currency) {
         try {
             NumberFormat fmt = NumberFormat.getNumberInstance(Locale.US);
@@ -310,9 +358,6 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
-    /**
-     * ✅ اسم النوع بالعربية
-     */
     private String getTypeName(String type) {
         if (!isArabic) return type;
         switch (type) {
@@ -325,9 +370,6 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
-    /**
-     * ✅ اسم مستوى الخطورة
-     */
     private String getRiskName(String risk) {
         if (!isArabic) return risk;
         switch (risk) {
@@ -340,9 +382,6 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
-    /**
-     * ✅ تعديل شفافية اللون
-     */
     private int adjustAlpha(int color, float factor) {
         int alpha = Math.round(Color.alpha(color) * factor);
         int red = Color.red(color);
