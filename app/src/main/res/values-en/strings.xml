@@ -1850,4 +1850,12 @@
     <string name="gate_active">🟢 Active</string>
     <string name="gate_inactive">⚪ Inactive</string>
     <string name="gate_alert_status">🔴 Alert</string>
+    
+    
+    <string name="session_locked_title">🔒 Session Locked</string>
+<string name="session_locked_message">For your security, your session has been locked due to inactivity.\n\nPlease verify your identity to continue.</string>
+<string name="session_locked_info">Last activity: 15 minutes ago</string>
+<string name="unlock_with_biometric">Unlock with Fingerprint</string>
+<string name="logout">Logout</string>
+<string name="security_icon">Security icon</string>
 </resources>
