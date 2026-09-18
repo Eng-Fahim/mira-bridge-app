@@ -287,6 +287,7 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
+    
     private void initViews(View v) {
         try {
             tvTotalItems = v.findViewById(R.id.tvTotalItems);
@@ -403,30 +404,31 @@ public class MiraDashboardFragment extends Fragment {
                 swipeRefresh.setColorSchemeResources(R.color.colorPrimary, R.color.gray1);
             }
 
-            // تحميل حالة الإخفاء
-            android.content.SharedPreferences privacyPrefs =
-                    requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE);
-            isHeroHidden = privacyPrefs.getBoolean(KEY_HIDE_HERO, true);
-            isSalesHidden = privacyPrefs.getBoolean(KEY_HIDE_SALES, true);
+          // ═══════════════════════════════════════════════════════
+// ✅ سياسة أمنية: إجبار الإخفاء دائماً
+// ═══════════════════════════════════════════════════════
+isHeroHidden = true;
+isSalesHidden = true;
 
-            // تطبيق الحالة الأولية
-            updateHeroBalance();
-            applySalesVisibility();
+// ✅ تحديث أيقونات العين
+if (btnToggleHeroVisibility != null) {
+    btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
+}
+if (btnToggleSalesVisibility != null) {
+    btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
+}
 
+// ✅ تطبيق الحالة الأولية
+updateHeroBalance();
+applySalesVisibility();
             // تحديث أيقونات العين
-            if (btnToggleHeroVisibility != null) {
-                btnToggleHeroVisibility.setImageResource(
-                        isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
-            }
-            if (btnToggleSalesVisibility != null) {
-                btnToggleSalesVisibility.setImageResource(
-                        isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
-            }
+            
 
         } catch (Exception e) {
             logNonFatal("initViews", e);
         }
     }
+
 
     private void updateHeader() {
         // Greeting Card محذوف
@@ -510,44 +512,44 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void toggleHeroVisibility() {
-        if (!isAdded() || tvHeroBalance == null) return;
+    if (!isAdded() || tvHeroBalance == null) return;
 
-        isHeroHidden = !isHeroHidden;
+    isHeroHidden = !isHeroHidden;
 
-        requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY_HIDE_HERO, isHeroHidden).apply();
+    // ✅ لا نحفظ في SharedPreferences — تُعاد للإخفاء دائماً عند مغادرة الشاشة
+    // requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
+    //         .edit().putBoolean(KEY_HIDE_HERO, isHeroHidden).apply();
 
-        if (btnToggleHeroVisibility != null) {
-            btnToggleHeroVisibility.setImageResource(
-                    isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
-        }
-
-        updateHeroBalance();
-
-        Log.d(TAG, "✅ Hero visibility toggled. isHeroHidden=" + isHeroHidden);
+    if (btnToggleHeroVisibility != null) {
+        btnToggleHeroVisibility.setImageResource(
+                isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
     }
+
+    updateHeroBalance();
+
+    Log.d(TAG, "✅ Hero visibility toggled (temporary). isHeroHidden=" + isHeroHidden);
+}
 
     // ═══════════════════════════════════════════════════════
     // Sales Visibility
     // ═══════════════════════════════════════════════════════
 
     private void toggleSalesVisibility() {
-        if (!isAdded() || tvSalesToday == null) return;
+    if (!isAdded() || tvSalesToday == null) return;
 
-        isSalesHidden = !isSalesHidden;
+    isSalesHidden = !isSalesHidden;
 
-        requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY_HIDE_SALES, isSalesHidden).apply();
+    // ✅ لا نحفظ — تُعاد للإخفاء دائماً عند مغادرة الشاشة
 
-        if (btnToggleSalesVisibility != null) {
-            btnToggleSalesVisibility.setImageResource(
-                    isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
-        }
-
-        applySalesVisibility();
-
-        Log.d(TAG, "✅ Sales visibility toggled. isSalesHidden=" + isSalesHidden);
+    if (btnToggleSalesVisibility != null) {
+        btnToggleSalesVisibility.setImageResource(
+                isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
     }
+
+    applySalesVisibility();
+
+    Log.d(TAG, "✅ Sales visibility toggled (temporary). isSalesHidden=" + isSalesHidden);
+}
 
     private void applySalesVisibility() {
         if (isSalesHidden) {
@@ -1570,40 +1572,89 @@ private void handleRecentActivityClick(JSONObject activity) {
             logNonFatal("onBranchChanged", e);
         }
     }
+@Override
+public void onResume() {
+    super.onResume();
+    try {
+        // ✅ سياسة أمنية: إجبار الإخفاء عند العودة للشاشة
+        isHeroHidden = true;
+        isSalesHidden = true;
+
+        if (btnToggleHeroVisibility != null) {
+            btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
+        }
+        if (btnToggleSalesVisibility != null) {
+            btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
+        }
+
+        registerDataRefreshReceiver();
+        isDataLoaded = false;
+        lastDataFetchTime = 0;
+
+        int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        if (latestBranchId != currentBranchId) {
+            onBranchChanged();
+        } else if (isViewInitialized) {
+            setupQuickAccessGrid();
+            updateHeader();
+            syncOrgProfileFromServer(false);
+            refreshInternalData();
+        }
+        startAutoRefresh();
+    } catch (Exception e) {
+        logNonFatal("onResume", e);
+    }
+}
 
     @Override
-    public void onResume() {
-        super.onResume();
-        try {
-            registerDataRefreshReceiver();
-            isDataLoaded = false;
-            lastDataFetchTime = 0;
+public void onPause() {
+    super.onPause();
+    try {
+        unregisterDataRefreshReceiver();
+        stopAutoRefresh();
 
-            int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            if (latestBranchId != currentBranchId) {
-                onBranchChanged();
-            } else if (isViewInitialized) {
-                setupQuickAccessGrid();
-                updateHeader();
-                syncOrgProfileFromServer(false);
-                refreshInternalData();
+        // ✅ سياسة أمنية: إعادة الإخفاء عند مغادرة الشاشة
+        hideSensitiveValuesOnExit();
+
+    } catch (Exception e) {
+        logNonFatal("onPause", e);
+    }
+}
+
+/**
+ * ✅ إعادة الإخفاء عند مغادرة الشاشة
+ * - تُستدعى في onPause (تغطي: التنقل، تبديل التطبيقات، إغلاق)
+ * - تُستدعى أيضاً في onStop للأمان الإضافي
+ */
+private void hideSensitiveValuesOnExit() {
+    try {
+        // ✅ إعادة الإخفاء
+        if (!isHeroHidden) {
+            isHeroHidden = true;
+            if (btnToggleHeroVisibility != null) {
+                btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             }
-            startAutoRefresh();
-        } catch (Exception e) {
-            logNonFatal("onResume", e);
+            Log.d(TAG, "🔒 Hero value hidden on exit");
         }
-    }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        try {
-            unregisterDataRefreshReceiver();
-            stopAutoRefresh();
-        } catch (Exception e) {
-            logNonFatal("onPause", e);
+        if (!isSalesHidden) {
+            isSalesHidden = true;
+            if (btnToggleSalesVisibility != null) {
+                btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
+            }
+            Log.d(TAG, "🔒 Sales value hidden on exit");
         }
+    } catch (Exception e) {
+        logNonFatal("hideSensitiveValuesOnExit", e);
     }
+}
+
+@Override
+public void onStop() {
+    super.onStop();
+    // ✅ للأمان: تأكيد الإخفاء عند إيقاف الشاشة
+    hideSensitiveValuesOnExit();
+}
 
     @Override
     public void onDestroyView() {
