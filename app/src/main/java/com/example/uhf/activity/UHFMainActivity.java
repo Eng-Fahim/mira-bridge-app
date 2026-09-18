@@ -1105,45 +1105,57 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
     // ==================== التنقل السريع (BottomNav) ====================
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-            if (fabActionCenter != null) {
-                boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
-                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-                fabActionCenter.setEnabled(hasQuickActions);
-                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+        if (fabActionCenter != null) {
+            boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
+            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+            fabActionCenter.setEnabled(hasQuickActions);
+            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+            // ✅ Tooltip عند الضغط المطوّل
+fabActionCenter.setOnLongClickListener(v -> {
+    Toast.makeText(UHFMainActivity.this,
+            isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
+            Toast.LENGTH_SHORT).show();
+    return true;
+});
+
+            // ✅ Pulse Animation لجذب الانتباه
+            if (hasQuickActions) {
+                pulseFab(fabActionCenter);
             }
-
-            if (quickNav != null) {
-                quickNav.setOnItemSelectedListener(item -> {
-                    int id = item.getItemId();
-                    String tag = getFragmentTagForNavItem(id);
-                    if (tag == null || tag.isEmpty()) return false;
-
-                    // ✅ تجاهل إذا كان نفس التبويب الحالي
-                    if (navigationManager != null
-                            && tag.equals(navigationManager.getCurrentFragmentTag())) {
-                        return true;
-                    }
-
-                    // ✅ استخدم loadFragmentDirectly (يمسح Back Stack)
-                    Fragment fragment = navigationManager != null
-                            ? navigationManager.createFragmentByTag(tag)
-                            : FragmentFactory.createFragmentByTag(tag);
-
-                    if (fragment != null) {
-                        loadFragmentDirectly(fragment, tag);
-                        return true;
-                    }
-                    return false;
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
         }
+
+        if (quickNav != null) {
+            quickNav.setOnItemSelectedListener(item -> {
+                int id = item.getItemId();
+                String tag = getFragmentTagForNavItem(id);
+                if (tag == null || tag.isEmpty()) return false;
+
+                // ✅ تجاهل إذا كان نفس التبويب الحالي
+                if (navigationManager != null
+                        && tag.equals(navigationManager.getCurrentFragmentTag())) {
+                    return true;
+                }
+
+                // ✅ استخدم loadFragmentDirectly (يمسح Back Stack)
+                Fragment fragment = navigationManager != null
+                        ? navigationManager.createFragmentByTag(tag)
+                        : FragmentFactory.createFragmentByTag(tag);
+
+                if (fragment != null) {
+                    loadFragmentDirectly(fragment, tag);
+                    return true;
+                }
+                return false;
+            });
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
 
     private String getFragmentTagForNavItem(int itemId) {
         if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
@@ -2255,4 +2267,33 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
+    
+    
+    /**
+ * ✅ نبضات FAB لجذب انتباه المستخدم
+ * - 3 نبضات عند فتح الشاشة الرئيسية
+ * - تبدأ بعد 1.5 ثانية من الفتح
+ */
+private void pulseFab(View fab) {
+    try {
+        if (fab == null) return;
+
+        android.animation.ObjectAnimator scaleX = android.animation.ObjectAnimator
+                .ofFloat(fab, "scaleX", 1f, 1.15f, 1f);
+        android.animation.ObjectAnimator scaleY = android.animation.ObjectAnimator
+                .ofFloat(fab, "scaleY", 1f, 1.15f, 1f);
+
+        scaleX.setDuration(600);
+        scaleY.setDuration(600);
+        scaleX.setRepeatCount(2);
+        scaleY.setRepeatCount(2);
+        scaleX.setStartDelay(1500);
+        scaleY.setStartDelay(1500);
+
+        scaleX.start();
+        scaleY.start();
+    } catch (Exception e) {
+        Log.e(TAG, "pulseFab error: " + e.getMessage());
+    }
+}
                     }
