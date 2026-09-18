@@ -425,13 +425,46 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 updateLastScan(normalizedEpc, rssi);
             }
             @Override public void onDuplicateTag(String epc) {}
-            @Override public void onError(String error) {
-                if (isAdded() && !isFragmentDestroyed) {
-                    Toast.makeText(requireContext(),
-                            (isArabic ? "خطأ: " : "Error: ") + error,
-                            Toast.LENGTH_SHORT).show();
-                }
-            }
+            @Override
+public void onError(String error) {
+    mainHandler.post(() -> {
+        if (isFragmentDestroyed || !isAdded()) return;
+        
+        // ✅ رسالة خطأ واضحة مع خيارات
+        String title = isArabic ? "⚠️ فشل تحميل الكاتولوج" 
+                                : "⚠️ Catalog Load Failed";
+        String message = (error != null && !error.isEmpty()) 
+                ? error 
+                : (isArabic ? "فشل غير معروف" : "Unknown error");
+        
+        if (tvInventoryStatus != null) {
+            tvInventoryStatus.setText(
+                    isArabic ? "⚠️ فشل التحميل" : "⚠️ Load failed");
+        }
+        
+        // ✅ Dialog مع 3 خيارات
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(title)
+                .setMessage(message + "\n\n" + 
+                        (isArabic ? "هل تريد إعادة المحاولة؟" 
+                                  : "Retry?"))
+                .setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", 
+                        (d, w) -> {
+                            d.dismiss();
+                            mainHandler.postDelayed(() -> startScanning(), 500);
+                        })
+                .setNeutralButton(isArabic ? "⚡ جرد أعمى" : "⚡ Blind Mode",
+                        (d, w) -> {
+                            d.dismiss();
+                            startBlindInventory();
+                        })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", 
+                        (d, w) -> d.dismiss())
+                .setCancelable(false)
+                .show();
+    });
+}
+
             @Override public void onConnectionChanged(boolean isConnected) {
                 handleConnectionChanged(isConnected);
             }
@@ -1560,4 +1593,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     public boolean isCurrentlyScanning() {
         return isScanning();
     }
-}
+            }
