@@ -174,7 +174,7 @@
                     </LinearLayout>
                 </RelativeLayout>
 
-                <!-- ==================== 2. HERO BALANCE CARD — مع زر العين ==================== -->
+                <!-- ==================== 2. HERO BALANCE CARD — تصميم محسّن ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
                     android:layout_width="match_parent"
@@ -191,7 +191,7 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
-                        <!-- Header: Label + Eye + Trend -->
+                        <!-- ============ Header: Label + Eye + Trend ============ -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -209,7 +209,6 @@
                                 android:letterSpacing="0.05"
                                 tools:text="💰 إجمالي قيمة المخزون" />
 
-                            <!-- ✅ زر إظهار/إخفاء قيمة المخزون -->
                             <ImageButton
                                 android:id="@+id/btnToggleHeroVisibility"
                                 android:layout_width="28dp"
@@ -234,38 +233,157 @@
                                 tools:text="📈 +2.4%" />
                         </LinearLayout>
 
-                        <!-- القيمة (مخفية افتراضياً) -->
-                        <TextView
-                            android:id="@+id/tvHeroBalance"
-                            android:layout_width="wrap_content"
+                        <!-- ============ القيمة (في صندوق فاخر) ============ -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="••••••••"
-                            android:textColor="?attr/colorOnPrimaryContainer"
-                            android:textSize="30sp"
-                            android:textStyle="bold"
-                            android:textDirection="ltr"
-                            android:letterSpacing="-0.02"
-                            tools:text="$81,647.51" />
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_sparkline_placeholder"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingVertical="16dp">
 
-                        <!-- Subtitle: عدد + وزن -->
-                        <TextView
-                            android:id="@+id/tvHeroSubtitle"
-                            android:layout_width="wrap_content"
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/current_inventory_value"
+                                android:textColor="?attr/colorOnPrimaryContainer"
+                                android:textSize="11sp"
+                                android:alpha="0.75" />
+
+                            <TextView
+                                android:id="@+id/tvHeroBalance"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="••••••••"
+                                android:textColor="?attr/colorOnPrimaryContainer"
+                                android:textSize="30sp"
+                                android:textStyle="bold"
+                                android:textDirection="ltr"
+                                android:letterSpacing="-0.02"
+                                tools:text="$81,647.51" />
+
+                            <TextView
+                                android:id="@+id/tvHeroSubtitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:textColor="?attr/colorOnPrimaryContainer"
+                                android:textSize="11sp"
+                                android:alpha="0.8"
+                                tools:text="👑 7 قطع • 615.0g" />
+                        </LinearLayout>
+
+                        <!-- ============ إحصائيات سريعة أسفل القيمة ============ -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:textColor="?attr/colorOnPrimaryContainer"
-                            android:textSize="11sp"
-                            android:alpha="0.8"
-                            tools:text="👑 7 قطع ذهبية • 615.0g" />
+                            android:layout_marginTop="12dp"
+                            android:baselineAligned="false"
+                            android:orientation="horizontal"
+                            android:weightSum="3">
 
-                        <!-- Sparkline placeholder -->
+                            <!-- Items -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvHeroItems"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0"
+                                    android:textColor="?attr/colorOnPrimaryContainer"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="7" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/items_label"
+                                    android:textColor="?attr/colorOnPrimaryContainer"
+                                    android:textSize="10sp"
+                                    android:alpha="0.7" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="match_parent"
+                                android:background="?attr/colorOutlineVariant"
+                                android:alpha="0.4" />
+
+                            <!-- Weight -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvHeroWeight"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0.0g"
+                                    android:textColor="?attr/colorOnPrimaryContainer"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="615.0g" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/total_weight_label"
+                                    android:textColor="?attr/colorOnPrimaryContainer"
+                                    android:textSize="10sp"
+                                    android:alpha="0.7" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="match_parent"
+                                android:background="?attr/colorOutlineVariant"
+                                android:alpha="0.4" />
+
+                            <!-- Gold Price 24K -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvHeroGoldPrice"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$0.00"
+                                    android:textColor="?attr/colorOnPrimaryContainer"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="$137.68" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/gold_24k_per_gram"
+                                    android:textColor="?attr/colorOnPrimaryContainer"
+                                    android:textSize="10sp"
+                                    android:alpha="0.7" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- ✅ Sparkline placeholder (مخفي للحفاظ على التوافق) -->
                         <View
                             android:id="@+id/heroSparkline"
                             android:layout_width="match_parent"
-                            android:layout_height="40dp"
-                            android:layout_marginTop="10dp"
-                            android:background="@drawable/bg_sparkline_placeholder" />
+                            android:layout_height="0dp"
+                            android:visibility="gone" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
