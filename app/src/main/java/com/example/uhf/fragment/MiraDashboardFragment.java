@@ -23,11 +23,13 @@ import androidx.constraintlayout.motion.widget.MotionLayout;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.adapter.ActivityTimelineAdapter;   // ✅ جديد
 import com.example.uhf.adapter.QuickActionsAdapter;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
@@ -38,6 +40,7 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
 
+import org.json.JSONArray;                                 // ✅ جديد
 import org.json.JSONObject;
 
 import java.text.NumberFormat;
@@ -96,11 +99,16 @@ public class MiraDashboardFragment extends Fragment {
 
     private View heroBalanceCard, heroSparkline;
     private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
-    private TextView tvHeroValueYER, tvHeroValueSAR, tvHeroValueUSD;  // ✅ جديد
+    private TextView tvHeroValueYER, tvHeroValueSAR, tvHeroValueUSD;
     private View alertsStrip;
     private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
     private View liveStatusDot;
     private TextView tvLiveStatusText;
+
+    // ✅ Recent Activity
+    private RecyclerView rvRecentActivity;
+    private ActivityTimelineAdapter recentActivityAdapter;
+    private TextView tvViewAllActivity;
 
     // ═══════════════════════════════════════════════════════
     // Managers & State
@@ -227,7 +235,6 @@ public class MiraDashboardFragment extends Fragment {
             setupProfileListener();
             setupBranchListener();
             setupQuickAccessGrid();
-            
 
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
@@ -246,6 +253,9 @@ public class MiraDashboardFragment extends Fragment {
 
             syncOrgProfileFromServer(false);
             fetchData();
+
+            // ✅ تحميل آخر العمليات
+            fetchRecentActivity();
 
             startAutoRefresh();
         } catch (Throwable e) {
@@ -283,7 +293,7 @@ public class MiraDashboardFragment extends Fragment {
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-            
+
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
             tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
@@ -316,11 +326,29 @@ public class MiraDashboardFragment extends Fragment {
             btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
 
+            // ✅ Recent Activity
+            rvRecentActivity = v.findViewById(R.id.rvRecentActivity);
+            tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
+
+            if (rvRecentActivity != null) {
+                rvRecentActivity.setLayoutManager(new LinearLayoutManager(requireContext()));
+                recentActivityAdapter = new ActivityTimelineAdapter(
+                        isArabic,
+                        activity -> handleRecentActivityClick(activity));
+                rvRecentActivity.setAdapter(recentActivityAdapter);
+                rvRecentActivity.setHasFixedSize(false);
+                rvRecentActivity.setNestedScrollingEnabled(false);
+            }
+
+            if (tvViewAllActivity != null) {
+                tvViewAllActivity.setOnClickListener(v2 ->
+                        navigateToFragment(new MiraInventoryProFragment(), "Scan"));
+            }
+
             // ═══════════════════════════════════════
             // Listeners
             // ═══════════════════════════════════════
 
-            // ✅ زر تحديث الذهب — مع Logs للتشخيص
             if (btnRefreshGold != null) {
                 btnRefreshGold.setOnClickListener(v2 -> {
                     Log.d(TAG, "🔘 Refresh Gold button clicked. isGoldRefreshing=" + isGoldRefreshing.get());
@@ -332,7 +360,6 @@ public class MiraDashboardFragment extends Fragment {
                 });
             }
 
-            // ✅ زر إخفاء/إظهار قيمة المخزون
             if (btnToggleHeroVisibility != null) {
                 btnToggleHeroVisibility.setOnClickListener(v2 -> {
                     Log.d(TAG, "👁️ Toggle Hero visibility clicked. Before: " + isHeroHidden);
@@ -340,7 +367,6 @@ public class MiraDashboardFragment extends Fragment {
                 });
             }
 
-            // ✅ زر إخفاء/إظهار المبيعات
             if (btnToggleSalesVisibility != null) {
                 btnToggleSalesVisibility.setOnClickListener(v2 -> {
                     Log.d(TAG, "👁️ Toggle Sales visibility clicked. Before: " + isSalesHidden);
@@ -367,10 +393,9 @@ public class MiraDashboardFragment extends Fragment {
                 rvQuickActions.setAdapter(quickAdapter);
             }
 
-            // ✅ SwipeRefreshLayout
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
-                swipeRefresh.setColorSchemeResources(R.color.colorPrimary,R.color.gray1);
+                swipeRefresh.setColorSchemeResources(R.color.colorPrimary, R.color.gray1);
             }
 
             // تحميل حالة الإخفاء
@@ -406,95 +431,79 @@ public class MiraDashboardFragment extends Fragment {
     // Hero Balance
     // ═══════════════════════════════════════════════════════
 
- /**
- * ✅ الدالة الموحّدة لتحديث قيمة المخزون
- * - تحسب القيمة من inventory_value أو من الوزن × سعر الذهب
- * - تحترم حالة isHeroHidden
- * - ✅ محدّثة لعرض 3 إحصائيات إضافية (عدد، وزن، سعر الذهب)
- */
-private void updateHeroBalance() {
-    try {
-        if (tvHeroBalance == null) return;
+    private void updateHeroBalance() {
+        try {
+            if (tvHeroBalance == null) return;
 
-        double totalValue = currentInventoryValue;
-        int itemCount = currentItemCount;
-        double totalWeight = currentTotalWeight;
+            double totalValue = currentInventoryValue;
+            int itemCount = currentItemCount;
+            double totalWeight = currentTotalWeight;
 
-        // حساب من سعر الذهب إذا القيمة صفر
-        if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
-            double price24 = priceManager.getGoldPricePerGram(24);
-            if (price24 > 0) {
-                totalValue = totalWeight * price24;
+            // حساب من سعر الذهب إذا القيمة صفر
+            if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+                double price24 = priceManager.getGoldPricePerGram(24);
+                if (price24 > 0) {
+                    totalValue = totalWeight * price24;
+                }
             }
+
+            // ✅ عرض القيمة — مع الإخفاء
+            if (isHeroHidden) {
+                tvHeroBalance.setText("••••••••");
+            } else {
+                tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+            }
+
+            // Subtitle يظهر دائماً
+            if (tvHeroSubtitle != null) {
+                tvHeroSubtitle.setText(String.format(
+                        "👑 %d قطعة • %.1fg", itemCount, totalWeight));
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ✅ عرض القيمة بـ 3 عملات
+            // ═══════════════════════════════════════════════════════
+
+            // 1. بالدولار الأمريكي
+            String usdText;
+            if (isHeroHidden) {
+                usdText = "••••••";
+            } else {
+                usdText = String.format(Locale.US, "%,.2f", totalValue);
+            }
+            if (tvHeroValueUSD != null) {
+                tvHeroValueUSD.setText(usdText);
+            }
+
+            // 2. بالريال السعودي (USD × 3.75)
+            String sarText;
+            if (isHeroHidden) {
+                sarText = "••••••";
+            } else {
+                double sarValue = totalValue * 3.75;
+                sarText = String.format(Locale.US, "%,.2f", sarValue);
+            }
+            if (tvHeroValueSAR != null) {
+                tvHeroValueSAR.setText(sarText);
+            }
+
+            // 3. بالريال اليمني (USD × 530)
+            String yerText;
+            if (isHeroHidden) {
+                yerText = "••••••";
+            } else {
+                double yerValue = totalValue * 530.0;
+                yerText = String.format(Locale.US, "%,.0f", yerValue);
+            }
+            if (tvHeroValueYER != null) {
+                tvHeroValueYER.setText(yerText);
+            }
+
+        } catch (Exception e) {
+            logNonFatal("updateHeroBalance", e);
         }
-
-        // ✅ عرض القيمة — مع الإخفاء
-        if (isHeroHidden) {
-            tvHeroBalance.setText("••••••••");
-        } else {
-            tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
-        }
-
-        // Subtitle يظهر دائماً
-        if (tvHeroSubtitle != null) {
-            tvHeroSubtitle.setText(String.format(
-                    "👑 %d قطعة • %.1fg", itemCount, totalWeight));
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ✅ الإحصائيات الثلاث الجديدة (أسفل القيمة)
-        // ═══════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════
-// ✅ عرض القيمة بـ 3 عملات
-// ═══════════════════════════════════════════════════════
-
-// 1. بالدولار الأمريكي (القيمة الأساسية)
-String usdText;
-if (isHeroHidden) {
-    usdText = "••••••";
-} else {
-    usdText = String.format(Locale.US, "%,.2f", totalValue);
-}
-if (tvHeroValueUSD != null) {
-    tvHeroValueUSD.setText(usdText);
-}
-
-// 2. بالريال السعودي (USD × 3.75)
-String sarText;
-if (isHeroHidden) {
-    sarText = "••••••";
-} else {
-    double sarValue = totalValue * 3.75;
-    sarText = String.format(Locale.US, "%,.2f", sarValue);
-}
-if (tvHeroValueSAR != null) {
-    tvHeroValueSAR.setText(sarText);
-}
-
-// 3. بالريال اليمني (USD × 530 - متوسط سعر الصرف)
-String yerText;
-if (isHeroHidden) {
-    yerText = "••••••";
-} else {
-    double yerValue = totalValue * 530.0;
-    yerText = String.format(Locale.US, "%,.0f", yerValue);
-}
-if (tvHeroValueYER != null) {
-    tvHeroValueYER.setText(yerText);
-}
-
-    } catch (Exception e) {
-        logNonFatal("updateHeroBalance", e);
     }
-}
 
-    /**
-     * ✅ إخفاء/إظهار قيمة المخزون
-     * - عكس الحالة
-     * - حفظ في SharedPreferences
-     * - تحديث الأيقونة
-     * - استدعاء updateHeroBalance() مباشرة
-     */
     private void toggleHeroVisibility() {
         if (!isAdded() || tvHeroBalance == null) return;
 
@@ -508,7 +517,6 @@ if (tvHeroValueYER != null) {
                     isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
         }
 
-        // ✅ استدعاء الدالة الموحّدة
         updateHeroBalance();
 
         Log.d(TAG, "✅ Hero visibility toggled. isHeroHidden=" + isHeroHidden);
@@ -997,53 +1005,50 @@ if (tvHeroValueYER != null) {
             logNonFatal("displayGoldPricesFromCache", e);
         }
     }
-    
-    
-    /**
- * ✅ حساب اتجاه تغير سعر الذهب ومقارنته بالسعر السابق
- */
-private void calculateTrend(double currentPrice) {
-    if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
 
-    sharedExecutor.execute(() -> {
-        try {
-            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
+    private void calculateTrend(double currentPrice) {
+        if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
 
-            if (previousPrice > 0 && currentPrice > 0) {
-                double change = currentPrice - previousPrice;
-                double changePercent = (change / previousPrice) * 100;
+        sharedExecutor.execute(() -> {
+            try {
+                double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
 
-                mainHandler.post(() -> {
-                    if (!isAdded()) return;
-                    if (change > 0) {
-                        tvGoldTrend.setText("📈");
-                        tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
-                        tvGoldChange.setTextColor(0xFF16A34A);
-                    } else if (change < 0) {
-                        tvGoldTrend.setText("📉");
-                        tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
-                        tvGoldChange.setTextColor(0xFFDC2626);
-                    } else {
-                        tvGoldTrend.setText("➡️");
-                        tvGoldChange.setText("0.00%");
-                        tvGoldChange.setTextColor(0xFF6B7280);
-                    }
+                if (previousPrice > 0 && currentPrice > 0) {
+                    double change = currentPrice - previousPrice;
+                    double changePercent = (change / previousPrice) * 100;
 
-                    if (tvHeroTrend != null) {
-                        String trendText = String.format(Locale.US, "%.2f%%", changePercent);
-                        tvHeroTrend.setText((change > 0 ? "📈 " : change < 0 ? "📉 " : "➡️ ") + trendText);
-                    }
-                });
+                    mainHandler.post(() -> {
+                        if (!isAdded()) return;
+                        if (change > 0) {
+                            tvGoldTrend.setText("📈");
+                            tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
+                            tvGoldChange.setTextColor(0xFF16A34A);
+                        } else if (change < 0) {
+                            tvGoldTrend.setText("📉");
+                            tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
+                            tvGoldChange.setTextColor(0xFFDC2626);
+                        } else {
+                            tvGoldTrend.setText("➡️");
+                            tvGoldChange.setText("0.00%");
+                            tvGoldChange.setTextColor(0xFF6B7280);
+                        }
+
+                        if (tvHeroTrend != null) {
+                            String trendText = String.format(Locale.US, "%.2f%%", changePercent);
+                            tvHeroTrend.setText((change > 0 ? "📈 " : change < 0 ? "📉 " : "➡️ ") + trendText);
+                        }
+                    });
+                }
+
+                if (currentPrice > 0) {
+                    offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
+                }
+            } catch (Exception e) {
+                logNonFatal("calculateTrend", e);
             }
+        });
+    }
 
-            if (currentPrice > 0) {
-                offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
-            }
-        } catch (Exception e) {
-            logNonFatal("calculateTrend", e);
-        }
-    });
-}
     // ═══════════════════════════════════════════════════════
     // Offline Data
     // ═══════════════════════════════════════════════════════
@@ -1164,7 +1169,6 @@ private void calculateTrend(double currentPrice) {
                             loadOfflineData();
                             showShimmer(false);
                         }
-                        // ✅ إيقاف SwipeRefresh دائماً
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
                 } catch (Exception e) {
@@ -1212,26 +1216,77 @@ private void calculateTrend(double currentPrice) {
         }
     }
 
-    private void setupListeners() {
-        try {
-            if (btnGate != null && permissionManager != null) {
-                boolean canAccess = permissionManager.canAccessFragment("SecureGate");
-                btnGate.setVisibility(canAccess ? View.VISIBLE : View.GONE);
-                if (canAccess) {
-                    btnGate.setOnClickListener(v ->
-                            navigateToFragment(new MiraSecureGateFragment(), "SecureGate"));
-                }
+    // ═══════════════════════════════════════════════════════
+    // ✅ Recent Activity (NEW)
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * ✅ جلب آخر 10 عمليات من الـ API الموحّد
+     */
+    private void fetchRecentActivity() {
+        if (apiClient == null || !isAdded()) return;
+
+        sharedExecutor.execute(() -> {
+            try {
+                int branchId = branchesManager != null
+                        ? branchesManager.getActiveBranchId() : 0;
+
+                MiraApiClient.ApiResponse response =
+                        apiClient.getUnifiedActivity(branchId, 10);
+
+                mainHandler.post(() -> {
+                    if (!isAdded() || response == null) return;
+
+                    if (response.isSuccess && response.data != null) {
+                        try {
+                            JSONArray activities = response.data.optJSONArray("activities");
+                            if (activities != null && activities.length() > 0) {
+                                List<JSONObject> list = new ArrayList<>();
+                                int max = Math.min(activities.length(), 10);
+                                for (int i = 0; i < max; i++) {
+                                    list.add(activities.getJSONObject(i));
+                                }
+                                if (recentActivityAdapter != null) {
+                                    recentActivityAdapter.submitList(list);
+                                }
+                            }
+                        } catch (Exception e) {
+                            logNonFatal("fetchRecentActivity.parse", e);
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                logNonFatal("fetchRecentActivity", e);
             }
-            if (btnInventory != null && permissionManager != null) {
-                boolean canAccess = permissionManager.canAccessFragment("Scan");
-                btnInventory.setVisibility(canAccess ? View.VISIBLE : View.GONE);
-                if (canAccess) {
-                    btnInventory.setOnClickListener(v ->
-                            navigateToFragment(new MiraUHFReadTagFragment(), "Scan"));
-                }
+        });
+    }
+
+    /**
+     * ✅ عند النقر على عملية → فتح الشاشة المناسبة
+     */
+    private void handleRecentActivityClick(JSONObject activity) {
+        if (activity == null) return;
+        try {
+            String type = activity.optString("type", "");
+
+            switch (type) {
+                case "sale":
+                    navigateToFragment(new MiraSalesHistoryFragment(), "SalesHistory");
+                    break;
+                case "inventory":
+                    navigateToFragment(new MiraInventoryProFragment(), "Scan");
+                    break;
+                case "transfer":
+                    navigateToFragment(new MiraTransferFragment(), "Transfers");
+                    break;
+                case "rfid":
+                    navigateToFragment(new MiraRfidBindingsFragment(), "RfidBindings");
+                    break;
+                default:
+                    break;
             }
         } catch (Exception e) {
-            logNonFatal("setupListeners", e);
+            logNonFatal("handleRecentActivityClick", e);
         }
     }
 
@@ -1274,6 +1329,7 @@ private void calculateTrend(double currentPrice) {
             lastDataFetchTime = 0;
             isLoading.set(false);
             fetchData();
+            fetchRecentActivity();
 
             long now = System.currentTimeMillis();
             if (permissionManager != null
@@ -1297,7 +1353,6 @@ private void calculateTrend(double currentPrice) {
                 tvLiveStatusText.setTextColor(0xFFF59E0B);
             }
 
-            // ✅ Timeout للأمان: إذا لم ينتهِ التحديث خلال 15 ثانية، أوقف SwipeRefresh
             if (swipeTimeoutRunnable != null) {
                 mainHandler.removeCallbacks(swipeTimeoutRunnable);
             }
@@ -1310,6 +1365,7 @@ private void calculateTrend(double currentPrice) {
             mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
 
             fetchData();
+            fetchRecentActivity();
 
             long now = System.currentTimeMillis();
             if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
@@ -1482,6 +1538,7 @@ private void calculateTrend(double currentPrice) {
                 loadOfflineData();
                 showShimmer(true);
                 fetchData();
+                fetchRecentActivity();
             }
         } catch (Exception e) {
             logNonFatal("onBranchChanged", e);
@@ -1569,4 +1626,4 @@ private void calculateTrend(double currentPrice) {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-                        }
+                }
