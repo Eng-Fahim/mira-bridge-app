@@ -1664,6 +1664,33 @@ private void openRfidSettings() {
 
         if (tvIdTitle != null) tvIdTitle.setText(title);
         if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
+        
+        // ✅ [جديد] عرض صورة القطعة إذا كانت متوفرة
+ImageView imgIdentityPhoto = view.findViewById(R.id.imgIdentityPhoto);
+if (imgIdentityPhoto != null && photos != null && !photos.isEmpty()) {
+    String firstPhotoPath = photos.get(0); // أخذ أول صورة (أو الصورة الأساسية)
+    File imgFile = new File(firstPhotoPath);
+    
+    if (imgFile.exists()) {
+        imgIdentityPhoto.setVisibility(View.VISIBLE);
+        
+        // استخدام Glide (الأفضل) - تأكد من إضافة الاعتمادية في build.gradle
+        Glide.with(requireContext())
+             .load(imgFile)
+             .placeholder(R.drawable.placeholder_image) // صورة مؤقتة أثناء التحميل
+             .error(R.drawable.ic_error_outline)        // صورة في حال الفشل
+             .into(imgIdentityPhoto);
+             
+        // بديل بدون Glide (لا ينصح به للصور الكبيرة):
+        // Bitmap myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
+        // imgIdentityPhoto.setImageBitmap(myBitmap);
+        
+    } else {
+        imgIdentityPhoto.setVisibility(View.GONE);
+    }
+} else {
+    imgIdentityPhoto.setVisibility(View.GONE);
+}
         // تعيين العيار والوزن
 if (tvIdMetalKarat != null) tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
 if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
