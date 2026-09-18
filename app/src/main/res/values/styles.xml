@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:android="http://schemas.android.com/apk/res/android">
+<resources xmlns:android="http://schemas.android.com/schemas/android">
     <!-- ==================== أشكال الحواف الفاخرة ==================== -->
     <style name="CircleImageView">
         <item name="cornerSize">50%</item>
@@ -29,27 +29,27 @@
         <item name="android:itemIconDisabledAlpha">0.5</item>
     </style>
 
-  <style name="TransparentBottomSheetDialog" parent="Theme.Material3.DayNight.BottomSheetDialog">
-    <item name="android:windowIsFloating">false</item>
-    <item name="android:windowIsTranslucent">true</item>
-    <item name="android:windowBackground">@android:color/transparent</item>
-    <item name="android:backgroundDimEnabled">true</item>
-    <item name="android:backgroundDimAmount">0.5</item>
-    <item name="bottomSheetStyle">@style/TransparentBottomSheetStyle</item>
-    <item name="android:windowContentOverlay">@null</item>
-    <item name="android:windowNoTitle">true</item>
-</style>
+    <style name="TransparentBottomSheetDialog" parent="Theme.Material3.DayNight.BottomSheetDialog">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.5</item>
+        <item name="bottomSheetStyle">@style/TransparentBottomSheetStyle</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 
-<style name="TransparentBottomSheetStyle" parent="Widget.Material3.BottomSheet.Modal">
-    <item name="android:background">@android:color/transparent</item>
-    <item name="behavior_peekHeight">auto</item>
-    <item name="behavior_hideable">true</item>
-    <item name="behavior_draggable">true</item>
-</style>
+    <style name="TransparentBottomSheetStyle" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="behavior_peekHeight">auto</item>
+        <item name="behavior_hideable">true</item>
+        <item name="behavior_draggable">true</item>
+    </style>
 
     <!-- ==================== Bottom Navigation ==================== -->
     <style name="CustomActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <item name="android:color">#25D9A736</item>
+        <item name="android:color">#1AC59B27</item>
         <item name="android:width">56dp</item>
         <item name="android:height">32dp</item>
         <item name="marginHorizontal">4dp</item>
@@ -169,45 +169,42 @@
         <item name="android:fontFamily">@font/cairo</item>
     </style>
     
-    
     <!-- ═══════════════════════════════════════════════════════
-     🎨 New Luxury Styles (v2.0)
+     🎨 New Luxury Styles (v3.0 - High Contrast Light)
      ═══════════════════════════════════════════════════════ -->
 
-<!-- Card View فاخر -->
-<style name="LuxuryCardStyle" parent="Widget.Material3.CardView.Elevated">
-    <item name="cardBackgroundColor">@color/pure_white</item>
-    <item name="cardCornerRadius">18dp</item>
-    <item name="cardElevation">3dp</item>
-    <item name="strokeColor">@color/border_warm</item>
-    <item name="strokeWidth">1dp</item>
-</style>
+    <!-- Card View فاخر -->
+    <style name="LuxuryCardStyle" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/pure_white</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">3dp</item>
+        <item name="strokeColor">@color/border_warm</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
 
-<!-- Chip فاخر -->
-<style name="LuxuryChipStyle" parent="Widget.Material3.Chip.Filter">
-    <item name="chipBackgroundColor">@color/selector_chip_bg</item>
-    <item name="android:textColor">@color/selector_chip_text</item>
-    <item name="chipStrokeColor">@color/selector_chip_stroke</item>
-    <item name="chipStrokeWidth">1dp</item>
-    <item name="chipCornerRadius">18dp</item>
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
-    <item name="android:textStyle">bold</item>
-</style>
+    <!-- Chip فاخر -->
+    <style name="LuxuryChipStyle" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/selector_chip_bg</item>
+        <item name="android:textColor">@color/selector_chip_text</item>
+        <item name="chipStrokeColor">@color/selector_chip_stroke</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipCornerRadius">18dp</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textStyle">bold</item>
+    </style>
 
-<!-- Divider فاخر -->
-<style name="LuxuryDivider" parent="Widget.Material3.MaterialDivider">
-    <item name="dividerColor">@color/border_warm</item>
-    <item name="dividerThickness">1dp</item>
-</style>
+    <!-- Divider فاخر -->
+    <style name="LuxuryDivider" parent="Widget.Material3.MaterialDivider">
+        <item name="dividerColor">@color/border_warm</item>
+        <item name="dividerThickness">1dp</item>
+    </style>
 
-<!-- Icon Button -->
-<style name="LuxuryIconButton" parent="Widget.Material3.Button.IconButton">
-    <item name="iconTint">@color/gold_luxury</item>
-    <item name="iconSize">24dp</item>
-</style>
-
-
+    <!-- Icon Button -->
+    <style name="LuxuryIconButton" parent="Widget.Material3.Button.IconButton">
+        <item name="iconTint">@color/gold_luxury</item>
+        <item name="iconSize">24dp</item>
+    </style>
 
     <declare-styleable name="RadarView">
         <attr name="center_image" format="reference" />
