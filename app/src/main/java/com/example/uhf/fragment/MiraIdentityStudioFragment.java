@@ -52,6 +52,7 @@ import com.example.uhf.utils.MiraExecutorService;
 import com.example.uhf.utils.PricingCalculator;
 import com.example.uhf.utils.TagPrinter;
 import com.example.uhf.MiraRfid.MiraRfidService;
+import com.bumptech.glide.Glide;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
