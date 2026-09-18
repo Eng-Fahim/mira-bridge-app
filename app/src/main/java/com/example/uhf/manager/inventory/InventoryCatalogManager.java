@@ -102,23 +102,31 @@ public class InventoryCatalogManager {
 
             // ==================== 3. إذا كان خطأ شبكة → Retry ====================
             if (response.isNetworkError) {
-                Log.w(TAG, "⚠️ Network error, retrying once after 2s...");
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException ignored) {}
+    Log.w(TAG, "⚠️ Network error: " + response.error + " — retrying in 3s...");
+    try {
+        Thread.sleep(3000);
+    } catch (InterruptedException ignored) {}
 
-                response = apiClient.getBranchItemsListWithLongTimeout(branchId);
-                
-                if (response == null || response.isNetworkError) {
-                    String err = response != null && response.error != null 
-                            ? response.error 
-                            : (isArabic ? "فشل الاتصال بعد محاولتين" 
-                                        : "Connection failed after 2 attempts");
-                    Log.e(TAG, "❌ Retry failed: " + err);
-                    if (callback != null) callback.onError(err);
-                    return;
-                }
-            }
+    // ✅ Retry
+    Log.d(TAG, "🔄 Retry #2");
+    response = apiClient.getBranchItemsListWithLongTimeout(branchId);
+    
+    if (response == null) {
+        if (callback != null) callback.onError(
+                isArabic ? "لا يوجد رد من الخادم بعد محاولتين" 
+                         : "No response after 2 attempts");
+        return;
+    }
+    
+    if (response.isNetworkError) {
+        String err = response.error != null ? response.error 
+                : (isArabic ? "فشل الاتصال بعد محاولتين" 
+                            : "Connection failed after 2 attempts");
+        Log.e(TAG, "❌ Retry #2 failed: " + err);
+        if (callback != null) callback.onError(err);
+        return;
+    }
+}
 
             // ==================== 4. إذا كان خطأ HTTP ====================
             if (!response.isSuccess || response.data == null) {
