@@ -109,7 +109,6 @@
                     android:background="?attr/colorSurface"
                     android:elevation="0dp">
 
-                    <!-- ✅ الشعار — LTR مفروض لمنع الانعكاس -->
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -143,7 +142,6 @@
                             tools:text="JEWELRY ID™" />
                     </LinearLayout>
 
-                    <!-- ✅ Status chip -->
                     <LinearLayout
                         android:id="@+id/tvLiveStatus"
                         android:layout_width="wrap_content"
@@ -174,7 +172,7 @@
                     </LinearLayout>
                 </RelativeLayout>
 
-                <!-- ==================== 2. HERO BALANCE CARD — تصميم محسّن ==================== -->
+                <!-- ==================== 2. HERO BALANCE CARD ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
                     android:layout_width="match_parent"
@@ -191,7 +189,6 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
-                        <!-- ============ Header: Label + Eye + Trend ============ -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -233,7 +230,6 @@
                                 tools:text="📈 +2.4%" />
                         </LinearLayout>
 
-                        <!-- ============ القيمة (في صندوق فاخر) ============ -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -275,7 +271,7 @@
                                 tools:text="👑 7 قطع • 615.0g" />
                         </LinearLayout>
 
-                        <!-- ============ إحصائيات سريعة أسفل القيمة ============ -->
+                        <!-- ✅ القيمة بـ 3 عملات -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -284,7 +280,6 @@
                             android:orientation="horizontal"
                             android:weightSum="3">
 
-                            <!-- Items -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -293,22 +288,24 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/tvHeroItems"
+                                    android:id="@+id/tvHeroValueYER"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="0"
+                                    android:text="••••••"
                                     android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:textSize="16sp"
+                                    android:textSize="13sp"
                                     android:textStyle="bold"
-                                    tools:text="7" />
+                                    android:textDirection="ltr"
+                                    tools:text="12,450,000" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/items_label"
+                                    android:layout_marginTop="2dp"
+                                    android:text="🇾🇪 ريال يمني"
                                     android:textColor="?attr/colorOnPrimaryContainer"
                                     android:textSize="10sp"
-                                    android:alpha="0.7" />
+                                    android:alpha="0.75" />
                             </LinearLayout>
 
                             <View
@@ -317,7 +314,6 @@
                                 android:background="?attr/colorOutlineVariant"
                                 android:alpha="0.4" />
 
-                            <!-- Weight -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -326,22 +322,24 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/tvHeroWeight"
+                                    android:id="@+id/tvHeroValueSAR"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="0.0g"
+                                    android:text="••••••"
                                     android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:textSize="16sp"
+                                    android:textSize="13sp"
                                     android:textStyle="bold"
-                                    tools:text="615.0g" />
+                                    android:textDirection="ltr"
+                                    tools:text="306,150" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/total_weight_label"
+                                    android:layout_marginTop="2dp"
+                                    android:text="🇸🇦 ريال سعودي"
                                     android:textColor="?attr/colorOnPrimaryContainer"
                                     android:textSize="10sp"
-                                    android:alpha="0.7" />
+                                    android:alpha="0.75" />
                             </LinearLayout>
 
                             <View
@@ -350,7 +348,6 @@
                                 android:background="?attr/colorOutlineVariant"
                                 android:alpha="0.4" />
 
-                            <!-- Gold Price 24K -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -359,26 +356,27 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/tvHeroGoldPrice"
+                                    android:id="@+id/tvHeroValueUSD"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="$0.00"
+                                    android:text="••••••"
                                     android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:textSize="16sp"
+                                    android:textSize="13sp"
                                     android:textStyle="bold"
-                                    tools:text="$137.68" />
+                                    android:textDirection="ltr"
+                                    tools:text="81,647.51" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/gold_24k_per_gram"
+                                    android:layout_marginTop="2dp"
+                                    android:text="🇺🇸 دولار أمريكي"
                                     android:textColor="?attr/colorOnPrimaryContainer"
                                     android:textSize="10sp"
-                                    android:alpha="0.7" />
+                                    android:alpha="0.75" />
                             </LinearLayout>
                         </LinearLayout>
 
-                        <!-- ✅ Sparkline placeholder (مخفي للحفاظ على التوافق) -->
                         <View
                             android:id="@+id/heroSparkline"
                             android:layout_width="match_parent"
@@ -439,7 +437,6 @@
                     android:baselineAligned="false"
                     android:weightSum="3">
 
-                    <!-- Total Items -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="96dp"
@@ -485,7 +482,6 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Total Weight -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="96dp"
@@ -532,7 +528,6 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Sold Today -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="96dp"
@@ -597,7 +592,6 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
-                        <!-- Header: Title + Refresh -->
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -639,7 +633,6 @@
                             </FrameLayout>
                         </RelativeLayout>
 
-                        <!-- Trend -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -665,7 +658,6 @@
                                 tools:text="-0.00%" />
                         </LinearLayout>
 
-                        <!-- Ounce Price -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -693,7 +685,6 @@
                                 tools:text="$4,282.33" />
                         </LinearLayout>
 
-                        <!-- Karat Prices -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -738,7 +729,6 @@
                                 tools:text="24K: $137.68/g" />
                         </LinearLayout>
 
-                        <!-- Footer -->
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -785,7 +775,7 @@
                     app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
                     app:spanCount="3" />
 
-                <!-- ==================== 7. SALES SUMMARY — مع زر العين ==================== -->
+                <!-- ==================== 7. SALES SUMMARY ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/salesSummaryCard"
                     android:layout_width="match_parent"
@@ -803,7 +793,6 @@
                         android:orientation="vertical"
                         android:padding="14dp">
 
-                        <!-- ✅ Header: Title + Eye -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -820,7 +809,6 @@
                                 android:textStyle="bold"
                                 tools:text="📈 ملخص المبيعات" />
 
-                            <!-- ✅ زر إظهار/إخفاء المبيعات -->
                             <ImageButton
                                 android:id="@+id/btnToggleSalesVisibility"
                                 android:layout_width="28dp"
@@ -832,7 +820,6 @@
                                 app:tint="?attr/colorPrimary" />
                         </LinearLayout>
 
-                        <!-- 3 خانات أفقية -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
