@@ -1885,50 +1885,108 @@ private void deleteReport(InventoryReport report) {
     }
 
     private void startCategoryInventory(String category) {
-        if (isFragmentDestroyed) return;
-        resetUiForNewScan();
-        Toast.makeText(requireContext(),
-                (isArabic ? "🔄 تحميل " : "🔄 Loading ") + category,
-                Toast.LENGTH_SHORT).show();
-                // ✅ فحص تشخيصي
-String currentApiKey = sessionManager != null ? sessionManager.getApiKey() : "NULL";
-String currentGateId = sessionManager != null ? sessionManager.getGateId() : "NULL";
-String currentToken = sessionManager != null ? sessionManager.getAuthToken() : "NULL";
+    if (isFragmentDestroyed) return;
+    resetUiForNewScan();
+    Toast.makeText(requireContext(),
+            (isArabic ? "🔄 تحميل " : "🔄 Loading ") + category,
+            Toast.LENGTH_SHORT).show();
 
-Toast.makeText(requireContext(),
-        "🔑 Key: " + (currentApiKey.length() > 20 ? currentApiKey.substring(0, 20) + "..." : currentApiKey) +
-        "\n🚪 Gate: " + currentGateId +
-        "\n🎫 Token: " + (currentToken.length() > 20 ? currentToken.substring(0, 20) + "..." : currentToken) +
-        "\n📍 Branch: " + branchesManager.getActiveBranchId(),
-        Toast.LENGTH_LONG).show();
+    // ✅✅✅ فحص تشخيصي — استخدام SessionManager الصحيح
+    showDebugDialog(category);
+}
 
-        catalogManager.fetchCatalog(apiClient, branchesManager,
-                new InventoryCatalogManager.CatalogCallback() {
-                    @Override public void onCatalogLoaded(Map<String, InventoryItem> full) {
-                        Map<String, InventoryItem> filtered =
-                                catalogManager.filterByCategory(full, category);
-                        mainHandler.post(() -> {
-                            if (isFragmentDestroyed || !isAdded()) return;
-                            catalogEpcs.clear();
-                            catalogEpcs.addAll(filtered.keySet());
-                            expectedCount = filtered.size();
-                            if (tvExpectedCount != null)
-                                tvExpectedCount.setText(String.valueOf(expectedCount));
-                            if (scanController != null) {
-                                scanController.startScanning(filtered);
-                            }
-                        });
-                    }
-                    @Override public void onError(String error) {
-                        mainHandler.post(() -> {
-                            if (isFragmentDestroyed || !isAdded()) return;
-                            Toast.makeText(requireContext(),
-                                    (isArabic ? "⚠️ " : "⚠️ ") + error,
-                                    Toast.LENGTH_LONG).show();
-                        });
-                    }
-                });
+/**
+ * ✅ عرض Dialog تشخيصي قبل بدء الجرد
+ * ثم بدء تحميل الكاتولوج
+ */
+private void showDebugDialog(String category) {
+    try {
+        com.example.uhf.tools.SessionManager userSession =
+                new com.example.uhf.tools.SessionManager(requireContext());
+
+        String currentApiKey = userSession.getApiKey();
+        String currentGateId = userSession.getGateId();
+        String currentToken = userSession.getAuthToken();
+
+        if (currentApiKey == null) currentApiKey = "NULL";
+        if (currentGateId == null) currentGateId = "NULL";
+        if (currentToken == null) currentToken = "NULL";
+
+        final String debugInfo =
+                "🔑 Key: " + (currentApiKey.length() > 25
+                        ? currentApiKey.substring(0, 25) + "..." : currentApiKey) +
+                "\n🚪 Gate: " + currentGateId +
+                "\n🎫 Token: " + (currentToken.length() > 25
+                        ? currentToken.substring(0, 25) + "..." : currentToken) +
+                "\n📍 Branch: " + branchesManager.getActiveBranchId() +
+                "\n\n📋 Key Length: " + currentApiKey.length() +
+                "\n📋 Expected Prefix: mira_cmt7";
+
+        final String capturedCategory = category;
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("🔍 بيانات التشخيص")
+                .setMessage(debugInfo)
+                .setPositiveButton("📋 نسخ", (d, w) -> {
+                    android.content.ClipboardManager clipboard =
+                            (android.content.ClipboardManager) requireContext()
+                                    .getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    android.content.ClipData clip =
+                            android.content.ClipData.newPlainText("API Debug", debugInfo);
+                    if (clipboard != null) clipboard.setPrimaryClip(clip);
+                    Toast.makeText(requireContext(),
+                            "✅ تم النسخ", Toast.LENGTH_SHORT).show();
+                })
+                .setNeutralButton("⏭️ متابعة", (d, w) -> {
+                    d.dismiss();
+                    loadCategoryCatalog(capturedCategory);
+                })
+                .setCancelable(false)
+                .show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "Debug dialog error: " + e.getMessage());
+        // في حالة الخطأ، ابدأ الجرد مباشرة
+        loadCategoryCatalog(category);
     }
+}
+
+/**
+ * ✅ تحميل كاتولوج الفئة الفعلي
+ */
+private void loadCategoryCatalog(String category) {
+    if (isFragmentDestroyed || !isAdded()) return;
+
+    catalogManager.fetchCatalog(apiClient, branchesManager,
+            new InventoryCatalogManager.CatalogCallback() {
+                @Override
+                public void onCatalogLoaded(Map<String, InventoryItem> full) {
+                    Map<String, InventoryItem> filtered =
+                            catalogManager.filterByCategory(full, category);
+                    mainHandler.post(() -> {
+                        if (isFragmentDestroyed || !isAdded()) return;
+                        catalogEpcs.clear();
+                        catalogEpcs.addAll(filtered.keySet());
+                        expectedCount = filtered.size();
+                        if (tvExpectedCount != null)
+                            tvExpectedCount.setText(String.valueOf(expectedCount));
+                        if (scanController != null) {
+                            scanController.startScanning(filtered);
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    mainHandler.post(() -> {
+                        if (isFragmentDestroyed || !isAdded()) return;
+                        Toast.makeText(requireContext(),
+                                (isArabic ? "⚠️ " : "⚠️ ") + error,
+                                Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+}
 
     private void startBlindInventory() {
         if (isFragmentDestroyed || isScanning()) return;
