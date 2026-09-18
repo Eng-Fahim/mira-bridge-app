@@ -175,22 +175,21 @@
             app:menu="@menu/bottom_nav_menu" />
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabActionCenter"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_marginBottom="14dp"
-            android:src="@drawable/ic_diamond"
-            app:backgroundTint="?attr/colorPrimary"
-            app:borderWidth="0dp"
-            app:elevation="12dp"
-            app:fabSize="normal"
-            app:layout_constraintBottom_toTopOf="@id/bottomNavigationView"
-            app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
-            app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
-            app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
-            app:maxImageSize="32dp"
-            app:pressedTranslationZ="8dp"
-            app:tint="?attr/colorOnPrimary" />
+    android:id="@+id/fabActionCenter"
+    android:layout_width="64dp"
+    android:layout_height="64dp"
+    android:src="@drawable/ic_diamond"
+    app:backgroundTint="?attr/colorPrimary"
+    app:borderWidth="0dp"
+    app:elevation="12dp"
+    app:fabSize="normal"
+    app:layout_constraintBottom_toBottomOf="@id/bottomNavigationView"
+    app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
+    app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
+    app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
+    app:maxImageSize="32dp"
+    app:pressedTranslationZ="8dp"
+    app:tint="?attr/colorOnPrimary" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
