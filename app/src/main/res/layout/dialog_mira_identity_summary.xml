@@ -85,7 +85,7 @@
                 android:padding="16dp"
                 android:gravity="center">
 
-                <!-- حاوية الأكواد أفقياً (معدلة للتجاوب) -->
+                <!-- حاوية الأكواد أفقياً -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -173,6 +173,7 @@
             android:layout_marginTop="8dp"
             android:orientation="vertical">
 
+            <!-- نوع المعدن والعيار -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -192,6 +193,7 @@
                     android:textColor="?attr/colorOnSurface"/>
             </LinearLayout>
 
+            <!-- الوزن القائم -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -211,6 +213,32 @@
                     android:textColor="?attr/colorOnSurface"/>
             </LinearLayout>
 
+            <!-- ✅ [جديد] صف الأحجار / التطعيم (يظهر ديناميكياً) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical"> <!-- تغيير الاتجاه إلى عمودي لاستيعاب النص الطويل -->
+                
+                <TextView 
+                    android:layout_width="wrap_content" 
+                    android:layout_height="wrap_content" 
+                    android:text="الأحجار / التطعيم:" 
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="2dp"/>
+                
+                <TextView 
+                    android:id="@+id/tvIdStonesInfo" 
+                    android:layout_width="match_parent" 
+                    android:layout_height="wrap_content" 
+                    android:text="لا توجد أحجار" 
+                    android:textStyle="bold" 
+                    android:textColor="?attr/colorOnSurface"
+                    android:visibility="gone" /> <!-- يظهر فقط عند الحاجة -->
+            </LinearLayout>
+
             <!-- السعر التقديري -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -218,7 +246,7 @@
                 android:paddingVertical="8dp"
                 android:background="?attr/colorSurfaceVariant"
                 android:paddingHorizontal="8dp"
-                android:layout_marginTop="4dp">
+                android:layout_marginTop="8dp">
                 <TextView 
                     android:layout_width="0dp" 
                     android:layout_weight="1" 
@@ -235,27 +263,9 @@
                     android:textSize="18sp"/>
             </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingVertical="4dp"
-                android:layout_marginTop="4dp">
-                <TextView 
-                    android:layout_width="0dp" 
-                    android:layout_weight="1" 
-                    android:layout_height="wrap_content" 
-                    android:text="الأحجار / التطعيم:" 
-                    android:textColor="?attr/colorOnSurfaceVariant"/>
-                <TextView 
-                    android:id="@+id/tvIdStones" 
-                    android:layout_width="wrap_content" 
-                    android:layout_height="wrap_content" 
-                    android:text="زركون (4 قطع)" 
-                    android:textStyle="bold" 
-                    android:textColor="?attr/colorOnSurface"/>
-            </LinearLayout>
         </LinearLayout>
-                <!-- زر الطباعة المباشرة -->
+
+        <!-- زر الطباعة المباشرة -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPrintTag"
             android:layout_width="match_parent"
@@ -265,7 +275,6 @@
             app:icon="@drawable/ic_menu_print"
             app:cornerRadius="10dp"
             app:backgroundTint="?attr/colorSecondary"/>
-
 
         <!-- زر الإغلاق -->
         <com.google.android.material.button.MaterialButton
