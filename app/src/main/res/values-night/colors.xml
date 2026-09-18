@@ -5,6 +5,7 @@
          🌙 Luxury Jewelry Dark Palette v2.0
          ═══════════════════════════════════════════════════ -->
 
+    <color name="toolbar_background">#161618</color>
     <!-- الذهبي -->
     <color name="gold_luxury">#E8C766</color>
     <color name="gold_luxury_dark">#B8860B</color>
