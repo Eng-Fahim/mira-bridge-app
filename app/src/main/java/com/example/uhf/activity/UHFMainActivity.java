@@ -2027,77 +2027,18 @@ fabActionCenter.setOnLongClickListener(v -> {
 
     // ==================== قائمة الإجراءات السريعة ====================
 
-    private void showQuickActionMenu() {
-        try {
-            BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
-            View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
-            dialog.setContentView(view);
-
-            PermissionManager pm = permissionManager;
-            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
-
-            View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
-            if (btnRfidWrite != null) {
-                boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
-                btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
-                if (allowed) {
-                    btnRfidWrite.setOnClickListener(v -> {
-                        dialog.dismiss();
-                        loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite");
-                    });
-                }
-            }
-
-            applyQuickActionButton(view, R.id.btnRfidBindings, dialog,
-                    pm.canViewRfidBindings() && quickAccess.isActionEnabled("rfid"),
-                    new MiraRfidBindingsFragment(), "RfidBindings");
-
-            applyQuickActionButton(view, R.id.btnIdentityStudio, dialog,
-                    pm.canAccessIdentityStudio() && quickAccess.isActionEnabled("identity"),
-                    new MiraIdentityStudioFragment(), "IdentityStudio");
-
-            applyQuickActionButton(view, R.id.btnRadarLocation, dialog,
-                    pm.canAccessRadar() && quickAccess.isActionEnabled("radar"),
-                    new MiraUHFRadarLocationFragment(), "Radar");
-
-            applyQuickActionButton(view, R.id.btnSecureGate, dialog,
-                    pm.canAccessGate() && quickAccess.isActionEnabled("gate"),
-                    new MiraSecureGateFragment(), "SecureGate");
-
-            applyQuickActionButton(view, R.id.btnReports, dialog,
-                    pm.canExportReports() && quickAccess.isActionEnabled("reports"),
-                    new MiraReportsProFragment(), "Reports");
-
-            applyQuickActionButton(view, R.id.btnAccounting, dialog,
-                    pm.canAccessAccounting() && quickAccess.isActionEnabled("accounting"),
-                    new MiraAccountingFragment(), "Accounting");
-
-            applyQuickActionButton(view, R.id.btnTransfer, dialog,
-                    pm.canAccessTransfers() && quickAccess.isActionEnabled("transfers"),
-                    new MiraTransferFragment(), "Transfers");
-
-            applyQuickActionButton(view, R.id.btnSalesHistory, dialog,
-                    pm.canViewSalesHistory() && quickAccess.isActionEnabled("sales_history"),
-                    new MiraSalesHistoryFragment(), "SalesHistory");
-
-            applyQuickActionButton(view, R.id.btnAdminHub, dialog,
-                    pm.isAdmin() && quickAccess.isActionEnabled("admin_hub"),
-                    new MiraAdminHubFragment(), "AdminHub");
-
-            applyQuickActionButton(view, R.id.btnServerConfig, dialog,
-                    pm.canViewServerConfig() && quickAccess.isActionEnabled("server_config"),
-                    new MiraServerConfigFragment(), "ServerConfig");
-
-            View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
-            if (fabCloseSheet != null) {
-                fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
-            }
-
-            dialog.show();
-        } catch (Exception e) {
-            Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
-        }
+  /**
+ * ✅ عرض قائمة الإجراءات السريعة (BottomSheetDialogFragment احترافي)
+ */
+private void showQuickActionMenu() {
+    try {
+        QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
+        sheet.show(getSupportFragmentManager(), "QuickActions");
+        Log.d(TAG, "✅ QuickActions bottom sheet shown");
+    } catch (Exception e) {
+        Log.e(TAG, "showQuickActionMenu error: " + e.getMessage(), e);
     }
+}
 
     private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
                                         boolean allowed, Fragment fragment, String tag) {
