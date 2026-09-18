@@ -281,4 +281,14 @@
     <color name="success_luxury">#10B981</color>
     <color name="warning_luxury">#F59E0B</color>
     <color name="info_luxury">#0284C7</color>
+    
+    <!-- Activity Status Colors -->
+<color name="activity_success">#16A34A</color>
+<color name="activity_success_bg">#DCFCE7</color>
+<color name="activity_danger">#DC2626</color>
+<color name="activity_danger_bg">#FEE2E2</color>
+<color name="activity_warning">#F59E0B</color>
+<color name="activity_warning_bg">#FEF3C7</color>
+<color name="activity_neutral">#6B7280</color>
+<color name="activity_neutral_bg">#F3F4F6</color>
 </resources>
