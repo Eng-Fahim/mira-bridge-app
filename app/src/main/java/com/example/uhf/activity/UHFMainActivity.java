@@ -39,6 +39,8 @@ import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
+
+import com.example.uhf.fragment.QuickActionsBottomSheetFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.PermissionManager;
