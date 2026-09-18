@@ -86,7 +86,7 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvKarat24, tvKarat21, tvKarat18;
     private TextView tvOuncePrice, tvPriceSource, tvLastUpdate;
     private TextView tvGoldTrend, tvGoldChange;
-    private View btnGate, btnInventory, btnRefreshGold;
+    private View btnRefreshGold;
     private SwipeRefreshLayout swipeRefresh;
     private View shimmerLayout, loadingOverlay;
     private ProgressBar pbGoldLoading;
@@ -227,7 +227,7 @@ public class MiraDashboardFragment extends Fragment {
             setupProfileListener();
             setupBranchListener();
             setupQuickAccessGrid();
-            setupListeners();
+            
 
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
@@ -283,8 +283,7 @@ public class MiraDashboardFragment extends Fragment {
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-            btnGate = v.findViewById(R.id.btnGateSecurity);
-            btnInventory = v.findViewById(R.id.btnRfidAudit);
+            
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
             tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
