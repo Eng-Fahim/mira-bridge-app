@@ -696,30 +696,72 @@ private boolean checkAutoLock() {
 /**
  * ✅ حوار القفل مع خيارين: بصمة / logout
  */
+/**
+ * ✅ حوار القفل الاحترافي (Material Design)
+ */
 private void showAutoLockDialog() {
     if (isFinishing() || isDestroyed()) return;
     if (!isActivityAlive()) return;
 
     try {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic ? "🔒 الجلسة مقفلة" : "🔒 Session Locked")
-                .setMessage(isArabic
-                        ? "التطبيق كان في الخلفية لأكثر من 15 دقيقة.\n\nاستخدم بصمة الإصبع للمتابعة."
-                        : "App was in background for over 15 minutes.\n\nUse fingerprint to continue.")
-                .setPositiveButton(isArabic ? "🔓 فتح بالبصمة" : "🔓 Unlock",
-                        (dialog, which) -> {
-                            dialog.dismiss();
-                            triggerBiometricUnlock();
-                        })
-                .setNegativeButton(isArabic ? "تسجيل الخروج" : "Logout",
-                        (dialog, which) -> {
-                            dialog.dismiss();
-                            performFullLogout();
-                        })
-                .setCancelable(false)
-                .show();
+        // ✅ استخدام BottomSheetDialog بدلاً من AlertDialog
+        BottomSheetDialog lockDialog = new BottomSheetDialog(
+                this,
+                R.style.TransparentBottomSheetDialog  // استايل موجود لديك
+        );
+
+        View view = getLayoutInflater().inflate(
+                R.layout.dialog_session_locked,
+                null
+        );
+        lockDialog.setContentView(view);
+
+        // ✅ منع الإغلاق عند النقر خارج النافذة
+        lockDialog.setCancelable(false);
+        lockDialog.setCanceledOnTouchOutside(false);
+
+        // ✅ ربط العناصر
+        MaterialButton btnBiometricUnlock = view.findViewById(R.id.btnBiometricUnlock);
+        MaterialButton btnLogout = view.findViewById(R.id.btnLogout);
+        TextView tvLockTitle = view.findViewById(R.id.tvLockTitle);
+        TextView tvLockMessage = view.findViewById(R.id.tvLockMessage);
+
+        // ✅ تعيين النصوص بناءً على اللغة
+        if (isArabic) {
+            tvLockTitle.setText("🔒 تم قفل الجلسة مؤقتاً");
+            tvLockMessage.setText(
+                "لحماية بياناتك، تم قفل الجلسة تلقائياً بعد فترة من عدم النشاط.\n\n" +
+                "يرجى التحقق من هويتك للمتابعة بأمان."
+            );
+            btnBiometricUnlock.setText("فتح بالبصمة");
+            btnLogout.setText("تسجيل الخروج");
+        } else {
+            tvLockTitle.setText("🔒 Session Locked");
+            tvLockMessage.setText(
+                "For your security, your session has been locked due to inactivity.\n\n" +
+                "Please verify your identity to continue."
+            );
+            btnBiometricUnlock.setText("Unlock with Fingerprint");
+            btnLogout.setText("Logout");
+        }
+
+        // ✅ زر الفتح بالبصمة
+        btnBiometricUnlock.setOnClickListener(v -> {
+            lockDialog.dismiss();
+            triggerBiometricUnlock();
+        });
+
+        // ✅ زر تسجيل الخروج
+        btnLogout.setOnClickListener(v -> {
+            lockDialog.dismiss();
+            performFullLogout();
+        });
+
+        // ✅ عرض النافذة
+        lockDialog.show();
+
     } catch (Exception e) {
-        Log.e(TAG, "showAutoLockDialog error: " + e.getMessage());
+        Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
     }
 }
 
@@ -753,15 +795,21 @@ private void triggerBiometricUnlock() {
                     }
 
                     @Override
-                    public void onAuthenticationError(int code, @NonNull CharSequence msg) {
-                        Log.e(TAG, "Biometric error: " + code + " - " + msg);
-                        // إذا ألغى المستخدم → logout
-                        if (code == BiometricPrompt.ERROR_USER_CANCELED
-                                || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                                || code == BiometricPrompt.ERROR_CANCELED) {
-                            performFullLogout();
-                        }
-                    }
+public void onAuthenticationError(int code, @NonNull CharSequence msg) {
+    Log.e(TAG, "Biometric error: " + code + " - " + msg);
+    
+    if (code == BiometricPrompt.ERROR_USER_CANCELED
+            || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+            || code == BiometricPrompt.ERROR_CANCELED) {
+        
+        // ✅ إعادة عرض شاشة القفل بدلاً من تسجيل الخروج فوراً
+        mainHandler.postDelayed(() -> {
+            if (isActivityAlive()) {
+                showAutoLockDialog();
+            }
+        }, 300);
+    }
+}
 
                     @Override
                     public void onAuthenticationFailed() {
@@ -773,11 +821,16 @@ private void triggerBiometricUnlock() {
                 });
 
         BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
-                .setTitle(isArabic ? "فتح القفل" : "Unlock")
-                .setSubtitle(isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint")
-                .setNegativeButtonText(isArabic ? "تسجيل الخروج" : "Logout")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                .build();
+        .setTitle(isArabic ? "التحقق من الهوية" : "Identity Verification")
+        .setSubtitle(isArabic 
+                ? "استخدم بصمة الإصبع للمتابعة بأمان" 
+                : "Use fingerprint to continue securely")
+        .setDescription(isArabic
+                ? "بياناتك محمية بتشفير AES-256"
+                : "Your data is protected with AES-256 encryption")
+        .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
+        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+        .build();
 
         prompt.authenticate(info);
 
