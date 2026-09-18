@@ -18,6 +18,15 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
+import android.animation.ObjectAnimator;
+import android.animation.ArgbEvaluator;
+import android.animation.ValueAnimator;
+
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.activity.OnBackPressedCallback;
@@ -112,6 +121,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private TextView tvProgressPercent, tvScannedCount, tvExpectedCount, tvInventoryStatus,
             tvElapsedTime, tvRssi, tvVariance, tvAccuracy, tvItemCount,
             tvTotalWeight, tvTotalValue;
+            // ✅ Last Scan Card Views
+    private TextView tvLastScanTitle, tvLastScanEpc, tvLastScanKarat,
+        tvLastScanWeight, tvLastScanRssi, tvLastScanStatus;
+    private View lastScanCard, flashOverlay, alertsRow;
+    private TextView tvAlertsText;
+    private MaterialButton btnOpenItemsList;
+    private MaterialButton btnPowerControlCompact, btnArchiveReportsCompact;
     private ProgressBar progressScanned;
     private View statusDot, statusBar, tvEmptyState;
     private MaterialButtonToggleGroup segmentedModes;
@@ -139,6 +155,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private ExecutorService ioExecutor;
     private ExecutorService processingExecutor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    
+    private Vibrator vibrator;
 
     // ==================== مكونات ====================
     private MiraInventoryEngine inventoryEngine;
@@ -480,50 +498,145 @@ public void onError(String error) {
 
     // ==================== Views ====================
     private void initViews(View view) {
-        tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
-        progressScanned = view.findViewById(R.id.progressScanned);
-        tvScannedCount = view.findViewById(R.id.tvScannedCount);
-        tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
-        statusDot = view.findViewById(R.id.statusDot);
-        statusBar = view.findViewById(R.id.statusBar);
-        tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
-        tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
-        tvRssi = view.findViewById(R.id.tvRssi);
-        segmentedModes = view.findViewById(R.id.segmentedModes);
-        btnModeFull = view.findViewById(R.id.btnModeFull);
-        btnModeCategory = view.findViewById(R.id.btnModeCategory);
-        btnModeBlind = view.findViewById(R.id.btnModeBlind);
-        tvVariance = view.findViewById(R.id.tvVariance);
-        tvAccuracy = view.findViewById(R.id.tvAccuracy);
-        tvItemCount = view.findViewById(R.id.tvItemCount);
-        tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
-        tvTotalValue = view.findViewById(R.id.tvTotalValue);
-        btnPowerControl = view.findViewById(R.id.btnPowerControl);
-        btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
-        btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
-        etSearchItems = view.findViewById(R.id.etSearchItems);
-        btnClearSearch = view.findViewById(R.id.btnClearSearch);
-        btnLiveFilter = view.findViewById(R.id.btnLiveFilter);
-        if (btnLiveFilter != null) {
-            btnLiveFilter.setOnClickListener(v -> showLiveFilterChips());
-        }
-        rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
-        tvEmptyState = view.findViewById(R.id.tvEmptyState);
-        if (rvInventoryItems != null) {
-            rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
-            rvInventoryItems.setNestedScrollingEnabled(false);
-            modernAdapter = new ModernScannedItemsAdapter(
-                    isArabic, this::showItemOptionsDialog);
-            rvInventoryItems.setAdapter(modernAdapter);
-            rvInventoryItems.setHasFixedSize(false);
-            rvInventoryItems.setItemAnimator(null);
-        }
-        btnMainToggleScan = view.findViewById(R.id.btnMainToggleScan);
-        btnCommitSession = view.findViewById(R.id.btnCommitSession);
-        setupButtons();
-        setupSegmentedControl();
-        setupSearchBar();
+    // ✅ Views القديمة (للتوافق)
+    tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
+    progressScanned = view.findViewById(R.id.progressScanned);
+    tvScannedCount = view.findViewById(R.id.tvScannedCount);
+    tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
+    statusDot = view.findViewById(R.id.statusDot);
+    statusBar = view.findViewById(R.id.statusBar);
+    tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
+    tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
+    tvRssi = view.findViewById(R.id.tvRssi);
+    segmentedModes = view.findViewById(R.id.segmentedModes);
+    btnModeFull = view.findViewById(R.id.btnModeFull);
+    btnModeCategory = view.findViewById(R.id.btnModeCategory);
+    btnModeBlind = view.findViewById(R.id.btnModeBlind);
+    tvVariance = view.findViewById(R.id.tvVariance);
+    tvAccuracy = view.findViewById(R.id.tvAccuracy);
+    tvItemCount = view.findViewById(R.id.tvItemCount);
+    tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
+    tvTotalValue = view.findViewById(R.id.tvTotalValue);
+    btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
+    btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
+    btnPowerControl = view.findViewById(R.id.btnPowerControl);
+    etSearchItems = view.findViewById(R.id.etSearchItems);
+    btnClearSearch = view.findViewById(R.id.btnClearSearch);
+    btnLiveFilter = view.findViewById(R.id.btnLiveFilter);
+    rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
+    tvEmptyState = view.findViewById(R.id.tvEmptyState);
+    btnMainToggleScan = view.findViewById(R.id.btnMainToggleScan);
+    btnCommitSession = view.findViewById(R.id.btnCommitSession);
+
+    // ✅ Last Scan Card
+    lastScanCard = view.findViewById(R.id.lastScanCard);
+    tvLastScanTitle = view.findViewById(R.id.tvLastScanTitle);
+    tvLastScanEpc = view.findViewById(R.id.tvLastScanEpc);
+    tvLastScanKarat = view.findViewById(R.id.tvLastScanKarat);
+    tvLastScanWeight = view.findViewById(R.id.tvLastScanWeight);
+    tvLastScanRssi = view.findViewById(R.id.tvLastScanRssi);
+    tvLastScanStatus = view.findViewById(R.id.tvLastScanStatus);
+    flashOverlay = view.findViewById(R.id.flashOverlay);
+    alertsRow = view.findViewById(R.id.alertsRow);
+    tvAlertsText = view.findViewById(R.id.tvAlertsText);
+    btnOpenItemsList = view.findViewById(R.id.btnOpenItemsList);
+    btnPowerControlCompact = view.findViewById(R.id.btnPowerControlCompact);
+    btnArchiveReportsCompact = view.findViewById(R.id.btnArchiveReportsCompact);
+
+    // ✅ تهيئة Vibrator
+    initVibrator();
+
+    // ✅ RecyclerView (يُخزّن مرجعاً، لكنه مخفي — يعمل في BottomSheet)
+    if (rvInventoryItems != null) {
+        rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvInventoryItems.setNestedScrollingEnabled(false);
+        modernAdapter = new ModernScannedItemsAdapter(
+                isArabic, this::showItemOptionsDialog);
+        rvInventoryItems.setAdapter(modernAdapter);
+        rvInventoryItems.setHasFixedSize(false);
+        rvInventoryItems.setItemAnimator(null);
     }
+
+    if (btnLiveFilter != null) {
+        btnLiveFilter.setOnClickListener(v -> showLiveFilterChips());
+    }
+
+    setupButtons();
+    setupSegmentedControl();
+    setupSearchBar();
+}
+
+/**
+ * ✅ تهيئة Vibrator (متوافق مع API 31+)
+ */
+private void initVibrator() {
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            VibratorManager vm = (VibratorManager) requireContext()
+                    .getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+            vibrator = vm != null ? vm.getDefaultVibrator() : null;
+        } else {
+            vibrator = (Vibrator) requireContext()
+                    .getSystemService(Context.VIBRATOR_SERVICE);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "initVibrator error", e);
+        vibrator = null;
+    }
+}
+
+/**
+ * ✅ اهتزاز حسب نوع المسح
+ */
+private void hapticFeedback(SoundManager.FeedbackType type) {
+    if (vibrator == null || !vibrator.hasVibrator()) return;
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            switch (type) {
+                case KNOWN_ITEM:
+                    vibrator.vibrate(VibrationEffect.createOneShot(40,
+                            VibrationEffect.DEFAULT_AMPLITUDE));
+                    break;
+                case DUPLICATE_ITEM:
+                    vibrator.vibrate(VibrationEffect.createWaveform(
+                            new long[]{0, 25, 40, 25}, -1));
+                    break;
+                case UNKNOWN_ITEM:
+                    vibrator.vibrate(VibrationEffect.createOneShot(150, 255));
+                    break;
+                case COMPLETED:
+                    vibrator.vibrate(VibrationEffect.createWaveform(
+                            new long[]{0, 50, 40, 50, 40, 100}, -1));
+                    break;
+                case ERROR:
+                    vibrator.vibrate(VibrationEffect.createWaveform(
+                            new long[]{0, 200, 80, 200}, -1));
+                    break;
+            }
+        } else {
+            vibrator.vibrate(40);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "hapticFeedback error", e);
+    }
+}
+
+/**
+ * ✅ وميض ملون عند المسح
+ */
+private void flashOverlay(int colorHex) {
+    if (flashOverlay == null) return;
+    try {
+        flashOverlay.setBackgroundColor(colorHex);
+        flashOverlay.setAlpha(0.6f);
+
+        ObjectAnimator anim = ObjectAnimator.ofFloat(flashOverlay, "alpha", 0.6f, 0f);
+        anim.setDuration(280);
+        anim.start();
+    } catch (Exception e) {
+        Log.e(TAG, "flashOverlay error", e);
+    }
+}
 
     private void setupButtons() {
         if (btnMainToggleScan != null) {
@@ -546,7 +659,49 @@ public void onError(String error) {
         if (btnArchiveReports != null) {
             btnArchiveReports.setOnClickListener(v -> showArchiveReports());
         }
+        
+        if (btnOpenItemsList != null) {
+    btnOpenItemsList.setOnClickListener(v -> showItemsBottomSheet());
+}
+if (btnPowerControlCompact != null) {
+    btnPowerControlCompact.setOnClickListener(v -> showPowerControlSheet());
+}
+if (btnArchiveReportsCompact != null) {
+    btnArchiveReportsCompact.setOnClickListener(v -> showArchiveReports());
+}
     }
+    
+    /**
+ * ✅ عرض قائمة الممسوحات في Bottom Sheet
+ */
+private void showItemsBottomSheet() {
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+            new com.google.android.material.bottomsheet.BottomSheetDialog(
+                    requireContext(), R.style.TransparentBottomSheetDialog);
+
+    View sheetView = getLayoutInflater().inflate(
+            R.layout.bottom_sheet_inventory_items, null);
+
+    // ✅ إعادة ربط RecyclerView في الـ Sheet
+    RecyclerView sheetRecycler = sheetView.findViewById(R.id.rvSheetItems);
+    if (sheetRecycler != null && modernAdapter != null) {
+        sheetRecycler.setLayoutManager(new LinearLayoutManager(requireContext()));
+        sheetRecycler.setAdapter(modernAdapter);
+    }
+
+    // ✅ العدّاد
+    TextView tvCount = sheetView.findViewById(R.id.tvSheetItemsCount);
+    if (tvCount != null) {
+        tvCount.setText(String.format(Locale.US, "%d %s",
+                scannedItemsDisplayList.size(),
+                isArabic ? "قطعة" : "items"));
+    }
+
+    sheet.setContentView(sheetView);
+    sheet.show();
+}
 
     private void setupSearchBar() {
         if (etSearchItems == null) return;
@@ -662,98 +817,156 @@ public void onError(String error) {
 
     // ==================== Connection Handling ====================
     private void handleConnectionChanged(boolean isConnected) {
-        if (connectionStateKnown.get() && lastConnectionState == isConnected) return;
-        lastConnectionState = isConnected;
-        connectionStateKnown.set(true);
+    if (connectionStateKnown.get() && lastConnectionState == isConnected) return;
+    lastConnectionState = isConnected;
+    connectionStateKnown.set(true);
 
-        if (!isAdded() || isFragmentDestroyed) return;
+    if (!isAdded() || isFragmentDestroyed) return;
 
-        mainHandler.post(() -> {
-            if (tvInventoryStatus != null) {
-                tvInventoryStatus.setText(isConnected
-                        ? (isArabic ? "📡 متصل" : "📡 Connected")
-                        : (isArabic ? "📡 غير متصل" : "📡 Disconnected"));
-            }
-            if (statusDot != null) {
-                statusDot.setBackgroundResource(isConnected
-                        ? R.drawable.bg_status_dot_green
-                        : R.drawable.bg_status_dot_red);
-            }
-            if (soundManager != null) {
-                soundManager.playBeep(isConnected
-                        ? SoundManager.FeedbackType.COMPLETED
-                        : SoundManager.FeedbackType.ERROR);
-            }
-            if (animationHelper != null) {
-                animationHelper.updateStatusBarBackground(
-                        statusBar, isConnected, isScanning());
-            }
-        });
-    }
+    mainHandler.post(() -> {
+        if (tvInventoryStatus != null) {
+            tvInventoryStatus.setText(isConnected
+                    ? (isArabic ? "🟢 متصل" : "🟢 Connected")
+                    : (isArabic ? "🔴 غير متصل" : "🔴 Disconnected"));
+        }
+        if (statusDot != null) {
+            statusDot.setBackgroundResource(isConnected
+                    ? R.drawable.bg_status_dot_green
+                    : R.drawable.bg_status_dot_red);
+        }
+        if (soundManager != null) {
+            soundManager.playBeep(isConnected
+                    ? SoundManager.FeedbackType.COMPLETED
+                    : SoundManager.FeedbackType.ERROR);
+        }
+        hapticFeedback(isConnected
+                ? SoundManager.FeedbackType.COMPLETED
+                : SoundManager.FeedbackType.ERROR);
+    });
+}
 
     // ==================== Add Scanned Item ====================
     private void addScannedItemToDisplay(String epc, int rssi) {
-        if (!isAdded() || isFragmentDestroyed || epc == null) return;
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(() -> addScannedItemToDisplay(epc, rssi));
-            return;
-        }
-
-        try {
-            ScannedItemDisplay existing = null;
-            for (ScannedItemDisplay d : scannedItemsDisplayList) {
-                if (d != null && epc.equals(d.epc)) { existing = d; break; }
-            }
-
-            SoundManager.FeedbackType feedback;
-
-            if (existing != null) {
-                existing.count++;
-                existing.rssi = rssi;
-                existing.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                        .format(new Date());
-                feedback = SoundManager.FeedbackType.DUPLICATE_ITEM;
-            } else {
-                boolean isKnown = catalogEpcs.contains(epc);
-                feedback = isKnown
-                        ? SoundManager.FeedbackType.KNOWN_ITEM
-                        : SoundManager.FeedbackType.UNKNOWN_ITEM;
-
-                InventoryItem catalogItem = catalogManager != null
-                        ? catalogManager.getItemByEpc(epc) : null;
-
-                String title = catalogItem != null && catalogItem.getTitle() != null
-                        ? catalogItem.getTitle()
-                        : (isKnown ? (isArabic ? "قطعة مسجلة" : "Catalog item")
-                                   : (isArabic ? "قطعة غير معروفة" : "Unknown item"));
-                String karat = catalogItem != null && catalogItem.getKarat() != null
-                        ? catalogItem.getKarat() : "—";
-                double weight = catalogItem != null ? catalogItem.getWeight() : 0;
-                double price = catalogItem != null ? catalogItem.getPrice() : 0;
-
-                ScannedItemDisplay display = new ScannedItemDisplay(
-                        epc, title, karat, 1, rssi,
-                        new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                                .format(new Date()));
-                display.weight = weight;
-                display.price = price;
-
-                scannedItemsDisplayList.add(0, display);
-                pendingUiItems.offer(display);
-            }
-
-            if (soundManager != null) soundManager.playBeep(feedback);
-            if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
-                tvEmptyState.setVisibility(View.GONE);
-            }
-
-            scheduleUiFlush();
-            scheduleUiUpdate();
-
-        } catch (Exception e) {
-            Log.e(TAG, "addScannedItemToDisplay error", e);
-        }
+    if (!isAdded() || isFragmentDestroyed || epc == null) return;
+    if (Looper.myLooper() != Looper.getMainLooper()) {
+        mainHandler.post(() -> addScannedItemToDisplay(epc, rssi));
+        return;
     }
+
+    try {
+        ScannedItemDisplay existing = null;
+        for (ScannedItemDisplay d : scannedItemsDisplayList) {
+            if (d != null && epc.equals(d.epc)) { existing = d; break; }
+        }
+
+        SoundManager.FeedbackType feedback;
+
+        if (existing != null) {
+            existing.count++;
+            existing.rssi = rssi;
+            existing.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                    .format(new Date());
+            feedback = SoundManager.FeedbackType.DUPLICATE_ITEM;
+
+            // ✅ وميض أزرق
+            flashOverlay(0x883B82F6);
+            // ✅ تحديث "آخر مسح" بالقطعة المكررة
+            updateLastScanCard(existing, true);
+        } else {
+            boolean isKnown = catalogEpcs.contains(epc);
+            feedback = isKnown
+                    ? SoundManager.FeedbackType.KNOWN_ITEM
+                    : SoundManager.FeedbackType.UNKNOWN_ITEM;
+
+            InventoryItem catalogItem = catalogManager != null
+                    ? catalogManager.getItemByEpc(epc) : null;
+
+            String title = catalogItem != null && catalogItem.getTitle() != null
+                    ? catalogItem.getTitle()
+                    : (isKnown ? (isArabic ? "قطعة مسجلة" : "Catalog item")
+                               : (isArabic ? "قطعة غير معروفة" : "Unknown item"));
+            String karat = catalogItem != null && catalogItem.getKarat() != null
+                    ? catalogItem.getKarat() : "—";
+            double weight = catalogItem != null ? catalogItem.getWeight() : 0;
+            double price = catalogItem != null ? catalogItem.getPrice() : 0;
+
+            ScannedItemDisplay display = new ScannedItemDisplay(
+                    epc, title, karat, 1, rssi,
+                    new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                            .format(new Date()));
+            display.weight = weight;
+            display.price = price;
+
+            scannedItemsDisplayList.add(0, display);
+            pendingUiItems.offer(display);
+
+            // ✅ وميض حسب النوع
+            if (isKnown) {
+                flashOverlay(0x8816A34A); // أخضر
+            } else {
+                flashOverlay(0x88DC2626); // أحمر
+            }
+
+            // ✅ تحديث "آخر مسح"
+            updateLastScanCard(display, false);
+        }
+
+        // ✅ اهتزاز + صوت
+        hapticFeedback(feedback);
+        if (soundManager != null) soundManager.playBeep(feedback);
+
+        if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
+            tvEmptyState.setVisibility(View.GONE);
+        }
+
+        scheduleUiFlush();
+        scheduleUiUpdate();
+
+    } catch (Exception e) {
+        Log.e(TAG, "addScannedItemToDisplay error", e);
+    }
+}
+
+/**
+ * ✅ تحديث بطاقة "آخر مسح"
+ */
+private void updateLastScanCard(ScannedItemDisplay item, boolean isDuplicate) {
+    if (item == null) return;
+    if (tvLastScanTitle == null) return;
+
+    try {
+        tvLastScanTitle.setText(item.title != null ? item.title : "—");
+        tvLastScanEpc.setText(item.epc != null ? item.epc : "—");
+        tvLastScanKarat.setText(item.karat != null ? item.karat : "—");
+        tvLastScanWeight.setText(String.format(Locale.US, "%.2fg", item.weight));
+        tvLastScanRssi.setText(String.format(Locale.US, "📶 %d", item.rssi));
+
+        boolean isKnown = catalogEpcs.contains(item.epc);
+        if (isKnown) {
+            tvLastScanStatus.setText(isArabic ? "✅ مطابق للمخزون" : "✅ In Catalog");
+            tvLastScanStatus.setTextColor(0xFF16A34A);
+        } else {
+            tvLastScanStatus.setText(isArabic ? "⚠️ غير معروف" : "⚠️ Unknown");
+            tvLastScanStatus.setTextColor(0xFFDC2626);
+        }
+
+        if (isDuplicate) {
+            tvLastScanStatus.setText(isArabic ? "🔁 مكرر" : "🔁 Duplicate");
+            tvLastScanStatus.setTextColor(0xFF3B82F6);
+        }
+
+        // ✅ Animation نبض على البطاقة
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(lastScanCard, "scaleX", 0.98f, 1f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(lastScanCard, "scaleY", 0.98f, 1f);
+        scaleX.setDuration(200);
+        scaleY.setDuration(200);
+        scaleX.start();
+        scaleY.start();
+
+    } catch (Exception e) {
+        Log.e(TAG, "updateLastScanCard error", e);
+    }
+}
 
     private void scheduleUiFlush() {
         if (uiFlushScheduled.compareAndSet(false, true)) {
