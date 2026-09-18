@@ -131,66 +131,77 @@ public class FileUtils {
         list.clear();
         saveXmlList(list);
     }
+/**
+ * ✅ كتابة ملف CSV (بديل خفيف لـ Excel)
+ * - Excel يفتحه مباشرة
+ * - حجم صفر تقريباً
+ */
+public static void writeFile(String fileName, List<String> data, boolean append) {
+    Log.e("TEST", "بدء كتابة ملف CSV");
 
-    /**
-     * كتابة ملف Excel باستخدام Apache POI
-     */
-    public static void writeFile(String fileName, List<String> data, boolean append) {
-        Log.e("TEST", "进入写入文件路径");
-        Workbook workbook = null;
-        FileOutputStream fileOut = null;
-        
+    // ✅ تغيير الامتداد إلى .csv
+    String csvFileName = fileName;
+    if (csvFileName.toLowerCase().endsWith(".xlsx")) {
+        csvFileName = csvFileName.substring(0, csvFileName.length() - 5) + ".csv";
+    } else if (csvFileName.toLowerCase().endsWith(".xls")) {
+        csvFileName = csvFileName.substring(0, csvFileName.length() - 4) + ".csv";
+    }
+
+    Writer writer = null;
+    try {
+        // ✅ فتح الملف (append = true للإضافة، false للكتابة من جديد)
+        writer = new java.io.OutputStreamWriter(
+                new java.io.FileOutputStream(csvFileName, append),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        // ✅ كتابة BOM لـ Excel العربي (UTF-8 BOM)
+        if (!append) {
+            writer.write('\ufeff');
+            // العناوين
+            writer.write("EPC Data,TID Data,USER Data\n");
+        }
+
+        // ✅ كتابة البيانات (كل 3 عناصر = صف واحد)
+        StringBuilder row = new StringBuilder();
+        for (int i = 0; i < data.size(); i++) {
+            if (i > 0 && i % 3 == 0) {
+                row.append('\n');
+                writer.write(row.toString());
+                row.setLength(0);
+            }
+            if (i % 3 > 0) row.append(',');
+            row.append(escapeCsv(data.get(i)));
+        }
+        // كتابة آخر صف
+        if (row.length() > 0) {
+            row.append('\n');
+            writer.write(row.toString());
+        }
+
+        writer.flush();
+        Log.e("TEST", "✅ تم كتابة ملف CSV بنجاح: " + csvFileName);
+
+    } catch (IOException e) {
+        Log.e(TAG, "خطأ في كتابة ملف CSV: " + e.getMessage());
+    } finally {
         try {
-            // إنشاء مصنف Excel جديد
-            workbook = new XSSFWorkbook();
-            Sheet sheet = workbook.createSheet("Sheet1");
-            
-            // كتابة العناوين في الصف الأول
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("EPC Data");
-            headerRow.createCell(1).setCellValue("TID Data");
-            headerRow.createCell(2).setCellValue("USER Data");
-            
-            // كتابة البيانات
-            for (int i = 0; i < data.size(); i++) {
-                int rowIndex = (i / 3) + 1;  // +1 لتجاوز صف العناوين
-                int colIndex = i % 3;
-                
-                Row row = sheet.getRow(rowIndex);
-                if (row == null) {
-                    row = sheet.createRow(rowIndex);
-                }
-                row.createCell(colIndex).setCellValue(data.get(i));
-            }
-            
-            // ضبط عرض الأعمدة
-            sheet.setColumnWidth(0, 20 * 256);
-            sheet.setColumnWidth(1, 20 * 256);
-            sheet.setColumnWidth(2, 20 * 256);
-            
-            // حفظ الملف
-            fileOut = new FileOutputStream(new File(fileName));
-            workbook.write(fileOut);
-            
-            Log.e("TEST", "تم كتابة ملف Excel بنجاح");
-            
+            if (writer != null) writer.close();
         } catch (IOException e) {
-            e.printStackTrace();
-            Log.e(TAG, "خطأ في كتابة ملف Excel: " + e.getMessage());
-        } finally {
-            try {
-                if (fileOut != null) {
-                    fileOut.flush();
-                    fileOut.close();
-                }
-                if (workbook != null) {
-                    workbook.close();
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "خطأ في إغلاق الملف: " + e.getMessage());
-            }
+            Log.e(TAG, "خطأ في إغلاق الملف: " + e.getMessage());
         }
     }
+}
+
+/**
+ * ✅ تهريب القيم لـ CSV (إذا احتوت على فاصلة أو علامة تنصيص)
+ */
+private static String escapeCsv(String value) {
+    if (value == null) return "";
+    if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+        return "\"" + value.replace("\"", "\"\"") + "\"";
+    }
+    return value;
+}
 
     private static String readInStream(FileInputStream inStream) {
         if(inStream==null)
