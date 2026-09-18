@@ -16,13 +16,14 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ✅ InventoryCatalogManager v2.0
+ * ✅ InventoryCatalogManager v3.0
  * 
- * إصلاحات v2.0:
- * - فلترة فئوية دقيقة (تطابق كامل مع "عيار X" و "XK")
- * - تحسين الأداء عند الفلترة الكبيرة
- * - إضافة clear آمن
- * - لا CountDownLatch (التزامن مسؤولية المُستدعي)
+ * إصلاحات v3.0:
+ * - استخدام getBranchItemsListWithLongTimeout (60s read)
+ * - Retry تلقائي مرة واحدة عند فشل الشبكة
+ * - رسائل خطأ واضحة (401/403/404/Timeout/No Internet)
+ * - Logging مفصل للتشخيص
+ * - فلترة فئوية دقيقة (من v2.0)
  */
 public class InventoryCatalogManager {
 
@@ -49,13 +50,15 @@ public class InventoryCatalogManager {
     public Map<String, String> getBarcodeToEpcMap() { return barcodeToEpcMap; }
     public Map<String, String> getEpcToBarcodeMap() { return epcToBarcodeMap; }
 
-    // ==================== Fetch ====================
+    // ==================== Fetch (v3.0) ====================
 
     /**
-     * ✅ جلب الكتالوج من السيرفر
+     * ✅ جلب الكتالوج من السيرفر — إصدار v3.0
      * 
-     * ⚠️ هذه الدالة **متزامنة** (blocking).
-     * يجب استدعاؤها من خيط خلفي (ioExecutor).
+     * التحسينات:
+     * - Timeout طويل (60s)
+     * - Retry تلقائي مرة واحدة
+     * - رسائل خطأ واضحة
      */
     public void fetchCatalog(MiraApiClient apiClient,
                              MiraBranchesManager branchesManager,
@@ -64,38 +67,87 @@ public class InventoryCatalogManager {
         Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
 
         try {
+            // ==================== 1. التحقق من المدخلات ====================
             if (apiClient == null || branchesManager == null) {
                 Log.e(TAG, "❌ apiClient or branchesManager is null");
-                if (callback != null) callback.onError("API or Branches manager not available");
+                if (callback != null) callback.onError(
+                        isArabic ? "خطأ في التهيئة" : "Initialization error");
                 return;
             }
 
             int branchId = branchesManager.getActiveBranchId();
-            Log.d(TAG, "📡 Fetching catalog for branchId: " + branchId);
+            Log.d(TAG, "📡 fetchCatalog START | branchId=" + branchId);
 
             if (branchId <= 0) {
-                Log.e(TAG, "❌❌❌ branchId = " + branchId + "! Branches not initialized");
-                if (callback != null) callback.onError("No active branch (branchId=" + branchId + ")");
+                Log.e(TAG, "❌ Invalid branchId: " + branchId);
+                if (callback != null) callback.onError(
+                        isArabic ? "لم يتم تحديد فرع نشط" : "No active branch");
                 return;
             }
 
-            MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
+            // ==================== 2. المحاولة الأولى (Timeout طويل) ====================
+            MiraApiClient.ApiResponse response = 
+                    apiClient.getBranchItemsListWithLongTimeout(branchId);
 
             if (response == null) {
-                Log.e(TAG, "❌ response is null");
-                if (callback != null) callback.onError("Null response");
+                Log.e(TAG, "❌ Null response from server");
+                if (callback != null) callback.onError(
+                        isArabic ? "لا يوجد رد من الخادم" : "No response from server");
                 return;
             }
 
-            Log.d(TAG, "📡 Response: isSuccess=" + response.isSuccess
-                    + ", code=" + response.code
-                    + ", data=" + (response.data != null ? "present" : "null"));
+            Log.d(TAG, "📥 Response: code=" + response.code 
+                    + ", isSuccess=" + response.isSuccess
+                    + ", isNetworkError=" + response.isNetworkError);
 
+            // ==================== 3. إذا كان خطأ شبكة → Retry ====================
+            if (response.isNetworkError) {
+                Log.w(TAG, "⚠️ Network error, retrying once after 2s...");
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ignored) {}
+
+                response = apiClient.getBranchItemsListWithLongTimeout(branchId);
+                
+                if (response == null || response.isNetworkError) {
+                    String err = response != null && response.error != null 
+                            ? response.error 
+                            : (isArabic ? "فشل الاتصال بعد محاولتين" 
+                                        : "Connection failed after 2 attempts");
+                    Log.e(TAG, "❌ Retry failed: " + err);
+                    if (callback != null) callback.onError(err);
+                    return;
+                }
+            }
+
+            // ==================== 4. إذا كان خطأ HTTP ====================
             if (!response.isSuccess || response.data == null) {
-                if (callback != null) callback.onError("Failed to fetch catalog: code " + response.code);
+                String err = response.error;
+                if (err == null || err.isEmpty()) {
+                    if (response.code == 401 || response.code == 403) {
+                        err = isArabic 
+                                ? "انتهت صلاحية الجلسة - يرجى إعادة تسجيل الدخول"
+                                : "Session expired - please re-login";
+                    } else if (response.code == 404) {
+                        err = isArabic 
+                                ? "الفرع غير موجود على السيرفر"
+                                : "Branch not found on server";
+                    } else if (response.code >= 500) {
+                        err = isArabic 
+                                ? "خطأ في السيرفر (" + response.code + ")"
+                                : "Server error (" + response.code + ")";
+                    } else {
+                        err = isArabic 
+                                ? "خطأ " + response.code 
+                                : "Error " + response.code;
+                    }
+                }
+                Log.e(TAG, "❌ HTTP error: " + err);
+                if (callback != null) callback.onError(err);
                 return;
             }
 
+            // ==================== 5. معالجة البيانات ====================
             JSONArray items = response.data.optJSONArray("items");
             if (items == null) {
                 JSONObject dataObj = response.data.optJSONObject("data");
@@ -103,7 +155,7 @@ public class InventoryCatalogManager {
             }
 
             if (items == null) {
-                Log.w(TAG, "⚠️ No items array in response");
+                Log.w(TAG, "⚠️ No items array — branch is empty");
                 if (callback != null) callback.onCatalogLoaded(catalog);
                 return;
             }
@@ -120,7 +172,8 @@ public class InventoryCatalogManager {
 
             Log.d(TAG, "✅ Catalog loaded: " + catalog.size() + " items");
 
-            if (!catalog.isEmpty()) {
+            // ✅ Log عينات للتشخيص
+            if (!catalog.isEmpty() && Log.isLoggable(TAG, Log.DEBUG)) {
                 int count = 0;
                 Log.d(TAG, "📋 Sample keys:");
                 for (String key : catalog.keySet()) {
@@ -132,8 +185,10 @@ public class InventoryCatalogManager {
             if (callback != null) callback.onCatalogLoaded(catalog);
 
         } catch (Exception e) {
-            Log.e(TAG, "fetchCatalog error: " + e.getMessage(), e);
-            if (callback != null) callback.onError(e.getMessage());
+            Log.e(TAG, "❌ fetchCatalog exception: " + e.getMessage(), e);
+            if (callback != null) callback.onError(
+                    e.getMessage() != null ? e.getMessage() 
+                    : (isArabic ? "خطأ غير متوقع" : "Unexpected error"));
         }
     }
 
@@ -165,10 +220,6 @@ public class InventoryCatalogManager {
             }
 
             String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(primaryEpc, barcodeToEpcMap);
-
-            Log.d(TAG, "──── Item ────");
-            Log.d(TAG, "  gtin13=" + gtin13 + " | serial=" + serialNumber + " | epc=" + epcCode);
-            Log.d(TAG, "  primary=" + primaryEpc + " → normalized=" + normalizedEpc);
 
             InventoryItem item = new InventoryItem(
                     normalizedEpc, gtin13, serialNumber, title, karat
@@ -204,11 +255,8 @@ public class InventoryCatalogManager {
         }
     }
 
-    // ==================== Filter by Category (v2.0 — محسّن) ====================
+    // ==================== Filter by Category ====================
 
-    /**
-     * ✅ فلترة حسب الفئة — إصدار دقيق
-     */
     public Map<String, InventoryItem> filterByCategory(Map<String, InventoryItem> fullCatalog,
                                                         String category) {
         Map<String, InventoryItem> filtered = new ConcurrentHashMap<>();
@@ -229,9 +277,6 @@ public class InventoryCatalogManager {
         return filtered;
     }
 
-    /**
-     * ✅ مطابقة الفئة — إصدار دقيق v2.0
-     */
     private boolean matchesCategory(InventoryItem item, String category) {
         if (item == null || category == null) return false;
 
@@ -242,36 +287,30 @@ public class InventoryCatalogManager {
         String cat = category.trim();
         String catUpper = cat.toUpperCase();
 
-        // ✅ 24K / 22K / 21K / 18K / 14K
         for (String k : new String[]{"24", "22", "21", "18", "14"}) {
             if (cat.equals("عيار " + k) || catUpper.equals(k + "K")) {
                 return itemKarat.equals(k + "K") || itemKarat.equals(k);
             }
         }
 
-        // ✅ سبائك / Bullion
         if (cat.equals("سبائك") || catUpper.equals("BULLION")) {
             return itemKarat.contains("BULLION")
                     || itemKarat.contains("BAR")
                     || itemKarat.contains("سبيكة");
         }
 
-        // ✅ أونصة / Ounce
         if (cat.equals("أونصة") || catUpper.equals("OUNCE")) {
             return itemKarat.contains("OUNCE") || itemKarat.contains("OZ");
         }
 
-        // ✅ فضة / Silver
         if (cat.equals("فضة") || catUpper.equals("SILVER")) {
             return itemKarat.contains("SILVER") || itemKarat.contains("AG");
         }
 
-        // ✅ ألماس / Diamond
         if (cat.equals("ألماس") || catUpper.equals("DIAMOND")) {
             return itemKarat.contains("DIAMOND") || itemKarat.contains("DIA");
         }
 
-        // ✅ أخرى / Other
         if (cat.equals("أخرى") || catUpper.equals("OTHER")) {
             return !itemKarat.matches("^(24K|22K|21K|18K|14K|24|22|21|18|14)$")
                     && !itemKarat.contains("BULLION")
@@ -303,9 +342,6 @@ public class InventoryCatalogManager {
         return catalogItemsMap.containsKey(epc);
     }
 
-    /**
-     * ✅ مسح شامل — آمن
-     */
     public void clear() {
         try {
             catalogItemsMap.clear();
