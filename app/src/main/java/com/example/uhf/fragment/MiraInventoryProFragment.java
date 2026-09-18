@@ -1,2197 +1,1573 @@
 package com.example.uhf.fragment;
 
+import android.content.Context;
+import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.content.Context;
-
-
-import android.os.Build;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
-import android.os.VibratorManager;
-import android.animation.ObjectAnimator;
-import android.animation.ArgbEvaluator;
-import android.animation.ValueAnimator;
-
+import android.widget.ImageButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.activity.OnBackPressedCallback;
-import androidx.appcompat.app.AlertDialog;
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.cardview.widget.CardView;
+import androidx.constraintlayout.motion.widget.MotionLayout;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
-import com.example.uhf.adapter.ModernScannedItemsAdapter;
+import com.example.uhf.adapter.QuickActionsAdapter;
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.dialog.inventory.InventoryDialogsManager;
-import com.example.uhf.engine.MiraInventoryEngine;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.MiraPriceManager;
+import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.manager.inventory.InventoryCatalogManager;
-import com.example.uhf.manager.inventory.InventoryFilterManager;
-import com.example.uhf.manager.inventory.InventoryPersistenceManager;
-import com.example.uhf.manager.inventory.InventoryScanController;
-import com.example.uhf.manager.inventory.InventorySessionManager;
-import com.example.uhf.MiraRfid.RFIDManager;
-import com.example.uhf.model.InventoryItem;
-import com.example.uhf.model.InventoryReport;
-import com.example.uhf.model.ScannedItemDisplay;
-import com.example.uhf.utils.InventoryAnimationHelper;
-import com.example.uhf.utils.PrintUtils;
-import com.example.uhf.utils.SoundManager;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.button.MaterialButtonToggleGroup;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.example.uhf.model.ApiProvider;
+import com.example.uhf.tools.SessionManager;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * MiraInventoryProFragment v4.0 — النسخة النهائية الكاملة
- *
- * ✅ إصلاحات v4.0:
- *  - setupBackPressHandler() + showExitWarning() مضافان
- *  - stopScanning() public
- *  - Fragment = UI فقط
- *  - ScanController = منطق المسح
- *  - Executors: ioExecutor + processingExecutor
- *  - AtomicBoolean + generation counter
- *  - UI Batching كل 250ms
- *  - CopyOnWriteArrayList
- */
-public class MiraInventoryProFragment extends KeyDwonFragment {
+public class MiraDashboardFragment extends Fragment {
 
-    private static final String TAG = "MiraInventoryPro";
+    private static final String TAG = "MiraDashboardFragment";
+    private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
+    private static final String PREFS_PRIVACY = "mira_dashboard_privacy";
+    private static final String KEY_HIDE_HERO = "hide_hero_value";
+    private static final String KEY_HIDE_SALES = "hide_sales_value";
 
-    // ==================== ثوابت ====================
-    private static final long UI_UPDATE_THROTTLE_MS = 200;
-    private static final int EXECUTOR_SHUTDOWN_TIMEOUT_MS = 1500;
+    private static final double OUNCE_TO_GRAM = 31.1035;
+    private static final int MAX_QUICK_ACTIONS = 9;
+    private static final long CACHE_VALIDITY_MS = 2 * 60 * 1000;
+    private static final long GOLD_CACHE_VALIDITY_MS = 12 * 60 * 60 * 1000;
+    private static final long PING_VALIDITY_MS = 30 * 1000;
+    private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+    private static final long SWIPE_REFRESH_TIMEOUT_MS = 15 * 1000;
 
-    private static final int KEYCODE_RFID_TRIGGER_1 = 139;
-    private static final int KEYCODE_RFID_TRIGGER_2 = 280;
-    private static final int KEYCODE_RFID_TRIGGER_3 = 293;
+    // ═══════════════════════════════════════════════════════
+    // State
+    // ═══════════════════════════════════════════════════════
+    private JSONObject lastSalesData = null;
+    private boolean isHeroHidden = true;
+    private boolean isSalesHidden = true;
 
-    // ==================== حالة ====================
-    private volatile String selectedCategoryFilter = null;
-    private volatile boolean isFragmentDestroyed = false;
-    private volatile boolean isArabic = true;
-    private volatile int expectedCount = 0;
-    private volatile int currentPowerDbm = 26;
-    private volatile int lastScannedForAnimation = 0;
+    // ═══════════════════════════════════════════════════════
+    // UI Elements
+    // ═══════════════════════════════════════════════════════
+    private ImageButton btnToggleHeroVisibility;
+    private ImageButton btnToggleSalesVisibility;
 
-    private volatile boolean lastConnectionState = false;
-    private final AtomicBoolean connectionStateKnown = new AtomicBoolean(false);
+    private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
+    private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
+    private TextView tvKarat24, tvKarat21, tvKarat18;
+    private TextView tvOuncePrice, tvPriceSource, tvLastUpdate;
+    private TextView tvGoldTrend, tvGoldChange;
+    private View btnGate, btnInventory, btnRefreshGold;
+    private SwipeRefreshLayout swipeRefresh;
+    private View shimmerLayout, loadingOverlay;
+    private ProgressBar pbGoldLoading;
+    private CardView cardGoldPrices;
+    private RecyclerView rvQuickActions;
+    private QuickActionsAdapter quickAdapter;
 
-    // ==================== Views ====================
-    private TextView tvProgressPercent, tvScannedCount, tvExpectedCount, tvInventoryStatus,
-            tvElapsedTime, tvRssi, tvVariance, tvAccuracy, tvItemCount,
-            tvTotalWeight, tvTotalValue;
-            // ✅ Last Scan Card Views
-    private TextView tvLastScanTitle, tvLastScanEpc, tvLastScanKarat,
-        tvLastScanWeight, tvLastScanRssi, tvLastScanStatus;
-    private View lastScanCard, flashOverlay, alertsRow;
-    private TextView tvAlertsText;
-    private MaterialButton btnOpenItemsList;
-    private MaterialButton btnPowerControlCompact, btnArchiveReportsCompact;
-    private ProgressBar progressScanned;
-    private View statusDot, statusBar, tvEmptyState;
-    private MaterialButtonToggleGroup segmentedModes;
-    private MaterialButton btnModeFull, btnModeCategory, btnModeBlind,
-            btnPowerControl, btnGenerateReport, btnArchiveReports,
-            btnMainToggleScan, btnCommitSession;
-    private EditText etSearchItems;
-    private ImageView btnClearSearch, btnLiveFilter;
-    private RecyclerView rvInventoryItems;
-    private ModernScannedItemsAdapter modernAdapter;
+    private View heroBalanceCard, heroSparkline;
+    private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
+    private TextView tvHeroValueYER, tvHeroValueSAR, tvHeroValueUSD;  // ✅ جديد
+    private View alertsStrip;
+    private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
+    private View liveStatusDot;
+    private TextView tvLiveStatusText;
 
-    // ==================== بيانات ====================
-    private final List<ScannedItemDisplay> scannedItemsDisplayList =
-            new CopyOnWriteArrayList<>();
-    private final Set<String> catalogEpcs =
-            Collections.newSetFromMap(new ConcurrentHashMap<>());
-
-    // ✅ UI Batching
-    private final ConcurrentLinkedQueue<ScannedItemDisplay> pendingUiItems =
-            new ConcurrentLinkedQueue<>();
-    private final AtomicBoolean uiFlushScheduled = new AtomicBoolean(false);
-    private final AtomicBoolean uiUpdateScheduled = new AtomicBoolean(false);
-
-    // ==================== Executors ====================
-    private ExecutorService ioExecutor;
-    private ExecutorService processingExecutor;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    
-    private Vibrator vibrator;
-
-    // ==================== مكونات ====================
-    private MiraInventoryEngine inventoryEngine;
+    // ═══════════════════════════════════════════════════════
+    // Managers & State
+    // ═══════════════════════════════════════════════════════
     private MiraApiClient apiClient;
+    private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
+    private MiraOrgProfileManager orgProfile;
+    private MiraOrgProfileManager.OnProfileChangedListener profileListener;
+    private MiraBranchesManager.OnBranchChangedListener branchListener;
+    private MiraPriceManager priceManager;
+    private MiraQuickAccessSettings quickAccessSettings;
     private PermissionManager permissionManager;
-    private SoundManager soundManager;
-    private RFIDManager rfidManager;
 
-    private InventoryAnimationHelper animationHelper;
-    private InventorySessionManager sessionManager;
-    private InventoryCatalogManager catalogManager;
-    private InventoryFilterManager filterManager;
-    private InventoryDialogsManager dialogsManager;
-    private InventoryPersistenceManager persistenceManager;
-    private InventoryScanController scanController;
+    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(2);
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Future<?> dataFuture, goldPriceFuture, pingFuture;
+    private Runnable swipeTimeoutRunnable;
 
-    private OnBackPressedCallback backPressedCallback;
+    private boolean isArabic;
+    private boolean isReceiverRegistered = false;
 
-    // ==================== Runnables ====================
-    private final Runnable uiUpdateRunnable = () -> {
-        uiUpdateScheduled.set(false);
-        updateUI();
-        updateTotalWeightAndValue();
-    };
+    private android.content.SharedPreferences offlineCache, goldCachePrefs;
+    private int currentBranchId = -1;
+    private boolean isViewInitialized = false;
+    private final AtomicBoolean isLoading = new AtomicBoolean(false);
+    private final AtomicBoolean isGoldRefreshing = new AtomicBoolean(false);
+    private boolean isDataLoaded = false;
+    private long lastDataFetchTime = 0, lastGoldFetchTime = 0, lastPingTime = 0;
 
-    private final Runnable uiFlushRunnable = () -> {
-        uiFlushScheduled.set(false);
-        flushPendingUiItems();
-    };
+    private double currentInventoryValue = 0;
+    private int currentItemCount = 0;
+    private double currentTotalWeight = 0;
 
-    private final Runnable timerRunnable = new Runnable() {
+    // ═══════════════════════════════════════════════════════
+    // Formatters
+    // ═══════════════════════════════════════════════════════
+    private SimpleDateFormat getTimeFormatter() {
+        return new SimpleDateFormat("HH:mm:ss", Locale.US);
+    }
+
+    private NumberFormat getCurrencyFormatter() {
+        return NumberFormat.getCurrencyInstance(Locale.US);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Auto Refresh
+    // ═══════════════════════════════════════════════════════
+    private final Runnable autoRefreshRunnable = new Runnable() {
         @Override
         public void run() {
-            if (scanController != null && scanController.isScanning()
-                    && !isFragmentDestroyed) {
-                updateElapsedTime();
-                mainHandler.postDelayed(this, 1000);
+            if (isAdded() && isViewInitialized) {
+                long now = System.currentTimeMillis();
+                if (now - lastDataFetchTime >= REFRESH_INTERVAL_MS) {
+                    fetchData();
+                }
+                mainHandler.postDelayed(this, REFRESH_INTERVAL_MS);
             }
         }
     };
 
-    // ==================== Factory ====================
-    public static MiraInventoryProFragment newInstance() {
-        return new MiraInventoryProFragment();
+    // ═══════════════════════════════════════════════════════
+    // Gold Price Data
+    // ═══════════════════════════════════════════════════════
+    private static class GoldPriceData {
+        final double price24, price21, price18, ouncePrice;
+        final String source;
+        GoldPriceData(double price24, double price21, double price18, double ouncePrice, String source) {
+            this.price24 = price24;
+            this.price21 = price21;
+            this.price18 = price18;
+            this.ouncePrice = ouncePrice;
+            this.source = source;
+        }
     }
 
-    public boolean isScanning() {
-        return scanController != null && scanController.isScanning();
-    }
+    // ═══════════════════════════════════════════════════════
+    // Broadcast Receiver
+    // ═══════════════════════════════════════════════════════
+    private final BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || !isAdded() || !isViewInitialized) return;
+            String action = intent.getAction();
+            Log.d(TAG, "Received broadcast: " + action);
 
-    // ==================== Lifecycle ====================
+            if ("com.example.uhf.REFRESH_DASHBOARD".equals(action) ||
+                "com.example.uhf.REFRESH_INVENTORY".equals(action) ||
+                "com.example.uhf.REFRESH_SALES".equals(action)) {
+
+                mainHandler.post(() -> {
+                    if (isAdded() && isViewInitialized) {
+                        isDataLoaded = false;
+                        lastDataFetchTime = 0;
+                        isLoading.set(false);
+                        if (isResumed()) fetchData();
+                    }
+                });
+            }
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════
+    // Lifecycle
+    // ═══════════════════════════════════════════════════════
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                              @Nullable ViewGroup container,
-                              @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         try {
-            return inflater.inflate(R.layout.fragment_mira_inventory_pro, container, false);
+            return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
         } catch (Exception e) {
-            Log.e(TAG, "Inflate error", e);
-            TextView tv = new TextView(requireContext());
-            tv.setText("✅ الجرد يعمل (Fallback)\n\n" + e.getMessage());
-            tv.setGravity(android.view.Gravity.CENTER);
-            return tv;
+            logNonFatal("onCreateView", e);
+            return null;
         }
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        isFragmentDestroyed = false;
+        try {
+            initializeManagers();
+            initViews(view);
+            setupProfileListener();
+            setupBranchListener();
+            setupQuickAccessGrid();
+            setupListeners();
 
-        initExecutors();
-        initLocale(view);
-        initSoundManager();
-        initManagers();
-        initViews(view);
-        initBusinessManagers();
-        initEngine();
-        initRfidAndScanController();
+            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            initBranchCache(currentBranchId);
 
-        setupBackPressHandler();
-        applyPermissions();
-        applyLanguage();
+            updateHeader();
+            showShimmer(false);
+
+            isViewInitialized = true;
+
+            // ✅ تشغيل MotionLayout بعد تحميل الشاشة
+            if (view instanceof MotionLayout) {
+                final MotionLayout motionLayout = (MotionLayout) view;
+                motionLayout.setProgress(0f);
+                motionLayout.post(() -> motionLayout.transitionToEnd());
+            }
+
+            syncOrgProfileFromServer(false);
+            fetchData();
+
+            startAutoRefresh();
+        } catch (Throwable e) {
+            logNonFatal("onViewCreated", e);
+        }
     }
 
-    private void initExecutors() {
+    private void initializeManagers() {
         try {
-            if (ioExecutor == null || ioExecutor.isShutdown()) {
-                ioExecutor = new ThreadPoolExecutor(
-                        1, 2, 30L, TimeUnit.SECONDS,
-                        new LinkedBlockingQueue<>(128),
-                        r -> {
-                            Thread t = new Thread(r, "Mira-IO");
-                            t.setPriority(Thread.NORM_PRIORITY - 1);
-                            t.setDaemon(true);
-                            return t;
-                        },
-                        new ThreadPoolExecutor.DiscardOldestPolicy());
-            }
-            if (processingExecutor == null || processingExecutor.isShutdown()) {
-                processingExecutor = Executors.newSingleThreadExecutor(r -> {
-                    Thread t = new Thread(r, "Mira-Processing");
-                    t.setPriority(Thread.NORM_PRIORITY);
-                    t.setDaemon(true);
-                    return t;
+            if (!isAdded()) return;
+            Context context = requireContext();
+            apiClient = MiraApiClient.getInstance(context);
+            sessionManager = new SessionManager(context);
+            branchesManager = MiraBranchesManager.getInstance(context);
+            orgProfile = MiraOrgProfileManager.getInstance(context);
+            priceManager = MiraPriceManager.getInstance(context);
+            quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
+            permissionManager = PermissionManager.getInstance(context);
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+            goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
+            lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
+        } catch (Exception e) {
+            logNonFatal("initializeManagers", e);
+        }
+    }
+
+    private void initViews(View v) {
+        try {
+            tvTotalItems = v.findViewById(R.id.tvTotalItems);
+            tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
+            tvSoldToday = v.findViewById(R.id.tvSoldToday);
+            tvSalesToday = v.findViewById(R.id.tvSalesToday);
+            tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
+            tvSalesYear = v.findViewById(R.id.tvSalesYear);
+            tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
+            tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
+            tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
+            btnGate = v.findViewById(R.id.btnGateSecurity);
+            btnInventory = v.findViewById(R.id.btnRfidAudit);
+            shimmerLayout = v.findViewById(R.id.shimmerLayout);
+            swipeRefresh = v.findViewById(R.id.swipeRefresh);
+            tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
+            tvPriceSource = v.findViewById(R.id.tvPriceSource);
+            tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
+            tvGoldTrend = v.findViewById(R.id.tvGoldTrend);
+            tvGoldChange = v.findViewById(R.id.tvGoldChange);
+            btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
+            cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+            loadingOverlay = v.findViewById(R.id.loadingOverlay);
+            pbGoldLoading = v.findViewById(R.id.pbGoldLoading);
+
+            heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
+            heroSparkline = v.findViewById(R.id.heroSparkline);
+            tvHeroBalance = v.findViewById(R.id.tvHeroBalance);
+            tvHeroTrend = v.findViewById(R.id.tvHeroTrend);
+            tvHeroSubtitle = v.findViewById(R.id.tvHeroSubtitle);
+            tvHeroValueYER = v.findViewById(R.id.tvHeroValueYER);
+            tvHeroValueSAR = v.findViewById(R.id.tvHeroValueSAR);
+            tvHeroValueUSD = v.findViewById(R.id.tvHeroValueUSD);
+
+            alertsStrip = v.findViewById(R.id.alertsStrip);
+            tvAlertIcon = v.findViewById(R.id.tvAlertIcon);
+            tvAlertMessage = v.findViewById(R.id.tvAlertMessage);
+            tvAlertAction = v.findViewById(R.id.tvAlertAction);
+
+            liveStatusDot = v.findViewById(R.id.liveStatusDot);
+            tvLiveStatusText = v.findViewById(R.id.tvLiveStatusText);
+
+            btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
+            btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
+
+            // ═══════════════════════════════════════
+            // Listeners
+            // ═══════════════════════════════════════
+
+            // ✅ زر تحديث الذهب — مع Logs للتشخيص
+            if (btnRefreshGold != null) {
+                btnRefreshGold.setOnClickListener(v2 -> {
+                    Log.d(TAG, "🔘 Refresh Gold button clicked. isGoldRefreshing=" + isGoldRefreshing.get());
+                    if (!isGoldRefreshing.get()) {
+                        fetchLiveGoldPrices(true);
+                    } else {
+                        Log.d(TAG, "⏳ Gold refresh already in progress");
+                    }
                 });
             }
+
+            // ✅ زر إخفاء/إظهار قيمة المخزون
+            if (btnToggleHeroVisibility != null) {
+                btnToggleHeroVisibility.setOnClickListener(v2 -> {
+                    Log.d(TAG, "👁️ Toggle Hero visibility clicked. Before: " + isHeroHidden);
+                    toggleHeroVisibility();
+                });
+            }
+
+            // ✅ زر إخفاء/إظهار المبيعات
+            if (btnToggleSalesVisibility != null) {
+                btnToggleSalesVisibility.setOnClickListener(v2 -> {
+                    Log.d(TAG, "👁️ Toggle Sales visibility clicked. Before: " + isSalesHidden);
+                    toggleSalesVisibility();
+                });
+            }
+
+            if (tvAlertAction != null) {
+                tvAlertAction.setOnClickListener(v2 ->
+                        navigateToFragment(new MiraUHFReadTagFragment(), "Scan"));
+            }
+
+            if (cardGoldPrices != null && permissionManager != null
+                    && !permissionManager.canAccessFragment("GoldRates")) {
+                cardGoldPrices.setVisibility(View.GONE);
+            }
+
+            // Quick Access RecyclerView
+            rvQuickActions = v.findViewById(R.id.rvQuickActions);
+            if (rvQuickActions != null) {
+                rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
+                rvQuickActions.setHasFixedSize(true);
+                quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
+                rvQuickActions.setAdapter(quickAdapter);
+            }
+
+            // ✅ SwipeRefreshLayout
+            if (swipeRefresh != null) {
+                swipeRefresh.setOnRefreshListener(this::refreshAllData);
+                swipeRefresh.setColorSchemeResources(R.color.colorPrimary,R.color.gray1);
+            }
+
+            // تحميل حالة الإخفاء
+            android.content.SharedPreferences privacyPrefs =
+                    requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE);
+            isHeroHidden = privacyPrefs.getBoolean(KEY_HIDE_HERO, true);
+            isSalesHidden = privacyPrefs.getBoolean(KEY_HIDE_SALES, true);
+
+            // تطبيق الحالة الأولية
+            updateHeroBalance();
+            applySalesVisibility();
+
+            // تحديث أيقونات العين
+            if (btnToggleHeroVisibility != null) {
+                btnToggleHeroVisibility.setImageResource(
+                        isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+            }
+            if (btnToggleSalesVisibility != null) {
+                btnToggleSalesVisibility.setImageResource(
+                        isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+            }
+
         } catch (Exception e) {
-            Log.e(TAG, "initExecutors error", e);
+            logNonFatal("initViews", e);
         }
     }
 
-    private void initLocale(View view) {
-        try {
-            isArabic = Locale.getDefault().getLanguage().equals("ar");
-            view.setLayoutDirection(isArabic
-                    ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        } catch (Exception ignored) {}
+    private void updateHeader() {
+        // Greeting Card محذوف
     }
 
-    private void initSoundManager() {
-        try { soundManager = new SoundManager(requireContext()); }
-        catch (Exception e) { Log.e(TAG, "SoundManager error", e); }
-    }
+    // ═══════════════════════════════════════════════════════
+    // Hero Balance
+    // ═══════════════════════════════════════════════════════
 
-    private void initManagers() {
-        try { animationHelper = new InventoryAnimationHelper(isArabic); }
-        catch (Exception e) { Log.e(TAG, "animationHelper error", e); }
-        try { sessionManager = new InventorySessionManager(requireContext(), isArabic); }
-        catch (Exception e) { Log.e(TAG, "sessionManager error", e); }
-        try { catalogManager = new InventoryCatalogManager(requireContext(), isArabic); }
-        catch (Exception e) { Log.e(TAG, "catalogManager error", e); }
-        try { filterManager = new InventoryFilterManager(isArabic); }
-        catch (Exception e) { Log.e(TAG, "filterManager error", e); }
-        try {
-            persistenceManager = new InventoryPersistenceManager(
-                    requireContext(), isArabic, ioExecutor);
-        } catch (Exception e) { Log.e(TAG, "persistenceManager error", e); }
-        try {
-            dialogsManager = new InventoryDialogsManager(requireActivity(), isArabic);
-            dialogsManager.setSoundManager(soundManager);
-            dialogsManager.setCurrentPowerDbm(currentPowerDbm);
-            dialogsManager.setCallback(createDialogsCallback());
-        } catch (Exception e) { Log.e(TAG, "dialogsManager error", e); }
-        try {
-            scanController = new InventoryScanController(
-                    requireContext(), isArabic, processingExecutor, ioExecutor);
-            scanController.setSoundManager(soundManager);
-            scanController.setCallback(createScanCallback());
-        } catch (Exception e) { Log.e(TAG, "scanController error", e); }
-    }
-
-    private void initBusinessManagers() {
-        try {
-            apiClient = MiraApiClient.getInstance(requireContext());
-            branchesManager = MiraBranchesManager.getInstance(requireContext());
-            permissionManager = PermissionManager.getInstance(requireContext());
-        } catch (Exception e) { Log.e(TAG, "business managers error", e); }
-    }
-
-    private void initEngine() {
-        try {
-            String sessionId = "SESS-" + UUID.randomUUID().toString()
-                    .substring(0, 8).toUpperCase();
-            inventoryEngine = new MiraInventoryEngine(requireContext(),
-                    sessionId, getDeviceId());
-            if (scanController != null) {
-                scanController.setInventoryEngine(inventoryEngine);
-            }
-        } catch (Exception e) { Log.e(TAG, "engine error", e); }
-    }
-
-    private void initRfidAndScanController() {
-        try {
-            rfidManager = RFIDManager.getInstance(requireContext());
-            if (scanController != null) {
-                scanController.attachRfidManager(rfidManager);
-            }
-        } catch (Exception e) { Log.e(TAG, "rfid error", e); }
-    }
-
-    // ==================== Back Press Handler ====================
-    private void setupBackPressHandler() {
-        try {
-            backPressedCallback = new OnBackPressedCallback(true) {
-                @Override
-                public void handleOnBackPressed() {
-                    if (isScanning()) {
-                        showExitWarning(() -> {
-                            stopScanning();
-                            setEnabled(false);
-                            requireActivity().getOnBackPressedDispatcher().onBackPressed();
-                        });
-                    } else {
-                        setEnabled(false);
-                        requireActivity().getOnBackPressedDispatcher().onBackPressed();
-                    }
-                }
-            };
-
-            requireActivity().getOnBackPressedDispatcher().addCallback(
-                    getViewLifecycleOwner(), backPressedCallback);
-        } catch (Exception e) {
-            Log.e(TAG, "setupBackPressHandler error: " + e.getMessage());
-        }
-    }
-
-    private void showExitWarning(Runnable onConfirm) {
-        if (!isAdded() || isFragmentDestroyed) return;
-
-        String title = isArabic ? "⚠️ تحذير مهم" : "⚠️ Important Warning";
-        String message = isArabic ?
-                "الجرد ما زال قيد التشغيل!\n\nإذا قمت بتغيير الواجهة، سيتوقف الجرد.\n\nهل تريد المتابعة؟" :
-                "Inventory is still running!\n\nIf you change the screen, the inventory will stop.\n\nContinue?";
-
-        try {
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(title)
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "إيقاف والمتابعة" : "Stop and Continue",
-                            (dialog, which) -> {
-                                if (onConfirm != null) onConfirm.run();
-                            })
-                    .setNegativeButton(isArabic ? "البقاء" : "Stay",
-                            (dialog, which) -> dialog.dismiss())
-                    .setCancelable(false)
-                    .show();
-        } catch (Exception e) {
-            Log.e(TAG, "showExitWarning error: " + e.getMessage());
-        }
-    }
-
-    // ==================== Callbacks ====================
-    private InventoryDialogsManager.DialogsCallback createDialogsCallback() {
-        return new InventoryDialogsManager.DialogsCallback() {
-            @Override public void onPowerChanged(int p) {
-                currentPowerDbm = p;
-                applyAntennaPower(p);
-                if (btnPowerControl != null)
-                    btnPowerControl.setText("⚡ " + p + " dBm");
-            }
-            @Override public void onSessionReset() { confirmResetSession(); }
-            @Override public void onBuzzerTest() {}
-            @Override public void onCommitConfirmed() { commitInventoryToServer(); }
-            @Override public void onPrintCurrentReport() { printCurrentReport(); }
-            @Override public void onPrintSingleItem(ScannedItemDisplay item) {
-                printSingleItemLabel(item);
-            }
-            @Override public void onItemStatusChange(ScannedItemDisplay item, String s) {
-                updateItemStatus(item.epc, s);
-            }
-            @Override public void onItemDamageRegister(ScannedItemDisplay item, String d) {
-                registerItemDamage(item.epc, d);
-            }
-            @Override public void onShowArchive() { showArchiveReports(); }
-            @Override public void onShowSnapshots() { showSnapshotsList(); }
-        };
-    }
-
-    private InventoryScanController.ScanCallback createScanCallback() {
-        return new InventoryScanController.ScanCallback() {
-            @Override public void onScanStarted() {
-                updateMainToggleButton(true);
-                if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-                if (btnArchiveReports != null) btnArchiveReports.setEnabled(false);
-                mainHandler.post(timerRunnable);
-            }
-            @Override public void onScanStopped() {
-                mainHandler.removeCallbacks(timerRunnable);
-                updateMainToggleButton(false);
-                if (btnGenerateReport != null) btnGenerateReport.setEnabled(true);
-                if (btnArchiveReports != null) btnArchiveReports.setEnabled(true);
-                if (tvInventoryStatus != null) {
-                    tvInventoryStatus.setText(isArabic ?
-                            "📡 تم إيقاف الجرد" : "📡 Scan stopped");
-                }
-                scheduleUiUpdate();
-                syncOfflineTransactions();
-            }
-            @Override public void onTagRead(String normalizedEpc, int rssi) {
-                addScannedItemToDisplay(normalizedEpc, rssi);
-                updateLastScan(normalizedEpc, rssi);
-            }
-            @Override public void onDuplicateTag(String epc) {}
-            @Override
-public void onError(String error) {
-    mainHandler.post(() -> {
-        if (isFragmentDestroyed || !isAdded()) return;
-        
-        // ✅ رسالة خطأ واضحة مع خيارات
-        String title = isArabic ? "⚠️ فشل تحميل الكاتولوج" 
-                                : "⚠️ Catalog Load Failed";
-        String message = (error != null && !error.isEmpty()) 
-                ? error 
-                : (isArabic ? "فشل غير معروف" : "Unknown error");
-        
-        if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText(
-                    isArabic ? "⚠️ فشل التحميل" : "⚠️ Load failed");
-        }
-        
-        // ✅ Dialog مع 3 خيارات
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(title)
-                .setMessage(message + "\n\n" + 
-                        (isArabic ? "هل تريد إعادة المحاولة؟" 
-                                  : "Retry?"))
-                .setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", 
-                        (d, w) -> {
-                            d.dismiss();
-                            mainHandler.postDelayed(() -> startScanning(), 500);
-                        })
-                .setNeutralButton(isArabic ? "⚡ جرد أعمى" : "⚡ Blind Mode",
-                        (d, w) -> {
-                            d.dismiss();
-                            startBlindInventory();
-                        })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", 
-                        (d, w) -> d.dismiss())
-                .setCancelable(false)
-                .show();
-    });
-}
-
-            @Override public void onConnectionChanged(boolean isConnected) {
-                handleConnectionChanged(isConnected);
-            }
-            @Override public void onTagDebounced(String epc) {}
-            @Override public void onExpectedCountChanged(int count) {
-                expectedCount = count;
-                if (tvExpectedCount != null) {
-                    tvExpectedCount.setText(count > 0 ? String.valueOf(count) : "—");
-                }
-            }
-        };
-    }
-
-    // ==================== Views ====================
-    private void initViews(View view) {
-    // ✅ Views القديمة (للتوافق)
-    tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
-    progressScanned = view.findViewById(R.id.progressScanned);
-    tvScannedCount = view.findViewById(R.id.tvScannedCount);
-    tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
-    statusDot = view.findViewById(R.id.statusDot);
-    statusBar = view.findViewById(R.id.statusBar);
-    tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
-    tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
-    tvRssi = view.findViewById(R.id.tvRssi);
-    segmentedModes = view.findViewById(R.id.segmentedModes);
-    btnModeFull = view.findViewById(R.id.btnModeFull);
-    btnModeCategory = view.findViewById(R.id.btnModeCategory);
-    btnModeBlind = view.findViewById(R.id.btnModeBlind);
-    tvVariance = view.findViewById(R.id.tvVariance);
-    tvAccuracy = view.findViewById(R.id.tvAccuracy);
-    tvItemCount = view.findViewById(R.id.tvItemCount);
-    tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
-    tvTotalValue = view.findViewById(R.id.tvTotalValue);
-    btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
-    btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
-    btnPowerControl = view.findViewById(R.id.btnPowerControl);
-    etSearchItems = view.findViewById(R.id.etSearchItems);
-    btnClearSearch = view.findViewById(R.id.btnClearSearch);
-    btnLiveFilter = view.findViewById(R.id.btnLiveFilter);
-    rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
-    tvEmptyState = view.findViewById(R.id.tvEmptyState);
-    btnMainToggleScan = view.findViewById(R.id.btnMainToggleScan);
-    btnCommitSession = view.findViewById(R.id.btnCommitSession);
-
-    // ✅ Last Scan Card
-    lastScanCard = view.findViewById(R.id.lastScanCard);
-    tvLastScanTitle = view.findViewById(R.id.tvLastScanTitle);
-    tvLastScanEpc = view.findViewById(R.id.tvLastScanEpc);
-    tvLastScanKarat = view.findViewById(R.id.tvLastScanKarat);
-    tvLastScanWeight = view.findViewById(R.id.tvLastScanWeight);
-    tvLastScanRssi = view.findViewById(R.id.tvLastScanRssi);
-    tvLastScanStatus = view.findViewById(R.id.tvLastScanStatus);
-    flashOverlay = view.findViewById(R.id.flashOverlay);
-    alertsRow = view.findViewById(R.id.alertsRow);
-    tvAlertsText = view.findViewById(R.id.tvAlertsText);
-    btnOpenItemsList = view.findViewById(R.id.btnOpenItemsList);
-    btnPowerControlCompact = view.findViewById(R.id.btnPowerControlCompact);
-    btnArchiveReportsCompact = view.findViewById(R.id.btnArchiveReportsCompact);
-
-    // ✅ تهيئة Vibrator
-    initVibrator();
-
-    // ✅ RecyclerView (يُخزّن مرجعاً، لكنه مخفي — يعمل في BottomSheet)
-    if (rvInventoryItems != null) {
-        rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
-        rvInventoryItems.setNestedScrollingEnabled(false);
-        modernAdapter = new ModernScannedItemsAdapter(
-                isArabic, this::showItemOptionsDialog);
-        rvInventoryItems.setAdapter(modernAdapter);
-        rvInventoryItems.setHasFixedSize(false);
-        rvInventoryItems.setItemAnimator(null);
-    }
-
-    if (btnLiveFilter != null) {
-        btnLiveFilter.setOnClickListener(v -> showLiveFilterChips());
-    }
-
-    setupButtons();
-    setupSegmentedControl();
-    setupSearchBar();
-}
-
-/**
- * ✅ تهيئة Vibrator (متوافق مع API 31+)
+ /**
+ * ✅ الدالة الموحّدة لتحديث قيمة المخزون
+ * - تحسب القيمة من inventory_value أو من الوزن × سعر الذهب
+ * - تحترم حالة isHeroHidden
+ * - ✅ محدّثة لعرض 3 إحصائيات إضافية (عدد، وزن، سعر الذهب)
  */
-private void initVibrator() {
+private void updateHeroBalance() {
     try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            VibratorManager vm = (VibratorManager) requireContext()
-                    .getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
-            vibrator = vm != null ? vm.getDefaultVibrator() : null;
+        if (tvHeroBalance == null) return;
+
+        double totalValue = currentInventoryValue;
+        int itemCount = currentItemCount;
+        double totalWeight = currentTotalWeight;
+
+        // حساب من سعر الذهب إذا القيمة صفر
+        if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+            double price24 = priceManager.getGoldPricePerGram(24);
+            if (price24 > 0) {
+                totalValue = totalWeight * price24;
+            }
+        }
+
+        // ✅ عرض القيمة — مع الإخفاء
+        if (isHeroHidden) {
+            tvHeroBalance.setText("••••••••");
         } else {
-            vibrator = (Vibrator) requireContext()
-                    .getSystemService(Context.VIBRATOR_SERVICE);
+            tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
         }
+
+        // Subtitle يظهر دائماً
+        if (tvHeroSubtitle != null) {
+            tvHeroSubtitle.setText(String.format(
+                    "👑 %d قطعة • %.1fg", itemCount, totalWeight));
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // ✅ الإحصائيات الثلاث الجديدة (أسفل القيمة)
+        // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// ✅ عرض القيمة بـ 3 عملات
+// ═══════════════════════════════════════════════════════
+
+// 1. بالدولار الأمريكي (القيمة الأساسية)
+String usdText;
+if (isHeroHidden) {
+    usdText = "••••••";
+} else {
+    usdText = String.format(Locale.US, "%,.2f", totalValue);
+}
+if (tvHeroValueUSD != null) {
+    tvHeroValueUSD.setText(usdText);
+}
+
+// 2. بالريال السعودي (USD × 3.75)
+String sarText;
+if (isHeroHidden) {
+    sarText = "••••••";
+} else {
+    double sarValue = totalValue * 3.75;
+    sarText = String.format(Locale.US, "%,.2f", sarValue);
+}
+if (tvHeroValueSAR != null) {
+    tvHeroValueSAR.setText(sarText);
+}
+
+// 3. بالريال اليمني (USD × 530 - متوسط سعر الصرف)
+String yerText;
+if (isHeroHidden) {
+    yerText = "••••••";
+} else {
+    double yerValue = totalValue * 530.0;
+    yerText = String.format(Locale.US, "%,.0f", yerValue);
+}
+if (tvHeroValueYER != null) {
+    tvHeroValueYER.setText(yerText);
+}
+
     } catch (Exception e) {
-        Log.e(TAG, "initVibrator error", e);
-        vibrator = null;
+        logNonFatal("updateHeroBalance", e);
     }
 }
 
-/**
- * ✅ اهتزاز حسب نوع المسح
- */
-private void hapticFeedback(SoundManager.FeedbackType type) {
-    if (vibrator == null || !vibrator.hasVibrator()) return;
-    try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            switch (type) {
-                case KNOWN_ITEM:
-                    vibrator.vibrate(VibrationEffect.createOneShot(40,
-                            VibrationEffect.DEFAULT_AMPLITUDE));
-                    break;
-                case DUPLICATE_ITEM:
-                    vibrator.vibrate(VibrationEffect.createWaveform(
-                            new long[]{0, 25, 40, 25}, -1));
-                    break;
-                case UNKNOWN_ITEM:
-                    vibrator.vibrate(VibrationEffect.createOneShot(150, 255));
-                    break;
-                case COMPLETED:
-                    vibrator.vibrate(VibrationEffect.createWaveform(
-                            new long[]{0, 50, 40, 50, 40, 100}, -1));
-                    break;
-                case ERROR:
-                    vibrator.vibrate(VibrationEffect.createWaveform(
-                            new long[]{0, 200, 80, 200}, -1));
-                    break;
+    /**
+     * ✅ إخفاء/إظهار قيمة المخزون
+     * - عكس الحالة
+     * - حفظ في SharedPreferences
+     * - تحديث الأيقونة
+     * - استدعاء updateHeroBalance() مباشرة
+     */
+    private void toggleHeroVisibility() {
+        if (!isAdded() || tvHeroBalance == null) return;
+
+        isHeroHidden = !isHeroHidden;
+
+        requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_HIDE_HERO, isHeroHidden).apply();
+
+        if (btnToggleHeroVisibility != null) {
+            btnToggleHeroVisibility.setImageResource(
+                    isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
+
+        // ✅ استدعاء الدالة الموحّدة
+        updateHeroBalance();
+
+        Log.d(TAG, "✅ Hero visibility toggled. isHeroHidden=" + isHeroHidden);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Sales Visibility
+    // ═══════════════════════════════════════════════════════
+
+    private void toggleSalesVisibility() {
+        if (!isAdded() || tvSalesToday == null) return;
+
+        isSalesHidden = !isSalesHidden;
+
+        requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_HIDE_SALES, isSalesHidden).apply();
+
+        if (btnToggleSalesVisibility != null) {
+            btnToggleSalesVisibility.setImageResource(
+                    isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
+
+        applySalesVisibility();
+
+        Log.d(TAG, "✅ Sales visibility toggled. isSalesHidden=" + isSalesHidden);
+    }
+
+    private void applySalesVisibility() {
+        if (isSalesHidden) {
+            setText(tvSalesToday, "••••••");
+            setText(tvSalesMonth, "••••••");
+            setText(tvSalesYear, "••••••");
+        } else if (lastSalesData != null) {
+            applySalesData(lastSalesData);
+        }
+    }
+
+    private void applySalesData(JSONObject sales) {
+        if (sales == null || tvSalesToday == null) return;
+
+        if (isSalesHidden) {
+            setText(tvSalesToday, "••••••");
+            setText(tvSalesMonth, "••••••");
+            setText(tvSalesYear, "••••••");
+            return;
+        }
+
+        setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
+        setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
+        setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Alerts
+    // ═══════════════════════════════════════════════════════
+    private void updateAlerts(int count, String message) {
+        try {
+            if (alertsStrip == null) return;
+
+            if (count > 0) {
+                alertsStrip.setVisibility(View.VISIBLE);
+                if (tvAlertIcon != null) tvAlertIcon.setText("⚠️");
+                if (tvAlertMessage != null) tvAlertMessage.setText(message);
+                if (tvAlertAction != null) {
+                    tvAlertAction.setText(isArabic
+                            ? "عرض (" + count + ") →"
+                            : "View (" + count + ") →");
+                }
+            } else {
+                alertsStrip.setVisibility(View.GONE);
             }
-        } else {
-            vibrator.vibrate(40);
+        } catch (Exception e) {
+            logNonFatal("updateAlerts", e);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "hapticFeedback error", e);
     }
-}
 
-/**
- * ✅ وميض ملون عند المسح
- */
-private void flashOverlay(int colorHex) {
-    if (flashOverlay == null) return;
-    try {
-        flashOverlay.setBackgroundColor(colorHex);
-        flashOverlay.setAlpha(0.6f);
+    private void computeAndShowAlerts(JSONObject data) {
+        try {
+            if (data == null) { updateAlerts(0, null); return; }
 
-        ObjectAnimator anim = ObjectAnimator.ofFloat(flashOverlay, "alpha", 0.6f, 0f);
-        anim.setDuration(280);
-        anim.start();
-    } catch (Exception e) {
-        Log.e(TAG, "flashOverlay error", e);
+            int alertsCount = 0;
+            StringBuilder message = new StringBuilder();
+            JSONObject inv = data.optJSONObject("inventory");
+
+            if (inv != null) {
+                int itemsWithoutWeight = inv.optInt("items_without_weight", -1);
+                int itemsWithoutPrice = inv.optInt("items_without_price", -1);
+
+                if (itemsWithoutWeight > 0) {
+                    alertsCount += itemsWithoutWeight;
+                    message.append(isArabic
+                            ? itemsWithoutWeight + " قطعة بدون وزن"
+                            : itemsWithoutWeight + " items without weight");
+                }
+                if (itemsWithoutPrice > 0) {
+                    if (message.length() > 0) message.append(" • ");
+                    alertsCount += itemsWithoutPrice;
+                    message.append(isArabic
+                            ? itemsWithoutPrice + " قطعة بدون سعر"
+                            : itemsWithoutPrice + " items without price");
+                }
+            }
+
+            if (alertsCount > 0) {
+                updateAlerts(alertsCount, message.toString());
+            } else {
+                updateAlerts(0, null);
+            }
+        } catch (Exception e) {
+            logNonFatal("computeAndShowAlerts", e);
+        }
     }
-}
 
-    private void setupButtons() {
-        if (btnMainToggleScan != null) {
-            btnMainToggleScan.setOnClickListener(v -> {
-                if (isScanning()) stopScanning();
-                else if (canEdit()) startScanning();
-                else showAccessDenied();
+    // ═══════════════════════════════════════════════════════
+    // Live Status
+    // ═══════════════════════════════════════════════════════
+    private void updateLiveStatusText(boolean isOnline) {
+        try {
+            if (!isAdded()) return;
+            Context context = getContext();
+            if (context == null) return;
+
+            if (tvLiveStatusText != null) {
+                tvLiveStatusText.setText(isOnline
+                        ? (isArabic ? "متصل" : "Online")
+                        : (isArabic ? "غير متصل" : "Offline"));
+                tvLiveStatusText.setTextColor(isOnline
+                        ? ContextCompat.getColor(context, R.color.status_online_green)
+                        : ContextCompat.getColor(context, R.color.status_offline_red));
+            }
+
+            if (liveStatusDot != null) {
+                liveStatusDot.setBackgroundResource(isOnline
+                        ? R.drawable.bg_status_dot_green
+                        : R.drawable.bg_status_dot_red);
+            }
+        } catch (Exception e) {
+            logNonFatal("updateLiveStatusText", e);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Listeners
+    // ═══════════════════════════════════════════════════════
+    private void setupProfileListener() {
+        try {
+            if (orgProfile == null) return;
+            profileListener = () -> mainHandler.post(() -> {
+                if (isAdded() && isViewInitialized) updateHeader();
             });
+            orgProfile.addListener(profileListener);
+        } catch (Exception e) {
+            logNonFatal("setupProfileListener", e);
         }
-        if (btnCommitSession != null) {
-            btnCommitSession.setOnClickListener(v -> showCommitConfirmationDialog());
+    }
+
+    private void setupBranchListener() {
+        try {
+            if (branchesManager == null) return;
+            branchListener = () -> {
+                if (!isAdded()) return;
+                mainHandler.post(() -> {
+                    if (isAdded() && isViewInitialized) updateHeader();
+                });
+            };
+            branchesManager.addListener(branchListener);
+        } catch (Exception e) {
+            logNonFatal("setupBranchListener", e);
         }
-        if (btnPowerControl != null) {
-            btnPowerControl.setOnClickListener(v -> showPowerControlSheet());
+    }
+
+    private void syncOrgProfileFromServer(boolean force) {
+        try {
+            if (orgProfile == null || apiClient == null) return;
+            orgProfile.syncFromServer(apiClient, force, new MiraOrgProfileManager.SyncCallback() {
+                @Override
+                public void onSuccess() {
+                    mainHandler.post(() -> {
+                        if (isAdded() && isViewInitialized) updateHeader();
+                    });
+                    syncBranchesListFromServer();
+                }
+                @Override
+                public void onError(String error) {
+                    Log.w(TAG, "⚠️ Org sync failed: " + error);
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("syncOrgProfileFromServer", e);
         }
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
-            btnGenerateReport.setEnabled(false);
+    }
+
+    private void syncBranchesListFromServer() {
+        try {
+            if (branchesManager == null) return;
+            branchesManager.syncFromServer(new MiraBranchesManager.SyncCallback() {
+                @Override
+                public void onSuccess() { Log.i(TAG, "✅ Branches synced"); }
+                @Override
+                public void onError(String error) { Log.w(TAG, "⚠️ Branches sync: " + error); }
+            });
+        } catch (Exception e) {
+            logNonFatal("syncBranchesListFromServer", e);
         }
-        if (btnArchiveReports != null) {
-            btnArchiveReports.setOnClickListener(v -> showArchiveReports());
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Quick Access
+    // ═══════════════════════════════════════════════════════
+    private void setupQuickAccessGrid() {
+        try {
+            if (quickAccessSettings == null || quickAdapter == null) return;
+
+            sharedExecutor.execute(() -> {
+                try {
+                    if (!isAdded()) return;
+
+                    List<MiraQuickAccessSettings.QuickAction> enabledActions =
+                            quickAccessSettings.getEnabledActions();
+                    List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
+
+                    if (enabledActions != null && !enabledActions.isEmpty()) {
+                        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+                            String tag = getFragmentTagForAction(action.id);
+                            boolean hasPermission = permissionManager == null
+                                    || permissionManager.canAccessFragment(tag);
+                            if (hasPermission) filteredActions.add(action);
+                        }
+                    }
+
+                    if (filteredActions.isEmpty()) {
+                        filteredActions = getDefaultQuickActions();
+                    }
+
+                    final List<MiraQuickAccessSettings.QuickAction> finalList = filteredActions;
+                    mainHandler.post(() -> {
+                        if (isAdded() && quickAdapter != null) {
+                            quickAdapter.submitList(finalList);
+                        }
+                    });
+
+                } catch (Exception e) {
+                    logNonFatal("setupQuickAccessGrid.inner", e);
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("setupQuickAccessGrid", e);
         }
-        
-        if (btnOpenItemsList != null) {
-    btnOpenItemsList.setOnClickListener(v -> showItemsBottomSheet());
-}
-if (btnPowerControlCompact != null) {
-    btnPowerControlCompact.setOnClickListener(v -> showPowerControlSheet());
-}
-if (btnArchiveReportsCompact != null) {
-    btnArchiveReportsCompact.setOnClickListener(v -> showArchiveReports());
-}
+    }
+
+    private List<MiraQuickAccessSettings.QuickAction> getDefaultQuickActions() {
+        List<MiraQuickAccessSettings.QuickAction> defaults = new ArrayList<>();
+        MiraQuickAccessSettings settings = MiraQuickAccessSettings.getInstance(requireContext());
+        if (settings == null) return defaults;
+
+        List<MiraQuickAccessSettings.QuickAction> allActions = settings.getAllActions();
+        if (allActions == null || allActions.isEmpty()) return defaults;
+
+        for (MiraQuickAccessSettings.QuickAction action : allActions) {
+            String tag = getFragmentTagForAction(action.id);
+            boolean hasPermission = permissionManager == null
+                    || permissionManager.canAccessFragment(tag);
+            if (hasPermission && defaults.size() < MAX_QUICK_ACTIONS) {
+                defaults.add(action);
+            }
+            if (defaults.size() >= MAX_QUICK_ACTIONS) break;
+        }
+        return defaults;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Live Status (Ping)
+    // ═══════════════════════════════════════════════════════
+    private void updateLiveStatus() {
+        try {
+            if (apiClient == null) return;
+            cancelFuture(pingFuture);
+            pingFuture = sharedExecutor.submit(() -> {
+                boolean isOnline = apiClient.pingApi();
+                mainHandler.post(() -> updateLiveStatusText(isOnline));
+            });
+        } catch (Exception e) {
+            logNonFatal("updateLiveStatus", e);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Gold Prices
+    // ═══════════════════════════════════════════════════════
+    private void fetchLiveGoldPrices(boolean forceRefresh) {
+        try {
+            if (apiClient == null) {
+                Log.w(TAG, "⚠️ apiClient is null");
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
+            if (isGoldRefreshing.get()) {
+                Log.d(TAG, "⏳ Gold refresh in progress, skipping");
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
+
+            long now = System.currentTimeMillis();
+            if (!forceRefresh && (now - lastGoldFetchTime) < GOLD_CACHE_VALIDITY_MS) {
+                displayGoldPricesFromCache();
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
+
+            isGoldRefreshing.set(true);
+            showGoldLoadingState(true);
+            cancelFuture(goldPriceFuture);
+
+            goldPriceFuture = sharedExecutor.submit(() -> {
+                try {
+                    List<ApiProvider> providers = apiClient.getActiveProviders();
+                    ApiProvider activeProvider = null;
+
+                    if (providers != null && !providers.isEmpty()) {
+                        for (ApiProvider provider : providers) {
+                            if (provider.isActive() && provider.getApiKey() != null
+                                    && !provider.getApiKey().isEmpty()) {
+                                activeProvider = provider;
+                                break;
+                            }
+                        }
+                        if (activeProvider == null) activeProvider = providers.get(0);
+                    }
+
+                    if (activeProvider == null) {
+                        mainHandler.post(() -> {
+                            isGoldRefreshing.set(false);
+                            showGoldLoadingState(false);
+                            if (isAdded()) displayGoldPricesFromCache();
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                        });
+                        return;
+                    }
+
+                    MiraApiClient.ApiResponse response =
+                            apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
+                    GoldPriceData priceData = parseGoldPriceData(response);
+
+                    mainHandler.post(() -> {
+                        isGoldRefreshing.set(false);
+                        showGoldLoadingState(false);
+                        if (!isAdded()) return;
+
+                        if (priceData != null) {
+                            lastGoldFetchTime = System.currentTimeMillis();
+                            displayGoldPrices(priceData);
+                            updateHeroBalance();
+                            if (goldCachePrefs != null) {
+                                goldCachePrefs.edit()
+                                        .putLong("last_gold_fetch_time", System.currentTimeMillis())
+                                        .apply();
+                            }
+                            Toast.makeText(getContext(),
+                                    isArabic ? "✅ تم تحديث أسعار الذهب" : "✅ Gold prices updated",
+                                    Toast.LENGTH_SHORT).show();
+                        } else {
+                            displayGoldPricesFromCache();
+                            Toast.makeText(getContext(),
+                                    isArabic ? "⚠️ تعذر التحديث - عرض الكاش" : "⚠️ Update failed - showing cache",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    });
+                } catch (Exception e) {
+                    logNonFatal("fetchLiveGoldPrices.thread", e);
+                    mainHandler.post(() -> {
+                        isGoldRefreshing.set(false);
+                        showGoldLoadingState(false);
+                        if (isAdded()) displayGoldPricesFromCache();
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    });
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("fetchLiveGoldPrices", e);
+            isGoldRefreshing.set(false);
+            showGoldLoadingState(false);
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        }
+    }
+
+    private void showGoldLoadingState(boolean loading) {
+        try {
+            if (btnRefreshGold == null) return;
+            btnRefreshGold.setEnabled(!loading);
+            btnRefreshGold.setAlpha(loading ? 0.4f : 1.0f);
+            if (pbGoldLoading != null) {
+                pbGoldLoading.setVisibility(loading ? View.VISIBLE : View.GONE);
+            }
+        } catch (Exception e) {
+            logNonFatal("showGoldLoadingState", e);
+        }
+    }
+
+    private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
+        try {
+            if (response == null || !response.isSuccess || response.data == null) return null;
+            JSONObject data = response.data.optJSONObject("data");
+            if (data == null) data = response.data;
+            JSONObject prices = data.optJSONObject("prices");
+            if (prices == null) prices = data;
+
+            double price24 = prices.optDouble("24k", 0);
+            double price21 = prices.optDouble("21k", 0);
+            double price18 = prices.optDouble("18k", 0);
+            double ouncePrice = data.optDouble("price_per_ounce",
+                    prices.optDouble("ounce_price", price24 * OUNCE_TO_GRAM));
+            String source = data.optString("source", "server");
+
+            return new GoldPriceData(price24, price21, price18, ouncePrice, source);
+        } catch (Exception e) {
+            logNonFatal("parseGoldPriceData", e);
+            return null;
+        }
+    }
+
+    private void displayGoldPrices(GoldPriceData data) {
+        try {
+            setGoldPrice(tvKarat24, "24K", data.price24);
+            setGoldPrice(tvKarat21, "21K", data.price21);
+            setGoldPrice(tvKarat18, "18K", data.price18);
+
+            if (tvOuncePrice != null && data.ouncePrice > 0) {
+                tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", data.ouncePrice));
+            }
+            if (tvPriceSource != null) {
+                tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
+            }
+            if (tvLastUpdate != null) {
+                SimpleDateFormat fmt = getTimeFormatter();
+                String time = fmt.format(new Date());
+                tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+            }
+
+            calculateTrend(data.price24);
+        } catch (Exception e) {
+            logNonFatal("displayGoldPrices", e);
+        }
+    }
+
+    private void displayGoldPricesFromCache() {
+        try {
+            if (priceManager == null) return;
+            double price24 = priceManager.getGoldPricePerGram(24);
+            double price21 = priceManager.getGoldPricePerGram(21);
+            double price18 = priceManager.getGoldPricePerGram(18);
+
+            setGoldPrice(tvKarat24, "24K", price24);
+            setGoldPrice(tvKarat21, "21K", price21);
+            setGoldPrice(tvKarat18, "18K", price18);
+
+            if (tvOuncePrice != null && price24 > 0) {
+                tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", price24 * OUNCE_TO_GRAM));
+            }
+
+            if (tvPriceSource != null) {
+                long now = System.currentTimeMillis();
+                long timeRemaining = GOLD_CACHE_VALIDITY_MS - (now - lastGoldFetchTime);
+                if (timeRemaining > 0) {
+                    long hours = timeRemaining / (60 * 60 * 1000);
+                    long minutes = (timeRemaining % (60 * 60 * 1000)) / (60 * 1000);
+                    tvPriceSource.setText(isArabic
+                            ? "📡 كاش محلي - التحديث بعد " + hours + " س " + minutes + " د"
+                            : "📡 Cache - update in " + hours + "h " + minutes + "m");
+                } else {
+                    tvPriceSource.setText(isArabic ? "📡 جاهز للتحديث" : "📡 Ready to update");
+                }
+            }
+
+            if (tvLastUpdate != null && offlineCache != null) {
+                long lastUpdate = offlineCache.getLong("last_update", 0);
+                if (lastUpdate > 0) {
+                    SimpleDateFormat fmt = getTimeFormatter();
+                    String time = fmt.format(new Date(lastUpdate));
+                    tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+                }
+            }
+
+            updateHeroBalance();
+        } catch (Exception e) {
+            logNonFatal("displayGoldPricesFromCache", e);
+        }
     }
     
+    
     /**
- * ✅ عرض قائمة الممسوحات في Bottom Sheet
+ * ✅ حساب اتجاه تغير سعر الذهب ومقارنته بالسعر السابق
  */
-private void showItemsBottomSheet() {
-    if (!isAdded() || isFragmentDestroyed) return;
+private void calculateTrend(double currentPrice) {
+    if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
 
-    com.google.android.material.bottomsheet.BottomSheetDialog sheet =
-            new com.google.android.material.bottomsheet.BottomSheetDialog(
-                    requireContext(), R.style.TransparentBottomSheetDialog);
+    sharedExecutor.execute(() -> {
+        try {
+            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
 
-    View sheetView = getLayoutInflater().inflate(
-            R.layout.bottom_sheet_inventory_items, null);
+            if (previousPrice > 0 && currentPrice > 0) {
+                double change = currentPrice - previousPrice;
+                double changePercent = (change / previousPrice) * 100;
 
-    // ✅ إعادة ربط RecyclerView في الـ Sheet
-    RecyclerView sheetRecycler = sheetView.findViewById(R.id.rvSheetItems);
-    if (sheetRecycler != null && modernAdapter != null) {
-        sheetRecycler.setLayoutManager(new LinearLayoutManager(requireContext()));
-        sheetRecycler.setAdapter(modernAdapter);
-    }
-
-    // ✅ العدّاد
-    TextView tvCount = sheetView.findViewById(R.id.tvSheetItemsCount);
-    if (tvCount != null) {
-        tvCount.setText(String.format(Locale.US, "%d %s",
-                scannedItemsDisplayList.size(),
-                isArabic ? "قطعة" : "items"));
-    }
-
-    sheet.setContentView(sheetView);
-    sheet.show();
-}
-
-    private void setupSearchBar() {
-        if (etSearchItems == null) return;
-        etSearchItems.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-            @Override public void afterTextChanged(Editable s) {}
-            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {
-                filterItems(s.toString());
-                if (btnClearSearch != null)
-                    btnClearSearch.setVisibility(s.length() > 0 ? View.VISIBLE : View.GONE);
-            }
-        });
-        if (btnClearSearch != null) {
-            btnClearSearch.setOnClickListener(v -> {
-                if (etSearchItems != null) etSearchItems.setText("");
-            });
-        }
-    }
-
-    private boolean canEdit() {
-        return permissionManager != null
-                && (permissionManager.canEdit("inventory") || permissionManager.isManager());
-    }
-
-    private void showAccessDenied() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        Toast.makeText(requireContext(),
-                isArabic ? "⛔ غير مصرح" : "⛔ Access denied", Toast.LENGTH_SHORT).show();
-        if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.ERROR);
-    }
-
-    // ==================== Key Events ====================
-    @Override
-    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
-        if ((keyCode == KEYCODE_RFID_TRIGGER_1
-                || keyCode == KEYCODE_RFID_TRIGGER_2
-                || keyCode == KEYCODE_RFID_TRIGGER_3)
-                && event.getRepeatCount() == 0) {
-            if (!canEdit()) { showAccessDenied(); return true; }
-            if (!isScanning()) startScanning(); else stopScanning();
-            return true;
-        }
-        return false;
-    }
-
-    // ==================== Start/Stop ====================
-    private void startScanning() {
-        if (isFragmentDestroyed || isScanning()) return;
-        if (!canEdit()) { showAccessDenied(); return; }
-
-        resetUiForNewScan();
-        scanController.setBarcodeToEpcMap(catalogManager.getBarcodeToEpcMap());
-
-        if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText(isArabic ?
-                    "🔄 جاري تحميل الكتالوج..." : "🔄 Loading catalog...");
-        }
-        Toast.makeText(requireContext(),
-                isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...",
-                Toast.LENGTH_SHORT).show();
-
-        catalogManager.fetchCatalog(apiClient, branchesManager,
-                new InventoryCatalogManager.CatalogCallback() {
-            @Override
-            public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
                 mainHandler.post(() -> {
-                    if (isFragmentDestroyed || !isAdded()) return;
+                    if (!isAdded()) return;
+                    if (change > 0) {
+                        tvGoldTrend.setText("📈");
+                        tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
+                        tvGoldChange.setTextColor(0xFF16A34A);
+                    } else if (change < 0) {
+                        tvGoldTrend.setText("📉");
+                        tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
+                        tvGoldChange.setTextColor(0xFFDC2626);
+                    } else {
+                        tvGoldTrend.setText("➡️");
+                        tvGoldChange.setText("0.00%");
+                        tvGoldChange.setTextColor(0xFF6B7280);
+                    }
 
-                    catalogEpcs.clear();
-                    if (catalog != null) catalogEpcs.addAll(catalog.keySet());
-                    expectedCount = catalogEpcs.size();
-
-                    if (scanController != null) {
-                        scanController.startScanning(catalog);
+                    if (tvHeroTrend != null) {
+                        String trendText = String.format(Locale.US, "%.2f%%", changePercent);
+                        tvHeroTrend.setText((change > 0 ? "📈 " : change < 0 ? "📉 " : "➡️ ") + trendText);
                     }
                 });
             }
-            @Override
-            public void onError(String error) {
-                mainHandler.post(() -> {
-                    if (isFragmentDestroyed || !isAdded()) return;
-                    Toast.makeText(requireContext(),
-                            (isArabic ? "⚠️ " : "⚠️ ") + error,
-                            Toast.LENGTH_LONG).show();
-                    if (tvInventoryStatus != null) {
-                        tvInventoryStatus.setText(isArabic ?
-                                "⚠️ فشل تحميل الكتالوج" : "⚠️ Catalog load failed");
-                    }
-                });
+
+            if (currentPrice > 0) {
+                offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
             }
-        });
-    }
-
-    private void resetUiForNewScan() {
-        scannedItemsDisplayList.clear();
-        pendingUiItems.clear();
-        if (modernAdapter != null) {
-            modernAdapter.submitList(new ArrayList<>());
-            modernAdapter.resetAnimationTracker();
+        } catch (Exception e) {
+            logNonFatal("calculateTrend", e);
         }
-        if (rvInventoryItems != null) rvInventoryItems.scrollToPosition(0);
-        if (tvScannedCount != null) tvScannedCount.setText("0");
-        if (tvItemCount != null) tvItemCount.setText("0");
-        if (progressScanned != null) progressScanned.setProgress(0);
-        if (tvProgressPercent != null) tvProgressPercent.setText("0%");
-        if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
-        lastScannedForAnimation = 0;
-    }
-
-    public void stopScanning() {
-        if (scanController != null) scanController.stopScanning();
-    }
-
-    // ==================== Connection Handling ====================
-    private void handleConnectionChanged(boolean isConnected) {
-    if (connectionStateKnown.get() && lastConnectionState == isConnected) return;
-    lastConnectionState = isConnected;
-    connectionStateKnown.set(true);
-
-    if (!isAdded() || isFragmentDestroyed) return;
-
-    mainHandler.post(() -> {
-        if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText(isConnected
-                    ? (isArabic ? "🟢 متصل" : "🟢 Connected")
-                    : (isArabic ? "🔴 غير متصل" : "🔴 Disconnected"));
-        }
-        if (statusDot != null) {
-            statusDot.setBackgroundResource(isConnected
-                    ? R.drawable.bg_status_dot_green
-                    : R.drawable.bg_status_dot_red);
-        }
-        if (soundManager != null) {
-            soundManager.playBeep(isConnected
-                    ? SoundManager.FeedbackType.COMPLETED
-                    : SoundManager.FeedbackType.ERROR);
-        }
-        hapticFeedback(isConnected
-                ? SoundManager.FeedbackType.COMPLETED
-                : SoundManager.FeedbackType.ERROR);
     });
 }
+    // ═══════════════════════════════════════════════════════
+    // Offline Data
+    // ═══════════════════════════════════════════════════════
+    private void loadOfflineData() {
+        if (offlineCache == null) return;
 
-    // ==================== Add Scanned Item ====================
-    private void addScannedItemToDisplay(String epc, int rssi) {
-    if (!isAdded() || isFragmentDestroyed || epc == null) return;
-    if (Looper.myLooper() != Looper.getMainLooper()) {
-        mainHandler.post(() -> addScannedItemToDisplay(epc, rssi));
-        return;
-    }
-
-    try {
-        ScannedItemDisplay existing = null;
-        for (ScannedItemDisplay d : scannedItemsDisplayList) {
-            if (d != null && epc.equals(d.epc)) { existing = d; break; }
-        }
-
-        SoundManager.FeedbackType feedback;
-
-        if (existing != null) {
-            existing.count++;
-            existing.rssi = rssi;
-            existing.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                    .format(new Date());
-            feedback = SoundManager.FeedbackType.DUPLICATE_ITEM;
-
-            // ✅ وميض أزرق
-            flashOverlay(0x883B82F6);
-            // ✅ تحديث "آخر مسح" بالقطعة المكررة
-            updateLastScanCard(existing, true);
-        } else {
-            boolean isKnown = catalogEpcs.contains(epc);
-            feedback = isKnown
-                    ? SoundManager.FeedbackType.KNOWN_ITEM
-                    : SoundManager.FeedbackType.UNKNOWN_ITEM;
-
-            InventoryItem catalogItem = catalogManager != null
-                    ? catalogManager.getItemByEpc(epc) : null;
-
-            String title = catalogItem != null && catalogItem.getTitle() != null
-                    ? catalogItem.getTitle()
-                    : (isKnown ? (isArabic ? "قطعة مسجلة" : "Catalog item")
-                               : (isArabic ? "قطعة غير معروفة" : "Unknown item"));
-            String karat = catalogItem != null && catalogItem.getKarat() != null
-                    ? catalogItem.getKarat() : "—";
-            double weight = catalogItem != null ? catalogItem.getWeight() : 0;
-            double price = catalogItem != null ? catalogItem.getPrice() : 0;
-
-            ScannedItemDisplay display = new ScannedItemDisplay(
-                    epc, title, karat, 1, rssi,
-                    new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                            .format(new Date()));
-            display.weight = weight;
-            display.price = price;
-
-            scannedItemsDisplayList.add(0, display);
-            pendingUiItems.offer(display);
-
-            // ✅ وميض حسب النوع
-            if (isKnown) {
-                flashOverlay(0x8816A34A); // أخضر
-            } else {
-                flashOverlay(0x88DC2626); // أحمر
-            }
-
-            // ✅ تحديث "آخر مسح"
-            updateLastScanCard(display, false);
-        }
-
-        // ✅ اهتزاز + صوت
-        hapticFeedback(feedback);
-        if (soundManager != null) soundManager.playBeep(feedback);
-
-        if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
-            tvEmptyState.setVisibility(View.GONE);
-        }
-
-        scheduleUiFlush();
-        scheduleUiUpdate();
-
-    } catch (Exception e) {
-        Log.e(TAG, "addScannedItemToDisplay error", e);
-    }
-}
-
-/**
- * ✅ تحديث بطاقة "آخر مسح"
- */
-private void updateLastScanCard(ScannedItemDisplay item, boolean isDuplicate) {
-    if (item == null) return;
-    if (tvLastScanTitle == null) return;
-
-    try {
-        tvLastScanTitle.setText(item.title != null ? item.title : "—");
-        tvLastScanEpc.setText(item.epc != null ? item.epc : "—");
-        tvLastScanKarat.setText(item.karat != null ? item.karat : "—");
-        tvLastScanWeight.setText(String.format(Locale.US, "%.2fg", item.weight));
-        tvLastScanRssi.setText(String.format(Locale.US, "📶 %d", item.rssi));
-
-        boolean isKnown = catalogEpcs.contains(item.epc);
-        if (isKnown) {
-            tvLastScanStatus.setText(isArabic ? "✅ مطابق للمخزون" : "✅ In Catalog");
-            tvLastScanStatus.setTextColor(0xFF16A34A);
-        } else {
-            tvLastScanStatus.setText(isArabic ? "⚠️ غير معروف" : "⚠️ Unknown");
-            tvLastScanStatus.setTextColor(0xFFDC2626);
-        }
-
-        if (isDuplicate) {
-            tvLastScanStatus.setText(isArabic ? "🔁 مكرر" : "🔁 Duplicate");
-            tvLastScanStatus.setTextColor(0xFF3B82F6);
-        }
-
-        // ✅ Animation نبض على البطاقة
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(lastScanCard, "scaleX", 0.98f, 1f);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(lastScanCard, "scaleY", 0.98f, 1f);
-        scaleX.setDuration(200);
-        scaleY.setDuration(200);
-        scaleX.start();
-        scaleY.start();
-
-    } catch (Exception e) {
-        Log.e(TAG, "updateLastScanCard error", e);
-    }
-}
-
-    private void scheduleUiFlush() {
-        if (uiFlushScheduled.compareAndSet(false, true)) {
-            mainHandler.postDelayed(uiFlushRunnable, 250);
-        }
-    }
-
-    private void flushPendingUiItems() {
-        if (isFragmentDestroyed || modernAdapter == null) return;
-
-        List<ScannedItemDisplay> batch = new ArrayList<>();
-        ScannedItemDisplay item;
-        while ((item = pendingUiItems.poll()) != null) batch.add(item);
-        if (batch.isEmpty()) return;
-
-        List<ScannedItemDisplay> current = new ArrayList<>(scannedItemsDisplayList);
-        modernAdapter.submitList(current);
-    }
-
-    private void scheduleUiUpdate() {
-        if (uiUpdateScheduled.compareAndSet(false, true)) {
-            mainHandler.postDelayed(uiUpdateRunnable, UI_UPDATE_THROTTLE_MS);
-        }
-    }
-
-    // ==================== Update UI ====================
-    private void updateUI() {
-        if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
-
-        try {
-            int scanned = inventoryEngine.getUniqueCount();
-
-            if (tvScannedCount != null) {
-                if (animationHelper != null) {
-                    animationHelper.animateNumberChange(
-                            tvScannedCount, lastScannedForAnimation, scanned);
-                } else tvScannedCount.setText(String.valueOf(scanned));
-            }
-            if (tvItemCount != null) tvItemCount.setText(String.valueOf(scanned));
-
-            if (expectedCount > 0) {
-                int progress = Math.min((int) (((float) scanned / expectedCount) * 100), 100);
-
-                if (progressScanned != null) {
-                    if (animationHelper != null) {
-                        animationHelper.animateProgressBar(
-                                progressScanned, progressScanned.getProgress(), progress);
-                    } else progressScanned.setProgress(progress);
-                }
-                if (tvProgressPercent != null) {
-                    if (animationHelper != null) {
-                        animationHelper.animateProgressText(tvProgressPercent, progress);
-                    } else tvProgressPercent.setText(progress + "%");
-                }
-                if (tvVariance != null)
-                    tvVariance.setText(String.valueOf(Math.max(0, expectedCount - scanned)));
-                if (tvAccuracy != null) tvAccuracy.setText(progress + "%");
-
-                if (scanned >= expectedCount && isScanning()) {
-                    stopScanning();
-                    if (soundManager != null)
-                        soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-                    if (animationHelper != null) {
-                        animationHelper.celebrateCompletion(
-                                tvProgressPercent, progressScanned, tvScannedCount);
-                    }
-                    if (isAdded() && !isFragmentDestroyed) {
-                        Toast.makeText(requireContext(),
-                                isArabic ? "🎉 اكتمل جرد جميع المواد!"
-                                        : "🎉 All items scanned!",
-                                Toast.LENGTH_LONG).show();
-                    }
-                }
-            } else if (tvProgressPercent != null) {
-                tvProgressPercent.setText("—");
-            }
-
-            if (tvEmptyState != null) {
-                tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
-            }
-            if (tvInventoryStatus != null && isScanning()) {
-                tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (" :
-                        "📡 Scanning... (") + scanned + ")");
-            }
-            lastScannedForAnimation = scanned;
-        } catch (Exception e) {
-            Log.e(TAG, "updateUI error", e);
-        }
-    }
-
-    private void updateElapsedTime() {
-        if (tvElapsedTime != null && scanController != null) {
+        sharedExecutor.execute(() -> {
             try {
-                long start = scanController.getScanStartTime();
-                if (start <= 0) return;
-                long ms = SystemClock.elapsedRealtime() - start;
-                long s = ms / 1000;
-                tvElapsedTime.setText(String.format(Locale.US, "%02d:%02d:%02d",
-                        s / 3600, (s % 3600) / 60, s % 60));
+                final int totalItems = offlineCache.getInt("total_items", 0);
+                final float totalWeight = offlineCache.getFloat("total_weight", 0.0f);
+                final int soldToday = offlineCache.getInt("sold_today", 0);
+                final float salesToday = offlineCache.getFloat("sales_today", 0.0f);
+                final float salesMonth = offlineCache.getFloat("sales_month", 0.0f);
+                final float salesYear = offlineCache.getFloat("sales_year", 0.0f);
+                final float inventoryValue = offlineCache.getFloat("inventory_value", 0.0f);
+
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    setText(tvTotalItems, String.valueOf(totalItems));
+                    setText(tvTotalWeight, formatWeight(totalWeight));
+                    setText(tvSoldToday, String.valueOf(soldToday));
+
+                    currentItemCount = totalItems;
+                    currentTotalWeight = totalWeight;
+                    currentInventoryValue = inventoryValue;
+                    updateHeroBalance();
+
+                    if (isSalesHidden) {
+                        setText(tvSalesToday, "••••••");
+                        setText(tvSalesMonth, "••••••");
+                        setText(tvSalesYear, "••••••");
+                    } else {
+                        setText(tvSalesToday, formatCurrency(salesToday));
+                        setText(tvSalesMonth, formatCurrency(salesMonth));
+                        setText(tvSalesYear, formatCurrency(salesYear));
+                    }
+
+                    if (priceManager != null) displayGoldPricesFromCache();
+                });
+            } catch (Exception e) {
+                logNonFatal("loadOfflineData", e);
+            }
+        });
+    }
+
+    private void saveOfflineData(JSONObject data) {
+        try {
+            if (offlineCache == null) return;
+            sharedExecutor.execute(() -> {
+                try {
+                    JSONObject inv = data.optJSONObject("inventory");
+                    JSONObject sales = data.optJSONObject("sales");
+
+                    offlineCache.edit()
+                            .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
+                            .putFloat("total_weight", (float) (inv != null ? inv.optDouble("total_weight", 0.0) : 0.0))
+                            .putFloat("inventory_value", (float) (inv != null ? inv.optDouble("total_value", 0.0) : 0.0))
+                            .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
+                            .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
+                            .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
+                            .putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0))
+                            .putLong("last_update", System.currentTimeMillis())
+                            .apply();
+                } catch (Exception e) {
+                    logNonFatal("saveOfflineData.inner", e);
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("saveOfflineData", e);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Fetch Data
+    // ═══════════════════════════════════════════════════════
+    private void fetchData() {
+        try {
+            if (apiClient == null || !isAdded()) {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
+
+            isLoading.set(true);
+
+            boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
+            final int finalBranchId;
+            if (isGlobalAdmin) {
+                finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
+            } else {
+                int fromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
+                int fromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                finalBranchId = fromSession > 0 ? fromSession : (fromManager > 0 ? fromManager : 1);
+            }
+
+            cancelFuture(dataFuture);
+
+            dataFuture = sharedExecutor.submit(() -> {
+                try {
+                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
+
+                    mainHandler.post(() -> {
+                        isLoading.set(false);
+                        lastDataFetchTime = System.currentTimeMillis();
+                        if (!isAdded()) {
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                            return;
+                        }
+
+                        if (response != null && response.isSuccess && response.data != null) {
+                            saveOfflineData(response.data);
+                            processData(response.data);
+                            computeAndShowAlerts(response.data);
+                            isDataLoaded = true;
+                            updateLiveStatusText(true);
+                            showShimmer(false);
+                        } else {
+                            updateLiveStatusText(false);
+                            loadOfflineData();
+                            showShimmer(false);
+                        }
+                        // ✅ إيقاف SwipeRefresh دائماً
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    });
+                } catch (Exception e) {
+                    logNonFatal("fetchData.thread", e);
+                    mainHandler.post(() -> {
+                        isLoading.set(false);
+                        loadOfflineData();
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    });
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("fetchData", e);
+            isLoading.set(false);
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        }
+    }
+
+    private void processData(JSONObject data) {
+        try {
+            JSONObject inv = data.optJSONObject("inventory");
+            if (inv != null) {
+                int itemCount = inv.optInt("total_items", 0);
+                double weight = inv.optDouble("total_weight", 0.0);
+                double value = inv.optDouble("total_value", 0.0);
+
+                setText(tvTotalItems, String.valueOf(itemCount));
+                setText(tvTotalWeight, formatWeight(weight));
+
+                currentItemCount = itemCount;
+                currentTotalWeight = weight;
+                currentInventoryValue = value;
+                updateHeroBalance();
+            }
+
+            JSONObject sales = data.optJSONObject("sales");
+            if (sales != null) {
+                lastSalesData = sales;
+                setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
+                applySalesData(sales);
+            }
+        } catch (Exception e) {
+            logNonFatal("processData", e);
+        }
+    }
+
+    private void setupListeners() {
+        try {
+            if (btnGate != null && permissionManager != null) {
+                boolean canAccess = permissionManager.canAccessFragment("SecureGate");
+                btnGate.setVisibility(canAccess ? View.VISIBLE : View.GONE);
+                if (canAccess) {
+                    btnGate.setOnClickListener(v ->
+                            navigateToFragment(new MiraSecureGateFragment(), "SecureGate"));
+                }
+            }
+            if (btnInventory != null && permissionManager != null) {
+                boolean canAccess = permissionManager.canAccessFragment("Scan");
+                btnInventory.setVisibility(canAccess ? View.VISIBLE : View.GONE);
+                if (canAccess) {
+                    btnInventory.setOnClickListener(v ->
+                            navigateToFragment(new MiraUHFReadTagFragment(), "Scan"));
+                }
+            }
+        } catch (Exception e) {
+            logNonFatal("setupListeners", e);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Broadcast Receiver Registration
+    // ═══════════════════════════════════════════════════════
+    private void registerDataRefreshReceiver() {
+        try {
+            if (getContext() == null || isReceiverRegistered) return;
+            IntentFilter filter = new IntentFilter();
+            filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
+            filter.addAction("com.example.uhf.REFRESH_INVENTORY");
+            filter.addAction("com.example.uhf.REFRESH_SALES");
+            ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter,
+                    ContextCompat.RECEIVER_NOT_EXPORTED);
+            isReceiverRegistered = true;
+        } catch (Exception e) {
+            Log.e(TAG, "registerDataRefreshReceiver: " + e.getMessage());
+        }
+    }
+
+    private void unregisterDataRefreshReceiver() {
+        try {
+            if (getContext() != null && isReceiverRegistered) {
+                requireContext().unregisterReceiver(dataRefreshReceiver);
+                isReceiverRegistered = false;
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Refresh
+    // ═══════════════════════════════════════════════════════
+    public void refreshInternalData() {
+        try {
+            if (!isAdded()) return;
+            isDataLoaded = false;
+            lastDataFetchTime = 0;
+            isLoading.set(false);
+            fetchData();
+
+            long now = System.currentTimeMillis();
+            if (permissionManager != null
+                    && permissionManager.canAccessFragment("GoldRates")) {
+                if (lastGoldFetchTime == 0
+                        || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    fetchLiveGoldPrices(false);
+                } else {
+                    displayGoldPricesFromCache();
+                }
+            }
+        } catch (Exception e) {
+            logNonFatal("refreshInternalData", e);
+        }
+    }
+
+    private void refreshAllData() {
+        try {
+            if (tvLiveStatusText != null) {
+                tvLiveStatusText.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+                tvLiveStatusText.setTextColor(0xFFF59E0B);
+            }
+
+            // ✅ Timeout للأمان: إذا لم ينتهِ التحديث خلال 15 ثانية، أوقف SwipeRefresh
+            if (swipeTimeoutRunnable != null) {
+                mainHandler.removeCallbacks(swipeTimeoutRunnable);
+            }
+            swipeTimeoutRunnable = () -> {
+                if (swipeRefresh != null && swipeRefresh.isRefreshing()) {
+                    Log.w(TAG, "⏰ SwipeRefresh timeout — forcing stop");
+                    swipeRefresh.setRefreshing(false);
+                }
+            };
+            mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
+
+            fetchData();
+
+            long now = System.currentTimeMillis();
+            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+                if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    fetchLiveGoldPrices(true);
+                } else {
+                    displayGoldPricesFromCache();
+                    updateLiveStatusText(true);
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                }
+            } else {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            }
+        } catch (Exception e) {
+            logNonFatal("refreshAllData", e);
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Utilities
+    // ═══════════════════════════════════════════════════════
+    private void showShimmer(boolean show) {
+        try {
+            if (shimmerLayout != null) {
+                shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+            }
+            if (loadingOverlay != null) {
+                loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
+            }
+            if (swipeRefresh != null) {
+                swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
+            }
+        } catch (Exception e) {
+            logNonFatal("showShimmer", e);
+        }
+    }
+
+    private void initBranchCache(int branchId) {
+        try {
+            if (getContext() != null) {
+                offlineCache = requireContext()
+                        .getSharedPreferences(OFFLINE_PREFS_BASE + branchId, Context.MODE_PRIVATE);
+            }
+        } catch (Exception e) {
+            logNonFatal("initBranchCache", e);
+        }
+    }
+
+    private void startAutoRefresh() {
+        mainHandler.removeCallbacks(autoRefreshRunnable);
+        mainHandler.postDelayed(autoRefreshRunnable, REFRESH_INTERVAL_MS);
+    }
+
+    private void stopAutoRefresh() {
+        mainHandler.removeCallbacks(autoRefreshRunnable);
+    }
+
+    private void navigateToFragment(Fragment fragment, String tag) {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).loadFragment(fragment, tag);
+            }
+        } catch (Exception e) {
+            logNonFatal("navigateToFragment", e);
+        }
+    }
+
+    private String getFragmentTagForAction(String actionId) {
+        if (actionId == null) return "";
+        switch (actionId) {
+            case "identity": return "IdentityStudio";
+            case "radar": return "Radar";
+            case "gate": return "SecureGate";
+            case "reports": return "Reports";
+            case "accounting": return "Accounting";
+            case "transfers": return "Transfers";
+            case "admin_hub": return "AdminHub";
+            case "sales_history": return "SalesHistory";
+            case "server_config": return "ServerConfig";
+            case "gold_rates": return "GoldRates";
+            case "users": return "UsersManagement";
+            default: return actionId;
+        }
+    }
+
+    private void handleQuickAction(String actionId) {
+        try {
+            if (actionId == null || actionId.isEmpty()) return;
+            if (!(getActivity() instanceof UHFMainActivity)) return;
+
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            String tag = getFragmentTagForAction(actionId);
+
+            Fragment fragment = null;
+            try {
+                fragment = activity.createFragmentByTag(tag);
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating fragment: " + e.getMessage(), e);
+            }
+
+            if (fragment == null) {
+                Toast.makeText(getContext(),
+                        isArabic ? "⚠️ تعذر فتح هذه الواجهة" : "⚠️ Cannot open this screen",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            activity.loadFragment(fragment, tag);
+        } catch (Exception e) {
+            logNonFatal("handleQuickAction", e);
+            try {
+                Toast.makeText(getContext(),
+                        isArabic ? "⚠️ خطأ في فتح الواجهة" : "⚠️ Error opening screen",
+                        Toast.LENGTH_SHORT).show();
             } catch (Exception ignored) {}
         }
     }
 
-    private void updateTotalWeightAndValue() {
-        double w = 0, v = 0;
-        for (ScannedItemDisplay item : scannedItemsDisplayList) {
-            w += item.weight * item.count;
-            v += item.price * item.count;
+    private String getSourceDisplayName(String source) {
+        if (source == null) return isArabic ? "غير معروف" : "Unknown";
+        switch (source.toLowerCase()) {
+            case "metalprice": return "MetalPrice";
+            case "goldapi": return "GoldAPI";
+            case "metalsdev": return "Metals.Dev";
+            case "fallback": return isArabic ? "احتياطي" : "Fallback";
+            default: return source;
         }
-        final double fw = w, fv = v;
-        mainHandler.post(() -> {
-            if (tvTotalWeight != null)
-                tvTotalWeight.setText(String.format(Locale.US, "%.2f g", fw));
-            if (tvTotalValue != null)
-                tvTotalValue.setText(String.format(Locale.US, "$%,.2f", fv));
-        });
     }
 
-    private void updateLastScan(String epc, int rssi) {
-        if (tvRssi != null) tvRssi.setText(String.format(Locale.US, "📶 %d", rssi));
-    }
-
-    // ==================== Filtering ====================
-    private void filterItems(String query) {
-        if (filterManager == null) return;
-        filterManager.setSearchQuery(query);
-        List<ScannedItemDisplay> filtered = filterManager.applyFilter(
-                scannedItemsDisplayList, catalogEpcs);
-        if (modernAdapter != null) modernAdapter.submitList(filtered);
-    }
-
-    private void showLiveFilterChips() {
-        if (!isAdded() || isFragmentDestroyed || filterManager == null) return;
-        String[] filters = filterManager.getFilterOptions();
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(), R.layout.item_dialog_list,
-                android.R.id.text1, filters);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(filterManager.buildFilterDialogTitle())
-                .setAdapter(adapter, (d, which) -> { applyLiveFilter(which); d.dismiss(); })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                .show();
-    }
-
-    private void applyLiveFilter(int filterType) {
-        if (filterManager == null || !isAdded() || isFragmentDestroyed) return;
-        filterManager.setCurrentFilter(filterType);
-        if (filterType == InventoryFilterManager.FILTER_MISSING) {
-            showMissingItemsDialog(); return;
-        }
-        List<ScannedItemDisplay> filtered = filterManager.applyFilter(
-                scannedItemsDisplayList, catalogEpcs);
-        if (modernAdapter != null) modernAdapter.submitList(filtered);
-        Toast.makeText(requireContext(),
-                (isArabic ? "🎯 الفلتر: " : "🎯 Filter: ")
-                        + filterManager.getCurrentFilterName(),
-                Toast.LENGTH_SHORT).show();
-    }
-
-    private void showMissingItemsDialog() {
-        if (filterManager == null || catalogManager == null
-                || !isAdded() || isFragmentDestroyed) return;
-        if (catalogManager.isEmpty()) {
-            Toast.makeText(requireContext(),
-                    filterManager.buildNoCatalogMessage(), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        List<String> missing = filterManager.getMissingItems(
-                catalogEpcs, scannedItemsDisplayList);
-        if (missing.isEmpty()) {
-            Toast.makeText(requireContext(),
-                    filterManager.buildNoMissingMessage(), Toast.LENGTH_LONG).show();
-            return;
-        }
-        String[] titles = filterManager.buildMissingItemsList(
-                missing, catalogManager.getCatalogItemsMap());
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(), R.layout.item_dialog_list, android.R.id.text1, titles);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(filterManager.buildMissingItemsTitle(missing.size()))
-                .setAdapter(adapter, null)
-                .setPositiveButton(isArabic ? "موافق" : "OK", null)
-                .show();
-    }
-
-    // ==================== Item Options ====================
-    private void showItemOptionsDialog(ScannedItemDisplay item) {
-        if (dialogsManager != null) dialogsManager.showItemOptionsDialog(item);
-    }
-    private void printSingleItemLabel(ScannedItemDisplay item) {
+    private String formatCurrency(double amount) {
         try {
-            InventoryReport r = new InventoryReport(0,
-                    inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SINGLE",
-                    new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                            .format(new Date()),
-                    1, 1, 0, isArabic ? "ملصق فردي" : "Single Label");
-            List<ScannedItemDisplay> single = new ArrayList<>();
-            single.add(item);
-            PrintUtils.printReportWithQRCode(requireContext(), r, single, isArabic, null);
-        } catch (Exception e) { Log.e(TAG, "printSingleItemLabel error", e); }
-    }
-    private void printCurrentReport() {
-        try {
-            if (inventoryEngine == null) return;
-            int scanned = inventoryEngine.getUniqueCount();
-            InventoryReport r = new InventoryReport(0,
-                    inventoryEngine.getClientSessionId(),
-                    new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                            .format(new Date()),
-                    expectedCount, scanned, Math.max(0, expectedCount - scanned),
-                    isArabic ? "جارية" : "In progress");
-            List<ScannedItemDisplay> snapshot =
-                    new ArrayList<>(scannedItemsDisplayList);
-            PrintUtils.printReportWithQRCode(requireContext(), r, snapshot, isArabic, null);
-        } catch (Exception e) { Log.e(TAG, "printCurrentReport error", e); }
-    }
-    private void updateItemStatus(String epc, String status) {
-        Log.d(TAG, "Status " + epc + " → " + status);
-    }
-    private void registerItemDamage(String epc, String damage) {
-        Log.d(TAG, "Damage " + epc + ": " + damage);
-    }
-
-    // ==================== Commit ====================
-    private void showCommitConfirmationDialog() {
-        if (dialogsManager == null || inventoryEngine == null) return;
-        if (!canEdit()) { showAccessDenied(); return; }
-        dialogsManager.setExpectedCount(expectedCount);
-        dialogsManager.showCommitConfirmationDialog(inventoryEngine.getUniqueCount());
-    }
-
-    private void commitInventoryToServer() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        if (persistenceManager == null || inventoryEngine == null || apiClient == null) {
-            Toast.makeText(requireContext(), "⚠️ غير جاهز", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (persistenceManager.isCommittingNow()) {
-            Toast.makeText(requireContext(),
-                    isArabic ? "⏳ جاري الإرسال..." : "⏳ Sending...",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Toast.makeText(requireContext(),
-                isArabic ? "⏳ جاري الإرسال..." : "⏳ Sending...",
-                Toast.LENGTH_SHORT).show();
-        int scanned = inventoryEngine.getUniqueCount();
-        int totalReads = inventoryEngine.getTotalReads();
-        int branchId = branchesManager != null
-                ? branchesManager.getActiveBranchId() : 0;
-
-        persistenceManager.commitInventory(
-                inventoryEngine.getClientSessionId(), branchId,
-                expectedCount, totalReads, scanned,
-                new ArrayList<>(scannedItemsDisplayList), apiClient,
-                new InventoryPersistenceManager.CommitCallback() {
-                    @Override public void onCommitSuccess(JSONObject report) {
-                        mainHandler.post(() -> {
-                            if (!isAdded() || isFragmentDestroyed) return;
-                            Toast.makeText(requireContext(),
-                                    isArabic ? "✅ تم الاعتماد" : "✅ Committed",
-                                    Toast.LENGTH_LONG).show();
-                            if (btnGenerateReport != null)
-                                btnGenerateReport.setEnabled(false);
-                            if (btnCommitSession != null)
-                                btnCommitSession.setEnabled(false);
-                            showCommitSuccessDialog(report);
-                        });
-                    }
-                    @Override public void onCommitError(String error) {
-                        mainHandler.post(() -> {
-                            if (!isAdded() || isFragmentDestroyed) return;
-                            Toast.makeText(requireContext(),
-                                    (isArabic ? "❌ " : "❌ ") + error,
-                                    Toast.LENGTH_LONG).show();
-                        });
-                    }
-                });
-    }
-
-    private void showCommitSuccessDialog(JSONObject report) {
-        if (!isAdded() || isFragmentDestroyed || report == null) return;
-        try {
-            String accuracy = report.optString("accuracy", "0");
-            String risk = report.optString("risk_level", "unknown");
-            String rec = report.optString("recommendation", "");
-            String msg = isArabic
-                    ? String.format("✅ تم الاعتماد:\n\n• الدقة: %s%%\n• الخطورة: %s\n• التوصية: %s",
-                            accuracy, risk, rec)
-                    : String.format("✅ Committed:\n\n• Accuracy: %s%%\n• Risk: %s\n• Recommendation: %s",
-                            accuracy, risk, rec);
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(isArabic ? "🎉 نجاح" : "🎉 Success")
-                    .setMessage(msg)
-                    .setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print",
-                            (d, w) -> printCurrentReport())
-                    .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                    .show();
-        } catch (Exception e) { Log.e(TAG, "showCommitSuccessDialog error", e); }
-    }
-
-    // ==================== Archive ====================
-    public void showArchiveReports() {
-        if (!isAdded() || isFragmentDestroyed) return;
-
-        AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "📂 جاري التحميل..." : "📂 Loading...")
-                .setMessage(isArabic ? "يرجى الانتظار" : "Please wait")
-                .setCancelable(false)
-                .show();
-
-        if (persistenceManager == null || apiClient == null || branchesManager == null) {
-            try { loading.dismiss(); } catch (Exception ignored) {}
-            return;
-        }
-
-        int branchId = branchesManager.getActiveBranchId();
-        persistenceManager.fetchArchiveReports(apiClient, branchId,
-                new InventoryPersistenceManager.ArchiveCallback() {
-                    @Override public void onArchiveLoaded(List<InventoryReport> reports) {
-                        mainHandler.post(() -> {
-                            try { loading.dismiss(); } catch (Exception ignored) {}
-                            if (isAdded() && !isFragmentDestroyed)
-                                displayArchiveDialog(reports);
-                        });
-                    }
-                    @Override public void onArchiveError(String error) {
-                        mainHandler.post(() -> {
-                            try { loading.dismiss(); } catch (Exception ignored) {}
-                            if (isAdded() && !isFragmentDestroyed)
-                                Toast.makeText(requireContext(),
-                                        (isArabic ? "❌ فشل: " : "❌ ") + error,
-                                        Toast.LENGTH_SHORT).show();
-                        });
-                    }
-                });
-    }
-
-    public void showArchiveReportsPublic() {
-        if (isAdded() && !isFragmentDestroyed) showArchiveReports();
-    }
-
-   private void displayArchiveDialog(List<InventoryReport> reports) {
-    if (!isAdded() || isFragmentDestroyed) return;
-    if (reports == null || reports.isEmpty()) {
-        Toast.makeText(requireContext(),
-                isArabic ? "لا توجد تقارير" : "No reports",
-                Toast.LENGTH_SHORT).show();
-        return;
-    }
-
-    // ✅ قائمة منسقة مع أيقونة الحالة
-    String[] titles = new String[reports.size()];
-    for (int i = 0; i < reports.size(); i++) {
-        InventoryReport r = reports.get(i);
-        String statusIcon = getReportStatusIcon(r);
-        titles[i] = String.format("%s %s\n   📅 %s   •   ✅ %d/%d",
-                statusIcon, r.sessionId, r.date,
-                r.scannedCount, r.expectedCount);
-    }
-
-    final int[] selectedIndex = {-1};
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(
-            requireContext(), R.layout.item_dialog_list,
-            android.R.id.text1, titles);
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "📂 أرشيف التقارير" : "📂 Archive Reports")
-            .setSingleChoiceItems(adapter, -1, (d, which) -> {
-                selectedIndex[0] = which;
-            })
-            .setPositiveButton(isArabic ? "⚙️ إجراءات" : "⚙️ Actions", (d, w) -> {
-                if (selectedIndex[0] < 0) {
-                    Toast.makeText(requireContext(),
-                            isArabic ? "⚠️ اختر تقريراً أولاً"
-                                     : "⚠️ Select a report first",
-                            Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                d.dismiss();
-                showReportActionsDialog(reports.get(selectedIndex[0]));
-            })
-            .setNeutralButton(isArabic ? "👁️ عرض سريع" : "👁️ Quick View", (d, w) -> {
-                if (selectedIndex[0] >= 0) {
-                    showReportDetails(reports.get(selectedIndex[0]));
-                } else {
-                    Toast.makeText(requireContext(),
-                            isArabic ? "⚠️ اختر تقريراً" : "⚠️ Select a report",
-                            Toast.LENGTH_SHORT).show();
-                }
-            })
-            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-            .show();
-}
-
-/**
- * ✅ أيقونة حالة التقرير
- */
-private String getReportStatusIcon(InventoryReport r) {
-    if (r == null) return "📋";
-    if (r.expectedCount == 0) return "⚡";           // جرد أعمى
-    if (r.scannedCount >= r.expectedCount) return "✅"; // مكتمل
-    if (r.scannedCount > 0) return "⚠️";             // جزئي
-    return "📋";                                     // فارغ
-}
-
-    
-    
-    /**
- * ✅ قائمة الإجراءات الكاملة
- */
-private void showReportActionsDialog(InventoryReport report) {
-    if (!isAdded() || isFragmentDestroyed || report == null) return;
-
-    String[] actions = isArabic
-            ? new String[]{
-                "👁️ عرض التفاصيل الكاملة",
-                "🖨️ طباعة التقرير",
-                "📊 مقارنة بجلسة أخرى",
-                "🔗 فتح في شاشة الجرد",
-                "🗑️ حذف التقرير"
-            }
-            : new String[]{
-                "👁️ View Full Details",
-                "🖨️ Print Report",
-                "📊 Compare with Session",
-                "🔗 Open in Inventory",
-                "🗑️ Delete Report"
-            };
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle((isArabic ? "⚙️ إجراءات: " : "⚙️ Actions: ") + report.sessionId)
-            .setItems(actions, (d, which) -> {
-                switch (which) {
-                    case 0: fetchAndShowReportDetails(report); break;
-                    case 1: printArchivedReport(report); break;
-                    case 2: showCompareSessionDialog(report); break;
-                    case 3: openReportInInventory(report); break;
-                    case 4: confirmDeleteReport(report); break;
-                }
-            })
-            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-            .show();
-}
-
-/**
- * ✅ جلب تفاصيل التقرير من السيرفر ثم عرضها
- */
-private void fetchAndShowReportDetails(InventoryReport report) {
-    if (!isAdded() || isFragmentDestroyed || report == null) return;
-    if (persistenceManager == null || apiClient == null) {
-        showReportDetails(report);
-        return;
-    }
-
-    AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "📥 جاري التحميل..." : "📥 Loading...")
-            .setMessage(isArabic ? "يتم جلب تفاصيل التقرير" : "Fetching report details")
-            .setCancelable(false)
-            .show();
-
-    persistenceManager.fetchReportDetails(apiClient, report.sessionId,
-            new InventoryPersistenceManager.ReportDetailsCallback() {
-                @Override
-                public void onDetailsLoaded(List<ScannedItemDisplay> items) {
-                    mainHandler.post(() -> {
-                        try { loading.dismiss(); } catch (Exception ignored) {}
-                        if (!isAdded() || isFragmentDestroyed) return;
-
-                        if (items == null || items.isEmpty()) {
-                            showReportDetails(report);
-                            Toast.makeText(requireContext(),
-                                    isArabic ? "⚠️ لا توجد تفاصيل — عرض الملخص"
-                                             : "⚠️ No details — showing summary",
-                                    Toast.LENGTH_SHORT).show();
-                        } else {
-                            showReportDetailsWithItems(report, items);
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(String error) {
-                    mainHandler.post(() -> {
-                        try { loading.dismiss(); } catch (Exception ignored) {}
-                        if (!isAdded() || isFragmentDestroyed) return;
-                        showReportDetails(report);
-                        Toast.makeText(requireContext(),
-                                (isArabic ? "⚠️ " : "⚠️ ") + error,
-                                Toast.LENGTH_SHORT).show();
-                    });
-                }
-            });
-}
-
-/**
- * ✅ عرض التقرير مع قائمة العناصر
- */
-private void showReportDetailsWithItems(InventoryReport report,
-                                         List<ScannedItemDisplay> items) {
-    if (!isAdded() || isFragmentDestroyed) return;
-
-    StringBuilder sb = new StringBuilder();
-    sb.append(String.format("%s: %s\n", isArabic ? "الجلسة" : "Session", report.sessionId));
-    sb.append(String.format("%s: %s\n\n", isArabic ? "التاريخ" : "Date", report.date));
-    sb.append(String.format("📦 %s: %d\n",
-            isArabic ? "العناصر" : "Items", items.size()));
-    sb.append("─────────────────\n\n");
-
-    int limit = Math.min(items.size(), 15);
-    for (int i = 0; i < limit; i++) {
-        ScannedItemDisplay item = items.get(i);
-        sb.append(String.format("%d. %s\n   %s • %.2fg\n\n",
-                i + 1, item.title, item.karat, item.weight));
-    }
-
-    if (items.size() > limit) {
-        sb.append(String.format("\n... %s %d %s\n",
-                isArabic ? "و" : "and",
-                items.size() - limit,
-                isArabic ? "عنصر آخر" : "more items"));
-    }
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle((isArabic ? "📋 " : "📋 ") + report.sessionId)
-            .setMessage(sb.toString())
-            .setPositiveButton(isArabic ? "🖨️ طباعة الكل" : "🖨️ Print All",
-                    (d, w) -> {
-                        try {
-                            PrintUtils.printReportWithQRCode(
-                                    requireContext(), report, items, isArabic, null);
-                        } catch (Exception e) {
-                            Log.e(TAG, "print error", e);
-                        }
-                    })
-            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-            .show();
-}
-
-/**
- * ✅ عرض التفاصيل (الملخص فقط)
- */
-private void showReportDetails(InventoryReport report) {
-    if (!isAdded() || isFragmentDestroyed || report == null) return;
-
-    int missing = Math.max(0, report.expectedCount - report.scannedCount);
-    String accuracy = report.expectedCount > 0
-            ? String.format(Locale.US, "%.1f%%",
-                (report.scannedCount * 100.0 / report.expectedCount))
-            : "N/A";
-
-    String msg = String.format(
-            "%s: %s\n\n" +
-            "📅 %s: %s\n" +
-            "📦 %s: %d\n" +
-            "✅ %s: %d\n" +
-            "❌ %s: %d\n" +
-            "📊 %s: %s\n" +
-            "🏷️ %s: %s",
-            isArabic ? "الجلسة" : "Session", report.sessionId,
-            isArabic ? "التاريخ" : "Date", report.date,
-            isArabic ? "المتوقع" : "Expected", report.expectedCount,
-            isArabic ? "الممسوح" : "Scanned", report.scannedCount,
-            isArabic ? "المفقود" : "Missing", missing,
-            isArabic ? "الدقة" : "Accuracy", accuracy,
-            isArabic ? "الحالة" : "Status", report.status);
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle((isArabic ? "📋 " : "📋 ") + report.sessionId)
-            .setMessage(msg)
-            .setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print",
-                    (d, w) -> printArchivedReport(report))
-            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-            .show();
-}
-
-/**
- * ✅ طباعة تقرير من الأرشيف
- */
-private void printArchivedReport(InventoryReport report) {
-    if (!isAdded() || isFragmentDestroyed || report == null) return;
-
-    try {
-        List<ScannedItemDisplay> emptyItems = new ArrayList<>();
-        PrintUtils.printReportWithQRCode(
-                requireContext(), report, emptyItems, isArabic, null);
-        Toast.makeText(requireContext(),
-                isArabic ? "🖨️ جاري الطباعة..." : "🖨️ Printing...",
-                Toast.LENGTH_SHORT).show();
-    } catch (Exception e) {
-        Log.e(TAG, "printArchivedReport error", e);
-        Toast.makeText(requireContext(),
-                isArabic ? "❌ فشل الطباعة" : "❌ Print failed",
-                Toast.LENGTH_SHORT).show();
-    }
-}
-
-/**
- * ✅ فتح التقرير في شاشة الجرد
- */
-private void openReportInInventory(InventoryReport report) {
-    if (!isAdded() || isFragmentDestroyed || report == null) return;
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "🔗 فتح في الجرد" : "🔗 Open in Inventory")
-            .setMessage(isArabic
-                    ? "سيتم فتح شاشة الجرد.\n\nهل تريد المتابعة؟"
-                    : "Inventory screen will open.\n\nContinue?")
-            .setPositiveButton(isArabic ? "فتح" : "Open", (d, w) -> {
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).loadFragment(
-                            new MiraInventoryProFragment(), "Scan");
-                }
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-            .show();
-}
-
-/**
- * ✅ مقارنة (قيد التطوير)
- */
-private void showCompareSessionDialog(InventoryReport currentReport) {
-    if (!isAdded() || isFragmentDestroyed || currentReport == null) return;
-
-    Toast.makeText(requireContext(),
-            isArabic ? "📊 المقارنة قيد التطوير"
-                     : "📊 Comparison coming soon",
-            Toast.LENGTH_LONG).show();
-}
-
-/**
- * ✅ تأكيد حذف التقرير
- */
-private void confirmDeleteReport(InventoryReport report) {
-    if (!isAdded() || isFragmentDestroyed || report == null) return;
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "⚠️ تأكيد الحذف" : "⚠️ Confirm Delete")
-            .setMessage(isArabic
-                    ? "هل أنت متأكد من حذف التقرير " + report.sessionId + "؟\n\n" +
-                      "⚠️ لا يمكن التراجع عن هذه العملية!"
-                    : "Delete report " + report.sessionId + "?\n\n" +
-                      "⚠️ This cannot be undone!")
-            .setPositiveButton(isArabic ? "🗑️ حذف" : "🗑️ Delete", (d, w) -> {
-                deleteReport(report);
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-            .setIcon(android.R.drawable.ic_dialog_alert)
-            .show();
-}
-
-/**
- * ✅ حذف التقرير فعلياً
- */
-private void deleteReport(InventoryReport report) {
-    if (!isAdded() || isFragmentDestroyed) return;
-    if (persistenceManager == null || apiClient == null) {
-        Toast.makeText(requireContext(),
-                isArabic ? "⚠️ غير جاهز" : "⚠️ Not ready",
-                Toast.LENGTH_SHORT).show();
-        return;
-    }
-
-    Toast.makeText(requireContext(),
-            isArabic ? "🗑️ جاري الحذف..." : "🗑️ Deleting...",
-            Toast.LENGTH_SHORT).show();
-
-    persistenceManager.deleteReport(apiClient, report.sessionId,
-            new InventoryPersistenceManager.DeleteCallback() {
-                @Override
-                public void onDeleteSuccess() {
-                    mainHandler.post(() -> {
-                        if (!isAdded() || isFragmentDestroyed) return;
-                        Toast.makeText(requireContext(),
-                                isArabic ? "✅ تم الحذف" : "✅ Deleted",
-                                Toast.LENGTH_SHORT).show();
-                        showArchiveReports();  // إعادة تحميل
-                    });
-                }
-
-                @Override
-                public void onDeleteError(String error) {
-                    mainHandler.post(() -> {
-                        if (!isAdded() || isFragmentDestroyed) return;
-                        Toast.makeText(requireContext(),
-                                (isArabic ? "❌ " : "❌ ") + error,
-                                Toast.LENGTH_SHORT).show();
-                    });
-                }
-            });
-}
-
-    // ==================== Snapshots ====================
-    private void showSnapshotsList() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        if (apiClient == null) return;
-        if (persistenceManager == null) return;
-
-        AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "📸 جاري التحميل..." : "📸 Loading...")
-                .setMessage(isArabic ? "يرجى الانتظار" : "Please wait")
-                .setCancelable(false)
-                .show();
-
-        persistenceManager.fetchSnapshots(apiClient, "Main Showroom", 50,
-                new InventoryPersistenceManager.ArchiveCallback() {
-                    @Override public void onArchiveLoaded(List<InventoryReport> snaps) {
-                        mainHandler.post(() -> {
-                            try { loading.dismiss(); } catch (Exception ignored) {}
-                            if (isAdded() && !isFragmentDestroyed)
-                                displaySnapshotsDialog(snaps);
-                        });
-                    }
-                    @Override public void onArchiveError(String error) {
-                        mainHandler.post(() -> {
-                            try { loading.dismiss(); } catch (Exception ignored) {}
-                        });
-                    }
-                });
-    }
-
-    private void displaySnapshotsDialog(List<InventoryReport> snaps) {
-        if (!isAdded() || isFragmentDestroyed) return;
-        if (snaps == null || snaps.isEmpty()) {
-            Toast.makeText(requireContext(),
-                    isArabic ? "لا توجد لقطات" : "No snapshots",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-        String[] arr = new String[snaps.size()];
-        for (int i = 0; i < snaps.size(); i++) {
-            InventoryReport r = snaps.get(i);
-            arr[i] = "📸 " + r.date + " - " + r.scannedCount + " items";
-        }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(), R.layout.item_dialog_list, android.R.id.text1, arr);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "📸 اللقطات" : "📸 Snapshots")
-                .setAdapter(adapter, (d, which) -> d.dismiss())
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
-    }
-
-    // ==================== Session Settings ====================
-    private void showPowerControlSheet() {
-        if (dialogsManager != null) {
-            dialogsManager.setCurrentPowerDbm(currentPowerDbm);
-            dialogsManager.showPowerControlSheet();
-        }
-    }
-    private void applyAntennaPower(int dbm) {
-        if (rfidManager != null && rfidManager.getActiveDevice() != null) {
-            Log.d(TAG, "Power → " + dbm + " dBm");
-        }
-        Toast.makeText(requireContext(),
-                (isArabic ? "القدرة: " : "Power: ") + dbm + " dBm",
-                Toast.LENGTH_SHORT).show();
-    }
-
-    private void confirmResetSession() {
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "⚠️ تأكيد" : "⚠️ Confirm")
-                .setMessage(isArabic ? "إعادة تعيين الجلسة؟" : "Reset session?")
-                .setPositiveButton(isArabic ? "إعادة" : "Reset", (d, w) -> {
-                    if (inventoryEngine != null) inventoryEngine.clearSession();
-                    scannedItemsDisplayList.clear();
-                    pendingUiItems.clear();
-                    if (modernAdapter != null) {
-                        modernAdapter.submitList(new ArrayList<>());
-                        modernAdapter.resetAnimationTracker();
-                    }
-                    if (sessionManager != null) sessionManager.clearSession();
-                    expectedCount = 0;
-                    lastScannedForAnimation = 0;
-                    if (tvScannedCount != null) tvScannedCount.setText("0");
-                    if (tvItemCount != null) tvItemCount.setText("0");
-                    if (tvExpectedCount != null) tvExpectedCount.setText("0");
-                    if (progressScanned != null) progressScanned.setProgress(0);
-                    if (tvProgressPercent != null) tvProgressPercent.setText("0%");
-                    if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
-                    scheduleUiUpdate();
-                    updateTotalWeightAndValue();
-                })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                .show();
-    }
-
-    // ==================== Session Restore ====================
-    private void checkAndRestoreSession() {
-        if (sessionManager == null || !isAdded() || isFragmentDestroyed) return;
-        sessionManager.tryRestoreSession(new InventorySessionManager.SessionCallback() {
-            @Override public void onSessionFound(JSONArray items, int expected,
-                                                  String category, long timeAgo) {
-                if (!isAdded() || isFragmentDestroyed) return;
-                showRestoreSessionDialog(items, expected, category, timeAgo);
-            }
-            @Override public void onNoSession() {}
-        });
-    }
-
-    private void showRestoreSessionDialog(JSONArray items, int expected,
-                                            String category, long timeAgo) {
-        if (!isAdded() || isFragmentDestroyed || sessionManager == null) return;
-        String msg = sessionManager.buildRestoreMessage(items, timeAgo);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "🔄 استرجاع" : "🔄 Restore")
-                .setMessage(msg)
-                .setPositiveButton(isArabic ? "استرجاع" : "Restore", (d, w) ->
-                        applyRestoredSession(items, expected, category))
-                .setNegativeButton(isArabic ? "بدء جديد" : "Start New", (d, w) -> {
-                    if (sessionManager != null) sessionManager.clearSession();
-                })
-                .setCancelable(false)
-                .show();
-    }
-
-    private void applyRestoredSession(JSONArray items, int expected, String category) {
-        try {
-            scannedItemsDisplayList.clear();
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject o = items.getJSONObject(i);
-                ScannedItemDisplay d = new ScannedItemDisplay(
-                        o.optString("epc"), o.optString("title"),
-                        o.optString("karat"), o.optInt("count", 1),
-                        o.optInt("rssi"), o.optString("time"));
-                d.weight = o.optDouble("weight", 0);
-                d.price = o.optDouble("price", 0);
-                scannedItemsDisplayList.add(d);
-            }
-            if (modernAdapter != null) {
-                modernAdapter.submitList(new ArrayList<>(scannedItemsDisplayList));
-            }
-            this.expectedCount = expected;
-            if (tvExpectedCount != null)
-                tvExpectedCount.setText(String.valueOf(expected));
-            selectedCategoryFilter = (category != null && !category.isEmpty())
-                    ? category : null;
-            lastScannedForAnimation = items.length();
-            scheduleUiUpdate();
-            updateTotalWeightAndValue();
+            if (amount <= 0) return "—";
+            if (priceManager != null) return priceManager.formatPriceDefault(amount);
+            return getCurrencyFormatter().format(amount);
         } catch (Exception e) {
-            Log.e(TAG, "applyRestoredSession error", e);
+            return "—";
         }
     }
 
-    // ==================== Segmented Control ====================
-    private void setupSegmentedControl() {
-        if (segmentedModes == null) return;
-        segmentedModes.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-            if (!isChecked) return;
-            if (checkedId == R.id.btnModeFull) {
-                selectedCategoryFilter = null;
-            } else if (checkedId == R.id.btnModeCategory) {
-                showCategorySelectionDialog();
-            } else if (checkedId == R.id.btnModeBlind) {
-                selectedCategoryFilter = null;
-                startBlindInventory();
-            }
-        });
+    private String formatWeight(double weightInGrams) {
+        if (weightInGrams <= 0) return "0.0 g";
+        return weightInGrams >= 1000
+                ? String.format(Locale.US, "%.2f kg", weightInGrams / 1000)
+                : String.format(Locale.US, "%.1f g", weightInGrams);
     }
 
-    private void showCategorySelectionDialog() {
-    if (!isAdded() || isFragmentDestroyed) return;
-
-    final String[] categories = isArabic
-            ? new String[]{"الكل", "عيار 24", "عيار 22", "عيار 21",
-                    "عيار 18", "عيار 14", "سبائك", "أونصة", "فضة", "ألماس", "أخرى"}
-            : new String[]{"All", "24K", "22K", "21K", "18K", "14K",
-                    "Bullion", "Ounce", "Silver", "Diamond", "Other"};
-
-    final int[] selectedIndex = {0};
-
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(
-            requireContext(), R.layout.item_dialog_list,
-            android.R.id.text1, categories);
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "🎯 اختر الفئة للجرد" : "🎯 Select Inventory Category")
-            .setSingleChoiceItems(adapter, 0, (d, which) -> {
-                selectedIndex[0] = which;
-            })
-            .setPositiveButton(isArabic ? "✅ تطبيق" : "✅ Apply", (d, w) -> {
-                d.dismiss();
-                applyCategoryFilter(categories[selectedIndex[0]], selectedIndex[0]);
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (d, w) -> {
-                d.dismiss();
-                if (segmentedModes != null && btnModeFull != null) {
-                    segmentedModes.check(R.id.btnModeFull);
-                }
-            })
-            .show();
-}
-
-    private void applyCategoryFilter(String category, int index) {
-        if (index == 0) {
-            Toast.makeText(requireContext(),
-                    isArabic ? "✅ الكل" : "✅ All", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        selectedCategoryFilter = category;
-
-        if (isScanning()) {
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(isArabic ? "⚠️ إعادة" : "⚠️ Restart")
-                    .setMessage(isArabic ? "إيقاف الجرد الحالي؟" : "Stop current?")
-                    .setPositiveButton(isArabic ? "نعم" : "Yes", (d, w) -> {
-                        stopScanning();
-                        mainHandler.postDelayed(() -> startCategoryInventory(category), 500);
-                    })
-                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                    .show();
-        } else startCategoryInventory(category);
+    private void setGoldPrice(TextView tv, String label, double price) {
+        if (tv == null) return;
+        tv.setText(price > 0
+                ? String.format(Locale.US, "%s: $%,.2f/g", label, price)
+                : label + ": —");
     }
 
-    private void startCategoryInventory(String category) {
-    if (isFragmentDestroyed) return;
-    resetUiForNewScan();
-    Toast.makeText(requireContext(),
-            (isArabic ? "🔄 تحميل " : "🔄 Loading ") + category,
-            Toast.LENGTH_SHORT).show();
-
-    // ✅✅✅ فحص تشخيصي — استخدام SessionManager الصحيح
-    showDebugDialog(category);
-}
-
-/**
- * ✅ عرض Dialog تشخيصي قبل بدء الجرد
- * ثم بدء تحميل الكاتولوج
- */
-private void showDebugDialog(String category) {
-    try {
-        com.example.uhf.tools.SessionManager userSession =
-                new com.example.uhf.tools.SessionManager(requireContext());
-
-        String currentApiKey = userSession.getApiKey();
-        String currentGateId = userSession.getGateId();
-        String currentToken = userSession.getAuthToken();
-
-        if (currentApiKey == null) currentApiKey = "NULL";
-        if (currentGateId == null) currentGateId = "NULL";
-        if (currentToken == null) currentToken = "NULL";
-
-        final String debugInfo =
-                "🔑 Key: " + (currentApiKey.length() > 25
-                        ? currentApiKey.substring(0, 25) + "..." : currentApiKey) +
-                "\n🚪 Gate: " + currentGateId +
-                "\n🎫 Token: " + (currentToken.length() > 25
-                        ? currentToken.substring(0, 25) + "..." : currentToken) +
-                "\n📍 Branch: " + branchesManager.getActiveBranchId() +
-                "\n\n📋 Key Length: " + currentApiKey.length() +
-                "\n📋 Expected Prefix: mira_cmt7";
-
-        final String capturedCategory = category;
-
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle("🔍 بيانات التشخيص")
-                .setMessage(debugInfo)
-                .setPositiveButton("📋 نسخ", (d, w) -> {
-                    android.content.ClipboardManager clipboard =
-                            (android.content.ClipboardManager) requireContext()
-                                    .getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip =
-                            android.content.ClipData.newPlainText("API Debug", debugInfo);
-                    if (clipboard != null) clipboard.setPrimaryClip(clip);
-                    Toast.makeText(requireContext(),
-                            "✅ تم النسخ", Toast.LENGTH_SHORT).show();
-                })
-                .setNeutralButton("⏭️ متابعة", (d, w) -> {
-                    d.dismiss();
-                    loadCategoryCatalog(capturedCategory);
-                })
-                .setCancelable(false)
-                .show();
-
-    } catch (Exception e) {
-        Log.e(TAG, "Debug dialog error: " + e.getMessage());
-        // في حالة الخطأ، ابدأ الجرد مباشرة
-        loadCategoryCatalog(category);
-    }
-}
-
-/**
- * ✅ تحميل كاتولوج الفئة الفعلي
- */
-private void loadCategoryCatalog(String category) {
-    if (isFragmentDestroyed || !isAdded()) return;
-
-    catalogManager.fetchCatalog(apiClient, branchesManager,
-            new InventoryCatalogManager.CatalogCallback() {
-                @Override
-                public void onCatalogLoaded(Map<String, InventoryItem> full) {
-                    Map<String, InventoryItem> filtered =
-                            catalogManager.filterByCategory(full, category);
-                    mainHandler.post(() -> {
-                        if (isFragmentDestroyed || !isAdded()) return;
-                        catalogEpcs.clear();
-                        catalogEpcs.addAll(filtered.keySet());
-                        expectedCount = filtered.size();
-                        if (tvExpectedCount != null)
-                            tvExpectedCount.setText(String.valueOf(expectedCount));
-                        if (scanController != null) {
-                            scanController.startScanning(filtered);
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(String error) {
-                    mainHandler.post(() -> {
-                        if (isFragmentDestroyed || !isAdded()) return;
-                        Toast.makeText(requireContext(),
-                                (isArabic ? "⚠️ " : "⚠️ ") + error,
-                                Toast.LENGTH_LONG).show();
-                    });
-                }
-            });
-}
-
-    private void startBlindInventory() {
-        if (isFragmentDestroyed || isScanning()) return;
-        resetUiForNewScan();
-        expectedCount = 0;
-        if (tvExpectedCount != null) tvExpectedCount.setText("—");
-        if (tvProgressPercent != null) tvProgressPercent.setText("—");
-        if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText(isArabic ?
-                    "⚡ جرد أعمى" : "⚡ Blind inventory");
-        }
-        if (scanController != null) {
-            scanController.setBarcodeToEpcMap(catalogManager.getBarcodeToEpcMap());
-            scanController.startScanning(null);
-        }
+    private void setText(TextView tv, String text) {
+        if (tv != null) tv.setText(text);
     }
 
-    // ==================== Helpers ====================
-    private void updateMainToggleButton(boolean scanning) {
-        if (btnMainToggleScan == null) return;
+    // ═══════════════════════════════════════════════════════
+    // Lifecycle (Resume/Pause/Destroy)
+    // ═══════════════════════════════════════════════════════
+    public void onBranchChanged() {
         try {
-            if (scanning) {
-                btnMainToggleScan.setText(isArabic ? "⏹️ إيقاف" : "⏹️ Stop");
-                btnMainToggleScan.setIcon(requireContext().getDrawable(
-                        android.R.drawable.ic_media_pause));
-                btnMainToggleScan.setBackgroundTintList(
-                        requireContext().getColorStateList(
-                                android.R.color.holo_red_dark));
-            } else {
-                btnMainToggleScan.setText(isArabic ?
-                        "▶️ بدء جرد RFID" : "▶️ Start RFID");
-                btnMainToggleScan.setIcon(requireContext().getDrawable(
-                        android.R.drawable.ic_media_play));
-                btnMainToggleScan.setBackgroundTintList(null);
+            if (!isAdded()) return;
+            int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            if (newBranchId != currentBranchId) {
+                currentBranchId = newBranchId;
+                initBranchCache(currentBranchId);
+                updateHeader();
+                syncOrgProfileFromServer(true);
+                loadOfflineData();
+                showShimmer(true);
+                fetchData();
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            logNonFatal("onBranchChanged", e);
+        }
     }
 
-    private String getDeviceId() {
-        try {
-            return android.provider.Settings.Secure.getString(
-                    requireContext().getContentResolver(),
-                    android.provider.Settings.Secure.ANDROID_ID);
-        } catch (Exception e) { return "UNKNOWN-DEVICE"; }
-    }
-
-    private void syncOfflineTransactions() {
-        if (persistenceManager == null || apiClient == null) return;
-        persistenceManager.syncOfflineTransactions(apiClient,
-                new InventoryPersistenceManager.SyncCallback() {
-                    @Override public void onSyncComplete(int count) {
-                        if (count > 0 && isAdded() && !isFragmentDestroyed) {
-                            mainHandler.post(() -> Toast.makeText(requireContext(),
-                                    (isArabic ? "✅ مزامنة " + count :
-                                            "✅ Synced " + count),
-                                    Toast.LENGTH_SHORT).show());
-                        }
-                    }
-                    @Override public void onSyncError(String e) {
-                        Log.w(TAG, "sync error: " + e);
-                    }
-                });
-    }
-
-    private void applyPermissions() {
-        if (permissionManager == null) return;
-        boolean canView = permissionManager.canView("inventory")
-                || permissionManager.isManager();
-        boolean canEdit = canEdit();
-        if (btnMainToggleScan != null) btnMainToggleScan.setEnabled(canEdit);
-        if (btnGenerateReport != null) btnGenerateReport.setEnabled(canEdit);
-        if (btnCommitSession != null) btnCommitSession.setEnabled(canEdit);
-        if (btnArchiveReports != null) btnArchiveReports.setEnabled(canView);
-    }
-
-    private void applyLanguage() {
-        if (btnMainToggleScan != null)
-            btnMainToggleScan.setText(isArabic ?
-                    "▶️ بدء جرد RFID" : "▶️ Start RFID");
-        if (btnGenerateReport != null)
-            btnGenerateReport.setText(isArabic ? "📋 تقرير" : "📋 Report");
-        if (btnArchiveReports != null)
-            btnArchiveReports.setText(isArabic ? "📂 الأرشيف" : "📂 Archive");
-        if (btnPowerControl != null)
-            btnPowerControl.setText("⚡ " + currentPowerDbm + " dBm");
-        if (btnCommitSession != null)
-            btnCommitSession.setText(isArabic ? "اعتماد" : "Commit");
-    }
-
-    // ==================== Lifecycle ====================
-    @Override public void onResume() {
+    @Override
+    public void onResume() {
         super.onResume();
         try {
-            if (!isAdded() || isFragmentDestroyed || isRemoving() || getActivity() == null) {
-                return;
+            registerDataRefreshReceiver();
+            isDataLoaded = false;
+            lastDataFetchTime = 0;
+
+            int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            if (latestBranchId != currentBranchId) {
+                onBranchChanged();
+            } else if (isViewInitialized) {
+                setupQuickAccessGrid();
+                updateHeader();
+                syncOrgProfileFromServer(false);
+                refreshInternalData();
             }
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActiveInventoryFragment(this);
-            }
-            if (scannedItemsDisplayList.isEmpty() && !isScanning()) {
-                mainHandler.postDelayed(this::checkAndRestoreSession, 600);
-            }
-        } catch (Exception e) { Log.e(TAG, "onResume error", e); }
+            startAutoRefresh();
+        } catch (Exception e) {
+            logNonFatal("onResume", e);
+        }
     }
 
-    @Override public void onPause() {
+    @Override
+    public void onPause() {
         super.onPause();
         try {
-            if (isAdded() && !isRemoving()) {
-                if ((isScanning() || !scannedItemsDisplayList.isEmpty())
-                        && sessionManager != null) {
-                    sessionManager.saveSession(expectedCount,
-                            scanController != null ? scanController.getScanStartTime() : 0,
-                            selectedCategoryFilter, scannedItemsDisplayList);
-                }
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).setActiveInventoryFragment(null);
-                }
-            }
-        } catch (Exception e) { Log.e(TAG, "onPause error", e); }
+            unregisterDataRefreshReceiver();
+            stopAutoRefresh();
+        } catch (Exception e) {
+            logNonFatal("onPause", e);
+        }
     }
 
-    @Override public void onDestroyView() {
-        try {
-            if ((isScanning() || !scannedItemsDisplayList.isEmpty())
-                    && sessionManager != null) {
-                sessionManager.saveSession(expectedCount,
-                        scanController != null ? scanController.getScanStartTime() : 0,
-                        selectedCategoryFilter, scannedItemsDisplayList);
-            }
-        } catch (Exception ignored) {}
-
-        try {
-            if (backPressedCallback != null) {
-                backPressedCallback.remove();
-                backPressedCallback = null;
-            }
-            isFragmentDestroyed = true;
-            mainHandler.removeCallbacksAndMessages(null);
-            if (scanController != null) scanController.stopScanning();
-            if (soundManager != null) { soundManager.release(); soundManager = null; }
-            if (filterManager != null) filterManager.reset();
-            if (modernAdapter != null) modernAdapter.resetAnimationTracker();
-        } catch (Exception e) { Log.e(TAG, "onDestroyView error", e); }
-
+    @Override
+    public void onDestroyView() {
         super.onDestroyView();
-    }
-
-    @Override public void onDestroy() {
-        super.onDestroy();
         try {
-            scannedItemsDisplayList.clear();
-            pendingUiItems.clear();
-            catalogEpcs.clear();
-            if (catalogManager != null) catalogManager.clear();
-            if (persistenceManager != null) persistenceManager.cleanup();
-            if (scanController != null) scanController.cleanup();
-        } catch (Exception e) { Log.e(TAG, "onDestroy error", e); }
-        shutdownExecutors();
-    }
+            unregisterDataRefreshReceiver();
+            stopAutoRefresh();
 
-    private void shutdownExecutors() {
-        shutdownExecutor(ioExecutor);
-        shutdownExecutor(processingExecutor);
-        ioExecutor = null;
-        processingExecutor = null;
-    }
-
-    private void shutdownExecutor(ExecutorService ex) {
-        if (ex == null || ex.isShutdown()) return;
-        ex.shutdown();
-        try {
-            if (!ex.awaitTermination(EXECUTOR_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                ex.shutdownNow();
+            if (branchesManager != null && branchListener != null) {
+                branchesManager.removeListener(branchListener);
+                branchListener = null;
             }
-        } catch (InterruptedException e) {
-            ex.shutdownNow();
-            Thread.currentThread().interrupt();
+            if (orgProfile != null && profileListener != null) {
+                orgProfile.removeListener(profileListener);
+            }
+
+            cancelFuture(dataFuture);
+            cancelFuture(goldPriceFuture);
+            cancelFuture(pingFuture);
+
+            if (swipeTimeoutRunnable != null) {
+                mainHandler.removeCallbacks(swipeTimeoutRunnable);
+            }
+            if (mainHandler != null) {
+                mainHandler.removeCallbacksAndMessages(null);
+            }
+
+            isViewInitialized = false;
+        } catch (Exception e) {
+            logNonFatal("onDestroyView", e);
         }
     }
 
-    // ==================== Public APIs ====================
-    public void showInventoryScannerSettings() {
-        if (isAdded() && !isFragmentDestroyed) showPowerControlSheet();
-    }
-    public void showInventorySessionSettings() {
-        if (isAdded() && !isFragmentDestroyed && dialogsManager != null) {
-            dialogsManager.setExpectedCount(expectedCount);
-            dialogsManager.showSessionSettingsDialog();
-        }
-    }
-    public void showInventoryBuzzerSettings() {
-        if (isAdded() && !isFragmentDestroyed && dialogsManager != null) {
-            dialogsManager.showBuzzerSettingsDialog();
-        }
-    }
-
-    public int getScannedCount() {
+    private void cancelFuture(Future<?> future) {
         try {
-            if (inventoryEngine != null) return inventoryEngine.getUniqueCount();
-            return scannedItemsDisplayList.size();
-        } catch (Exception e) { return 0; }
+            if (future != null && !future.isDone()) future.cancel(true);
+        } catch (Exception e) {
+            logNonFatal("cancelFuture", e);
+        }
     }
 
-    public boolean isCurrentlyScanning() {
-        return isScanning();
+    private void logNonFatal(String location, Throwable throwable) {
+        try {
+            Log.e(TAG, "Error at " + location + ": " + throwable.getMessage(), throwable);
+        } catch (Exception e) {
+            Log.e(TAG, "logNonFatal error: " + e.getMessage());
+        }
     }
     }
