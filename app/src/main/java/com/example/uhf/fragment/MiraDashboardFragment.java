@@ -39,6 +39,7 @@ import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.tools.RecentActivityCache;
 
 import org.json.JSONArray;                                 // ✅ جديد
 import org.json.JSONObject;
@@ -62,6 +63,8 @@ public class MiraDashboardFragment extends Fragment {
     private static final String PREFS_PRIVACY = "mira_dashboard_privacy";
     private static final String KEY_HIDE_HERO = "hide_hero_value";
     private static final String KEY_HIDE_SALES = "hide_sales_value";
+    
+    private RecentActivityCache activityCache;
 
     private static final double OUNCE_TO_GRAM = 31.1035;
     private static final int MAX_QUICK_ACTIONS = 9;
@@ -277,6 +280,7 @@ public class MiraDashboardFragment extends Fragment {
             isArabic = Locale.getDefault().getLanguage().equals("ar");
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
+            activityCache = new RecentActivityCache(context);
         } catch (Exception e) {
             logNonFatal("initializeManagers", e);
         }
@@ -1221,45 +1225,81 @@ public class MiraDashboardFragment extends Fragment {
     // ═══════════════════════════════════════════════════════
 
     /**
-     * ✅ جلب آخر 10 عمليات من الـ API الموحّد
-     */
-    private void fetchRecentActivity() {
-        if (apiClient == null || !isAdded()) return;
+ * ✅ جلب آخر 10 عمليات — مع Cache
+ * 
+ * 1. عرض البيانات من الكاش فوراً (لا تأخير)
+ * 2. جلب من السيرفر في الخلفية
+ * 3. تحديث الواجهة + الكاش
+ */
+private void fetchRecentActivity() {
+    if (apiClient == null || !isAdded()) return;
 
-        sharedExecutor.execute(() -> {
-            try {
-                int branchId = branchesManager != null
-                        ? branchesManager.getActiveBranchId() : 0;
-
-                MiraApiClient.ApiResponse response =
-                        apiClient.getUnifiedActivity(branchId, 10);
-
-                mainHandler.post(() -> {
-                    if (!isAdded() || response == null) return;
-
-                    if (response.isSuccess && response.data != null) {
-                        try {
-                            JSONArray activities = response.data.optJSONArray("activities");
-                            if (activities != null && activities.length() > 0) {
-                                List<JSONObject> list = new ArrayList<>();
-                                int max = Math.min(activities.length(), 10);
-                                for (int i = 0; i < max; i++) {
-                                    list.add(activities.getJSONObject(i));
-                                }
-                                if (recentActivityAdapter != null) {
-                                    recentActivityAdapter.submitList(list);
-                                }
-                            }
-                        } catch (Exception e) {
-                            logNonFatal("fetchRecentActivity.parse", e);
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                logNonFatal("fetchRecentActivity", e);
-            }
-        });
+    // ═══════════════════════════════════════════════════════
+    // ✅ 1. عرض البيانات من الكاش فوراً (بدون تأخير)
+    // ═══════════════════════════════════════════════════════
+    if (activityCache != null) {
+        JSONArray cached = activityCache.load();
+        if (cached.length() > 0) {
+            updateRecentActivityUI(cached);
+            Log.d(TAG, "✅ Displayed " + cached.length() + " activities from cache");
+        }
     }
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ 2. إذا الكاش صالح، لا نُجدد — لكن نُجدد في الخلفية
+    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
+    // ✅ 3. جلب من السيرفر في الخلفية
+    // ═══════════════════════════════════════════════════════
+    sharedExecutor.execute(() -> {
+        try {
+            int branchId = branchesManager != null
+                    ? branchesManager.getActiveBranchId() : 0;
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.getUnifiedActivity(branchId, 10);
+
+            mainHandler.post(() -> {
+                if (!isAdded() || response == null) return;
+
+                if (response.isSuccess && response.data != null) {
+                    try {
+                        JSONArray activities = response.data.optJSONArray("activities");
+                        if (activities != null && activities.length() > 0) {
+                            // ✅ حفظ في الكاش
+                            if (activityCache != null) {
+                                activityCache.save(activities);
+                            }
+                            // ✅ تحديث الواجهة
+                            updateRecentActivityUI(activities);
+                        }
+                    } catch (Exception e) {
+                        logNonFatal("fetchRecentActivity.parse", e);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("fetchRecentActivity", e);
+        }
+    });
+}
+
+/**
+ * ✅ تحديث واجهة آخر العمليات
+ */
+private void updateRecentActivityUI(JSONArray activities) {
+    if (activities == null || recentActivityAdapter == null) return;
+    try {
+        List<JSONObject> list = new ArrayList<>();
+        int max = Math.min(activities.length(), 10);
+        for (int i = 0; i < max; i++) {
+            list.add(activities.getJSONObject(i));
+        }
+        recentActivityAdapter.submitList(list);
+    } catch (Exception e) {
+        logNonFatal("updateRecentActivityUI", e);
+    }
+}
 
     /**
      * ✅ عند النقر على عملية → فتح الشاشة المناسبة
@@ -1626,4 +1666,4 @@ public class MiraDashboardFragment extends Fragment {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-                }
+    }
