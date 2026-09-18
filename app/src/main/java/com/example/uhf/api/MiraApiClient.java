@@ -234,6 +234,65 @@ public class MiraApiClient {
             if (conn != null) conn.disconnect();
         }
     }
+    
+    /**
+ * ✅ GET مع Timeout طويل (60 ثانية) — للكتالوجات الكبيرة
+ */
+public ApiResponse getWithAuthLongTimeout(String endpoint) {
+    HttpURLConnection conn = null;
+    try {
+        String token = getAuthToken();
+        if (token == null || token.isEmpty()) {
+            Log.w(TAG, "No auth token for endpoint: " + endpoint);
+            ApiResponse response = new ApiResponse(401, null, "No auth token");
+            response.isNetworkError = false;
+            return response;
+        }
+        
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
+        }
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        URL url = new URL(fullUrl);
+        
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, true);
+        
+        // ✅ Timeout طويل للكتالوجات الكبيرة
+        conn.setConnectTimeout(15000);  // 15 ثانية للاتصال
+        conn.setReadTimeout(60000);     // 60 ثانية للقراءة
+        
+        return buildResponse(conn);
+        
+    } catch (java.net.UnknownHostException e) {
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.ConnectException e) {
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.SocketTimeoutException e) {
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة - السيرفر بطيء");
+        response.isNetworkError = true;
+        return response;
+    } catch (Exception e) {
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
         HttpURLConnection conn = null;
@@ -1454,10 +1513,10 @@ public ApiResponse getBranchItemsListWithLongTimeout(int branchId) {
     Log.d(TAG, "🌐 getBranchItemsListWithLongTimeout | branchId=" + branchId);
     
     String endpoint = "/branches/" + branchId + "/inventory/items";
-    Log.d(TAG, "📡 Calling getWithAuth: " + endpoint);
+    Log.d(TAG, "📡 Calling getWithAuthLongTimeout: " + endpoint);
     
-    // ✅ استخدم getWithAuth المُجرَّبة (نفس Headers Dashboard)
-    ApiResponse response = getWithAuth(endpoint);
+    // ✅ استخدم الدالة الجديدة ذات الـ Timeout الطويل
+    ApiResponse response = getWithAuthLongTimeout(endpoint);
     
     // ✅ Logging تفصيلي
     if (response != null) {
@@ -1474,7 +1533,7 @@ public ApiResponse getBranchItemsListWithLongTimeout(int branchId) {
         }
         Log.d(TAG, "═══════════════════════════════════════════");
     } else {
-        Log.e(TAG, "❌ Null response from getWithAuth");
+        Log.e(TAG, "❌ Null response from getWithAuthLongTimeout");
     }
     
     return response;
