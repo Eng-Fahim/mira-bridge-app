@@ -1096,48 +1096,355 @@ public void onError(String error) {
         if (isAdded() && !isFragmentDestroyed) showArchiveReports();
     }
 
-    private void displayArchiveDialog(List<InventoryReport> reports) {
-        if (!isAdded() || isFragmentDestroyed) return;
-        if (reports == null || reports.isEmpty()) {
-            Toast.makeText(requireContext(),
-                    isArabic ? "لا توجد تقارير" : "No reports",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-        String[] titles = new String[reports.size()];
-        for (int i = 0; i < reports.size(); i++) {
-            InventoryReport r = reports.get(i);
-            titles[i] = String.format("📋 %s - %s (%d/%d)",
-                    r.sessionId, r.date, r.scannedCount, r.expectedCount);
-        }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(), R.layout.item_dialog_list, android.R.id.text1, titles);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "📂 أرشيف التقارير" : "📂 Archive")
-                .setAdapter(adapter, (d, which) -> {
-                    showReportDetails(reports.get(which));
-                    d.dismiss();
-                })
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
+   private void displayArchiveDialog(List<InventoryReport> reports) {
+    if (!isAdded() || isFragmentDestroyed) return;
+    if (reports == null || reports.isEmpty()) {
+        Toast.makeText(requireContext(),
+                isArabic ? "لا توجد تقارير" : "No reports",
+                Toast.LENGTH_SHORT).show();
+        return;
     }
 
-    private void showReportDetails(InventoryReport report) {
-        if (!isAdded() || isFragmentDestroyed || report == null) return;
-        String msg = String.format(
-                "%s: %s\n%s: %s\n%s: %d\n%s: %d\n%s: %d\n%s: %s",
-                isArabic ? "الجلسة" : "Session", report.sessionId,
-                isArabic ? "التاريخ" : "Date", report.date,
-                isArabic ? "المتوقع" : "Expected", report.expectedCount,
-                isArabic ? "الممسوح" : "Scanned", report.scannedCount,
-                isArabic ? "المفقود" : "Missing", report.missingCount,
-                isArabic ? "الحالة" : "Status", report.status);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "تفاصيل" : "Details")
-                .setMessage(msg)
-                .setPositiveButton(isArabic ? "موافق" : "OK", null)
-                .show();
+    // ✅ قائمة منسقة مع أيقونة الحالة
+    String[] titles = new String[reports.size()];
+    for (int i = 0; i < reports.size(); i++) {
+        InventoryReport r = reports.get(i);
+        String statusIcon = getReportStatusIcon(r);
+        titles[i] = String.format("%s %s\n   📅 %s   •   ✅ %d/%d",
+                statusIcon, r.sessionId, r.date,
+                r.scannedCount, r.expectedCount);
     }
+
+    final int[] selectedIndex = {-1};
+    ArrayAdapter<String> adapter = new ArrayAdapter<>(
+            requireContext(), R.layout.item_dialog_list,
+            android.R.id.text1, titles);
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📂 أرشيف التقارير" : "📂 Archive Reports")
+            .setSingleChoiceItems(adapter, -1, (d, which) -> {
+                selectedIndex[0] = which;
+            })
+            .setPositiveButton(isArabic ? "⚙️ إجراءات" : "⚙️ Actions", (d, w) -> {
+                if (selectedIndex[0] < 0) {
+                    Toast.makeText(requireContext(),
+                            isArabic ? "⚠️ اختر تقريراً أولاً"
+                                     : "⚠️ Select a report first",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                d.dismiss();
+                showReportActionsDialog(reports.get(selectedIndex[0]));
+            })
+            .setNeutralButton(isArabic ? "👁️ عرض سريع" : "👁️ Quick View", (d, w) -> {
+                if (selectedIndex[0] >= 0) {
+                    showReportDetails(reports.get(selectedIndex[0]));
+                } else {
+                    Toast.makeText(requireContext(),
+                            isArabic ? "⚠️ اختر تقريراً" : "⚠️ Select a report",
+                            Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+}
+
+/**
+ * ✅ أيقونة حالة التقرير
+ */
+private String getReportStatusIcon(InventoryReport r) {
+    if (r == null) return "📋";
+    if (r.expectedCount == 0) return "⚡";           // جرد أعمى
+    if (r.scannedCount >= r.expectedCount) return "✅"; // مكتمل
+    if (r.scannedCount > 0) return "⚠️";             // جزئي
+    return "📋";                                     // فارغ
+}
+
+    
+    
+    /**
+ * ✅ قائمة الإجراءات الكاملة
+ */
+private void showReportActionsDialog(InventoryReport report) {
+    if (!isAdded() || isFragmentDestroyed || report == null) return;
+
+    String[] actions = isArabic
+            ? new String[]{
+                "👁️ عرض التفاصيل الكاملة",
+                "🖨️ طباعة التقرير",
+                "📊 مقارنة بجلسة أخرى",
+                "🔗 فتح في شاشة الجرد",
+                "🗑️ حذف التقرير"
+            }
+            : new String[]{
+                "👁️ View Full Details",
+                "🖨️ Print Report",
+                "📊 Compare with Session",
+                "🔗 Open in Inventory",
+                "🗑️ Delete Report"
+            };
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle((isArabic ? "⚙️ إجراءات: " : "⚙️ Actions: ") + report.sessionId)
+            .setItems(actions, (d, which) -> {
+                switch (which) {
+                    case 0: fetchAndShowReportDetails(report); break;
+                    case 1: printArchivedReport(report); break;
+                    case 2: showCompareSessionDialog(report); break;
+                    case 3: openReportInInventory(report); break;
+                    case 4: confirmDeleteReport(report); break;
+                }
+            })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+}
+
+/**
+ * ✅ جلب تفاصيل التقرير من السيرفر ثم عرضها
+ */
+private void fetchAndShowReportDetails(InventoryReport report) {
+    if (!isAdded() || isFragmentDestroyed || report == null) return;
+    if (persistenceManager == null || apiClient == null) {
+        showReportDetails(report);
+        return;
+    }
+
+    AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📥 جاري التحميل..." : "📥 Loading...")
+            .setMessage(isArabic ? "يتم جلب تفاصيل التقرير" : "Fetching report details")
+            .setCancelable(false)
+            .show();
+
+    persistenceManager.fetchReportDetails(apiClient, report.sessionId,
+            new InventoryPersistenceManager.ReportDetailsCallback() {
+                @Override
+                public void onDetailsLoaded(List<ScannedItemDisplay> items) {
+                    mainHandler.post(() -> {
+                        try { loading.dismiss(); } catch (Exception ignored) {}
+                        if (!isAdded() || isFragmentDestroyed) return;
+
+                        if (items == null || items.isEmpty()) {
+                            showReportDetails(report);
+                            Toast.makeText(requireContext(),
+                                    isArabic ? "⚠️ لا توجد تفاصيل — عرض الملخص"
+                                             : "⚠️ No details — showing summary",
+                                    Toast.LENGTH_SHORT).show();
+                        } else {
+                            showReportDetailsWithItems(report, items);
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    mainHandler.post(() -> {
+                        try { loading.dismiss(); } catch (Exception ignored) {}
+                        if (!isAdded() || isFragmentDestroyed) return;
+                        showReportDetails(report);
+                        Toast.makeText(requireContext(),
+                                (isArabic ? "⚠️ " : "⚠️ ") + error,
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+            });
+}
+
+/**
+ * ✅ عرض التقرير مع قائمة العناصر
+ */
+private void showReportDetailsWithItems(InventoryReport report,
+                                         List<ScannedItemDisplay> items) {
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    StringBuilder sb = new StringBuilder();
+    sb.append(String.format("%s: %s\n", isArabic ? "الجلسة" : "Session", report.sessionId));
+    sb.append(String.format("%s: %s\n\n", isArabic ? "التاريخ" : "Date", report.date));
+    sb.append(String.format("📦 %s: %d\n",
+            isArabic ? "العناصر" : "Items", items.size()));
+    sb.append("─────────────────\n\n");
+
+    int limit = Math.min(items.size(), 15);
+    for (int i = 0; i < limit; i++) {
+        ScannedItemDisplay item = items.get(i);
+        sb.append(String.format("%d. %s\n   %s • %.2fg\n\n",
+                i + 1, item.title, item.karat, item.weight));
+    }
+
+    if (items.size() > limit) {
+        sb.append(String.format("\n... %s %d %s\n",
+                isArabic ? "و" : "and",
+                items.size() - limit,
+                isArabic ? "عنصر آخر" : "more items"));
+    }
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle((isArabic ? "📋 " : "📋 ") + report.sessionId)
+            .setMessage(sb.toString())
+            .setPositiveButton(isArabic ? "🖨️ طباعة الكل" : "🖨️ Print All",
+                    (d, w) -> {
+                        try {
+                            PrintUtils.printReportWithQRCode(
+                                    requireContext(), report, items, isArabic, null);
+                        } catch (Exception e) {
+                            Log.e(TAG, "print error", e);
+                        }
+                    })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+}
+
+/**
+ * ✅ عرض التفاصيل (الملخص فقط)
+ */
+private void showReportDetails(InventoryReport report) {
+    if (!isAdded() || isFragmentDestroyed || report == null) return;
+
+    int missing = Math.max(0, report.expectedCount - report.scannedCount);
+    String accuracy = report.expectedCount > 0
+            ? String.format(Locale.US, "%.1f%%",
+                (report.scannedCount * 100.0 / report.expectedCount))
+            : "N/A";
+
+    String msg = String.format(
+            "%s: %s\n\n" +
+            "📅 %s: %s\n" +
+            "📦 %s: %d\n" +
+            "✅ %s: %d\n" +
+            "❌ %s: %d\n" +
+            "📊 %s: %s\n" +
+            "🏷️ %s: %s",
+            isArabic ? "الجلسة" : "Session", report.sessionId,
+            isArabic ? "التاريخ" : "Date", report.date,
+            isArabic ? "المتوقع" : "Expected", report.expectedCount,
+            isArabic ? "الممسوح" : "Scanned", report.scannedCount,
+            isArabic ? "المفقود" : "Missing", missing,
+            isArabic ? "الدقة" : "Accuracy", accuracy,
+            isArabic ? "الحالة" : "Status", report.status);
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle((isArabic ? "📋 " : "📋 ") + report.sessionId)
+            .setMessage(msg)
+            .setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print",
+                    (d, w) -> printArchivedReport(report))
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+}
+
+/**
+ * ✅ طباعة تقرير من الأرشيف
+ */
+private void printArchivedReport(InventoryReport report) {
+    if (!isAdded() || isFragmentDestroyed || report == null) return;
+
+    try {
+        List<ScannedItemDisplay> emptyItems = new ArrayList<>();
+        PrintUtils.printReportWithQRCode(
+                requireContext(), report, emptyItems, isArabic, null);
+        Toast.makeText(requireContext(),
+                isArabic ? "🖨️ جاري الطباعة..." : "🖨️ Printing...",
+                Toast.LENGTH_SHORT).show();
+    } catch (Exception e) {
+        Log.e(TAG, "printArchivedReport error", e);
+        Toast.makeText(requireContext(),
+                isArabic ? "❌ فشل الطباعة" : "❌ Print failed",
+                Toast.LENGTH_SHORT).show();
+    }
+}
+
+/**
+ * ✅ فتح التقرير في شاشة الجرد
+ */
+private void openReportInInventory(InventoryReport report) {
+    if (!isAdded() || isFragmentDestroyed || report == null) return;
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🔗 فتح في الجرد" : "🔗 Open in Inventory")
+            .setMessage(isArabic
+                    ? "سيتم فتح شاشة الجرد.\n\nهل تريد المتابعة؟"
+                    : "Inventory screen will open.\n\nContinue?")
+            .setPositiveButton(isArabic ? "فتح" : "Open", (d, w) -> {
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).loadFragment(
+                            new MiraInventoryProFragment(), "Scan");
+                }
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+}
+
+/**
+ * ✅ مقارنة (قيد التطوير)
+ */
+private void showCompareSessionDialog(InventoryReport currentReport) {
+    if (!isAdded() || isFragmentDestroyed || currentReport == null) return;
+
+    Toast.makeText(requireContext(),
+            isArabic ? "📊 المقارنة قيد التطوير"
+                     : "📊 Comparison coming soon",
+            Toast.LENGTH_LONG).show();
+}
+
+/**
+ * ✅ تأكيد حذف التقرير
+ */
+private void confirmDeleteReport(InventoryReport report) {
+    if (!isAdded() || isFragmentDestroyed || report == null) return;
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "⚠️ تأكيد الحذف" : "⚠️ Confirm Delete")
+            .setMessage(isArabic
+                    ? "هل أنت متأكد من حذف التقرير " + report.sessionId + "؟\n\n" +
+                      "⚠️ لا يمكن التراجع عن هذه العملية!"
+                    : "Delete report " + report.sessionId + "?\n\n" +
+                      "⚠️ This cannot be undone!")
+            .setPositiveButton(isArabic ? "🗑️ حذف" : "🗑️ Delete", (d, w) -> {
+                deleteReport(report);
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show();
+}
+
+/**
+ * ✅ حذف التقرير فعلياً
+ */
+private void deleteReport(InventoryReport report) {
+    if (!isAdded() || isFragmentDestroyed) return;
+    if (persistenceManager == null || apiClient == null) {
+        Toast.makeText(requireContext(),
+                isArabic ? "⚠️ غير جاهز" : "⚠️ Not ready",
+                Toast.LENGTH_SHORT).show();
+        return;
+    }
+
+    Toast.makeText(requireContext(),
+            isArabic ? "🗑️ جاري الحذف..." : "🗑️ Deleting...",
+            Toast.LENGTH_SHORT).show();
+
+    persistenceManager.deleteReport(apiClient, report.sessionId,
+            new InventoryPersistenceManager.DeleteCallback() {
+                @Override
+                public void onDeleteSuccess() {
+                    mainHandler.post(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+                        Toast.makeText(requireContext(),
+                                isArabic ? "✅ تم الحذف" : "✅ Deleted",
+                                Toast.LENGTH_SHORT).show();
+                        showArchiveReports();  // إعادة تحميل
+                    });
+                }
+
+                @Override
+                public void onDeleteError(String error) {
+                    mainHandler.post(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+                        Toast.makeText(requireContext(),
+                                (isArabic ? "❌ " : "❌ ") + error,
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+            });
+}
 
     // ==================== Snapshots ====================
     private void showSnapshotsList() {
@@ -1309,27 +1616,37 @@ public void onError(String error) {
     }
 
     private void showCategorySelectionDialog() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        final String[] categories = isArabic
-                ? new String[]{"الكل", "عيار 24", "عيار 22", "عيار 21",
-                        "عيار 18", "عيار 14", "سبائك", "أونصة", "فضة", "ألماس", "أخرى"}
-                : new String[]{"All", "24K", "22K", "21K", "18K", "14K",
-                        "Bullion", "Ounce", "Silver", "Diamond", "Other"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(), R.layout.item_dialog_list,
-                android.R.id.text1, categories);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "🎯 الفئة" : "🎯 Category")
-                .setAdapter(adapter, (d, which) -> {
-                    applyCategoryFilter(categories[which], which);
-                    d.dismiss();
-                })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (d, w) -> {
-                    if (segmentedModes != null && btnModeFull != null)
-                        segmentedModes.check(R.id.btnModeFull);
-                })
-                .show();
-    }
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    final String[] categories = isArabic
+            ? new String[]{"الكل", "عيار 24", "عيار 22", "عيار 21",
+                    "عيار 18", "عيار 14", "سبائك", "أونصة", "فضة", "ألماس", "أخرى"}
+            : new String[]{"All", "24K", "22K", "21K", "18K", "14K",
+                    "Bullion", "Ounce", "Silver", "Diamond", "Other"};
+
+    final int[] selectedIndex = {0};
+
+    ArrayAdapter<String> adapter = new ArrayAdapter<>(
+            requireContext(), R.layout.item_dialog_list,
+            android.R.id.text1, categories);
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🎯 اختر الفئة للجرد" : "🎯 Select Inventory Category")
+            .setSingleChoiceItems(adapter, 0, (d, which) -> {
+                selectedIndex[0] = which;
+            })
+            .setPositiveButton(isArabic ? "✅ تطبيق" : "✅ Apply", (d, w) -> {
+                d.dismiss();
+                applyCategoryFilter(categories[selectedIndex[0]], selectedIndex[0]);
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (d, w) -> {
+                d.dismiss();
+                if (segmentedModes != null && btnModeFull != null) {
+                    segmentedModes.check(R.id.btnModeFull);
+                }
+            })
+            .show();
+}
 
     private void applyCategoryFilter(String category, int index) {
         if (index == 0) {
