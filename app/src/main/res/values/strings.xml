@@ -2269,4 +2269,13 @@
 <string name="items_label">قطعة</string>
 <string name="total_weight_label">وزن إجمالي</string>
 <string name="gold_24k_per_gram">24K / جرام</string>
+
+<!-- Session Lock -->
+<string name="session_locked_title">🔒 تم قفل الجلسة مؤقتاً</string>
+<string name="session_locked_message">لحماية بياناتك، تم قفل الجلسة تلقائياً بعد فترة من عدم النشاط.\n\nيرجى التحقق من هويتك للمتابعة بأمان.</string>
+<string name="session_locked_info">آخر نشاط: قبل 15 دقيقة</string>
+<string name="unlock_with_biometric">فتح بالبصمة</string>
+<string name="logout">تسجيل الخروج</string>
+<string name="security_icon">أيقونة الأمان</string>
+
 </resources>
