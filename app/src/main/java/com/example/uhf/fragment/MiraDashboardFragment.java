@@ -246,13 +246,20 @@ public class MiraDashboardFragment extends Fragment {
             showShimmer(false);
 
             isViewInitialized = true;
+            
+            // ✅ حركة دخول بسيطة باستخدام ViewPropertyAnimator
+View heroCard = view.findViewById(R.id.heroBalanceCard);
+if (heroCard != null) {
+    heroCard.setAlpha(0f);
+    heroCard.setTranslationY(30f);
+    heroCard.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(400)
+            .start();
+}
 
-            // ✅ تشغيل MotionLayout بعد تحميل الشاشة
-            if (view instanceof MotionLayout) {
-                final MotionLayout motionLayout = (MotionLayout) view;
-                motionLayout.setProgress(0f);
-                motionLayout.post(() -> motionLayout.transitionToEnd());
-            }
+
 
             syncOrgProfileFromServer(false);
             fetchData();
