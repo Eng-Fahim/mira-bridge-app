@@ -755,27 +755,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 6. QUICK ACCESS ==================== -->
-                <TextView
-                    android:id="@+id/quickAccessTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:text="@string/quick_access"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvQuickActions"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    android:nestedScrollingEnabled="false"
-                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-                    app:spanCount="3" />
-
-                <!-- ==================== 7. SALES SUMMARY ==================== -->
+                <!-- ==================== 6. SALES SUMMARY ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/salesSummaryCard"
                     android:layout_width="match_parent"
@@ -921,7 +901,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 8. RECENT ACTIVITY TIMELINE ==================== -->
+                <!-- ==================== 7. RECENT ACTIVITY TIMELINE ==================== -->
                 <LinearLayout
                     android:id="@+id/recentActivityHeader"
                     android:layout_width="match_parent"
