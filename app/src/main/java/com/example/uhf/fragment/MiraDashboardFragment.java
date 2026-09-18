@@ -22,7 +22,7 @@ import androidx.cardview.widget.CardView;
 import androidx.constraintlayout.motion.widget.MotionLayout;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.GridLayoutManager;
+
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -30,13 +30,13 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.ActivityTimelineAdapter;   // ✅ جديد
-import com.example.uhf.adapter.QuickActionsAdapter;
+
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.fragment.MiraAllActivitiesFragment;
-import com.example.uhf.manager.MiraQuickAccessSettings;
+
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
@@ -49,7 +49,6 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -98,8 +97,7 @@ public class MiraDashboardFragment extends Fragment {
     private View shimmerLayout, loadingOverlay;
     private ProgressBar pbGoldLoading;
     private CardView cardGoldPrices;
-    private RecyclerView rvQuickActions;
-    private QuickActionsAdapter quickAdapter;
+    
 
     private View heroBalanceCard, heroSparkline;
     private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
@@ -124,7 +122,7 @@ public class MiraDashboardFragment extends Fragment {
     private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     private MiraBranchesManager.OnBranchChangedListener branchListener;
     private MiraPriceManager priceManager;
-    private MiraQuickAccessSettings quickAccessSettings;
+    
     private PermissionManager permissionManager;
 
     private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(2);
@@ -238,7 +236,7 @@ public class MiraDashboardFragment extends Fragment {
             initViews(view);
             setupProfileListener();
             setupBranchListener();
-            setupQuickAccessGrid();
+            
 
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
@@ -276,7 +274,7 @@ public class MiraDashboardFragment extends Fragment {
             branchesManager = MiraBranchesManager.getInstance(context);
             orgProfile = MiraOrgProfileManager.getInstance(context);
             priceManager = MiraPriceManager.getInstance(context);
-            quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
+            
             permissionManager = PermissionManager.getInstance(context);
             isArabic = Locale.getDefault().getLanguage().equals("ar");
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
@@ -390,14 +388,7 @@ public class MiraDashboardFragment extends Fragment {
                 cardGoldPrices.setVisibility(View.GONE);
             }
 
-            // Quick Access RecyclerView
-            rvQuickActions = v.findViewById(R.id.rvQuickActions);
-            if (rvQuickActions != null) {
-                rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
-                rvQuickActions.setHasFixedSize(true);
-                quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
-                rvQuickActions.setAdapter(quickAdapter);
-            }
+          
 
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
@@ -730,69 +721,6 @@ applySalesVisibility();
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    // Quick Access
-    // ═══════════════════════════════════════════════════════
-    private void setupQuickAccessGrid() {
-        try {
-            if (quickAccessSettings == null || quickAdapter == null) return;
-
-            sharedExecutor.execute(() -> {
-                try {
-                    if (!isAdded()) return;
-
-                    List<MiraQuickAccessSettings.QuickAction> enabledActions =
-                            quickAccessSettings.getEnabledActions();
-                    List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
-
-                    if (enabledActions != null && !enabledActions.isEmpty()) {
-                        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
-                            String tag = getFragmentTagForAction(action.id);
-                            boolean hasPermission = permissionManager == null
-                                    || permissionManager.canAccessFragment(tag);
-                            if (hasPermission) filteredActions.add(action);
-                        }
-                    }
-
-                    if (filteredActions.isEmpty()) {
-                        filteredActions = getDefaultQuickActions();
-                    }
-
-                    final List<MiraQuickAccessSettings.QuickAction> finalList = filteredActions;
-                    mainHandler.post(() -> {
-                        if (isAdded() && quickAdapter != null) {
-                            quickAdapter.submitList(finalList);
-                        }
-                    });
-
-                } catch (Exception e) {
-                    logNonFatal("setupQuickAccessGrid.inner", e);
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("setupQuickAccessGrid", e);
-        }
-    }
-
-    private List<MiraQuickAccessSettings.QuickAction> getDefaultQuickActions() {
-        List<MiraQuickAccessSettings.QuickAction> defaults = new ArrayList<>();
-        MiraQuickAccessSettings settings = MiraQuickAccessSettings.getInstance(requireContext());
-        if (settings == null) return defaults;
-
-        List<MiraQuickAccessSettings.QuickAction> allActions = settings.getAllActions();
-        if (allActions == null || allActions.isEmpty()) return defaults;
-
-        for (MiraQuickAccessSettings.QuickAction action : allActions) {
-            String tag = getFragmentTagForAction(action.id);
-            boolean hasPermission = permissionManager == null
-                    || permissionManager.canAccessFragment(tag);
-            if (hasPermission && defaults.size() < MAX_QUICK_ACTIONS) {
-                defaults.add(action);
-            }
-            if (defaults.size() >= MAX_QUICK_ACTIONS) break;
-        }
-        return defaults;
-    }
 
     // ═══════════════════════════════════════════════════════
     // Live Status (Ping)
@@ -1595,7 +1523,7 @@ public void onResume() {
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
         } else if (isViewInitialized) {
-            setupQuickAccessGrid();
+            
             updateHeader();
             syncOrgProfileFromServer(false);
             refreshInternalData();
