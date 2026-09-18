@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="?attr/colorSurface"
+    android:paddingTop="12dp">
+
+    <!-- مقبض السحب العلوي -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="?attr/colorOutlineVariant" />
+
+    <!-- العنوان -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:text="⚡ الوصول السريع"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- الشبكة -->
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="2"
+        android:paddingHorizontal="12dp"
+        android:useDefaultMargins="false">
+
+        <!-- برمجة RFID -->
+        <include
+            android:id="@+id/cardRfidWrite"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- إدارة الشرائح -->
+        <include
+            android:id="@+id/cardRfidBindings"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- استوديو التكويد -->
+        <include
+            android:id="@+id/cardIdentityStudio"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- رادار التتبع -->
+        <include
+            android:id="@+id/cardRadarLocation"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- مراقبة البوابات -->
+        <include
+            android:id="@+id/cardSecureGate"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- التقارير -->
+        <include
+            android:id="@+id/cardReports"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- المالية -->
+        <include
+            android:id="@+id/cardAccounting"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- التحويلات -->
+        <include
+            android:id="@+id/cardTransfer"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- سجل المبيعات -->
+        <include
+            android:id="@+id/cardSalesHistory"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- الخيارات الإدارية -->
+        <include
+            android:id="@+id/cardAdminHub"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+        <!-- إعدادات السيرفر -->
+        <include
+            android:id="@+id/cardServerConfig"
+            layout="@layout/item_quick_action_card"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1" />
+
+    </GridLayout>
+
+    <!-- زر الإغلاق -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnClose"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="24dp"
+        android:text="إغلاق"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+
+</LinearLayout>
