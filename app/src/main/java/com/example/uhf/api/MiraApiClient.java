@@ -1433,6 +1433,91 @@ public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
         return getWithAuth("/branches/" + branchId + "/inventory/items");
     }
     
+    /**
+ * ✅ جلب قطع الفرع مع Timeout طويل (مخصص للجرد)
+ * - Connect: 20 ثانية
+ * - Read: 60 ثانية (للفروع الكبيرة)
+ * - Logging مفصل للتشخيص
+ */
+public ApiResponse getBranchItemsListWithLongTimeout(int branchId) {
+    HttpURLConnection conn = null;
+    try {
+        String token = getAuthToken();
+        if (token == null || token.isEmpty()) {
+            Log.w(TAG, "No auth token for getBranchItemsList");
+            return new ApiResponse(401, null, "No auth token - please login again");
+        }
+        
+        String fullUrl = apiUrl + "branches/" + branchId + "/inventory/items";
+        Log.d(TAG, "🌐 GET (Long) " + fullUrl);
+        
+        URL url = new URL(fullUrl);
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, true);
+        
+        // ✅ Timeout مخصص للفروع الكبيرة
+        conn.setConnectTimeout(20000);   // 20 ثانية للاتصال
+        conn.setReadTimeout(60000);      // 60 ثانية للقراءة
+        
+        ApiResponse response = buildResponse(conn);
+        Log.d(TAG, "📥 Response code=" + response.code 
+                + ", isSuccess=" + response.isSuccess
+                + ", bodySize=" + (response.getBody() != null ? response.getBody().length() : 0));
+        return response;
+        
+    } catch (java.net.SocketTimeoutException e) {
+        Log.e(TAG, "⏱️ Read timeout — branch has too many items or server is slow");
+        ApiResponse response = new ApiResponse(-1, null, 
+                isArabicText() ? "انتهت المهلة - الفرع يحتوي على بيانات كثيرة" 
+                               : "Timeout - branch has too many items");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.UnknownHostException e) {
+        Log.e(TAG, "🌐 Unknown host: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, 
+                isArabicText() ? "لا يوجد اتصال بالإنترنت" : "No internet connection");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.ConnectException e) {
+        Log.e(TAG, "🔌 Connect failed: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, 
+                isArabicText() ? "الخادم غير متاح" : "Server unreachable");
+        response.isNetworkError = true;
+        return response;
+    } catch (javax.net.ssl.SSLException e) {
+        Log.e(TAG, "🔒 SSL error: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, 
+                isArabicText() ? "خطأ في شهادة الأمان" : "SSL certificate error");
+        response.isNetworkError = true;
+        return response;
+    } catch (Exception e) {
+        Log.e(TAG, "❌ Unexpected error: " + e.getMessage(), e);
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
+
+/**
+ * ✅ مساعد لمعرفة اللغة
+ */
+private boolean isArabicText() {
+    try {
+        return java.util.Locale.getDefault().getLanguage().equals("ar");
+    } catch (Exception e) {
+        return true;
+    }
+}
+    
     public ApiResponse getTransferItems(int transferId) {
         return getWithAuth("/transfers/" + transferId + "/items");
     }
