@@ -35,6 +35,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
+import com.example.uhf.MiraAllActivitiesFragment;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
@@ -1651,4 +1652,4 @@ private void handleRecentActivityClick(JSONObject activity) {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-                }
+            }
