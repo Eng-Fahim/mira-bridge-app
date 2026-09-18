@@ -8,10 +8,7 @@ import android.util.Xml;
 
 import com.example.uhf.AppContext;
 
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -136,8 +133,14 @@ public class FileUtils {
  * - Excel يفتحه مباشرة
  * - حجم صفر تقريباً
  */
+/**
+ * ✅ كتابة ملف CSV (بديل خفيف لـ Excel)
+ * - Excel يفتحه مباشرة
+ * - حجم صفر تقريباً
+ * - يدعم النص العربي (UTF-8 BOM)
+ */
 public static void writeFile(String fileName, List<String> data, boolean append) {
-    Log.e("TEST", "بدء كتابة ملف CSV");
+    Log.e(TAG, "بدء كتابة ملف CSV");
 
     // ✅ تغيير الامتداد إلى .csv
     String csvFileName = fileName;
@@ -149,7 +152,7 @@ public static void writeFile(String fileName, List<String> data, boolean append)
 
     Writer writer = null;
     try {
-        // ✅ فتح الملف (append = true للإضافة، false للكتابة من جديد)
+        // ✅ فتح الملف (append = true للإضافة)
         writer = new java.io.OutputStreamWriter(
                 new java.io.FileOutputStream(csvFileName, append),
                 java.nio.charset.StandardCharsets.UTF_8);
@@ -179,7 +182,7 @@ public static void writeFile(String fileName, List<String> data, boolean append)
         }
 
         writer.flush();
-        Log.e("TEST", "✅ تم كتابة ملف CSV بنجاح: " + csvFileName);
+        Log.e(TAG, "✅ تم كتابة ملف CSV بنجاح: " + csvFileName);
 
     } catch (IOException e) {
         Log.e(TAG, "خطأ في كتابة ملف CSV: " + e.getMessage());
@@ -193,7 +196,7 @@ public static void writeFile(String fileName, List<String> data, boolean append)
 }
 
 /**
- * ✅ تهريب القيم لـ CSV (إذا احتوت على فاصلة أو علامة تنصيص)
+ * ✅ تهريب القيم لـ CSV
  */
 private static String escapeCsv(String value) {
     if (value == null) return "";
