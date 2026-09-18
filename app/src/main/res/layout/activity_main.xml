@@ -6,18 +6,15 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorSurface"
+    android:background="?attr/colorSurface"
     tools:context=".activity.UHFMainActivity">
 
-    <!-- ═══════════════════════════════════════════════════════
-         1. TOOLBAR / APP BAR
-         ✅ تعطيل liftOnScroll لمنع الوميض
-         ═══════════════════════════════════════════════════════ -->
+    <!-- 1. TOOLBAR / APP BAR -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/colorSurface"
+        android:background="?attr/colorSurface"
         android:stateListAnimator="@null"
         app:elevation="0dp"
         app:liftOnScroll="false">
@@ -27,7 +24,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/colorPrimaryContainer"
+            android:background="?attr/colorPrimaryContainer"
             android:paddingHorizontal="8dp"
             app:contentInsetStartWithNavigation="0dp"
             app:menu="@menu/main_menu">
@@ -89,12 +86,11 @@
         </com.google.android.material.appbar.MaterialToolbar>
 
         <!-- الشريط الثانوي -->
-        <!-- ✅ خلفية صريحة من colorSurface + elevation حقيقي -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:background="@color/colorSurface"
+            android:background="?attr/colorSurface"
             android:elevation="3dp"
             android:layoutDirection="locale"
             app:contentInsetEnd="0dp"
@@ -106,14 +102,11 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ═══════════════════════════════════════════════════════
-         2. MAIN CONTENT
-         ✅ تم إزالة layout_behavior لتجنب الوميض
-         ═══════════════════════════════════════════════════════ -->
+    <!-- 2. MAIN CONTENT -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/colorSurface">
+        android:background="?attr/colorSurface">
 
         <FrameLayout
             android:id="@+id/fragment_container"
@@ -146,10 +139,7 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ═══════════════════════════════════════════════════════
-         3+4. FLOATING NAV + FAB
-         ✅ FAB في المنتصف تماماً
-         ═══════════════════════════════════════════════════════ -->
+    <!-- 3+4. FLOATING NAV + FAB -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -181,7 +171,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- ✅ FAB في المنتصف تماماً (Top/Bottom/Start/End على BottomNav) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="64dp"
