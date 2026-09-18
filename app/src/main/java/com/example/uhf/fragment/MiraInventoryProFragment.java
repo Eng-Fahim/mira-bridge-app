@@ -1890,6 +1890,17 @@ private void deleteReport(InventoryReport report) {
         Toast.makeText(requireContext(),
                 (isArabic ? "🔄 تحميل " : "🔄 Loading ") + category,
                 Toast.LENGTH_SHORT).show();
+                // ✅ فحص تشخيصي
+String currentApiKey = sessionManager != null ? sessionManager.getApiKey() : "NULL";
+String currentGateId = sessionManager != null ? sessionManager.getGateId() : "NULL";
+String currentToken = sessionManager != null ? sessionManager.getAuthToken() : "NULL";
+
+Toast.makeText(requireContext(),
+        "🔑 Key: " + (currentApiKey.length() > 20 ? currentApiKey.substring(0, 20) + "..." : currentApiKey) +
+        "\n🚪 Gate: " + currentGateId +
+        "\n🎫 Token: " + (currentToken.length() > 20 ? currentToken.substring(0, 20) + "..." : currentToken) +
+        "\n📍 Branch: " + branchesManager.getActiveBranchId(),
+        Toast.LENGTH_LONG).show();
 
         catalogManager.fetchCatalog(apiClient, branchesManager,
                 new InventoryCatalogManager.CatalogCallback() {
