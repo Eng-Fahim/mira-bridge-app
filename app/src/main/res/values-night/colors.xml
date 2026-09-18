@@ -192,5 +192,17 @@
     <color name="text_primary">#FFFFFFFF</color>
     <color name="text_light">#FFFFFFFF</color>
     <color name="text_muted">#FFD7CCC8</color>
+    
+    
+     <!-- Activity Status Colors - Dark Theme -->
+    <color name="activity_success">#4ADE80</color>
+    <color name="activity_success_bg">#14532D</color>
+    <color name="activity_danger">#F87171</color>
+    <color name="activity_danger_bg">#7F1D1D</color>
+    <color name="activity_warning">#FBBF24</color>
+    <color name="activity_warning_bg">#78350F</color>
+    <color name="activity_neutral">#9CA3AF</color>
+    <color name="activity_neutral_bg">#374151</color>
+
 
 </resources>
