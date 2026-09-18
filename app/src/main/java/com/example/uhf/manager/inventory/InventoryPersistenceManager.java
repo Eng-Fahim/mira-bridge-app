@@ -521,7 +521,7 @@ public void deleteReport(MiraApiClient apiClient,
                           String sessionId,
                           DeleteCallback callback) {
     if (executor == null || executor.isShutdown() || apiClient == null) {
-        if (callback != null) callback.onError("Prerequisites not met");
+        if (callback != null) callback.onDeleteError("Prerequisites not met");
         return;
     }
 
@@ -529,7 +529,7 @@ public void deleteReport(MiraApiClient apiClient,
         try {
             int numericId = extractNumericId(sessionId);
             if (numericId <= 0) {
-                if (callback != null) callback.onError(
+                if (callback != null) callback.onDeleteError(
                     isArabic ? "معرف الجلسة غير صالح" : "Invalid session ID");
                 return;
             }
@@ -541,12 +541,12 @@ public void deleteReport(MiraApiClient apiClient,
                 if (callback != null) callback.onDeleteSuccess();
             } else {
                 String error = response != null ? response.error : "Unknown error";
-                if (callback != null) callback.onError(error);
+                if (callback != null) callback.onDeleteError(error);
             }
 
         } catch (Exception e) {
             Log.e(TAG, "deleteReport error: " + e.getMessage());
-            if (callback != null) callback.onError(e.getMessage());
+            if (callback != null) callback.onDeleteError(e.getMessage());
         }
     });
 }
