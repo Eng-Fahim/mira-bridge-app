@@ -40,7 +40,7 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.RecentActivityCache;
-
+import com.example.uhf.dialog.ActivityDetailsBottomSheet;
 import org.json.JSONArray;                                 // ✅ جديد
 import org.json.JSONObject;
 
@@ -345,8 +345,8 @@ public class MiraDashboardFragment extends Fragment {
             }
 
             if (tvViewAllActivity != null) {
-                tvViewAllActivity.setOnClickListener(v2 ->
-                        navigateToFragment(new MiraInventoryProFragment(), "Scan"));
+            tvViewAllActivity.setOnClickListener(v2 ->
+            navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
             }
 
             // ═══════════════════════════════════════
@@ -1302,33 +1302,18 @@ private void updateRecentActivityUI(JSONArray activities) {
 }
 
     /**
-     * ✅ عند النقر على عملية → فتح الشاشة المناسبة
-     */
-    private void handleRecentActivityClick(JSONObject activity) {
-        if (activity == null) return;
-        try {
-            String type = activity.optString("type", "");
-
-            switch (type) {
-                case "sale":
-                    navigateToFragment(new MiraSalesHistoryFragment(), "SalesHistory");
-                    break;
-                case "inventory":
-                    navigateToFragment(new MiraInventoryProFragment(), "Scan");
-                    break;
-                case "transfer":
-                    navigateToFragment(new MiraTransferFragment(), "Transfers");
-                    break;
-                case "rfid":
-                    navigateToFragment(new MiraRfidBindingsFragment(), "RfidBindings");
-                    break;
-                default:
-                    break;
-            }
-        } catch (Exception e) {
-            logNonFatal("handleRecentActivityClick", e);
-        }
+ * ✅ عند النقر على عملية → فتح Bottom Sheet التفاصيل
+ */
+private void handleRecentActivityClick(JSONObject activity) {
+    if (activity == null || !isAdded()) return;
+    try {
+        ActivityDetailsBottomSheet sheet =
+                ActivityDetailsBottomSheet.newInstance(activity, isArabic);
+        sheet.show(getParentFragmentManager(), "ActivityDetails");
+    } catch (Exception e) {
+        logNonFatal("handleRecentActivityClick", e);
     }
+}
 
     // ═══════════════════════════════════════════════════════
     // Broadcast Receiver Registration
@@ -1666,4 +1651,4 @@ private void updateRecentActivityUI(JSONArray activities) {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-    }
+                }
