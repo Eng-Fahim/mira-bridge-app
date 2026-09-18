@@ -1278,11 +1278,18 @@ private void finalizeItemIdentity() {
                             "❌ EPC write failed — tag has old code");
                     }
 
-                    showEncodingSuccessDialogEnhanced(
-                            finalTitle, displayEpc, tid, gs1Code, qrUrl,
-                            String.valueOf(fGrossWeight), selectedKarat,
-                            finalPriceLocal, localCurrency, finalPhotoPaths
-                    );
+                    // ✅ تمرير البيانات الإضافية للأحجار
+showEncodingSuccessDialogEnhanced(
+        finalTitle, displayEpc, tid, gs1Code, qrUrl,
+        String.valueOf(fGrossWeight), selectedKarat,
+        finalPriceLocal, localCurrency, finalPhotoPaths,
+        // البيانات الجديدة:
+        fStoneType,                    // نوع الحجر
+        fStoneWeightCarats,            // وزن الحجر بالقيراط
+        fStoneCount,                   // عدد الأحجار
+        fStoneValue,                   // قيمة الأحجار
+        netGoldWeight                  // الوزن الصافي (اختياري)
+);
                 });
 
             } catch (Exception e) {
@@ -1627,11 +1634,14 @@ private void openRfidSettings() {
     }
 
     // ==================== حوار النجاح ====================
-
+    
     private void showEncodingSuccessDialogEnhanced(
-        String title, String epc, String tid, String gs1Code, String qrUrl,
-        String weight, String karat, double finalPrice, String currency, 
-        List<String> photos) {
+    String title, String epc, String tid, String gs1Code, String qrUrl,
+    String weight, String karat, double finalPrice, String currency, 
+    List<String> photos,
+    // المتغيرات الجديدة:
+    String stoneType, double stoneWeightCarats, int stoneCount, double stoneValue,
+    double netWeight) {
 
         if (!isAdded() || getContext() == null) return;
 
@@ -1654,11 +1664,39 @@ private void openRfidSettings() {
 
         if (tvIdTitle != null) tvIdTitle.setText(title);
         if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
-        if (tvIdMetalKarat != null) tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
-        if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
-        if (tvIdPrice != null && priceManager != null) {
-            tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice) + " " + currency);
+        // تعيين العيار والوزن
+if (tvIdMetalKarat != null) tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
+if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
+
+// ✅ تعيين السعر (تأكد أن هذا السعر هو finalPriceLocal وليس USD)
+if (tvIdPrice != null && priceManager != null) {
+    // إذا كانت formatPriceDefault ترجع "YER 805..." فقط استخدمها مباشرة
+    tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice)); 
+}
+
+// ✅ [جديد] تعيين بيانات الأحجار والتطعيم
+// افترض أن لديك TextView باسم tvIdStonesInfo في ملف XML
+TextView tvIdStonesInfo = view.findViewById(R.id.tvIdStonesInfo); 
+if (tvIdStonesInfo != null) {
+    if (stoneWeightCarats > 0 || stoneValue > 0 || stoneCount > 0) {
+        String stonesText = "";
+        if (isArabic) {
+            stonesText = "الأحجار: " + (stoneType.isEmpty() ? "غير محدد" : stoneType);
+            if (stoneWeightCarats > 0) stonesText += " | وزن: " + stoneWeightCarats + " قيراط";
+            if (stoneCount > 0) stonesText += " | عدد: " + stoneCount + " حجر";
+            if (stoneValue > 0) stonesText += " | قيمة: " + priceManager.formatPriceDefault(stoneValue) + " " + currency;
+        } else {
+            stonesText = "Stones: " + (stoneType.isEmpty() ? "N/A" : stoneType);
+            if (stoneWeightCarats > 0) stonesText += " | Wt: " + stoneWeightCarats + " ct";
+            if (stoneCount > 0) stonesText += " | Pcs: " + stoneCount;
+            if (stoneValue > 0) stonesText += " | Val: " + priceManager.formatPriceDefault(stoneValue) + " " + currency;
         }
+        tvIdStonesInfo.setText(stonesText);
+        tvIdStonesInfo.setVisibility(View.VISIBLE);
+    } else {
+        tvIdStonesInfo.setVisibility(View.GONE);
+    }
+}
 
         miraExecutor.getImageExecutor().execute(() -> {
             Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty()) ? 
