@@ -1,6 +1,6 @@
 package com.example.uhf.adapter;
 
-import android.graphics.Color;
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -8,6 +8,7 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
@@ -22,9 +23,13 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * ✅ Adapter لعرض جميع العمليات
+ * ✅ Adapter لعرض Timeline آخر العمليات
+ * 
+ * ✅ v2.0:
+ *  - احترام كامل للثيمات (فاتح/داكن)
+ *  - استخدام ContextCompat.getColor
  */
-public class AllActivitiesAdapter extends RecyclerView.Adapter<AllActivitiesAdapter.ViewHolder> {
+public class ActivityTimelineAdapter extends RecyclerView.Adapter<ActivityTimelineAdapter.ViewHolder> {
 
     private final List<JSONObject> items = new ArrayList<>();
     private final boolean isArabic;
@@ -34,7 +39,7 @@ public class AllActivitiesAdapter extends RecyclerView.Adapter<AllActivitiesAdap
         void onActivityClick(JSONObject activity);
     }
 
-    public AllActivitiesAdapter(boolean isArabic, OnActivityClickListener listener) {
+    public ActivityTimelineAdapter(boolean isArabic, OnActivityClickListener listener) {
         this.isArabic = isArabic;
         this.clickListener = listener;
     }
@@ -45,22 +50,11 @@ public class AllActivitiesAdapter extends RecyclerView.Adapter<AllActivitiesAdap
         notifyDataSetChanged();
     }
 
-    public void appendList(List<JSONObject> newList) {
-        if (newList == null || newList.isEmpty()) return;
-        int start = items.size();
-        items.addAll(newList);
-        notifyItemRangeInserted(start, newList.size());
-    }
-
-    public int getItemCount() {
-        return items.size();
-    }
-
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_all_activity, parent, false);
+                .inflate(R.layout.item_activity_timeline, parent, false);
         return new ViewHolder(v);
     }
 
@@ -70,77 +64,93 @@ public class AllActivitiesAdapter extends RecyclerView.Adapter<AllActivitiesAdap
         if (item == null) return;
 
         try {
-            String type = item.optString("type", "");
+            Context ctx = holder.itemView.getContext();
+
+            String type = item.optString("type", "system");
             String icon = item.optString("icon", "⚙️");
             String status = item.optString("status", "neutral");
-            String title = isArabic ? item.optString("title_ar", "") 
-                                    : item.optString("title_en", "");
-            String details = isArabic ? item.optString("details_ar", "") 
-                                      : item.optString("details_en", "");
+            String titleAr = item.optString("title_ar", "");
+            String titleEn = item.optString("title_en", "");
+            String detailsAr = item.optString("details_ar", "");
+            String detailsEn = item.optString("details_en", "");
             String user = item.optString("user", "—");
             String timestamp = item.optString("timestamp", "");
             double amount = item.optDouble("amount", 0);
             String currency = item.optString("currency", "USD");
             double accuracy = item.optDouble("accuracy", -1);
 
-            // ✅ النصوص
-            holder.tvIconAll.setText(icon);
-            holder.tvTitleAll.setText(title);
-            holder.tvDetailsAll.setText(details);
-            holder.tvUserAll.setText("👤 " + user);
-            holder.tvTimeAll.setText(formatFullTime(timestamp));
+            String title = isArabic ? titleAr : titleEn;
+            if (title.isEmpty()) title = titleAr.isEmpty() ? titleEn : titleAr;
 
-            // ✅ القيمة (المبلغ أو الدقة)
+            String details = isArabic ? detailsAr : detailsEn;
+            if (details.isEmpty()) details = detailsAr.isEmpty() ? detailsEn : detailsAr;
+
+            String time = extractTime(timestamp);
+
+            // ✅ البيانات
+            holder.tvActivityIcon.setText(icon);
+            holder.tvActivityTitle.setText(title);
+            holder.tvActivityDetails.setText(details);
+            holder.tvActivityUser.setText("👤 " + user);
+            holder.tvActivityTime.setText(time);
+
+            // ✅ المبلغ / الدقة
             if (amount > 0) {
-                holder.tvValueAll.setText(formatAmount(amount, currency));
-                holder.tvValueAll.setVisibility(View.VISIBLE);
+                holder.tvActivityAmount.setVisibility(View.VISIBLE);
+                holder.tvActivityAmount.setText(formatAmount(amount, currency));
             } else if (accuracy >= 0) {
-                holder.tvValueAll.setText(String.format(Locale.US, "🎯 %.1f%%", accuracy));
-                holder.tvValueAll.setVisibility(View.VISIBLE);
+                holder.tvActivityAmount.setVisibility(View.VISIBLE);
+                holder.tvActivityAmount.setText(String.format(Locale.US, "🎯 %.1f%%", accuracy));
             } else {
-                holder.tvValueAll.setVisibility(View.GONE);
+                holder.tvActivityAmount.setVisibility(View.GONE);
             }
 
-            // ✅ الألوان
+            // ═══════════════════════════════════════════════════════
+            // ✅ الألوان (تحترم الثيم)
+            // ═══════════════════════════════════════════════════════
             int color;
             int bgColor;
 
             switch (status) {
                 case "success":
-                    color = Color.parseColor("#16A34A");
-                    bgColor = Color.parseColor("#DCFCE7");
+                    color = ContextCompat.getColor(ctx, R.color.activity_success);
+                    bgColor = ContextCompat.getColor(ctx, R.color.activity_success_bg);
                     break;
                 case "warning":
-                    color = Color.parseColor("#F59E0B");
-                    bgColor = Color.parseColor("#FEF3C7");
+                    color = ContextCompat.getColor(ctx, R.color.activity_warning);
+                    bgColor = ContextCompat.getColor(ctx, R.color.activity_warning_bg);
                     break;
                 case "danger":
-                    color = Color.parseColor("#DC2626");
-                    bgColor = Color.parseColor("#FEE2E2");
+                    color = ContextCompat.getColor(ctx, R.color.activity_danger);
+                    bgColor = ContextCompat.getColor(ctx, R.color.activity_danger_bg);
                     break;
                 default:
-                    color = Color.parseColor("#6B7280");
-                    bgColor = Color.parseColor("#F3F4F6");
+                    color = ContextCompat.getColor(ctx, R.color.activity_neutral);
+                    bgColor = ContextCompat.getColor(ctx, R.color.activity_neutral_bg);
                     break;
             }
 
-            holder.tvValueAll.setTextColor(color);
-            holder.tvIconAll.setTextColor(color);
-            if (holder.iconContainerAll != null) {
-                holder.iconContainerAll.getBackground().setTint(bgColor);
+            holder.tvActivityAmount.setTextColor(color);
+            holder.tvActivityIcon.setTextColor(color);
+
+            if (holder.iconContainer != null) {
+                holder.iconContainer.setBackgroundResource(R.drawable.bg_activity_icon);
+                holder.iconContainer.getBackground().setTint(bgColor);
             }
 
             // ✅ Chip الحالة
-            if ("danger".equals(status)) {
-                holder.tvStatusAll.setVisibility(View.VISIBLE);
-                holder.tvStatusAll.setText(isArabic ? "⚠️ حرج" : "⚠️ Critical");
-                holder.tvStatusAll.setTextColor(color);
-            } else if ("warning".equals(status)) {
-                holder.tvStatusAll.setVisibility(View.VISIBLE);
-                holder.tvStatusAll.setText(isArabic ? "⚠️ تحذير" : "⚠️ Warning");
-                holder.tvStatusAll.setTextColor(color);
-            } else {
-                holder.tvStatusAll.setVisibility(View.GONE);
+            if (holder.tvActivityStatusChip != null) {
+                if ("danger".equals(status) || "warning".equals(status)) {
+                    holder.tvActivityStatusChip.setVisibility(View.VISIBLE);
+                    if ("danger".equals(status)) {
+                        holder.tvActivityStatusChip.setText(isArabic ? "⚠️ حرج" : "⚠️ Critical");
+                    } else {
+                        holder.tvActivityStatusChip.setText(isArabic ? "⚠️ تحذير" : "⚠️ Warning");
+                    }
+                    holder.tvActivityStatusChip.setTextColor(color);
+                } else {
+                    holder.tvActivityStatusChip.setVisibility(View.GONE);
+                }
             }
 
             // ✅ onClick
@@ -153,51 +163,51 @@ public class AllActivitiesAdapter extends RecyclerView.Adapter<AllActivitiesAdap
         }
     }
 
-    /**
-     * ✅ تنسيق التاريخ الكامل
-     */
-    private String formatFullTime(String timestamp) {
-        if (timestamp == null || timestamp.isEmpty()) return "—";
+    private String extractTime(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) return "";
         try {
-            SimpleDateFormat input = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
-            SimpleDateFormat output = new SimpleDateFormat(
-                    isArabic ? "d MMM yyyy • HH:mm" : "MMM d, yyyy • HH:mm",
-                    isArabic ? new Locale("ar") : Locale.US);
-            Date date = input.parse(timestamp);
-            return output.format(date);
-        } catch (Exception e) {
-            return timestamp;
-        }
+            String[] parts = dateStr.split(" ");
+            if (parts.length >= 2) {
+                String[] timeParts = parts[1].split(":");
+                if (timeParts.length >= 2) {
+                    return timeParts[0] + ":" + timeParts[1];
+                }
+            }
+        } catch (Exception ignored) {}
+        return dateStr;
     }
 
-    /**
-     * ✅ تنسيق المبلغ
-     */
     private String formatAmount(double amount, String currency) {
         try {
             NumberFormat fmt = NumberFormat.getNumberInstance(Locale.US);
             fmt.setMaximumFractionDigits(2);
+            fmt.setMinimumFractionDigits(0);
             return fmt.format(amount) + " " + currency;
         } catch (Exception e) {
             return String.format(Locale.US, "%.2f %s", amount, currency);
         }
     }
 
+    @Override
+    public int getItemCount() {
+        return items.size();
+    }
+
     static class ViewHolder extends RecyclerView.ViewHolder {
-        final FrameLayout iconContainerAll;
-        final TextView tvIconAll, tvTitleAll, tvValueAll, tvDetailsAll,
-                tvUserAll, tvTimeAll, tvStatusAll;
+        final FrameLayout iconContainer;
+        final TextView tvActivityIcon, tvActivityTitle, tvActivityDetails,
+                tvActivityUser, tvActivityTime, tvActivityAmount, tvActivityStatusChip;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
-            iconContainerAll = itemView.findViewById(R.id.iconContainerAll);
-            tvIconAll = itemView.findViewById(R.id.tvIconAll);
-            tvTitleAll = itemView.findViewById(R.id.tvTitleAll);
-            tvValueAll = itemView.findViewById(R.id.tvValueAll);
-            tvDetailsAll = itemView.findViewById(R.id.tvDetailsAll);
-            tvUserAll = itemView.findViewById(R.id.tvUserAll);
-            tvTimeAll = itemView.findViewById(R.id.tvTimeAll);
-            tvStatusAll = itemView.findViewById(R.id.tvStatusAll);
+            iconContainer = itemView.findViewById(R.id.iconContainer);
+            tvActivityIcon = itemView.findViewById(R.id.tvActivityIcon);
+            tvActivityTitle = itemView.findViewById(R.id.tvActivityTitle);
+            tvActivityDetails = itemView.findViewById(R.id.tvActivityDetails);
+            tvActivityUser = itemView.findViewById(R.id.tvActivityUser);
+            tvActivityTime = itemView.findViewById(R.id.tvActivityTime);
+            tvActivityAmount = itemView.findViewById(R.id.tvActivityAmount);
+            tvActivityStatusChip = itemView.findViewById(R.id.tvActivityStatusChip);
         }
     }
 }
