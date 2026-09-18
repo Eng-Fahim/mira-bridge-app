@@ -412,7 +412,144 @@ public class InventoryPersistenceManager {
             }
         });
     }
+// ==================== 5.b. Fetch Report Details (جديد) ====================
 
+public interface ReportDetailsCallback {
+    void onDetailsLoaded(List<ScannedItemDisplay> items);
+    void onError(String error);
+}
+
+/**
+ * ✅ جلب تفاصيل تقرير (قائمة العناصر) من السيرفر
+ */
+public void fetchReportDetails(MiraApiClient apiClient,
+                                String sessionId,
+                                ReportDetailsCallback callback) {
+    if (executor == null || executor.isShutdown() || apiClient == null) {
+        if (callback != null) callback.onError("Prerequisites not met");
+        return;
+    }
+
+    executor.execute(() -> {
+        try {
+            List<ScannedItemDisplay> items = new ArrayList<>();
+
+            // ✅ نحتاج رقم الجلسة (id) — نستخرجها من sessionId إذا كانت رقم
+            int numericId = extractNumericId(sessionId);
+            if (numericId <= 0) {
+                if (callback != null) callback.onError(
+                    isArabic ? "معرف الجلسة غير صالح" : "Invalid session ID");
+                return;
+            }
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.getInventorySessionItems(numericId);
+
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray itemsArray = response.data.optJSONArray("items");
+                if (itemsArray == null) {
+                    JSONObject dataObj = response.data.optJSONObject("data");
+                    if (dataObj != null) {
+                        itemsArray = dataObj.optJSONArray("items");
+                    }
+                }
+
+                if (itemsArray != null) {
+                    for (int i = 0; i < itemsArray.length(); i++) {
+                        try {
+                            JSONObject obj = itemsArray.getJSONObject(i);
+                            ScannedItemDisplay display = new ScannedItemDisplay(
+                                obj.optString("epc", obj.optString("code", "")),
+                                obj.optString("title", 
+                                    isArabic ? "قطعة مجوهرات" : "Jewelry Item"),
+                                obj.optString("karat", "—"),
+                                1,
+                                obj.optInt("rssi", -50),
+                                obj.optString("time", "")
+                            );
+                            display.weight = obj.optDouble("weight", 0);
+                            display.price = obj.optDouble("price", 0);
+                            items.add(display);
+                        } catch (Exception e) {
+                            Log.e(TAG, "parse item error: " + e.getMessage());
+                        }
+                    }
+                }
+            }
+
+            if (callback != null) callback.onDetailsLoaded(items);
+
+        } catch (Exception e) {
+            Log.e(TAG, "fetchReportDetails error: " + e.getMessage());
+            if (callback != null) callback.onError(e.getMessage());
+        }
+    });
+}
+
+/**
+ * ✅ استخراج رقم الجلسة من sessionId
+ * مثال: "SESS-2" → 2
+ */
+private int extractNumericId(String sessionId) {
+    if (sessionId == null || sessionId.isEmpty()) return -1;
+    try {
+        // استخرج الأرقام فقط
+        StringBuilder digits = new StringBuilder();
+        for (char c : sessionId.toCharArray()) {
+            if (Character.isDigit(c)) digits.append(c);
+        }
+        if (digits.length() > 0) {
+            return Integer.parseInt(digits.toString());
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "extractNumericId error: " + e.getMessage());
+    }
+    return -1;
+}
+
+// ==================== 5.c. Delete Report (جديد) ====================
+
+public interface DeleteCallback {
+    void onDeleteSuccess();
+    void onDeleteError(String error);
+}
+
+/**
+ * ✅ حذف تقرير من الأرشيف
+ */
+public void deleteReport(MiraApiClient apiClient,
+                          String sessionId,
+                          DeleteCallback callback) {
+    if (executor == null || executor.isShutdown() || apiClient == null) {
+        if (callback != null) callback.onError("Prerequisites not met");
+        return;
+    }
+
+    executor.execute(() -> {
+        try {
+            int numericId = extractNumericId(sessionId);
+            if (numericId <= 0) {
+                if (callback != null) callback.onError(
+                    isArabic ? "معرف الجلسة غير صالح" : "Invalid session ID");
+                return;
+            }
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.deleteInventorySession(numericId);
+
+            if (response != null && response.isSuccess) {
+                if (callback != null) callback.onDeleteSuccess();
+            } else {
+                String error = response != null ? response.error : "Unknown error";
+                if (callback != null) callback.onError(error);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "deleteReport error: " + e.getMessage());
+            if (callback != null) callback.onError(e.getMessage());
+        }
+    });
+}
     // ==================== 6. Utilities ====================
 
     public String getDeviceId() {
