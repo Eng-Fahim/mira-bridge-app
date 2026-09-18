@@ -96,6 +96,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private View heroBalanceCard, heroSparkline;
     private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
+    private TextView tvHeroItems, tvHeroWeight, tvHeroGoldPrice;  // ✅ جديد
     private View alertsStrip;
     private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
     private View liveStatusDot;
@@ -301,6 +302,9 @@ public class MiraDashboardFragment extends Fragment {
             tvHeroBalance = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend = v.findViewById(R.id.tvHeroTrend);
             tvHeroSubtitle = v.findViewById(R.id.tvHeroSubtitle);
+            tvHeroItems = v.findViewById(R.id.tvHeroItems);       // ✅ جديد
+            tvHeroWeight = v.findViewById(R.id.tvHeroWeight);     // ✅ جديد
+            tvHeroGoldPrice = v.findViewById(R.id.tvHeroGoldPrice); // ✅ جديد
 
             alertsStrip = v.findViewById(R.id.alertsStrip);
             tvAlertIcon = v.findViewById(R.id.tvAlertIcon);
@@ -403,43 +407,69 @@ public class MiraDashboardFragment extends Fragment {
     // Hero Balance
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * ✅ الدالة الموحّدة لتحديث قيمة المخزون
-     * - تحسب القيمة من inventory_value أو من الوزن × سعر الذهب
-     * - تحترم حالة isHeroHidden
-     */
-    private void updateHeroBalance() {
-        try {
-            if (tvHeroBalance == null) return;
+ /**
+ * ✅ الدالة الموحّدة لتحديث قيمة المخزون
+ * - تحسب القيمة من inventory_value أو من الوزن × سعر الذهب
+ * - تحترم حالة isHeroHidden
+ * - ✅ محدّثة لعرض 3 إحصائيات إضافية (عدد، وزن، سعر الذهب)
+ */
+private void updateHeroBalance() {
+    try {
+        if (tvHeroBalance == null) return;
 
-            double totalValue = currentInventoryValue;
-            int itemCount = currentItemCount;
-            double totalWeight = currentTotalWeight;
+        double totalValue = currentInventoryValue;
+        int itemCount = currentItemCount;
+        double totalWeight = currentTotalWeight;
 
-            // حساب من سعر الذهب إذا القيمة صفر
-            if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
-                double price24 = priceManager.getGoldPricePerGram(24);
-                if (price24 > 0) {
-                    totalValue = totalWeight * price24;
-                }
+        // حساب من سعر الذهب إذا القيمة صفر
+        if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+            double price24 = priceManager.getGoldPricePerGram(24);
+            if (price24 > 0) {
+                totalValue = totalWeight * price24;
             }
-
-            // ✅ عرض القيمة — مع الإخفاء
-            if (isHeroHidden) {
-                tvHeroBalance.setText("••••••••");
-            } else {
-                tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
-            }
-
-            // Subtitle يظهر دائماً
-            if (tvHeroSubtitle != null) {
-                tvHeroSubtitle.setText(String.format(
-                        "👑 %d قطعة • %.1fg", itemCount, totalWeight));
-            }
-        } catch (Exception e) {
-            logNonFatal("updateHeroBalance", e);
         }
+
+        // ✅ عرض القيمة — مع الإخفاء
+        if (isHeroHidden) {
+            tvHeroBalance.setText("••••••••");
+        } else {
+            tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+        }
+
+        // Subtitle يظهر دائماً
+        if (tvHeroSubtitle != null) {
+            tvHeroSubtitle.setText(String.format(
+                    "👑 %d قطعة • %.1fg", itemCount, totalWeight));
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // ✅ الإحصائيات الثلاث الجديدة (أسفل القيمة)
+        // ═══════════════════════════════════════════════════════
+
+        // 1. عدد القطع
+        if (tvHeroItems != null) {
+            tvHeroItems.setText(String.valueOf(itemCount));
+        }
+
+        // 2. الوزن الإجمالي
+        if (tvHeroWeight != null) {
+            tvHeroWeight.setText(String.format(Locale.US, "%.1fg", totalWeight));
+        }
+
+        // 3. سعر الذهب 24K
+        if (tvHeroGoldPrice != null && priceManager != null) {
+            double price24 = priceManager.getGoldPricePerGram(24);
+            if (price24 > 0) {
+                tvHeroGoldPrice.setText(String.format(Locale.US, "$%,.2f", price24));
+            } else {
+                tvHeroGoldPrice.setText("—");
+            }
+        }
+
+    } catch (Exception e) {
+        logNonFatal("updateHeroBalance", e);
     }
+}
 
     /**
      * ✅ إخفاء/إظهار قيمة المخزون
@@ -1522,4 +1552,4 @@ private void calculateTrend(double currentPrice) {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-}
+    }
