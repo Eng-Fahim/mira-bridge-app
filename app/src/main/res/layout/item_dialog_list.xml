@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+<CheckedTextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/text1"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -12,4 +12,7 @@
     android:paddingHorizontal="20dp"
     android:paddingVertical="14dp"
     android:textColor="?attr/colorOnSurface"
-    android:textSize="14sp" />
+    android:textSize="14sp"
+    android:checkMark="?android:attr/listChoiceIndicatorSingle"
+    android:checkMarkTint="?attr/colorPrimary"
+    android:drawablePadding="12dp" />
