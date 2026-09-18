@@ -6,6 +6,9 @@
          ═══════════════════════════════════════════════════════ -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
 
+        <!-- داخل Base.Theme.Uhfuartdemo -->
+<item name="colorSurfaceContainer">#1A1816</item>
+<item name="colorSurfaceContainerHigh">#221F1C</item>
         <!-- 🔗 ربط مكونات Material 3 -->
         <item name="bottomNavigationStyle">@style/AppBottomNavigationViewStyle</item>
         <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
