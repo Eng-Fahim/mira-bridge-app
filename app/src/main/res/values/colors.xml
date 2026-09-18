@@ -4,9 +4,9 @@
     <color name="fab_icon_color">#FFFFFFFF</color>
     <color name="progress_indicator_color">#FF6200EE</color>
     
-    <!-- 🎨 ألوان الهوية الرئيسية (تم تغميق الذهبي لزيادة التباين على الأبيض) -->
-    <color name="brand_primary">#B8860B</color>
-    <color name="brand_primary_dark">#8B6508</color>
+    <!-- 🎨 ألوان الهوية الرئيسية (الذهبي الملكي المطور لزيادة التباين) -->
+    <color name="brand_primary">#C59B27</color>
+    <color name="brand_primary_dark">#9A771C</color>
     
     <!-- ألوان الحالة المتصلة والمنفصلة -->
     <color name="status_online_green">#10B981</color>
@@ -14,8 +14,8 @@
     
     <!-- 📍 خلفية القائمة السفلية والأيقونات (معدلة للوضوح) -->
     <color name="nav_bar_background">#FFFFFF</color>
-    <color name="nav_item_selected">#B8860B</color>
-    <color name="nav_item_unselected">#64748B</color> <!-- تم تغميق الأيقونة غير النشطة -->
+    <color name="nav_item_selected">#C59B27</color>
+    <color name="nav_item_unselected">#64748B</color>
     
     <!-- النافذة المنبثقة للإجراءات السريعة (Dark Sheet) -->
     <color name="action_sheet_bg">#1E222B</color>
@@ -39,7 +39,7 @@
     <color name="red3">#22FF0000</color>
     <color name="red4">#88FF0000</color>
     <color name="red5">#aaFF0000</color>
-    <color name="gold">#D4AF37</color> <!-- تم ضبط درجة الذهبي القياسية -->
+    <color name="gold">#C59B27</color>
     <color name="yellow">#FFFF00</color>
     <color name="green">#008000</color>
     <color name="green1">#22008000</color>
@@ -57,7 +57,7 @@
     <color name="pink">#FFC0CB</color>
     <color name="orange">#FFA500</color>
     <color name="lemonyellow">#FFFACD</color>
-    <color name="graywhite">#F5F5F5</color>
+    <color name="graywhite">#F8FAFC</color>
     <color name="grayslate">#708090</color>
     <color name="full_transparent">#00000000</color>
     <color name="half_transparent">#aa000000</color>
@@ -105,7 +105,7 @@
     <color name="viewfinder_frame">#ff000000</color>
     <color name="viewfinder_laser">#ffff0000</color>
     <color name="viewfinder_mask">#60000000</color>
-    <color name="primary">#B8860B</color>
+    <color name="primary">#C59B27</color>
     <color name="on_surface_variant">#475569</color>
     <color name="outline">#CBD5E1</color>
     <!--zxing end-->
@@ -130,24 +130,24 @@
         <item>#888888</item>
     </string-array>
 
-    <!-- ========== ألوان الداشبورد - الوضع الفاتح معزز التباين ========== -->
+    <!-- ========== ألوان الداشبورد - الوضع الفاتح العصري (High Contrast) ========== -->
 
-    <!-- ألوان النصوص الرئيسية -->
+    <!-- ألوان النصوص الرئيسية (كحلي عميق) -->
     <color name="primary_text">#0F172A</color>
     <color name="primary_text_variant">#1E293B</color>
 
-    <!-- 🔍 ألوان النصوص الثانوية (تم تغميقها لمنع البُهتان) -->
+    <!-- 🔍 ألوان النصوص الثانوية -->
     <color name="text_secondary">#475569</color>
     <color name="text_secondary_variant">#64748B</color>
 
-    <!-- ألوان الخلفيات -->
-    <color name="background_dark">#F8F9FA</color>
+    <!-- ألوان الخلفيات والنقاء -->
+    <color name="background_dark">#F8FAFC</color>
     <color name="background_card">#FFFFFFFF</color>
     <color name="background_card_variant">#F1F5F9</color>
 
     <!-- ألوان التمييز والتأثيرات -->
-    <color name="accent_color">#B8860B</color>
-    <color name="accent_color_variant">#8B6508</color>
+    <color name="accent_color">#C59B27</color>
+    <color name="accent_color_variant">#9A771C</color>
 
     <!-- ألوان Shimmer Loading للوضع الفاتح -->
     <color name="shimmer_color">#FFE2E8F0</color>
@@ -158,7 +158,7 @@
     <color name="card_stroke">#E2E8F0</color>
 
     <!-- ألوان الحالات -->
-    <color name="status_online">#16A34A</color>
+    <color name="status_online">#10B981</color>
     <color name="status_offline">#DC2626</color>
     <color name="status_updating">#D97706</color>
 
@@ -167,15 +167,15 @@
     <color name="karat_text_empty">#64748B</color>
 
     <!-- ألوان إضافية للثيم -->
-    <color name="colorBackground">#F8F9FA</color>
-    <color name="colorPrimary">#B8860B</color>
+    <color name="colorBackground">#F8FAFC</color>
+    <color name="colorPrimary">#C59B27</color>
     <color name="colorOnPrimary">#FFFFFFFF</color>
     <color name="colorSurface">#FFFFFFFF</color>
     <color name="colorSurfaceVariant">#F1F5F9</color>
     <color name="colorOnSurface">#0F172A</color>
     <color name="colorOnSurfaceVariant">#475569</color>
-    <color name="colorOutline">#E2E8F0</color>
-    <color name="colorOutlineVariant">#CBD5E1</color>
+    <color name="colorOutline">#CBD5E1</color>
+    <color name="colorOutlineVariant">#E2E8F0</color>
     <color name="colorWhite">#FFFFFFFF</color>
 
     <color name="gate_pass_green">#2E7D32</color>
@@ -196,8 +196,8 @@
     <!-- ========== ألوان التقارير ========== -->
     <color name="report_primary">#1E293B</color>
     <color name="report_primary_dark">#0F172A</color>
-    <color name="report_accent">#B8860B</color>
-    <color name="report_background">#F8F9FA</color>
+    <color name="report_accent">#C59B27</color>
+    <color name="report_background">#F8FAFC</color>
     <color name="report_surface">#FFFFFF</color>
     <color name="report_text_primary">#0F172A</color>
     <color name="report_text_secondary">#475569</color>
@@ -229,21 +229,19 @@
     <color name="icon_reorder">#FFA726</color>
     <color name="icon_users">#7E57C2</color>
     <color name="icon_financial">#26C6DA</color>
-    <color name="icon_advanced">#B8860B</color>
+    <color name="icon_advanced">#C59B27</color>
 
     <!-- ========== ألوان التصميم الجديد الفاخر ========== -->
-    <color name="bg_main">#F8F9FA</color>
+    <color name="bg_main">#F8FAFC</color>
     <color name="bg_card">#FFFFFF</color>
     <color name="text_primary">#0F172A</color>
     <color name="text_light">#FFFFFF</color>
     <color name="text_muted">#475569</color>
-    <color name="accent">#B8860B</color>
-    <color name="accent_light">#D4AF37</color>
-    <color name="accent_dark">#8B6508</color>
-    <!-- ✅ Alias للتوافق مع الكود -->
-        <!-- ═══════════════════════════════════════════════════
-         Material 3 Aliases (Light)
-         ═══════════════════════════════════════════════════ -->
+    <color name="accent">#C59B27</color>
+    <color name="accent_light">#E5C158</color>
+    <color name="accent_dark">#9A771C</color>
+
+    <!-- Material 3 Aliases (Light) -->
     <color name="on_surface">@color/colorOnSurface</color>
     <color name="on_surface_variant_alias">@color/colorOnSurfaceVariant</color>
     <color name="primary_alias">@color/colorPrimary</color>
@@ -252,46 +250,35 @@
     <color name="surface_variant_alias">@color/colorSurfaceVariant</color>
     <color name="outline_alias">@color/colorOutline</color>
     <color name="outline_variant_alias">@color/colorOutlineVariant</color>
-    <!-- ═══════════════════════════════════════════════════════
-     🎨 Luxury Jewelry Light Palette (v2.0)
-     ═══════════════════════════════════════════════════════ -->
 
-<!-- الذهبي الفاخر -->
-<color name="gold_luxury">#B8860B</color>
-<color name="gold_luxury_dark">#8B6508</color>
-<color name="gold_luxury_light">#D4AF37</color>
-<color name="gold_luxury_soft">#FFF8E7</color>
-<color name="gold_luxury_highlight">#F5D77E</color>
+    <!-- 🎨 Luxury Jewelry Light Palette (v3.0 - Bright Luxury) -->
+    <color name="gold_luxury">#C59B27</color>
+    <color name="gold_luxury_dark">#9A771C</color>
+    <color name="gold_luxury_light">#E5C158</color>
+    <color name="gold_luxury_soft">#FFFBF0</color>
+    <color name="gold_luxury_highlight">#F5D77E</color>
 
-<!-- بني شوكولاتة -->
-<color name="chocolate">#6D4C41</color>
-<color name="chocolate_dark">#3E2723</color>
-<color name="chocolate_light">#A1887F</color>
-<color name="chocolate_soft">#F5EFE9</color>
+    <color name="chocolate">#0F172A</color>
+    <color name="chocolate_dark">#020617</color>
+    <color name="chocolate_light">#334155</color>
+    <color name="chocolate_soft">#F1F5F9</color>
 
-<!-- كريمي دافئ -->
-<color name="cream_warm">#FDFCF9</color>
-<color name="cream_soft">#F7F4EF</color>
-<color name="cream_highlight">#FFFCF5</color>
+    <color name="cream_warm">#F8FAFC</color>
+    <color name="cream_soft">#F1F5F9</color>
+    <color name="cream_highlight">#FFFFFF</color>
 
-<!-- أبيض نقي -->
-<color name="pure_white">#FFFFFF</color>
+    <color name="pure_white">#FFFFFF</color>
 
-<!-- حدود دافئة -->
-<color name="border_warm">#E5DDD0</color>
-<color name="border_warm_dark">#D2C7B6</color>
+    <color name="border_warm">#E2E8F0</color>
+    <color name="border_warm_dark">#CBD5E1</color>
 
-<!-- نصوص -->
-<color name="text_dark_primary">#1A1A1A</color>
-<color name="text_dark_secondary">#5D4037</color>
-<color name="text_muted_warm">#8D7B6F</color>
+    <color name="text_dark_primary">#0F172A</color>
+    <color name="text_dark_secondary">#475569</color>
+    <color name="text_muted_warm">#64748B</color>
 
-<!-- أخطاء وناجح -->
-<color name="error_luxury">#B3261E</color>
-<color name="error_container_luxury">#FCEEEE</color>
-<color name="success_luxury">#2E7D32</color>
-<color name="warning_luxury">#E65100</color>
-<color name="info_luxury">#0277BD</color>
-
-
+    <color name="error_luxury">#DC2626</color>
+    <color name="error_container_luxury">#FEF2F2</color>
+    <color name="success_luxury">#10B981</color>
+    <color name="warning_luxury">#F59E0B</color>
+    <color name="info_luxury">#0284C7</color>
 </resources>
