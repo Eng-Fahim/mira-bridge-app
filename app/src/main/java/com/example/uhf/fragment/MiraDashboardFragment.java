@@ -96,7 +96,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private View heroBalanceCard, heroSparkline;
     private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
-    private TextView tvHeroItems, tvHeroWeight, tvHeroGoldPrice;  // ✅ جديد
+    private TextView tvHeroValueYER, tvHeroValueSAR, tvHeroValueUSD;  // ✅ جديد
     private View alertsStrip;
     private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
     private View liveStatusDot;
@@ -302,9 +302,9 @@ public class MiraDashboardFragment extends Fragment {
             tvHeroBalance = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend = v.findViewById(R.id.tvHeroTrend);
             tvHeroSubtitle = v.findViewById(R.id.tvHeroSubtitle);
-            tvHeroItems = v.findViewById(R.id.tvHeroItems);       // ✅ جديد
-            tvHeroWeight = v.findViewById(R.id.tvHeroWeight);     // ✅ جديد
-            tvHeroGoldPrice = v.findViewById(R.id.tvHeroGoldPrice); // ✅ جديد
+            tvHeroValueYER = v.findViewById(R.id.tvHeroValueYER);
+            tvHeroValueSAR = v.findViewById(R.id.tvHeroValueSAR);
+            tvHeroValueUSD = v.findViewById(R.id.tvHeroValueUSD);
 
             alertsStrip = v.findViewById(R.id.alertsStrip);
             tvAlertIcon = v.findViewById(R.id.tvAlertIcon);
@@ -445,26 +445,44 @@ private void updateHeroBalance() {
         // ═══════════════════════════════════════════════════════
         // ✅ الإحصائيات الثلاث الجديدة (أسفل القيمة)
         // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// ✅ عرض القيمة بـ 3 عملات
+// ═══════════════════════════════════════════════════════
 
-        // 1. عدد القطع
-        if (tvHeroItems != null) {
-            tvHeroItems.setText(String.valueOf(itemCount));
-        }
+// 1. بالدولار الأمريكي (القيمة الأساسية)
+String usdText;
+if (isHeroHidden) {
+    usdText = "••••••";
+} else {
+    usdText = String.format(Locale.US, "%,.2f", totalValue);
+}
+if (tvHeroValueUSD != null) {
+    tvHeroValueUSD.setText(usdText);
+}
 
-        // 2. الوزن الإجمالي
-        if (tvHeroWeight != null) {
-            tvHeroWeight.setText(String.format(Locale.US, "%.1fg", totalWeight));
-        }
+// 2. بالريال السعودي (USD × 3.75)
+String sarText;
+if (isHeroHidden) {
+    sarText = "••••••";
+} else {
+    double sarValue = totalValue * 3.75;
+    sarText = String.format(Locale.US, "%,.2f", sarValue);
+}
+if (tvHeroValueSAR != null) {
+    tvHeroValueSAR.setText(sarText);
+}
 
-        // 3. سعر الذهب 24K
-        if (tvHeroGoldPrice != null && priceManager != null) {
-            double price24 = priceManager.getGoldPricePerGram(24);
-            if (price24 > 0) {
-                tvHeroGoldPrice.setText(String.format(Locale.US, "$%,.2f", price24));
-            } else {
-                tvHeroGoldPrice.setText("—");
-            }
-        }
+// 3. بالريال اليمني (USD × 530 - متوسط سعر الصرف)
+String yerText;
+if (isHeroHidden) {
+    yerText = "••••••";
+} else {
+    double yerValue = totalValue * 530.0;
+    yerText = String.format(Locale.US, "%,.0f", yerValue);
+}
+if (tvHeroValueYER != null) {
+    tvHeroValueYER.setText(yerText);
+}
 
     } catch (Exception e) {
         logNonFatal("updateHeroBalance", e);
@@ -1552,4 +1570,4 @@ private void calculateTrend(double currentPrice) {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-    }
+                        }
