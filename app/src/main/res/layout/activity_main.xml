@@ -6,16 +6,18 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
+    android:background="@color/colorSurface"
     tools:context=".activity.UHFMainActivity">
 
-    <!-- 1. TOOLBAR / APP BAR -->
-    <!-- ✅ تعطيل liftOnScroll لمنع الوميض -->
+    <!-- ═══════════════════════════════════════════════════════
+         1. TOOLBAR / APP BAR
+         ✅ تعطيل liftOnScroll لمنع الوميض
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
+        android:background="@color/colorSurface"
         android:stateListAnimator="@null"
         app:elevation="0dp"
         app:liftOnScroll="false">
@@ -25,7 +27,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimaryContainer"
+            android:background="@color/colorPrimaryContainer"
             android:paddingHorizontal="8dp"
             app:contentInsetStartWithNavigation="0dp"
             app:menu="@menu/main_menu">
@@ -104,12 +106,14 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- 2. MAIN CONTENT -->
-    <!-- ✅ تم إزالة layout_behavior لتجنب الوميض -->
+    <!-- ═══════════════════════════════════════════════════════
+         2. MAIN CONTENT
+         ✅ تم إزالة layout_behavior لتجنب الوميض
+         ═══════════════════════════════════════════════════════ -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface">
+        android:background="@color/colorSurface">
 
         <FrameLayout
             android:id="@+id/fragment_container"
@@ -142,7 +146,10 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 3+4. FLOATING NAV + FAB -->
+    <!-- ═══════════════════════════════════════════════════════
+         3+4. FLOATING NAV + FAB
+         ✅ FAB في المنتصف تماماً
+         ═══════════════════════════════════════════════════════ -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -174,22 +181,23 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
+        <!-- ✅ FAB في المنتصف تماماً (Top/Bottom/Start/End على BottomNav) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
-    android:id="@+id/fabActionCenter"
-    android:layout_width="64dp"
-    android:layout_height="64dp"
-    android:src="@drawable/ic_diamond"
-    app:backgroundTint="?attr/colorPrimary"
-    app:borderWidth="0dp"
-    app:elevation="12dp"
-    app:fabSize="normal"
-    app:layout_constraintBottom_toBottomOf="@id/bottomNavigationView"
-    app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
-    app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
-    app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
-    app:maxImageSize="32dp"
-    app:pressedTranslationZ="8dp"
-    app:tint="?attr/colorOnPrimary" />
+            android:id="@+id/fabActionCenter"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/ic_diamond"
+            app:backgroundTint="?attr/colorPrimary"
+            app:borderWidth="0dp"
+            app:elevation="12dp"
+            app:fabSize="normal"
+            app:layout_constraintBottom_toBottomOf="@id/bottomNavigationView"
+            app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
+            app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
+            app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
+            app:maxImageSize="32dp"
+            app:pressedTranslationZ="8dp"
+            app:tint="?attr/colorOnPrimary" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
