@@ -1227,6 +1227,19 @@ public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
     public ApiResponse getInventorySessionDetail(int sessionId) {
         return getWithAuth("/inventory/sessions/" + sessionId);
     }
+    
+    public ApiResponse deleteInventorySession(int sessionId) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("session_id", sessionId);
+        payload.put("gate_id", getEffectiveGateId());
+    } catch (Exception ignored) {}
+    return postWithAuth("/inventory/sessions/" + sessionId + "/delete", payload);
+}
+
+public ApiResponse getInventorySessionItems(int sessionId) {
+    return getWithAuth("/inventory/sessions/" + sessionId + "/items");
+}
 
     public ApiResponse startInventorySession(String location, String type) {
         JSONObject payload = new JSONObject();
