@@ -151,31 +151,11 @@ public class MiraApiClient {
     }
 
     private String getAuthToken() {
-    // ✅ محاولة 1: من SessionManager
     String token = sessionManager.getAuthToken();
-    if (token != null && !token.isEmpty()) {
-        Log.d(TAG, "✅ Token from SessionManager");
-        return token;
+    if (token == null || token.isEmpty()) {
+        token = serverConfig.getAuthToken();
     }
-    
-    // ✅ محاولة 2: من ServerConfig
-    token = serverConfig.getAuthToken();
-    if (token != null && !token.isEmpty()) {
-        Log.d(TAG, "✅ Token from ServerConfig");
-        // ✅ احفظه في SessionManager للمرات القادمة
-        sessionManager.saveAuthToken(token);
-        return token;
-    }
-    
-    // ✅ محاولة 3: من SessionManager كـ API key بديل (بعض الأنظمة تستخدم api_key كـ token)
-    token = sessionManager.getApiKey();
-    if (token != null && !token.isEmpty()) {
-        Log.w(TAG, "⚠️ Using API Key as fallback token");
-        return token;
-    }
-    
-    Log.e(TAG, "❌ No auth token available!");
-    return "";
+    return token;
 }
     
     public boolean hasValidCredentials() {
@@ -254,65 +234,6 @@ public class MiraApiClient {
             if (conn != null) conn.disconnect();
         }
     }
-    
-    /**
- * ✅ GET مع Timeout طويل (60 ثانية) — للكتالوجات الكبيرة
- */
-public ApiResponse getWithAuthLongTimeout(String endpoint) {
-    HttpURLConnection conn = null;
-    try {
-        String token = getAuthToken();
-        if (token == null || token.isEmpty()) {
-            Log.w(TAG, "No auth token for endpoint: " + endpoint);
-            ApiResponse response = new ApiResponse(401, null, "No auth token");
-            response.isNetworkError = false;
-            return response;
-        }
-        
-        String cleanEndpoint = endpoint;
-        if (cleanEndpoint.startsWith("/")) {
-            cleanEndpoint = cleanEndpoint.substring(1);
-        }
-        
-        String fullUrl = apiUrl + cleanEndpoint;
-        URL url = new URL(fullUrl);
-        
-        if (url.getProtocol().equals("https")) {
-            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-            CertificatePinningManager.applyPinning(httpsConn);
-            conn = httpsConn;
-        } else {
-            conn = (HttpURLConnection) url.openConnection();
-        }
-        conn.setRequestMethod("GET");
-        applyStandardHeaders(conn, true);
-        
-        // ✅ Timeout طويل للكتالوجات الكبيرة
-        conn.setConnectTimeout(15000);  // 15 ثانية للاتصال
-        conn.setReadTimeout(60000);     // 60 ثانية للقراءة
-        
-        return buildResponse(conn);
-        
-    } catch (java.net.UnknownHostException e) {
-        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-        response.isNetworkError = true;
-        return response;
-    } catch (java.net.ConnectException e) {
-        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        response.isNetworkError = true;
-        return response;
-    } catch (java.net.SocketTimeoutException e) {
-        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة - السيرفر بطيء");
-        response.isNetworkError = true;
-        return response;
-    } catch (Exception e) {
-        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-        response.isNetworkError = true;
-        return response;
-    } finally {
-        if (conn != null) conn.disconnect();
-    }
-}
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
         HttpURLConnection conn = null;
@@ -528,20 +449,17 @@ public ApiResponse getWithAuthLongTimeout(String endpoint) {
         String newApiKey = response.data.optString("api_key", "");
         String newGateId = response.data.optString("gate_id", "");
         String authToken = response.data.optString("token", "");
-        long expiresIn = response.data.optLong("expires_in", 86400 * 7); // 7 أيام افتراضياً
+        long expiresIn = response.data.optLong("expires_in", 86400 * 7);
         
         Log.d(TAG, "🔐 Login response received:");
         Log.d(TAG, "   - api_key: " + (newApiKey.isEmpty() ? "EMPTY" : "EXISTS"));
         Log.d(TAG, "   - token: " + (authToken.isEmpty() ? "EMPTY" : "EXISTS (" + authToken.length() + " chars)"));
         Log.d(TAG, "   - gate_id: " + (newGateId.isEmpty() ? "EMPTY" : newGateId));
-        Log.d(TAG, "   - expires_in: " + expiresIn + "s");
         
-        // ✅ 1. حفظ التوكن — كان مفقوداً!
+        // ✅ 1. حفظ التوكن (مهم جداً!)
         if (!authToken.isEmpty()) {
             sessionManager.saveAuthToken(authToken, expiresIn);
             Log.d(TAG, "✅ Auth token saved");
-        } else {
-            Log.w(TAG, "⚠️ Login succeeded but server returned no token!");
         }
         
         // ✅ 2. حفظ API Key
@@ -555,59 +473,44 @@ public ApiResponse getWithAuthLongTimeout(String endpoint) {
                 (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
         if (!effectiveGateId.isEmpty()) {
             sessionManager.saveGateId(effectiveGateId);
-            Log.d(TAG, "✅ Gate ID saved: " + effectiveGateId);
+            Log.d(TAG, "✅ Gate ID saved");
         }
         
         // ✅ 4. تحديث الـ Credentials الداخلية
         refreshCredentials();
-        
-        // ✅ 5. حفظ اسم المستخدم للاستخدام المستقبلي
-        if (username != null && !username.isEmpty()) {
-            sessionManager.saveLastUsername(username);
-        }
-        
-        Log.d(TAG, "════════════════════════════════════════════");
-        Log.d(TAG, "✅ Login complete. Diagnostics:");
-        Log.d(TAG, getAuthDiagnostics());
-        Log.d(TAG, "════════════════════════════════════════════");
     }
     
     return response;
 }
 
     public ApiResponse reconnectDevice(String username, String password, String gateId) {
-    try {
-        JSONObject params = new JSONObject();
-        params.put("username", username);
-        params.put("password", password);
-        params.put("gate_id", gateId);
+        try {
+            JSONObject params = new JSONObject();
+            params.put("username", username);
+            params.put("password", password);
+            params.put("gate_id", gateId);
 
-        ApiResponse response = post("/auth/reconnect", params);
-        if (response != null && response.isSuccess && response.data != null) {
-            String newApiKey = response.data.optString("api_key", "");
-            String newGateId = response.data.optString("gate_id", gateId);
-            String authToken = response.data.optString("token", "");
-            long expiresIn = response.data.optLong("expires_in", 86400 * 7);
-            
-            // ✅ حفظ التوكن (كان مفقوداً!)
-            if (!authToken.isEmpty()) {
-                sessionManager.saveAuthToken(authToken, expiresIn);
-                Log.d(TAG, "✅ Auth token saved from reconnect");
+            ApiResponse response = post("/auth/reconnect", params);
+            if (response != null && response.isSuccess && response.data != null) {
+                String newApiKey = response.data.optString("api_key", "");
+                String newGateId = response.data.optString("gate_id", gateId);
+                String authToken = response.data.optString("token", "");
+
+                if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
+                    if (!newApiKey.isEmpty()) {
+                        sessionManager.saveApiKey(newApiKey);
+                    }
+                    if (newGateId != null && !newGateId.isEmpty()) {
+                        sessionManager.saveGateId(newGateId);
+                    }
+                    refreshCredentials();
+                }
             }
-            
-            if (!newApiKey.isEmpty()) {
-                sessionManager.saveApiKey(newApiKey);
-            }
-            if (newGateId != null && !newGateId.isEmpty()) {
-                sessionManager.saveGateId(newGateId);
-            }
-            refreshCredentials();
+            return response;
+        } catch (Exception e) {
+            return new ApiResponse(-1, null, e.getMessage());
         }
-        return response;
-    } catch (Exception e) {
-        return new ApiResponse(-1, null, e.getMessage());
     }
-}
 
     public ApiResponse validateToken(String token) {
         JSONObject payload = new JSONObject();
@@ -660,46 +563,6 @@ public ApiResponse getWithAuthLongTimeout(String endpoint) {
         } catch (Exception ignored) {}
         return post("/auth/verify-biometric", payload);
     }
-    
-    
-    /**
- * ✅ فحص شامل لحالة المصادقة قبل أي عملية
- */
-public boolean isAuthenticated() {
-    String token = getAuthToken();
-    String key = getEffectiveApiKey();
-    String gate = getEffectiveGateId();
-    
-    boolean hasToken = token != null && !token.isEmpty();
-    boolean hasKey = key != null && !key.isEmpty();
-    boolean hasGate = gate != null && !gate.isEmpty();
-    
-    Log.d(TAG, "🔐 Auth check: token=" + hasToken 
-            + ", key=" + hasKey 
-            + ", gate=" + hasGate);
-    
-    return hasToken && hasKey && hasGate;
-}
-
-/**
- * ✅ الحصول على تشخيص كامل لحالة المصادقة
- */
-public String getAuthDiagnostics() {
-    StringBuilder sb = new StringBuilder();
-    String token = getAuthToken();
-    String key = getEffectiveApiKey();
-    String gate = getEffectiveGateId();
-    
-    sb.append("Token: ").append(token != null && !token.isEmpty() 
-            ? "✅ موجود (" + token.length() + " حرف)" : "❌ مفقود").append("\n");
-    sb.append("API Key: ").append(key != null && !key.isEmpty() 
-            ? "✅ موجود" : "❌ مفقود").append("\n");
-    sb.append("Gate ID: ").append(gate != null && !gate.isEmpty() 
-            ? "✅ " + gate : "❌ مفقود").append("\n");
-    sb.append("Base URL: ").append(apiUrl).append("\n");
-    
-    return sb.toString();
-}
     
     // ==================== دوال المراسلات والإشعارات ====================
     
@@ -1600,10 +1463,10 @@ public ApiResponse getBranchItemsListWithLongTimeout(int branchId) {
     Log.d(TAG, "🌐 getBranchItemsListWithLongTimeout | branchId=" + branchId);
     
     String endpoint = "/branches/" + branchId + "/inventory/items";
-    Log.d(TAG, "📡 Calling getWithAuthLongTimeout: " + endpoint);
+    Log.d(TAG, "📡 Calling getWithAuth: " + endpoint);
     
-    // ✅ استخدم الدالة الجديدة ذات الـ Timeout الطويل
-    ApiResponse response = getWithAuthLongTimeout(endpoint);
+    // ✅ استخدم getWithAuth المُجرَّبة (نفس Headers Dashboard)
+    ApiResponse response = getWithAuth(endpoint);
     
     // ✅ Logging تفصيلي
     if (response != null) {
@@ -1620,7 +1483,7 @@ public ApiResponse getBranchItemsListWithLongTimeout(int branchId) {
         }
         Log.d(TAG, "═══════════════════════════════════════════");
     } else {
-        Log.e(TAG, "❌ Null response from getWithAuthLongTimeout");
+        Log.e(TAG, "❌ Null response from getWithAuth");
     }
     
     return response;
