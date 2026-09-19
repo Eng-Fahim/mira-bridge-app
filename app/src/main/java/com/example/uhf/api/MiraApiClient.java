@@ -151,12 +151,32 @@ public class MiraApiClient {
     }
 
     private String getAuthToken() {
-        String token = sessionManager.getAuthToken();
-        if (token == null || token.isEmpty()) {
-            token = serverConfig.getAuthToken();
-        }
+    // ✅ محاولة 1: من SessionManager
+    String token = sessionManager.getAuthToken();
+    if (token != null && !token.isEmpty()) {
+        Log.d(TAG, "✅ Token from SessionManager");
         return token;
     }
+    
+    // ✅ محاولة 2: من ServerConfig
+    token = serverConfig.getAuthToken();
+    if (token != null && !token.isEmpty()) {
+        Log.d(TAG, "✅ Token from ServerConfig");
+        // ✅ احفظه في SessionManager للمرات القادمة
+        sessionManager.saveAuthToken(token);
+        return token;
+    }
+    
+    // ✅ محاولة 3: من SessionManager كـ API key بديل (بعض الأنظمة تستخدم api_key كـ token)
+    token = sessionManager.getApiKey();
+    if (token != null && !token.isEmpty()) {
+        Log.w(TAG, "⚠️ Using API Key as fallback token");
+        return token;
+    }
+    
+    Log.e(TAG, "❌ No auth token available!");
+    return "";
+}
     
     public boolean hasValidCredentials() {
         return !getEffectiveApiKey().isEmpty() && !getEffectiveGateId().isEmpty();
@@ -613,6 +633,46 @@ public ApiResponse getWithAuthLongTimeout(String endpoint) {
         } catch (Exception ignored) {}
         return post("/auth/verify-biometric", payload);
     }
+    
+    
+    /**
+ * ✅ فحص شامل لحالة المصادقة قبل أي عملية
+ */
+public boolean isAuthenticated() {
+    String token = getAuthToken();
+    String key = getEffectiveApiKey();
+    String gate = getEffectiveGateId();
+    
+    boolean hasToken = token != null && !token.isEmpty();
+    boolean hasKey = key != null && !key.isEmpty();
+    boolean hasGate = gate != null && !gate.isEmpty();
+    
+    Log.d(TAG, "🔐 Auth check: token=" + hasToken 
+            + ", key=" + hasKey 
+            + ", gate=" + hasGate);
+    
+    return hasToken && hasKey && hasGate;
+}
+
+/**
+ * ✅ الحصول على تشخيص كامل لحالة المصادقة
+ */
+public String getAuthDiagnostics() {
+    StringBuilder sb = new StringBuilder();
+    String token = getAuthToken();
+    String key = getEffectiveApiKey();
+    String gate = getEffectiveGateId();
+    
+    sb.append("Token: ").append(token != null && !token.isEmpty() 
+            ? "✅ موجود (" + token.length() + " حرف)" : "❌ مفقود").append("\n");
+    sb.append("API Key: ").append(key != null && !key.isEmpty() 
+            ? "✅ موجود" : "❌ مفقود").append("\n");
+    sb.append("Gate ID: ").append(gate != null && !gate.isEmpty() 
+            ? "✅ " + gate : "❌ مفقود").append("\n");
+    sb.append("Base URL: ").append(apiUrl).append("\n");
+    
+    return sb.toString();
+}
     
     // ==================== دوال المراسلات والإشعارات ====================
     
