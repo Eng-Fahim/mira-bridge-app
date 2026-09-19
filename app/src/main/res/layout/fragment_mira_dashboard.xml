@@ -99,79 +99,7 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- ==================== 1. HEADER ==================== -->
-                <RelativeLayout
-                    android:id="@+id/headerSection"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    android:background="?attr/colorSurface"
-                    android:elevation="0dp">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:layoutDirection="ltr">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/app_brand_name"
-                            android:textColor="?attr/colorPrimary"
-                            android:textSize="20sp"
-                            android:textStyle="bold"
-                            android:textDirection="ltr"
-                            android:letterSpacing="0.02"
-                            tools:text="MIRA" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:text="@string/app_brand_tagline"
-                            android:textColor="?attr/colorSecondary"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:textDirection="ltr"
-                            android:letterSpacing="0.08"
-                            tools:text="JEWELRY ID™" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/tvLiveStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:background="@drawable/bg_luxury_card"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="6dp">
-
-                        <View
-                            android:id="@+id/liveStatusDot"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:background="@drawable/bg_status_dot_green" />
-
-                        <TextView
-                            android:id="@+id/tvLiveStatusText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:textColor="?attr/colorPrimary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            tools:text="متصل" />
-                    </LinearLayout>
-                </RelativeLayout>
-
-                <!-- ==================== 2. HERO BALANCE CARD ==================== -->
+                <!-- ==================== 1. HERO BALANCE CARD ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
                     android:layout_width="match_parent"
@@ -384,7 +312,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 3. ALERTS STRIP ==================== -->
+                <!-- ==================== 2. ALERTS STRIP ==================== -->
                 <LinearLayout
                     android:id="@+id/alertsStrip"
                     android:layout_width="match_parent"
@@ -426,7 +354,7 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- ==================== 4. INVENTORY METRICS ==================== -->
+                <!-- ==================== 3. INVENTORY METRICS ==================== -->
                 <LinearLayout
                     android:id="@+id/inventoryMetrics"
                     android:layout_width="match_parent"
@@ -573,7 +501,7 @@
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <!-- ==================== 5. GOLD PRICES ==================== -->
+                <!-- ==================== 4. GOLD PRICES ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGoldPrices"
                     android:layout_width="match_parent"
@@ -754,7 +682,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 6. SALES SUMMARY ==================== -->
+                <!-- ==================== 5. SALES SUMMARY ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/salesSummaryCard"
                     android:layout_width="match_parent"
@@ -900,7 +828,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 7. RECENT ACTIVITY TIMELINE ==================== -->
+                <!-- ==================== 6. RECENT ACTIVITY TIMELINE ==================== -->
                 <LinearLayout
                     android:id="@+id/recentActivityHeader"
                     android:layout_width="match_parent"
