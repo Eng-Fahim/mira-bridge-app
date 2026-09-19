@@ -332,8 +332,7 @@ if (heroCard != null) {
             tvAlertMessage = v.findViewById(R.id.tvAlertMessage);
             tvAlertAction = v.findViewById(R.id.tvAlertAction);
 
-            liveStatusDot = v.findViewById(R.id.liveStatusDot);
-            tvLiveStatusText = v.findViewById(R.id.tvLiveStatusText);
+            
 
             btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
