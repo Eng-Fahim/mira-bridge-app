@@ -734,6 +734,25 @@ private void showItemsBottomSheet() {
                 isArabic ? "⛔ غير مصرح" : "⛔ Access denied", Toast.LENGTH_SHORT).show();
         if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.ERROR);
     }
+    
+    /**
+ * ✅ Dialog يظهر عند فشل المصادقة
+ */
+private void showAuthErrorDialog() {
+    if (!isAdded() || isFragmentDestroyed) return;
+    
+    String diag = apiClient != null ? apiClient.getAuthDiagnostics() : "N/A";
+    
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🔐 انتهت صلاحية الجلسة" : "🔐 Session Expired")
+            .setMessage(isArabic 
+                    ? "انتهت صلاحية جلستك.\n\nيرجى تسجيل الخروج والدخول مجدداً.\n\n" + diag
+                    : "Your session has expired.\n\nPlease logout and login again.\n\n" + diag)
+            .setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss())
+            .setCancelable(false)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show();
+}
 
     // ==================== Key Events ====================
     @Override
@@ -750,52 +769,58 @@ private void showItemsBottomSheet() {
     }
 
     // ==================== Start/Stop ====================
-    private void startScanning() {
-        if (isFragmentDestroyed || isScanning()) return;
-        if (!canEdit()) { showAccessDenied(); return; }
+   private void startScanning() {
+    if (isFragmentDestroyed || isScanning()) return;
+    if (!canEdit()) { showAccessDenied(); return; }
 
-        resetUiForNewScan();
-        scanController.setBarcodeToEpcMap(catalogManager.getBarcodeToEpcMap());
-
-        if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText(isArabic ?
-                    "🔄 جاري تحميل الكتالوج..." : "🔄 Loading catalog...");
-        }
-        Toast.makeText(requireContext(),
-                isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...",
-                Toast.LENGTH_SHORT).show();
-
-        catalogManager.fetchCatalog(apiClient, branchesManager,
-                new InventoryCatalogManager.CatalogCallback() {
-            @Override
-            public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
-                mainHandler.post(() -> {
-                    if (isFragmentDestroyed || !isAdded()) return;
-
-                    catalogEpcs.clear();
-                    if (catalog != null) catalogEpcs.addAll(catalog.keySet());
-                    expectedCount = catalogEpcs.size();
-
-                    if (scanController != null) {
-                        scanController.startScanning(catalog);
-                    }
-                });
-            }
-            @Override
-            public void onError(String error) {
-                mainHandler.post(() -> {
-                    if (isFragmentDestroyed || !isAdded()) return;
-                    Toast.makeText(requireContext(),
-                            (isArabic ? "⚠️ " : "⚠️ ") + error,
-                            Toast.LENGTH_LONG).show();
-                    if (tvInventoryStatus != null) {
-                        tvInventoryStatus.setText(isArabic ?
-                                "⚠️ فشل تحميل الكتالوج" : "⚠️ Catalog load failed");
-                    }
-                });
-            }
-        });
+    // ✅ فحص المصادقة أولاً
+    if (apiClient == null || !apiClient.isAuthenticated()) {
+        showAuthErrorDialog();
+        return;
     }
+
+    resetUiForNewScan();
+    scanController.setBarcodeToEpcMap(catalogManager.getBarcodeToEpcMap());
+
+    if (tvInventoryStatus != null) {
+        tvInventoryStatus.setText(isArabic ?
+                "🔄 جاري تحميل الكتالوج..." : "🔄 Loading catalog...");
+    }
+    Toast.makeText(requireContext(),
+            isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...",
+            Toast.LENGTH_SHORT).show();
+
+    catalogManager.fetchCatalog(apiClient, branchesManager,
+            new InventoryCatalogManager.CatalogCallback() {
+        @Override
+        public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
+            mainHandler.post(() -> {
+                if (isFragmentDestroyed || !isAdded()) return;
+
+                catalogEpcs.clear();
+                if (catalog != null) catalogEpcs.addAll(catalog.keySet());
+                expectedCount = catalogEpcs.size();
+
+                if (scanController != null) {
+                    scanController.startScanning(catalog);
+                }
+            });
+        }
+        @Override
+        public void onError(String error) {
+            mainHandler.post(() -> {
+                if (isFragmentDestroyed || !isAdded()) return;
+                Toast.makeText(requireContext(),
+                        (isArabic ? "⚠️ " : "⚠️ ") + error,
+                        Toast.LENGTH_LONG).show();
+                if (tvInventoryStatus != null) {
+                    tvInventoryStatus.setText(isArabic ?
+                            "⚠️ فشل التحميل" : "⚠️ Load failed");
+                }
+            });
+        }
+    });
+}
 
     private void resetUiForNewScan() {
         scannedItemsDisplayList.clear();
