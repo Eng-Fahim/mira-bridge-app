@@ -81,6 +81,7 @@
                         android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
+
         </com.google.android.material.appbar.MaterialToolbar>
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -96,20 +97,22 @@
             app:contentInsetStartWithNavigation="0dp"
             app:paddingEnd="0dp"
             app:paddingStart="0dp" />
+
     </com.google.android.material.appbar.AppBarLayout>
 
     <!-- 2. MAIN CONTENT -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface">
+        android:background="?attr/colorSurface"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:clipToPadding="false"
-            android:paddingBottom="100dp" 
+            android:paddingBottom="90dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -132,9 +135,10 @@
                 android:indeterminate="true"
                 app:indicatorColor="?attr/colorPrimary" />
         </FrameLayout>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 3. BOTTOM NAVIGATION CONTAINER -->
+    <!-- 3+4. FLOATING NAV + FAB -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -142,17 +146,16 @@
         android:layout_gravity="bottom"
         android:layoutDirection="locale"
         android:clipToPadding="false"
-        android:paddingHorizontal="16dp"
+        android:paddingHorizontal="20dp"
         android:paddingBottom="16dp">
 
-        <!-- الشريط السفلي مع الانحناءة -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
-            android:layout_height="72dp"
+            android:layout_height="64dp"
             android:layoutDirection="locale"
-            android:background="@drawable/bg_bottom_nav_with_notch"
-            app:elevation="8dp"
+            android:background="@drawable/bg_floating_bottom_nav_with_shadow"
+            app:elevation="4dp"
             app:itemBackground="@null"
             app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
             app:itemIconSize="24dp"
@@ -164,26 +167,24 @@
             app:labelVisibilityMode="labeled"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
+            app:layout_constraintStart_toStartOf="parent"
+            app:menu="@menu/bottom_nav_menu" />
 
-        <!-- الزر الأوسط (FAB) - مرفوع ومتمركز فوق الانحناءة -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
             android:src="@drawable/ic_diamond"
-            android:background="@drawable/bg_fab_with_border"
-            app:backgroundTint="@null"
-            app:borderWidth="4dp"
+            app:backgroundTint="?attr/colorPrimary"
+            app:borderWidth="0dp"
             app:elevation="12dp"
             app:fabSize="normal"
             app:layout_constraintBottom_toBottomOf="@id/bottomNavigationView"
             app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
             app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
             app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
-            app:layout_constraintVertical_bias="0.0"
-            app:maxImageSize="28dp"
-            app:pressedTranslationZ="16dp"
+            app:maxImageSize="32dp"
+            app:pressedTranslationZ="8dp"
             app:tint="?attr/colorOnPrimary" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
