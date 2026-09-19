@@ -211,6 +211,53 @@ public class SecureSessionManager {
         tokenCacheTime = System.currentTimeMillis();
     }
     
+    /**
+ * ✅ حفظ التوكن (JWT) — كان مفقوداً!
+ * تُستدعى عند تسجيل الدخول الناجح
+ */
+public void saveAuthToken(String token) {
+    if (token == null || token.isEmpty()) {
+        Log.w(TAG, "⚠️ Attempted to save empty auth token");
+        return;
+    }
+    try {
+        securePrefs.edit().putString(KEY_AUTH_TOKEN, token).apply();
+        // ✅ تحديث التخزين المؤقت
+        cachedAuthToken = token;
+        tokenCacheTime = System.currentTimeMillis();
+        Log.d(TAG, "✅ Auth token saved (" + token.length() + " chars)");
+    } catch (Exception e) {
+        Log.e(TAG, "saveAuthToken error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ حفظ التوكن مع مدة صلاحية (expiresIn)
+ * تُستدعى عند تسجيل الدخول للحصول على توكن مع تاريخ انتهاء
+ */
+public void saveAuthToken(String token, long expiresInSeconds) {
+    if (token == null || token.isEmpty()) {
+        Log.w(TAG, "⚠️ Attempted to save empty auth token");
+        return;
+    }
+    try {
+        long expiryTime = (expiresInSeconds > 0)
+                ? (System.currentTimeMillis() + (expiresInSeconds * 1000L))
+                : (System.currentTimeMillis() + (86400 * 1000L * 30)); // 30 يوم افتراضي
+        
+        securePrefs.edit()
+                .putString(KEY_AUTH_TOKEN, token)
+                .putLong(KEY_TOKEN_EXPIRY, expiryTime)
+                .apply();
+        
+        cachedAuthToken = token;
+        tokenCacheTime = System.currentTimeMillis();
+        Log.d(TAG, "✅ Auth token saved with expiry: " + expiresInSeconds + "s");
+    } catch (Exception e) {
+        Log.e(TAG, "saveAuthToken error: " + e.getMessage());
+    }
+}
+    
     public String getAuthToken() {
         // ✅ استخدام التخزين المؤقت
         long now = System.currentTimeMillis();
