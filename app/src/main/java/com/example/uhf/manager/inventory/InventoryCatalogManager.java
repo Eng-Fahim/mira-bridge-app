@@ -61,144 +61,171 @@ public class InventoryCatalogManager {
      * - رسائل خطأ واضحة
      */
     public void fetchCatalog(MiraApiClient apiClient,
-                             MiraBranchesManager branchesManager,
-                             CatalogCallback callback) {
+                         MiraBranchesManager branchesManager,
+                         CatalogCallback callback) {
 
-        Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
+    Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
 
-        try {
-            // ==================== 1. التحقق من المدخلات ====================
-            if (apiClient == null || branchesManager == null) {
-                Log.e(TAG, "❌ apiClient or branchesManager is null");
-                if (callback != null) callback.onError(
-                        isArabic ? "خطأ في التهيئة" : "Initialization error");
-                return;
+    try {
+        // ==================== 1. التحقق من المدخلات ====================
+        if (apiClient == null || branchesManager == null) {
+            Log.e(TAG, "❌ apiClient or branchesManager is null");
+            if (callback != null) callback.onError(
+                    isArabic ? "خطأ في التهيئة" : "Initialization error");
+            return;
+        }
+
+        int branchId = branchesManager.getActiveBranchId();
+        Log.d(TAG, "📡 fetchCatalog START | branchId=" + branchId);
+
+        if (branchId <= 0) {
+            Log.e(TAG, "❌ Invalid branchId: " + branchId);
+            if (callback != null) callback.onError(
+                    isArabic ? "لم يتم تحديد فرع نشط" : "No active branch");
+            return;
+        }
+
+        // ==================== 2. ✅ فحص المصادقة قبل البدء ====================
+        if (!apiClient.isAuthenticated()) {
+            Log.e(TAG, "❌ Not authenticated!");
+            String diag = apiClient.getAuthDiagnostics();
+            Log.e(TAG, "Diagnostics:\n" + diag);
+            
+            if (callback != null) {
+                callback.onError(isArabic 
+                        ? "🔐 انتهت صلاحية الجلسة\n\nيرجى تسجيل الخروج ثم الدخول مجدداً\n\n" + diag
+                        : "🔐 Session expired\n\nPlease logout and login again\n\n" + diag);
             }
+            return;
+        }
 
-            int branchId = branchesManager.getActiveBranchId();
-            Log.d(TAG, "📡 fetchCatalog START | branchId=" + branchId);
+        // ==================== 3. المحاولة الأولى ====================
+        Log.d(TAG, "🔄 Attempt #1...");
+        MiraApiClient.ApiResponse response = 
+                apiClient.getBranchItemsListWithLongTimeout(branchId);
 
-            if (branchId <= 0) {
-                Log.e(TAG, "❌ Invalid branchId: " + branchId);
-                if (callback != null) callback.onError(
-                        isArabic ? "لم يتم تحديد فرع نشط" : "No active branch");
-                return;
-            }
+        if (response == null) {
+            Log.e(TAG, "❌ Null response from server");
+            if (callback != null) callback.onError(
+                    isArabic ? "لا يوجد رد من الخادم" : "No response from server");
+            return;
+        }
 
-            // ==================== 2. المحاولة الأولى (Timeout طويل) ====================
-            MiraApiClient.ApiResponse response = 
-                    apiClient.getBranchItemsListWithLongTimeout(branchId);
+        Log.d(TAG, "📥 Attempt #1: code=" + response.code 
+                + ", isSuccess=" + response.isSuccess
+                + ", isNetworkError=" + response.isNetworkError
+                + ", error=" + response.error);
 
+        // ==================== 4. ✅ معالجة 401/403 فوراً (بدون Retry) ====================
+        if (response.code == 401 || response.code == 403) {
+            Log.e(TAG, "🔐 Auth error: " + response.code);
+            if (callback != null) callback.onError(
+                    isArabic ? "🔐 انتهت صلاحية الجلسة - يرجى إعادة تسجيل الدخول"
+                             : "🔐 Session expired - please re-login");
+            return;
+        }
+
+        // ==================== 5. ✅ معالجة 404 ====================
+        if (response.code == 404) {
+            Log.e(TAG, "❌ Branch not found: " + branchId);
+            if (callback != null) callback.onError(
+                    isArabic ? "الفرع غير موجود على السيرفر (ID: " + branchId + ")"
+                             : "Branch not found (ID: " + branchId + ")");
+            return;
+        }
+
+        // ==================== 6. ✅ معالجة 5xx (خطأ سيرفر) ====================
+        if (response.code >= 500) {
+            Log.e(TAG, "❌ Server error: " + response.code);
+            if (callback != null) callback.onError(
+                    isArabic ? "خطأ في السيرفر (" + response.code + ") - حاول لاحقاً"
+                             : "Server error (" + response.code + ") - try later");
+            return;
+        }
+
+        // ==================== 7. Retry فقط لأخطاء الشبكة الحقيقية ====================
+        if (response.isNetworkError) {
+            Log.w(TAG, "⚠️ Network error: " + response.error + " — retrying in 2s...");
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+
+            Log.d(TAG, "🔄 Attempt #2...");
+            response = apiClient.getBranchItemsListWithLongTimeout(branchId);
+            
             if (response == null) {
-                Log.e(TAG, "❌ Null response from server");
+                Log.e(TAG, "❌ Attempt #2: NULL response");
                 if (callback != null) callback.onError(
-                        isArabic ? "لا يوجد رد من الخادم" : "No response from server");
+                        isArabic ? "لا يوجد رد من الخادم بعد محاولتين" 
+                                 : "No response after 2 attempts");
                 return;
             }
-
-            Log.d(TAG, "📥 Response: code=" + response.code 
+            
+            Log.d(TAG, "📥 Attempt #2: code=" + response.code 
                     + ", isSuccess=" + response.isSuccess
                     + ", isNetworkError=" + response.isNetworkError);
-
-            // ==================== 3. إذا كان خطأ شبكة → Retry ====================
+            
             if (response.isNetworkError) {
-    Log.w(TAG, "⚠️ Network error: " + response.error + " — retrying in 3s...");
-    try {
-        Thread.sleep(3000);
-    } catch (InterruptedException ignored) {}
-
-    // ✅ Retry
-    Log.d(TAG, "🔄 Retry #2");
-    response = apiClient.getBranchItemsListWithLongTimeout(branchId);
-    
-    if (response == null) {
-        if (callback != null) callback.onError(
-                isArabic ? "لا يوجد رد من الخادم بعد محاولتين" 
-                         : "No response after 2 attempts");
-        return;
-    }
-    
-    if (response.isNetworkError) {
-        String err = response.error != null ? response.error 
-                : (isArabic ? "فشل الاتصال بعد محاولتين" 
-                            : "Connection failed after 2 attempts");
-        Log.e(TAG, "❌ Retry #2 failed: " + err);
-        if (callback != null) callback.onError(err);
-        return;
-    }
-}
-
-            // ==================== 4. إذا كان خطأ HTTP ====================
-            if (!response.isSuccess || response.data == null) {
-                String err = response.error;
-                if (err == null || err.isEmpty()) {
-                    if (response.code == 401 || response.code == 403) {
-                        err = isArabic 
-                                ? "انتهت صلاحية الجلسة - يرجى إعادة تسجيل الدخول"
-                                : "Session expired - please re-login";
-                    } else if (response.code == 404) {
-                        err = isArabic 
-                                ? "الفرع غير موجود على السيرفر"
-                                : "Branch not found on server";
-                    } else if (response.code >= 500) {
-                        err = isArabic 
-                                ? "خطأ في السيرفر (" + response.code + ")"
-                                : "Server error (" + response.code + ")";
-                    } else {
-                        err = isArabic 
-                                ? "خطأ " + response.code 
-                                : "Error " + response.code;
-                    }
-                }
-                Log.e(TAG, "❌ HTTP error: " + err);
+                String err = response.error != null && !response.error.isEmpty()
+                        ? response.error
+                        : (isArabic ? "فشل الاتصال بعد محاولتين" 
+                                    : "Connection failed after 2 attempts");
+                Log.e(TAG, "❌ Retry failed: " + err);
                 if (callback != null) callback.onError(err);
                 return;
             }
-
-            // ==================== 5. معالجة البيانات ====================
-            JSONArray items = response.data.optJSONArray("items");
-            if (items == null) {
-                JSONObject dataObj = response.data.optJSONObject("data");
-                if (dataObj != null) items = dataObj.optJSONArray("items");
-            }
-
-            if (items == null) {
-                Log.w(TAG, "⚠️ No items array — branch is empty");
-                if (callback != null) callback.onCatalogLoaded(catalog);
-                return;
-            }
-
-            Log.d(TAG, "📦 Found " + items.length() + " items in response");
-
-            for (int i = 0; i < items.length(); i++) {
-                try {
-                    processCatalogItem(items.getJSONObject(i), catalog);
-                } catch (Exception e) {
-                    Log.e(TAG, "processCatalogItem error at " + i + ": " + e.getMessage());
-                }
-            }
-
-            Log.d(TAG, "✅ Catalog loaded: " + catalog.size() + " items");
-
-            // ✅ Log عينات للتشخيص
-            if (!catalog.isEmpty() && Log.isLoggable(TAG, Log.DEBUG)) {
-                int count = 0;
-                Log.d(TAG, "📋 Sample keys:");
-                for (String key : catalog.keySet()) {
-                    Log.d(TAG, "   → " + key);
-                    if (++count >= 5) break;
-                }
-            }
-
-            if (callback != null) callback.onCatalogLoaded(catalog);
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ fetchCatalog exception: " + e.getMessage(), e);
-            if (callback != null) callback.onError(
-                    e.getMessage() != null ? e.getMessage() 
-                    : (isArabic ? "خطأ غير متوقع" : "Unexpected error"));
         }
+
+        // ==================== 8. التحقق من النجاح النهائي ====================
+        if (!response.isSuccess || response.data == null) {
+            String err = response.error != null ? response.error 
+                    : (isArabic ? "بيانات غير صالحة" : "Invalid data");
+            Log.e(TAG, "❌ Invalid response: " + err);
+            if (callback != null) callback.onError(err);
+            return;
+        }
+
+        // ==================== 9. معالجة البيانات ====================
+        JSONArray items = response.data.optJSONArray("items");
+        if (items == null) {
+            JSONObject dataObj = response.data.optJSONObject("data");
+            if (dataObj != null) items = dataObj.optJSONArray("items");
+        }
+
+        if (items == null) {
+            Log.w(TAG, "⚠️ No items array — branch is empty");
+            if (callback != null) callback.onCatalogLoaded(catalog);
+            return;
+        }
+
+        Log.d(TAG, "📦 Found " + items.length() + " items in response");
+
+        for (int i = 0; i < items.length(); i++) {
+            try {
+                processCatalogItem(items.getJSONObject(i), catalog);
+            } catch (Exception e) {
+                Log.e(TAG, "processCatalogItem error at " + i + ": " + e.getMessage());
+            }
+        }
+
+        Log.d(TAG, "✅ Catalog loaded: " + catalog.size() + " items");
+
+        if (!catalog.isEmpty() && Log.isLoggable(TAG, Log.DEBUG)) {
+            int count = 0;
+            Log.d(TAG, "📋 Sample keys:");
+            for (String key : catalog.keySet()) {
+                Log.d(TAG, "   → " + key);
+                if (++count >= 5) break;
+            }
+        }
+
+        if (callback != null) callback.onCatalogLoaded(catalog);
+
+    } catch (Exception e) {
+        Log.e(TAG, "❌ fetchCatalog exception: " + e.getMessage(), e);
+        if (callback != null) callback.onError(
+                e.getMessage() != null ? e.getMessage() 
+                : (isArabic ? "خطأ غير متوقع" : "Unexpected error"));
     }
+}
 
     // ==================== Process Item ====================
 
