@@ -318,6 +318,14 @@ public void setBranchId(int branchId) {
         Log.e(TAG, "setBranchId error: " + e.getMessage());
     }
 }
+public void saveAuthToken(String token) {
+    secureManager.saveAuthToken(token);
+}
+
+public void saveAuthToken(String token, long expiresInSeconds) {
+    secureManager.saveAuthToken(token, expiresInSeconds);
+}
+
 
     // ==================== تسجيل الخروج ====================
     
