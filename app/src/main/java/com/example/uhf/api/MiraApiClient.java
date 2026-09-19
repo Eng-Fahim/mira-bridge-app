@@ -506,81 +506,108 @@ public ApiResponse getWithAuthLongTimeout(String endpoint) {
     }
 
     public ApiResponse login(String username, String password, String deviceId) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("username", username);
-            payload.put("password", password);
-            payload.put("device_id", deviceId != null ? deviceId : "");
-            
-            String effectiveGateId = getEffectiveGateId();
-            if (effectiveGateId.isEmpty()) {
-                effectiveGateId = deviceId != null ? deviceId : "default-gate";
-                serverConfig.setGateId(effectiveGateId);
-            }
-            
-            payload.put("gate_id", effectiveGateId);
-            payload.put("app_version", "MIRA-ANDROID-v3.0");
-        } catch (Exception ignored) {}
-
-        ApiResponse response = post("/auth/login", payload);
-
-        if (response.isSuccess && response.data != null) {
-            String newApiKey = response.data.optString("api_key", "");
-            String newGateId = response.data.optString("gate_id", "");
-            String authToken = response.data.optString("token", "");
-
-            if (!newApiKey.isEmpty()) {
-                String effectiveGateId = !newGateId.isEmpty() ? newGateId :
-                        (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
-
-                sessionManager.saveApiKey(newApiKey);
-                sessionManager.saveGateId(effectiveGateId);
-                refreshCredentials();
-            } else if (!authToken.isEmpty()) {
-                String currentApiKey = getEffectiveApiKey();
-                String currentGateId = getEffectiveGateId();
-
-                String effectiveGateId = !currentGateId.isEmpty() ? currentGateId :
-                        (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
-
-                if (!currentApiKey.isEmpty()) {
-                    sessionManager.saveApiKey(currentApiKey);
-                }
-                sessionManager.saveGateId(effectiveGateId);
-                refreshCredentials();
-            }
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("username", username);
+        payload.put("password", password);
+        payload.put("device_id", deviceId != null ? deviceId : "");
+        
+        String effectiveGateId = getEffectiveGateId();
+        if (effectiveGateId.isEmpty()) {
+            effectiveGateId = deviceId != null ? deviceId : "default-gate";
+            serverConfig.setGateId(effectiveGateId);
         }
-        return response;
+        
+        payload.put("gate_id", effectiveGateId);
+        payload.put("app_version", "MIRA-ANDROID-v3.0");
+    } catch (Exception ignored) {}
+
+    ApiResponse response = post("/auth/login", payload);
+
+    if (response.isSuccess && response.data != null) {
+        String newApiKey = response.data.optString("api_key", "");
+        String newGateId = response.data.optString("gate_id", "");
+        String authToken = response.data.optString("token", "");
+        long expiresIn = response.data.optLong("expires_in", 86400 * 7); // 7 أيام افتراضياً
+        
+        Log.d(TAG, "🔐 Login response received:");
+        Log.d(TAG, "   - api_key: " + (newApiKey.isEmpty() ? "EMPTY" : "EXISTS"));
+        Log.d(TAG, "   - token: " + (authToken.isEmpty() ? "EMPTY" : "EXISTS (" + authToken.length() + " chars)"));
+        Log.d(TAG, "   - gate_id: " + (newGateId.isEmpty() ? "EMPTY" : newGateId));
+        Log.d(TAG, "   - expires_in: " + expiresIn + "s");
+        
+        // ✅ 1. حفظ التوكن — كان مفقوداً!
+        if (!authToken.isEmpty()) {
+            sessionManager.saveAuthToken(authToken, expiresIn);
+            Log.d(TAG, "✅ Auth token saved");
+        } else {
+            Log.w(TAG, "⚠️ Login succeeded but server returned no token!");
+        }
+        
+        // ✅ 2. حفظ API Key
+        if (!newApiKey.isEmpty()) {
+            sessionManager.saveApiKey(newApiKey);
+            Log.d(TAG, "✅ API Key saved");
+        }
+        
+        // ✅ 3. حفظ Gate ID
+        String effectiveGateId = !newGateId.isEmpty() ? newGateId :
+                (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
+        if (!effectiveGateId.isEmpty()) {
+            sessionManager.saveGateId(effectiveGateId);
+            Log.d(TAG, "✅ Gate ID saved: " + effectiveGateId);
+        }
+        
+        // ✅ 4. تحديث الـ Credentials الداخلية
+        refreshCredentials();
+        
+        // ✅ 5. حفظ اسم المستخدم للاستخدام المستقبلي
+        if (username != null && !username.isEmpty()) {
+            sessionManager.saveLastUsername(username);
+        }
+        
+        Log.d(TAG, "════════════════════════════════════════════");
+        Log.d(TAG, "✅ Login complete. Diagnostics:");
+        Log.d(TAG, getAuthDiagnostics());
+        Log.d(TAG, "════════════════════════════════════════════");
     }
+    
+    return response;
+}
 
     public ApiResponse reconnectDevice(String username, String password, String gateId) {
-        try {
-            JSONObject params = new JSONObject();
-            params.put("username", username);
-            params.put("password", password);
-            params.put("gate_id", gateId);
+    try {
+        JSONObject params = new JSONObject();
+        params.put("username", username);
+        params.put("password", password);
+        params.put("gate_id", gateId);
 
-            ApiResponse response = post("/auth/reconnect", params);
-            if (response != null && response.isSuccess && response.data != null) {
-                String newApiKey = response.data.optString("api_key", "");
-                String newGateId = response.data.optString("gate_id", gateId);
-                String authToken = response.data.optString("token", "");
-
-                if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
-                    if (!newApiKey.isEmpty()) {
-                        sessionManager.saveApiKey(newApiKey);
-                    }
-                    if (newGateId != null && !newGateId.isEmpty()) {
-                        sessionManager.saveGateId(newGateId);
-                    }
-                    refreshCredentials();
-                }
+        ApiResponse response = post("/auth/reconnect", params);
+        if (response != null && response.isSuccess && response.data != null) {
+            String newApiKey = response.data.optString("api_key", "");
+            String newGateId = response.data.optString("gate_id", gateId);
+            String authToken = response.data.optString("token", "");
+            long expiresIn = response.data.optLong("expires_in", 86400 * 7);
+            
+            // ✅ حفظ التوكن (كان مفقوداً!)
+            if (!authToken.isEmpty()) {
+                sessionManager.saveAuthToken(authToken, expiresIn);
+                Log.d(TAG, "✅ Auth token saved from reconnect");
             }
-            return response;
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
+            
+            if (!newApiKey.isEmpty()) {
+                sessionManager.saveApiKey(newApiKey);
+            }
+            if (newGateId != null && !newGateId.isEmpty()) {
+                sessionManager.saveGateId(newGateId);
+            }
+            refreshCredentials();
         }
+        return response;
+    } catch (Exception e) {
+        return new ApiResponse(-1, null, e.getMessage());
     }
+}
 
     public ApiResponse validateToken(String token) {
         JSONObject payload = new JSONObject();
