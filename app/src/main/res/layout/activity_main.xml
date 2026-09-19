@@ -175,7 +175,6 @@
             android:background="@drawable/bg_fab_with_border"
             app:backgroundTint="@null"
             app:borderWidth="4dp"
-            app:borderColor="?attr/colorSurface"
             app:elevation="12dp"
             app:fabSize="normal"
             app:layout_constraintBottom_toBottomOf="@id/bottomNavigationView"
