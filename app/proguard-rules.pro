@@ -113,16 +113,6 @@
 -dontwarn com.google.zxing.**
 -dontwarn com.google.mlkit.vision.**
 
-# ==================== Retrofit & OkHttp & Gson ====================
--keep class retrofit2.** { *; }
--keep class okhttp3.** { *; }
--keep class com.google.gson.** { *; }
--keepclassmembers class * {
-    @com.google.gson.annotations.SerializedName <fields>;
-}
--keepclassmembers interface * {
-    @retrofit2.http.* <methods>;
-}
 
 # ==================== Room Database ====================
 -keep class * extends androidx.room.RoomDatabase
