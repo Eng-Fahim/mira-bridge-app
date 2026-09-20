@@ -252,60 +252,59 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
      * ✅ 1) onTagRead — القراءة الأساسية
      */
     @Override
-    public void onTagRead(String rawEpc, int rssi) {
-        if (!isScanning.get() || rawEpc == null || rawEpc.isEmpty()) return;
+public void onTagRead(String rawEpc, int rssi) {
+    if (!isScanning.get() || rawEpc == null || rawEpc.isEmpty()) return;
 
-        final int generation = scanGeneration.get();
+    final int generation = scanGeneration.get();
 
-        if (processingExecutor == null || processingExecutor.isShutdown()) return;
+    if (processingExecutor == null || processingExecutor.isShutdown()) return;
 
-        processingExecutor.execute(() -> {
-            if (generation != scanGeneration.get()) return;
+    processingExecutor.execute(() -> {
+        if (generation != scanGeneration.get()) return;
 
-            final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(
-                    rawEpc, barcodeToEpcMap);
+        final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(
+                rawEpc, barcodeToEpcMap);
 
-            if (!catalogEpcs.isEmpty() && !catalogEpcs.contains(normalizedEpc)) {
-                return;
-            }
+        // ✅ إصلاح حرج: لا تفلتر القطع غير المعروفة!
+        // كانت المشكلة: القطع غير المعروفة لا تظهر أبداً في الجرد
+        // الحل: مررها للـ callback — والواجهة تقرر كيف تعرضها
 
-            long now = System.currentTimeMillis();
-            Long last = recentTagReads.get(normalizedEpc);
-            if (last != null && (now - last) < TAG_READ_DEBOUNCE_MS) {
-                if (callback != null) {
-                    mainHandler.post(() -> {
-                        if (generation == scanGeneration.get()) {
-                            callback.onTagDebounced(normalizedEpc);
-                        }
-                    });
-                }
-                return;
-            }
-            recentTagReads.put(normalizedEpc, now);
-
-            if (recentTagReads.size() > MAX_CACHE_ITEMS) {
-                cleanOldTagReads(now);
-            }
-
-            try {
-                if (inventoryEngine != null) {
-                    inventoryEngine.onTagScanned(normalizedEpc, rssi);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "engine error", e);
-            }
-
+        long now = System.currentTimeMillis();
+        Long last = recentTagReads.get(normalizedEpc);
+        if (last != null && (now - last) < TAG_READ_DEBOUNCE_MS) {
             if (callback != null) {
-                final int finalRssi = rssi;
                 mainHandler.post(() -> {
                     if (generation == scanGeneration.get()) {
-                        callback.onTagRead(normalizedEpc, finalRssi);
+                        callback.onTagDebounced(normalizedEpc);
                     }
                 });
             }
-        });
-    }
+            return;
+        }
+        recentTagReads.put(normalizedEpc, now);
 
+        if (recentTagReads.size() > MAX_CACHE_ITEMS) {
+            cleanOldTagReads(now);
+        }
+
+        try {
+            if (inventoryEngine != null) {
+                inventoryEngine.onTagScanned(normalizedEpc, rssi);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "engine error", e);
+        }
+
+        if (callback != null) {
+            final int finalRssi = rssi;
+            mainHandler.post(() -> {
+                if (generation == scanGeneration.get()) {
+                    callback.onTagRead(normalizedEpc, finalRssi);
+                }
+            });
+        }
+    });
+}
     /**
      * ✅ 2) onScanStarted — إشعار بدء المسح من القارئ
      */
