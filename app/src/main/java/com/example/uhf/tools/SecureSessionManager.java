@@ -676,10 +676,17 @@ public void setUsername(String username) {
                 .apply();
     }
     
-    public int getLastBiometricBranchId() {
-        return userPrefs.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
-    }
-    
+    // ==================== الإصلاح 1: getLastBiometricBranchId ====================
+
+/**
+ * ✅ إصلاح: افتراضي -1 بدلاً من 1
+ * لمنع استخدام فرع #1 غير موجود
+ */
+public int getLastBiometricBranchId() {
+    return userPrefs.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, -1);
+}
+
+
     public String getLastBiometricBranchName() {
         return userPrefs.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
     }
@@ -983,23 +990,28 @@ public void setBranchId(int branchId) {
     }
 }
 
+
+// ==================== الإصلاح 2: getBranchId ====================
+
 /**
- * ✅ الحصول على معرف الفرع الحالي
+ * ✅ إصلاح: يفصل بوضوح بين "لم يُحفظ" و"محفوظ"
  */
 public int getBranchId() {
     try {
         int branchId = userPrefs.getInt(KEY_BRANCH_ID, -1);
-        if (branchId <= 0) {
-            // ✅ محاولة من البيانات البيومترية
-            branchId = getLastBiometricBranchId();
-        }
-        return branchId;
+        if (branchId > 0) return branchId;
+
+        // ✅ محاولة من البيانات البيومترية (بعد الإصلاح = -1)
+        int bioBranchId = getLastBiometricBranchId();
+        if (bioBranchId > 0) return bioBranchId;
+
+        return -1;
     } catch (Exception e) {
         Log.e(TAG, "getBranchId error: " + e.getMessage());
         return -1;
     }
 }
-
+    
 /**
  * ✅ حفظ اسم الفرع الحالي
  */
