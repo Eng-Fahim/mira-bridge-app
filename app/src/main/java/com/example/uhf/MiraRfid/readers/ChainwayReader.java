@@ -571,9 +571,28 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public String readTid() {
-        return readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_TID, 0, 6);
+public String readTid() {
+    // ✅ محاولة قراءة TID بأطوال مختلفة
+    for (int words : new int[]{6, 5, 4}) {
+        try {
+            String tid = readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_TID, 0, words);
+            if (tid != null && !tid.isEmpty()) {
+                tid = tid.trim().toUpperCase();
+                // ✅ إزالة padding
+                while (tid.length() > 20 && tid.endsWith("0000")) {
+                    tid = tid.substring(0, tid.length() - 4);
+                }
+                Log.i(TAG, "✅ TID read OK (" + words + " words): " + tid 
+                    + " (length=" + tid.length() + ")");
+                return tid;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "⚠️ TID read failed with " + words + " words", e);
+        }
     }
+    Log.e(TAG, "❌ TID read FAILED after 3 attempts");
+    return null;
+}
     
     @Override
     public String readUserMemory(int address, int length) {
