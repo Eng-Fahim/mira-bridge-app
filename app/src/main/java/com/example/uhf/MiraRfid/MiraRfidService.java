@@ -11,7 +11,7 @@ import com.rscja.deviceapi.RFIDWithUHFUART;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-
+import java.util.Locale;
 /**
  * خدمة RFID موحدة لربط القارئات وواجهات التطبيق
  * 
@@ -243,22 +243,63 @@ public class MiraRfidService {
         return null;
     }
 
-    public String readTid(String accessPassword) {
-        currentState = OperationState.READING;
-        String safePwd = normalizePwd(accessPassword);
+   public String readTid(String accessPassword) {
+    currentState = OperationState.READING;
+    String safePwd = normalizePwd(accessPassword);
+    
+    String tid = null;
+    
+    // ✅ محاولة 1: قراءة 6 كلمات (24 حرف HEX)
+    try {
+        tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 6);
+    } catch (Exception e) {
+        Log.w(TAG, "⚠️ readTid 6-words failed: " + e.getMessage());
+    }
+    
+    // ✅ محاولة 2: قراءة 5 كلمات (20 حرف HEX)
+    if (tid == null || tid.isEmpty()) {
+        try {
+            Log.d(TAG, "🔄 Retry readTid with 5 words...");
+            tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 5);
+        } catch (Exception e) {
+            Log.w(TAG, "⚠️ readTid 5-words failed: " + e.getMessage());
+        }
+    }
+    
+    // ✅ محاولة 3: قراءة 4 كلمات (16 حرف HEX)
+    if (tid == null || tid.isEmpty()) {
+        try {
+            Log.d(TAG, "🔄 Retry readTid with 4 words...");
+            tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 4);
+        } catch (Exception e) {
+            Log.w(TAG, "⚠️ readTid 4-words failed: " + e.getMessage());
+        }
+    }
+    
+    if (tid != null && !tid.isEmpty()) {
+        // ✅ تطبيع TID
+        tid = tid.trim().toUpperCase(Locale.US);
         
-        String tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 6);
+        // ✅ إزالة padding (0000 في النهاية)
+        while (tid.length() > 20 && tid.endsWith("0000")) {
+            tid = tid.substring(0, tid.length() - 4);
+        }
         
-        if (tid != null && !tid.isEmpty()) {
+        // ✅ التحقق من صحة TID
+        if (tid.length() >= 16 && tid.matches("^[0-9A-F]+$")) {
             lastReadTid = tid;
             currentState = OperationState.COMPLETED;
-            Log.i(TAG, "✅ readTid OK: " + tid);
+            Log.i(TAG, "✅ readTid OK: " + tid + " (length=" + tid.length() + ")");
             return tid;
+        } else {
+            Log.w(TAG, "⚠️ readTid returned invalid format: " + tid);
         }
-        currentState = OperationState.FAILED;
-        Log.e(TAG, "❌ readTid FAILED");
-        return null;
     }
+    
+    currentState = OperationState.FAILED;
+    Log.e(TAG, "❌ readTid FAILED after 3 attempts");
+    return null;
+}
 
     public boolean writeEpc(String newEpc, String accessPassword) {
         currentState = OperationState.WRITING;
