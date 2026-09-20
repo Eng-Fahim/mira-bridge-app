@@ -390,6 +390,16 @@ public boolean isInactivityTimeout(long timeoutMs) {
     return secureManager.isInactivityTimeout(timeoutMs);
 }
 
+/**
+ * ✅ إنشاء جلسة دخول مع مدة صلاحية مخصصة
+ */
+public void createLoginSession(String username, String role, String token, 
+                                String serverUrl, long expiresInSeconds) {
+    secureManager.createLoginSession(username, role, token, serverUrl, expiresInSeconds);
+    Log.d(TAG, "Login session created for user: " + username 
+            + " (expires in " + expiresInSeconds + "s)");
+}
+
 public void unlockSession() {
     secureManager.unlockSession();
 }
