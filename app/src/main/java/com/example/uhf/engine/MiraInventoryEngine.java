@@ -76,27 +76,41 @@ public void clearSession() {
     }
 
     public void onTagScanned(String rawEpc, int rssi) {
-        String epc = InventoryItem.normalizeEpc(rawEpc);
-        if (epc.isEmpty()) return;
+    String epc = InventoryItem.normalizeEpc(rawEpc);
+    if (epc.isEmpty()) return;
 
-        totalReads.incrementAndGet();
+    totalReads.incrementAndGet();
 
-        scannedByEpcMap.compute(epc, (k, existingItem) -> {
-            if (existingItem == null) {
-                uniqueCount.incrementAndGet();
-                InventoryItem catalogMatch = catalogByEpc.get(epc);
-                InventoryItem newItem = (catalogMatch != null) 
-                        ? catalogMatch 
-                        : new InventoryItem(epc, "", "", "Uncatalogued Asset");
-                newItem.recordScan(rssi);
-                return newItem;
+    scannedByEpcMap.compute(epc, (k, existingItem) -> {
+        if (existingItem == null) {
+            uniqueCount.incrementAndGet();
+            
+            InventoryItem catalogMatch = catalogByEpc.get(epc);
+            InventoryItem newItem;
+            
+            if (catalogMatch != null) {
+                // ✅ إصلاح: انسخ الكائن (لا تشارك!)
+                newItem = new InventoryItem(
+                        catalogMatch.getEpc(),
+                        catalogMatch.getGtin(),
+                        catalogMatch.getSerial(),
+                        catalogMatch.getTitle(),
+                        catalogMatch.getKarat());
+                newItem.setWeight(catalogMatch.getWeight());
+                newItem.setPrice(catalogMatch.getPrice());
             } else {
-                duplicateCount.incrementAndGet();
-                existingItem.recordScan(rssi);
-                return existingItem;
+                newItem = new InventoryItem(epc, "", "", "Uncatalogued Asset");
             }
-        });
-    }
+            
+            newItem.recordScan(rssi);
+            return newItem;
+        } else {
+            duplicateCount.incrementAndGet();
+            existingItem.recordScan(rssi);
+            return existingItem;
+        }
+    });
+}
     
     public String getClientSessionId() {
     return clientSessionId;
