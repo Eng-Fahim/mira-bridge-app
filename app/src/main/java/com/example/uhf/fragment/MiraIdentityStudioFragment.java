@@ -623,59 +623,76 @@ private void activateRFIDModeForEncoding() {
             }
 
             activity.setActiveRfidListener(epc -> {
-                final String normalizedEpc = epc != null ?
+                // ⚠️ تجاهل EPC المُستلَم — سنستخدم TID فقط
+                final String scannedEpc = epc != null ?
                         epc.trim().toUpperCase(Locale.US) : "";
 
-                // ✅ المرحلة 1: قراءة TID + التحقق من مخزون SunlandRFID
+                // ✅ قراءة TID الحقيقي (المعرّف الوحيد الموثوق)
                 miraExecutor.getBackgroundExecutor().execute(() -> {
                     MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
                     final String tid = rfidService.readTid(null);
                     final boolean isSim = rfidService.isSimulationMode();
 
-                    // ✅ التحقق من أن الشريحة معتمدة
-                    boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(tid);
+                    // ✅ التحقق من أن TID تم قراءته
+                    if (tid == null || tid.isEmpty()) {
+                        safeRun(() -> {
+                            playErrorSound();
+                            showErrorDialog(
+                                isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
+                                isArabic ? 
+                                    "تعذّر قراءة TID الشريحة. يرجى إعادة المسح." :
+                                    "Failed to read tag TID. Please re-scan."
+                            );
+                            stopRfidScanningMode();
+                        });
+                        return;
+                    }
 
-                    // ✅ التحقق من عدم التكرار
-                    boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedEpc);
+                    final String normalizedTid = tid.trim().toUpperCase(Locale.US);
+
+                    // ✅ التحقق من أن الشريحة معتمدة (بالـ TID)
+                    boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(normalizedTid);
+
+                    // ✅ التحقق من عدم التكرار (بالـ TID)
+                    boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedTid);
 
                     safeRun(() -> {
-                        // فحص أول: شريحة غير معتمدة
                         if (!isTagAllowed) {
                             playErrorSound();
                             showErrorDialog(
                                 isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
                                 isArabic ?
-                                    "هذه الشريحة (TID: " + tid + ") غير مسجلة في مخزون الشرائح المعتمدة.\n\n" +
+                                    "هذه الشريحة (TID: " + normalizedTid + ") غير مسجلة في مخزون الشرائح المعتمدة.\n\n" +
                                     "يرجى استخدام شريحة من مورد معتمد (SunlandRFID)." :
-                                    "This tag (TID: " + tid + ") is not in the authorized inventory.\n\n" +
+                                    "This tag (TID: " + normalizedTid + ") is not in the authorized inventory.\n\n" +
                                     "Please use a tag from an approved supplier."
                             );
                             stopRfidScanningMode();
                             return;
                         }
 
-                        // فحص ثانٍ: شريحة مكررة محلياً
                         if (isDuplicate) {
                             playErrorSound();
                             showErrorDialog(
-                                isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag",
+                                isArabic ? "شريحة مكررة" : "Duplicate Tag",
                                 isArabic ?
-                                    "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل." :
-                                    "This tag (" + normalizedEpc + ") is already registered."
+                                    "هذه الشريحة (TID: " + normalizedTid + ") مسجلة بالفعل." :
+                                    "This tag (TID: " + normalizedTid + ") is already registered."
                             );
                             stopRfidScanningMode();
                             return;
                         }
 
-                        // ✅ نجاح: تعبئة EPC و TID
+                        // ✅ حفظ TID في الحقل (المعرّف الأساسي)
                         if (binding != null && binding.etEpc != null) {
-                            binding.etEpc.setText(normalizedEpc);
+                            binding.etEpc.setText(normalizedTid);
+                            binding.etEpc.setTag(normalizedTid);  // ← تخزين TID في tag الحقل
                             binding.tvStatusBadge.setText("BOUND");
                         }
 
-                        // ✅ إخفاء TID في مكان ما (اختياري)
-                        Log.i(TAG, "✅ Tag verified: EPC=" + normalizedEpc + " TID=" + tid);
-
+                        Log.i(TAG, "✅ Tag verified: TID=" + normalizedTid 
+                                + " (scanned EPC ignored: " + scannedEpc + ")");
+                        
                         playSuccessSound();
                         stopRfidScanningMode();
                     });
@@ -965,14 +982,15 @@ private void finalizeItemIdentity() {
         }
 
         // ==================== 1) قراءة البيانات من النموذج ====================
-        String epc = binding.etEpc.getText() != null ?
-                binding.etEpc.getText().toString().trim() : "";
+        // ✅ الحقل يحتوي على TID الآن
+        String identifier = binding.etEpc.getText() != null ?
+        binding.etEpc.getText().toString().trim() : "";
         String title = binding.etTitle.getText() != null ?
                 binding.etTitle.getText().toString().trim() : "";
         String weightStr = binding.etGrossWeight.getText() != null ?
                 binding.etGrossWeight.getText().toString().trim() : "";
 
-        if (!validateInputData(epc, title, weightStr)) {
+        if (!validateInputData(identifier, title, weightStr)) {
             unlockFormFast();
             return;
         }
@@ -1031,7 +1049,7 @@ private void finalizeItemIdentity() {
         );
 
         // ==================== 3) تثبيت المتغيرات للمعالجة الخلفية ====================
-        final String finalEpc = epc;
+        final String finalIdentifier = identifier;   // ✅ TID
         final String finalTitle = title;
         final double fGrossWeight = grossWeight;
         final double fStoneWeightCarats = stoneWeightCarats;
@@ -1056,7 +1074,7 @@ private void finalizeItemIdentity() {
         miraExecutor.getBackgroundExecutor().execute(() -> {
             try {
                 JSONObject payload = buildPayload(
-                    finalEpc, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
+    finalIdentifier, finalTitle, selectedKarat , fGrossWeight, netGoldWeight,
                     fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
                     details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
                     localCurrency, exchangeRate, selectedCategory, location,
@@ -1124,11 +1142,11 @@ private void finalizeItemIdentity() {
 
                 // ==================== 6) نجاح السيرفر → كتابة EPC على الشريحة ====================
                 Log.i(TAG, "✅ Server OK — Starting hardware encoding sequence");
-                Log.i(TAG, "📡 TID=" + tid + " | EPC_original=" + finalEpc + " | SIM=" + isSim);
+                Log.i(TAG, "📡 TID=" + tid + " | Identifier=" + finalIdentifier + " | SIM=" + isSim);
 
                 // استخراج mira_id من الاستجابة
                 String miraId = (finalResponseData != null) ?
-                        finalResponseData.optString("mira_id", finalEpc) : finalEpc;
+                        finalResponseData.optString("mira_id", finalIdentifier) : finalIdentifier;
 
                 // توليد EPC الجديد
                 String newEpc = rfidService.generateEpcFromMiraId(miraId);
@@ -1195,8 +1213,8 @@ private void finalizeItemIdentity() {
                     try {
                         JSONObject updatePayload = new JSONObject();
                         updatePayload.put("item_id", finalServerItemId);
-                        updatePayload.put("rfid_epc_final", finalNewEpc);
-                        updatePayload.put("rfid_tid", tid);
+                        updatePayload.put("rfid_epc_final", finalNewEpc);   // ← EPC الجديد
+                        updatePayload.put("rfid_tid", tid);     // ✅ ← TID
                         updatePayload.put("rfid_locked", finalLock);
                         updatePayload.put("rfid_verified", finalVerify);
                         updatePayload.put("rfid_pre_encoded", finalWasPreEncoded);
@@ -1220,7 +1238,7 @@ private void finalizeItemIdentity() {
 
                     // إزالة المسودة
                     miraExecutor.getSingleThreadExecutor().execute(() ->
-                            syncManager.removePendingEncode(finalEpc));
+                            syncManager.removePendingEncode(finalIdentifier));
                     if (formManager != null) formManager.clearDraft();
 
                     notifyDashboardUpdate("encode_success");
@@ -1231,7 +1249,7 @@ private void finalizeItemIdentity() {
                     }
 
                     // EPC النهائي للعرض
-                    String displayEpc = finalWrite ? finalNewEpc : finalEpc;
+                    String displayEpc = finalWrite ? finalNewEpc : finalIdentifier;
 
                     // توليد GS1 و QR
                     String gs1Code = "(01)0729000000" +
@@ -1400,6 +1418,7 @@ showEncodingSuccessDialogEnhanced(
     if (epc != null && !epc.isEmpty()) {
         payload.put("epc", epc);
     }
+    
     payload.put("title", title);
     payload.put("purity_code", karat);
     payload.put("category", category);
@@ -1433,15 +1452,15 @@ showEncodingSuccessDialogEnhanced(
     payload.put("exchange_rate", exchangeRate);
     payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
 
-    // ==================== 5) بيانات RFID (مُوحَّدة) ====================
-    if (tid != null && !tid.isEmpty()) {
-        payload.put("rfid_tid", tid);
-    }
-    payload.put("rfid_sim_mode", isSim);
-    payload.put("rfid_epc_original", epc);   // EPC الأصلي على الشريحة قبل الكتابة
-    payload.put("rfid_epc_final", "");       // سيُحدَّث لاحقاً عبر /items/update-rfid
-    payload.put("rfid_locked", false);       // سيُحدَّث بعد القفل
-    payload.put("rfid_verified", false);     // سيُحدَّث بعد التحقق
+    // ==================== 5) بيانات RFID ====================
+if (tid != null && !tid.isEmpty()) {
+    payload.put("tid", tid);              // ✅ TID كمعرّف أساسي
+    payload.put("rfid_tid", tid);          // ✅ للتوافق مع السيرفر
+}
+payload.put("rfid_epc_original", "");      // ← فارغ (الشرائح بكر)
+payload.put("rfid_epc_final", "");         // ← يُحدَّث لاحقاً
+payload.put("rfid_locked", false);
+payload.put("rfid_verified", false);
 
     // ==================== 6) صور القطعة ====================
     if (!photoPathsList.isEmpty()) {
