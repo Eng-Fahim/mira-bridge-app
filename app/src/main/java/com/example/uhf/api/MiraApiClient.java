@@ -1901,6 +1901,35 @@ private boolean isArabicText() {
     public ApiResponse getPermissionTemplates() {
         return getWithAuth("/auth/permissions/templates");
     }
+    
+    /**
+ * ✅ فحص شامل لحالة المصادقة قبل أي عملية
+ */
+public boolean isAuthenticated() {
+    String token = getAuthToken();
+    boolean hasToken = token != null && !token.isEmpty();
+    return hasToken;
+}
+
+/**
+ * ✅ الحصول على تشخيص كامل لحالة المصادقة
+ */
+public String getAuthDiagnostics() {
+    StringBuilder sb = new StringBuilder();
+    String token = getAuthToken();
+    String key = getEffectiveApiKey();
+    String gate = getEffectiveGateId();
+    
+    sb.append("Token: ").append(token != null && !token.isEmpty() 
+            ? "✅ موجود (" + token.length() + " حرف)" : "❌ مفقود").append("\n");
+    sb.append("API Key: ").append(key != null && !key.isEmpty() 
+            ? "✅ موجود" : "❌ مفقود").append("\n");
+    sb.append("Gate ID: ").append(gate != null && !gate.isEmpty() 
+            ? "✅ " + gate : "❌ مفقود").append("\n");
+    sb.append("Base URL: ").append(apiUrl).append("\n");
+    
+    return sb.toString();
+}
 
     public interface ApiCallback {
     void onSuccess(ApiResponse response);
