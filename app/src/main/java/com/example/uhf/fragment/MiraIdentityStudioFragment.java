@@ -1063,9 +1063,53 @@ private void finalizeItemIdentity() {
         final List<String> finalPhotoPaths = new ArrayList<>(photoManager.getPhotoPaths());
         final int currentUserId = getCurrentUserId();
 
-        MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
-        final String tid = rfidService.readTid(null);
-        final boolean isSim = rfidService.isSimulationMode();
+        // ✅ الأولوية: القيمة الموجودة في etEpc (يدوية أو من المسح)
+String tidFromField = binding.etEpc.getText() != null
+        ? binding.etEpc.getText().toString().trim().toUpperCase(Locale.US)
+        : "";
+
+// ✅ محاولة قراءة TID من القارئ
+MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
+String tidFromReader = rfidService.readTid(null);
+final boolean isSim = rfidService.isSimulationMode();
+
+// ✅ تحديد TID النهائي: القارئ أولاً، ثم الحقل
+final String tid;
+if (tidFromReader != null && !tidFromReader.isEmpty()) {
+    // ✅ إذا نجح القارئ، استخدم قيمته
+    tid = tidFromReader.trim().toUpperCase(Locale.US);
+    Log.i(TAG, "✅ TID from reader: " + tid);
+} else if (!tidFromField.isEmpty() && tidFromField.length() >= 16) {
+    // ✅ fallback: استخدم القيمة المُدخلة يدوياً
+    tid = tidFromField;
+    Log.i(TAG, "✅ TID from field (manual): " + tid);
+} else {
+    // ❌ لا يوجد TID
+    tid = null;
+    Log.e(TAG, "❌ No TID available (reader failed + field empty)");
+}
+
+// ✅ التحقق من وجود TID قبل المتابعة
+if (tid == null) {
+    safeRun(() -> {
+        dismissDialog(loadingDialog);
+        unlockFormFast();
+        setFormEnabled(true);
+        showErrorDialog(
+            isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
+            isArabic ?
+                "لا يمكن قراءة TID الشريحة.\n\n" +
+                "يرجى:\n" +
+                "• التأكد من إدخال TID في الحقل\n" +
+                "• أو توصيل قارئ RFID والمحاولة مجدداً" :
+                "Cannot read tag TID.\n\n" +
+                "Please:\n" +
+                "• Enter TID manually in the field\n" +
+                "• Or connect RFID reader and retry"
+        );
+    });
+    return;  // ← توقف عن التنفيذ
+}
 
         // ✅ كلمة المرور الافتراضية للشريحة (بديل null)
         //final String DEFAULT_PWD = "00000000";
