@@ -38,18 +38,69 @@ public class MiraServerConfig {
      * ✅ الحصول على الرابط الأساسي
      * في حال عدم وجود رابط محفوظ، يتم استخدام الرابط الافتراضي
      */
-    public String getBaseUrl() {
-        String url = prefs.getString(KEY_BASE_URL, "");
+    /**
+ * ✅ إصلاح: ضمان / نهائي دائماً
+ */
+public String getBaseUrl() {
+    String url = prefs.getString(KEY_BASE_URL, "");
+    if (url == null || url.isEmpty()) {
+        url = DEFAULT_BASE_URL;
+        setBaseUrl(DEFAULT_BASE_URL);
+    }
+    // ✅ ضمان / نهائي
+    if (!url.endsWith("/")) {
+        url += "/";
+        setBaseUrl(url);
+    }
+    return url;
+}
+
+
+/**
+ * ✅ إصلاح: دعم baseUrl مع أو بدون wp-json
+ */
+public boolean testConnection(String baseUrl) {
+    try {
+        Log.d(TAG, "Testing connection to: " + baseUrl);
         
-        // ✅ إذا كان الرابط فارغاً، استخدم الافتراضي واحفظه
-        if (url == null || url.isEmpty()) {
-            Log.d(TAG, "No saved URL, using default: " + DEFAULT_BASE_URL);
-            url = DEFAULT_BASE_URL;
-            setBaseUrl(DEFAULT_BASE_URL);
+        String cleanUrl = baseUrl.trim();
+        if (!cleanUrl.endsWith("/")) cleanUrl += "/";
+        
+        // ✅ لا تكرر wp-json
+        String pingUrl;
+        if (cleanUrl.contains("/wp-json/")) {
+            pingUrl = cleanUrl + "mira-gate/v1/ping";
+        } else {
+            pingUrl = cleanUrl + "wp-json/mira-gate/v1/ping";
         }
         
-        return url;
+        Log.d(TAG, "Ping URL: " + pingUrl);
+        
+        java.net.URL url = new java.net.URL(pingUrl);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        conn.setRequestMethod("GET");
+        
+        int responseCode = conn.getResponseCode();
+        Log.d(TAG, "Connection test response: " + responseCode);
+        
+        conn.disconnect();
+        return responseCode >= 200 && responseCode < 400;
+    } catch (Exception e) {
+        Log.e(TAG, "Connection test failed: " + e.getMessage());
+        return false;
     }
+}
+
+
+/**
+ * ✅ جديد: مسح Token منفرداً (يُستدعى من logout)
+ */
+public void clearAuthToken() {
+    prefs.edit().remove(KEY_AUTH_TOKEN).apply();
+    Log.d(TAG, "Auth token cleared from serverConfig");
+}
 
     /**
      * ✅ حفظ الرابط الأساسي
@@ -157,38 +208,7 @@ public class MiraServerConfig {
         return url != null && !url.isEmpty();
     }
 
-    /**
-     * ✅ اختبار الاتصال بالخادم
-     */
-    public boolean testConnection(String baseUrl) {
-        try {
-            Log.d(TAG, "Testing connection to: " + baseUrl);
-            
-            // ✅ تنظيف الرابط
-            String cleanUrl = baseUrl.trim();
-            if (!cleanUrl.endsWith("/")) {
-                cleanUrl += "/";
-            }
-            
-            // ✅ إضافة مسار البينج
-            String pingUrl = cleanUrl + "wp-json/mira-gate/v1/ping";
-            
-            java.net.URL url = new java.net.URL(pingUrl);
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-            conn.setRequestMethod("GET");
-            
-            int responseCode = conn.getResponseCode();
-            Log.d(TAG, "Connection test response: " + responseCode);
-            
-            conn.disconnect();
-            return responseCode > 0 && responseCode < 500;
-        } catch (Exception e) {
-            Log.e(TAG, "Connection test failed: " + e.getMessage());
-            return false;
-        }
-    }
+   
 
     /**
      * ✅ إعادة تعيين الإعدادات إلى الافتراضي
