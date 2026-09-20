@@ -412,51 +412,94 @@ public class MiraApiClient {
 
     // ==================== المصادقة ====================
     public ApiResponse login(String username, String password, String deviceId) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("username", username);
-            payload.put("password", password);
-            payload.put("device_id", deviceId != null ? deviceId : "");
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("username", username);
+        payload.put("password", password);
+        payload.put("device_id", deviceId != null ? deviceId : "");
 
-            String effectiveGate = getEffectiveGateId();
-            if (effectiveGate.isEmpty()) {
-                effectiveGate = deviceId != null && !deviceId.isEmpty()
-                        ? deviceId : "default-gate";
-                serverConfig.setGateId(effectiveGate);
-            }
-
-            payload.put("gate_id", effectiveGate);
-            payload.put("app_version", "MIRA-ANDROID-v3.0");
-        } catch (Exception ignored) {}
-
-        ApiResponse response = post("/auth/login", payload);
-
-        if (response.isSuccess && response.data != null) {
-            String newApiKey = response.data.optString("api_key", "");
-            String newGateId = response.data.optString("gate_id", "");
-            String authToken = response.data.optString("token", "");
-
-            if (!newApiKey.isEmpty()) {
-                String effectiveGateId = !newGateId.isEmpty() ? newGateId
-                        : (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
-                sessionManager.saveApiKey(newApiKey);
-                sessionManager.saveGateId(effectiveGateId);
-                refreshCredentials();
-            } else if (!authToken.isEmpty()) {
-                String currentApiKey = getEffectiveApiKey();
-                String currentGateId = getEffectiveGateId();
-                String effectiveGateId = !currentGateId.isEmpty() ? currentGateId
-                        : (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
-
-                if (!currentApiKey.isEmpty()) {
-                    sessionManager.saveApiKey(currentApiKey);
-                }
-                sessionManager.saveGateId(effectiveGateId);
-                refreshCredentials();
-            }
+        String effectiveGate = getEffectiveGateId();
+        if (effectiveGate.isEmpty()) {
+            effectiveGate = deviceId != null && !deviceId.isEmpty()
+                    ? deviceId : "default-gate";
+            serverConfig.setGateId(effectiveGate);
         }
-        return response;
+
+        payload.put("gate_id", effectiveGate);
+        payload.put("app_version", "MIRA-ANDROID-v3.0");
+    } catch (Exception ignored) {}
+
+    ApiResponse response = post("/auth/login", payload);
+
+    if (response.isSuccess && response.data != null) {
+        String newApiKey = response.data.optString("api_key", "");
+        String newGateId = response.data.optString("gate_id", "");
+        String authToken = response.data.optString("token", "");
+        long expiresIn = response.data.optLong("expires_in", 0);
+
+        // ========== 1. حفظ API Key ==========
+        if (!newApiKey.isEmpty()) {
+            sessionManager.saveApiKey(newApiKey);
+            serverConfig.setApiKey(newApiKey);
+            Log.d(TAG, "✅ API Key saved");
+        }
+
+        // ========== 2. حفظ Gate ID ==========
+        String effectiveGateId = !newGateId.isEmpty() ? newGateId
+                : (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
+        if (!effectiveGateId.isEmpty()) {
+            sessionManager.saveGateId(effectiveGateId);
+            serverConfig.setGateId(effectiveGateId);
+        }
+
+        // ========== 3. ✅ حفظ Auth Token (الإصلاح الحرج) ==========
+        if (!authToken.isEmpty()) {
+            if (expiresIn > 0) {
+                sessionManager.saveAuthToken(authToken, expiresIn);
+            } else {
+                sessionManager.saveAuthToken(authToken);
+            }
+            serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
+            Log.d(TAG, "✅ Auth token saved (" + authToken.length() + " chars)");
+        } else if (newApiKey.isEmpty()) {
+            Log.e(TAG, "⚠️ Login succeeded but NO token and NO api_key!");
+        } else {
+            // API Key فقط — طبيعي
+            serverConfig.setApiKey(newApiKey);
+            Log.d(TAG, "ℹ️ API Key only, no token");
+        }
+
+        // ========== 4. حفظ معلومات المستخدم ==========
+        try {
+            String uname = response.data.optString("username", username);
+            String role = response.data.optString("role", "");
+            String displayName = response.data.optString("display_name", "");
+            int userId = response.data.optInt("user_id", 0);
+            String email = response.data.optString("email", "");
+            String phone = response.data.optString("phone", "");
+
+            if (!uname.isEmpty()) sessionManager.setUsername(uname);
+            if (!role.isEmpty()) sessionManager.setRole(role);
+            if (!displayName.isEmpty()) sessionManager.setDisplayName(displayName);
+            if (userId > 0) sessionManager.setUserId(userId);
+            if (!email.isEmpty()) sessionManager.setEmail(email);
+            if (!phone.isEmpty()) sessionManager.setPhone(phone);
+
+            // ✅ حفظ is_logged_in = true
+            sessionManager.createLoginSession(
+                    uname, role, authToken,
+                    serverConfig.getBaseUrl(),
+                    expiresIn > 0 ? expiresIn : 86400 * 7);
+        } catch (Exception e) {
+            Log.e(TAG, "Save user info error: " + e.getMessage());
+        }
+
+        // ========== 5. تحديث Credentials ==========
+        refreshCredentials();
     }
+
+    return response;
+}
 
     public ApiResponse reconnectDevice(String username, String password, String gateId) {
         try {
@@ -1928,4 +1971,4 @@ public class MiraApiClient {
             return t;
         }
     }
-}
+    }
