@@ -67,7 +67,7 @@ public class InventoryCatalogManager {
     Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
 
     try {
-        // ==================== 1. التحقق من المدخلات ====================
+        // ==================== 1. فحص المدخلات ====================
         if (apiClient == null || branchesManager == null) {
             Log.e(TAG, "❌ apiClient or branchesManager is null");
             if (callback != null) callback.onError(
@@ -76,25 +76,37 @@ public class InventoryCatalogManager {
         }
 
         int branchId = branchesManager.getActiveBranchId();
-        Log.d(TAG, "📡 fetchCatalog START | branchId=" + branchId);
+        Log.d(TAG, "═══════════════════════════════════════════");
+        Log.d(TAG, "📡 fetchCatalog START");
+        Log.d(TAG, "   branchId = " + branchId);
+        Log.d(TAG, "═══════════════════════════════════════════");
 
+        // ✅ الإصلاح: رسالة واضحة عند عدم وجود فرع نشط
         if (branchId <= 0) {
-            Log.e(TAG, "❌ Invalid branchId: " + branchId);
+            Log.e(TAG, "❌ No active branch! branchId=" + branchId);
             if (callback != null) callback.onError(
-                    isArabic ? "لم يتم تحديد فرع نشط" : "No active branch");
+                    isArabic 
+                        ? "⚠️ لم يتم تحديد فرع نشط.\n\n" +
+                          "الحل:\n" +
+                          "1. افتح شاشة الفروع\n" +
+                          "2. اختر فرعاً\n" +
+                          "3. حاول مجدداً"
+                        : "⚠️ No active branch.\n\n" +
+                          "Solution:\n" +
+                          "1. Open branches screen\n" +
+                          "2. Select a branch\n" +
+                          "3. Try again");
             return;
         }
 
-        // ==================== 2. ✅ فحص المصادقة قبل البدء ====================
+        // ✅ فحص المصادقة
         if (!apiClient.isAuthenticated()) {
             Log.e(TAG, "❌ Not authenticated!");
             String diag = apiClient.getAuthDiagnostics();
-            Log.e(TAG, "Diagnostics:\n" + diag);
-            
             if (callback != null) {
                 callback.onError(isArabic 
-                        ? "🔐 انتهت صلاحية الجلسة\n\nيرجى تسجيل الخروج ثم الدخول مجدداً\n\n" + diag
-                        : "🔐 Session expired\n\nPlease logout and login again\n\n" + diag);
+                        ? "🔐 انتهت صلاحية الجلسة\n\n" + diag
+                        : "🔐 Session expired\n\n" + diag);
             }
             return;
         }
@@ -219,10 +231,10 @@ public class InventoryCatalogManager {
 
         if (callback != null) callback.onCatalogLoaded(catalog);
 
-    } catch (Exception e) {
+        } catch (Exception e) {
         Log.e(TAG, "❌ fetchCatalog exception: " + e.getMessage(), e);
         if (callback != null) callback.onError(
-                e.getMessage() != null ? e.getMessage() 
+                e.getMessage() != null ? e.getMessage()
                 : (isArabic ? "خطأ غير متوقع" : "Unexpected error"));
     }
 }
