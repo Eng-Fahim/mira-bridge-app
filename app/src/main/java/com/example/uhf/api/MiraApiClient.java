@@ -215,12 +215,23 @@ public class MiraApiClient {
     }
 
     private String getAuthToken() {
-        String token = sessionManager.getAuthToken();
-        if (token == null || token.isEmpty()) {
-            token = serverConfig.getAuthToken();
-        }
-        return token != null ? token : "";
+    // ✅ المصدر الأساسي: sessionManager
+    String token = sessionManager.getAuthToken();
+    if (token != null && !token.isEmpty()) {
+        return token;
     }
+    
+    // ✅ احتياطي: serverConfig — فقط إذا كان المستخدم مسجلاً
+    if (sessionManager.isLoggedIn()) {
+        String fallback = serverConfig.getAuthToken();
+        if (fallback != null && !fallback.isEmpty()) {
+            Log.d(TAG, "Using fallback token from serverConfig");
+            return fallback;
+        }
+    }
+    
+    return "";
+}
 
     public boolean hasValidCredentials() {
         return !getEffectiveApiKey().isEmpty() && !getEffectiveGateId().isEmpty();
@@ -540,13 +551,25 @@ public class MiraApiClient {
     }
 
     public ApiResponse logout(String token) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("token", token);
-            payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception ignored) {}
-        return post("/auth/logout", payload);
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("token", token);
+        payload.put("gate_id", getEffectiveGateId());
+    } catch (Exception ignored) {}
+    
+    ApiResponse response = post("/auth/logout", payload);
+    
+    // ✅ نظّف serverConfig أيضاً
+    try {
+        if (serverConfig != null) {
+            serverConfig.clearSession();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "logout cleanup error: " + e.getMessage());
     }
+    
+    return response;
+}
 
     public ApiResponse getCurrentUser() {
         return getWithAuth("/auth/me");
