@@ -797,26 +797,73 @@ private void showAuthErrorDialog() {
             mainHandler.post(() -> {
                 if (isFragmentDestroyed || !isAdded()) return;
 
+                if (catalog == null || catalog.isEmpty()) {
+                    // ✅ الكاتولوج فارغ — لا توجد قطع في الفرع
+                    if (tvInventoryStatus != null) {
+                        tvInventoryStatus.setText(isArabic ?
+                                "⚠️ لا توجد قطع في الفرع" : "⚠️ Branch is empty");
+                    }
+                    new MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(isArabic ? "📦 لا توجد قطع" : "📦 No Items")
+                            .setMessage(isArabic ?
+                                    "لا توجد قطع مسجلة في هذا الفرع.\n\nهل تريد بدء جرد أعمى؟" :
+                                    "No items registered in this branch.\n\nStart blind inventory?")
+                            .setPositiveButton(isArabic ? "⚡ جرد أعمى" : "⚡ Blind Mode",
+                                    (d, w) -> startBlindInventory())
+                            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                            .show();
+                    return;
+                }
+
                 catalogEpcs.clear();
-                if (catalog != null) catalogEpcs.addAll(catalog.keySet());
+                catalogEpcs.addAll(catalog.keySet());
                 expectedCount = catalogEpcs.size();
+
+                if (tvExpectedCount != null) {
+                    tvExpectedCount.setText(String.valueOf(expectedCount));
+                }
 
                 if (scanController != null) {
                     scanController.startScanning(catalog);
                 }
+
+                Log.i(TAG, "✅ Catalog loaded: " + catalog.size() + " items");
             });
         }
+
         @Override
         public void onError(String error) {
             mainHandler.post(() -> {
                 if (isFragmentDestroyed || !isAdded()) return;
-                Toast.makeText(requireContext(),
-                        (isArabic ? "⚠️ " : "⚠️ ") + error,
-                        Toast.LENGTH_LONG).show();
+
+                String errorMsg = (error != null && !error.isEmpty())
+                        ? error
+                        : (isArabic ? "فشل غير معروف" : "Unknown error");
+
                 if (tvInventoryStatus != null) {
                     tvInventoryStatus.setText(isArabic ?
                             "⚠️ فشل التحميل" : "⚠️ Load failed");
                 }
+
+                // ✅ Dialog مع 3 خيارات
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(isArabic ? "⚠️ فشل التحميل" : "⚠️ Load Failed")
+                        .setMessage(errorMsg + "\n\n" +
+                                (isArabic ? "هل تريد إعادة المحاولة؟" : "Retry?"))
+                        .setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry",
+                                (d, w) -> {
+                                    d.dismiss();
+                                    mainHandler.postDelayed(() -> startScanning(), 500);
+                                })
+                        .setNeutralButton(isArabic ? "⚡ جرد أعمى" : "⚡ Blind Mode",
+                                (d, w) -> {
+                                    d.dismiss();
+                                    startBlindInventory();
+                                })
+                        .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
+                                (d, w) -> d.dismiss())
+                        .setCancelable(false)
+                        .show();
             });
         }
     });
@@ -900,10 +947,26 @@ private void showAuthErrorDialog() {
             // ✅ تحديث "آخر مسح" بالقطعة المكررة
             updateLastScanCard(existing, true);
         } else {
-            boolean isKnown = catalogEpcs.contains(epc);
-            feedback = isKnown
-                    ? SoundManager.FeedbackType.KNOWN_ITEM
-                    : SoundManager.FeedbackType.UNKNOWN_ITEM;
+    // ✅ فحص إذا كان EPC ينتمي لشريحة بكر (لم تُبرمج)
+    boolean isKnown = catalogEpcs.contains(epc);
+    
+    // ✅ إذا لم يُعرف بـ EPC، جرّب البحث بـ TID (احتياطي)
+    if (!isKnown && epc != null && epc.length() >= 16) {
+        // ✅ EPC قد يكون TID في الواقع (لشريحة بكر)
+        // ابحث في الكاتولوج بـ tag_tid
+        for (InventoryItem catalogItem : catalogManager.getCatalogItemsMap().values()) {
+            if (catalogItem != null && catalogItem.getEpc() != null 
+                    && catalogItem.getEpc().equalsIgnoreCase(epc)) {
+                isKnown = true;
+                break;
+            }
+        }
+    }
+    
+    feedback = isKnown
+            ? SoundManager.FeedbackType.KNOWN_ITEM
+            : SoundManager.FeedbackType.UNKNOWN_ITEM;
+
 
             InventoryItem catalogItem = catalogManager != null
                     ? catalogManager.getItemByEpc(epc) : null;
@@ -2183,4 +2246,4 @@ private void loadCategoryCatalog(String category) {
     public boolean isCurrentlyScanning() {
         return isScanning();
     }
-                    }
+                        }
