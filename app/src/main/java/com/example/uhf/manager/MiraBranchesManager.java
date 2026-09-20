@@ -75,26 +75,40 @@ public void notifyListeners() {
         return instance;
     }
 
-    public void setActiveBranch(int branchId, String branchName, String branchCode,
-                            String branchType, String city) {
-    prefs.edit()
-        .putInt(KEY_ACTIVE_BRANCH_ID, branchId)
-        .putString(KEY_ACTIVE_BRANCH_NAME, branchName)
-        .putString(KEY_ACTIVE_BRANCH_CODE, branchCode)
-        .putString(KEY_ACTIVE_BRANCH_TYPE, branchType)
-        .putString(KEY_ACTIVE_BRANCH_CITY, city)
-        .apply();
-    
-    Log.d(TAG, "✅ Active branch saved: ID=" + branchId + ", Name=" + branchName);
-    
-    // ✅ إشعار المستمعين
-    notifyListeners();
+
+
+    // ==================== الإصلاح 1: getActiveBranchId ====================
+
+/**
+ * ✅ الحصول على الفرع النشط
+ * 
+ * ⚠️ إصلاح حرج: نعيد -1 (بدلاً من 1) عند عدم وجود فرع نشط
+ * هذا يمنع إرسال طلبات لفرع #1 غير موجود → 404
+ */
+public int getActiveBranchId() {
+    try {
+        if (!prefs.contains(KEY_ACTIVE_BRANCH_ID)) {
+            Log.w(TAG, "⚠️ No active branch saved — returning -1");
+            return -1;
+        }
+        int branchId = prefs.getInt(KEY_ACTIVE_BRANCH_ID, -1);
+        Log.d(TAG, "Active Branch ID: " + branchId);
+        return branchId;
+    } catch (Exception e) {
+        Log.e(TAG, "Error getting branch ID: " + e.getMessage());
+        return -1;
+    }
 }
-    
-    // في MiraBranchesManager.java - أضف هذه الدالة
+
+
+// ==================== الإصلاح 2: saveBranchesFromServer ====================
 
 /**
  * ✅ حفظ الفروع من استجابة السيرفر
+ * 
+ * ⚠️ إصلاح حرج: 
+ * - إذا لم يُعثر على الفرع النشط في القائمة → عيّن أول فرع تلقائياً
+ * - يمنع حالة "الفرع النشط = 1 لكن غير موجود على السيرفر"
  */
 public void saveBranchesFromServer(JSONObject data) {
     try {
@@ -102,80 +116,125 @@ public void saveBranchesFromServer(JSONObject data) {
         if (branches == null) {
             branches = data.optJSONArray("data");
         }
-        
+
         if (branches == null || branches.length() == 0) {
             Log.w(TAG, "No branches found in server response");
             return;
         }
-        
+
         SharedPreferences.Editor editor = prefs.edit();
-        int currentActiveId = getActiveBranchId();   // ← احصل على الفرع النشط الحالي
-        
-        // حفظ قائمة الفروع كاملة
+        int currentActiveId = prefs.contains(KEY_ACTIVE_BRANCH_ID)
+                ? prefs.getInt(KEY_ACTIVE_BRANCH_ID, -1) : -1;
+
+        boolean foundActive = false;
+        int firstBranchId = -1;
+        String firstBranchName = "";
+        String firstBranchCode = "";
+        String firstBranchType = "main";
+        String firstBranchCity = "";
+
         editor.putString("branches_list", branches.toString());
-        
-        // حفظ كل فرع على حدة
+
         for (int i = 0; i < branches.length(); i++) {
             try {
                 JSONObject branch = branches.getJSONObject(i);
                 int branchId = branch.optInt("id", branch.optInt("branch_id", 0));
+                if (branchId <= 0) continue;
+
                 String branchName = branch.optString("branch_name_ar",
-                                    branch.optString("name",
-                                    branch.optString("branch_name", "")));
+                        branch.optString("name",
+                        branch.optString("branch_name", "")));
                 String branchCode = branch.optString("branch_code",
-                                    branch.optString("code", ""));
-                String branchAddress = branch.optString("address", "");
-                String branchPhone = branch.optString("phone", "");
+                        branch.optString("code", ""));
                 String branchCity = branch.optString("city", "");
                 String branchType = branch.optString("branch_type", "main");
-                
-                if (branchId > 0) {
-                    editor.putInt("branch_id_" + branchId, branchId);
-                    editor.putString("branch_name_" + branchId, branchName);
-                    editor.putString("branch_code_" + branchId, branchCode);
-                    editor.putString("branch_address_" + branchId, branchAddress);
-                    editor.putString("branch_phone_" + branchId, branchPhone);
-                    
-                    // ✅ إذا كان هذا الفرع هو النشط → حدّث بياناته
-                    if (branchId == currentActiveId && !branchName.isEmpty()) {
-                        editor.putString(KEY_ACTIVE_BRANCH_NAME, branchName);
-                        if (!branchCode.isEmpty()) editor.putString(KEY_ACTIVE_BRANCH_CODE, branchCode);
-                        if (!branchCity.isEmpty()) editor.putString(KEY_ACTIVE_BRANCH_CITY, branchCity);
-                        if (!branchType.isEmpty()) editor.putString(KEY_ACTIVE_BRANCH_TYPE, branchType);
-                        
-                        Log.d(TAG, "✅ Active branch refreshed: " + branchName);
+
+                // ✅ حفظ بيانات كل فرع
+                editor.putInt("branch_id_" + branchId, branchId);
+                editor.putString("branch_name_" + branchId, branchName);
+                editor.putString("branch_code_" + branchId, branchCode);
+
+                // ✅ احفظ أول فرع كمرشح بديل
+                if (firstBranchId < 0) {
+                    firstBranchId = branchId;
+                    firstBranchName = branchName;
+                    firstBranchCode = branchCode;
+                    firstBranchType = branchType;
+                    firstBranchCity = branchCity;
+                }
+
+                // ✅ إذا كان هذا هو الفرع النشط → حدّث بياناته
+                if (branchId == currentActiveId && !branchName.isEmpty()) {
+                    foundActive = true;
+                    editor.putString(KEY_ACTIVE_BRANCH_NAME, branchName);
+                    if (!branchCode.isEmpty()) {
+                        editor.putString(KEY_ACTIVE_BRANCH_CODE, branchCode);
                     }
+                    if (!branchCity.isEmpty()) {
+                        editor.putString(KEY_ACTIVE_BRANCH_CITY, branchCity);
+                    }
+                    if (!branchType.isEmpty()) {
+                        editor.putString(KEY_ACTIVE_BRANCH_TYPE, branchType);
+                    }
+                    Log.d(TAG, "✅ Active branch refreshed: " + branchName);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Parse branch error: " + e.getMessage());
             }
         }
-        
+
+        // ✅ الإصلاح الحرج: إذا لم يُعثر على الفرع النشط → عيّن أول فرع
+        if (!foundActive && firstBranchId > 0) {
+            Log.w(TAG, "⚠️ Active branch " + currentActiveId 
+                    + " not found. Assigning first available: " + firstBranchId);
+            editor.putInt(KEY_ACTIVE_BRANCH_ID, firstBranchId);
+            editor.putString(KEY_ACTIVE_BRANCH_NAME, 
+                    firstBranchName.isEmpty() ? "الفرع الرئيسي" : firstBranchName);
+            editor.putString(KEY_ACTIVE_BRANCH_CODE, firstBranchCode);
+            editor.putString(KEY_ACTIVE_BRANCH_TYPE, firstBranchType);
+            editor.putString(KEY_ACTIVE_BRANCH_CITY, firstBranchCity);
+        }
+
         editor.putLong(KEY_BRANCHES_LAST_SYNC, System.currentTimeMillis());
         editor.apply();
-        
-        Log.i(TAG, "✅ Branches saved: " + branches.length());
-        
-        // ✅ إشعار المستمعين (لأن الفرع النشط قد يكون تغيّر)
+
+        Log.i(TAG, "✅ Branches saved: " + branches.length() 
+                + ", active=" + getActiveBranchId());
+
         notifyListeners();
-        
+
     } catch (Exception e) {
         Log.e(TAG, "Save branches error: " + e.getMessage());
     }
 }
 
 
+// ==================== الإصلاح 3: setActiveBranch ====================
 
-    public int getActiveBranchId() {
-        try {
-            int branchId = prefs.getInt(KEY_ACTIVE_BRANCH_ID, 1); // ✅ افتراضي 1
-            Log.d(TAG, "Active Branch ID: " + branchId);
-            return branchId;
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting branch ID: " + e.getMessage());
-            return 1; // ✅ افتراضي 1
-        }
+/**
+ * ✅ تعيين الفرع النشط
+ * 
+ * ⚠️ إصلاح: نتحقق من أن branchId > 0 قبل الحفظ
+ */
+public void setActiveBranch(int branchId, String branchName, String branchCode,
+                             String branchType, String city) {
+    if (branchId <= 0) {
+        Log.e(TAG, "❌ Cannot set invalid branchId: " + branchId);
+        return;
     }
+
+    prefs.edit()
+        .putInt(KEY_ACTIVE_BRANCH_ID, branchId)
+        .putString(KEY_ACTIVE_BRANCH_NAME, branchName != null ? branchName : "")
+        .putString(KEY_ACTIVE_BRANCH_CODE, branchCode != null ? branchCode : "")
+        .putString(KEY_ACTIVE_BRANCH_TYPE, branchType != null ? branchType : "main")
+        .putString(KEY_ACTIVE_BRANCH_CITY, city != null ? city : "")
+        .apply();
+
+    Log.d(TAG, "✅ Active branch saved: ID=" + branchId + ", Name=" + branchName);
+
+    notifyListeners();
+}
 
     public String getActiveBranchName() {
         return prefs.getString(KEY_ACTIVE_BRANCH_NAME, "الفرع الرئيسي");
