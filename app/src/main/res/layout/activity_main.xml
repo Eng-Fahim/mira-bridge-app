@@ -170,6 +170,12 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
+        <!-- 
+             تم إصلاح موقع الزر هنا:
+             - تم ربط الجزء السفلي للزر بالجزء السفلي لشريط التنقل.
+             - تم استخدام layout_marginBottom لرفع الزر للأعلى قليلاً.
+             - تم إزالة القيود الرأسية المتعارضة (Top/Bottom) التي كانت تسبب تمدد الزر.
+        -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="64dp"
@@ -182,7 +188,7 @@
             app:layout_constraintBottom_toBottomOf="@id/bottomNavigationView"
             app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
             app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
-            app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
+            android:layout_marginBottom="32dp"
             app:maxImageSize="32dp"
             app:pressedTranslationZ="8dp"
             app:tint="?attr/colorOnPrimary" />
