@@ -8,6 +8,8 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
@@ -15,32 +17,60 @@ import com.example.uhf.R;
 import org.json.JSONObject;
 
 import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 /**
  * ✅ Adapter لعرض Timeline آخر العمليات
+ * - يستخدم ListAdapter + DiffUtil لتحديث سلس وبدون ANR
  */
-public class ActivityTimelineAdapter extends RecyclerView.Adapter<ActivityTimelineAdapter.ViewHolder> {
+public class ActivityTimelineAdapter 
+        extends ListAdapter<JSONObject, ActivityTimelineAdapter.ViewHolder> {
 
-    private final List<JSONObject> items = new ArrayList<>();
     private final boolean isArabic;
     private final OnActivityClickListener clickListener;
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ DiffUtil: يقارن العناصر بكفاءة عالية
+    // ═══════════════════════════════════════════════════════
+    private static final DiffUtil.ItemCallback<JSONObject> DIFF_CALLBACK =
+            new DiffUtil.ItemCallback<JSONObject>() {
+                @Override
+                public boolean areItemsTheSame(@NonNull JSONObject oldItem,
+                                               @NonNull JSONObject newItem) {
+                    // ✅ معرّف فريد لكل عملية
+                    String oldId = oldItem.optString("id", "");
+                    String newId = newItem.optString("id", "");
+                    if (!oldId.isEmpty() && !newId.isEmpty()) {
+                        return oldId.equals(newId);
+                    }
+                    // fallback: قارن بالـ timestamp + type
+                    return oldItem.optString("timestamp").equals(newItem.optString("timestamp"))
+                            && oldItem.optString("type").equals(newItem.optString("type"));
+                }
+
+                @Override
+                public boolean areContentsTheSame(@NonNull JSONObject oldItem,
+                                                  @NonNull JSONObject newItem) {
+                    // ✅ قارن الحقول المهمة فقط (سريع جداً)
+                    return oldItem.optString("status").equals(newItem.optString("status"))
+                            && oldItem.optString("title_ar").equals(newItem.optString("title_ar"))
+                            && oldItem.optString("title_en").equals(newItem.optString("title_en"))
+                            && oldItem.optString("details_ar").equals(newItem.optString("details_ar"))
+                            && oldItem.optString("details_en").equals(newItem.optString("details_en"))
+                            && oldItem.optString("user").equals(newItem.optString("user"))
+                            && oldItem.optDouble("amount", 0) == newItem.optDouble("amount", 0)
+                            && oldItem.optDouble("accuracy", -1) == newItem.optDouble("accuracy", -1);
+                }
+            };
 
     public interface OnActivityClickListener {
         void onActivityClick(JSONObject activity);
     }
 
     public ActivityTimelineAdapter(boolean isArabic, OnActivityClickListener listener) {
+        super(DIFF_CALLBACK);
         this.isArabic = isArabic;
         this.clickListener = listener;
-    }
-
-    public void submitList(List<JSONObject> newList) {
-        items.clear();
-        if (newList != null) items.addAll(newList);
-        notifyDataSetChanged();
     }
 
     @NonNull
@@ -53,12 +83,11 @@ public class ActivityTimelineAdapter extends RecyclerView.Adapter<ActivityTimeli
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        JSONObject item = items.get(position);
+        JSONObject item = getItem(position);
         if (item == null) return;
 
         try {
             // ✅ البيانات
-            String type = item.optString("type", "system");
             String icon = item.optString("icon", "⚙️");
             String status = item.optString("status", "neutral");
             String titleAr = item.optString("title_ar", "");
@@ -91,12 +120,11 @@ public class ActivityTimelineAdapter extends RecyclerView.Adapter<ActivityTimeli
             holder.tvActivityUser.setText("👤 " + user);
             holder.tvActivityTime.setText(time);
 
-            // ✅ المبلغ (إذا موجود)
+            // ✅ المبلغ / الدقة
             if (amount > 0) {
                 holder.tvActivityAmount.setVisibility(View.VISIBLE);
                 holder.tvActivityAmount.setText(formatAmount(amount, currency));
             } else if (accuracy >= 0) {
-                // ✅ الدقة بدلاً من المبلغ
                 holder.tvActivityAmount.setVisibility(View.VISIBLE);
                 holder.tvActivityAmount.setText(String.format(Locale.US, "🎯 %.1f%%", accuracy));
             } else {
@@ -111,33 +139,32 @@ public class ActivityTimelineAdapter extends RecyclerView.Adapter<ActivityTimeli
 
             switch (status) {
                 case "success":
-                    color = Color.parseColor("#16A34A"); // أخضر
-                    iconBgColor = Color.parseColor("#DCFCE7"); // أخضر فاتح
+                    color = Color.parseColor("#16A34A");
+                    iconBgColor = Color.parseColor("#DCFCE7");
                     break;
                 case "warning":
-                    color = Color.parseColor("#F59E0B"); // برتقالي
-                    iconBgColor = Color.parseColor("#FEF3C7"); // برتقالي فاتح
+                    color = Color.parseColor("#F59E0B");
+                    iconBgColor = Color.parseColor("#FEF3C7");
                     break;
                 case "danger":
-                    color = Color.parseColor("#DC2626"); // أحمر
-                    iconBgColor = Color.parseColor("#FEE2E2"); // أحمر فاتح
+                    color = Color.parseColor("#DC2626");
+                    iconBgColor = Color.parseColor("#FEE2E2");
                     break;
                 default:
-                    color = Color.parseColor("#6B7280"); // رمادي
-                    iconBgColor = Color.parseColor("#F3F4F6"); // رمادي فاتح
+                    color = Color.parseColor("#6B7280");
+                    iconBgColor = Color.parseColor("#F3F4F6");
                     break;
             }
 
             holder.tvActivityAmount.setTextColor(color);
             holder.tvActivityIcon.setTextColor(color);
 
-            // ✅ خلفية الأيقونة
             if (holder.iconContainer != null) {
                 holder.iconContainer.setBackgroundResource(R.drawable.bg_activity_icon);
                 holder.iconContainer.getBackground().setTint(iconBgColor);
             }
 
-            // ✅ Chip الحالة (اختياري)
+            // ✅ Chip الحالة
             if (holder.tvActivityStatusChip != null) {
                 if ("danger".equals(status) || "warning".equals(status)) {
                     holder.tvActivityStatusChip.setVisibility(View.VISIBLE);
@@ -192,11 +219,6 @@ public class ActivityTimelineAdapter extends RecyclerView.Adapter<ActivityTimeli
         } catch (Exception e) {
             return String.format(Locale.US, "%.2f %s", amount, currency);
         }
-    }
-
-    @Override
-    public int getItemCount() {
-        return items.size();
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
