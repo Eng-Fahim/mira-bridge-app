@@ -113,23 +113,34 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     private static final int[] SCAN_KEY_CODES = {
         139, 280, 291, 293, 294, 311, 312, 313, 315, 591, 593, 594, 596
     };
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        Log.i(TAG, "🚀 onCreate started");
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    Log.i(TAG, "🚀 onCreate started");
+    
+    MemoryManager.getInstance().registerActivity(this);
+    dialogHelper = new MiraDialogHelper(this);
+    registerComponentCallbacks(MemoryManager.getInstance());
+    isDestroyed.set(false);
+    
+    checkStoragePermission();
+    
+    // ═══════════════════════════════════════════════════════
+    // ✅✅✅ الإصلاح الجذري: تحقق من دعم العتاد أولاً
+    // ═══════════════════════════════════════════════════════
+    if (DeviceDetector.isRfidHardwareSupported()) {
+        Log.i(TAG, "✅ RFID hardware supported — scheduling UHF init");
+        // ✅ تأخير 800ms بدلاً من 200ms (يسمح للواجهة بالاستقرار)
+        mainHandler.postDelayed(this::initUHF, 800);
+    } else {
+        Log.w(TAG, "⚠️ RFID hardware NOT supported — skipping UHF init");
+        // ✅ مهم جداً: ضبط الحالة كـ false
+        sRfidDevicePresent.set(false);
         
-        MemoryManager.getInstance().registerActivity(this);
-        dialogHelper = new MiraDialogHelper(this);
-        registerComponentCallbacks(MemoryManager.getInstance());
-        isDestroyed.set(false);
-        
-        checkStoragePermission();
-        
-        // ✅ الأهم: بدء تهيئة UHF تلقائياً
-        // ننتظر 200ms لضمان استقرار الواجهة
-        mainHandler.postDelayed(this::initUHF, 200);
+        // ✅ رسالة واضحة للمستخدم (اختياري - مرة واحدة فقط)
+        // لا نعرض Toast لتجنب الإزعاج على الأجهزة غير المدعومة
     }
+}
 
     private void createExecutorIfNeeded() {
         if (rfidExecutor == null || rfidExecutor.isShutdown() || rfidExecutor.isTerminated()) {
@@ -198,141 +209,174 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
      * - يمنع التهيئة المزدوجة عبر sIsInitializing
      * - يعيد المحاولة 3 مرات عند الفشل
      */
-    public void initUHF() {
-        if (isDestroyed.get()) return;
-        
-        // ✅ إذا كان هناك قارئ مشترك جاهز
-        RFIDWithUHFUART shared = sSharedReader.get();
-        if (shared != null && isInitialized) {
-            Log.d(TAG, "✅ Using existing shared reader");
-            mReader = shared;
-            sRfidDevicePresent.set(true);
-            return;
-        }
-        
-        // ✅ منع التهيئة المزدوجة
-        if (!sIsInitializing.compareAndSet(false, true)) {
-            Log.d(TAG, "⏳ UHF init already in progress");
-            return;
-        }
-        
-        if (isInitialized && mReader != null) {
-            Log.d(TAG, "initUHF: already initialized");
-            sIsInitializing.set(false);
-            return;
-        }
-        
-        createExecutorIfNeeded();
-        showInitDialog();
-        initStartTime = System.currentTimeMillis();
-        
-        rfidExecutor.execute(() -> {
-            try {
-                Log.i(TAG, "🔧 Starting UHF initialization...");
-                
-                if (mReader == null) {
-                    mReader = RFIDWithUHFUART.getInstance();
-                }
-                
-                if (mReader == null) {
-                    Log.e(TAG, "❌ RFIDWithUHFUART.getInstance() returned null");
-                    sRfidDevicePresent.set(false);
-                    mainHandler.post(() -> {
-                        sIsInitializing.set(false);
-                        handleInitResult(false);
-                    });
-                    return;
-                }
-                
-                final boolean[] initResult = new boolean[1];
-                Thread initThread = new Thread(() -> {
-                    try {
-                        initResult[0] = mReader.init(BaseTabFragmentActivity.this);
-                    } catch (Throwable e) {
-                        Log.e(TAG, "UHF init thread error", e);
-                        initResult[0] = false;
-                    }
-                }, "UHF-Native-Init");
-                initThread.setDaemon(true);
-                initThread.start();
-                initThread.join(RFID_INIT_TIMEOUT_MS);
-                
-                if (initThread.isAlive()) {
-                    Log.e(TAG, "❌ UHF init timeout after " + RFID_INIT_TIMEOUT_MS + "ms");
-                    sRfidDevicePresent.set(false);
-                    mainHandler.post(() -> {
-                        sIsInitializing.set(false);
-                        handleInitResult(false);
-                    });
-                    return;
-                }
-                
-                boolean result = initResult[0];
-                long elapsed = System.currentTimeMillis() - initStartTime;
-                Log.i(TAG, "UHF init result: " + result + " (took " + elapsed + "ms)");
-                
-                // ✅ حفظ الحالة الديناميكية
-                sRfidDevicePresent.set(result);
-                if (result) {
-                    sSharedReader.set(mReader);
-                    Log.i(TAG, "✅ Shared reader registered");
-                }
-                
+    /**
+ * ✅ تهيئة UHF تلقائياً (محمية)
+ * - تتحقق من دعم العتاد أولاً
+ * - تستخدم sSharedReader إذا موجود
+ * - تمنع التهيئة المزدوجة عبر sIsInitializing
+ * - تعيد المحاولة 2 مرات عند الفشل
+ */
+public void initUHF() {
+    if (isDestroyed.get()) return;
+    
+    // ═══════════════════════════════════════════════════════
+    // ✅ الحماية الأولى: فحص العتاد
+    // ═══════════════════════════════════════════════════════
+    if (!DeviceDetector.isRfidHardwareSupported()) {
+        Log.w(TAG, "⚠️ initUHF skipped — hardware not supported");
+        sRfidDevicePresent.set(false);
+        return;
+    }
+    
+    // ✅ إذا كان هناك قارئ مشترك جاهز
+    RFIDWithUHFUART shared = sSharedReader.get();
+    if (shared != null && isInitialized) {
+        Log.d(TAG, "✅ Using existing shared reader");
+        mReader = shared;
+        sRfidDevicePresent.set(true);
+        return;
+    }
+    
+    // ✅ منع التهيئة المزدوجة
+    if (!sIsInitializing.compareAndSet(false, true)) {
+        Log.d(TAG, "⏳ UHF init already in progress");
+        return;
+    }
+    
+    if (isInitialized && mReader != null) {
+        Log.d(TAG, "initUHF: already initialized");
+        sIsInitializing.set(false);
+        return;
+    }
+    
+    createExecutorIfNeeded();
+    
+    // ✅ لا ProgressDialog — Toast خفيف فقط
+    toastMessageSafe("جاري تهيئة قارئ RFID...");
+    initStartTime = System.currentTimeMillis();
+    
+    rfidExecutor.execute(() -> {
+        try {
+            Log.i(TAG, "🔧 Starting UHF initialization...");
+            
+            // ✅ الحماية الثانية: فحص العتاد داخل الـ thread
+            if (!DeviceDetector.isRfidHardwareSupported()) {
+                Log.w(TAG, "⚠️ Hardware not supported (inside thread)");
+                sRfidDevicePresent.set(false);
                 mainHandler.post(() -> {
                     sIsInitializing.set(false);
-                    handleInitResult(result);
                 });
-                
-            } catch (Exception e) {
-                Log.e(TAG, "❌ UHF init exception", e);
+                return;
+            }
+            
+            if (mReader == null) {
+                try {
+                    mReader = RFIDWithUHFUART.getInstance();
+                } catch (Throwable e) {
+                    Log.e(TAG, "❌ RFIDWithUHFUART.getInstance() failed", e);
+                    sRfidDevicePresent.set(false);
+                    mainHandler.post(() -> {
+                        sIsInitializing.set(false);
+                        handleInitResult(false);
+                    });
+                    return;
+                }
+            }
+            
+            if (mReader == null) {
+                Log.e(TAG, "❌ RFIDWithUHFUART.getInstance() returned null");
                 sRfidDevicePresent.set(false);
                 mainHandler.post(() -> {
                     sIsInitializing.set(false);
                     handleInitResult(false);
                 });
+                return;
             }
-        });
-    }
+            
+            final boolean[] initResult = new boolean[1];
+            Thread initThread = new Thread(() -> {
+                try {
+                    initResult[0] = mReader.init(BaseTabFragmentActivity.this);
+                } catch (Throwable e) {
+                    Log.e(TAG, "UHF init thread error", e);
+                    initResult[0] = false;
+                }
+            }, "UHF-Native-Init");
+            initThread.setDaemon(true);
+            initThread.start();
+            
+            // ✅✅✅ 3 ثوان بدلاً من 8
+            initThread.join(3000);
+            
+            if (initThread.isAlive()) {
+                Log.e(TAG, "❌ UHF init timeout after 3000ms");
+                sRfidDevicePresent.set(false);
+                mainHandler.post(() -> {
+                    sIsInitializing.set(false);
+                    handleInitResult(false);
+                });
+                return;
+            }
+            
+            boolean result = initResult[0];
+            long elapsed = System.currentTimeMillis() - initStartTime;
+            Log.i(TAG, "UHF init result: " + result + " (took " + elapsed + "ms)");
+            
+            // ✅ حفظ الحالة الديناميكية
+            sRfidDevicePresent.set(result);
+            if (result) {
+                sSharedReader.set(mReader);
+                Log.i(TAG, "✅ Shared reader registered");
+            }
+            
+            mainHandler.post(() -> {
+                sIsInitializing.set(false);
+                handleInitResult(result);
+            });
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ UHF init exception", e);
+            sRfidDevicePresent.set(false);
+            mainHandler.post(() -> {
+                sIsInitializing.set(false);
+                handleInitResult(false);
+            });
+        }
+    });
+}
 
     private void handleInitResult(boolean result) {
-        dismissInitDialogSafely();
-        if (isDestroyed.get() || isFinishing()) return;
+    dismissInitDialogSafely();
+    if (isDestroyed.get() || isFinishing()) return;
+    
+    if (!result) {
+        isInitialized = false;
+        DeviceDetector.reset();
         
-        if (!result) {
-            isInitialized = false;
-            DeviceDetector.reset();
-            
-            Log.e(TAG, "⚠️ UHF initialization FAILED");
-            
-            // ✅ رسالة أولى
-            if (initRetryCount == 0) {
-                toastMessageSafe("⚠️ تعذر تهيئة قارئ RFID\nجاري إعادة المحاولة...");
-            }
-            
-            // ✅ إعادة محاولة 3 مرات
-            if (initRetryCount < 3) {
-                initRetryCount++;
-                Log.i(TAG, "🔄 Retry #" + initRetryCount + "/3 in 3s...");
-                mainHandler.postDelayed(() -> {
-                    if (!isDestroyed.get() && !isInitialized) {
-                        initUHF();
-                    }
-                }, 3000);
-            } else {
-                toastMessageSafe("❌ فشل الاتصال بقارئ RFID\n\n" +
-                    "تحقق من:\n" +
-                    "• الجهاز مدعوم (Chainway C72)\n" +
-                    "• القارئ مفعّل من الإعدادات\n" +
-                    "• أعد تشغيل الجهاز");
-            }
+        Log.e(TAG, "⚠️ UHF initialization FAILED");
+        
+        // ✅ محاولة واحدة فقط (لا 3)
+        if (initRetryCount < 1) {
+            initRetryCount++;
+            Log.i(TAG, "🔄 Retry #" + initRetryCount + "/1 in 5s...");
+            mainHandler.postDelayed(() -> {
+                if (!isDestroyed.get() && !isInitialized
+                        && DeviceDetector.isRfidHardwareSupported()) {
+                    initUHF();
+                }
+            }, 5000);
         } else {
-            isInitialized = true;
-            initRetryCount = 0;
-            Log.i(TAG, "✅ UHF initialized successfully");
-            toastMessageSafe("✅ قارئ RFID جاهز");
-            configureReaderForDevice();
+            Log.e(TAG, "❌ UHF init permanently failed");
+            // ✅ لا Toast — العمليات المتعلقة بالـ RFID ستتعامل مع الوضع
         }
+    } else {
+        isInitialized = true;
+        initRetryCount = 0;
+        Log.i(TAG, "✅ UHF initialized successfully");
+        // ✅ لا Toast للنجاح أيضاً (أقل إزعاجاً)
+        configureReaderForDevice();
     }
+}
 
     private void showInitDialog() {
         if (isDestroyed.get() || isFinishing()) return;
