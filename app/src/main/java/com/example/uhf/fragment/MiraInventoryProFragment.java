@@ -1868,7 +1868,7 @@ private Map<String, InventoryItem> fetchCatalogFromServer() {
 }
 
 /**
- * بدء مصدر القراءة
+ * ✅ بدء المصدر — النسخة النهائية
  */
 private void startReadingSource() {
     Log.i(TAG, "🚀 startReadingSource() called");
@@ -1884,27 +1884,49 @@ private void startReadingSource() {
         return;
     }
     
-    // ✅ 2. تحقق من الحالة الديناميكية
+    // ✅ 2. تحقق من حالة RFID
     if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-        Log.w(TAG, "⚠️ RFID device not present per BaseTabFragmentActivity");
-        showFatalErrorDialog(
-            isArabic ? "❌ قارئ RFID غير متاح" : "❌ RFID Reader not available",
-            isArabic ? 
-                "تحقق من:\n" +
-                "• الجهاز مدعوم (Chainway C72)\n" +
-                "• القارئ مفعّل من إعدادات النظام\n" +
-                "• أعد تشغيل التطبيق" :
-                "Check:\n" +
-                "• Supported device (Chainway C72)\n" +
-                "• Reader enabled in system settings\n" +
-                "• Restart the app"
-        );
-        isScanning = false;
-        updateMainToggleButton(false);
+        Log.w(TAG, "⚠️ RFID device not present");
+        
+        // عرض خيار: إعادة محاولة أم جرد محاكاة
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "⚠️ قارئ RFID غير متاح" : "⚠️ RFID Not Available")
+            .setMessage(isArabic ? 
+                "الأسباب المحتملة:\n" +
+                "• القارئ لم يُهيأ بعد\n" +
+                "• الجهاز غير مدعوم\n" +
+                "• تعارض مع تطبيق آخر\n\n" +
+                "الحلول:\n" +
+                "1. أعد تشغيل التطبيق\n" +
+                "2. أعد تشغيل الجهاز\n" +
+                "3. تحقق من إعدادات القارئ" :
+                "Possible reasons:\n" +
+                "• Reader not initialized\n" +
+                "• Device not supported\n" +
+                "• Conflict with another app\n\n" +
+                "Solutions:\n" +
+                "1. Restart the app\n" +
+                "2. Restart the device\n" +
+                "3. Check reader settings")
+            .setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", 
+                (d, w) -> {
+                    mainHandler.postDelayed(() -> {
+                        if (getActivity() instanceof UHFMainActivity) {
+                            ((UHFMainActivity) getActivity()).initUHF();
+                        }
+                        mainHandler.postDelayed(this::startReadingSource, 3000);
+                    }, 500);
+                })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (d, w) -> {
+                isScanning = false;
+                updateMainToggleButton(false);
+            })
+            .setCancelable(false)
+            .show();
         return;
     }
     
-    // ✅ 3. الاتصال التلقائي (اختياري - القارئ قد يكون متصلاً بالفعل)
+    // ✅ 3. محاولة الاتصال التلقائي
     boolean connected = false;
     try {
         connected = rfidManager.autoConnectAndBind(requireContext());
@@ -1916,7 +1938,7 @@ private void startReadingSource() {
         Log.w(TAG, "⚠️ autoConnectAndBind failed, trying direct startScan...");
     }
     
-    // ✅ 4. محاولة بدء القراءة
+    // ✅ 4. بدء القراءة
     boolean started = false;
     try {
         started = rfidManager.startScan();
@@ -1929,11 +1951,11 @@ private void startReadingSource() {
             isArabic ? "❌ فشل بدء القراءة" : "❌ Failed to start scanning",
             isArabic ? 
                 "الحلول:\n" +
-                "1. تأكد أن القارئ يعمل من التطبيق الأصلي\n" +
+                "1. تأكد أن القارئ يعمل\n" +
                 "2. أعد تشغيل الجهاز\n" +
                 "3. أعد تشغيل التطبيق" :
                 "Solutions:\n" +
-                "1. Verify reader works from native app\n" +
+                "1. Verify reader works\n" +
                 "2. Restart the device\n" +
                 "3. Restart the app"
         );
@@ -1948,9 +1970,14 @@ private void startReadingSource() {
     if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
     if (btnArchiveReports != null) btnArchiveReports.setEnabled(false);
     
-    if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
+    if (soundManager != null) {
+        soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
+    }
 }
 
+/**
+ * ✅ عرض خطأ فادح
+ */
 private void showFatalErrorDialog(String title, String message) {
     if (!isAdded() || isFragmentDestroyed) return;
     new MaterialAlertDialogBuilder(requireContext())
@@ -1960,6 +1987,7 @@ private void showFatalErrorDialog(String title, String message) {
         .setCancelable(false)
         .show();
 }
+
 
 /**
  * ✅ تحديث زر البدء/الإيقاف الذكي
