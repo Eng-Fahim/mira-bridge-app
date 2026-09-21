@@ -40,7 +40,9 @@ import java.util.Locale;
 /**
  * ✅ Bottom Sheet احترافي لعرض تفاصيل العملية
  * 
- * ✅ v3.0 (2026-09-21):
+ * ✅ v3.1 (2026-09-22):
+ *  - تحسين الأداء: static cache بدلاً من toString()
+ *  - Log مختصر (لا طباعة JSON كامل)
  *  - عرض القطع المباعة مع RFID/EPC/Serial
  *  - عرض العملات (USD + محلي + سعر الصرف)
  *  - إجراءات حقيقية مرتبطة بالشاشات
@@ -49,16 +51,30 @@ import java.util.Locale;
 public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
 
     private static final String TAG = "ActivityDetailsSheet";
-    private static final String ARG_ACTIVITY = "activity_json";
     private static final String ARG_IS_ARABIC = "is_arabic";
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ STATIC CACHE - لتجنب toString() على JSON كبير
+    // يُفرَّغ فوراً في onCreate لتجنب memory leak
+    // ═══════════════════════════════════════════════════════
+    private static JSONObject sPendingActivity = null;
 
     private JSONObject activity;
     private boolean isArabic;
 
+    /**
+     * ✅ إنشاء BottomSheet بدون serialization
+     * - يُمرِّر JSONObject مباشرة عبر static cache
+     * - يحفظ فقط isArabic في Bundle
+     */
     public static ActivityDetailsBottomSheet newInstance(JSONObject activity, boolean isArabic) {
         ActivityDetailsBottomSheet sheet = new ActivityDetailsBottomSheet();
         Bundle args = new Bundle();
-        args.putString(ARG_ACTIVITY, activity != null ? activity.toString() : "{}");
+
+        // ✅ حفظ في static cache — بدون toString()
+        sPendingActivity = activity;
+
+        // ✅ فقط isArabic في Bundle
         args.putBoolean(ARG_IS_ARABIC, isArabic);
         sheet.setArguments(args);
         return sheet;
@@ -67,14 +83,18 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            try {
-                activity = new JSONObject(getArguments().getString(ARG_ACTIVITY, "{}"));
-            } catch (Exception e) {
-                activity = new JSONObject();
-            }
-            isArabic = getArguments().getBoolean(ARG_IS_ARABIC, true);
+
+        // ✅ استخدم الكاش المباشر (بدون JSON parsing)
+        if (sPendingActivity != null) {
+            activity = sPendingActivity;
+            sPendingActivity = null;  // ✅ نظّف المرجع فوراً
+        } else {
+            // ✅ fallback (بعد process death — نادر)
+            activity = new JSONObject();
         }
+
+        isArabic = getArguments() != null
+                && getArguments().getBoolean(ARG_IS_ARABIC, true);
     }
 
     @Nullable
@@ -95,6 +115,10 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         LinearLayout detailsContainer = view.findViewById(R.id.detailsContainer);
         LinearLayout actionsContainer = view.findViewById(R.id.actionsContainer);
 
+        if (activity == null) {
+            activity = new JSONObject();
+        }
+
         String icon = activity.optString("icon", "⚙️");
         String title = isArabic ? activity.optString("title_ar", "")
                                 : activity.optString("title_en", "");
@@ -109,11 +133,19 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         iconContainer.getBackground().setTint(adjustAlpha(statusColor, 0.15f));
         tvDetailIcon.setTextColor(statusColor);
 
-        // ✅ DEBUG: طباعة JSON في Logcat
-        Log.d(TAG, "Activity JSON: " + activity.toString());
+        // ✅ DEBUG: Log مختصر فقط (لا toString كامل)
+        Log.d(TAG, "Activity opened: type=" + activity.optString("type", "?")
+                + ", hasItems=" + activity.has("items"));
 
         buildDetails(detailsContainer, statusColor);
         buildActions(actionsContainer);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // ✅ للأمان: نظّف الكاش عند التدمير
+        sPendingActivity = null;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -261,7 +293,10 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
                         "📦 " + (isArabic ? "القطع المباعة" : "Sold Items")
                                 + " (" + itemsArr.length() + ")");
 
-                for (int i = 0; i < itemsArr.length(); i++) {
+                // ✅ حد أقصى للعرض (حماية من القوائم الطويلة)
+                int maxDisplay = Math.min(itemsArr.length(), 30);
+
+                for (int i = 0; i < maxDisplay; i++) {
                     JSONObject item = itemsArr.optJSONObject(i);
                     if (item == null) continue;
 
@@ -325,7 +360,14 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
                             sb.toString());
                 }
 
-                Log.d(TAG, "✅ Displayed " + itemsArr.length() + " items");
+                // ✅ إذا كانت هناك قطع إضافية
+                if (itemsArr.length() > maxDisplay) {
+                    addDetailRow(container, "…",
+                            "+" + (itemsArr.length() - maxDisplay)
+                            + " " + (isArabic ? "قطعة أخرى" : "more items"));
+                }
+
+                Log.d(TAG, "✅ Displayed " + maxDisplay + "/" + itemsArr.length() + " items");
             } else {
                 Log.d(TAG, "ℹ️ No items array in activity");
             }
