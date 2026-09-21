@@ -347,7 +347,8 @@ if (heroCard != null) {
                         isArabic,
                         activity -> handleRecentActivityClick(activity));
                 rvRecentActivity.setAdapter(recentActivityAdapter);
-                rvRecentActivity.setHasFixedSize(false);
+                rvRecentActivity.setItemViewCacheSize(10);  // ✅ يحفظ 10 Views في الذاكرة
+                rvRecentActivity.setHasFixedSize(true);
                 
             }
 
@@ -1493,24 +1494,31 @@ private void handleRecentActivityClick(JSONObject activity) {
     // ═══════════════════════════════════════════════════════
     // Lifecycle (Resume/Pause/Destroy)
     // ═══════════════════════════════════════════════════════
-    public void onBranchChanged() {
-        try {
-            if (!isAdded()) return;
-            int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            if (newBranchId != currentBranchId) {
-                currentBranchId = newBranchId;
-                initBranchCache(currentBranchId);
-                updateHeader();
-                syncOrgProfileFromServer(true);
-                loadOfflineData();
+  public void onBranchChanged() {
+    try {
+        if (!isAdded()) return;
+        int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        if (newBranchId != currentBranchId) {
+            currentBranchId = newBranchId;
+            initBranchCache(currentBranchId);
+            updateHeader();
+            syncOrgProfileFromServer(true);
+            
+            // ✅ عرض الكاش أولاً، ثم Shimmer فقط إذا كان الكاش فارغاً
+            loadOfflineData();
+            
+            // عرض Shimmer فقط إذا كان الكاش فارغاً
+            if (offlineCache == null || offlineCache.getInt("total_items", 0) == 0) {
                 showShimmer(true);
-                fetchData();
-                fetchRecentActivity();
             }
-        } catch (Exception e) {
-            logNonFatal("onBranchChanged", e);
+            
+            fetchData();
+            fetchRecentActivity();
         }
+    } catch (Exception e) {
+        logNonFatal("onBranchChanged", e);
     }
+}
 @Override
 public void onResume() {
     super.onResume();
@@ -1661,4 +1669,4 @@ public void onStop() {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-                        }
+        }
