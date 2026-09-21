@@ -2351,82 +2351,56 @@ private void showCommitSuccessDialog(JSONObject report) {
     /**
      * عرض الأرشيف
      */
-    private void showArchiveReports() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        
-        AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "📂 جاري تحميل الأرشيف..." : "📂 Loading archive...")
-                .setMessage(isArabic ? "يرجى الانتظار" : "Please wait")
-                .setCancelable(false)
-                .show();
-        
-        if (backgroundExecutor == null || backgroundExecutor.isShutdown()) {
-            backgroundExecutor = Executors.newSingleThreadExecutor();
-        }
-        
-        backgroundExecutor.execute(() -> {
-            try {
-                List<InventoryReport> reports = fetchArchiveReports();
-                
-                mainThreadHandler.post(() -> {
-                    loading.dismiss();
-                    if (isAdded() && !isFragmentDestroyed) {
-                        displayArchiveDialog(reports);
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching archive", e);
-                mainThreadHandler.post(() -> {
-                    loading.dismiss();
-                    if (isAdded() && !isFragmentDestroyed) {
-                        Toast.makeText(requireContext(), 
-                            isArabic ? "❌ فشل تحميل الأرشيف" : "❌ Failed to load archive", 
-                            Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        });
-    }
+  /**
+ * ✅ عرض الأرشيف — نسخة لاتزامنية بدون CountDownLatch
+ */
+private void showArchiveReports() {
+    if (!isAdded() || isFragmentDestroyed) return;
     
-    /**
-     * جلب تقارير الأرشيف
-     */
-private List<InventoryReport> fetchArchiveReports() {
     if (persistenceManager == null || apiClient == null || branchesManager == null) {
-        return new ArrayList<>();
+        Toast.makeText(requireContext(), 
+            isArabic ? "❌ غير جاهز" : "❌ Not ready", 
+            Toast.LENGTH_SHORT).show();
+        return;
     }
     
-    // ⚠️ ملاحظة: هذه دالة متزامنة — تُنفَّذ في backgroundExecutor
-    final List<InventoryReport>[] result = new List[1];
-    result[0] = new ArrayList<>();
-    
-    final java.util.concurrent.CountDownLatch latch = 
-            new java.util.concurrent.CountDownLatch(1);
+    // ✅ عرض loading
+    AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📂 جاري تحميل الأرشيف..." : "📂 Loading archive...")
+            .setMessage(isArabic ? "يرجى الانتظار" : "Please wait")
+            .setCancelable(false)
+            .show();
     
     int branchId = branchesManager.getActiveBranchId();
     
+    // ✅ استدعاء مباشر (بدون backgroundExecutor.execute خارجي)
     persistenceManager.fetchArchiveReports(apiClient, branchId,
             new InventoryPersistenceManager.ArchiveCallback() {
         @Override
         public void onArchiveLoaded(List<InventoryReport> reports) {
-            result[0] = reports;
-            latch.countDown();
+            // ✅ الرد يأتي من خيط الـ executor — ننقله للـ main thread
+            mainThreadHandler.post(() -> {
+                try { loading.dismiss(); } catch (Exception ignored) {}
+                
+                if (isAdded() && !isFragmentDestroyed) {
+                    displayArchiveDialog(reports);
+                }
+            });
         }
         
         @Override
         public void onArchiveError(String error) {
-            Log.e(TAG, "Archive fetch error: " + error);
-            latch.countDown();
+            mainThreadHandler.post(() -> {
+                try { loading.dismiss(); } catch (Exception ignored) {}
+                
+                if (isAdded() && !isFragmentDestroyed) {
+                    Toast.makeText(requireContext(), 
+                        (isArabic ? "❌ فشل التحميل: " : "❌ Load failed: ") + error, 
+                        Toast.LENGTH_LONG).show();
+                }
+            });
         }
     });
-    
-    try {
-        latch.await(30, java.util.concurrent.TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-    }
-    
-    return result[0];
 }
     
     /**
@@ -2729,49 +2703,58 @@ private List<InventoryReport> fetchArchiveReports() {
      * عرض مقارنة اللقطات
      */
     private void showSnapshotComparison() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        
-        AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "📊 جاري تحميل الجلسات..." : "📊 Loading sessions...")
-                .setMessage(isArabic ? "يرجى الانتظار" : "Please wait")
-                .setCancelable(false)
-                .show();
-        
-        if (backgroundExecutor == null || backgroundExecutor.isShutdown()) {
-            backgroundExecutor = Executors.newSingleThreadExecutor();
+    if (!isAdded() || isFragmentDestroyed) return;
+    
+    if (persistenceManager == null || apiClient == null || branchesManager == null) {
+        Toast.makeText(requireContext(), 
+            isArabic ? "❌ غير جاهز" : "❌ Not ready", 
+            Toast.LENGTH_SHORT).show();
+        return;
+    }
+    
+    AlertDialog loading = new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📊 جاري تحميل الجلسات..." : "📊 Loading sessions...")
+            .setMessage(isArabic ? "يرجى الانتظار" : "Please wait")
+            .setCancelable(false)
+            .show();
+    
+    int branchId = branchesManager.getActiveBranchId();
+    
+    persistenceManager.fetchArchiveReports(apiClient, branchId,
+            new InventoryPersistenceManager.ArchiveCallback() {
+        @Override
+        public void onArchiveLoaded(List<InventoryReport> sessions) {
+            mainThreadHandler.post(() -> {
+                try { loading.dismiss(); } catch (Exception ignored) {}
+                
+                if (!isAdded() || isFragmentDestroyed) return;
+                
+                if (sessions == null || sessions.size() < 2) {
+                    Toast.makeText(requireContext(), 
+                        isArabic ? "⚠️ تحتاج إلى جلستين على الأقل" : 
+                        "⚠️ Need at least two sessions", 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                showSessionSelectionDialog(sessions);
+            });
         }
         
-        backgroundExecutor.execute(() -> {
-            try {
-                List<InventoryReport> sessions = fetchArchiveReports();
+        @Override
+        public void onArchiveError(String error) {
+            mainThreadHandler.post(() -> {
+                try { loading.dismiss(); } catch (Exception ignored) {}
                 
-                mainThreadHandler.post(() -> {
-                    loading.dismiss();
-                    if (!isAdded() || isFragmentDestroyed) return;
-                    
-                    if (sessions.size() < 2) {
-                        Toast.makeText(requireContext(), 
-                            isArabic ? "⚠️ تحتاج إلى جلستين على الأقل للمقارنة" : 
-                            "⚠️ Need at least two sessions for comparison", 
-                            Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    showSessionSelectionDialog(sessions);
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching sessions for comparison", e);
-                mainThreadHandler.post(() -> {
-                    loading.dismiss();
-                    if (isAdded() && !isFragmentDestroyed) {
-                        Toast.makeText(requireContext(), 
-                            isArabic ? "❌ فشل تحميل الجلسات" : "❌ Failed to load sessions", 
-                            Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        });
-    }
+                if (isAdded() && !isFragmentDestroyed) {
+                    Toast.makeText(requireContext(), 
+                        (isArabic ? "❌ فشل: " : "❌ ") + error, 
+                        Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    });
+}
 
     /**
      * عرض اختيار الجلسات
