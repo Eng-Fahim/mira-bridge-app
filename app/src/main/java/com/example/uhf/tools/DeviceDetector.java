@@ -91,6 +91,79 @@ public class DeviceDetector {
         return model.contains("C72") || model.contains("CHAINWAY") || 
                manufacturer.contains("CHAINWAY") || getDeviceModel() == DeviceModel.C72;
     }
+    
+    /**
+ * ✅✅✅ دالة حرجة: هل الجهاز يدعم قارئ RFID؟
+ * 
+ * تُستخدم قبل استدعاء initUHF() لتجنب:
+ * - ANR بسبب timeout 8 ثوان
+ * - محاولة تهيئة AAR على جهاز بدون قارئ
+ * - استدعاء getInstance() المكلف
+ * 
+ * @return true فقط إذا كان الجهاز من أجهزة Chainway/Zebra/Honeywell المدعومة
+ */
+public static boolean isRfidHardwareSupported() {
+    try {
+        String model = Build.MODEL != null 
+            ? Build.MODEL.toUpperCase() 
+            : "";
+        String manufacturer = Build.MANUFACTURER != null 
+            ? Build.MANUFACTURER.toUpperCase() 
+            : "";
+        String device = Build.DEVICE != null 
+            ? Build.DEVICE.toUpperCase() 
+            : "";
+        String brand = Build.BRAND != null 
+            ? Build.BRAND.toUpperCase() 
+            : "";
+        
+        Log.d(TAG, "🔍 Checking RFID support: model=" + model 
+            + ", manufacturer=" + manufacturer 
+            + ", device=" + device
+            + ", brand=" + brand);
+        
+        // ✅ الأجهزة المدعومة
+        boolean isChainway = model.contains("C72") 
+                          || model.contains("C61") 
+                          || model.contains("C66")
+                          || model.contains("C5")
+                          || device.contains("C72")
+                          || manufacturer.contains("CHAINWAY")
+                          || brand.contains("CHAINWAY");
+        
+        boolean isZebra = model.contains("MC33") 
+                       || model.contains("MC32") 
+                       || model.contains("TC51")
+                       || model.contains("TC52")
+                       || model.contains("TC72")
+                       || manufacturer.contains("ZEBRA")
+                       || brand.contains("ZEBRA");
+        
+        boolean isHoneywell = model.contains("EDA5") 
+                           || model.contains("CT40")
+                           || model.contains("CT60")
+                           || manufacturer.contains("HONEYWELL")
+                           || brand.contains("HONEYWELL");
+        
+        boolean isUnitech = model.contains("RP90") 
+                         || model.contains("PA70")
+                         || manufacturer.contains("UNITECH");
+        
+        boolean isUrovo = model.contains("DT50") 
+                       || model.contains("RT40")
+                       || manufacturer.contains("UROVO");
+        
+        boolean supported = isChainway || isZebra || isHoneywell 
+                         || isUnitech || isUrovo;
+        
+        Log.i(TAG, "✅ RFID hardware supported: " + supported);
+        return supported;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "isRfidHardwareSupported error: " + e.getMessage(), e);
+        return false;
+    }
+}
 
     public static boolean isC5() { return getDeviceModel() == DeviceModel.C5; }
     public static boolean isC72() { return isChainwayC72(); }
