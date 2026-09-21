@@ -60,9 +60,10 @@ import com.google.android.material.slider.Slider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+
+import java.util.Collections;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -75,7 +76,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * MiraInventoryProFragment - الإصدار الاحترافي 2.0
  * 
@@ -185,13 +186,17 @@ private android.os.Vibrator vibrator;
     private ModernScannedItemsAdapter modernAdapter;
     private View tvEmptyState;
     
+    
+    // ==================== ✅ Aggregates (أداء) ====================
+private volatile double aggregateTotalWeight = 0.0;
+private volatile double aggregateTotalValue = 0.0;
     // ==================== Floating Action Dock (السفلي) ====================
     private MaterialButton btnMainToggleScan;
     private MaterialButton btnCommitSession;
 
     // ==================== مجموعات آمنة للخيوط ====================
     private final List<ScannedItemDisplay> scannedItemsDisplayList = 
-        Collections.synchronizedList(new ArrayList<>());
+    new CopyOnWriteArrayList<>();
     
     private final Set<String> catalogEpcs = 
         Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -1182,13 +1187,17 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
 
         for (ScannedItemDisplay display : scannedItemsDisplayList) {
             if (display != null && epc.equals(display.epc)) {
-                display.count++;
-                display.rssi = rssi;
-                display.time = getCurrentTimeString();
-                exists = true;
-                currentDisplay = display;
-                break;
-            }
+    // ✅ إضافة القيمة الإضافية فقط (O(1))
+    aggregateTotalWeight += display.weight;
+    aggregateTotalValue += display.price;
+    
+    display.count++;
+    display.rssi = rssi;
+    display.time = getCurrentTimeString();
+    exists = true;
+    currentDisplay = display;
+    break;
+}
         }
 
         boolean isKnown = catalogEpcs.contains(epc);
@@ -1236,13 +1245,14 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
             display.price = price;
 
             scannedItemsDisplayList.add(0, display);
-            currentDisplay = display;
+currentDisplay = display;
 
-            if (rvInventoryItems != null) {
-                rvInventoryItems.scrollToPosition(0);
-            }
-            
-            updateTotalWeightAndValue();
+if (rvInventoryItems != null) {
+    rvInventoryItems.scrollToPosition(0);
+}
+
+// ✅ O(n) مرة واحدة عند الإضافة (بدلاً من كل قراءة)
+recalculateAggregates();
         } else {
             feedbackType = SoundManager.FeedbackType.DUPLICATE_ITEM;
             isDuplicate = true;
@@ -1361,18 +1371,9 @@ private void showItemFullDetails(ScannedItemDisplay item) {
  * تحديث الوزن والقيمة الإجمالية
  */
 private void updateTotalWeightAndValue() {
-    double totalWeight = 0;
-    double totalValue = 0;
-    
-    synchronized (scannedItemsDisplayList) {
-        for (ScannedItemDisplay item : scannedItemsDisplayList) {
-            totalWeight += item.weight * item.count;
-            totalValue += item.price * item.count;
-        }
-    }
-    
-    final double finalWeight = totalWeight;
-    final double finalValue = totalValue;
+    // ✅ الآن O(1) بدل O(n)
+    final double finalWeight = aggregateTotalWeight;
+    final double finalValue = aggregateTotalValue;
     
     mainThreadHandler.post(() -> {
         if (tvTotalWeight != null) {
@@ -1382,6 +1383,24 @@ private void updateTotalWeightAndValue() {
             tvTotalValue.setText(String.format(Locale.US, "$%,.2f", finalValue));
         }
     });
+}
+
+
+/**
+ * ✅ إعادة حساب الإجماليات (تُستدعى فقط عند إضافة/حذف قطعة)
+ */
+private void recalculateAggregates() {
+    double w = 0, v = 0;
+    
+    for (ScannedItemDisplay item : scannedItemsDisplayList) {
+        if (item != null) {
+            w += item.weight * item.count;
+            v += item.price * item.count;
+        }
+    }
+    
+    aggregateTotalWeight = w;
+    aggregateTotalValue = v;
 }
 
 /**
@@ -1637,8 +1656,11 @@ private void startScanning() {
     
     // ✅ امسح القائمة قبل بدء الجلسة الجديدة
     synchronized (scannedItemsDisplayList) {
-        scannedItemsDisplayList.clear();
-    }
+    scannedItemsDisplayList.clear();
+}
+aggregateTotalWeight = 0;
+aggregateTotalValue = 0;
+
     if (modernAdapter != null) {
         modernAdapter.submitList(new ArrayList<>());
     }
@@ -1684,6 +1706,10 @@ private void startBlindInventory() {
     synchronized (scannedItemsDisplayList) {
         scannedItemsDisplayList.clear();
     }
+    
+// ✅ أضف:
+aggregateTotalWeight = 0;
+aggregateTotalValue = 0;
     if (modernAdapter != null) {
         modernAdapter.submitList(new ArrayList<>());
     }
@@ -2066,6 +2092,10 @@ private void startCategoryInventory(String category) {
         synchronized (scannedItemsDisplayList) {
             scannedItemsDisplayList.clear();
         }
+        
+// ✅ أضف:
+aggregateTotalWeight = 0;
+aggregateTotalValue = 0;
         if (modernAdapter != null) {
             modernAdapter.submitList(new ArrayList<>());
         }
@@ -3061,6 +3091,7 @@ public void onDestroy() {
     synchronized (scannedItemsDisplayList) {
         scannedItemsDisplayList.clear();
     }
+    
     recentTagReads.clear();
     catalogEpcs.clear();
     // ✅ مسح الكتالوج عبر Manager
@@ -3190,6 +3221,10 @@ private void confirmResetSession() {
                     synchronized (scannedItemsDisplayList) {
                         scannedItemsDisplayList.clear();
                     }
+                    
+// ✅ أضف:
+aggregateTotalWeight = 0;
+aggregateTotalValue = 0;
                     if (modernAdapter != null) {
                         modernAdapter.submitList(new ArrayList<>());
                     }
@@ -3295,6 +3330,7 @@ private void applyRestoredSession(JSONArray items, int expectedCount, String cat
             
             for (int i = 0; i < items.length(); i++) {
                 JSONObject itemObj = items.getJSONObject(i);
+               
                 ScannedItemDisplay item = new ScannedItemDisplay(
                     itemObj.optString("epc"),
                     itemObj.optString("title"),
@@ -3308,11 +3344,11 @@ private void applyRestoredSession(JSONArray items, int expectedCount, String cat
                 scannedItemsDisplayList.add(item);
             }
         }
-        
+        recalculateAggregates();
         if (modernAdapter != null) {
             updateAdapterList();
         }
-        
+     
         this.expectedCount = expectedCount;
         if (tvExpectedCount != null) {
             tvExpectedCount.setText(String.valueOf(expectedCount));
