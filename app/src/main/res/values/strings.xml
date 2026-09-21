@@ -2277,5 +2277,5 @@
 <string name="unlock_with_biometric">فتح بالبصمة</string>
 <string name="logout">تسجيل الخروج</string>
 <string name="security_icon">أيقونة الأمان</string>
-
+<string name="pos_remove_item">إزالة القطعة من السلة</string>
 </resources>
