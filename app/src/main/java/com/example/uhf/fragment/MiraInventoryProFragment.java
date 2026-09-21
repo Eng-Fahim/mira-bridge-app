@@ -102,6 +102,21 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final long TAG_READ_DEBOUNCE_MS = 500;
     private static final int MAX_CACHE_ITEMS = 5000;
     
+    // ==================== ✅ Time Formatting (أداء) ====================
+private final SimpleDateFormat timeFormat = 
+        new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+private final SimpleDateFormat dateTimeFormat = 
+        new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+
+/** الحصول على الوقت الحالي كنص — آمِن للخيوط */
+private synchronized String getCurrentTimeString() {
+    return timeFormat.format(new Date());
+}
+
+/** الحصول على التاريخ والوقت الحاليين */
+private synchronized String getCurrentDateTimeString() {
+    return dateTimeFormat.format(new Date());
+}
     // ==================== ✅ Views الجديدة ====================
 private View flashOverlay;
 private View lastScanCard;
@@ -1051,22 +1066,14 @@ public void onTagRead(String epc, int rssi) {
             saveTransactionLocally(normalizedEpc, finalRssi);
             
             mainThreadHandler.post(() -> {
-                if (!isFragmentDestroyed) {
-                    addScannedItemToDisplay(normalizedEpc, finalRssi, null);
-                    // ✅ تحديث بطاقة آخر مسح
-ScannedItemDisplay lastItem = null;
-synchronized (scannedItemsDisplayList) {
-    if (!scannedItemsDisplayList.isEmpty()) {
-        lastItem = scannedItemsDisplayList.get(0);
+    if (!isFragmentDestroyed) {
+        // ✅ addScannedItemToDisplay يُحدّث بطاقة "آخر مسح" بنفسه
+        addScannedItemToDisplay(normalizedEpc, finalRssi, null);
+        
+        updateLastScan(normalizedEpc, finalRssi);
+        scheduleUiUpdate();
     }
-}
-if (lastItem != null) {
-    updateLastScanCard(lastItem, false);
-}
-                    updateLastScan(normalizedEpc, finalRssi);
-                    scheduleUiUpdate();
-                }
-            });
+});
         } catch (Exception e) {
             Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
         }
@@ -1177,8 +1184,7 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
             if (display != null && epc.equals(display.epc)) {
                 display.count++;
                 display.rssi = rssi;
-                display.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                    .format(new Date());
+                display.time = getCurrentTimeString();
                 exists = true;
                 currentDisplay = display;
                 break;
@@ -1221,8 +1227,7 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
                 title = isArabic ? "مادة مسجلة بالكتالوج" : "Catalog registered item";
             }
 
-            String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                .format(new Date());
+            String currentTime = getCurrentTimeString();
 
             ScannedItemDisplay display = new ScannedItemDisplay(
                 epc, title, karat, 1, rssi, currentTime
@@ -1327,7 +1332,7 @@ private void printSingleItemLabel(ScannedItemDisplay item) {
         InventoryReport singleReport = new InventoryReport(
             0,
             inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SINGLE",
-            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()),
+            getCurrentDateTimeString(),
             1,
             1,
             0,
@@ -1409,7 +1414,7 @@ private void printCurrentReport() {
         InventoryReport currentReport = new InventoryReport(
             0,
             inventoryEngine.getClientSessionId(),
-            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()),
+            getCurrentDateTimeString(),
             expectedCount,
             scanned,
             missing,
@@ -2262,8 +2267,7 @@ private void showCommitSuccessDialog(JSONObject report) {
                         0,
                         inventoryEngine != null ? 
                             inventoryEngine.getClientSessionId() : "SESS-COMMITTED",
-                        new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                            .format(new Date()),
+                        getCurrentDateTimeString(),
                         expectedCount,
                         scanned,
                         Math.max(0, expectedCount - scanned),
