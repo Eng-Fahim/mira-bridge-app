@@ -7,7 +7,7 @@
     android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
-    <!-- Header Bar (ثابت - لا يتحرك) -->
+    <!-- ==================== HEADER BAR (ثابت) ==================== -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -47,7 +47,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- ✅ NestedScrollView لكل شيء آخر -->
+    <!-- ==================== NESTED SCROLL VIEW ==================== -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/posScrollView"
         android:layout_width="match_parent"
@@ -62,7 +62,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Scan Actions Bar -->
+            <!-- ==================== SCAN ACTIONS BAR ==================== -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -104,7 +104,7 @@
                     app:iconPadding="8dp" />
             </LinearLayout>
 
-            <!-- زر المرتجع -->
+            <!-- ==================== زر المرتجع ==================== -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPosRefund"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -118,7 +118,7 @@
                 app:cornerRadius="8dp"
                 app:strokeColor="?attr/colorSecondary" />
 
-            <!-- Status Strip -->
+            <!-- ==================== STATUS STRIP ==================== -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -136,7 +136,7 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Manual Input (الآن داخل ScrollView - يتحرك مع الكيبورد) -->
+            <!-- ==================== MANUAL INPUT (مُصلح) ==================== -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -144,7 +144,7 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="12dp"
-                android:paddingVertical="8dp">
+                android:paddingVertical="10dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilPosManualEpc"
@@ -160,7 +160,9 @@
                     app:boxCornerRadiusTopEnd="10dp"
                     app:boxCornerRadiusTopStart="10dp"
                     app:boxStrokeColor="?attr/colorPrimary"
-                    app:endIconMode="clear_text">
+                    app:endIconMode="clear_text"
+                    app:hintTextColor="?attr/colorPrimary"
+                    app:errorEnabled="true">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etPosManualEpc"
@@ -168,10 +170,12 @@
                         android:layout_height="wrap_content"
                         android:imeOptions="actionDone"
                         android:inputType="text"
-                        android:paddingVertical="12dp"
+                        android:maxLines="1"
+                        android:singleLine="true"
                         android:textColor="?attr/colorOnSurface"
+                        android:textColorHint="?attr/colorOnSurfaceVariant"
                         android:textDirection="ltr"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -189,7 +193,7 @@
                     app:cornerRadius="10dp" />
             </LinearLayout>
 
-            <!-- ✅ Cart Container (ارتفاع ثابت داخل ScrollView) -->
+            <!-- ==================== CART CONTAINER ==================== -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="400dp"
@@ -232,7 +236,7 @@
                 </LinearLayout>
             </FrameLayout>
 
-            <!-- Summary Footer -->
+            <!-- ==================== SUMMARY FOOTER ==================== -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -250,6 +254,7 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
+                    <!-- Item Count + Total Amount -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -306,6 +311,7 @@
                         </LinearLayout>
                     </LinearLayout>
 
+                    <!-- Clear + Checkout Buttons -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
