@@ -43,6 +43,17 @@ import javax.net.ssl.HttpsURLConnection;
 import org.brotli.dec.BrotliInputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
+
+/**
+ * ✅ MiraApiClient v3.1 — النسخة المُحصّنة
+ * 
+ * التحسينات:
+ * 1. pingApiAsync() — لا يُجمّد Main Thread
+ * 2. reinitializeWithServerAsync() — آمنة للواجهات
+ * 3. Cache للـ Auth Token — تقليل Disk I/O
+ * 4. refreshCredentials على background
+ * 5. تنظيف أفضل للخيوط
+ */
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
@@ -58,6 +69,9 @@ public class MiraApiClient {
     private static final int PING_CONNECT_TIMEOUT    = 5_000;
     private static final int PING_READ_TIMEOUT       = 5_000;
 
+    // ✅ Cache للـ Token
+    private static final long TOKEN_CACHE_MS = 30_000;
+
     private final Context context;
     private final MiraServerConfig serverConfig;
     private final SessionManager sessionManager;
@@ -68,6 +82,10 @@ public class MiraApiClient {
     private volatile String apiKey;
     private volatile String gateId;
     private final Object credentialsLock = new Object();
+
+    // ✅ Cache للـ Auth Token
+    private volatile String cachedToken = null;
+    private volatile long cachedTokenTimestamp = 0;
 
     // ==================== الخيوط ====================
     private final ExecutorService executorService;
@@ -120,11 +138,12 @@ public class MiraApiClient {
         }
         this.baseUrl = normalizeBaseUrl(savedBaseUrl);
 
+        // ✅ قراءة أولية — سريعة عادةً (< 10ms)
         refreshCredentials();
     }
 
     /**
-     * ✅ إغلاق كل الخيوط — يُستدعى من reloadInstance أو من Application.onTerminate
+     * ✅ إغلاق كل الخيوط
      */
     public void shutdown() {
         Log.d(TAG, "shutdown() — closing executors");
@@ -163,10 +182,21 @@ public class MiraApiClient {
             }
             this.gateId = gate != null ? gate : "";
 
+            // ✅ إجبار تحديث Cache
+            this.cachedToken = null;
+            this.cachedTokenTimestamp = 0;
+
             Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
                     + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "EXISTS")
                     + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
         }
+    }
+
+    /**
+     * ✅ refreshCredentials آمنة للواجهات — على background
+     */
+    private void refreshCredentialsAsync() {
+        executorService.execute(this::refreshCredentials);
     }
 
     private String normalizeBaseUrl(String url) {
@@ -198,6 +228,83 @@ public class MiraApiClient {
         }
     }
 
+    // ==================== ✅ دوال Async جديدة ====================
+    public interface PingCallback {
+        void onResult(boolean isSuccess);
+    }
+
+    /**
+     * ✅ Ping غير متزامن — آمن للاستخدام من Main Thread
+     * 
+     * الاستخدام:
+     * <pre>
+     * apiClient.pingApiAsync(success -> {
+     *     // يعمل على Main Thread بعد انتهاء الطلب
+     *     updateUI(success);
+     * });
+     * </pre>
+     */
+    public void pingApiAsync(PingCallback callback) {
+        networkExecutor.execute(() -> {
+            final boolean result = pingApi();
+            mainHandler.post(() -> {
+                if (callback != null) {
+                    try {
+                        callback.onResult(result);
+                    } catch (Exception e) {
+                        Log.e(TAG, "pingApiAsync callback error", e);
+                    }
+                }
+            });
+        });
+    }
+
+    /**
+     * ✅ إعادة تهيئة async — لا تُجمّد Main Thread
+     */
+    public void reinitializeWithServerAsync(String newServerUrl, PingCallback callback) {
+        executorService.execute(() -> {
+            boolean success = false;
+            try {
+                if (newServerUrl == null || newServerUrl.trim().isEmpty()) {
+                    Log.e(TAG, "reinitializeWithServerAsync: empty URL");
+                    final boolean fail = false;
+                    mainHandler.post(() -> {
+                        if (callback != null) callback.onResult(fail);
+                    });
+                    return;
+                }
+
+                String cleanUrl = normalizeBaseUrl(newServerUrl);
+                sessionManager.setServerUrl(cleanUrl);
+                serverConfig.setBaseUrl(cleanUrl);
+
+                synchronized (credentialsLock) {
+                    this.baseUrl = cleanUrl;
+                }
+                refreshCredentials();
+
+                success = pingApi();
+                Log.d(TAG, "reinitializeWithServerAsync result: " + success);
+            } catch (Exception e) {
+                Log.e(TAG, "reinitializeWithServerAsync error: " + e.getMessage(), e);
+                success = false;
+            }
+
+            final boolean finalSuccess = success;
+            mainHandler.post(() -> {
+                if (callback != null) {
+                    try {
+                        callback.onResult(finalSuccess);
+                    } catch (Exception e) {
+                        Log.e(TAG, "reinitialize callback error", e);
+                    }
+                }
+            });
+        });
+    }
+
+    // ==================== الدوال الأساسية ====================
     private String getEffectiveApiKey() {
         String key = apiKey;
         if (key == null || key.isEmpty()) {
@@ -216,24 +323,50 @@ public class MiraApiClient {
         return gate;
     }
 
+    /**
+     * ✅ Cache مُحسّن للـ Auth Token
+     * - يقلل قراءات SharedPreferences
+     * - يُحدَّث عند refreshCredentials
+     */
     private String getAuthToken() {
-    // ✅ المصدر الأساسي: sessionManager
-    String token = sessionManager.getAuthToken();
-    if (token != null && !token.isEmpty()) {
-        return token;
-    }
-    
-    // ✅ احتياطي: serverConfig — فقط إذا كان المستخدم مسجلاً
-    if (sessionManager.isLoggedIn()) {
-        String fallback = serverConfig.getAuthToken();
-        if (fallback != null && !fallback.isEmpty()) {
-            Log.d(TAG, "Using fallback token from serverConfig");
-            return fallback;
+        // ✅ استخدم Cache إذا كان حديثاً (30 ثانية)
+        long now = System.currentTimeMillis();
+        String cached = cachedToken;
+        if (cached != null && (now - cachedTokenTimestamp) < TOKEN_CACHE_MS) {
+            return cached;
         }
+
+        // ✅ قراءة من Disk
+        String token = sessionManager.getAuthToken();
+        
+        // ✅ Fallback إذا لزم
+        if (token == null || token.isEmpty()) {
+            if (sessionManager.isLoggedIn()) {
+                String fallback = serverConfig.getAuthToken();
+                if (fallback != null && !fallback.isEmpty()) {
+                    Log.d(TAG, "Using fallback token");
+                    token = fallback;
+                }
+            }
+        }
+
+        // ✅ حفظ في Cache
+        String result = token != null ? token : "";
+        cachedToken = result;
+        cachedTokenTimestamp = now;
+        
+        return result;
     }
-    
-    return "";
-}
+
+    /**
+     * ✅ إجبار تحديث Token Cache
+     * استخدمها بعد login/logout
+     */
+    public void invalidateTokenCache() {
+        cachedToken = null;
+        cachedTokenTimestamp = 0;
+        Log.d(TAG, "Token cache invalidated");
+    }
 
     public boolean hasValidCredentials() {
         return !getEffectiveApiKey().isEmpty() && !getEffectiveGateId().isEmpty();
@@ -275,7 +408,7 @@ public class MiraApiClient {
         }
 
         if (requiresAuth) {
-            String token = getAuthToken();
+            String token = getAuthToken();   // ✅ الآن مع Cache
             if (!token.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
@@ -284,10 +417,6 @@ public class MiraApiClient {
     }
 
     // ==================== المُنفِّذ الموحَّد للطلبات ====================
-    /**
-     * ✅ دالة واحدة مركزية لكل طلبات الشبكة — تُستخدم من كل الدوال العامة.
-     * تقضي على ازدواجية الكود وتضمن توحيد المعالجة والـ Timeouts.
-     */
     private ApiResponse executeRequest(String method,
                                        String endpoint,
                                        JSONObject payload,
@@ -375,181 +504,173 @@ public class MiraApiClient {
     }
 
     // ==================== بناء الاستجابة ====================
-  private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
-    int responseCode = conn.getResponseCode();
-    
-    Log.d(TAG, "═══════════════════════════════════════════");
-    Log.d(TAG, "📥 RESPONSE CODE: " + responseCode);
-    Log.d(TAG, "   Content-Encoding: " + conn.getContentEncoding());
-    Log.d(TAG, "   Content-Length: " + conn.getContentLength());
-    
-    InputStream rawStream = (responseCode >= 200 && responseCode < 300)
-            ? conn.getInputStream()
-            : conn.getErrorStream();
+    private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
+        int responseCode = conn.getResponseCode();
 
-    if (rawStream == null) {
-        return new ApiResponse(responseCode, null, "Empty response");
-    }
+        Log.d(TAG, "═══════════════════════════════════════════");
+        Log.d(TAG, "📥 RESPONSE CODE: " + responseCode);
+        Log.d(TAG, "   Content-Encoding: " + conn.getContentEncoding());
+        Log.d(TAG, "   Content-Length: " + conn.getContentLength());
 
-    // ✅ فك الترميز (Brotli / Gzip / Deflate)
-    InputStream is = rawStream;
-    String encoding = conn.getContentEncoding();
-    
-    try {
-        if (encoding != null && !encoding.isEmpty()) {
-            String enc = encoding.toLowerCase(Locale.US).trim();
-            
-            if (enc.contains("br")) {
-                Log.d(TAG, "   ✅ Decompressing Brotli...");
-                is = new BrotliInputStream(rawStream);
-            } else if (enc.contains("gzip")) {
-                Log.d(TAG, "   ✅ Decompressing Gzip...");
-                is = new GZIPInputStream(rawStream);
-            } else if (enc.contains("deflate")) {
-                Log.d(TAG, "   ✅ Decompressing Deflate...");
-                is = new InflaterInputStream(rawStream);
+        InputStream rawStream = (responseCode >= 200 && responseCode < 300)
+                ? conn.getInputStream()
+                : conn.getErrorStream();
+
+        if (rawStream == null) {
+            return new ApiResponse(responseCode, null, "Empty response");
+        }
+
+        // ✅ فك الترميز
+        InputStream is = rawStream;
+        String encoding = conn.getContentEncoding();
+
+        try {
+            if (encoding != null && !encoding.isEmpty()) {
+                String enc = encoding.toLowerCase(Locale.US).trim();
+
+                if (enc.contains("br")) {
+                    Log.d(TAG, "   ✅ Decompressing Brotli...");
+                    is = new BrotliInputStream(rawStream);
+                } else if (enc.contains("gzip")) {
+                    Log.d(TAG, "   ✅ Decompressing Gzip...");
+                    is = new GZIPInputStream(rawStream);
+                } else if (enc.contains("deflate")) {
+                    Log.d(TAG, "   ✅ Decompressing Deflate...");
+                    is = new InflaterInputStream(rawStream);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "   ❌ Decompression error: " + e.getMessage());
+            is = rawStream;
+        }
+
+        // ✅ قراءة الاستجابة
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            char[] buffer = new char[8192];
+            int read;
+            while ((read = reader.read(buffer)) != -1) {
+                response.append(buffer, 0, read);
             }
         }
-    } catch (Exception e) {
-        Log.e(TAG, "   ❌ Decompression error: " + e.getMessage());
-        is = rawStream;
-    }
 
-    // ✅ قراءة الاستجابة
-    StringBuilder response = new StringBuilder();
-    try (BufferedReader reader = new BufferedReader(
-            new InputStreamReader(is, StandardCharsets.UTF_8))) {
-        char[] buffer = new char[8192];
-        int read;
-        while ((read = reader.read(buffer)) != -1) {
-            response.append(buffer, 0, read);
+        String responseBody = response.toString().trim();
+
+        Log.d(TAG, "   ✅ Body length: " + responseBody.length());
+        Log.d(TAG, "   Preview: " + (responseBody.length() > 100
+                ? responseBody.substring(0, 100) + "..." : responseBody));
+        Log.d(TAG, "═══════════════════════════════════════════");
+
+        // ✅ تحليل JSON
+        JSONObject json = null;
+        String serverMessage = null;
+
+        if (!responseBody.isEmpty()) {
+            try {
+                json = new JSONObject(responseBody);
+                serverMessage = json.optString("message", null);
+            } catch (Exception e) {
+                Log.w(TAG, "   ⚠️ Non-JSON");
+            }
         }
-    }
 
-    String responseBody = response.toString().trim();
-    
-    Log.d(TAG, "   ✅ Body length: " + responseBody.length());
-    Log.d(TAG, "   Preview: " + (responseBody.length() > 100 
-            ? responseBody.substring(0, 100) + "..." : responseBody));
-    Log.d(TAG, "═══════════════════════════════════════════");
+        boolean isSuccess = responseCode >= 200 && responseCode < 300;
+        String errorMessage = isSuccess ? null
+                : (serverMessage != null ? serverMessage : responseBody);
 
-    // ✅ تحليل JSON
-    JSONObject json = null;
-    String serverMessage = null;
+        ApiResponse apiResponse = new ApiResponse(responseCode, json, errorMessage);
+        apiResponse.setBody(responseBody);
 
-    if (!responseBody.isEmpty()) {
-        try {
-            json = new JSONObject(responseBody);
-            serverMessage = json.optString("message", null);
-        } catch (Exception e) {
-            Log.w(TAG, "   ⚠️ Non-JSON: " 
-                    + responseBody.substring(0, Math.min(200, responseBody.length())));
+        if (isSuccess && serverMessage != null) {
+            apiResponse.message = serverMessage;
         }
+
+        return apiResponse;
     }
 
-    boolean isSuccess = responseCode >= 200 && responseCode < 300;
-    String errorMessage = isSuccess ? null
-            : (serverMessage != null ? serverMessage : responseBody);
-
-    ApiResponse apiResponse = new ApiResponse(responseCode, json, errorMessage);
-    apiResponse.setBody(responseBody);
-
-    if (isSuccess && serverMessage != null) {
-        apiResponse.message = serverMessage;
-    }
-
-    return apiResponse;
-}
     // ==================== المصادقة ====================
     public ApiResponse login(String username, String password, String deviceId) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("username", username);
-        payload.put("password", password);
-        payload.put("device_id", deviceId != null ? deviceId : "");
-
-        String effectiveGate = getEffectiveGateId();
-        if (effectiveGate.isEmpty()) {
-            effectiveGate = deviceId != null && !deviceId.isEmpty()
-                    ? deviceId : "default-gate";
-            serverConfig.setGateId(effectiveGate);
-        }
-
-        payload.put("gate_id", effectiveGate);
-        payload.put("app_version", "MIRA-ANDROID-v3.0");
-    } catch (Exception ignored) {}
-
-    ApiResponse response = post("/auth/login", payload);
-
-    if (response.isSuccess && response.data != null) {
-        String newApiKey = response.data.optString("api_key", "");
-        String newGateId = response.data.optString("gate_id", "");
-        String authToken = response.data.optString("token", "");
-        long expiresIn = response.data.optLong("expires_in", 0);
-
-        // ========== 1. حفظ API Key ==========
-        if (!newApiKey.isEmpty()) {
-            sessionManager.saveApiKey(newApiKey);
-            serverConfig.setApiKey(newApiKey);
-            Log.d(TAG, "✅ API Key saved");
-        }
-
-        // ========== 2. حفظ Gate ID ==========
-        String effectiveGateId = !newGateId.isEmpty() ? newGateId
-                : (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
-        if (!effectiveGateId.isEmpty()) {
-            sessionManager.saveGateId(effectiveGateId);
-            serverConfig.setGateId(effectiveGateId);
-        }
-
-        // ========== 3. ✅ حفظ Auth Token (الإصلاح الحرج) ==========
-        if (!authToken.isEmpty()) {
-            if (expiresIn > 0) {
-                sessionManager.saveAuthToken(authToken, expiresIn);
-            } else {
-                sessionManager.saveAuthToken(authToken);
-            }
-            serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
-            Log.d(TAG, "✅ Auth token saved (" + authToken.length() + " chars)");
-        } else if (newApiKey.isEmpty()) {
-            Log.e(TAG, "⚠️ Login succeeded but NO token and NO api_key!");
-        } else {
-            // API Key فقط — طبيعي
-            serverConfig.setApiKey(newApiKey);
-            Log.d(TAG, "ℹ️ API Key only, no token");
-        }
-
-        // ========== 4. حفظ معلومات المستخدم ==========
+        JSONObject payload = new JSONObject();
         try {
-            String uname = response.data.optString("username", username);
-            String role = response.data.optString("role", "");
-            String displayName = response.data.optString("display_name", "");
-            int userId = response.data.optInt("user_id", 0);
-            String email = response.data.optString("email", "");
-            String phone = response.data.optString("phone", "");
+            payload.put("username", username);
+            payload.put("password", password);
+            payload.put("device_id", deviceId != null ? deviceId : "");
 
-            if (!uname.isEmpty()) sessionManager.setUsername(uname);
-            if (!role.isEmpty()) sessionManager.setRole(role);
-            if (!displayName.isEmpty()) sessionManager.setDisplayName(displayName);
-            if (userId > 0) sessionManager.setUserId(userId);
-            if (!email.isEmpty()) sessionManager.setEmail(email);
-            if (!phone.isEmpty()) sessionManager.setPhone(phone);
+            String effectiveGate = getEffectiveGateId();
+            if (effectiveGate.isEmpty()) {
+                effectiveGate = deviceId != null && !deviceId.isEmpty()
+                        ? deviceId : "default-gate";
+                serverConfig.setGateId(effectiveGate);
+            }
 
-            // ✅ حفظ is_logged_in = true
-            sessionManager.createLoginSession(
-                    uname, role, authToken,
-                    serverConfig.getBaseUrl(),
-                    expiresIn > 0 ? expiresIn : 86400 * 7);
-        } catch (Exception e) {
-            Log.e(TAG, "Save user info error: " + e.getMessage());
+            payload.put("gate_id", effectiveGate);
+            payload.put("app_version", "MIRA-ANDROID-v3.0");
+        } catch (Exception ignored) {}
+
+        ApiResponse response = post("/auth/login", payload);
+
+        if (response.isSuccess && response.data != null) {
+            String newApiKey = response.data.optString("api_key", "");
+            String newGateId = response.data.optString("gate_id", "");
+            String authToken = response.data.optString("token", "");
+            long expiresIn = response.data.optLong("expires_in", 0);
+
+            // 1. API Key
+            if (!newApiKey.isEmpty()) {
+                sessionManager.saveApiKey(newApiKey);
+                serverConfig.setApiKey(newApiKey);
+            }
+
+            // 2. Gate ID
+            String effectiveGateId = !newGateId.isEmpty() ? newGateId
+                    : (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
+            if (!effectiveGateId.isEmpty()) {
+                sessionManager.saveGateId(effectiveGateId);
+                serverConfig.setGateId(effectiveGateId);
+            }
+
+            // 3. Auth Token
+            if (!authToken.isEmpty()) {
+                if (expiresIn > 0) {
+                    sessionManager.saveAuthToken(authToken, expiresIn);
+                } else {
+                    sessionManager.saveAuthToken(authToken);
+                }
+                serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
+                Log.d(TAG, "✅ Auth token saved (" + authToken.length() + " chars)");
+            }
+
+            // 4. User info
+            try {
+                String uname = response.data.optString("username", username);
+                String role = response.data.optString("role", "");
+                String displayName = response.data.optString("display_name", "");
+                int userId = response.data.optInt("user_id", 0);
+                String email = response.data.optString("email", "");
+                String phone = response.data.optString("phone", "");
+
+                if (!uname.isEmpty()) sessionManager.setUsername(uname);
+                if (!role.isEmpty()) sessionManager.setRole(role);
+                if (!displayName.isEmpty()) sessionManager.setDisplayName(displayName);
+                if (userId > 0) sessionManager.setUserId(userId);
+                if (!email.isEmpty()) sessionManager.setEmail(email);
+                if (!phone.isEmpty()) sessionManager.setPhone(phone);
+
+                sessionManager.createLoginSession(
+                        uname, role, authToken,
+                        serverConfig.getBaseUrl(),
+                        expiresIn > 0 ? expiresIn : 86400 * 7);
+            } catch (Exception e) {
+                Log.e(TAG, "Save user info error: " + e.getMessage());
+            }
+
+            // ✅ 5. تحديث Credentials — على background!
+            refreshCredentialsAsync();
         }
 
-        // ========== 5. تحديث Credentials ==========
-        refreshCredentials();
+        return response;
     }
-
-    return response;
-}
 
     public ApiResponse reconnectDevice(String username, String password, String gateId) {
         try {
@@ -571,7 +692,7 @@ public class MiraApiClient {
                     if (newGateId != null && !newGateId.isEmpty()) {
                         sessionManager.saveGateId(newGateId);
                     }
-                    refreshCredentials();
+                    refreshCredentialsAsync();
                 }
             }
             return response;
@@ -590,25 +711,27 @@ public class MiraApiClient {
     }
 
     public ApiResponse logout(String token) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("token", token);
-        payload.put("gate_id", getEffectiveGateId());
-    } catch (Exception ignored) {}
-    
-    ApiResponse response = post("/auth/logout", payload);
-    
-    // ✅ نظّف serverConfig أيضاً
-    try {
-        if (serverConfig != null) {
-            serverConfig.clearSession();
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("token", token);
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception ignored) {}
+
+        ApiResponse response = post("/auth/logout", payload);
+
+        // ✅ تنظيف Cache
+        invalidateTokenCache();
+
+        try {
+            if (serverConfig != null) {
+                serverConfig.clearSession();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "logout cleanup error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "logout cleanup error: " + e.getMessage());
+
+        return response;
     }
-    
-    return response;
-}
 
     public ApiResponse getCurrentUser() {
         return getWithAuth("/auth/me");
@@ -696,7 +819,7 @@ public class MiraApiClient {
                     }
                     mainHandler.post(() -> callback.onSuccess(messages));
                 } else {
-                    String err = response.error != null ? response.error : "Failed to fetch messages";
+                    String err = response.error != null ? response.error : "Failed";
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
@@ -723,7 +846,7 @@ public class MiraApiClient {
                     }
                     mainHandler.post(() -> callback.onSuccess(messages));
                 } else {
-                    String err = response.error != null ? response.error : "Failed to fetch messages";
+                    String err = response.error != null ? response.error : "Failed";
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
@@ -757,7 +880,7 @@ public class MiraApiClient {
                     }
                     mainHandler.post(() -> callback.onSuccess(message));
                 } else {
-                    String err = response.error != null ? response.error : "Failed to send message";
+                    String err = response.error != null ? response.error : "Failed";
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
@@ -776,7 +899,7 @@ public class MiraApiClient {
                     int unreadCount = response.data.optInt("unread_count", 0);
                     mainHandler.post(() -> callback.onSuccess(unreadCount));
                 } else {
-                    String err = response.error != null ? response.error : "Failed to fetch unread count";
+                    String err = response.error != null ? response.error : "Failed";
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
@@ -803,7 +926,7 @@ public class MiraApiClient {
                     }
                     mainHandler.post(() -> callback.onSuccess(notifications));
                 } else {
-                    String err = response.error != null ? response.error : "Failed to fetch notifications";
+                    String err = response.error != null ? response.error : "Failed";
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
@@ -967,6 +1090,14 @@ public class MiraApiClient {
     }
 
     // ==================== Ping ====================
+    /**
+     * ⚠️ Ping — SYNC
+     * 
+     * ⚠️⚠️ تحذير: هذه الدالة Synchronous!
+     * - إذا استُدعيت من Main Thread → ANR!
+     * - استخدم pingApiAsync() من الواجهات
+     * - هذه الدالة للاستخدام من داخل Executor فقط
+     */
     public boolean pingApi() {
         HttpURLConnection conn = null;
         try {
@@ -1013,10 +1144,6 @@ public class MiraApiClient {
     }
 
     // ==================== POS ====================
-    /**
-     * ✅ Checkout مع Timeout طويل + Idempotency Key لمنع الخصم المزدوج.
-     * إن حدث Timeout فقد تكون البيعة قد نجحت على السيرفر — المعرّف يمنع التكرار.
-     */
     public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
@@ -1105,7 +1232,7 @@ public class MiraApiClient {
                 payload.put("gate_id", getEffectiveGateId());
             }
 
-            Log.d(TAG, "SEARCH POS ITEM START -> Branch=" + payload.optInt("branch_id", 0));
+            Log.d(TAG, "SEARCH POS ITEM START");
             ApiResponse response = postWithAuth("/pos/search-item", payload);
             Log.d(TAG, "SEARCH POS ITEM END -> Code: " + response.code);
             return response;
@@ -1430,7 +1557,6 @@ public class MiraApiClient {
             payload.put("status", status != null ? status : "online");
             if (battery > 0) payload.put("battery", battery);
         } catch (Exception ignored) {}
-        // ✅ يُرسل بدون auth متعمداً — يُستدعى حتى قبل تسجيل الدخول
         return post("/heartbeat", payload);
     }
 
@@ -1498,28 +1624,12 @@ public class MiraApiClient {
 
     public ApiResponse getBranchItemsListWithLongTimeout(int branchId) {
         Log.d(TAG, "🌐 getBranchItemsListWithLongTimeout | branchId=" + branchId);
-
         String endpoint = "/branches/" + branchId + "/inventory/items";
-        Log.d(TAG, "📡 Calling getWithAuthLongTimeout: " + endpoint);
         ApiResponse response = getWithAuthLongTimeout(endpoint);
 
         if (response != null) {
-            Log.d(TAG, "═══════════════════════════════════════════");
-            Log.d(TAG, "📥 RESPONSE from: " + endpoint);
-            Log.d(TAG, "   Code: " + response.code);
-            Log.d(TAG, "   isSuccess: " + response.isSuccess);
-            Log.d(TAG, "   isNetworkError: " + response.isNetworkError);
-            Log.d(TAG, "   error: " + (response.error != null ? response.error : "null"));
-
-            String body = response.getBody();
-            if (body != null && !body.isEmpty()) {
-                Log.d(TAG, "   body: " + body.substring(0, Math.min(200, body.length())));
-            }
-            Log.d(TAG, "═══════════════════════════════════════════");
-        } else {
-            Log.e(TAG, "❌ Null response from getWithAuth");
+            Log.d(TAG, "📥 Code: " + response.code + ", isSuccess: " + response.isSuccess);
         }
-
         return response;
     }
 
@@ -1926,9 +2036,6 @@ public class MiraApiClient {
         void onFailure(String errorMessage);
     }
 
-    /**
-     * ✅ استدعاء تجاوبي — يُستدعى onSuccess أو onFailure فقط (وليس كليهما).
-     */
     public void get(final String endpoint, final ApiCallback callback) {
         networkExecutor.execute(() -> {
             final ApiResponse response = getWithAuth(endpoint);
@@ -2033,4 +2140,4 @@ public class MiraApiClient {
             return t;
         }
     }
-    }
+}
