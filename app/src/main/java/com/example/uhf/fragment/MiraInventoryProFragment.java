@@ -102,6 +102,24 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final long TAG_READ_DEBOUNCE_MS = 500;
     private static final int MAX_CACHE_ITEMS = 5000;
     
+    // ==================== ✅ Views الجديدة ====================
+private View flashOverlay;
+private View lastScanCard;
+private TextView tvLastScanTitle;
+private TextView tvLastScanEpc;
+private TextView tvLastScanKarat;
+private TextView tvLastScanWeight;
+private TextView tvLastScanRssi;
+private TextView tvLastScanStatus;
+private View alertsRow;
+private TextView tvAlertsText;
+private MaterialButton btnOpenItemsList;
+private MaterialButton btnPowerControlCompact;
+private MaterialButton btnArchiveReportsCompact;
+
+// ==================== Vibrator للاهتزاز ====================
+private android.os.Vibrator vibrator;
+    
     // ==================== مفاتيح الزناد ====================
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
@@ -622,7 +640,7 @@ try {
         // ==================== Search ====================
         etSearchItems = view.findViewById(R.id.etSearchItems);
         btnClearSearch = view.findViewById(R.id.btnClearSearch);
-btnLiveFilter = view.findViewById(R.id.btnLiveFilter);  // ✅ جديد
+        btnLiveFilter = view.findViewById(R.id.btnLiveFilter);  // ✅ جديد
 
 // ✅ ربط زر الفلترة
 if (btnLiveFilter != null) {
@@ -647,6 +665,36 @@ if (btnLiveFilter != null) {
         // ==================== Floating Action Dock ====================
         btnMainToggleScan = view.findViewById(R.id.btnMainToggleScan);
         btnCommitSession = view.findViewById(R.id.btnCommitSession);
+        
+        
+        // ==================== ✅ Views الجديدة ====================
+flashOverlay = view.findViewById(R.id.flashOverlay);
+lastScanCard = view.findViewById(R.id.lastScanCard);
+tvLastScanTitle = view.findViewById(R.id.tvLastScanTitle);
+tvLastScanEpc = view.findViewById(R.id.tvLastScanEpc);
+tvLastScanKarat = view.findViewById(R.id.tvLastScanKarat);
+tvLastScanWeight = view.findViewById(R.id.tvLastScanWeight);
+tvLastScanRssi = view.findViewById(R.id.tvLastScanRssi);
+tvLastScanStatus = view.findViewById(R.id.tvLastScanStatus);
+alertsRow = view.findViewById(R.id.alertsRow);
+tvAlertsText = view.findViewById(R.id.tvAlertsText);
+btnOpenItemsList = view.findViewById(R.id.btnOpenItemsList);
+btnPowerControlCompact = view.findViewById(R.id.btnPowerControlCompact);
+btnArchiveReportsCompact = view.findViewById(R.id.btnArchiveReportsCompact);
+
+// ✅ تهيئة Vibrator
+initVibrator();
+
+// ✅ ربط الأزرار الجديدة
+if (btnOpenItemsList != null) {
+    btnOpenItemsList.setOnClickListener(v -> showItemsListDialog());
+}
+if (btnPowerControlCompact != null) {
+    btnPowerControlCompact.setOnClickListener(v -> showPowerControlSheet());
+}
+if (btnArchiveReportsCompact != null) {
+    btnArchiveReportsCompact.setOnClickListener(v -> showArchiveReports());
+}
         
         // ==================== إعداد الأزرار ====================
         setupButtons();
@@ -1005,6 +1053,16 @@ public void onTagRead(String epc, int rssi) {
             mainThreadHandler.post(() -> {
                 if (!isFragmentDestroyed) {
                     addScannedItemToDisplay(normalizedEpc, finalRssi, null);
+                    // ✅ تحديث بطاقة آخر مسح
+ScannedItemDisplay lastItem = null;
+synchronized (scannedItemsDisplayList) {
+    if (!scannedItemsDisplayList.isEmpty()) {
+        lastItem = scannedItemsDisplayList.get(0);
+    }
+}
+if (lastItem != null) {
+    updateLastScanCard(lastItem, false);
+}
                     updateLastScan(normalizedEpc, finalRssi);
                     scheduleUiUpdate();
                 }
@@ -1108,6 +1166,10 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
         return;
     }
     
+    ScannedItemDisplay currentDisplay = null;
+    SoundManager.FeedbackType feedbackType = SoundManager.FeedbackType.UNKNOWN_ITEM;
+    boolean isDuplicate = false;
+    
     synchronized (scannedItemsDisplayList) {
         boolean exists = false;
 
@@ -1118,11 +1180,11 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
                 display.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                     .format(new Date());
                 exists = true;
+                currentDisplay = display;
                 break;
             }
         }
 
-        SoundManager.FeedbackType feedbackType;
         boolean isKnown = catalogEpcs.contains(epc);
 
         if (!exists) {
@@ -1135,7 +1197,7 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
             double price = 0;
 
             InventoryItem catalogItem = catalogManager != null ? 
-        catalogManager.getItemByEpc(epc) : null;
+                catalogManager.getItemByEpc(epc) : null;
             
             if (catalogItem != null) {
                 title = catalogItem.getTitle() != null && !catalogItem.getTitle().isEmpty() 
@@ -1169,6 +1231,7 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
             display.price = price;
 
             scannedItemsDisplayList.add(0, display);
+            currentDisplay = display;
 
             if (rvInventoryItems != null) {
                 rvInventoryItems.scrollToPosition(0);
@@ -1177,16 +1240,33 @@ private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
             updateTotalWeightAndValue();
         } else {
             feedbackType = SoundManager.FeedbackType.DUPLICATE_ITEM;
+            isDuplicate = true;
         }
-
-        if (soundManager != null) soundManager.playBeep(feedbackType);
 
         if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
             tvEmptyState.setVisibility(View.GONE);
         }
     }
     
-    // ✅ التحديث الفعلي للـ Adapter باستخدام DiffUtil
+    // ✅ الآن currentDisplay معرَّف خارج الـ if
+    // ✅ اهتزاز + صوت + وميض
+    if (soundManager != null) soundManager.playBeep(feedbackType);
+    hapticFeedback(feedbackType);
+    
+    if (feedbackType == SoundManager.FeedbackType.KNOWN_ITEM) {
+        flashOverlay(0x8816A34A);  // أخضر
+    } else if (feedbackType == SoundManager.FeedbackType.UNKNOWN_ITEM) {
+        flashOverlay(0x88DC2626);  // أحمر
+    } else if (feedbackType == SoundManager.FeedbackType.DUPLICATE_ITEM) {
+        flashOverlay(0x883B82F6);  // أزرق
+    }
+    
+    // ✅ تحديث بطاقة "آخر مسح"
+    if (currentDisplay != null) {
+        updateLastScanCard(currentDisplay, isDuplicate);
+    }
+    
+    // ✅ تحديث الـ Adapter
     updateAdapterList();
 }
 
@@ -3290,6 +3370,164 @@ public void showArchiveReportsPublic() {
         }
     } catch (Exception e) {
         Log.e(TAG, "showArchiveReportsPublic error: " + e.getMessage());
+    }
+}
+
+// ==================== ✅ Vibrator ====================
+
+/**
+ * تهيئة Vibrator (متوافق مع API 31+)
+ */
+private void initVibrator() {
+    try {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            android.os.VibratorManager vm = 
+                (android.os.VibratorManager) requireContext()
+                    .getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+            vibrator = vm != null ? vm.getDefaultVibrator() : null;
+        } else {
+            vibrator = (android.os.Vibrator) requireContext()
+                    .getSystemService(Context.VIBRATOR_SERVICE);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "initVibrator error", e);
+        vibrator = null;
+    }
+}
+
+/**
+ * اهتزاز حسب النوع
+ */
+private void hapticFeedback(SoundManager.FeedbackType type) {
+    if (vibrator == null || !vibrator.hasVibrator()) return;
+    try {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            switch (type) {
+                case KNOWN_ITEM:
+                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(
+                        40, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                    break;
+                case DUPLICATE_ITEM:
+                    vibrator.vibrate(android.os.VibrationEffect.createWaveform(
+                        new long[]{0, 25, 40, 25}, -1));
+                    break;
+                case UNKNOWN_ITEM:
+                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(150, 255));
+                    break;
+                case COMPLETED:
+                    vibrator.vibrate(android.os.VibrationEffect.createWaveform(
+                        new long[]{0, 50, 40, 50, 40, 100}, -1));
+                    break;
+                case ERROR:
+                    vibrator.vibrate(android.os.VibrationEffect.createWaveform(
+                        new long[]{0, 200, 80, 200}, -1));
+                    break;
+            }
+        } else {
+            vibrator.vibrate(40);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "hapticFeedback error", e);
+    }
+}
+
+/**
+ * وميض ملون عند المسح
+ */
+private void flashOverlay(int colorInt) {
+    if (flashOverlay == null) return;
+    try {
+        flashOverlay.setBackgroundColor(colorInt);
+        flashOverlay.setAlpha(0.6f);
+
+        android.animation.ObjectAnimator anim = 
+            android.animation.ObjectAnimator.ofFloat(flashOverlay, "alpha", 0.6f, 0f);
+        anim.setDuration(280);
+        anim.start();
+    } catch (Exception e) {
+        Log.e(TAG, "flashOverlay error", e);
+    }
+}
+
+/**
+ * تحديث بطاقة "آخر مسح"
+ */
+private void updateLastScanCard(ScannedItemDisplay item, boolean isDuplicate) {
+    if (item == null || tvLastScanTitle == null) return;
+
+    try {
+        tvLastScanTitle.setText(item.title != null ? item.title : "—");
+        tvLastScanEpc.setText(item.epc != null ? item.epc : "—");
+        tvLastScanKarat.setText(item.karat != null ? item.karat : "—");
+        tvLastScanWeight.setText(String.format(Locale.US, "%.2fg", item.weight));
+        tvLastScanRssi.setText(String.format(Locale.US, "📶 %d", item.rssi));
+
+        boolean isKnown = catalogEpcs.contains(item.epc);
+        if (isDuplicate) {
+            tvLastScanStatus.setText(isArabic ? "🔁 مكرر" : "🔁 Duplicate");
+            tvLastScanStatus.setTextColor(0xFF3B82F6);
+        } else if (isKnown) {
+            tvLastScanStatus.setText(isArabic ? "✅ مطابق للمخزون" : "✅ In Catalog");
+            tvLastScanStatus.setTextColor(0xFF16A34A);
+        } else {
+            tvLastScanStatus.setText(isArabic ? "⚠️ غير معروف" : "⚠️ Unknown");
+            tvLastScanStatus.setTextColor(0xFFDC2626);
+        }
+
+        // Animation نبض على البطاقة
+        if (lastScanCard != null) {
+            android.animation.ObjectAnimator scaleX = 
+                android.animation.ObjectAnimator.ofFloat(lastScanCard, "scaleX", 0.98f, 1f);
+            android.animation.ObjectAnimator scaleY = 
+                android.animation.ObjectAnimator.ofFloat(lastScanCard, "scaleY", 0.98f, 1f);
+            scaleX.setDuration(200);
+            scaleY.setDuration(200);
+            scaleX.start();
+            scaleY.start();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "updateLastScanCard error", e);
+    }
+}
+
+/**
+ * عرض قائمة الممسوحات في Dialog
+ */
+private void showItemsListDialog() {
+    try {
+        if (!isAdded() || isFragmentDestroyed) return;
+
+        int count = scannedItemsDisplayList.size();
+        if (count == 0) {
+            Toast.makeText(requireContext(),
+                isArabic ? "لا توجد مسوحات بعد" : "No scans yet",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // قائمة بالقطع الممسوحة
+        String[] titles = new String[count];
+        synchronized (scannedItemsDisplayList) {
+            for (int i = 0; i < count; i++) {
+                ScannedItemDisplay item = scannedItemsDisplayList.get(i);
+                titles[i] = String.format("%s\n%s • %s • %.2fg • 📶%d",
+                    item.title, item.epc, item.karat, item.weight, item.rssi);
+            }
+        }
+
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle((isArabic ? "📋 الممسوحات (" : "📋 Scans (") + count + ")")
+            .setItems(titles, (d, which) -> {
+                ScannedItemDisplay item = scannedItemsDisplayList.get(which);
+                if (dialogsManager != null) {
+                    dialogsManager.showItemOptionsDialog(item);
+                }
+            })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "showItemsListDialog error", e);
     }
 }
 
