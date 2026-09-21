@@ -32,7 +32,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputLayout;
 import com.journeyapps.barcodescanner.ScanContract;
@@ -62,7 +61,9 @@ import com.example.uhf.utils.ScaleSimulationHelper;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -71,22 +72,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * MiraPosFragment - الإصدار الاحترافي 3.0
- * 
- * ✅ الميزات:
- * - استخدام MiraExecutorService (مدير خيوط على مستوى التطبيق)
- * - Payload كامل مع gate_id, user_id, username
- * - بحث ذكي عن القطع مع منع التكرار
- * - إتمام البيع مع Retry
- * - الإرجاع مع Payload كامل
- * - الميزان الذكي + المحاكاة
- * - دعم Offline
- * - keyboard handling احترافي
- * - ربط كامل مع الشريط الثانوي (سلة، خصم، إيصال، بحث)
+ * MiraPosFragment - الإصدار الاحترافي 3.1
+ *
+ * ✅ جديد في 3.1:
+ * - إصلاح جذري لعملية الإرجاع (Refund)
+ * - إرسال item_id, sale_id, epc, serial_no معاً للتمييز
+ * - فحص شامل لصلاحية الإرجاع (checkRefundEligibility)
+ * - تحديث الكاش المحلي بعد الإرجاع
+ * - دعم إرجاع قطعة واحدة من عدة قطع لنفس العميل
  */
 public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
+    private static final String REFUND_DEBUG = "REFUND_DEBUG";
 
     // ✅ المتغيرات
     private boolean isSyncing = false;
@@ -125,12 +123,40 @@ public class MiraPosFragment extends MiraBaseFragment {
     private boolean isRFIDModeActive = false;
     private boolean isArabic;
     private MiraApiClient.ApiResponse lastSaleResponse = null;
-    private boolean isRefundable = false;
     private double liveScaleWeight = 0.0;
 
     private final List<CartItem> cartList = new ArrayList<>();
     private final Set<String> scannedEpcs = new HashSet<>();
     private CartAdapter cartAdapter;
+
+    // ✅ متغيرات الإرجاع
+    private RefundItem selectedRefundItem;
+
+    // ==================== كلاسات مساعدة للإرجاع ====================
+
+    /**
+     * ✅ قطعة مختارة للإرجاع
+     */
+    private static class RefundItem {
+        String epc;
+        String serialNo;
+        int itemId;
+        long saleId;
+        double originalPrice;
+        String title;
+    }
+
+    /**
+     * ✅ نتيجة فحص صلاحية الإرجاع
+     */
+    private static class RefundEligibility {
+        boolean isEligible;
+        String reason;
+        long saleId;
+        int itemId;
+        double originalPrice;
+        String originalSaleDate;
+    }
 
     // ==================== دورة الحياة ====================
 
@@ -200,7 +226,6 @@ public class MiraPosFragment extends MiraBaseFragment {
             initSmartScale();
             updateCartSummary();
 
-            // ✅ مراقبة الكيبورد (داخل try)
             setupKeyboardVisibilityListener(view);
 
         } catch (Exception e) {
@@ -223,7 +248,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
                     boolean isKeyboardVisible = keypadHeight > screenHeight * 0.15;
 
-                    // ✅ 1) تمرير إلى حقل الإدخال عند ظهور الكيبورد
                     if (isKeyboardVisible && etManualEpc != null && etManualEpc.hasFocus()) {
                         etManualEpc.postDelayed(() -> {
                             try {
@@ -239,7 +263,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                         }, 200);
                     }
 
-                    // ✅ 2) إخفاء الـ EmptyState عند الكيبورد
                     if (layoutCartEmptyState != null) {
                         layoutCartEmptyState.setVisibility(
                                 (cartList.isEmpty() && !isKeyboardVisible)
@@ -252,7 +275,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                 }
             });
 
-            // ✅ 3) حل بسيط إضافي: مراقبة focus الحقل
             if (etManualEpc != null) {
                 etManualEpc.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus && getActivity() != null) {
@@ -277,9 +299,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    /**
-     * ✅ ابحث عن NestedScrollView داخل الـ View hierarchy
-     */
     private View findNestedScrollView(View view) {
         if (view instanceof androidx.core.widget.NestedScrollView) {
             return view;
@@ -355,9 +374,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     // ==================== واجهات عامة للشريط الثانوي ====================
 
-    /**
-     * ✅ عرض السلة في BottomSheet (يُستدعى من الشريط الثانوي)
-     */
     public void showCartBottomSheet() {
         try {
             if (!isAdded() || getContext() == null) return;
@@ -373,8 +389,8 @@ public class MiraPosFragment extends MiraBaseFragment {
             root.setPadding(24, 24, 24, 24);
 
             TextView title = new TextView(requireContext());
-            title.setText(isArabic ? "🛒 سلة البيع (" + cartList.size() + ")" 
-                                    : "🛒 Cart (" + cartList.size() + ")");
+            title.setText(isArabic ? "🛒 سلة البيع (" + cartList.size() + ")"
+                    : "🛒 Cart (" + cartList.size() + ")");
             title.setTextSize(18);
             title.setTypeface(null, android.graphics.Typeface.BOLD);
             title.setPadding(0, 0, 0, 16);
@@ -404,7 +420,7 @@ public class MiraPosFragment extends MiraBaseFragment {
 
             TextView totalView = new TextView(requireContext());
             totalView.setText(isArabic ? "الإجمالي: " + priceManager.formatPriceDefault(getCartTotal())
-                                        : "Total: " + priceManager.formatPriceDefault(getCartTotal()));
+                    : "Total: " + priceManager.formatPriceDefault(getCartTotal()));
             totalView.setTextSize(16);
             totalView.setTypeface(null, android.graphics.Typeface.BOLD);
             totalView.setPadding(0, 16, 0, 0);
@@ -419,9 +435,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    /**
-     * ✅ فتح حوار الخصم/الدفع (يُستدعى من الشريط الثانوي)
-     */
     public void showDiscountDialog() {
         try {
             if (!isAdded() || cartList.isEmpty()) {
@@ -434,9 +447,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    /**
-     * ✅ عرض آخر إيصال (يُستدعى من الشريط الثانوي)
-     */
     public void showLastReceiptDialog() {
         try {
             if (lastSaleResponse == null) {
@@ -449,24 +459,19 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    /**
-     * ✅ تفعيل حقل البحث (يُستدعى من الشريط الثانوي)
-     */
     public void focusSearchField() {
-    try {
-        if (etManualEpc != null) {
-            etManualEpc.requestFocus();
-            etManualEpc.performClick();
-            
-            // ✅ فحص إضافي
-            if (getActivity() != null) {
-                UIHelper.showKeyboard(getActivity(), etManualEpc);
+        try {
+            if (etManualEpc != null) {
+                etManualEpc.requestFocus();
+                etManualEpc.performClick();
+                if (getActivity() != null) {
+                    UIHelper.showKeyboard(getActivity(), etManualEpc);
+                }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "focusSearchField error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "focusSearchField error: " + e.getMessage());
     }
-}
 
     // ==================== أدوات مساعدة ====================
 
@@ -1492,12 +1497,15 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== الإرجاع ====================
+    // ==================== الإرجاع (Refund) - الإصدار المُصلح ====================
 
     private void showRefundDialog() {
         if (!isAdded() || getContext() == null) return;
 
         try {
+            // ✅ إعادة تعيين القطعة المُختارة
+            selectedRefundItem = null;
+
             refundDialog = new RefundDialog(requireContext(), new RefundDialog.RefundCallback() {
                 @Override
                 public void onRefundConfirm(String code, String reason) {
@@ -1525,16 +1533,26 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
+    /**
+     * ✅ البحث عن قطعة للإرجاع - الإصدار المُصلح
+     * - إرسال code موحد بدلاً من epc + serial_no بنفس القيمة
+     * - فحص شامل للصلاحية
+     */
     private void searchItemForRefund(String code) {
         if (code == null || code.trim().isEmpty()) return;
 
-        Log.e("REFUND_DEBUG", "🔍 Searching for refund: " + code);
+        final String cleanCode = code.trim();
+        Log.e(REFUND_DEBUG, "🔍 Searching for refund: " + cleanCode);
+
+        // ✅ إعادة تعيين القطعة المُختارة عند كل بحث جديد
+        selectedRefundItem = null;
 
         miraExecutor.getNetworkExecutor().execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
-                payload.put("epc", code);
-                payload.put("serial_no", code);
+                // ✅ إرسال القيمة الموحدة فقط
+                payload.put("code", cleanCode);
+                payload.put("search_type", "auto");  // السيرفر يحدد epc/serial/gtin
                 payload.put("branch_id", getActiveBranchId());
                 payload.put("context", "refund_check");
                 payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
@@ -1544,9 +1562,9 @@ public class MiraPosFragment extends MiraBaseFragment {
                 MiraApiClient client = MiraApiClient.getInstance(requireContext());
                 MiraApiClient.ApiResponse response = client.searchItem(payload);
 
-                Log.e("REFUND_DEBUG", "Response code: " + (response != null ? response.code : "null"));
-                Log.e("REFUND_DEBUG", "Is success: " + (response != null && response.isSuccess));
-                Log.e("REFUND_DEBUG", "Body: " + (response != null ? response.getBody() : "null"));
+                Log.e(REFUND_DEBUG, "Response code: " + (response != null ? response.code : "null"));
+                Log.e(REFUND_DEBUG, "Is success: " + (response != null && response.isSuccess));
+                Log.e(REFUND_DEBUG, "Body: " + (response != null ? response.getBody() : "null"));
 
                 safeRun(() -> {
                     if (response != null && response.isSuccess && response.data != null) {
@@ -1555,51 +1573,161 @@ public class MiraPosFragment extends MiraBaseFragment {
                             itemData = response.data;
                         }
 
-                        boolean isRefundable = itemData.optBoolean("is_refundable", false);
-                        String itemStatus = itemData.optString("status",
-                                itemData.optString("vault_status", ""));
+                        // ✅ فحص شامل للصلاحية
+                        RefundEligibility eligibility = checkRefundEligibility(itemData);
 
-                        Log.e("REFUND_DEBUG", "is_refundable: " + isRefundable +
-                                ", status: " + itemStatus);
+                        Log.e(REFUND_DEBUG, "isEligible: " + eligibility.isEligible +
+                                ", reason: " + eligibility.reason);
 
-                        if (isRefundable) {
-                            showRefundItemInfoInDialog(itemData);
+                        if (eligibility.isEligible) {
+                            // ✅ احفظ القطعة المُختارة
+                            selectedRefundItem = new RefundItem();
+                            selectedRefundItem.epc = itemData.optString("epc", cleanCode);
+                            selectedRefundItem.serialNo = itemData.optString("serial",
+                                    itemData.optString("serial_number", ""));
+                            selectedRefundItem.itemId = eligibility.itemId;
+                            selectedRefundItem.saleId = eligibility.saleId;
+                            selectedRefundItem.originalPrice = eligibility.originalPrice;
+                            selectedRefundItem.title = itemData.optString("title",
+                                    itemData.optString("item_title", ""));
+
+                            Log.e(REFUND_DEBUG, "✅ Item eligible for refund: " +
+                                    selectedRefundItem.epc);
+
+                            showRefundItemInfoInDialog(itemData, eligibility);
                         } else {
-                            showRefundItemErrorInDialog(
-                                    isArabic ? "⚠️ القطعة غير صالحة للإرجاع (حالتها: " +
-                                            itemStatus + ")" :
-                                            "⚠️ Item not eligible (status: " + itemStatus + ")"
-                            );
+                            showRefundItemErrorInDialog(eligibility.reason);
                         }
                     } else {
                         String errorMsg = response != null && response.error != null
-                                ? response.error : "Unknown error";
+                                ? response.error : "Item not found";
                         showRefundItemErrorInDialog(errorMsg);
                     }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "searchItemForRefund error: " + e.getMessage(), e);
                 safeRun(() -> showRefundItemErrorInDialog(
-                        isArabic ? "⚠️ خطأ في البحث" : "⚠️ Search error"
-                ));
+                        isArabic ? "⚠️ خطأ في البحث" : "⚠️ Search error"));
             }
         });
     }
 
-    private void showRefundItemInfoInDialog(JSONObject itemData) {
+    /**
+     * ✅ فحص شامل لصلاحية الإرجاع
+     */
+    private RefundEligibility checkRefundEligibility(JSONObject itemData) {
+        RefundEligibility result = new RefundEligibility();
+
+        try {
+            // 1. حالة القطعة
+            String status = itemData.optString("status",
+                    itemData.optString("vault_status", "")).toLowerCase();
+
+            if (!"sold".equals(status)) {
+                result.isEligible = false;
+                result.reason = isArabic
+                        ? "⚠️ القطعة غير مباعة (حالتها: " + status + ")"
+                        : "⚠️ Item not sold (status: " + status + ")";
+                return result;
+            }
+
+            // 2. نوع العملية (يجب أن تكون بيع)
+            String lastAction = itemData.optString("last_action", "").toLowerCase();
+            if (!lastAction.isEmpty() && !"sale".equals(lastAction)
+                    && !"pos_sale".equals(lastAction)) {
+                result.isEligible = false;
+                result.reason = isArabic
+                        ? "⚠️ آخر عملية ليست بيعاً (آخر عملية: " + lastAction + ")"
+                        : "⚠️ Last action is not a sale (" + lastAction + ")";
+                return result;
+            }
+
+            // 3. تاريخ البيع (لا يزيد عن 30 يوماً)
+            String saleDateStr = itemData.optString("sale_date",
+                    itemData.optString("sold_at", ""));
+            if (!saleDateStr.isEmpty()) {
+                try {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+                    Date saleDate = sdf.parse(saleDateStr);
+                    if (saleDate != null) {
+                        long diffDays = (System.currentTimeMillis() - saleDate.getTime())
+                                / (1000 * 60 * 60 * 24);
+
+                        if (diffDays > 30) {
+                            result.isEligible = false;
+                            result.reason = isArabic
+                                    ? "⚠️ انتهت فترة الإرجاع (" + diffDays + " يوم)"
+                                    : "⚠️ Refund period expired (" + diffDays + " days)";
+                            return result;
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not parse sale_date: " + saleDateStr);
+                }
+            }
+
+            // 4. التحقق من عدم الإرجاع المسبق
+            boolean alreadyRefunded = itemData.optBoolean("is_refunded", false);
+            if (alreadyRefunded) {
+                result.isEligible = false;
+                result.reason = isArabic
+                        ? "⚠️ تم إرجاع هذه القطعة مسبقاً"
+                        : "⚠️ Item already refunded";
+                return result;
+            }
+
+            // ✅ القطعة صالحة للإرجاع
+            result.isEligible = true;
+            result.saleId = itemData.optLong("sale_id", 0);
+            result.itemId = itemData.optInt("id", itemData.optInt("item_id", 0));
+            result.originalPrice = itemData.optDouble("retail_price_usd",
+                    itemData.optDouble("retail_price", 0));
+            result.originalSaleDate = saleDateStr;
+
+            return result;
+
+        } catch (Exception e) {
+            Log.e(TAG, "checkRefundEligibility error: " + e.getMessage());
+            result.isEligible = false;
+            result.reason = isArabic ? "⚠️ خطأ في التحقق" : "⚠️ Validation error";
+            return result;
+        }
+    }
+
+    /**
+     * ✅ عرض معلومات القطعة القابلة للإرجاع
+     */
+    private void showRefundItemInfoInDialog(JSONObject itemData, RefundEligibility eligibility) {
         try {
             if (refundDialog == null) return;
 
             String title = itemData.optString("title",
                     itemData.optString("item_title", isArabic ? "قطعة ذهبية" : "Gold Item"));
-            double price = itemData.optDouble("retail_price_usd",
-                    itemData.optDouble("retail_price", 0.0));
+
+            String epc = itemData.optString("epc", "");
+            String serialNo = itemData.optString("serial",
+                    itemData.optString("serial_number", ""));
+            String karat = itemData.optString("karat", "21K");
+            double weight = itemData.optDouble("weight", 0);
+
+            // ✅ استخدم السعر الأصلي من الفاتورة
+            double originalPrice = eligibility.originalPrice > 0
+                    ? eligibility.originalPrice
+                    : itemData.optDouble("retail_price_usd", 0);
 
             String priceStr = priceManager != null
-                    ? priceManager.formatPriceDefault(price)
-                    : String.format(Locale.US, "$%.2f", price);
+                    ? priceManager.formatPriceDefault(originalPrice)
+                    : String.format(Locale.US, "$%.2f", originalPrice);
 
-            refundDialog.showRefundItemInfo(title, priceStr);
+            // ✅ عرض تفاصيل كاملة تشمل EPC و Serial للتمييز
+            String details = String.format(Locale.US,
+                    "EPC: %s\nSerial: %s\nKarat: %s | Weight: %.2fg\nPrice: %s",
+                    epc.isEmpty() ? "—" : epc,
+                    serialNo.isEmpty() ? "—" : serialNo,
+                    karat, weight, priceStr
+            );
+
+            refundDialog.showRefundItemInfo(title, details);
         } catch (Exception e) {
             Log.e(TAG, "showRefundItemInfoInDialog error: " + e.getMessage());
         }
@@ -1614,28 +1742,50 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
+    /**
+     * ✅ تنفيذ الإرجاع - الإصدار المُصلح
+     * - إرسال جميع المعرّفات للتمييز
+     * - تحديث الكاش المحلي بعد الإرجاع
+     */
     private void processRefund(String code, String reason) {
         final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+
+        // ✅ احتفظ بمرجع للقطعة المُختارة
+        final RefundItem itemToRefund = this.selectedRefundItem;
 
         miraExecutor.getNetworkExecutor().execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
-                payload.put("epc", code);
-                payload.put("serial_no", code);
-                payload.put("reason", reason);
+
+                // ✅ إرسال جميع المعرّفات للتمييز
+                payload.put("code", code != null ? code.trim() : "");
+                payload.put("epc", itemToRefund != null && itemToRefund.epc != null
+                        ? itemToRefund.epc : code);
+                payload.put("serial_no", itemToRefund != null && itemToRefund.serialNo != null
+                        ? itemToRefund.serialNo : "");
+                payload.put("item_id", itemToRefund != null ? itemToRefund.itemId : 0);
+                payload.put("sale_id", itemToRefund != null ? itemToRefund.saleId : 0);
+                payload.put("original_price_usd",
+                        itemToRefund != null ? itemToRefund.originalPrice : 0);
+
+                // ✅ معلومات الإرجاع
+                payload.put("reason", reason != null ? reason : "customer_request");
+                payload.put("refund_type", "full");
                 payload.put("branch_id", getActiveBranchId());
                 payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
                 payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
                 payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
+                payload.put("timestamp", System.currentTimeMillis());
 
-                Log.e("REFUND_DEBUG", "🚨 SENDING REFUND");
-                Log.e("REFUND_DEBUG", "Payload: " + payload.toString());
+                Log.e(REFUND_DEBUG, "🚨 SENDING REFUND");
+                Log.e(REFUND_DEBUG, "Payload: " + payload.toString());
 
                 MiraApiClient client = MiraApiClient.getInstance(requireContext());
                 MiraApiClient.ApiResponse response = client.processRefund(payload);
 
-                Log.e("REFUND_DEBUG", "Response code: " + (response != null ? response.code : "null"));
-                Log.e("REFUND_DEBUG", "Is success: " + (response != null && response.isSuccess));
+                Log.e(REFUND_DEBUG, "Response code: " + (response != null ? response.code : "null"));
+                Log.e(REFUND_DEBUG, "Is success: " + (response != null && response.isSuccess));
+                Log.e(REFUND_DEBUG, "Body: " + (response != null ? response.getBody() : "null"));
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
@@ -1644,31 +1794,70 @@ public class MiraPosFragment extends MiraBaseFragment {
                     }
 
                     if (response != null && response.isSuccess) {
+                        // ✅ إزالة من الكاش المحلي
+                        restoreItemToCache(code, itemToRefund);
+
                         showSuccessMessage(
                                 isArabic ? "✅ تم الإرجاع" : "✅ Refund Successful",
                                 isArabic ? "تم إرجاع القطعة بنجاح إلى المخزون" :
                                         "Item successfully returned to inventory",
                                 true
                         );
+
+                        // ✅ إشعار لوحة التحكم
                         notifyDashboardAndInventoryUpdate("refund");
+
+                        // ✅ مسح القطعة المُختارة
+                        selectedRefundItem = null;
+
                     } else {
                         String err = response != null && response.error != null
                                 ? response.error : "Unknown error";
                         showSuccessMessage(
                                 isArabic ? "❌ فشل الإرجاع" : "❌ Refund Failed",
-                                err,
-                                false
+                                err, false
                         );
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "processRefund error: " + e.getMessage());
+                Log.e(TAG, "processRefund error: " + e.getMessage(), e);
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
-                    showSuccessMessage(isArabic ? "❌ خطأ" : "❌ Error", e.getMessage(), false);
+                    showSuccessMessage(isArabic ? "❌ خطأ" : "❌ Error",
+                            e.getMessage(), false);
                 });
             }
         });
+    }
+
+    /**
+     * ✅ إزالة القطعة المرتجعة من الكاش المحلي
+     */
+    private void restoreItemToCache(String code, RefundItem item) {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) return;
+
+            MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
+
+            // ✅ استخدم طريقة إلغاء البيع بدلاً من markItemAsSold
+            if (item != null && item.epc != null && !item.epc.isEmpty()) {
+                cache.markItemAsAvailable(item.epc);
+                Log.d(TAG, "✅ Item restored to cache (EPC): " + item.epc);
+            } else if (code != null && !code.isEmpty()) {
+                cache.markItemAsAvailable(code);
+                Log.d(TAG, "✅ Item restored to cache (code): " + code);
+            }
+
+            // ✅ إذا كان هناك serial أيضاً، أعده
+            if (item != null && item.serialNo != null && !item.serialNo.isEmpty()) {
+                cache.markItemAsAvailable(item.serialNo);
+                Log.d(TAG, "✅ Item restored to cache (serial): " + item.serialNo);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "restoreItemToCache error: " + e.getMessage());
+        }
     }
 
     // ==================== التحديث والإشعارات ====================
@@ -1707,19 +1896,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    private void removeSoldItemsFromCache() {
-        try {
-            Context ctx = getContext();
-            if (ctx == null) return;
-            MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
-            for (CartItem item : cartList) {
-                cache.markItemAsSold(item.epc);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "removeSoldItemsFromCache error: " + e.getMessage());
-        }
-    }
-
     // ==================== Dialogs المساعدة ====================
 
     private AlertDialog showProfessionalLoadingDialog() {
@@ -1741,7 +1917,7 @@ public class MiraPosFragment extends MiraBaseFragment {
             layout.addView(progressBar);
 
             TextView tvLoading = new TextView(ctx);
-            tvLoading.setText(isArabic ? "جاري إتمام البيع..." : "Processing sale...");
+            tvLoading.setText(isArabic ? "جاري إتمام العملية..." : "Processing...");
             tvLoading.setTextSize(17);
             tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
             tvLoading.setGravity(android.view.Gravity.CENTER);
@@ -1827,10 +2003,9 @@ public class MiraPosFragment extends MiraBaseFragment {
             registerForActivityResult(new ScanContract(), result -> {
         if (result.getContents() != null && isAdded()) {
             if (refundDialog != null) {
-                refundDialog.showRefundItemInfo(
-                        result.getContents(),
-                        isArabic ? "✅ تم مسح الباركود" : "✅ Barcode scanned"
-                );
+                // ✅ أعد تعيين القطعة المُختارة
+                selectedRefundItem = null;
+                // ✅ ابحث عن القطعة
                 searchItemForRefund(result.getContents());
             }
         }
