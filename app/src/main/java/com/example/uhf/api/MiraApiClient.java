@@ -2019,6 +2019,25 @@ public class MiraApiClient {
     public ApiResponse logActivity(JSONObject logEntry) {
         return postWithAuth("/activity/log", logEntry);
     }
+    
+    /**
+ * ✅ إعادة قراءة URL من SessionManager
+ * تُستدعى بعد تغيير الـ URL من الإعدادات
+ */
+public void refreshUrl() {
+    try {
+        String savedBaseUrl = sessionManager.getServerUrl();
+        if (savedBaseUrl != null && !savedBaseUrl.isEmpty()) {
+            synchronized (credentialsLock) {
+                this.baseUrl = normalizeBaseUrl(savedBaseUrl);
+            }
+            refreshCredentials();
+            Log.d(TAG, "✅ URL refreshed: " + apiUrl);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "refreshUrl error: " + e.getMessage(), e);
+    }
+}
 
     public ApiResponse getUnifiedActivity(int branchId, int limit) {
         String endpoint = "/activity/unified?limit=" + limit;
