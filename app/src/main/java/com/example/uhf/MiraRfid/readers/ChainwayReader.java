@@ -17,31 +17,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * ✅ ChainwayReader v3.0 — النسخة النهائية المُحصّنة
  * 
+ * متوافق مع: DeviceAPI_ver20251103_release.aar
+ * 
  * التغييرات الجذرية:
- * - استخدم isRfidDevicePresent() بدلاً من الثابت القديم
- * - استخدم sSharedReader (قارئ مشترك)
- * - Thread leak prevention في startScan()
- * - AtomicBoolean لـ isScanning
- * - تحقق دقيق قبل كل عملية
- * - رسائل خطأ واضحة
+ * - استخدام isRfidDevicePresent() بدلاً من RFID_DEVICE_PRESENT
+ * - استخدام sSharedReader عند الإمكان
+ * - Thread leak prevention
+ * - AtomicBoolean للـ isScanning
+ * - لا System.loadLibrary() — SDK يُحمّل تلقائياً
  */
 public class ChainwayReader implements MiraIRFIDReader {
     
     private static final String TAG = "ChainwayReader";
     private static final String PREFS_NAME = "mira_rfid_dynamic_settings";
     
-    // ✅ كلمة المرور الافتراضية
     private static final String DEFAULT_PWD = "00000000";
-    
-    // ✅ timeout للاتصال
-    private static final int INIT_TIMEOUT_MS = 8000;
-    private static final int START_SCAN_TIMEOUT_MS = 5000;
     
     private Context context;
     private RFIDWithUHFUART reader;
     private OnTagReadListener listener;
     
-    // ✅ استخدام AtomicBoolean للأمان
     private final AtomicBoolean isScanning = new AtomicBoolean(false);
     private volatile boolean isConnected = false;
     
@@ -165,7 +160,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             
             synchronized (initLock) {
                 try {
-                    initLock.wait(INIT_TIMEOUT_MS);
+                    initLock.wait(8000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return false;
@@ -173,7 +168,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             }
             
             if (initThread.isAlive()) {
-                Log.e(TAG, "❌ Init timeout after " + INIT_TIMEOUT_MS + "ms");
+                Log.e(TAG, "❌ Init timeout");
                 return false;
             }
             
@@ -289,7 +284,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             return false;
         }
         
-        // ✅ 2. تحقق من عدم التشغيل المسبق (Atomic)
+        // ✅ 2. تحقق من عدم التشغيل المسبق
         if (!isScanning.compareAndSet(false, true)) {
             Log.d(TAG, "Already scanning");
             return true;
@@ -309,7 +304,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             // ✅ 4. طبّق الإعدادات
             applySupportedSettings();
             
-            // ✅ 5. ابدأ القراءة (بدون Thread يدوي!)
+            // ✅ 5. ابدأ القراءة (بدون Thread يدوي)
             boolean success = false;
             try {
                 success = reader.startInventoryTag();
@@ -354,19 +349,16 @@ public class ChainwayReader implements MiraIRFIDReader {
                 int tagsRead = 0;
                 
                 if (reader != null) {
-                    // ✅ اقرأ كل الوسوم المتاحة في buffer
                     while (isScanning.get() && (tag = reader.readTagFromBuffer()) != null) {
                         processTag(tag);
                         tagsRead++;
                         
-                        // ✅ إذا قرأنا الكثير، اسمح للـ UI بالتنفس
                         if (tagsRead % 50 == 0) {
                             Thread.sleep(1);
                         }
                     }
                 }
                 
-                // ✅ sleep قصير
                 Thread.sleep(scanIntervalMs);
                 
             } catch (InterruptedException e) {
@@ -378,7 +370,6 @@ public class ChainwayReader implements MiraIRFIDReader {
                 if (isScanning.get() && listener != null) {
                     listener.onError(e.getMessage());
                 }
-                // ✅ استمر بدلاً من الخروج
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException ie) {
@@ -438,9 +429,6 @@ public class ChainwayReader implements MiraIRFIDReader {
             Log.e(TAG, "Stop inventory error: " + e.getMessage());
         }
         
-        // ✅ لا shutdownNow() — دع الخيط ينتهي بنفسه
-        // scanExecutor.shutdownNow() → يُسبب InterruptedException
-        
         if (listener != null) listener.onScanStopped();
     }
     
@@ -497,7 +485,9 @@ public class ChainwayReader implements MiraIRFIDReader {
     public int getQValue() { return qValue; }
     
     @Override
-    public String getDeviceName() { return "Chainway " + Build.MODEL + " / UHF Terminal"; }
+    public String getDeviceName() { 
+        return "Chainway " + Build.MODEL + " / UHF Terminal"; 
+    }
     
     @Override
     public String getFirmwareVersion() {
@@ -516,7 +506,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
 
     // =========================================================================
-    // 💾 الكتابة والقراءة - كما هي
+    // 💾 الكتابة والقراءة
     // =========================================================================
 
     @Override
@@ -540,7 +530,8 @@ public class ChainwayReader implements MiraIRFIDReader {
             Log.i(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr + 
                   " words=" + wordCount);
             
-            boolean result = reader.writeData(safePwd, bank, ptr, wordCount, paddedData.toString());
+            boolean result = reader.writeData(safePwd, bank, ptr, wordCount, 
+                paddedData.toString());
             
             if (result) {
                 Log.i(TAG, "✅ writeData OK");
