@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
+import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.rscja.deviceapi.RFIDWithUHFUART;
