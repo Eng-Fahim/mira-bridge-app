@@ -44,7 +44,7 @@ import com.example.uhf.tools.RecentActivityCache;
 import com.example.uhf.dialog.ActivityDetailsBottomSheet;
 import org.json.JSONArray;                                 // ✅ جديد
 import org.json.JSONObject;
-
+import org.json.JSONException;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -816,9 +816,9 @@ applySalesVisibility();
                                         .putLong("last_gold_fetch_time", System.currentTimeMillis())
                                         .apply();
                             }
-                            Toast.makeText(getContext(),
-                                    isArabic ? "✅ تم تحديث أسعار الذهب" : "✅ Gold prices updated",
-                                    Toast.LENGTH_SHORT).show();
+                            if (forceRefresh && isAdded()) {
+                                Toast.makeText(getContext(), "✅ تم تحديث أسعار الذهب", Toast.LENGTH_SHORT).show();
+                            }
                         } else {
                             displayGoldPricesFromCache();
                             Toast.makeText(getContext(),
@@ -1172,30 +1172,25 @@ applySalesVisibility();
 private void fetchRecentActivity() {
     if (apiClient == null || !isAdded()) return;
 
-    // ═══════════════════════════════════════════════════════
-    // ✅ 1. عرض البيانات من الكاش فوراً (بدون تأخير)
-    // ═══════════════════════════════════════════════════════
+    // 1. عرض الكاش فوراً
     if (activityCache != null) {
         JSONArray cached = activityCache.load();
-        if (cached.length() > 0) {
+        if (cached != null && cached.length() > 0) {
             updateRecentActivityUI(cached);
-            Log.d(TAG, "✅ Displayed " + cached.length() + " activities from cache");
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    // ✅ 2. إذا الكاش صالح، لا نُجدد — لكن نُجدد في الخلفية
-    // ═══════════════════════════════════════════════════════
-    // ═══════════════════════════════════════════════════════
-    // ✅ 3. جلب من السيرفر في الخلفية
-    // ═══════════════════════════════════════════════════════
+    // 2. جلب من السيرفر فقط إذا مر وقت كافٍ (مثلاً 5 دقائق)
+    long lastFetch = activityCache != null ? activityCache.getLastFetchTime() : 0;
+    if (System.currentTimeMillis() - lastFetch < 5 * 60 * 1000) {
+        Log.d(TAG, "⏳ Activity cache is still valid, skipping network call");
+        return;
+    }
+
     sharedExecutor.execute(() -> {
         try {
-            int branchId = branchesManager != null
-                    ? branchesManager.getActiveBranchId() : 0;
-
-            MiraApiClient.ApiResponse response =
-                    apiClient.getUnifiedActivity(branchId, 10);
+            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 10);
 
             mainHandler.post(() -> {
                 if (!isAdded() || response == null) return;
@@ -1204,11 +1199,9 @@ private void fetchRecentActivity() {
                     try {
                         JSONArray activities = response.data.optJSONArray("activities");
                         if (activities != null && activities.length() > 0) {
-                            // ✅ حفظ في الكاش
                             if (activityCache != null) {
                                 activityCache.save(activities);
                             }
-                            // ✅ تحديث الواجهة
                             updateRecentActivityUI(activities);
                         }
                     } catch (Exception e) {
@@ -1227,18 +1220,21 @@ private void fetchRecentActivity() {
  */
 private void updateRecentActivityUI(JSONArray activities) {
     if (activities == null || recentActivityAdapter == null) return;
-    try {
-        List<JSONObject> list = new ArrayList<>();
-        int max = Math.min(activities.length(), 10);
-        for (int i = 0; i < max; i++) {
+    
+    // ⚠️ لا تقم بإنشاء ArrayList جديدة هنا، استخدم القائمة كما هي
+    List<JSONObject> list = new ArrayList<>();
+    int max = Math.min(activities.length(), 10);
+    for (int i = 0; i < max; i++) {
+        try {
             list.add(activities.getJSONObject(i));
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
-        recentActivityAdapter.submitList(list);
-    } catch (Exception e) {
-        logNonFatal("updateRecentActivityUI", e);
     }
+    
+    // ✅ استخدم submitList (التي تعمل في الخلفية عبر DiffUtil)
+    recentActivityAdapter.submitList(list);
 }
-
     /**
  * ✅ عند النقر على عملية → فتح Bottom Sheet التفاصيل
  */
@@ -1638,4 +1634,4 @@ public void onStop() {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-        }
+            }
