@@ -273,26 +273,7 @@ if (heroCard != null) {
         }
     }
 
-    private void initializeManagers() {
-        try {
-            if (!isAdded()) return;
-            Context context = requireContext();
-            apiClient = MiraApiClient.getInstance(context);
-            sessionManager = new SessionManager(context);
-            branchesManager = MiraBranchesManager.getInstance(context);
-            orgProfile = MiraOrgProfileManager.getInstance(context);
-            priceManager = MiraPriceManager.getInstance(context);
-            
-            permissionManager = PermissionManager.getInstance(context);
-            isArabic = Locale.getDefault().getLanguage().equals("ar");
-            goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
-            lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
-            activityCache = new RecentActivityCache(context);
-        } catch (Exception e) {
-            logNonFatal("initializeManagers", e);
-        }
-    }
-
+    
     
     private void initViews(View v) {
         try {
