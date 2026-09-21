@@ -771,43 +771,52 @@ public class MiraPosFragment extends MiraBaseFragment {
     // ==================== الباركود ====================
 
     private void openBarcodeScanner() {
-        try {
-            if (!isAdded() || getContext() == null) return;
-            if (getParentFragmentManager() == null) return;
-            if (getParentFragmentManager().isStateSaved()) return;
+    try {
+        if (!isAdded() || getContext() == null) return;
+        if (getParentFragmentManager() == null) return;
+        if (getParentFragmentManager().isStateSaved()) return;
 
-            MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
-            sf.setOnBarcodeScannedListener((data, format) -> {
-                try {
-                    onBarcodeScanned(data);
-                    if (isAdded() && getParentFragmentManager() != null &&
-                            getParentFragmentManager().getBackStackEntryCount() > 0) {
-                        getParentFragmentManager().popBackStack();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Barcode callback error: " + e.getMessage());
-                }
-            });
-
-            int containerId = android.R.id.content;
+        MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
+        sf.setOnBarcodeScannedListener((data, format) -> {
             try {
-                View view = getView();
-                if (view != null && view.getParent() instanceof View) {
-                    containerId = ((View) view.getParent()).getId();
+                // 1. أغلق شاشة الماسح فوراً
+                if (isAdded() && getParentFragmentManager() != null &&
+                        getParentFragmentManager().getBackStackEntryCount() > 0) {
+                    getParentFragmentManager().popBackStack();
                 }
-            } catch (Exception e) {
-                containerId = android.R.id.content;
-            }
 
-            getParentFragmentManager().beginTransaction()
-                    .replace(containerId, sf)
-                    .addToBackStack("barcode_scanner")
-                    .commitAllowingStateLoss();
+                // 2. ثم ابدأ معالجة الباركود (سيظهر الـ Loading على شاشة البيع)
+                // نستخدم postDelayed لضمان إغلاق الشاشة أولاً
+                mainHandler.postDelayed(() -> {
+                    if (isAdded()) {
+                        onBarcodeScanned(data);
+                    }
+                }, 200); // 200ms كافية لإغلاق الشاشة
+
+            } catch (Exception e) {
+                Log.e(TAG, "Barcode callback error: " + e.getMessage());
+            }
+        });
+
+        int containerId = android.R.id.content;
+        try {
+            View view = getView();
+            if (view != null && view.getParent() instanceof View) {
+                containerId = ((View) view.getParent()).getId();
+            }
         } catch (Exception e) {
-            Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
-            showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+            containerId = android.R.id.content;
         }
+
+        getParentFragmentManager().beginTransaction()
+                .replace(containerId, sf)
+                .addToBackStack("barcode_scanner")
+                .commitAllowingStateLoss();
+    } catch (Exception e) {
+        Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
+        showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
     }
+}
 
     // ==================== RFID ====================
 
