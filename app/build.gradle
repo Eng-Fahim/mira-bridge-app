@@ -117,6 +117,8 @@ dependencies {
     implementation 'androidx.gridlayout:gridlayout:1.0.0'
     implementation 'androidx.preference:preference:1.2.1'
     
+    // ✅ Brotli decoder — لحل مشكلة Content-Encoding: br
+    implementation 'org.brotli:dec:0.1.2'
     // ✅ Lifecycle (لـ AppLifecycleObserver + ProcessLifecycleOwner)
     implementation "androidx.lifecycle:lifecycle-process:2.7.0"
     implementation "androidx.lifecycle:lifecycle-common-java8:2.7.0"
