@@ -49,7 +49,7 @@ import com.example.uhf.manager.inventory.InventoryCatalogManager;
 import com.example.uhf.manager.inventory.InventoryFilterManager;
 import com.example.uhf.dialog.inventory.InventoryDialogsManager;
 import com.example.uhf.manager.inventory.InventoryPersistenceManager;
-
+import com.example.uhf.manager.inventory.InventoryFeedbackHelper;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -92,15 +92,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         implements MiraIRFIDReader.OnTagReadListener {
 
     private static final String TAG = "MiraInventoryPro";
-    
-    // ==================== ✅ Debounce (أداء) ====================
-private static final long HAPTIC_DEBOUNCE_MS = 150;
-private static final long FLASH_DEBOUNCE_MS = 120;
 
-private long lastHapticTime = 0;
-private long lastFlashTime = 0;
-private SoundManager.FeedbackType lastFeedbackType = null;
-    
+
+// ==================== ✅ Feedback Helper ====================
+private InventoryFeedbackHelper feedbackHelper;
     // ==================== ثوابت الأداء ====================
     // ✅ Adaptive Throttle
 private static final long UI_UPDATE_THROTTLE_MIN_MS = 100;   // جرد صغير
@@ -134,7 +129,7 @@ private synchronized String getCurrentDateTimeString() {
     return dateTimeFormat.format(new Date());
 }
     // ==================== ✅ Views الجديدة ====================
-private View flashOverlay;
+
 private View lastScanCard;
 private TextView tvLastScanTitle;
 private TextView tvLastScanEpc;
@@ -148,9 +143,7 @@ private MaterialButton btnOpenItemsList;
 private MaterialButton btnPowerControlCompact;
 private MaterialButton btnArchiveReportsCompact;
 
-// ==================== Vibrator للاهتزاز ====================
-private android.os.Vibrator vibrator;
-    
+
     // ==================== مفاتيح الزناد ====================
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
@@ -353,7 +346,12 @@ private InventoryPersistenceManager persistenceManager;   // ✅ جديد
         } catch (Exception e) { 
             Log.e(TAG, "Sound: " + e.getMessage()); 
         }
-        
+        // ✅ تهيئة FeedbackHelper
+try {
+    feedbackHelper = new InventoryFeedbackHelper(requireContext());
+} catch (Exception e) {
+    Log.e(TAG, "FeedbackHelper error: " + e.getMessage());
+}
         // ==================== تهيئة Managers ====================
 
 // ✅ تهيئة AnimationHelper
@@ -718,7 +716,10 @@ if (btnLiveFilter != null) {
         
         
         // ==================== ✅ Views الجديدة ====================
-flashOverlay = view.findViewById(R.id.flashOverlay);
+View flashOverlayView = view.findViewById(R.id.flashOverlay);
+if (feedbackHelper != null) {
+    feedbackHelper.setFlashOverlay(flashOverlayView);
+}
 lastScanCard = view.findViewById(R.id.lastScanCard);
 tvLastScanTitle = view.findViewById(R.id.tvLastScanTitle);
 tvLastScanEpc = view.findViewById(R.id.tvLastScanEpc);
@@ -732,8 +733,7 @@ btnOpenItemsList = view.findViewById(R.id.btnOpenItemsList);
 btnPowerControlCompact = view.findViewById(R.id.btnPowerControlCompact);
 btnArchiveReportsCompact = view.findViewById(R.id.btnArchiveReportsCompact);
 
-// ✅ تهيئة Vibrator
-initVibrator();
+
 
 // ✅ ربط الأزرار الجديدة
 if (btnOpenItemsList != null) {
@@ -1295,16 +1295,9 @@ recalculateAggregates();
     
     // ✅ الآن currentDisplay معرَّف خارج الـ if
     // ✅ اهتزاز + صوت + وميض
-    if (soundManager != null) soundManager.playBeep(feedbackType);
-    hapticFeedback(feedbackType);
-    
-    if (feedbackType == SoundManager.FeedbackType.KNOWN_ITEM) {
-        flashOverlay(0x8816A34A);  // أخضر
-    } else if (feedbackType == SoundManager.FeedbackType.UNKNOWN_ITEM) {
-        flashOverlay(0x88DC2626);  // أحمر
-    } else if (feedbackType == SoundManager.FeedbackType.DUPLICATE_ITEM) {
-        flashOverlay(0x883B82F6);  // أزرق
-    }
+   // ✅ بعد:
+if (soundManager != null) soundManager.playBeep(feedbackType);
+if (feedbackHelper != null) feedbackHelper.feedback(feedbackType);
     
     // ✅ تحديث بطاقة "آخر مسح"
     if (currentDisplay != null) {
@@ -1690,9 +1683,8 @@ private void startScanning() {
 }
 aggregateTotalWeight = 0;
 aggregateTotalValue = 0;
-lastHapticTime = 0;
-lastFlashTime = 0;
-lastFeedbackType = null;
+// ✅ بعد:
+if (feedbackHelper != null) feedbackHelper.resetDebounce();
     if (modernAdapter != null) {
         modernAdapter.submitList(new ArrayList<>());
     }
@@ -1982,9 +1974,8 @@ public void stopScanning() {
                         "📡 Scan stopped");
                 }
                 
-                lastHapticTime = 0;
-                lastFlashTime = 0;
-                lastFeedbackType = null;
+                // ✅ بعد:
+if (feedbackHelper != null) feedbackHelper.resetDebounce();
                 
                 Toast.makeText(requireContext(), 
                     isArabic ? "🛑 تم إيقاف المسح" : "🛑 Scan stopped", 
@@ -3104,7 +3095,10 @@ public void onDestroyView() {
         soundManager.release();
         soundManager = null;
     }
-    
+    if (feedbackHelper != null) {
+    feedbackHelper.cleanup();
+    feedbackHelper = null;
+}
     // ✅ إعادة تعيين الفلتر
 if (filterManager != null) {
     filterManager.reset();
@@ -3449,98 +3443,7 @@ public void showArchiveReportsPublic() {
     }
 }
 
-// ==================== ✅ Vibrator ====================
 
-/**
- * تهيئة Vibrator (متوافق مع API 31+)
- */
-private void initVibrator() {
-    try {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            android.os.VibratorManager vm = 
-                (android.os.VibratorManager) requireContext()
-                    .getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
-            vibrator = vm != null ? vm.getDefaultVibrator() : null;
-        } else {
-            vibrator = (android.os.Vibrator) requireContext()
-                    .getSystemService(Context.VIBRATOR_SERVICE);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "initVibrator error", e);
-        vibrator = null;
-    }
-}
-
-/**
- * اهتزاز حسب النوع
- */
-private void hapticFeedback(SoundManager.FeedbackType type) {
-    if (vibrator == null || !vibrator.hasVibrator()) return;
-    
-    // ✅ Debounce
-    long now = System.currentTimeMillis();
-    if (now - lastHapticTime < HAPTIC_DEBOUNCE_MS && type == lastFeedbackType) {
-        return;
-    }
-    lastHapticTime = now;
-    lastFeedbackType = type;
-    
-    try {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            switch (type) {
-                case KNOWN_ITEM:
-                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(
-                        40, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
-                    break;
-                case DUPLICATE_ITEM:
-                    vibrator.vibrate(android.os.VibrationEffect.createWaveform(
-                        new long[]{0, 25, 40, 25}, -1));
-                    break;
-                case UNKNOWN_ITEM:
-                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(150, 255));
-                    break;
-                case COMPLETED:
-                    vibrator.vibrate(android.os.VibrationEffect.createWaveform(
-                        new long[]{0, 50, 40, 50, 40, 100}, -1));
-                    break;
-                case ERROR:
-                    vibrator.vibrate(android.os.VibrationEffect.createWaveform(
-                        new long[]{0, 200, 80, 200}, -1));
-                    break;
-            }
-        } else {
-            vibrator.vibrate(40);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "hapticFeedback error", e);
-    }
-}
-
-/**
- * وميض ملون عند المسح
- */
-private void flashOverlay(int colorInt) {
-    if (flashOverlay == null) return;
-    
-    // ✅ Debounce
-    long now = System.currentTimeMillis();
-    if (now - lastFlashTime < FLASH_DEBOUNCE_MS) {
-        return;
-    }
-    lastFlashTime = now;
-    
-    try {
-        flashOverlay.setBackgroundColor(colorInt);
-        flashOverlay.setAlpha(0.6f);
-        
-        android.animation.ObjectAnimator anim = 
-            android.animation.ObjectAnimator.ofFloat(flashOverlay, "alpha", 0.6f, 0f);
-        anim.setDuration(280);
-        anim.start();
-    } catch (Exception e) {
-        Log.e(TAG, "flashOverlay error", e);
-    }
-}
 /**
  * تحديث بطاقة "آخر مسح"
  */
