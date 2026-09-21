@@ -91,7 +91,7 @@
             android:layout_height="match_parent"
             android:clipToPadding="false"
             android:fillViewport="true"
-            android:overScrollMode="never"  
+            android:overScrollMode="never"
             android:paddingBottom="32dp">
 
             <LinearLayout
@@ -199,7 +199,6 @@
                                 tools:text="👑 7 قطع • 615.0g" />
                         </LinearLayout>
 
-                        <!-- ✅ القيمة بـ 3 عملات -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -860,16 +859,17 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
+                <!-- RecyclerView لآخر العمليات -->
                 <androidx.recyclerview.widget.RecyclerView
-    android:id="@+id/rvRecentActivity"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginBottom="14dp"
-    android:nestedScrollingEnabled="true"
-    android:overScrollMode="never"       <!-- ✅ اختياري للتحسين -->
-    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-    tools:itemCount="3"
-    tools:listitem="@layout/item_activity_timeline" />
+                    android:id="@+id/rvRecentActivity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="14dp"
+                    android:nestedScrollingEnabled="true"
+                    android:overScrollMode="never"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                    tools:itemCount="3"
+                    tools:listitem="@layout/item_activity_timeline" />
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
