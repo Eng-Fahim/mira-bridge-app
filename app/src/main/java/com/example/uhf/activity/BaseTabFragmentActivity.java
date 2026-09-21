@@ -38,30 +38,34 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * ✅ BaseTabFragmentActivity v2.0
+ * ✅ BaseTabFragmentActivity v3.0 — النسخة النهائية المحصّنة
  * 
  * التغييرات الجذرية:
- * 1. RFID_DEVICE_PRESENT أصبحت حالة ديناميكية (AtomicReference)
+ * 1. إزالة RFID_DEVICE_PRESENT الثابت → isRfidDevicePresent() ديناميكية
  * 2. initUHF() يُستدعى تلقائياً في onCreate()
- * 3. لا توجد فترة "Simulator" - إما C72 أو خطأ واضح
- * 4. استدعاء isRfidDevicePresent() متاح لكل الكلاسات
+ * 3. القارئ مشترك عبر sSharedReader (Singleton-like)
+ * 4. منع التهيئة المزدوجة عبر sIsInitializing
+ * 5. إعادة محاولة تلقائية عند فشل التهيئة (3 مرات)
+ * 6. لا يوجد Simulator صامت - إما C72 أو خطأ واضح
  */
 public class BaseTabFragmentActivity extends AppCompatActivity {
 
     private static final String TAG = "BaseTabFragmentActivity";
     
     // ============================================================================
-    // 🔴 تم حذف الثابت القديم نهائياً
-    // public static final boolean RFID_DEVICE_PRESENT = false;  ❌
+    // ✅ الحالة الديناميكية (Static - Shared across all instances)
     // ============================================================================
     
-    // ✅ الحالة الديناميكية (Shared across all instances)
+    /** null = لم يتم الفحص بعد | true = جهاز موجود | false = غير موجود */
     private static final AtomicReference<Boolean> sRfidDevicePresent = 
-        new AtomicReference<>(null); // null = لم يتم الفحص بعد
+        new AtomicReference<>(null);
     
-    // ✅ حالة القارئ المشتركة (static لسهولة الوصول من RFIDManager)
+    /** القارئ المشترك - Singleton-like */
     private static final AtomicReference<RFIDWithUHFUART> sSharedReader = 
         new AtomicReference<>(null);
+    
+    /** منع التهيئة المزدوجة */
+    private static final AtomicBoolean sIsInitializing = new AtomicBoolean(false);
     
     /**
      * ✅ دالة ثابتة للاستعلام من أي مكان في التطبيق
@@ -74,7 +78,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
     
     /**
-     * ✅ الحصول على القارئ المشترك (للاستخدام من RFIDManager)
+     * ✅ الحصول على القارئ المشترك (للاستخدام من RFIDManager/ChainwayReader)
      */
     public static RFIDWithUHFUART getSharedReader() {
         return sSharedReader.get();
@@ -87,7 +91,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         sRfidDevicePresent.set(null);
     }
     
-    // ==================== Lifecycle ====================
+    // ==================== Lifecycle Fields ====================
     
     public RFIDWithUHFUART mReader;
     public Fragment currentFragment = null;
@@ -95,7 +99,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
 
     protected MiraDialogHelper dialogHelper;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
-    private static final int RFID_INIT_TIMEOUT_MS = 8000; // 8 ثواني كافية
+    private static final int RFID_INIT_TIMEOUT_MS = 8000;  // 8 ثواني (كافية للـ AAR الجديد)
     private int initRetryCount = 0;
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
     protected final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -105,9 +109,6 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     private volatile boolean isInitialized = false;
     private ProgressDialog initDialog;
     private long initStartTime = 0;
-    
-    // ✅ flag لمنع التهيئة المزدوجة
-    private static final AtomicBoolean sIsInitializing = new AtomicBoolean(false);
 
     private static final int[] SCAN_KEY_CODES = {
         139, 280, 291, 293, 294, 311, 312, 313, 315, 591, 593, 594, 596
@@ -125,14 +126,18 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         
         checkStoragePermission();
         
-        // ✅ ⚡ الأهم: بدء تهيئة UHF تلقائياً
+        // ✅ الأهم: بدء تهيئة UHF تلقائياً
         // ننتظر 200ms لضمان استقرار الواجهة
         mainHandler.postDelayed(this::initUHF, 200);
     }
 
     private void createExecutorIfNeeded() {
         if (rfidExecutor == null || rfidExecutor.isShutdown() || rfidExecutor.isTerminated()) {
-            rfidExecutor = Executors.newSingleThreadExecutor();
+            rfidExecutor = Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "UHF-Init-Executor");
+                t.setDaemon(true);
+                return t;
+            });
         }
     }
 
@@ -142,9 +147,8 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         mainHandler.removeCallbacksAndMessages(null);
         dismissInitDialogSafely();
         
-        // ✅ لا نحرر mReader هنا — نترك RFIDManager يدير دورة الحياة
-        // لأن mReader قد يكون مشتركاً بين الأنشطة
-        // freeReaderSafely();  // ← تم تعطيلها
+        // ✅ لا نحرر mReader هنا — RFIDManager يدير دورة الحياة
+        // لأن mReader مشترك بين الأنشطة
         
         shutdownExecutorSafely();
         
@@ -178,23 +182,26 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, 
+                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
-            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            boolean granted = grantResults.length > 0 && 
+                grantResults[0] == PackageManager.PERMISSION_GRANTED;
             if (!granted) Log.w(TAG, "Storage permission denied");
         }
     }
 
     /**
-     * ✅ تهيئة UHF - يعمل تلقائياً
-     * - يتحقق من sSharedReader أولاً (لأنشطة متعددة)
+     * ✅ تهيئة UHF تلقائياً
+     * - يستخدم sSharedReader إذا موجود
      * - يمنع التهيئة المزدوجة عبر sIsInitializing
+     * - يعيد المحاولة 3 مرات عند الفشل
      */
     public void initUHF() {
         if (isDestroyed.get()) return;
         
-        // ✅ إذا كان هناك قارئ مشترك جاهز، استخدمه
+        // ✅ إذا كان هناك قارئ مشترك جاهز
         RFIDWithUHFUART shared = sSharedReader.get();
         if (shared != null && isInitialized) {
             Log.d(TAG, "✅ Using existing shared reader");
@@ -228,7 +235,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
                 }
                 
                 if (mReader == null) {
-                    Log.e(TAG, "❌ mReader is null after getInstance()");
+                    Log.e(TAG, "❌ RFIDWithUHFUART.getInstance() returned null");
                     sRfidDevicePresent.set(false);
                     mainHandler.post(() -> {
                         sIsInitializing.set(false);
@@ -245,8 +252,8 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
                         Log.e(TAG, "UHF init thread error", e);
                         initResult[0] = false;
                     }
-                });
-                initThread.setName("UHF-Init-Thread");
+                }, "UHF-Native-Init");
+                initThread.setDaemon(true);
                 initThread.start();
                 initThread.join(RFID_INIT_TIMEOUT_MS);
                 
@@ -264,7 +271,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
                 long elapsed = System.currentTimeMillis() - initStartTime;
                 Log.i(TAG, "UHF init result: " + result + " (took " + elapsed + "ms)");
                 
-                // ✅ حفظ الحالة الديناميكية والقارئ المشترك
+                // ✅ حفظ الحالة الديناميكية
                 sRfidDevicePresent.set(result);
                 if (result) {
                     sSharedReader.set(mReader);
@@ -297,22 +304,22 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
             
             Log.e(TAG, "⚠️ UHF initialization FAILED");
             
-            // ✅ إشعار المستخدم برسالة واضحة
+            // ✅ رسالة أولى
             if (initRetryCount == 0) {
                 toastMessageSafe("⚠️ تعذر تهيئة قارئ RFID\nجاري إعادة المحاولة...");
             }
             
-            // ✅ إعادة محاولة مرتين
-            if (initRetryCount < 2) {
+            // ✅ إعادة محاولة 3 مرات
+            if (initRetryCount < 3) {
                 initRetryCount++;
-                Log.i(TAG, "🔄 Retry #" + initRetryCount + " in 3s...");
+                Log.i(TAG, "🔄 Retry #" + initRetryCount + "/3 in 3s...");
                 mainHandler.postDelayed(() -> {
                     if (!isDestroyed.get() && !isInitialized) {
                         initUHF();
                     }
                 }, 3000);
             } else {
-                toastMessageSafe("❌ فشل الاتصال بقارئ RFID\n" +
+                toastMessageSafe("❌ فشل الاتصال بقارئ RFID\n\n" +
                     "تحقق من:\n" +
                     "• الجهاز مدعوم (Chainway C72)\n" +
                     "• القارئ مفعّل من الإعدادات\n" +
@@ -467,8 +474,11 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
                 String rfidVer = mReader.getVersion();
                 String hardwareVersion = mReader.getHardwareVersion();
                 String deviceInfo = DeviceDetector.getDeviceInfo();
-                String version = "=== Device ===\n" + deviceInfo + "\n=== UHF ===\nSoftware: " + rfidVer + "\nHardware: " + hardwareVersion;
-                mainHandler.post(() -> UIHelper.alert(BaseTabFragmentActivity.this, R.string.action_uhf_ver, version, R.drawable.webtext));
+                String version = "=== Device ===\n" + deviceInfo + 
+                    "\n=== UHF ===\nSoftware: " + rfidVer + 
+                    "\nHardware: " + hardwareVersion;
+                mainHandler.post(() -> UIHelper.alert(BaseTabFragmentActivity.this, 
+                    R.string.action_uhf_ver, version, R.drawable.webtext));
             } catch (Exception e) {
                 Log.e(TAG, "Get UHF version error: " + e.getMessage());
                 toastMessageSafe("Error getting UHF version");
@@ -478,7 +488,8 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
 
     public String getVerName() {
         try {
-            return this.getPackageManager().getPackageInfo(this.getPackageName(), 0).versionName;
+            return this.getPackageManager()
+                .getPackageInfo(this.getPackageName(), 0).versionName;
         } catch (Exception e) {
             return "";
         }
