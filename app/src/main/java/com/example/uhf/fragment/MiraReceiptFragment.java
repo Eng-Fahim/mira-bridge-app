@@ -71,15 +71,14 @@ public class MiraReceiptFragment extends DialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // استخدام الثيم لمنع الانكماش وتغطية 90% من مساحة الشاشة
         setStyle(DialogFragment.STYLE_NORMAL, android.R.style.Theme_Material_Light_Dialog_Alert);
-        
+
         if (getArguments() != null) {
             receiptJsonStr = getArguments().getString(ARG_RECEIPT_JSON, "{}");
         }
-        
+
         isArabic = Locale.getDefault().getLanguage().equals("ar");
-        
+
         if (getContext() != null) {
             orgProfile = MiraOrgProfileManager.getInstance(getContext());
             priceManager = MiraPriceManager.getInstance(getContext());
@@ -91,7 +90,6 @@ public class MiraReceiptFragment extends DialogFragment {
     @Override
     public void onStart() {
         super.onStart();
-        // إعطاء الحجم الكافي للديالوج كي لا يظهر فارغاً أو منكمشاً
         if (getDialog() != null && getDialog().getWindow() != null) {
             getDialog().getWindow().setLayout(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -123,7 +121,7 @@ public class MiraReceiptFragment extends DialogFragment {
         btnPrintReceipt = view.findViewById(R.id.btnPrintReceipt);
         btnShareReceipt = view.findViewById(R.id.btnShareReceipt);
         btnSaveReceipt = view.findViewById(R.id.btnSaveReceipt);
-        
+
         if (webReceipt != null) {
             WebSettings settings = webReceipt.getSettings();
             settings.setJavaScriptEnabled(true);
@@ -153,6 +151,82 @@ public class MiraReceiptFragment extends DialogFragment {
         if (btnShareReceipt != null) btnShareReceipt.setOnClickListener(v -> shareReceiptAsPDF());
         if (btnSaveReceipt != null) btnSaveReceipt.setOnClickListener(v -> saveReceiptAsPDF());
     }
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ دوال مساعدة آمنة لقراءة JSON
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * ✅ استخراج نص آمن (يتجاهل null, "null", "", JSONObject.NULL)
+     */
+    private String safeString(JSONObject obj, String key, String defaultValue) {
+        if (obj == null || key == null) return defaultValue;
+        try {
+            Object val = obj.opt(key);
+            if (val == null || val == JSONObject.NULL) return defaultValue;
+            String s = String.valueOf(val).trim();
+            if (s.isEmpty() || "null".equalsIgnoreCase(s)) {
+                return defaultValue;
+            }
+            return s;
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * ✅ إيجاد أول قيمة غير فارغة من مجموعة مفاتيح
+     */
+    private String findFirstNonEmpty(JSONObject obj, String... keys) {
+        if (obj == null || keys == null) return "—";
+        for (String key : keys) {
+            String val = safeString(obj, key, null);
+            if (val != null && !val.isEmpty()) {
+                return val;
+            }
+        }
+        return "—";
+    }
+
+    /**
+     * ✅ استخراج رقم آمن (يدعم Number و String)
+     */
+    private double safeDouble(JSONObject obj, String key, double defaultValue) {
+        if (obj == null || key == null) return defaultValue;
+        try {
+            Object val = obj.opt(key);
+            if (val == null || val == JSONObject.NULL) return defaultValue;
+            if (val instanceof Number) {
+                return ((Number) val).doubleValue();
+            }
+            String s = String.valueOf(val).trim().replace(",", "");
+            if (s.isEmpty() || "null".equalsIgnoreCase(s)) return defaultValue;
+            return Double.parseDouble(s);
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * ✅ تنسيق آمن للسعر
+     */
+    private String safeFormatPrice(double amount) {
+        try {
+            if (priceManager != null) {
+                String formatted = priceManager.formatPriceDefault(amount);
+                if (formatted != null && !formatted.isEmpty()) {
+                    return formatted;
+                }
+            }
+            return String.format(Locale.US, "%,.2f", amount);
+        } catch (Exception e) {
+            return String.format(Locale.US, "%,.2f", amount);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Print / Share / Save
+    // ═══════════════════════════════════════════════════════
 
     private void printReceipt() {
         if (getContext() == null || webReceipt == null) return;
@@ -199,7 +273,7 @@ public class MiraReceiptFragment extends DialogFragment {
             FileOutputStream fos = new FileOutputStream(file);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
             fos.close();
-            
+
             Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("image/png");
@@ -229,13 +303,13 @@ public class MiraReceiptFragment extends DialogFragment {
             if (bitmap == null) return null;
 
             PdfDocument doc = new PdfDocument();
-            int pageWidth = 595; // A4 Standard
+            int pageWidth = 595;
             int pageHeight = Math.max(842, (bitmap.getHeight() * pageWidth) / bitmap.getWidth());
-            
+
             PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create();
             PdfDocument.Page page = doc.startPage(info);
             Canvas canvas = page.getCanvas();
-            
+
             Bitmap scaled = Bitmap.createScaledBitmap(bitmap, pageWidth, pageHeight, true);
             canvas.drawBitmap(scaled, 0, 0, null);
             doc.finishPage(page);
@@ -243,7 +317,7 @@ public class MiraReceiptFragment extends DialogFragment {
             String fileName = orgName.replaceAll("\\s+", "_") + "_Invoice_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".pdf";
             File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MIRA_Invoices");
             if (!dir.exists()) dir.mkdirs();
-            
+
             File file = new File(dir, fileName);
             FileOutputStream fos = new FileOutputStream(file);
             doc.writeTo(fos);
@@ -260,26 +334,30 @@ public class MiraReceiptFragment extends DialogFragment {
         if (webReceipt == null) return null;
         try {
             webReceipt.measure(
-                View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                    View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             );
             webReceipt.layout(0, 0, webReceipt.getMeasuredWidth(), webReceipt.getMeasuredHeight());
-            
+
             Bitmap bitmap = Bitmap.createBitmap(webReceipt.getMeasuredWidth(), webReceipt.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             canvas.drawColor(android.graphics.Color.WHITE);
             webReceipt.draw(canvas);
             return bitmap;
-        } catch (Exception e) { 
+        } catch (Exception e) {
             Log.e(TAG, "Capture error: " + e.getMessage());
-            return null; 
+            return null;
         }
     }
+
+    // ═══════════════════════════════════════════════════════
+    // HTML Rendering
+    // ═══════════════════════════════════════════════════════
 
     private void renderHtmlReceipt() {
         if (webReceipt == null) return;
         if (progressLoading != null) progressLoading.setVisibility(View.VISIBLE);
-        
+
         String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
         String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
         String dir = isArabic ? "rtl" : "ltr";
@@ -290,29 +368,19 @@ public class MiraReceiptFragment extends DialogFragment {
          .append("<style>")
          .append("* { box-sizing: border-box; }")
          .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 12px; margin: 0 auto; max-width: 100%; background: #fff; color: #1a1a1a; font-size: 11px; line-height: 1.4; }")
-         
-         // Header Styling
          .append(".header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0d1b2a; padding-bottom: 10px; margin-bottom: 10px; }")
          .append(".brand-box { text-align: right; }")
          .append(".org-name { font-size: 22px; font-weight: 800; color: #0d1b2a; }")
          .append(".org-subtitle { font-size: 10px; color: #c59b27; font-weight: bold; text-transform: uppercase; }")
          .append(".org-meta { font-size: 10px; color: #555; margin-top: 2px; }")
-         
-         // Invoice Badge
          .append(".invoice-title-bar { display: flex; justify-content: space-between; align-items: center; background: #0d1b2a; color: #fff; padding: 8px 12px; border-radius: 6px; margin: 10px 0; }")
          .append(".invoice-title { font-size: 15px; font-weight: bold; color: #f4d58d; }")
          .append(".invoice-type { font-size: 11px; background: rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 4px; border: 1px solid #c59b27; }")
-
-         // Refund Alert Badge
          .append(".refund-alert { background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 8px; border-radius: 6px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 12px; }")
-
-         // Grid Info Box
          .append(".info-grid { width: 100%; font-size: 10px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; background: #fafafa; }")
          .append(".info-grid table { width: 100%; border-collapse: collapse; }")
          .append(".info-grid td { padding: 3px 4px; vertical-align: top; }")
          .append(".label { color: #666; } .value { font-weight: bold; color: #0d1b2a; }")
-         
-         // Items Table
          .append("table.items { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; }")
          .append("table.items th { background: #0d1b2a; color: #f4d58d; padding: 6px 4px; text-align: center; border: 1px solid #0d1b2a; }")
          .append("table.items td { padding: 6px 4px; border: 1px solid #e2e8f0; text-align: center; color: #2d3748; }")
@@ -320,27 +388,20 @@ public class MiraReceiptFragment extends DialogFragment {
          .append(".returned-row { background-color: #fff5f5 !important; color: #e53e3e; text-decoration: line-through; }")
          .append(".serial-box { font-family: monospace; font-size: 9px; background: #edf2f7; padding: 2px 4px; border-radius: 3px; color: #2b6cb0; word-break: break-all; display: inline-block; }")
          .append(".karat-badge { display: inline-block; padding: 1px 5px; border-radius: 8px; font-weight: bold; background: #fefcbf; color: #744210; border: 1px solid #f6e05e; }")
-
-         // Totals Layout
          .append(".summary-container { display: flex; justify-content: space-between; margin-top: 10px; gap: 10px; }")
          .append(".notes-box { width: 50%; font-size: 9px; border: 1px dashed #cbd5e0; padding: 8px; border-radius: 6px; background: #f7fafc; }")
          .append(".totals-box { width: 48%; }")
          .append(".totals-table { width: 100%; font-size: 11px; border-collapse: collapse; }")
          .append(".totals-table td { padding: 4px 0; }")
          .append(".grand-total { font-size: 14px; font-weight: bold; color: #0d1b2a; border-top: 2px solid #0d1b2a; border-bottom: 2px solid #0d1b2a; padding: 6px 0; }")
-         
-         // Warranty & Legal
          .append(".tafqeet-box { font-size: 10px; color: #1a202c; text-align: center; margin-top: 8px; padding: 6px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0; }")
          .append(".warranty-box { font-size: 10px; font-weight: bold; text-align: center; margin: 10px 0; padding: 6px; border-radius: 6px; border: 1px dashed #38a169; background: #f0fff4; color: #22543d; }")
-         
-         // Footer & Signatures
          .append(".footer-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; }")
          .append(".qr-box { text-align: center; }")
          .append(".qr-box img { width: 80dp; height: 80dp; border: 1px solid #e2e8f0; padding: 2px; border-radius: 4px; }")
          .append(".signatures { display: flex; gap: 20px; }")
          .append(".sig-box { text-align: center; width: 100px; font-size: 9px; font-weight: bold; color: #4a5568; }")
          .append(".sig-line { border-top: 1px solid #a0aec0; margin-top: 30px; padding-top: 3px; }")
-         
          .append(".copyright { text-align: center; margin-top: 15px; font-size: 8px; color: #a0aec0; border-top: 1px solid #edf2f7; padding-top: 6px; }")
          .append("</style></head><body>");
 
@@ -350,12 +411,15 @@ public class MiraReceiptFragment extends DialogFragment {
             if (t == null) t = root.optJSONObject("data");
             if (t == null) t = root.optJSONObject("receipt");
             if (t == null) t = root;
-            
+
             JSONObject customerObj = t.optJSONObject("customer");
             JSONObject paymentObj = t.optJSONObject("payment");
 
-            String sellerName = t.optString("seller_name", t.optString("seller", t.optString("cashier_name", t.optString("created_by", "—"))));
-            String branchName = t.optString("branch_name", t.optString("branch", ""));
+            // ✅ قراءة آمنة للبيانات الأساسية
+            String sellerName = findFirstNonEmpty(t, "seller_name", "seller", "cashier_name", "created_by");
+            if ("—".equals(sellerName)) sellerName = "—";
+
+            String branchName = safeString(t, "branch_name", safeString(t, "branch", ""));
             if (branchName.isEmpty() && getContext() != null) {
                 try {
                     MiraBranchesManager bm = MiraBranchesManager.getInstance(getContext());
@@ -363,38 +427,58 @@ public class MiraReceiptFragment extends DialogFragment {
                 } catch (Exception ignored) {}
             }
             if (branchName.isEmpty()) branchName = isArabic ? "الفرع الرئيسي" : "Main Branch";
-            
-            String saleNumber = t.optString("sale_number", t.optString("invoice_number", t.optString("receipt_number", t.optString("id", "—"))));
-            String dateStr = t.optString("timestamp", t.optString("created_at", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())));
-            
-            String customer = t.optString("customer_name", customerObj != null ? customerObj.optString("name", "") : "");
+
+            String saleNumber = findFirstNonEmpty(t, "sale_number", "invoice_number", "receipt_number", "id");
+            String dateStr = findFirstNonEmpty(t, "timestamp", "created_at");
+            if ("—".equals(dateStr)) {
+                dateStr = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date());
+            }
+
+            String customer = safeString(t, "customer_name",
+                    customerObj != null ? safeString(customerObj, "name", "") : "");
             if (customer.isEmpty()) customer = isArabic ? "عميل نقدي" : "Cash Customer";
-            
-            String customerPhone = t.optString("customer_phone", customerObj != null ? customerObj.optString("phone", "") : "");
-            
-            String paymentMethod = t.optString("payment_method", paymentObj != null ? paymentObj.optString("payment_method", "CASH") : "CASH");
-            
-            String currency = t.optString("currency", paymentObj != null ? paymentObj.optString("currency_code", "") : "");
+
+            String customerPhone = safeString(t, "customer_phone",
+                    customerObj != null ? safeString(customerObj, "phone", "") : "");
+
+            String paymentMethod = findFirstNonEmpty(t, "payment_method",
+                    paymentObj != null ? safeString(paymentObj, "payment_method", "CASH") : "CASH");
+            if ("—".equals(paymentMethod)) paymentMethod = "CASH";
+
+            String currency = safeString(t, "currency",
+                    paymentObj != null ? safeString(paymentObj, "currency_code", "") : "");
             if (currency.isEmpty() && priceManager != null) currency = priceManager.getCurrencySymbol("YER");
             if (currency.isEmpty()) currency = defaultCurrency;
-            
-            String currencyName = paymentObj != null ? paymentObj.optString("currency_name", "") : ArabicNumberToWords.getCurrencyArabicName(currency);
 
-            double exchangeRate = t.optDouble("exchange_rate", paymentObj != null ? paymentObj.optDouble("exchange_rate", 1.0) : 1.0);
-            if (priceManager != null && exchangeRate == 1.0) exchangeRate = priceManager.getExchangeRate(currency);
-            
-            // قراءة حالة المرتجع بكل مرونة
-            String refundStatus = t.optString("refund_status", t.optString("status", "completed"));
+            String currencyName = paymentObj != null ? safeString(paymentObj, "currency_name", "") : "";
+            if (currencyName.isEmpty()) {
+                try {
+                    currencyName = ArabicNumberToWords.getCurrencyArabicName(currency);
+                } catch (Exception ignored) {
+                    currencyName = currency;
+                }
+            }
+
+            double exchangeRate = safeDouble(t, "exchange_rate",
+                    paymentObj != null ? safeDouble(paymentObj, "exchange_rate", 1.0) : 1.0);
+            if (priceManager != null && exchangeRate == 1.0) {
+                try { exchangeRate = priceManager.getExchangeRate(currency); } catch (Exception ignored) {}
+            }
+            if (exchangeRate <= 0) exchangeRate = 1.0;
+
+            String refundStatus = findFirstNonEmpty(t, "refund_status", "status");
+            if ("—".equals(refundStatus)) refundStatus = "completed";
+
             boolean isFullyRefunded = "refunded".equals(refundStatus) || "fully_refunded".equals(refundStatus);
             boolean isPartiallyRefunded = "partially_refunded".equals(refundStatus);
-            boolean isRefund = isFullyRefunded || isPartiallyRefunded;
 
-            // Header Render
+            // Header
             h.append("<div class='header'>")
              .append("<div class='brand-box'>")
-             .append("<div class='org-name'>").append(orgName).append("</div>")
+             .append("<div class='org-name'>").append(escapeHtml(orgName)).append("</div>")
              .append("<div class='org-subtitle'>").append(isArabic ? "للمجوهرات والذهب والماس" : "Jewelry & Gold Specialist").append("</div>")
-             .append("<div class='org-meta'>📍 ").append(address.isEmpty() ? "صنعاء - اليمن" : address).append(" | 📞 ").append(phone).append("</div>")
+             .append("<div class='org-meta'>📍 ").append(escapeHtml(address.isEmpty() ? "صنعاء - اليمن" : address))
+             .append(" | 📞 ").append(escapeHtml(phone)).append("</div>")
              .append("</div>")
              .append("</div>");
 
@@ -405,7 +489,7 @@ public class MiraReceiptFragment extends DialogFragment {
 
             h.append("<div class='invoice-title-bar'>")
              .append("<div class='invoice-title'>").append(titleText).append("</div>")
-             .append("<div class='invoice-type'>").append(isArabic ? "فاتورة رقم: " : "INV #: ").append(saleNumber).append("</div>")
+             .append("<div class='invoice-type'>").append(isArabic ? "فاتورة رقم: " : "INV #: ").append(escapeHtml(saleNumber)).append("</div>")
              .append("</div>");
 
             if (isPartiallyRefunded) {
@@ -414,23 +498,24 @@ public class MiraReceiptFragment extends DialogFragment {
                 h.append("<div class='refund-alert'>🚨 تنبيه: هذه الفاتورة مرتجعة بالكامل والمبلغ مرجع للعميل.</div>");
             }
 
-            // Info Grid Table
+            // Info Grid
             h.append("<div class='info-grid'><table>")
              .append("<tr>")
-             .append("<td class='label'>").append(isArabic ? "اسم العميل:" : "Customer:").append("</td><td class='value'>").append(customer).append("</td>")
-             .append("<td class='label'>").append(isArabic ? "التاريخ والوقت:" : "Date:").append("</td><td class='value'>").append(dateStr).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "اسم العميل:" : "Customer:").append("</td><td class='value'>").append(escapeHtml(customer)).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "التاريخ والوقت:" : "Date:").append("</td><td class='value'>").append(escapeHtml(dateStr)).append("</td>")
              .append("</tr><tr>")
-             .append("<td class='label'>").append(isArabic ? "هاتف العميل:" : "Phone:").append("</td><td class='value'>").append(customerPhone.isEmpty() ? "—" : customerPhone).append("</td>")
-             .append("<td class='label'>").append(isArabic ? "مُحرر السند:" : "Seller:").append("</td><td class='value'>").append(sellerName).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "هاتف العميل:" : "Phone:").append("</td><td class='value'>").append(customerPhone.isEmpty() ? "—" : escapeHtml(customerPhone)).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "مُحرر السند:" : "Seller:").append("</td><td class='value'>").append(escapeHtml(sellerName)).append("</td>")
              .append("</tr><tr>")
-             .append("<td class='label'>").append(isArabic ? "طريقة الدفع:" : "Payment:").append("</td><td class='value'>").append(paymentMethod).append("</td>")
-             .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'>").append(branchName).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "طريقة الدفع:" : "Payment:").append("</td><td class='value'>").append(escapeHtml(paymentMethod)).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'>").append(escapeHtml(branchName)).append("</td>")
              .append("</tr></table></div>");
 
+            // Items
             JSONArray items = t.optJSONArray("items");
             if (items == null) items = t.optJSONArray("sold_items");
             if (items == null) items = t.optJSONArray("products");
-            
+
             double totalWeightSum = 0;
 
             if (items != null && items.length() > 0) {
@@ -443,53 +528,78 @@ public class MiraReceiptFragment extends DialogFragment {
                  .append("<th>").append(isArabic ? "المجوهرات / الصياغة" : "Labor/Stone").append("</th>")
                  .append("<th>").append(isArabic ? "الإجمالي" : "Total").append("</th>")
                  .append("</tr></thead><tbody>");
-                
+
                 for (int i = 0; i < items.length(); i++) {
                     JSONObject it = items.optJSONObject(i);
                     if (it == null) continue;
-                    
-                    boolean isItemRefunded = it.optBoolean("is_returned", it.optBoolean("is_refunded", false)) || isFullyRefunded;
 
-                    double weight = it.optDouble("weight", it.optDouble("gross_weight", 0));
+                    boolean isItemRefunded = safeBoolean(it, "is_returned",
+                                            safeBoolean(it, "is_refunded", false)) || isFullyRefunded;
+
+                    double weight = safeDouble(it, "weight",
+                                    safeDouble(it, "gross_weight",
+                                    safeDouble(it, "gross_weight_grams", 0)));
                     if (!isItemRefunded) {
                         totalWeightSum += weight;
                     }
 
-                    double laborFee = it.optDouble("making_fee", it.optDouble("labor_price", 0));
-                    double itemPriceUSD = it.optDouble("price_usd", it.optDouble("sale_price", it.optDouble("price", 0)));
-                    
-                    // الإصلاح الشامل لقراءة أرقام القطع بكافة تسميات الـ API
-                    String serial = it.optString("serial_number", 
-                                    it.optString("item_code", 
-                                    it.optString("serial_no", 
-                                    it.optString("epc", 
-                                    it.optString("barcode", 
-                                    it.optString("code", "—"))))));
+                    double laborFee = safeDouble(it, "making_fee",
+                                       safeDouble(it, "labor_price", 0));
+                    double itemPriceUSD = safeDouble(it, "price_usd",
+                                          safeDouble(it, "sale_price",
+                                          safeDouble(it, "price", 0)));
 
-                    String title = it.optString("title", it.optString("item_title", it.optString("name", "—")));
-                    String karat = it.optString("karat", it.optString("gold_karat", "21K"));
+                    // ✅ قراءة آمنة لرقم القطعة (Serial / RFID / EPC / Barcode)
+                    String serial = findFirstNonEmpty(it,
+                            "serial_number",
+                            "serial_no",
+                            "item_code",
+                            "epc",
+                            "barcode",
+                            "gtin",
+                            "tag",
+                            "code"
+                    );
+
+                    String title = findFirstNonEmpty(it,
+                            "title",
+                            "item_title",
+                            "name",
+                            "product_name",
+                            "description"
+                    );
+
+                    String karat = findFirstNonEmpty(it, "karat", "gold_karat");
+                    if ("—".equals(karat)) karat = "21K";
 
                     String rowClass = isItemRefunded ? "class='returned-row'" : "";
 
                     h.append("<tr ").append(rowClass).append(">")
                      .append("<td>").append(i + 1).append("</td>")
-                     .append("<td style='text-align:right; font-weight:bold;'>").append(title).append(isItemRefunded ? " (مرتجع)" : "").append("</td>")
-                     .append("<td><span class='serial-box'>").append(serial).append("</span></td>")
-                     .append("<td><span class='karat-badge'>").append(karat).append("</span></td>")
+                     .append("<td style='text-align:right; font-weight:bold;'>")
+                     .append(escapeHtml(title))
+                     .append(isItemRefunded ? " <span style='color:#e53e3e;'>(مرتجع)</span>" : "")
+                     .append("</td>")
+                     .append("<td><span class='serial-box'>").append(escapeHtml(serial)).append("</span></td>")
+                     .append("<td><span class='karat-badge'>").append(escapeHtml(karat)).append("</span></td>")
                      .append("<td><b>").append(String.format(Locale.US, "%.3f", weight)).append("</b> g</td>")
-                     .append("<td>").append(laborFee > 0 ? (priceManager != null ? priceManager.formatPriceDefault(laborFee) : String.valueOf(laborFee)) : "—").append("</td>")
-                     .append("<td style='font-weight:bold; color:#0d1b2a;'>").append(priceManager != null ? priceManager.formatPriceDefault(itemPriceUSD) : String.valueOf(itemPriceUSD)).append("</td>")
+                     .append("<td>").append(laborFee > 0 ? safeFormatPrice(laborFee) : "—").append("</td>")
+                     .append("<td style='font-weight:bold; color:#0d1b2a;'>").append(safeFormatPrice(itemPriceUSD)).append("</td>")
                      .append("</tr>");
                 }
                 h.append("</tbody></table>");
             }
 
-            double subtotalUSD = t.optDouble("subtotal_usd", paymentObj != null ? paymentObj.optDouble("subtotal_usd", 0) : t.optDouble("subtotal", 0));
-            double discountUSD = t.optDouble("discount_amount_usd", paymentObj != null ? paymentObj.optDouble("discount_amount_usd", 0) : t.optDouble("discount", 0));
-            double finalUSD = t.optDouble("final_amount_usd", paymentObj != null ? paymentObj.optDouble("final_amount_usd", subtotalUSD - discountUSD) : (subtotalUSD - discountUSD));
-            double finalLocal = t.optDouble("final_amount_local", paymentObj != null ? paymentObj.optDouble("final_amount_local", finalUSD * exchangeRate) : finalUSD * exchangeRate);
+            // Totals
+            double subtotalUSD = safeDouble(t, "subtotal_usd",
+                    paymentObj != null ? safeDouble(paymentObj, "subtotal_usd", 0) : safeDouble(t, "subtotal", 0));
+            double discountUSD = safeDouble(t, "discount_amount_usd",
+                    paymentObj != null ? safeDouble(paymentObj, "discount_amount_usd", 0) : safeDouble(t, "discount", 0));
+            double finalUSD = safeDouble(t, "final_amount_usd",
+                    paymentObj != null ? safeDouble(paymentObj, "final_amount_usd", subtotalUSD - discountUSD) : (subtotalUSD - discountUSD));
+            double finalLocal = safeDouble(t, "final_amount_local",
+                    paymentObj != null ? safeDouble(paymentObj, "final_amount_local", finalUSD * exchangeRate) : finalUSD * exchangeRate);
 
-            // Summary Section
             h.append("<div class='summary-container'>")
              .append("<div class='notes-box'>")
              .append("<b>📌 ").append(isArabic ? "ملاحظات وإرشادات الضمان:" : "Terms & Conditions:").append("</b><br>")
@@ -497,47 +607,47 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("2. ").append(isArabic ? "عند إعادة البيع أو الاستبدال يجب إحضار هذا السند الأصلي." : "Original invoice required for resale or exchange.").append("<br>")
              .append("3. ").append(isArabic ? "صافي الوزن المباع المتبقي: " : "Net Active Weight: ").append("<b>").append(String.format(Locale.US, "%.3f g", totalWeightSum)).append("</b>")
              .append("</div>")
-             
+
              .append("<div class='totals-box'><table class='totals-table'>")
-             .append("<tr><td class='label'>").append(isArabic ? "المبلغ الإجمالي:" : "Subtotal:").append("</td><td class='value' style='text-align:left;'>").append(priceManager != null ? priceManager.formatPriceDefault(subtotalUSD) : String.valueOf(subtotalUSD)).append("</td></tr>");
-            
+             .append("<tr><td class='label'>").append(isArabic ? "المبلغ الإجمالي:" : "Subtotal:").append("</td><td class='value' style='text-align:left;'>").append(safeFormatPrice(subtotalUSD)).append("</td></tr>");
+
             if (discountUSD > 0) {
-                h.append("<tr><td class='label'>").append(isArabic ? "الخصم الممنوح:" : "Discount:").append("</td><td class='value' style='text-align:left; color:#e53e3e;'>- ").append(priceManager != null ? priceManager.formatPriceDefault(discountUSD) : String.valueOf(discountUSD)).append("</td></tr>");
+                h.append("<tr><td class='label'>").append(isArabic ? "الخصم الممنوح:" : "Discount:").append("</td><td class='value' style='text-align:left; color:#e53e3e;'>- ").append(safeFormatPrice(discountUSD)).append("</td></tr>");
             }
 
-            h.append("<tr class='grand-total'><td class='label' style='color:#0d1b2a;'>").append(isArabic ? "💰 الصافي المستحق:" : "💰 Net Total:").append("</td><td class='value' style='text-align:left; color:#0d1b2a;'>").append(priceManager != null ? priceManager.formatPriceDefault(finalUSD) : String.valueOf(finalUSD)).append("</td></tr>")
+            h.append("<tr class='grand-total'><td class='label' style='color:#0d1b2a;'>").append(isArabic ? "💰 الصافي المستحق:" : "💰 Net Total:").append("</td><td class='value' style='text-align:left; color:#0d1b2a;'>").append(safeFormatPrice(finalUSD)).append("</td></tr>")
              .append("</table></div></div>");
 
-            // Tafqeet Box
+            // Tafqeet
             if (finalUSD > 0 || finalLocal > 0) {
                 try {
                     boolean isLocal = "YER".equalsIgnoreCase(currency) || "SAR".equalsIgnoreCase(currency) || "AED".equalsIgnoreCase(currency);
                     String amountInWords = ArabicNumberToWords.convert(isLocal ? finalLocal : finalUSD, currencyName);
-                    
+
                     h.append("<div class='tafqeet-box'>")
                      .append("<b>").append(isArabic ? "مبلغ الفاتورة كتابةً: " : "Amount in words: ").append("</b>")
-                     .append("<span style='color:#c59b27; font-weight:bold;'>").append(amountInWords).append("</span>")
+                     .append("<span style='color:#c59b27; font-weight:bold;'>").append(escapeHtml(amountInWords)).append("</span>")
                      .append("</div>");
                 } catch (Exception e) {
                     Log.e(TAG, "Tafqeet error: " + e.getMessage());
                 }
             }
 
-            // Warranty Seal
+            // Warranty
             h.append("<div class='warranty-box'>")
              .append("🛡️ ").append(isArabic ? "سند موثق برقم تسلسلي مع الضمان المالي والتصنيعي للمجوهرات" : "Certified Gold & Jewelry Transaction Guarantee")
              .append("</div>");
 
-            // Footer Section
+            // Footer
             String qrData = Uri.encode("Org:" + orgName + "|Invoice:" + saleNumber + "|Total:" + finalUSD + "|Weight:" + totalWeightSum + "g");
             String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
-            
+
             h.append("<div class='footer-section'>")
              .append("<div class='qr-box'>")
              .append("<img src='").append(qrApiUrl).append("' alt='QR Verify'/><br>")
              .append("<span style='font-size:8px; color:#718096;'>").append(isArabic ? "رمز التحقق الرقمي" : "Digital Verification").append("</span>")
              .append("</div>")
-             
+
              .append("<div class='signatures'>")
              .append("<div class='sig-box'><div class='sig-line'>").append(isArabic ? "توقيع المشتري" : "Customer Sign").append("</div></div>")
              .append("<div class='sig-box'><div class='sig-line'>").append(isArabic ? "ختم وتوقيع المحل" : "Authorized Stamp").append("</div></div>")
@@ -546,14 +656,46 @@ public class MiraReceiptFragment extends DialogFragment {
 
         } catch (Exception e) {
             Log.e(TAG, "Error rendering receipt: " + e.getMessage(), e);
-            h.append("<p style='color:red;text-align:center'>Error rendering receipt</p>");
+            h.append("<p style='color:red;text-align:center;padding:20px;'>❌ خطأ في تحميل البيانات</p>");
+            h.append("<p style='color:#666;text-align:center;font-size:10px;'>").append(escapeHtml(e.getMessage())).append("</p>");
         }
 
         h.append("<div class='copyright'>")
-         .append(orgName).append(" © 2026 | ").append(isArabic ? "نظام إدارة المبيعات الذكي - ميرا للمجوهرات" : "MIRA Jewelry POS System")
+         .append(escapeHtml(orgName)).append(" © 2026 | ")
+         .append(isArabic ? "نظام إدارة المبيعات الذكي - ميرا للمجوهرات" : "MIRA Jewelry POS System")
          .append("</div></body></html>");
 
         webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
+    }
+
+    /**
+     * ✅ استخراج Boolean آمن
+     */
+    private boolean safeBoolean(JSONObject obj, String key, boolean defaultValue) {
+        if (obj == null || key == null) return defaultValue;
+        try {
+            Object val = obj.opt(key);
+            if (val == null || val == JSONObject.NULL) return defaultValue;
+            if (val instanceof Boolean) return (Boolean) val;
+            String s = String.valueOf(val).trim().toLowerCase();
+            if ("true".equals(s) || "1".equals(s) || "yes".equals(s)) return true;
+            if ("false".equals(s) || "0".equals(s) || "no".equals(s)) return false;
+            return defaultValue;
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * ✅ Escape HTML لمنع كسر الصفحة
+     */
+    private String escapeHtml(String input) {
+        if (input == null) return "";
+        return input.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+                    .replace("'", "&#39;");
     }
 
     private void closeFragment() {
