@@ -40,7 +40,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.HttpsURLConnection;
-
+import org.brotli.dec.BrotliInputStream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
@@ -373,13 +375,12 @@ public class MiraApiClient {
     }
 
     // ==================== بناء الاستجابة ====================
-    private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
+  private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
     int responseCode = conn.getResponseCode();
     
     Log.d(TAG, "═══════════════════════════════════════════");
     Log.d(TAG, "📥 RESPONSE CODE: " + responseCode);
     Log.d(TAG, "   Content-Encoding: " + conn.getContentEncoding());
-    Log.d(TAG, "   Content-Type: " + conn.getContentType());
     Log.d(TAG, "   Content-Length: " + conn.getContentLength());
     
     InputStream rawStream = (responseCode >= 200 && responseCode < 300)
@@ -387,7 +388,6 @@ public class MiraApiClient {
             : conn.getErrorStream();
 
     if (rawStream == null) {
-        Log.e(TAG, "   ❌ Stream is null");
         return new ApiResponse(responseCode, null, "Empty response");
     }
 
@@ -401,21 +401,17 @@ public class MiraApiClient {
             
             if (enc.contains("br")) {
                 Log.d(TAG, "   ✅ Decompressing Brotli...");
-                is = new org.brotli.dec.BrotliInputStream(rawStream);
+                is = new BrotliInputStream(rawStream);
             } else if (enc.contains("gzip")) {
                 Log.d(TAG, "   ✅ Decompressing Gzip...");
-                is = new java.util.zip.GZIPInputStream(rawStream);
+                is = new GZIPInputStream(rawStream);
             } else if (enc.contains("deflate")) {
                 Log.d(TAG, "   ✅ Decompressing Deflate...");
-                is = new java.util.zip.InflaterInputStream(rawStream);
-            } else {
-                Log.d(TAG, "   ℹ️ No compression handled: " + enc);
+                is = new InflaterInputStream(rawStream);
             }
-        } else {
-            Log.d(TAG, "   ℹ️ No Content-Encoding header");
         }
     } catch (Exception e) {
-        Log.e(TAG, "   ❌ Decompression setup error: " + e.getMessage());
+        Log.e(TAG, "   ❌ Decompression error: " + e.getMessage());
         is = rawStream;
     }
 
@@ -428,33 +424,13 @@ public class MiraApiClient {
         while ((read = reader.read(buffer)) != -1) {
             response.append(buffer, 0, read);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "   ❌ Read error: " + e.getMessage());
-        // Fallback: حاول بدون فك ترميز
-        if (is != rawStream) {
-            try {
-                response.setLength(0);
-                try (BufferedReader reader2 = new BufferedReader(
-                        new InputStreamReader(rawStream, StandardCharsets.UTF_8))) {
-                    char[] buffer = new char[8192];
-                    int read;
-                    while ((read = reader2.read(buffer)) != -1) {
-                        response.append(buffer, 0, read);
-                    }
-                }
-            } catch (Exception e2) {
-                Log.e(TAG, "   ❌ Fallback read error: " + e2.getMessage());
-            }
-        }
     }
 
     String responseBody = response.toString().trim();
     
     Log.d(TAG, "   ✅ Body length: " + responseBody.length());
-    if (responseBody.length() > 0) {
-        Log.d(TAG, "   ✅ Body preview: " + 
-                responseBody.substring(0, Math.min(200, responseBody.length())));
-    }
+    Log.d(TAG, "   Preview: " + (responseBody.length() > 100 
+            ? responseBody.substring(0, 100) + "..." : responseBody));
     Log.d(TAG, "═══════════════════════════════════════════");
 
     // ✅ تحليل JSON
@@ -466,8 +442,8 @@ public class MiraApiClient {
             json = new JSONObject(responseBody);
             serverMessage = json.optString("message", null);
         } catch (Exception e) {
-            Log.w(TAG, "   ⚠️ Non-JSON response: " 
-                    + responseBody.substring(0, Math.min(300, responseBody.length())));
+            Log.w(TAG, "   ⚠️ Non-JSON: " 
+                    + responseBody.substring(0, Math.min(200, responseBody.length())));
         }
     }
 
@@ -484,7 +460,6 @@ public class MiraApiClient {
 
     return apiResponse;
 }
-
     // ==================== المصادقة ====================
     public ApiResponse login(String username, String password, String deviceId) {
     JSONObject payload = new JSONObject();
