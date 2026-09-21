@@ -1442,39 +1442,40 @@ fabActionCenter.setOnLongClickListener(v -> {
     }
 
     private void showSystemVersionDialog() {
-        String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
-        String hwVer = null;
-        String modelName = Build.MODEL;
+    String miraSystemVersion = "MIRA ID™ v1.4.8 (Enterprise)";
+    String hwVer = null;
+    String modelName = Build.MODEL;
 
-        if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT && mReader != null) {
-            try {
-                hwVer = mReader.getHardwareVersion();
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
-            }
+    // ✅ استخدام الحالة الديناميكية
+    if (BaseTabFragmentActivity.isRfidDevicePresent() && mReader != null) {
+        try {
+            hwVer = mReader.getHardwareVersion();
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
         }
-
-        StringBuilder message = new StringBuilder();
-        message.append("MIRA Trust Architecture™\n");
-        message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
-        message.append(isArabic ? "📱 الجهاز: " : "📱 Device: ").append(modelName).append("\n");
-        message.append(isArabic ? "📦 النسخة: " : "📦 Version: ").append(miraSystemVersion).append("\n");
-
-        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-            message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected");
-        } else if (hwVer == null || hwVer.trim().isEmpty()) {
-            message.append(isArabic ? "📡 العتاد: غير متهيئ" : "📡 Hardware: Not Configured");
-        } else {
-            message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
-            message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
-        }
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic ? "حول النظام | System Info" : "About System")
-                .setMessage(message.toString())
-                .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
-                .show();
     }
+
+    StringBuilder message = new StringBuilder();
+    message.append("MIRA Trust Architecture™\n");
+    message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
+    message.append(isArabic ? "📱 الجهاز: " : "📱 Device: ").append(modelName).append("\n");
+    message.append(isArabic ? "📦 النسخة: " : "📦 Version: ").append(miraSystemVersion).append("\n");
+
+    if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+        message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected");
+    } else if (hwVer == null || hwVer.trim().isEmpty()) {
+        message.append(isArabic ? "📡 العتاد: غير متهيئ" : "📡 Hardware: Not Configured");
+    } else {
+        message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
+        message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
+    }
+
+    new MaterialAlertDialogBuilder(this)
+            .setTitle(isArabic ? "حول النظام | System Info" : "About System")
+            .setMessage(message.toString())
+            .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
+            .show();
+}
 
     // ==================== حوارات التولبار الثانوي ====================
 
