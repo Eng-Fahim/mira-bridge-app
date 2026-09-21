@@ -126,7 +126,7 @@ public class MiraDashboardFragment extends Fragment {
     
     private PermissionManager permissionManager;
 
-    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(2);
+    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Future<?> dataFuture, goldPriceFuture, pingFuture;
     private Runnable swipeTimeoutRunnable;
@@ -230,48 +230,58 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        try {
-            initializeManagers();
-            initViews(view);
-            setupProfileListener();
-            setupBranchListener();
-            
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
+    try {
+        initializeManagers();
+        initViews(view);
+        setupProfileListener();
+        setupBranchListener();
 
-            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            initBranchCache(currentBranchId);
+        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        initBranchCache(currentBranchId);
 
-            updateHeader();
-            showShimmer(false);
+        updateHeader();
+        showShimmer(false);
 
-            isViewInitialized = true;
-            
-            // ✅ حركة دخول بسيطة باستخدام ViewPropertyAnimator
-View heroCard = view.findViewById(R.id.heroBalanceCard);
-if (heroCard != null) {
-    heroCard.setAlpha(0f);
-    heroCard.setTranslationY(30f);
-    heroCard.animate()
-            .alpha(1f)
-            .translationY(0f)
-            .setDuration(400)
-            .start();
-}
-
-
-
-            syncOrgProfileFromServer(false);
-            fetchData();
-
-            // ✅ تحميل آخر العمليات
-            fetchRecentActivity();
-
-            startAutoRefresh();
-        } catch (Throwable e) {
-            logNonFatal("onViewCreated", e);
+        isViewInitialized = true;
+        
+        // ✅ حركة دخول
+        View heroCard = view.findViewById(R.id.heroBalanceCard);
+        if (heroCard != null) {
+            heroCard.setAlpha(0f);
+            heroCard.setTranslationY(30f);
+            heroCard.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(400)
+                    .start();
         }
+
+        // ✅ عرض الكاش فوراً
+        loadOfflineData();
+
+        // ✅ ping مؤجل
+        mainHandler.postDelayed(() -> {
+            if (isAdded() && isResumed()) {
+                updateLiveStatus();
+            }
+        }, 2000);
+
+        syncOrgProfileFromServer(false);
+        
+        // ❌ لا fetchData هنا — onResume سيفعل ذلك
+        // ❌ لا fetchRecentActivity هنا — onResume سيفعل ذلك
+        
+        startAutoRefresh();
+        
+        // ✅ الوقت 0 → onResume سيجلب
+        lastDataFetchTime = 0;
+        
+    } catch (Throwable e) {
+        logNonFatal("onViewCreated", e);
     }
+}
 
     
     
@@ -1516,10 +1526,9 @@ private void handleRecentActivityClick(JSONObject activity) {
 public void onResume() {
     super.onResume();
     try {
-        // ✅ سياسة أمنية: إجبار الإخفاء عند العودة للشاشة
+        // ✅ سياسة أمنية
         isHeroHidden = true;
         isSalesHidden = true;
-
         if (btnToggleHeroVisibility != null) {
             btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
         }
@@ -1528,37 +1537,59 @@ public void onResume() {
         }
 
         registerDataRefreshReceiver();
-        isDataLoaded = false;
-        lastDataFetchTime = 0;
 
+        // ✅ لا تصفّر lastDataFetchTime
         int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
         } else if (isViewInitialized) {
             updateHeader();
             syncOrgProfileFromServer(false);
-            
-            // ✅ تتابع التحميل لتجنب ANR:
-            // 1) المخزون أولاً
-            fetchData();
-            
-            // 2) آخر العمليات بعد 400ms
-            mainHandler.postDelayed(this::fetchRecentActivity, 400);
-            
-            // 3) أسعار الذهب بعد 800ms
-            mainHandler.postDelayed(() -> {
-                if (!isAdded()) return;
-                long now = System.currentTimeMillis();
-                if (permissionManager != null 
-                        && permissionManager.canAccessFragment("GoldRates")) {
-                    if (lastGoldFetchTime == 0 
-                            || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                        fetchLiveGoldPrices(false);
-                    } else {
-                        displayGoldPricesFromCache();
+
+            long now = System.currentTimeMillis();
+            long timeSinceLastFetch = now - lastDataFetchTime;
+            long timeSinceLastGoldFetch = now - lastGoldFetchTime;
+            boolean isCacheValid = activityCache != null && activityCache.isValid();
+
+            Log.d(TAG, "📊 onResume — lastFetch: " + (timeSinceLastFetch / 1000) + "s ago"
+                    + ", lastGold: " + (timeSinceLastGoldFetch / 1000) + "s ago"
+                    + ", activityCacheValid: " + isCacheValid);
+
+            // ✅ fetchData فقط إذا مرت 30 ثانية أو أكثر
+            if (timeSinceLastFetch > 30 * 1000) {
+                Log.d(TAG, "🔄 Fetching dashboard data (stale)");
+                fetchData();
+            } else {
+                Log.d(TAG, "⏭️ Skipping fetchData (fresh)");
+            }
+
+            // ✅ fetchRecentActivity فقط إذا الكاش منتهي
+            if (!isCacheValid) {
+                Log.d(TAG, "🔄 Fetching recent activity (cache expired)");
+                mainHandler.postDelayed(() -> {
+                    if (isAdded() && isResumed()) {
+                        fetchRecentActivity();
                     }
-                }
-            }, 800);
+                }, 800);
+            } else {
+                Log.d(TAG, "⏭️ Skipping fetchRecentActivity (cache valid)");
+            }
+
+            // ✅ fetchLiveGoldPrices فقط إذا مرت 30 دقيقة
+            if (timeSinceLastGoldFetch > 30 * 60 * 1000) {
+                Log.d(TAG, "🔄 Fetching gold prices (stale)");
+                mainHandler.postDelayed(() -> {
+                    if (isAdded() && isResumed()) {
+                        if (permissionManager != null
+                                && permissionManager.canAccessFragment("GoldRates")) {
+                            fetchLiveGoldPrices(false);
+                        }
+                    }
+                }, 1500);
+            } else {
+                Log.d(TAG, "⏭️ Using cached gold prices");
+                displayGoldPricesFromCache();
+            }
         }
         startAutoRefresh();
     } catch (Exception e) {
