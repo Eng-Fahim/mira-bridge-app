@@ -124,27 +124,94 @@ public class MiraSecureGateFragment extends Fragment {
     private boolean isArabic = true;
 
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
-        new ScanContract(),
-        result -> {
-            gateExecutor.execute(() -> {
-                try {
-                    Thread.sleep(300);
-                } catch (InterruptedException ignored) {}
+    new ScanContract(),
+    result -> {
+        if (gateExecutor == null || gateExecutor.isShutdown()) return;
+        
+        gateExecutor.execute(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException ignored) {}
 
-                mainHandler.post(() -> {
-                    isCameraOpen = false;
+            mainHandler.post(() -> {
+                isCameraOpen = false;
+                
+                if (result.getContents() != null && !isDestroyed && isAdded()) {
+                    final String scannedCode = result.getContents().trim();
                     
-                    if (result.getContents() != null && !isDestroyed) {
-                        processInputEpc(result.getContents().trim(), "CAMERA");
-                    }
-                    
-                    if (!isLockdown && !isDestroyed) {
-                        autoStartScanning();
-                    }
-                });
+                    // ✅ نقل processInputEpc إلى background
+                    gateExecutor.execute(() -> {
+                        processInputEpcBackground(scannedCode, "CAMERA");
+                    });
+                }
+                
+                if (!isLockdown && !isDestroyed && isAdded()) {
+                    autoStartScanning();
+                }
             });
-        }
-    );
+        });
+    }
+);
+
+/**
+ * ✅ نسخة background من processInputEpc
+ */
+private void processInputEpcBackground(String epc, String sourceType) {
+    if (isDestroyed || epc == null || epc.trim().isEmpty()) return;
+    
+    final String cleanedEpc = epc.trim().toUpperCase();
+    
+    long now = System.currentTimeMillis();
+    Long last = scanDebounceMap.putIfAbsent(cleanedEpc, now);
+    if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
+    scanDebounceMap.put(cleanedEpc, now);
+    
+    logConsole(getLocalizedText("📡 [", "📡 [") + sourceType 
+        + getLocalizedText("] فحص: ", "] Scan: ") + cleanedEpc);
+    
+    // ✅ قراءة Disk I/O على background الآن
+    if (offlineCache != null && offlineCache.isAllowedLocally(cleanedEpc)) {
+        mainHandler.post(() -> {
+            if (isAdded() && !isDestroyed) {
+                handleGateDecision(true, 
+                    getLocalizedText("قطعة مصرح بها (محلي)", "Authorized item (local)"), 
+                    cleanedEpc);
+            }
+        });
+        return;
+    }
+    
+    if (!isOnline) {
+        logConsole(getLocalizedText("⚠️ بدون إنترنت - رفض أمني فوري", 
+            "⚠️ Offline - immediate security denial"));
+        mainHandler.post(() -> {
+            if (isAdded() && !isDestroyed) {
+                handleGateDecision(false, getLocalizedText("بدون إنترنت", "Offline"), cleanedEpc);
+                if (offlineCache != null) {
+                    offlineCache.saveOfflineEvent(cleanedEpc, false, 
+                        getLocalizedText("بدون إنترنت", "Offline"), "local");
+                }
+            }
+        });
+        return;
+    }
+    
+    queryMiraGateServer(cleanedEpc);
+}
+
+/**
+ * ✅ النسخة القديمة — نُبقيها للتوافق مع RFID callback
+ */
+private void processInputEpc(String epc, String sourceType) {
+    // ✅ أعد التوجيه إلى background مباشرة
+    if (gateExecutor != null && !gateExecutor.isShutdown()) {
+        final String finalEpc = epc;
+        final String finalSource = sourceType;
+        gateExecutor.execute(() -> processInputEpcBackground(finalEpc, finalSource));
+    } else {
+        processInputEpcBackground(epc, sourceType);
+    }
+}
 
     // ==================== Helper Methods ====================
     
@@ -656,31 +723,31 @@ private void toggleGateState(String gateId, String currentStatus) {
     }
 
     private void checkPing() {
-        if (gateExecutor == null) return;
-        gateExecutor.execute(() -> {
-            try {
-                Context context = getContext();
-                if (context == null) return;
-                MiraApiClient client = MiraApiClient.getInstance(context);
-                long start = System.currentTimeMillis();
-                boolean ok = client.pingApi();
-                long latency = System.currentTimeMillis() - start;
-                mainHandler.post(() -> {
-                    if (tvPingLatency != null) {
-                        if (ok) {
-                            tvPingLatency.setText(getLocalizedText("📡 Ping: ", "📡 Ping: ") + latency + " ms | ✅ " + getLocalizedText("متصل", "Connected"));
-                            tvPingLatency.setTextColor(getSuccessColor());
-                        } else {
-                            tvPingLatency.setText(getLocalizedText("📡 Ping: -- | ⚠️ غير متصل", "📡 Ping: -- | ⚠️ Disconnected"));
-                            tvPingLatency.setTextColor(getWarningColor());
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "checkPing: " + e.getMessage());
+    if (isDestroyed || !isAdded()) return;
+    
+    Context context = getContext();
+    if (context == null) return;
+    
+    MiraApiClient client = MiraApiClient.getInstance(context);
+    long start = System.currentTimeMillis();
+    
+    // ✅ استخدم الدالة async الجديدة
+    client.pingApiAsync(ok -> {
+        long latency = System.currentTimeMillis() - start;
+        
+        if (tvPingLatency != null && isAdded() && !isDestroyed) {
+            if (ok) {
+                tvPingLatency.setText(getLocalizedText("📡 Ping: ", "📡 Ping: ") 
+                    + latency + " ms | ✅ " + getLocalizedText("متصل", "Connected"));
+                tvPingLatency.setTextColor(getSuccessColor());
+            } else {
+                tvPingLatency.setText(getLocalizedText("📡 Ping: -- | ⚠️ غير متصل", 
+                    "📡 Ping: -- | ⚠️ Disconnected"));
+                tvPingLatency.setTextColor(getWarningColor());
             }
-        });
-    }
+        }
+    });
+}
 
     private void updateSystemStatus(boolean armed) {
         if (tvSystemStatus != null) {
@@ -884,37 +951,6 @@ private void toggleGateState(String gateId, String currentStatus) {
         });
     }
 
-    // ==================== فحص التوافقية والأذونات ====================
-    private void processInputEpc(String epc, String sourceType) {
-        if (isDestroyed || !isAdded()) return;
-        if (epc == null || epc.trim().isEmpty()) return;
-        final String cleanedEpc = epc.trim().toUpperCase();
-        
-        long now = System.currentTimeMillis();
-        Long last = scanDebounceMap.putIfAbsent(cleanedEpc, now);
-        if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
-        scanDebounceMap.put(cleanedEpc, now);
-        
-        logConsole(getLocalizedText("📡 [", "📡 [") + sourceType + getLocalizedText("] فحص: ", "] Scan: ") + cleanedEpc);
-        
-        if (offlineCache != null && offlineCache.isAllowedLocally(cleanedEpc)) {
-            mainHandler.post(() -> handleGateDecision(true, getLocalizedText("قطعة مصرح بها (محلي)", "Authorized item (local)"), cleanedEpc));
-            return;
-        }
-        
-        if (!isOnline) {
-            logConsole(getLocalizedText("⚠️ بدون إنترنت - رفض أمني فوري", "⚠️ Offline - immediate security denial"));
-            mainHandler.post(() -> {
-                handleGateDecision(false, getLocalizedText("بدون إنترنت", "Offline"), cleanedEpc);
-                if (offlineCache != null) {
-                    offlineCache.saveOfflineEvent(cleanedEpc, false, getLocalizedText("بدون إنترنت", "Offline"), "local");
-                }
-            });
-            return;
-        }
-        
-        queryMiraGateServer(cleanedEpc);
-    }
 
     private void syncOfflineEvents() {
         if (gateExecutor == null || offlineCache == null) return;
@@ -976,32 +1012,40 @@ private void toggleGateState(String gateId, String currentStatus) {
     }
 
     private void checkConnection() {
-        if (gateExecutor == null) return;
-        gateExecutor.execute(() -> {
-            try {
-                Context context = getContext();
-                if (context == null) return;
-                MiraApiClient client = MiraApiClient.getInstance(context);
-                boolean wasOnline = isOnline;
-                isOnline = client.pingApi();
-                
-                if (isOnline != wasOnline) {
-                    mainHandler.post(() -> {
-                        if (isOnline) {
-                            logConsole(getLocalizedText("🟢 عاد الاتصال - جاري المزامنة...", "🟢 Connection restored - syncing..."));
-                            updateLocalAllowedCache();
-                            syncOfflineEvents();
-                        } else {
-                            logConsole(getLocalizedText("🔴 انقطع الاتصال - الوضع المحلي", "🔴 Connection lost - local mode"));
-                        }
-                        if (offlineCache != null) offlineCache.saveConnectionState(isOnline);
+    if (isDestroyed || !isAdded()) return;
+    
+    Context context = getContext();
+    if (context == null) return;
+    
+    MiraApiClient client = MiraApiClient.getInstance(context);
+    
+    // ✅ استخدم async
+    client.pingApiAsync(isOnlineNow -> {
+        boolean wasOnline = isOnline;
+        isOnline = isOnlineNow;
+        
+        if (isOnline != wasOnline && isAdded() && !isDestroyed) {
+            if (isOnline) {
+                logConsole(getLocalizedText("🟢 عاد الاتصال - جاري المزامنة...", 
+                    "🟢 Connection restored - syncing..."));
+                // ✅ لا تستدعي على Main Thread مباشرة - استخدم background
+                if (gateExecutor != null && !gateExecutor.isShutdown()) {
+                    gateExecutor.execute(() -> {
+                        updateLocalAllowedCache();
+                        syncOfflineEvents();
                     });
                 }
-            } catch (Exception e) {
-                isOnline = false;
+            } else {
+                logConsole(getLocalizedText("🔴 انقطع الاتصال - الوضع المحلي", 
+                    "🔴 Connection lost - local mode"));
             }
-        });
-    }
+            
+            if (offlineCache != null) {
+                offlineCache.saveConnectionState(isOnline);
+            }
+        }
+    });
+}
 
     private void queryMiraGateServer(String epc) {
         if (gateExecutor == null) return;
