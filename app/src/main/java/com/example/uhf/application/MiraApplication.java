@@ -15,7 +15,7 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
-import com.example.uhf.utils.MiraExecutorService;   // 🆕
+import com.example.uhf.utils.MiraExecutorService;
 
 public class MiraApplication extends AppContext {
     
@@ -36,17 +36,59 @@ public class MiraApplication extends AppContext {
         
         Log.i(TAG, "MiraApplication Started: onCreate()");
         
+        // ✅ جديد: تهيئة Chainway SDK
+        initializeChainwaySdk();
+        
         initializeCoreServices();
         initializeDatabase();
-        initializeExecutors();   // 🆕
+        initializeExecutors();
         logDeviceInfo();
         
         Log.d(TAG, "MiraApplication initialized successfully");
     }
 
     /**
-     * 🆕 تهيئة مدير الخيوط المشترك
+     * ✅ تهيئة Chainway SDK (DeviceAPI_ver20251103)
+     * 
+     * معلومات مهمة:
+     * - المكتبة تحتوي على 3 ملفات .so:
+     *   • libDeviceAPIM.so (745 KB)  ← يُحمَّل تلقائياً عند init()
+     *   • libDeviceAPIQ.so (1000 KB) ← يُحمَّل حسب الإصدار
+     *   • libIDFingerprintAlg.so (367 KB) ← للبصمة
+     * - لا نحتاج System.loadLibrary() — SDK يدير التحميل
      */
+    private void initializeChainwaySdk() {
+        Log.i(TAG, "🔧 Initializing Chainway SDK...");
+        
+        // ✅ 1. التحقق من وجود الكلاس الرئيسي
+        try {
+            Class<?> readerClass = Class.forName(
+                "com.rscja.deviceapi.RFIDWithUHFUART");
+            Log.i(TAG, "✅ Chainway RFIDWithUHFUART class found: " + 
+                       readerClass.getName());
+        } catch (ClassNotFoundException e) {
+            Log.w(TAG, "⚠️ Chainway SDK not found in classpath. " +
+                       "Reader will fall back to simulator.");
+        }
+        
+        // ✅ 2. التحقق من وجود الفئات الإضافية
+        String[] optionalClasses = {
+            "com.rscja.deviceapi.entity.UHFTAGInfo",
+            "com.imagealgorithmlab.fingerprint.FingerprintManager"
+        };
+        
+        for (String className : optionalClasses) {
+            try {
+                Class.forName(className);
+                Log.d(TAG, "✅ Found: " + className);
+            } catch (ClassNotFoundException e) {
+                Log.d(TAG, "ℹ️ Optional class not present: " + className);
+            }
+        }
+        
+        Log.i(TAG, "✅ Chainway SDK initialization complete");
+    }
+
     private void initializeExecutors() {
         try {
             MiraExecutorService.getInstance();
@@ -199,7 +241,7 @@ public class MiraApplication extends AppContext {
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        Log.w(TAG, "Low Memory Warning: System.gc() called");
+        Log.w(TAG, "Low Memory Warning");
         
         try {
             System.gc();
