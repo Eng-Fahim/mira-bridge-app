@@ -18,6 +18,14 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * ✅ RFIDManager v3.0 — النسخة النهائية
+ * 
+ * التغييرات:
+ * - autoConnectAndBind() يعيد boolean
+ * - getActiveReader() لا يتحول لـ Simulator بدون سبب
+ * - startScan() يتحقق من isRfidDevicePresent()
+ */
 public class RFIDManager {
     
     private static final String TAG = "RFIDManager";
@@ -31,7 +39,6 @@ public class RFIDManager {
     private RFIDDevice activeDevice;
     private MiraIRFIDReader.OnTagReadListener listener;
     
-    // ⚡ التعديل 1: إضافة مستقبل بث الزناد لجهاز Chainway
     private BroadcastReceiver keyReceiver;
     private boolean isReceiverRegistered = false;
     
@@ -46,162 +53,93 @@ public class RFIDManager {
         }
         return instance;
     }
-/**
- * ✅ الاتصال التلقائي مع التحقق الفعلي
- */
-public synchronized boolean autoConnectAndBind(Context hostContext) {
-    try {
-        Log.i(TAG, "🔗 autoConnectAndBind() called");
-        
-        // ✅ 1. تحقق من الحالة الديناميكية
-        if (!com.example.uhf.activity.BaseTabFragmentActivity.isRfidDevicePresent()) {
-            Log.e(TAG, "❌ RFID hardware not present");
-            return false;
-        }
-        
-        // ✅ 2. احصل على القارئ المشترك
-        com.rscja.deviceapi.RFIDWithUHFUART sharedReader = 
-            com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
-        
-        if (sharedReader != null) {
-            Log.i(TAG, "✅ Using shared reader from BaseTabFragmentActivity");
-        }
-        
-        // ✅ 3. احصل على الجهاز النشط
-        RFIDDevice device = getActiveDevice();
-        if (device == null) {
-            Log.e(TAG, "❌ No active device");
-            return false;
-        }
-        
-        // ✅ 4. إذا كان نوع الجهاز SIMULATOR، لا تتصل
-        if (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
-            Log.w(TAG, "⚠️ Active device is SIMULATOR");
-            return false;
-        }
-        
-        // ✅ 5. نظّف القارئ القديم إذا كان مختلفاً
-        if (activeReader != null && !(activeReader instanceof com.example.uhf.MiraRfid.readers.ChainwayReader)) {
-            try {
-                activeReader.stopScan();
-                activeReader.disconnect();
-                activeReader.release();
-            } catch (Exception ignored) {}
-            activeReader = null;
-        }
-        
-        // ✅ 6. أنشئ القارئ إذا لم يكن موجوداً
-        if (activeReader == null) {
-            activeReader = RFIDReaderFactory.create(device.getType(), device.getAddress());
-            if (activeReader == null) {
-                Log.e(TAG, "❌ Failed to create reader for: " + device.getType());
-                return false;
-            }
-        }
-        
-        // ✅ 7. ربط المستمع
-        if (listener != null) {
-            activeReader.setOnTagReadListener(listener);
-        }
-        
-        // ✅ 8. تهيئة + اتصال
-        if (!activeReader.isConnected()) {
-            if (!activeReader.initialize()) {
-                Log.e(TAG, "❌ initialize() failed");
+
+    /**
+     * ✅ الاتصال التلقائي مع التحقق الفعلي
+     * @return true إذا نجح الاتصال
+     */
+    public synchronized boolean autoConnectAndBind(Context hostContext) {
+        try {
+            Log.i(TAG, "🔗 autoConnectAndBind() called");
+            
+            // ✅ 1. تحقق من العتاد
+            if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+                Log.e(TAG, "❌ RFID hardware not present");
                 return false;
             }
             
-            if (!activeReader.connect()) {
-                Log.e(TAG, "❌ connect() failed");
+            // ✅ 2. احصل على القارئ المشترك إذا موجود
+            com.rscja.deviceapi.RFIDWithUHFUART sharedReader = 
+                BaseTabFragmentActivity.getSharedReader();
+            
+            if (sharedReader != null) {
+                Log.i(TAG, "✅ Shared reader available");
+            }
+            
+            // ✅ 3. احصل على الجهاز النشط
+            RFIDDevice device = getActiveDevice();
+            if (device == null) {
+                Log.e(TAG, "❌ No active device");
                 return false;
             }
-        }
-        
-        // ✅ 9. تسجيل مستقبل الزناد
-        registerTriggerKeyReceiver();
-        
-        Log.i(TAG, "✅ autoConnectAndBind SUCCESS: " + device.getType());
-        return true;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "❌ autoConnectAndBind exception", e);
-        return false;
-    }
-}
-
-/**
- * ✅ الحصول على القارئ النشط (بدون تحول صامت إلى Simulator)
- */
-public MiraIRFIDReader getActiveReader() {
-    if (activeReader != null && activeReader.isConnected()) {
-        return activeReader;
-    }
-    
-    // ✅ تحقق من الحالة الديناميكية
-    if (!com.example.uhf.activity.BaseTabFragmentActivity.isRfidDevicePresent()) {
-        Log.w(TAG, "⚠️ RFID device not present — falling back to simulator");
-        if (activeReader == null) {
-            activeReader = RFIDReaderFactory.create(
-                MiraIRFIDReader.ReaderType.SIMULATOR, "");
-        }
-        return activeReader;
-    }
-    
-    // ✅ جهاز موجود — أنشئ القارئ الصحيح
-    RFIDDevice device = getActiveDevice();
-    if (device == null || device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
-        Log.w(TAG, "⚠️ No real device configured — using simulator");
-        if (activeReader == null) {
-            activeReader = RFIDReaderFactory.create(
-                MiraIRFIDReader.ReaderType.SIMULATOR, "");
-        }
-        return activeReader;
-    }
-    
-    // ✅ إنشاء القارئ الحقيقي
-    if (activeReader == null) {
-        activeReader = RFIDReaderFactory.create(device.getType(), device.getAddress());
-    }
-    
-    return activeReader;
-}
-
-/**
- * ✅ بدء المسح - يتطلب جهاز حقيقي
- */
-public boolean startScan() {
-    Log.i(TAG, "🚀 RFIDManager.startScan() called");
-    
-    // ✅ تحقق من الحالة الديناميكية
-    if (!com.example.uhf.activity.BaseTabFragmentActivity.isRfidDevicePresent()) {
-        Log.e(TAG, "❌ Cannot start scan — RFID device not present");
-        return false;
-    }
-    
-    MiraIRFIDReader reader = getActiveReader();
-    if (reader == null) {
-        Log.e(TAG, "❌ getActiveReader() returned null");
-        return false;
-    }
-    
-    if (!reader.isConnected()) {
-        Log.d(TAG, "Reader not connected — connecting...");
-        if (!reader.initialize()) {
-            Log.e(TAG, "❌ initialize() failed");
-            return false;
-        }
-        if (!reader.connect()) {
-            Log.e(TAG, "❌ connect() failed");
+            
+            // ✅ 4. إذا كان SIMULATOR — لا تتصل
+            if (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
+                Log.w(TAG, "⚠️ Active device is SIMULATOR");
+                return false;
+            }
+            
+            // ✅ 5. نظّف القارئ القديم
+            if (activeReader != null && 
+                !(activeReader instanceof com.example.uhf.MiraRfid.readers.ChainwayReader)) {
+                try {
+                    activeReader.stopScan();
+                    activeReader.disconnect();
+                    activeReader.release();
+                } catch (Exception ignored) {}
+                activeReader = null;
+            }
+            
+            // ✅ 6. أنشئ القارئ إذا لزم
+            if (activeReader == null) {
+                activeReader = RFIDReaderFactory.create(device.getType(), 
+                    device.getAddress());
+                if (activeReader == null) {
+                    Log.e(TAG, "❌ Failed to create reader: " + device.getType());
+                    return false;
+                }
+            }
+            
+            // ✅ 7. ربط المستمع
+            if (listener != null) {
+                activeReader.setOnTagReadListener(listener);
+            }
+            
+            // ✅ 8. تهيئة + اتصال
+            if (!activeReader.isConnected()) {
+                if (!activeReader.initialize()) {
+                    Log.e(TAG, "❌ initialize() failed");
+                    return false;
+                }
+                
+                if (!activeReader.connect()) {
+                    Log.e(TAG, "❌ connect() failed");
+                    return false;
+                }
+            }
+            
+            // ✅ 9. تسجيل مستقبل الزناد
+            registerTriggerKeyReceiver();
+            
+            Log.i(TAG, "✅ autoConnectAndBind SUCCESS: " + device.getType());
+            return true;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ autoConnectAndBind exception", e);
             return false;
         }
     }
-    
-    boolean result = reader.startScan();
-    Log.i(TAG, "startScan result: " + result);
-    return result;
-}
 
-    // ⚡ التعديل 3: تسجيل مستقبل إشارات زر الزناد (Trigger) لـ Chainway C72
     public void registerTriggerKeyReceiver() {
         if (isReceiverRegistered) return;
         
@@ -213,7 +151,6 @@ public boolean startScan() {
                         int keyCode = intent.getIntExtra("keyCode", 0);
                         boolean keyDown = intent.getBooleanExtra("keydown", false);
 
-                        // أزرار زناد المسح في Chainway C72 (139, 280, 293)
                         if (keyCode == 139 || keyCode == 280 || keyCode == 293) {
                             if (keyDown) {
                                 startScan();
@@ -228,7 +165,7 @@ public boolean startScan() {
             IntentFilter filter = new IntentFilter("android.intent.action.FUN_KEY");
             context.registerReceiver(keyReceiver, filter);
             isReceiverRegistered = true;
-            Log.i(TAG, "🔑 Chainway hardware trigger receiver registered successfully");
+            Log.i(TAG, "🔑 Trigger receiver registered");
         } catch (Exception e) {
             Log.e(TAG, "Failed to register trigger receiver: " + e.getMessage());
         }
@@ -245,25 +182,24 @@ public boolean startScan() {
     
     public MiraIRFIDReader.ReaderType detectDeviceType() {
         String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
-        String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toUpperCase() : "";
+        String manufacturer = Build.MANUFACTURER != null ? 
+            Build.MANUFACTURER.toUpperCase() : "";
         
         if (model.contains("C72")) return MiraIRFIDReader.ReaderType.CHAINWAY_C72;
         if (model.contains("C61")) return MiraIRFIDReader.ReaderType.CHAINWAY_C61;
-        if (model.contains("MC33") || model.contains("MC32")) return MiraIRFIDReader.ReaderType.ZEBRA_MC3300;
-        if (model.contains("EDA5") || model.contains("CT40")) return MiraIRFIDReader.ReaderType.HONEYWELL_EDA50;
+        if (model.contains("MC33") || model.contains("MC32")) 
+            return MiraIRFIDReader.ReaderType.ZEBRA_MC3300;
+        if (model.contains("EDA5") || model.contains("CT40")) 
+            return MiraIRFIDReader.ReaderType.HONEYWELL_EDA50;
         if (model.contains("RP90")) return MiraIRFIDReader.ReaderType.UNITECH_RP902;
         
         return MiraIRFIDReader.ReaderType.SIMULATOR;
     }
     
-    /**
-     * حفظ جهاز جديد
-     */
     public boolean saveDevice(RFIDDevice device) {
         try {
             List<RFIDDevice> devices = getAllDevices();
             
-            // إزالة القديم إذا كان نفس النوع والعنوان
             devices.removeIf(d -> 
                 d.getType() == device.getType() && 
                 (device.getAddress() == null || device.getAddress().equals(d.getAddress()))
@@ -278,9 +214,6 @@ public boolean startScan() {
         }
     }
     
-    /**
-     * حفظ قائمة الأجهزة
-     */
     private boolean saveDevices(List<RFIDDevice> devices) {
         try {
             JSONArray arr = new JSONArray();
@@ -297,7 +230,8 @@ public boolean startScan() {
                 arr.put(obj);
             }
             
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, 
+                Context.MODE_PRIVATE);
             prefs.edit().putString(KEY_DEVICES, arr.toString()).apply();
             return true;
         } catch (Exception e) {
@@ -306,13 +240,11 @@ public boolean startScan() {
         }
     }
     
-    /**
-     * الحصول على جميع الأجهزة المحفوظة
-     */
     public List<RFIDDevice> getAllDevices() {
         List<RFIDDevice> devices = new ArrayList<>();
         try {
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, 
+                Context.MODE_PRIVATE);
             String json = prefs.getString(KEY_DEVICES, "[]");
             JSONArray arr = new JSONArray(json);
             
@@ -343,15 +275,11 @@ public boolean startScan() {
         return devices;
     }
     
-    /**
-     * حذف جهاز
-     */
     public void deleteDevice(RFIDDevice device) {
         List<RFIDDevice> devices = getAllDevices();
         devices.removeIf(d -> d == device || d.toString().equals(device.toString()));
         saveDevices(devices);
     }
-    
     
     public boolean setActiveDevice(RFIDDevice device) {
         this.activeDevice = device;
@@ -389,7 +317,42 @@ public boolean startScan() {
         return activeDevice;
     }
     
-    
+    /**
+     * ✅ الحصول على القارئ النشط (بدون تحول صامت إلى Simulator)
+     */
+    public MiraIRFIDReader getActiveReader() {
+        if (activeReader != null && activeReader.isConnected()) {
+            return activeReader;
+        }
+        
+        // ✅ تحقق من الحالة الديناميكية
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            Log.w(TAG, "⚠️ RFID device not present — falling back to simulator");
+            if (activeReader == null) {
+                activeReader = RFIDReaderFactory.create(
+                    MiraIRFIDReader.ReaderType.SIMULATOR, "");
+            }
+            return activeReader;
+        }
+        
+        // ✅ جهاز موجود — أنشئ القارئ الصحيح
+        RFIDDevice device = getActiveDevice();
+        if (device == null || device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
+            Log.w(TAG, "⚠️ No real device configured — using simulator");
+            if (activeReader == null) {
+                activeReader = RFIDReaderFactory.create(
+                    MiraIRFIDReader.ReaderType.SIMULATOR, "");
+            }
+            return activeReader;
+        }
+        
+        // ✅ إنشاء القارئ الحقيقي
+        if (activeReader == null) {
+            activeReader = RFIDReaderFactory.create(device.getType(), device.getAddress());
+        }
+        
+        return activeReader;
+    }
     
     public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         this.listener = listener;
@@ -398,7 +361,39 @@ public boolean startScan() {
         }
     }
     
-    
+    /**
+     * ✅ بدء المسح - يتطلب جهاز حقيقي
+     */
+    public boolean startScan() {
+        Log.i(TAG, "🚀 RFIDManager.startScan() called");
+        
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            Log.e(TAG, "❌ Cannot start scan — RFID device not present");
+            return false;
+        }
+        
+        MiraIRFIDReader reader = getActiveReader();
+        if (reader == null) {
+            Log.e(TAG, "❌ getActiveReader() returned null");
+            return false;
+        }
+        
+        if (!reader.isConnected()) {
+            Log.d(TAG, "Reader not connected — connecting...");
+            if (!reader.initialize()) {
+                Log.e(TAG, "❌ initialize() failed");
+                return false;
+            }
+            if (!reader.connect()) {
+                Log.e(TAG, "❌ connect() failed");
+                return false;
+            }
+        }
+        
+        boolean result = reader.startScan();
+        Log.i(TAG, "startScan result: " + result);
+        return result;
+    }
     
     public void stopScan() {
         if (activeReader != null) {
@@ -407,7 +402,7 @@ public boolean startScan() {
     }
     
     public void release() {
-        unregisterTriggerKeyReceiver(); // ⚡ تحرير المستمع عند التدمير
+        unregisterTriggerKeyReceiver();
         if (activeReader != null) {
             try {
                 activeReader.stopScan();
@@ -423,7 +418,8 @@ public boolean startScan() {
     }
     
     public boolean testConnection(RFIDDevice device) {
-        MiraIRFIDReader reader = RFIDReaderFactory.create(device.getType(), device.getAddress());
+        MiraIRFIDReader reader = RFIDReaderFactory.create(device.getType(), 
+            device.getAddress());
         boolean initSuccess = reader.initialize();
         if (!initSuccess) return false;
         
