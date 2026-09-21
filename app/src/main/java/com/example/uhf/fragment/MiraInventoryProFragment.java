@@ -93,8 +93,23 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
     private static final String TAG = "MiraInventoryPro";
     
+    // ==================== ✅ Debounce (أداء) ====================
+private static final long HAPTIC_DEBOUNCE_MS = 150;
+private static final long FLASH_DEBOUNCE_MS = 120;
+
+private long lastHapticTime = 0;
+private long lastFlashTime = 0;
+private SoundManager.FeedbackType lastFeedbackType = null;
+    
     // ==================== ثوابت الأداء ====================
-    private static final long UI_UPDATE_THROTTLE_MS = 200;
+    // ✅ Adaptive Throttle
+private static final long UI_UPDATE_THROTTLE_MIN_MS = 100;   // جرد صغير
+private static final long UI_UPDATE_THROTTLE_MEDIUM_MS = 200; // جرد متوسط
+private static final long UI_UPDATE_THROTTLE_MAX_MS = 350;   // جرد كبير
+
+private static final int ITEMS_COUNT_SMALL = 200;
+private static final int ITEMS_COUNT_MEDIUM = 800;
+
     private static final long SIMULATION_INITIAL_DELAY_MS = 500;
     private static final long SIMULATION_MIN_DELAY_MS = 150;
     private static final long SIMULATION_MAX_ADDITIONAL_DELAY_MS = 350;
@@ -512,6 +527,21 @@ try {
     // ✅ تم نقلها إلى InventoryPersistenceManager
     // لا حاجة لفعل شيء هنا
     Log.d(TAG, "initDatabase: handled by PersistenceManager");
+}
+
+/**
+ * ✅ حساب Throttle المناسب بناءً على عدد القطع
+ */
+private long getAdaptiveUiThrottle() {
+    int count = scannedItemsDisplayList.size();
+    
+    if (count < ITEMS_COUNT_SMALL) {
+        return UI_UPDATE_THROTTLE_MIN_MS;    // 100ms
+    } else if (count < ITEMS_COUNT_MEDIUM) {
+        return UI_UPDATE_THROTTLE_MEDIUM_MS;  // 200ms
+    } else {
+        return UI_UPDATE_THROTTLE_MAX_MS;    // 350ms
+    }
 }
     /**
      * الحصول على معرف الجهاز بأمان
@@ -1482,10 +1512,10 @@ private void updateLastScan(String epc, int rssi) {
 private void scheduleUiUpdate() {
     if (!pendingUiUpdate && !isFragmentDestroyed) {
         pendingUiUpdate = true;
-        mainThreadHandler.postDelayed(uiUpdateRunnable, UI_UPDATE_THROTTLE_MS);
+        // ✅ استخدام Throttle الديناميكي
+        mainThreadHandler.postDelayed(uiUpdateRunnable, getAdaptiveUiThrottle());
     }
 }
-
 /**
  * معالجات RFID
  */
@@ -1660,7 +1690,9 @@ private void startScanning() {
 }
 aggregateTotalWeight = 0;
 aggregateTotalValue = 0;
-
+lastHapticTime = 0;
+lastFlashTime = 0;
+lastFeedbackType = null;
     if (modernAdapter != null) {
         modernAdapter.submitList(new ArrayList<>());
     }
@@ -1949,6 +1981,10 @@ public void stopScanning() {
                     tvInventoryStatus.setText(isArabic ? "📡 تم إيقاف الجرد" : 
                         "📡 Scan stopped");
                 }
+                
+                lastHapticTime = 0;
+                lastFlashTime = 0;
+                lastFeedbackType = null;
                 
                 Toast.makeText(requireContext(), 
                     isArabic ? "🛑 تم إيقاف المسح" : "🛑 Scan stopped", 
@@ -3440,6 +3476,15 @@ private void initVibrator() {
  */
 private void hapticFeedback(SoundManager.FeedbackType type) {
     if (vibrator == null || !vibrator.hasVibrator()) return;
+    
+    // ✅ Debounce
+    long now = System.currentTimeMillis();
+    if (now - lastHapticTime < HAPTIC_DEBOUNCE_MS && type == lastFeedbackType) {
+        return;
+    }
+    lastHapticTime = now;
+    lastFeedbackType = type;
+    
     try {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             switch (type) {
@@ -3476,10 +3521,18 @@ private void hapticFeedback(SoundManager.FeedbackType type) {
  */
 private void flashOverlay(int colorInt) {
     if (flashOverlay == null) return;
+    
+    // ✅ Debounce
+    long now = System.currentTimeMillis();
+    if (now - lastFlashTime < FLASH_DEBOUNCE_MS) {
+        return;
+    }
+    lastFlashTime = now;
+    
     try {
         flashOverlay.setBackgroundColor(colorInt);
         flashOverlay.setAlpha(0.6f);
-
+        
         android.animation.ObjectAnimator anim = 
             android.animation.ObjectAnimator.ofFloat(flashOverlay, "alpha", 0.6f, 0f);
         anim.setDuration(280);
@@ -3488,7 +3541,6 @@ private void flashOverlay(int colorInt) {
         Log.e(TAG, "flashOverlay error", e);
     }
 }
-
 /**
  * تحديث بطاقة "آخر مسح"
  */
@@ -3533,42 +3585,99 @@ private void updateLastScanCard(ScannedItemDisplay item, boolean isDuplicate) {
 /**
  * عرض قائمة الممسوحات في Dialog
  */
+/**
+ * ✅ عرض قائمة الممسوحات — محسّن مع Pagination
+ */
+private static final int ITEMS_LIST_PAGE_SIZE = 100;
+
 private void showItemsListDialog() {
     try {
         if (!isAdded() || isFragmentDestroyed) return;
-
-        int count = scannedItemsDisplayList.size();
-        if (count == 0) {
+        
+        final int totalCount = scannedItemsDisplayList.size();
+        if (totalCount == 0) {
             Toast.makeText(requireContext(),
                 isArabic ? "لا توجد مسوحات بعد" : "No scans yet",
                 Toast.LENGTH_SHORT).show();
             return;
         }
-
-        // قائمة بالقطع الممسوحة
-        String[] titles = new String[count];
-        synchronized (scannedItemsDisplayList) {
-            for (int i = 0; i < count; i++) {
-                ScannedItemDisplay item = scannedItemsDisplayList.get(i);
-                titles[i] = String.format("%s\n%s • %s • %.2fg • 📶%d",
-                    item.title, item.epc, item.karat, item.weight, item.rssi);
-            }
+        
+        // ✅ إذا القائمة صغيرة → عرض مباشر
+        if (totalCount <= ITEMS_LIST_PAGE_SIZE) {
+            showItemsListPage(0, totalCount);
+            return;
         }
-
+        
+        // ✅ إذا القائمة كبيرة → خيارات
+        int pages = (int) Math.ceil((double) totalCount / ITEMS_LIST_PAGE_SIZE);
+        String[] options = new String[pages];
+        
+        for (int i = 0; i < pages; i++) {
+            int start = i * ITEMS_LIST_PAGE_SIZE + 1;
+            int end = Math.min((i + 1) * ITEMS_LIST_PAGE_SIZE, totalCount);
+            options[i] = isArabic 
+                ? String.format("📋 القطع %d - %d (من %d)", start, end, totalCount)
+                : String.format("📋 Items %d - %d (of %d)", start, end, totalCount);
+        }
+        
         new MaterialAlertDialogBuilder(requireContext())
-            .setTitle((isArabic ? "📋 الممسوحات (" : "📋 Scans (") + count + ")")
-            .setItems(titles, (d, which) -> {
-                ScannedItemDisplay item = scannedItemsDisplayList.get(which);
-                if (dialogsManager != null) {
-                    dialogsManager.showItemOptionsDialog(item);
-                }
+            .setTitle((isArabic ? "📋 الممسوحات (" : "📋 Scans (") + totalCount + ")")
+            .setItems(options, (d, which) -> {
+                int startIndex = which * ITEMS_LIST_PAGE_SIZE;
+                int endIndex = Math.min(startIndex + ITEMS_LIST_PAGE_SIZE, totalCount);
+                showItemsListPage(startIndex, endIndex);
             })
             .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
             .show();
-
+        
     } catch (Exception e) {
         Log.e(TAG, "showItemsListDialog error", e);
     }
 }
 
+/**
+ * ✅ عرض صفحة واحدة من القائمة
+ */
+private void showItemsListPage(int startIndex, int endIndex) {
+    try {
+        if (!isAdded() || isFragmentDestroyed) return;
+        if (startIndex < 0 || endIndex > scannedItemsDisplayList.size()) return;
+        
+        int pageSize = endIndex - startIndex;
+        if (pageSize <= 0) return;
+        
+        // ✅ بناء قائمة الصفحة فقط
+        String[] titles = new String[pageSize];
+        final List<ScannedItemDisplay> pageItems = new ArrayList<>(pageSize);
+        
+        synchronized (scannedItemsDisplayList) {
+            for (int i = 0; i < pageSize; i++) {
+                ScannedItemDisplay item = scannedItemsDisplayList.get(startIndex + i);
+                pageItems.add(item);
+                titles[i] = String.format("%s\n%s • %s • %.2fg • 📶%d",
+                    item.title, item.epc, item.karat, item.weight, item.rssi);
+            }
+        }
+        
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle((isArabic ? "📋 الممسوحات (" : "📋 Scans (") 
+                      + (startIndex + 1) + "-" + endIndex 
+                      + (isArabic ? " من " : " of ") + scannedItemsDisplayList.size() + ")")
+            .setItems(titles, (d, which) -> {
+                if (which >= 0 && which < pageItems.size()) {
+                    ScannedItemDisplay item = pageItems.get(which);
+                    if (dialogsManager != null) {
+                        dialogsManager.showItemOptionsDialog(item);
+                    }
+                }
+            })
+            .setPositiveButton(isArabic ? "رجوع" : "Back", 
+                (d, w) -> showItemsListDialog())  // ✅ رجوع للصفحات
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "showItemsListPage error", e);
+    }
+}
 } // ✅ نهاية الكلاس MiraInventoryProFragment
