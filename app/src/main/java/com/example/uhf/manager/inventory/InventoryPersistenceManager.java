@@ -302,6 +302,62 @@ public class InventoryPersistenceManager {
         });
     }
 
+    // ==================== 4. Fetch Archive Reports ====================
+
+    public void fetchArchiveReports(MiraApiClient apiClient,
+                                     int branchId,
+                                     ArchiveCallback callback) {
+        if (executor == null || executor.isShutdown() || apiClient == null) {
+            if (callback != null) callback.onArchiveError("Prerequisites not met");
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                List<InventoryReport> reports = new ArrayList<>();
+
+                MiraApiClient.ApiResponse response =
+                        apiClient.getInventoryReports(branchId, 1, 50);
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject dataObj = response.data.optJSONObject("data");
+                    JSONArray sessions = null;
+
+                    if (dataObj != null) {
+                        sessions = dataObj.optJSONArray("sessions");
+                    } else {
+                        sessions = response.data.optJSONArray("sessions");
+                    }
+
+                    if (sessions != null) {
+                        for (int i = 0; i < sessions.length(); i++) {
+                            JSONObject obj = sessions.getJSONObject(i);
+
+                            InventoryReport report = new InventoryReport(
+                                obj.optInt("id", i + 1),
+                                obj.optString("client_session_id",
+                                    obj.optString("session_id", "SESS-" + (i + 1))),
+                                obj.optString("started_at",
+                                    obj.optString("created_at", "")),
+                                obj.optInt("expected_count", 0),
+                                obj.optInt("unique_items_found",
+                                    obj.optInt("scanned_count", 0)),
+                                obj.optInt("missing_count", 0),
+                                obj.optString("status", "completed")
+                            );
+                            reports.add(report);
+                        }
+                    }
+                }
+
+                if (callback != null) callback.onArchiveLoaded(reports);
+
+            } catch (Exception e) {
+                Log.e(TAG, "fetchArchiveReports error: " + e.getMessage());
+                if (callback != null) callback.onArchiveError(e.getMessage());
+            }
+        });
+    }
 
     // ==================== 5. Fetch Snapshots ====================
 
