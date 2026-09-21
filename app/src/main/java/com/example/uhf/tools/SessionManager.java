@@ -6,6 +6,10 @@ import android.util.Log;
 /**
  * SessionManager - كلاس التوافق الوسيط
  * 
+ * ✅ v2.0 — تحسين الأداء:
+ * - استخدام SecureSessionManager.getInstance() بدلاً من new
+ * - هذا يمنع ANR بسبب إعادة تهيئة EncryptedSharedPreferences
+ * 
  * يحافظ على الواجهة القديمة لجميع الاستدعاءات في التطبيق،
  * لكنه يوجهها داخليًا إلى SecureSessionManager الآمن.
  * 
@@ -27,7 +31,9 @@ public class SessionManager {
 
     public SessionManager(Context context) {
         this.context = context.getApplicationContext();
-        this.secureManager = new SecureSessionManager(context);
+        // ✅ استخدام Singleton — لا يُنشئ EncryptedSharedPreferences جديد
+        this.secureManager = SecureSessionManager.getInstance(context);
+        Log.d(TAG, "SessionManager created (using Singleton)");
     }
 
     public boolean isLoggedIn() {
@@ -106,46 +112,44 @@ public class SessionManager {
     public boolean isManager() {
         return secureManager.isManager();
     }
-// ==================== بيانات المستخدم ====================
 
-public String getDisplayName() {
-    return secureManager.getDisplayName();
-}
+    // ==================== بيانات المستخدم ====================
 
-public void setDisplayName(String displayName) {
-    secureManager.setDisplayName(displayName);
-}
+    public String getDisplayName() {
+        return secureManager.getDisplayName();
+    }
 
-public int getUserId() {
-    return secureManager.getUserId();
-}
+    public void setDisplayName(String displayName) {
+        secureManager.setDisplayName(displayName);
+    }
 
-public void setUserId(int userId) {
-    secureManager.setUserId(userId);
-}
+    public int getUserId() {
+        return secureManager.getUserId();
+    }
 
-// ✅ Phone — يقرأ من SecureSessionManager الحقيقي
-public String getPhone() {
-    return secureManager.getPhone();
-}
+    public void setUserId(int userId) {
+        secureManager.setUserId(userId);
+    }
 
-public void setPhone(String phone) {
-    secureManager.setPhone(phone);
-}
+    public String getPhone() {
+        return secureManager.getPhone();
+    }
 
-// ✅ Email — جديد
-public String getEmail() {
-    return secureManager.getEmail();
-}
+    public void setPhone(String phone) {
+        secureManager.setPhone(phone);
+    }
 
-public void setEmail(String email) {
-    secureManager.setEmail(email);
-}
+    public String getEmail() {
+        return secureManager.getEmail();
+    }
 
-// ✅ Username — لتعيين اسم المستخدم
-public void setUsername(String username) {
-    secureManager.setUsername(username);
-}
+    public void setEmail(String email) {
+        secureManager.setEmail(email);
+    }
+
+    public void setUsername(String username) {
+        secureManager.setUsername(username);
+    }
 
     // ==================== عنوان الخادم ====================
     
@@ -279,53 +283,40 @@ public void setUsername(String username) {
 
     // ==================== معرف الفرع ====================
     
-    /**
-     * ✅ الحصول على معرف الفرع الحالي
-     */
-    // ==================== معرف الفرع ====================
-
-/**
- * ✅ الحصول على معرف الفرع الحالي
- */
-public int getBranchId() {
-    try {
-        // ✅ الطريقة 1: من SecureSessionManager (الملف العادي userPrefs)
-        int branchId = secureManager.getBranchId();
-        if (branchId > 0) {
-            return branchId;
+    public int getBranchId() {
+        try {
+            int branchId = secureManager.getBranchId();
+            if (branchId > 0) {
+                return branchId;
+            }
+            
+            branchId = secureManager.getLastBiometricBranchId();
+            if (branchId > 0) {
+                return branchId;
+            }
+            
+            return -1;
+        } catch (Exception e) {
+            Log.e(TAG, "getBranchId error: " + e.getMessage());
+            return -1;
         }
-        
-        // ✅ الطريقة 2: من البيانات البيومترية
-        branchId = secureManager.getLastBiometricBranchId();
-        if (branchId > 0) {
-            return branchId;
+    }
+
+    public void setBranchId(int branchId) {
+        try {
+            secureManager.setBranchId(branchId);
+        } catch (Exception e) {
+            Log.e(TAG, "setBranchId error: " + e.getMessage());
         }
-        
-        return -1;
-    } catch (Exception e) {
-        Log.e(TAG, "getBranchId error: " + e.getMessage());
-        return -1;
     }
-}
 
-/**
- * ✅ حفظ معرف الفرع الحالي
- */
-public void setBranchId(int branchId) {
-    try {
-        secureManager.setBranchId(branchId);
-    } catch (Exception e) {
-        Log.e(TAG, "setBranchId error: " + e.getMessage());
+    public void saveAuthToken(String token) {
+        secureManager.saveAuthToken(token);
     }
-}
-public void saveAuthToken(String token) {
-    secureManager.saveAuthToken(token);
-}
 
-public void saveAuthToken(String token, long expiresInSeconds) {
-    secureManager.saveAuthToken(token, expiresInSeconds);
-}
-
+    public void saveAuthToken(String token, long expiresInSeconds) {
+        secureManager.saveAuthToken(token, expiresInSeconds);
+    }
 
     // ==================== تسجيل الخروج ====================
     
@@ -338,7 +329,7 @@ public void saveAuthToken(String token, long expiresInSeconds) {
         logoutUser();
     }
 
-    // ==================== وظائف مساعدة لحماية الأوفلاين ====================
+    // ==================== وظائف مساعدة ====================
     
     public void refreshProfileData() {
         // يمكن إضافة منطق إضافي هنا إذا لزم
@@ -348,65 +339,56 @@ public void saveAuthToken(String token, long expiresInSeconds) {
         secureManager.clearAll();
     }
     
-    /**
-     * مسح التوكن نهائياً
-     */
     public void clearAuthToken() {
         secureManager.clearAuthToken();
     }
 
-    /**
-     * مسح الجلسة بالكامل
-     */
     public void clearSessionCompletely() {
         secureManager.clearSessionCompletely();
     }
     
     // ═══════════════════════════════════════════════════════
-// ✅ Auto-Lock Wrappers
-// ═══════════════════════════════════════════════════════
+    // ✅ Auto-Lock Wrappers
+    // ═══════════════════════════════════════════════════════
 
-public void setLastAppActiveTime(long timestamp) {
-    secureManager.setLastAppActiveTime(timestamp);
-}
+    public void setLastAppActiveTime(long timestamp) {
+        secureManager.setLastAppActiveTime(timestamp);
+    }
 
-public long getLastAppActiveTime() {
-    return secureManager.getLastAppActiveTime();
-}
+    public long getLastAppActiveTime() {
+        return secureManager.getLastAppActiveTime();
+    }
 
-public void touchActivity() {
-    secureManager.touchActivity();
-}
+    public void touchActivity() {
+        secureManager.touchActivity();
+    }
 
-public void setSessionLocked(boolean locked) {
-    secureManager.setSessionLocked(locked);
-}
+    public void setSessionLocked(boolean locked) {
+        secureManager.setSessionLocked(locked);
+    }
 
-public boolean isSessionLocked() {
-    return secureManager.isSessionLocked();
-}
+    public boolean isSessionLocked() {
+        return secureManager.isSessionLocked();
+    }
 
-public boolean isInactivityTimeout(long timeoutMs) {
-    return secureManager.isInactivityTimeout(timeoutMs);
-}
+    public boolean isInactivityTimeout(long timeoutMs) {
+        return secureManager.isInactivityTimeout(timeoutMs);
+    }
 
-/**
- * ✅ إنشاء جلسة دخول مع مدة صلاحية مخصصة
- */
-public void createLoginSession(String username, String role, String token, 
-                                String serverUrl, long expiresInSeconds) {
-    secureManager.createLoginSession(username, role, token, serverUrl, expiresInSeconds);
-    Log.d(TAG, "Login session created for user: " + username 
-            + " (expires in " + expiresInSeconds + "s)");
-}
+    public void createLoginSession(String username, String role, String token, 
+                                    String serverUrl, long expiresInSeconds) {
+        secureManager.createLoginSession(username, role, token, serverUrl, expiresInSeconds);
+        Log.d(TAG, "Login session created for user: " + username 
+                + " (expires in " + expiresInSeconds + "s)");
+    }
 
-public void unlockSession() {
-    secureManager.unlockSession();
-}
+    public void unlockSession() {
+        secureManager.unlockSession();
+    }
 
-public void resetAutoLock() {
-    secureManager.resetAutoLock();
-}
+    public void resetAutoLock() {
+        secureManager.resetAutoLock();
+    }
 
     // ==================== إنشاء جلسة دخول ====================
 
