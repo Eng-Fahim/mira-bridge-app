@@ -348,7 +348,7 @@ if (heroCard != null) {
                         activity -> handleRecentActivityClick(activity));
                 rvRecentActivity.setAdapter(recentActivityAdapter);
                 rvRecentActivity.setHasFixedSize(false);
-                rvRecentActivity.setNestedScrollingEnabled(false);
+                
             }
 
             if (tvViewAllActivity != null) {
@@ -1172,25 +1172,35 @@ applySalesVisibility();
 private void fetchRecentActivity() {
     if (apiClient == null || !isAdded()) return;
 
-    // 1. عرض الكاش فوراً
+    // ═══════════════════════════════════════════════════════
+    // 1. عرض الكاش فوراً (بدون تأخير)
+    // ═══════════════════════════════════════════════════════
     if (activityCache != null) {
         JSONArray cached = activityCache.load();
         if (cached != null && cached.length() > 0) {
             updateRecentActivityUI(cached);
+            Log.d(TAG, "✅ Displayed " + cached.length() + " activities from cache");
         }
     }
 
-    // 2. جلب من السيرفر فقط إذا مر وقت كافٍ (مثلاً 5 دقائق)
-    long lastFetch = activityCache != null ? activityCache.getLastFetchTime() : 0;
-    if (System.currentTimeMillis() - lastFetch < 5 * 60 * 1000) {
+    // ═══════════════════════════════════════════════════════
+    // 2. إذا كان الكاش لا يزال صالحاً (أقل من دقيقتين)، لا نجلب من السيرفر
+    // ═══════════════════════════════════════════════════════
+    if (activityCache != null && activityCache.isValid()) {
         Log.d(TAG, "⏳ Activity cache is still valid, skipping network call");
         return;
     }
 
+    // ═══════════════════════════════════════════════════════
+    // 3. جلب من السيرفر في الخلفية
+    // ═══════════════════════════════════════════════════════
     sharedExecutor.execute(() -> {
         try {
-            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 10);
+            int branchId = branchesManager != null
+                    ? branchesManager.getActiveBranchId() : 0;
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.getUnifiedActivity(branchId, 10);
 
             mainHandler.post(() -> {
                 if (!isAdded() || response == null) return;
@@ -1199,9 +1209,11 @@ private void fetchRecentActivity() {
                     try {
                         JSONArray activities = response.data.optJSONArray("activities");
                         if (activities != null && activities.length() > 0) {
+                            // ✅ حفظ في الكاش (يحفظ آخر تحديث تلقائياً)
                             if (activityCache != null) {
                                 activityCache.save(activities);
                             }
+                            // ✅ تحديث الواجهة
                             updateRecentActivityUI(activities);
                         }
                     } catch (Exception e) {
@@ -1214,26 +1226,22 @@ private void fetchRecentActivity() {
         }
     });
 }
-
 /**
  * ✅ تحديث واجهة آخر العمليات
  */
 private void updateRecentActivityUI(JSONArray activities) {
     if (activities == null || recentActivityAdapter == null) return;
-    
-    // ⚠️ لا تقم بإنشاء ArrayList جديدة هنا، استخدم القائمة كما هي
-    List<JSONObject> list = new ArrayList<>();
-    int max = Math.min(activities.length(), 10);
-    for (int i = 0; i < max; i++) {
-        try {
+    try {
+        List<JSONObject> list = new ArrayList<>();
+        int max = Math.min(activities.length(), 10);
+        for (int i = 0; i < max; i++) {
             list.add(activities.getJSONObject(i));
-        } catch (JSONException e) {
-            e.printStackTrace();
         }
+        // ✅ submitList تعمل في الخلفية عبر DiffUtil
+        recentActivityAdapter.submitList(list);
+    } catch (JSONException e) {
+        logNonFatal("updateRecentActivityUI", e);
     }
-    
-    // ✅ استخدم submitList (التي تعمل في الخلفية عبر DiffUtil)
-    recentActivityAdapter.submitList(list);
 }
     /**
  * ✅ عند النقر على عملية → فتح Bottom Sheet التفاصيل
@@ -1526,17 +1534,36 @@ public void onResume() {
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
         } else if (isViewInitialized) {
-            
             updateHeader();
             syncOrgProfileFromServer(false);
-            refreshInternalData();
+            
+            // ✅ تتابع التحميل لتجنب ANR:
+            // 1) المخزون أولاً
+            fetchData();
+            
+            // 2) آخر العمليات بعد 400ms
+            mainHandler.postDelayed(this::fetchRecentActivity, 400);
+            
+            // 3) أسعار الذهب بعد 800ms
+            mainHandler.postDelayed(() -> {
+                if (!isAdded()) return;
+                long now = System.currentTimeMillis();
+                if (permissionManager != null 
+                        && permissionManager.canAccessFragment("GoldRates")) {
+                    if (lastGoldFetchTime == 0 
+                            || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                        fetchLiveGoldPrices(false);
+                    } else {
+                        displayGoldPricesFromCache();
+                    }
+                }
+            }, 800);
         }
         startAutoRefresh();
     } catch (Exception e) {
         logNonFatal("onResume", e);
     }
 }
-
     @Override
 public void onPause() {
     super.onPause();
@@ -1634,4 +1661,4 @@ public void onStop() {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-            }
+                        }
