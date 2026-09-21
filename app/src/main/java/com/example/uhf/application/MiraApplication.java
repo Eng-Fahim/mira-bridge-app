@@ -30,46 +30,35 @@ public class MiraApplication extends AppContext {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     @Override
-    public void onCreate() {
-        super.onCreate();
-        
-        instance = this;
-        
-        // ✅ 1. فقط الأشياء الخفيفة على Main Thread
-        Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
-        Log.i(TAG, "MiraApplication Started: onCreate()");
-        
-        // ✅ 2. تأجيل كل شيء آخر إلى background
-        // هذا يمنع ANR عند بدء التطبيق
-        
+public void onCreate() {
+    super.onCreate();
+    
+    instance = this;
+    
+    Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
+    
+    Log.i(TAG, "MiraApplication Started: onCreate()");
+    
+    // ✅ 1. الخفيف فقط على Main
+    initializeChainwaySdk();
+    initializeExecutors();
+    logDeviceInfo();
+    
+    // ✅ 2. الثقيل — تأجيل 300ms + على background
+    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
         new Thread(() -> {
             try {
-                // ✅ Class.forName خفيف نسبياً — يمكن تركه
-                initializeChainwaySdk();
-                initializeExecutors();
-                logDeviceInfo();
-                
-                Log.d(TAG, "✅ Background init complete");
+                initializeCoreServices();
+                initializeDatabase();
+                Log.d(TAG, "✅ Deferred init complete");
             } catch (Exception e) {
-                Log.e(TAG, "Background init error", e);
+                Log.e(TAG, "Deferred init error", e);
             }
-        }, "MiraApp-Init").start();
-        
-        // ✅ 3. الخدمات الأساسية — تأجيل 500ms (بعد استقرار الواجهة)
-        mainHandler.postDelayed(() -> {
-            new Thread(() -> {
-                try {
-                    initializeCoreServices();
-                    initializeDatabase();
-                    Log.d(TAG, "✅ Delayed init complete");
-                } catch (Exception e) {
-                    Log.e(TAG, "Delayed init error", e);
-                }
-            }, "MiraApp-Services").start();
-        }, 500);
-        
-        Log.d(TAG, "MiraApplication onCreate finished — heavy init deferred");
-    }
+        }, "Mira-Deferred-Init").start();
+    }, 300);
+    
+    Log.d(TAG, "MiraApplication onCreate finished — heavy init deferred");
+}
 
     /**
      * ✅ تهيئة Chainway SDK
