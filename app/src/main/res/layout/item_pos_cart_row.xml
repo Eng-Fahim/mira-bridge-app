@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -14,16 +15,19 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="76dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="12dp">
 
+        <!-- ==================== معلومات القطعة (يسار) ==================== -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical">
 
+            <!-- عنوان القطعة -->
             <TextView
                 android:id="@+id/tvRowItemTitle"
                 android:layout_width="match_parent"
@@ -35,15 +39,18 @@
                 android:textStyle="bold"
                 tools:text="خاتم ذهب 21K" />
 
+            <!-- EPC -->
             <TextView
                 android:id="@+id/tvRowItemEpc"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:textColor="?attr/colorOnSurfaceVariant"
+                android:textDirection="ltr"
                 android:textSize="11sp"
                 tools:text="EPC: 070045537109" />
 
+            <!-- العيار + الوزن + الحالة -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -72,21 +79,23 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- ==================== السعر (يمين) ==================== -->
         <TextView
             android:id="@+id/tvRowItemPrice"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
+            android:layout_marginEnd="8dp"
             android:textColor="?attr/colorPrimary"
             android:textSize="16sp"
             android:textStyle="bold"
             tools:text="$350.00" />
 
+        <!-- ==================== زر الحذف (أقصى اليمين) ==================== -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRowRemove"
             style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:insetLeft="0dp"
             android:insetTop="0dp"
             android:insetRight="0dp"
@@ -94,8 +103,12 @@
             android:padding="0dp"
             android:text="✕"
             android:textColor="?attr/colorError"
-            android:textSize="15sp"
+            android:textSize="16sp"
             android:textStyle="bold"
-            app:cornerRadius="18dp" />
+            android:contentDescription="@string/pos_remove_item"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:cornerRadius="20dp"
+            tools:ignore="HardcodedText" />
+
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
