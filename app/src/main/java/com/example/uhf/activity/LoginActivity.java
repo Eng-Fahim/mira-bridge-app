@@ -276,8 +276,17 @@ public class LoginActivity extends AppCompatActivity {
                 if (!url.endsWith("/")) url += "/";
                 sessionManager.setServerUrl(url);
                 MiraServerConfig.getInstance(this).setBaseUrl(url);
-                MiraApiClient.reloadInstance(getApplicationContext());
-                apiClient = MiraApiClient.getInstance(getApplicationContext());
+                
+                // ✅ إصلاح: استخدام refreshUrl بدلاً من reloadInstance
+                // هذا يضمن استخدام نفس instance مع تحديث الـ URL
+                MiraApiClient client = MiraApiClient.getInstance(getApplicationContext());
+                if (client != null) {
+                    client.refreshUrl();
+                    client.invalidateTokenCache();
+                }
+                apiClient = client;
+                
+                Log.d(TAG, "✅ Server URL saved, using same instance: " + url);
 
                 Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
                 serverConfigCard.animate().alpha(0f).setDuration(200)
@@ -597,8 +606,23 @@ public class LoginActivity extends AppCompatActivity {
         tilServerUrl.setError(null);
         showLoading(true);
 
-        MiraApiClient.reloadInstance(getApplicationContext());
+        // ═══════════════════════════════════════════════════════════════
+        // ✅✅✅ الإصلاح الجذري: لا نُعيد إنشاء MiraApiClient
+        // ═══════════════════════════════════════════════════════════════
+        // 
+        // السبب: استخدام reloadInstance() كان يُنشئ instance جديد،
+        // بينما MiraBranchesManager يحتفظ بمرجع للـ instance القديم
+        // → تعارض → طلبات مزدوجة → ANR عند Login بعد Logout
+        //
+        // الحل: استخدام نفس الـ instance دائماً + تحديث credentials
+        //
         apiClient = MiraApiClient.getInstance(getApplicationContext());
+        if (apiClient != null) {
+            // ✅ إجبار قراءة credentials الجديدة من SessionManager
+            apiClient.invalidateTokenCache();
+            apiClient.refreshUrl();  // ← تحديث URL أيضاً (احتياط)
+            Log.d(TAG, "✅ Using same MiraApiClient instance, cache invalidated");
+        }
 
         executeSafeBg(() -> {
             String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -734,7 +758,17 @@ public class LoginActivity extends AppCompatActivity {
         bm.setActiveBranch(branchId, branchName, branchCode, "", "");
         bm.setUserBranchLocked(true);
 
-        MiraApiClient.reloadInstance(appContext);
+        // ═══════════════════════════════════════════════════════════════
+        // ✅✅✅ الإصلاح: لا نُعيد إنشاء MiraApiClient — فقط نحدّث credentials
+        // ═══════════════════════════════════════════════════════════════
+        MiraApiClient client = MiraApiClient.getInstance(appContext);
+        if (client != null) {
+            // ✅ إجبار قراءة credentials الجديدة (API Key, Token, URL)
+            client.invalidateTokenCache();
+            client.refreshUrl();
+            Log.d(TAG, "✅ Token cache invalidated, using same instance");
+        }
+        
         showSuccessOverlayAndNavigate();
     }
 
