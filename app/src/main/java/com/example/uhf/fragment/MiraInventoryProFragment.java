@@ -1869,39 +1869,94 @@ private Map<String, InventoryItem> fetchCatalogFromServer() {
  * بدء مصدر القراءة
  */
 private void startReadingSource() {
-    boolean hardwareStarted = false;
+    Log.i(TAG, "🚀 startReadingSource() called");
     
-    if (rfidManager != null) {
-        try {
-            if (rfidManager.getActiveDevice() != null) {
-                MiraIRFIDReader.ReaderType deviceType = 
-                    rfidManager.getActiveDevice().getType();
-                
-                if (deviceType != MiraIRFIDReader.ReaderType.SIMULATOR) {
-                    hardwareStarted = rfidManager.startScan();
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error starting hardware scanner", e);
-        }
+    // ✅ 1. تحقق من RFIDManager
+    if (rfidManager == null) {
+        showFatalErrorDialog(
+            isArabic ? "⚠️ مدير RFID غير جاهز" : "⚠️ RFID Manager not ready",
+            isArabic ? "حاول إعادة فتح الشاشة" : "Try reopening the screen"
+        );
+        isScanning = false;
+        updateMainToggleButton(false);
+        return;
     }
     
-    if (!hardwareStarted) {
-        startSimulationLoop();
-        if (isAdded() && !isFragmentDestroyed) {
-            Toast.makeText(requireContext(), 
-                isArabic ? "🎯 بدء وضع المحاكاة" : "🎯 Simulation mode started", 
-                Toast.LENGTH_SHORT).show();
-        }
+    // ✅ 2. تحقق من الحالة الديناميكية
+    if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+        Log.w(TAG, "⚠️ RFID device not present per BaseTabFragmentActivity");
+        showFatalErrorDialog(
+            isArabic ? "❌ قارئ RFID غير متاح" : "❌ RFID Reader not available",
+            isArabic ? 
+                "تحقق من:\n" +
+                "• الجهاز مدعوم (Chainway C72)\n" +
+                "• القارئ مفعّل من إعدادات النظام\n" +
+                "• أعد تشغيل التطبيق" :
+                "Check:\n" +
+                "• Supported device (Chainway C72)\n" +
+                "• Reader enabled in system settings\n" +
+                "• Restart the app"
+        );
+        isScanning = false;
+        updateMainToggleButton(false);
+        return;
     }
     
-    // ✅ تحديث زر البدء الذكي
+    // ✅ 3. الاتصال التلقائي (اختياري - القارئ قد يكون متصلاً بالفعل)
+    boolean connected = false;
+    try {
+        connected = rfidManager.autoConnectAndBind(requireContext());
+    } catch (Exception e) {
+        Log.e(TAG, "autoConnectAndBind error", e);
+    }
+    
+    if (!connected) {
+        Log.w(TAG, "⚠️ autoConnectAndBind failed, trying direct startScan...");
+    }
+    
+    // ✅ 4. محاولة بدء القراءة
+    boolean started = false;
+    try {
+        started = rfidManager.startScan();
+    } catch (Exception e) {
+        Log.e(TAG, "startScan error", e);
+    }
+    
+    if (!started) {
+        showFatalErrorDialog(
+            isArabic ? "❌ فشل بدء القراءة" : "❌ Failed to start scanning",
+            isArabic ? 
+                "الحلول:\n" +
+                "1. تأكد أن القارئ يعمل من التطبيق الأصلي\n" +
+                "2. أعد تشغيل الجهاز\n" +
+                "3. أعد تشغيل التطبيق" :
+                "Solutions:\n" +
+                "1. Verify reader works from native app\n" +
+                "2. Restart the device\n" +
+                "3. Restart the app"
+        );
+        isScanning = false;
+        updateMainToggleButton(false);
+        return;
+    }
+    
+    Log.i(TAG, "✅ Reading source started successfully");
     updateMainToggleButton(true);
     
     if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
     if (btnArchiveReports != null) btnArchiveReports.setEnabled(false);
     
     if (soundManager != null) soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
+}
+
+private void showFatalErrorDialog(String title, String message) {
+    if (!isAdded() || isFragmentDestroyed) return;
+    new MaterialAlertDialogBuilder(requireContext())
+        .setTitle(title)
+        .setMessage(message)
+        .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+        .setCancelable(false)
+        .show();
 }
 
 /**
