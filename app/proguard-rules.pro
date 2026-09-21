@@ -1,23 +1,47 @@
 # ==================== إعدادات عامة ====================
 -keepattributes *Annotation*,Signature,Exception,InnerClasses,EnclosingMethod
--dontwarn **
+-keepattributes SourceFile,LineNumberTable
+
+# ✅ استبدال -dontwarn ** بـ قائمة محددة
+-dontwarn com.rscja.**
+-dontwarn com.chainway.**
+-dontwarn org.apache.**
+-dontwarn javax.**
+-dontwarn kotlin.**
+-dontwarn kotlinx.**
+-dontwarn org.brotli.**
+-dontwarn com.google.mlkit.**
+-dontwarn com.google.zxing.**
+-dontwarn com.journeyapps.**
+-dontwarn com.bumptech.glide.**
+-dontwarn androidx.camera.**
+
+# ==================== 🔴 حماية Native Methods (حرج!) ====================
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# ==================== 🔴 حماية Chainway SDK كاملاً ====================
+-keep class com.rscja.** { *; }
+-keepclassmembers class com.rscja.** { *; }
+-keep class com.rscja.deviceapi.RFIDWithUHFUART { *; }
+-keep class com.rscja.deviceapi.RFIDWithUHFUART$* { *; }
+-keep class com.rscja.deviceapi.entity.** { *; }
+-keep class com.chainway.** { *; }
+-keepclassmembers class com.chainway.** { *; }
 
 # ==================== حماية BroadcastReceiver ====================
 -keepclassmembers class * extends android.content.BroadcastReceiver {
     public void onReceive(android.content.Context, android.content.Intent);
 }
--keep class android.content.BroadcastReceiver { *; }
--keep class com.example.uhf.fragment.MiraDashboardFragment$** { *; }
--keep class com.example.uhf.fragment.MiraSalesHistoryFragment$** { *; }
--keep class com.example.uhf.fragment.MiraPosFragment$** { *; }
--keep class com.example.uhf.fragment.MiraIdentityStudioFragment$** { *; }
--keep class com.example.uhf.fragment.MiraAllActivitiesFragment$** { *; }
+-keep class com.example.uhf.MiraRfid.TriggerKeyReceiver { *; }
+-keep class com.example.uhf.BootBroadcastReceiver { *; }
 
-# ==================== حماية جميع Fragments ====================
+# ==================== حماية Fragments ====================
 -keep class com.example.uhf.fragment.** { *; }
 -keepclassmembers class com.example.uhf.fragment.** { *; }
 
-# ==================== حماية SessionManager & SecureSessionManager ====================
+# ==================== حماية SessionManager ====================
 -keep class com.example.uhf.tools.SessionManager { *; }
 -keep class com.example.uhf.tools.SecureSessionManager { *; }
 -keep class com.example.uhf.tools.SecureSessionManager$Role { *; }
@@ -25,6 +49,7 @@
 -keep class com.example.uhf.tools.UIHelper { *; }
 -keep class com.example.uhf.tools.CertificatePinningManager { *; }
 -keep class com.example.uhf.tools.RecentActivityCache { *; }
+-keep class com.example.uhf.tools.DeviceDetector { *; }
 
 # ==================== حماية MiraApiClient ====================
 -keep class com.example.uhf.api.MiraApiClient { *; }
@@ -32,38 +57,20 @@
 -keep class com.example.uhf.api.MiraApiClient$ApiCallback { *; }
 
 # ==================== حماية Managers ====================
--keep class com.example.uhf.manager.MiraBranchesManager { *; }
--keep class com.example.uhf.manager.MiraBranchesManager$* { *; }
--keep class com.example.uhf.manager.PermissionManager { *; }
--keep class com.example.uhf.manager.MiraPriceManager { *; }
--keep class com.example.uhf.manager.MiraPriceManager$* { *; }
--keep class com.example.uhf.manager.MiraOrgProfileManager { *; }
--keep class com.example.uhf.manager.MiraOrgProfileManager$* { *; }
--keep class com.example.uhf.manager.MiraServerConfig { *; }
--keep class com.example.uhf.manager.MiraQuickAccessSettings { *; }
--keep class com.example.uhf.manager.MiraQuickAccessSettings$* { *; }
--keep class com.example.uhf.manager.MiraLocalItemCache { *; }
--keep class com.example.uhf.manager.MiraItemSyncManager { *; }
--keep class com.example.uhf.manager.MiraItemSyncManager$* { *; }
+-keep class com.example.uhf.manager.** { *; }
+-keepclassmembers class com.example.uhf.manager.** { *; }
 
 # ==================== حماية Activities ====================
 -keep class com.example.uhf.activity.** { *; }
 -keepclassmembers class com.example.uhf.activity.** { *; }
 
-# ==================== حماية Intent & IntentFilter ====================
+# ==================== حماية Intent & Broadcast ====================
 -keep class android.content.Intent { *; }
 -keep class android.content.IntentFilter { *; }
--keep class android.content.Context { *; }
--keep class android.content.ContextCompat { *; }
 
 # ==================== حماية SharedPreferences ====================
--keep class android.content.SharedPreferences { *; }
--keep class android.content.SharedPreferences$* { *; }
-
-# ==================== حماية EncryptedSharedPreferences ====================
 -keep class androidx.security.crypto.** { *; }
 -keep class com.google.crypto.tink.** { *; }
--dontwarn com.google.crypto.tink.**
 
 # ==================== حماية JSON ====================
 -keep class org.json.** { *; }
@@ -79,47 +86,32 @@
     *** *put*(...);
 }
 
-# ==================== حماية النماذج (Models) ====================
+# ==================== حماية Models ====================
 -keep class com.example.uhf.model.** { *; }
 -keepclassmembers class com.example.uhf.model.** { <fields>; }
--keep class com.mira.jewelry.enterprise.models.** { *; }
--keepclassmembers class com.mira.jewelry.enterprise.models.** { <fields>; }
--keepclassmembers class com.mira.jewelry.enterprise.data.** { <fields>; }
 
-# ==================== حماية POS Checkout ====================
--keep class com.example.uhf.dialog.POSCheckoutDialog { *; }
--keep class com.example.uhf.dialog.POSCheckoutDialog$* { *; }
-
-# ==================== حماية Adapters ====================
+# ==================== حماية Adapters & Dialogs ====================
 -keep class com.example.uhf.adapter.** { *; }
 -keepclassmembers class com.example.uhf.adapter.** { *; }
+-keep class com.example.uhf.dialog.** { *; }
+-keepclassmembers class com.example.uhf.dialog.** { *; }
 
 # ==================== حماية Engine ====================
 -keep class com.example.uhf.engine.** { *; }
 -keepclassmembers class com.example.uhf.engine.** { *; }
 
-# ==================== حماية RFID ====================
+# ==================== حماية MiraRfid كاملاً ====================
 -keep class com.example.uhf.MiraRfid.** { *; }
 -keepclassmembers class com.example.uhf.MiraRfid.** { *; }
--keep class com.hsm.** { *; }
--keep class com.rscja.deviceapi.** { *; }
--keep class com.imagealgorithmlab.** { *; }
 
-# ==================== ZXing & MLKit ====================
--keep class com.journeyapps.barcodescanner.** { *; }
--keep class com.google.zxing.** { *; }
--keep class com.google.mlkit.vision.barcode.** { *; }
--dontwarn com.journeyapps.barcodescanner.**
--dontwarn com.google.zxing.**
--dontwarn com.google.mlkit.vision.**
-
-
-# ==================== Room Database ====================
+# ==================== Room ====================
 -keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
 -keepclassmembers class * {
     @androidx.room.* <fields>;
     @androidx.room.* <methods>;
 }
+-dontwarn androidx.room.paging.**
 
 # ==================== Glide ====================
 -keep public class * implements com.bumptech.glide.module.GlideModule
@@ -128,38 +120,32 @@
 
 # ==================== CameraX ====================
 -keep class androidx.camera.** { *; }
--dontwarn androidx.camera.**
 
 # ==================== Biometric ====================
 -keep class androidx.biometric.** { *; }
--dontwarn androidx.biometric.**
-
-# ✅ ✅ ✅ تم حذف قسم Apache POI بالكامل ✅ ✅ ✅
 
 # ==================== MPAndroidChart ====================
 -keep class com.github.mikephil.charting.** { *; }
--dontwarn com.github.mikephil.charting.**
 
 # ==================== Coroutines ====================
 -keep class kotlinx.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
 
 # ==================== Desugaring ====================
 -keep class j$.time.** { *; }
--dontwarn j$.time.**
 
-# ==================== حماية عامة للحقول getters و setters ====================
+# ==================== Getters & Setters ====================
 -keepclassmembers class * {
     *** get*();
     *** set*(***);
 }
 
-# ==================== إزالة سجلات Log في نسخة Release ====================
--assumenosideeffects class android.util.Log {
-    public static boolean isLoggable(java.lang.String, int);
-    public static int v(...);
-    public static int d(...);
-    public static int i(...);
-    public static int w(...);
-    public static int e(...);
-}
+# ==================== Log removal في Release ====================
+# (مؤقتاً معطّل — سنُفعّله بعد نجاح الاختبار)
+# -assumenosideeffects class android.util.Log {
+#     public static boolean isLoggable(java.lang.String, int);
+#     public static int v(...);
+#     public static int d(...);
+#     public static int i(...);
+#     public static int w(...);
+#     public static int e(...);
+# }
