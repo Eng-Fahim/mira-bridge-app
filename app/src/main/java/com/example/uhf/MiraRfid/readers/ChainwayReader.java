@@ -6,34 +6,43 @@ import android.os.Build;
 import android.util.Log;
 
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
+import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * قارئ Chainway حقيقي - محسّن ومُحصّن ضد تسريب الذاكرة وأخطاء المزامنة
+ * ✅ ChainwayReader v3.0 — النسخة النهائية المُحصّنة
  * 
- * ✅ الإصدار 2.0 — تصحيحات جوهرية:
- * - setTagLockState: Lock Code صحيح لكل بنك (EPC Gen2 compliant)
- * - writeEpc: توحيد كلمة المرور الافتراضية
- * - writeData: حساب طول الكلمات الصحيح
- * - readData: حماية من null
- * - lockTag/unlockTag: استخدام Bank_EPC الصحيح
+ * التغييرات الجذرية:
+ * - استخدم isRfidDevicePresent() بدلاً من الثابت القديم
+ * - استخدم sSharedReader (قارئ مشترك)
+ * - Thread leak prevention في startScan()
+ * - AtomicBoolean لـ isScanning
+ * - تحقق دقيق قبل كل عملية
+ * - رسائل خطأ واضحة
  */
 public class ChainwayReader implements MiraIRFIDReader {
     
     private static final String TAG = "ChainwayReader";
     private static final String PREFS_NAME = "mira_rfid_dynamic_settings";
     
-    // ✅ كلمة المرور الافتراضية للشرائح الخام
+    // ✅ كلمة المرور الافتراضية
     private static final String DEFAULT_PWD = "00000000";
+    
+    // ✅ timeout للاتصال
+    private static final int INIT_TIMEOUT_MS = 8000;
+    private static final int START_SCAN_TIMEOUT_MS = 5000;
     
     private Context context;
     private RFIDWithUHFUART reader;
     private OnTagReadListener listener;
-    private volatile boolean isScanning = false;
+    
+    // ✅ استخدام AtomicBoolean للأمان
+    private final AtomicBoolean isScanning = new AtomicBoolean(false);
     private volatile boolean isConnected = false;
     
     // إعدادات ديناميكية
@@ -60,7 +69,11 @@ public class ChainwayReader implements MiraIRFIDReader {
 
     private synchronized void ensureExecutor() {
         if (scanExecutor == null || scanExecutor.isShutdown() || scanExecutor.isTerminated()) {
-            scanExecutor = Executors.newSingleThreadExecutor();
+            scanExecutor = Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "Chainway-ScanLoop");
+                t.setDaemon(true);
+                return t;
+            });
         }
     }
     
@@ -92,14 +105,6 @@ public class ChainwayReader implements MiraIRFIDReader {
             .apply();
     }
     
-    // =========================================================================
-    // 🔧 دالة مساعدة: توحيد كلمة المرور
-    // =========================================================================
-    
-    /**
-     * ✅ توحيد كلمة المرور: null/empty → "00000000"
-     * تقليم + تحويل لحالة أحرف كبيرة + إزالة المسافات
-     */
     private String normalizePwd(String pwdStr) {
         if (pwdStr == null || pwdStr.trim().isEmpty()) {
             return DEFAULT_PWD;
@@ -113,22 +118,81 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public boolean initialize() {
-        if (context == null) return false;
+        if (context == null) {
+            Log.e(TAG, "❌ Context is null");
+            return false;
+        }
+        
         try {
+            // ✅ استخدم القارئ المشترك إذا كان متاحاً
+            RFIDWithUHFUART sharedReader = BaseTabFragmentActivity.getSharedReader();
+            if (sharedReader != null) {
+                Log.i(TAG, "✅ Using shared reader instance");
+                this.reader = sharedReader;
+                this.isConnected = true;
+                applySupportedSettings();
+                return true;
+            }
+            
+            // ✅ أنشئ قارئ جديد
             if (reader == null) {
                 reader = RFIDWithUHFUART.getInstance();
             }
-            boolean success = reader.init(context);
+            
+            if (reader == null) {
+                Log.e(TAG, "❌ RFIDWithUHFUART.getInstance() returned null");
+                return false;
+            }
+            
+            // ✅ init مع timeout
+            final boolean[] initResult = new boolean[1];
+            final Object initLock = new Object();
+            
+            Thread initThread = new Thread(() -> {
+                try {
+                    initResult[0] = reader.init(context);
+                } catch (Throwable e) {
+                    Log.e(TAG, "init thread error", e);
+                    initResult[0] = false;
+                } finally {
+                    synchronized (initLock) {
+                        initLock.notifyAll();
+                    }
+                }
+            }, "Chainway-Init");
+            initThread.setDaemon(true);
+            initThread.start();
+            
+            synchronized (initLock) {
+                try {
+                    initLock.wait(INIT_TIMEOUT_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+            
+            if (initThread.isAlive()) {
+                Log.e(TAG, "❌ Init timeout after " + INIT_TIMEOUT_MS + "ms");
+                return false;
+            }
+            
+            boolean success = initResult[0];
             
             if (success) {
+                isConnected = true;
                 applySupportedSettings();
                 Log.i(TAG, "✅ Chainway initialized successfully");
             } else {
+                isConnected = false;
                 Log.e(TAG, "❌ Chainway init failed");
             }
+            
             return success;
+            
         } catch (Exception e) {
-            Log.e(TAG, "Init error", e);
+            Log.e(TAG, "❌ Init exception", e);
+            isConnected = false;
             return false;
         }
     }
@@ -137,27 +201,42 @@ public class ChainwayReader implements MiraIRFIDReader {
         if (reader == null) return;
         try {
             reader.setPower(powerDbm);
+            Log.d(TAG, "⚡ Power applied: " + powerDbm + " dBm");
         } catch (Exception e) {
-            Log.e(TAG, "Error applying settings", e);
+            Log.w(TAG, "⚠️ Failed to apply power: " + e.getMessage());
         }
     }
     
     @Override
     public boolean connect() {
         try {
-            if (reader == null) {
-                initialize();
+            // ✅ تحقق من الحالة الديناميكية
+            if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+                Log.e(TAG, "❌ RFID device not present");
+                return false;
             }
+            
+            if (reader == null) {
+                if (!initialize()) {
+                    return false;
+                }
+            }
+            
             isConnected = (reader != null);
+            
             if (isConnected) {
                 applySupportedSettings();
                 if (listener != null) {
                     listener.onConnectionChanged(true);
                 }
+                Log.i(TAG, "✅ Connected");
             }
+            
             return isConnected;
+            
         } catch (Exception e) {
-            Log.e(TAG, "Connection error", e);
+            Log.e(TAG, "❌ Connection error", e);
+            isConnected = false;
             return false;
         }
     }
@@ -178,92 +257,138 @@ public class ChainwayReader implements MiraIRFIDReader {
             scanExecutor.shutdownNow();
             scanExecutor = null;
         }
-        try {
-            if (reader != null) {
+        // ✅ لا نحرر reader إذا كان مشتركاً
+        if (reader != null && reader != BaseTabFragmentActivity.getSharedReader()) {
+            try {
                 reader.free();
-                reader = null;
+            } catch (Exception e) {
+                Log.e(TAG, "Release error", e);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Release error", e);
         }
+        reader = null;
         listener = null;
     }
     
     @Override
     public boolean isConnected() {
-        return isConnected;
+        return isConnected && reader != null;
     }
     
     // =========================================================================
-    // 📡 المسح والقراءة
+    // 📡 المسح - النسخة المُحصّنة
     // =========================================================================
     
     @Override
     public boolean startScan() {
-        if (!com.example.uhf.activity.BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-            Log.d(TAG, "RFID device not present - cannot start real scan");
+        Log.i(TAG, "🚀 startScan() called");
+        
+        // ✅ 1. تحقق من الحالة الديناميكية
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            Log.e(TAG, "❌ RFID device not present");
+            if (listener != null) listener.onError("RFID device not present");
             return false;
         }
         
-        if (reader == null && !connect()) return false;
-        if (isScanning) return true;
+        // ✅ 2. تحقق من عدم التشغيل المسبق (Atomic)
+        if (!isScanning.compareAndSet(false, true)) {
+            Log.d(TAG, "Already scanning");
+            return true;
+        }
         
         try {
+            // ✅ 3. تأكد من الاتصال
+            if (reader == null || !isConnected) {
+                if (!connect()) {
+                    Log.e(TAG, "❌ Cannot connect");
+                    isScanning.set(false);
+                    if (listener != null) listener.onError("Connection failed");
+                    return false;
+                }
+            }
+            
+            // ✅ 4. طبّق الإعدادات
             applySupportedSettings();
             
-            final boolean[] result = new boolean[1];
-            Thread scanThread = new Thread(() -> {
-                try {
-                    result[0] = reader.startInventoryTag();
-                } catch (Exception e) {
-                    result[0] = false;
-                }
-            });
-            scanThread.start();
-            scanThread.join(3000);
+            // ✅ 5. ابدأ القراءة (بدون Thread يدوي!)
+            boolean success = false;
+            try {
+                success = reader.startInventoryTag();
+            } catch (Exception e) {
+                Log.e(TAG, "startInventoryTag exception", e);
+                success = false;
+            }
             
-            if (scanThread.isAlive()) {
-                Log.e(TAG, "startInventoryTag timeout - device not responding");
+            Log.i(TAG, "startInventoryTag result: " + success);
+            
+            if (!success) {
+                Log.e(TAG, "❌ Failed to start inventory");
+                isScanning.set(false);
+                if (listener != null) listener.onError("Failed to start inventory");
                 return false;
             }
             
-            boolean success = result[0];
+            // ✅ 6. أبلغ المستمع
+            if (listener != null) listener.onScanStarted();
             
-            if (success) {
-                isScanning = true;
-                if (listener != null) listener.onScanStarted();
-                ensureExecutor();
-                scanExecutor.execute(this::scanLoop);
-            }
-            return success;
+            // ✅ 7. ابدأ حلقة القراءة
+            ensureExecutor();
+            scanExecutor.execute(this::scanLoop);
+            
+            Log.i(TAG, "✅ Scan started successfully");
+            return true;
+            
         } catch (Exception e) {
-            Log.e(TAG, "startScan error", e);
+            Log.e(TAG, "❌ startScan exception", e);
+            isScanning.set(false);
+            if (listener != null) listener.onError("Start error: " + e.getMessage());
             return false;
         }
     }
     
     private void scanLoop() {
-        while (isScanning && !Thread.currentThread().isInterrupted()) {
+        Log.d(TAG, "🔄 Scan loop started");
+        
+        while (isScanning.get() && !Thread.currentThread().isInterrupted()) {
             try {
                 UHFTAGInfo tag;
+                int tagsRead = 0;
+                
                 if (reader != null) {
-                    while (isScanning && (tag = reader.readTagFromBuffer()) != null) {
+                    // ✅ اقرأ كل الوسوم المتاحة في buffer
+                    while (isScanning.get() && (tag = reader.readTagFromBuffer()) != null) {
                         processTag(tag);
+                        tagsRead++;
+                        
+                        // ✅ إذا قرأنا الكثير، اسمح للـ UI بالتنفس
+                        if (tagsRead % 50 == 0) {
+                            Thread.sleep(1);
+                        }
                     }
                 }
+                
+                // ✅ sleep قصير
                 Thread.sleep(scanIntervalMs);
+                
             } catch (InterruptedException e) {
                 Log.d(TAG, "Scan loop interrupted");
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                if (isScanning && listener != null) {
+                Log.e(TAG, "Scan loop error: " + e.getMessage(), e);
+                if (isScanning.get() && listener != null) {
                     listener.onError(e.getMessage());
                 }
-                Log.e(TAG, "Scan loop error", e);
-                break;
+                // ✅ استمر بدلاً من الخروج
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
+        
+        Log.d(TAG, "🔄 Scan loop ended");
     }
     
     private void processTag(UHFTAGInfo tag) {
@@ -288,7 +413,10 @@ public class ChainwayReader implements MiraIRFIDReader {
     private int parseRssi(String rssiStr) {
         if (rssiStr == null || rssiStr.isEmpty()) return -50;
         try {
-            String cleaned = rssiStr.replace("dBm", "").replace("dbm", "").trim();
+            String cleaned = rssiStr.replace("dBm", "")
+                                    .replace("dbm", "")
+                                    .replace("dB", "")
+                                    .trim();
             int rssi = Integer.parseInt(cleaned);
             return rssi > 0 ? -rssi : rssi;
         } catch (NumberFormatException e) {
@@ -298,25 +426,27 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public void stopScan() {
-        isScanning = false;
+        Log.d(TAG, "⏹️ stopScan() called");
+        
+        isScanning.set(false);
+        
         try {
             if (reader != null) {
                 reader.stopInventory();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Stop scan error", e);
+            Log.e(TAG, "Stop inventory error: " + e.getMessage());
         }
         
-        if (scanExecutor != null && !scanExecutor.isShutdown()) {
-            scanExecutor.shutdownNow();
-        }
+        // ✅ لا shutdownNow() — دع الخيط ينتهي بنفسه
+        // scanExecutor.shutdownNow() → يُسبب InterruptedException
         
         if (listener != null) listener.onScanStopped();
     }
     
     @Override
     public boolean isScanning() {
-        return isScanning;
+        return isScanning.get();
     }
     
     // =========================================================================
@@ -330,6 +460,7 @@ public class ChainwayReader implements MiraIRFIDReader {
         try {
             if (reader != null) {
                 reader.setPower(powerDbm);
+                Log.d(TAG, "⚡ Power set to: " + powerDbm + " dBm");
             }
         } catch (Exception e) {
             Log.e(TAG, "Set power error", e);
@@ -385,17 +516,9 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
 
     // =========================================================================
-    // 💾 الكتابة والقراءة في الذاكرة
+    // 💾 الكتابة والقراءة - كما هي
     // =========================================================================
 
-    /**
-     * ✅ كتابة بيانات في بنك الذاكرة
-     * 
-     * @param pwdStr كلمة مرور الوصول (null → "00000000")
-     * @param bank رقم البنك (0=RESERVED, 1=EPC, 2=TID, 3=USER)
-     * @param ptr مؤشر الكلمة (Word pointer) — عادة 2 لـ EPC
-     * @param data البيانات بصيغة Hex String
-     */
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
         if (reader == null || data == null || data.isEmpty()) {
@@ -406,42 +529,31 @@ public class ChainwayReader implements MiraIRFIDReader {
         String safePwd = normalizePwd(pwdStr);
         
         try {
-            // ✅ حساب عدد الكلمات الصحيح: كل كلمة = 4 حروف Hex
             int hexLen = data.length();
-            int wordCount = (hexLen + 3) / 4; // ceil division
+            int wordCount = (hexLen + 3) / 4;
             
-            // ✅ إضافة Padding إذا لزم
             StringBuilder paddedData = new StringBuilder(data.toUpperCase());
             while (paddedData.length() < wordCount * 4) {
                 paddedData.append("0");
             }
             
             Log.i(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr + 
-                  " words=" + wordCount + " len=" + paddedData.length() + 
-                  " data=" + paddedData);
+                  " words=" + wordCount);
             
             boolean result = reader.writeData(safePwd, bank, ptr, wordCount, paddedData.toString());
             
             if (result) {
                 Log.i(TAG, "✅ writeData OK");
             } else {
-                Log.e(TAG, "❌ writeData FAILED: bank=" + bank + " ptr=" + ptr);
+                Log.e(TAG, "❌ writeData FAILED");
             }
             return result;
         } catch (Exception e) {
-            Log.e(TAG, "writeData exception: bank=" + bank + " ptr=" + ptr, e);
+            Log.e(TAG, "writeData exception", e);
             return false;
         }
     }
 
-    /**
-     * ✅ قراءة بيانات من بنك الذاكرة
-     * 
-     * @param pwdStr كلمة مرور الوصول (null → "00000000")
-     * @param bank رقم البنك
-     * @param ptr مؤشر الكلمة
-     * @param len عدد الكلمات للقراءة
-     */
     @Override
     public String readData(String pwdStr, int bank, int ptr, int len) {
         if (reader == null) {
@@ -462,105 +574,50 @@ public class ChainwayReader implements MiraIRFIDReader {
             }
             return result;
         } catch (Exception e) {
-            Log.e(TAG, "readData exception: bank=" + bank + " ptr=" + ptr, e);
+            Log.e(TAG, "readData exception", e);
             return null;
         }
     }
 
-    // =========================================================================
-    // 🔐 القفل والحماية (الجزء الأهم!)
-    // =========================================================================
-
-    /**
-     * ✅ قفل/فتح بنك ذاكرة معين — مُصحَّح وفق EPC Gen2
-     * 
-     * Lock Code Format (EPC Gen2):
-     * ┌─────────────────────────────────────────────┐
-     * │ Bits:  [15-14] [13-12] [11-10] [9-8] [7-6] [5-4] [3-2] [1-0] │
-     * │        Access  Kill    EPC     EPC   TID   TID   USER  USER │
-     * │                                                              │
-     * │ Value: 00=Open, 01=Write, 10=PermaWrite, 11=Lock             │
-     * └─────────────────────────────────────────────┘
-     * 
-     * أمثلة عملية:
-     * - "0C00" → قفل EPC (bits 11-10 = 11)
-     * - "C000" → قفل Access + Kill
-     * - "00C0" → قفل USER
-     * - "0000" → فتح كل شيء
-     * 
-     * @param pwdStr كلمة مرور الوصول
-     * @param bank رقم البنك (0=ACCESS, 1=EPC, 2=TID, 3=USER)
-     * @param shouldLock true=قفل, false=فتح
-     */
     @Override
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
-        if (reader == null) {
-            Log.w(TAG, "setTagLockState: reader is null");
-            return false;
-        }
+        if (reader == null) return false;
         
         String safePwd = normalizePwd(pwdStr);
         
-        // ✅ بناء Lock Code الصحيح حسب البنك
         String lockCode;
         switch (bank) {
-            case 0: // ACCESS Bank — قفل Access + Kill معاً
-                lockCode = shouldLock ? "C000" : "0000";
-                break;
-            case 1: // EPC Bank — قفل EPC فقط
-                lockCode = shouldLock ? "0C00" : "0000";
-                break;
-            case 2: // TID Bank — عادةً للقراءة فقط، لا يُقفل
-                Log.w(TAG, "⚠️ TID Bank is read-only — cannot lock");
+            case 0: lockCode = shouldLock ? "C000" : "0000"; break;
+            case 1: lockCode = shouldLock ? "0C00" : "0000"; break;
+            case 2:
+                Log.w(TAG, "⚠️ TID Bank is read-only");
                 return false;
-            case 3: // USER Bank
-                lockCode = shouldLock ? "00C0" : "0000";
-                break;
-            default:
-                Log.e(TAG, "Unsupported bank: " + bank);
-                return false;
+            case 3: lockCode = shouldLock ? "00C0" : "0000"; break;
+            default: return false;
         }
         
         try {
-            Log.i(TAG, "🔐 setTagLockState: bank=" + bank + 
-                  " lock=" + shouldLock + " code=" + lockCode + 
-                  " pwd=" + safePwd);
-            
+            Log.i(TAG, "🔐 setTagLockState: bank=" + bank + " code=" + lockCode);
             boolean result = reader.lockMem(safePwd, lockCode);
-            
             if (result) {
-                Log.i(TAG, "🔒 Lock operation successful: bank=" + bank + 
-                      " locked=" + shouldLock);
+                Log.i(TAG, "🔒 Lock OK");
             } else {
-                Log.e(TAG, "❌ Lock operation FAILED: bank=" + bank + 
-                      " code=" + lockCode);
+                Log.e(TAG, "❌ Lock FAILED");
             }
             return result;
         } catch (Exception e) {
-            Log.e(TAG, "Lock exception: bank=" + bank + " code=" + lockCode, e);
+            Log.e(TAG, "Lock exception", e);
             return false;
         }
     }
 
-    // =========================================================================
-    // 🎯 دوال EPC المخصصة
-    // =========================================================================
-
-    /**
-     * ✅ كتابة EPC على الشريحة
-     * EPC دائماً يبدأ من Word 2 (Bit 32) في Bank 1
-     */
     @Override
     public boolean writeEpc(String newEpc, String accessPassword) {
         if (newEpc == null || newEpc.isEmpty()) {
             Log.w(TAG, "writeEpc: empty EPC");
             return false;
         }
-        
         String safePwd = normalizePwd(accessPassword);
-        Log.i(TAG, "📝 writeEpc: epc=" + newEpc + " pwd=" + safePwd);
-        
-        // ✅ EPC يبدأ دائماً من Word 2 في Bank 1
         return writeData(safePwd, RFIDWithUHFUART.Bank_EPC, 2, newEpc);
     }
     
@@ -571,37 +628,31 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-public String readTid() {
-    // ✅ محاولة قراءة TID بأطوال مختلفة
-    for (int words : new int[]{6, 5, 4}) {
-        try {
-            String tid = readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_TID, 0, words);
-            if (tid != null && !tid.isEmpty()) {
-                tid = tid.trim().toUpperCase();
-                // ✅ إزالة padding
-                while (tid.length() > 20 && tid.endsWith("0000")) {
-                    tid = tid.substring(0, tid.length() - 4);
+    public String readTid() {
+        for (int words : new int[]{6, 5, 4}) {
+            try {
+                String tid = readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_TID, 0, words);
+                if (tid != null && !tid.isEmpty()) {
+                    tid = tid.trim().toUpperCase();
+                    while (tid.length() > 20 && tid.endsWith("0000")) {
+                        tid = tid.substring(0, tid.length() - 4);
+                    }
+                    Log.i(TAG, "✅ TID: " + tid);
+                    return tid;
                 }
-                Log.i(TAG, "✅ TID read OK (" + words + " words): " + tid 
-                    + " (length=" + tid.length() + ")");
-                return tid;
+            } catch (Exception e) {
+                Log.w(TAG, "TID read failed with " + words + " words");
             }
-        } catch (Exception e) {
-            Log.w(TAG, "⚠️ TID read failed with " + words + " words", e);
         }
+        Log.e(TAG, "❌ TID read FAILED");
+        return null;
     }
-    Log.e(TAG, "❌ TID read FAILED after 3 attempts");
-    return null;
-}
     
     @Override
     public String readUserMemory(int address, int length) {
         return readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_USER, address, length);
     }
     
-    /**
-     * ✅ قفل الشريحة (EPC Bank فقط) — الأكثر استخداماً
-     */
     @Override
     public boolean lockTag(String accessPassword) {
         return setTagLockState(normalizePwd(accessPassword), 
@@ -619,7 +670,7 @@ public String readTid() {
         if (reader == null) return false;
         String safePwd = normalizePwd(accessPassword);
         try {
-            Log.w(TAG, "☠️ killTag — IRREVERSIBLE operation!");
+            Log.w(TAG, "☠️ killTag!");
             return reader.killTag(safePwd);
         } catch (Exception e) {
             Log.e(TAG, "killTag error", e);
@@ -627,17 +678,11 @@ public String readTid() {
         }
     }
 
-    // =========================================================================
-    // 🎯 الفلترة
-    // =========================================================================
-
     @Override
     public boolean setFilter(int bank, int ptr, String filterData) {
         if (reader == null || filterData == null) return false;
         try {
             int len = filterData.length() * 4;
-            Log.d(TAG, "🎯 setFilter: bank=" + bank + " ptr=" + ptr + 
-                  " data=" + filterData);
             return reader.setFilter(bank, ptr, len, filterData);
         } catch (Exception e) {
             Log.e(TAG, "setFilter error", e);
@@ -650,7 +695,6 @@ public String readTid() {
         if (reader != null) {
             try {
                 reader.setFilter(1, 0, 0, "");
-                Log.d(TAG, "🎯 clearFilter OK");
             } catch (Exception e) {
                 Log.e(TAG, "Clear filter error", e);
             }
