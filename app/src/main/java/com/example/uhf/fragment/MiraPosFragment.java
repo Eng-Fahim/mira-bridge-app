@@ -785,13 +785,22 @@ public class MiraPosFragment extends MiraBaseFragment {
                     getParentFragmentManager().popBackStack();
                 }
 
-                // 2. ثم ابدأ معالجة الباركود (سيظهر الـ Loading على شاشة البيع)
-                // نستخدم postDelayed لضمان إغلاق الشاشة أولاً
+                // 2. ضع الكود مباشرة في حقل الإدخال
+                if (etManualEpc != null) {
+                    etManualEpc.setText(data);
+                }
+
+                // 3. ابدأ المعالجة بعد إغلاق الشاشة بقليل
                 mainHandler.postDelayed(() -> {
                     if (isAdded()) {
-                        onBarcodeScanned(data);
+                        // ✅ استدعاء المعالجة مباشرة
+                        processRingEpc(data, "barcode");
+                        // ✅ مسح الحقل بعد بدء المعالجة (لتجنب التكرار)
+                        if (etManualEpc != null) {
+                            etManualEpc.setText("");
+                        }
                     }
-                }, 200); // 200ms كافية لإغلاق الشاشة
+                }, 200);
 
             } catch (Exception e) {
                 Log.e(TAG, "Barcode callback error: " + e.getMessage());
@@ -910,155 +919,156 @@ public class MiraPosFragment extends MiraBaseFragment {
     // ==================== البحث عن القطعة ====================
 
     private void processRingEpc(final String code, final String source) {
-        if (code == null || code.trim().isEmpty() || !isAdded()) return;
-        final String cleanCode = code.trim();
+    if (code == null || code.trim().isEmpty() || !isAdded()) return;
+    final String cleanCode = code.trim();
 
-        synchronized (pendingEpcs) {
-            if (pendingEpcs.contains(cleanCode)) return;
-            pendingEpcs.add(cleanCode);
-        }
-
-        playAlertSound(1);
-
-        safeRun(() -> {
-            showSearchLoadingDialog(cleanCode);
-            if (tvCartStatus != null)
-                tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
-        });
-
-        miraExecutor.getNetworkExecutor().execute(() -> {
-            try {
-                Context context = getContext();
-                if (context == null) return;
-
-                MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(context);
-                final int branchId = getActiveBranchId();
-
-                syncManager.findItem(cleanCode, branchId,
-                        new MiraItemSyncManager.ItemLookupCallback() {
-                    @Override
-                    public void onItemFound(JSONObject item, boolean fromServer) {
-                        safeRun(() -> {
-                            dismissSearchLoadingDialog();
-                            int itemBranchId = item.optInt("branch_id", -1);
-                            if (itemBranchId > 0 && itemBranchId != branchId) {
-                                showSuccessMessage(
-                                        isArabic ? "❌ قطعة في فرع آخر" : "❌ Item in Another Branch",
-                                        isArabic ? "هذه القطعة موجودة في فرع مختلف ولا يمكن بيعها من هنا" :
-                                                "This item is in a different branch and cannot be sold here",
-                                        false
-                                );
-                                playAlertSound(2);
-                                return;
-                            }
-                            parseItemResponse(cleanCode, item);
-                        });
-                    }
-
-                    @Override
-                    public void onItemNotFound() {
-                        safeRun(() -> {
-                            dismissSearchLoadingDialog();
-                            handleItemNotFound(cleanCode);
-                        });
-                    }
-                });
-            } catch (Exception e) {
-                safeRun(() -> {
-                    dismissSearchLoadingDialog();
-                    handleItemNotFound(cleanCode);
-                });
-            } finally {
-                synchronized (pendingEpcs) {
-                    pendingEpcs.remove(cleanCode);
-                }
-            }
-        });
+    synchronized (pendingEpcs) {
+        if (pendingEpcs.contains(cleanCode)) return;
+        pendingEpcs.add(cleanCode);
     }
 
-    private void parseItemResponse(String code, JSONObject data) {
+    playAlertSound(1);
+
+    // ✅ بدلاً من showSearchLoadingDialog، نكتفي بتحديث نص الحالة
+    safeRun(() -> {
+        if (tvCartStatus != null)
+            tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
+    });
+
+    miraExecutor.getNetworkExecutor().execute(() -> {
         try {
-            JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
-            if (item == null) {
-                handleItemNotFound(code);
-                return;
-            }
+            Context context = getContext();
+            if (context == null) return;
 
-            String vaultStatus = item.optString("status",
-                    item.optString("vault_status", "")).toLowerCase();
+            MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(context);
+            final int branchId = getActiveBranchId();
 
-            if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
-                safeRun(() -> {
-                    showSuccessMessage(
-                            isArabic ? "❌ قطعة مباعة" : "❌ Item Sold",
-                            isArabic ? "هذه القطعة تم بيعها بالفعل ولا يمكن بيعها مرة أخرى" :
-                                    "This item has already been sold",
-                            false
-                    );
-                    playAlertSound(2);
-                });
-                return;
-            }
-
-            boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
-            String title = item.optString("title",
-                    item.optString("item_title", isArabic ? "قطعة" : "Item"));
-            String karat = item.optString("karat", item.optString("gold_karat", "21K"));
-            double weight = item.optDouble("weight",
-                    item.optDouble("gross_weight",
-                            item.optDouble("gross_weight_grams", 0)));
-            double price = item.optDouble("retail_price",
-                    item.optDouble("retail_price_usd", item.optDouble("price", 0)));
-
-            if (price <= 0 && weight > 0 && priceManager != null) {
-                price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
-            }
-
-            CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
-                    price, isAvailable, vaultStatus.toUpperCase());
-            cartItem.serialNo = item.optString("serial", item.optString("serial_number", ""));
-            cartItem.gtin = item.optString("gtin", item.optString("gtin13", ""));
-            cartItem.location = item.optString("location", item.optString("current_location", ""));
-            cartItem.itemId = item.optInt("id", item.optInt("item_id", 0));
-
-            boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo,
-                    cartItem.gtin);
-
-            safeRun(() -> {
-                if (alreadyInCart) {
-                    showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
-                    playAlertSound(2);
-                    return;
+            syncManager.findItem(cleanCode, branchId,
+                    new MiraItemSyncManager.ItemLookupCallback() {
+                @Override
+                public void onItemFound(JSONObject item, boolean fromServer) {
+                    safeRun(() -> {
+                        // ✅ تم إلغاء dismissSearchLoadingDialog لأننا لم نعد نعرضه
+                        int itemBranchId = item.optInt("branch_id", -1);
+                        if (itemBranchId > 0 && itemBranchId != branchId) {
+                            // ✅ استخدم Toast بدلاً من Dialog
+                            showToast(isArabic ? "❌ قطعة في فرع آخر" : "❌ Item in Another Branch");
+                            playAlertSound(2);
+                            updateCartSummary(); // لإعادة تعيين نص الحالة
+                            return;
+                        }
+                        parseItemResponse(cleanCode, item);
+                    });
                 }
 
-                if (!isAvailable) {
-                    showSuccessMessage(
-                            isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
-                            isArabic ? "حالة القطعة: " + vaultStatus : "Item status: " + vaultStatus,
-                            false
-                    );
-                    updateCartSummary();
-                    return;
+                @Override
+                public void onItemNotFound() {
+                    safeRun(() -> {
+                        // ✅ Toast بسيط بدون Dialog
+                        showToast(isArabic ? "❌ القطعة غير موجودة" : "❌ Item Not Found");
+                        playAlertSound(2);
+                        updateCartSummary(); // لإعادة تعيين نص الحالة
+                    });
                 }
-
-                scannedEpcs.add(code);
-                if (cartItem.serialNo != null && !cartItem.serialNo.isEmpty()) {
-                    scannedEpcs.add(cartItem.serialNo);
-                }
-                if (cartItem.gtin != null && !cartItem.gtin.isEmpty()) {
-                    scannedEpcs.add(cartItem.gtin);
-                }
-
-                cartList.add(0, cartItem);
-                if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
-                if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-                updateCartSummary();
             });
         } catch (Exception e) {
-            Log.e(TAG, "Parse error: " + e.getMessage());
-            handleItemNotFound(code);
+            safeRun(() -> {
+                showToast(isArabic ? "⚠️ خطأ في البحث" : "⚠️ Search error");
+                updateCartSummary();
+            });
+        } finally {
+            synchronized (pendingEpcs) {
+                pendingEpcs.remove(cleanCode);
+            }
         }
+    });
+}
+
+    private void parseItemResponse(String code, JSONObject data) {
+    try {
+        JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
+        if (item == null) {
+            // ✅ Toast بدلاً من Dialog
+            showToast(isArabic ? "❌ القطعة غير موجودة" : "❌ Item Not Found");
+            playAlertSound(2);
+            updateCartSummary();
+            return;
+        }
+
+        String vaultStatus = item.optString("status",
+                item.optString("vault_status", "")).toLowerCase();
+
+        if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
+            safeRun(() -> {
+                // ✅ Toast بدلاً من Dialog
+                showToast(isArabic ? "❌ القطعة مباعة مسبقاً" : "❌ Item already sold");
+                playAlertSound(2);
+                updateCartSummary();
+            });
+            return;
+        }
+
+        boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
+        String title = item.optString("title",
+                item.optString("item_title", isArabic ? "قطعة" : "Item"));
+        String karat = item.optString("karat", item.optString("gold_karat", "21K"));
+        double weight = item.optDouble("weight",
+                item.optDouble("gross_weight",
+                        item.optDouble("gross_weight_grams", 0)));
+        double price = item.optDouble("retail_price",
+                item.optDouble("retail_price_usd", item.optDouble("price", 0)));
+
+        if (price <= 0 && weight > 0 && priceManager != null) {
+            price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
+        }
+
+        CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
+                price, isAvailable, vaultStatus.toUpperCase());
+        cartItem.serialNo = item.optString("serial", item.optString("serial_number", ""));
+        cartItem.gtin = item.optString("gtin", item.optString("gtin13", ""));
+        cartItem.location = item.optString("location", item.optString("current_location", ""));
+        cartItem.itemId = item.optInt("id", item.optInt("item_id", 0));
+
+        boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo,
+                cartItem.gtin);
+
+        safeRun(() -> {
+            if (alreadyInCart) {
+                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
+                playAlertSound(2);
+                updateCartSummary();
+                return;
+            }
+
+            if (!isAvailable) {
+                showToast(isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable");
+                updateCartSummary();
+                return;
+            }
+
+            scannedEpcs.add(code);
+            if (cartItem.serialNo != null && !cartItem.serialNo.isEmpty()) {
+                scannedEpcs.add(cartItem.serialNo);
+            }
+            if (cartItem.gtin != null && !cartItem.gtin.isEmpty()) {
+                scannedEpcs.add(cartItem.gtin);
+            }
+
+            cartList.add(0, cartItem);
+            if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
+            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
+            updateCartSummary();
+            
+            // ✅ إشعار صوتي ورسالة Toast سريعة بالنجاح
+            playAlertSound(1);
+            showToast(isArabic ? "✅ تمت الإضافة: " + title : "✅ Added: " + title);
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "Parse error: " + e.getMessage());
+        showToast(isArabic ? "❌ خطأ في معالجة القطعة" : "❌ Error processing item");
+        updateCartSummary();
     }
+}
 
     private boolean isItemAlreadyInCart(String epc, String serialNo, String gtin) {
         synchronized (cartList) {
