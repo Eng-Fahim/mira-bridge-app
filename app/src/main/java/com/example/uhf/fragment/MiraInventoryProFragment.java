@@ -1910,12 +1910,12 @@ private void startReadingSource() {
                 "3. Check reader settings")
             .setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", 
                 (d, w) -> {
-                    mainHandler.postDelayed(() -> {
-                        if (getActivity() instanceof UHFMainActivity) {
-                            ((UHFMainActivity) getActivity()).initUHF();
-                        }
-                        mainHandler.postDelayed(this::startReadingSource, 3000);
-                    }, 500);
+                    mainThreadHandler.postDelayed(() -> {
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).initUHF();
+    }
+    mainThreadHandler.postDelayed(this::startReadingSource, 3000);
+}, 500);
                 })
             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (d, w) -> {
                 isScanning = false;
