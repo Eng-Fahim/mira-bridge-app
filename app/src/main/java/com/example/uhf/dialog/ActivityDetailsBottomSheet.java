@@ -17,7 +17,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-
+import android.util.Log;
+import org.json.JSONArray;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.fragment.MiraAllActivitiesFragment;
@@ -123,13 +124,81 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
 
         switch (type) {
             case "sale":
-                double amount = activity.optDouble("amount", 0);
-                String currency = activity.optString("currency", "USD");
-                if (amount > 0) {
-                    addDetailRow(container, "💰 " + (isArabic ? "المبلغ" : "Amount"),
-                            formatAmount(amount, currency));
-                }
-                break;
+    // ✅ المبلغ بالدولار
+    double amountUsd = activity.optDouble("final_amount_usd", 
+                      activity.optDouble("amount_usd", 
+                      activity.optDouble("amount", 0)));
+    
+    // ✅ المبلغ المحلي
+    double amountLocal = activity.optDouble("final_amount", 
+                        activity.optDouble("amount_local", 0));
+    
+    // ✅ العملة وسعر الصرف
+    String currencyCode = activity.optString("currency", "USD");
+    double exchangeRate = activity.optDouble("exchange_rate", 1.0);
+    
+    // ✅ المبلغ بالدولار دائماً
+    if (amountUsd > 0) {
+        addDetailRow(container, "💵 " + (isArabic ? "المبلغ (USD)" : "Amount (USD)"),
+                String.format(Locale.US, "$%,.2f", amountUsd));
+    }
+    
+    // ✅ المبلغ المحلي (إن كانت العملة مختلفة)
+    if (amountLocal > 0 && !currencyCode.equals("USD")) {
+        addDetailRow(container, "💰 " + (isArabic ? "المبلغ المحلي" : "Local Amount"),
+                formatAmount(amountLocal, currencyCode));
+        
+        // ✅ سعر الصرف
+        if (exchangeRate > 0 && exchangeRate != 1.0) {
+            addDetailRow(container, "💱 " + (isArabic ? "سعر الصرف" : "Exchange Rate"),
+                    String.format(Locale.US, "1 USD = %,.2f %s", 
+                            exchangeRate, currencyCode));
+        }
+    }
+    
+    // ✅ العملة (إن كانت USD، اعرضها بشكل بسيط)
+    if (amountUsd > 0 && (currencyCode.equals("USD") || amountLocal <= 0)) {
+        addDetailRow(container, "💱 " + (isArabic ? "العملة" : "Currency"), currencyCode);
+    }
+    
+    // ✅ عدد القطع
+    int itemCount = activity.optInt("item_count", 0);
+    if (itemCount > 0) {
+        addDetailRow(container, "📦 " + (isArabic ? "عدد القطع" : "Items Count"),
+                String.valueOf(itemCount));
+    }
+    
+    // ✅ رقم الفاتورة
+    String saleNumber = activity.optString("sale_number", "");
+    if (!saleNumber.isEmpty()) {
+        addDetailRow(container, "🧾 " + (isArabic ? "رقم الفاتورة" : "Invoice #"), saleNumber);
+    }
+    
+    // ✅ الوزن الإجمالي
+    double totalWeight = activity.optDouble("total_weight", 0);
+    if (totalWeight > 0) {
+        addDetailRow(container, "⚖️ " + (isArabic ? "الوزن الإجمالي" : "Total Weight"),
+                String.format(Locale.US, "%.2f g", totalWeight));
+    }
+    
+    // ✅ الخصم (إن وُجد)
+    double discountUsd = activity.optDouble("discount_amount_usd", 0);
+    if (discountUsd > 0) {
+        addDetailRow(container, "🏷️ " + (isArabic ? "الخصم" : "Discount"),
+                String.format(Locale.US, "$%,.2f", discountUsd));
+    }
+    
+    // ✅ حالة الإرجاع
+    String refundStatus = activity.optString("refund_status", 
+                          activity.optString("status", ""));
+    if (refundStatus.equals("refunded") || refundStatus.equals("partial")) {
+        String refundLabel = refundStatus.equals("refunded") 
+                ? (isArabic ? "🔄 مُرجعة بالكامل" : "🔄 Fully Refunded")
+                : (isArabic ? "⚠️ مُرجعة جزئياً" : "⚠️ Partially Refunded");
+        addDetailRow(container, "↩️ " + (isArabic ? "حالة الإرجاع" : "Refund Status"), refundLabel);
+    }
+    
+    break;
 
             case "inventory":
                 double accuracy = activity.optDouble("accuracy", -1);
@@ -194,6 +263,90 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
                             dismiss();
                             navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
                         });
+                        
+                   // ═══════════════════════════════════════
+// 📦 عرض تفاصيل كل قطعة
+// ═══════════════════════════════════════
+try {
+    org.json.JSONArray itemsArr = activity.optJSONArray("items");
+    if (itemsArr != null && itemsArr.length() > 0) {
+        // ✅ فاصل
+        addSectionHeader(container, 
+            "📦 " + (isArabic ? "القطع المباعة" : "Sold Items") 
+            + " (" + itemsArr.length() + ")");
+        
+        for (int i = 0; i < itemsArr.length(); i++) {
+            JSONObject item = itemsArr.optJSONObject(i);
+            if (item == null) continue;
+            
+            // ✅ عنوان القطعة
+            String itemTitle = item.optString("title", 
+                               item.optString("item_title", 
+                               (isArabic ? "قطعة" : "Item") + " #" + (i + 1)));
+            
+            // ✅ EPC / RFID
+            String epc = item.optString("epc", 
+                         item.optString("rfid_epc", ""));
+            
+            // ✅ Serial
+            String serial = item.optString("serial", 
+                            item.optString("serial_number", ""));
+            
+            // ✅ العيار
+            String karat = item.optString("karat", 
+                           item.optString("gold_karat", ""));
+            
+            // ✅ الوزن
+            double weight = item.optDouble("weight", 
+                            item.optDouble("gross_weight_grams", 0));
+            
+            // ✅ السعر
+            double priceUsd = item.optDouble("price_usd", 0);
+            double priceLocal = item.optDouble("price_local", 0);
+            
+            // ✅ بناء نص القطعة
+            StringBuilder sb = new StringBuilder();
+            sb.append("▸ ").append(itemTitle);
+            
+            if (!serial.isEmpty()) {
+                sb.append("\n   🔢 Serial: ").append(serial);
+            }
+            
+            // ✅ عرض RFID/EPC بشكل بارز
+            if (!epc.isEmpty()) {
+                sb.append("\n   📡 RFID: ").append(epc);
+            } else {
+                sb.append("\n   📡 RFID: ")
+                  .append(isArabic ? "غير مربوط" : "Not bound");
+            }
+            
+            if (!karat.isEmpty()) {
+                sb.append("\n   🏷️ ").append(isArabic ? "العيار" : "Karat")
+                  .append(": ").append(karat);
+            }
+            
+            if (weight > 0) {
+                sb.append("\n   ⚖️ ").append(isArabic ? "الوزن" : "Weight")
+                  .append(": ").append(String.format(Locale.US, "%.2f g", weight));
+            }
+            
+            if (priceUsd > 0) {
+                sb.append("\n   💵 ").append(String.format(Locale.US, "$%,.2f", priceUsd));
+            }
+            
+            if (priceLocal > 0 && !currencyCode.equals("USD")) {
+                sb.append("  •  ").append(formatAmount(priceLocal, currencyCode));
+            }
+            
+            // ✅ صف لكل قطعة
+            addDetailRow(container, 
+                "🆔 " + (isArabic ? "قطعة" : "Item") + " #" + (i + 1), 
+                sb.toString());
+        }
+    }
+} catch (Exception e) {
+    Log.e("ActivityDetailsSheet", "Error parsing items: " + e.getMessage());
+}     
 
                 addActionButton(container, "🖨️ " + (isArabic ? "طباعة الفاتورة" : "Print Invoice"),
                         v -> {
@@ -348,15 +501,35 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
-    private String formatAmount(double amount, String currency) {
-        try {
-            NumberFormat fmt = NumberFormat.getNumberInstance(Locale.US);
-            fmt.setMaximumFractionDigits(2);
+    /**
+ * ✅ تنسيق المبلغ حسب العملة
+ * - العملات الكبيرة (YER, EGP): بدون كسور عشرية
+ * - العملات الصغيرة (USD, SAR, AED): بكسرين عشريين
+ */
+private String formatAmount(double amount, String currency) {
+    try {
+        if (currency == null) currency = "USD";
+        
+        // ✅ العملات ذات الأرقام الكبيرة (لا نحتاج كسور)
+        boolean isLargeCurrency = currency.equals("YER") 
+                || currency.equals("EGP") 
+                || currency.equals("IQD")
+                || currency.equals("SYP");
+        
+        NumberFormat fmt = NumberFormat.getNumberInstance(Locale.US);
+        
+        if (isLargeCurrency) {
+            fmt.setMaximumFractionDigits(0);
             return fmt.format(amount) + " " + currency;
-        } catch (Exception e) {
-            return String.format(Locale.US, "%.2f %s", amount, currency);
+        } else {
+            fmt.setMaximumFractionDigits(2);
+            fmt.setMinimumFractionDigits(2);
+            return fmt.format(amount) + " " + currency;
         }
+    } catch (Exception e) {
+        return String.format(Locale.US, "%.2f %s", amount, currency);
     }
+}
 
     private String getTypeName(String type) {
         if (!isArabic) return type;
@@ -389,4 +562,81 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
         int blue = Color.blue(color);
         return Color.argb(alpha, red, green, blue);
     }
+    
+    /**
+ * ✅ عرض المبلغ بعملتين (USD + محلي)
+ */
+private void addDualAmountRow(LinearLayout container, String label, 
+                              double amountUsd, double amountLocal, 
+                              String currency, double exchangeRate) {
+    StringBuilder sb = new StringBuilder();
+    
+    if (amountUsd > 0) {
+        sb.append(String.format(Locale.US, "$%,.2f", amountUsd));
+    }
+    
+    if (amountLocal > 0 && !currency.equals("USD") && amountLocal != amountUsd) {
+        if (sb.length() > 0) sb.append("  •  ");
+        sb.append(formatAmount(amountLocal, currency));
+    }
+    
+    if (sb.length() > 0) {
+        addDetailRow(container, label, sb.toString());
+    }
+}
+
+/**
+ * ✅ الحصول على اسم العملة بالعربية
+ */
+private String getCurrencyNameArabic(String currency) {
+    switch (currency) {
+        case "USD": return "دولار أمريكي";
+        case "YER": return "ريال يمني";
+        case "EGP": return "جنيه مصري";
+        case "SAR": return "ريال سعودي";
+        case "AED": return "درهم إماراتي";
+        case "IQD": return "دينار عراقي";
+        default: return currency;
+    }
+}
+
+/**
+ * ✅ إضافة عنوان قسم مميز داخل القائمة
+ */
+private void addSectionHeader(LinearLayout container, String title) {
+    try {
+        TextView header = new TextView(requireContext());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 24, 0, 8);
+        header.setLayoutParams(params);
+        header.setText(title);
+        header.setTextSize(15);
+        header.setTypeface(null, android.graphics.Typeface.BOLD);
+        header.setPadding(0, 16, 0, 12);
+        
+        // ✅ لون مميز من الثيم
+        int color = ContextCompat.getColor(requireContext(), 
+                R.color.activity_neutral);
+        header.setTextColor(color);
+        
+        // ✅ خط علوي
+        header.setCompoundDrawablePadding(8);
+        
+        container.addView(header);
+        
+        // ✅ خط فاصل رفيع
+        View divider = new View(requireContext());
+        LinearLayout.LayoutParams dParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1);
+        dParams.setMargins(0, 4, 0, 12);
+        divider.setLayoutParams(dParams);
+        divider.setBackgroundColor(adjustAlpha(color, 0.3f));
+        container.addView(divider);
+        
+    } catch (Exception e) {
+        Log.e("ActivityDetailsSheet", "addSectionHeader error: " + e.getMessage());
+    }
+}
 }
