@@ -22,11 +22,21 @@ import javax.crypto.spec.GCMParameterSpec;
 
 /**
  * SecureSessionManager - إدارة الجلسات الآمنة للتطبيق
- * مع تخزين مؤقت لمنع I/O المتكرر على الـ Main Thread
+ * 
+ * ✅ v2.0 — Singleton Pattern (يُهيأ مرة واحدة فقط)
+ * 
+ * التحسينات الحرجة:
+ * - Singleton Pattern لمنع إعادة تهيئة EncryptedSharedPreferences
+ * - تخزين مؤقت (Cache) للقيم المستخدمة كثيراً
+ * - منع ANR بسبب إعادة فتح AndroidKeyStore
  */
 public class SecureSessionManager {
     
     private static final String TAG = "SecureSessionManager";
+    
+    // ✅ Singleton Pattern — يمنع إنشاء نسخ متعددة
+    private static volatile SecureSessionManager instance;
+    private static final Object INSTANCE_LOCK = new Object();
     
     // أسماء الملفات
     private static final String SECURE_PREFS_NAME = "mira_secure_session";
@@ -106,7 +116,45 @@ public class SecureSessionManager {
         AUDITOR
     }
     
-    public SecureSessionManager(Context context) {
+    // ═══════════════════════════════════════════════════════
+    // ✅ Singleton Pattern
+    // ═══════════════════════════════════════════════════════
+    
+    /**
+     * ✅ الحصول على النسخة الوحيدة (Singleton)
+     * 
+     * مهم جداً:
+     * - يُنشئ EncryptedSharedPreferences مرة واحدة فقط
+     * - يمنع ANR بسبب إعادة تهيئة AndroidKeyStore
+     * - آمن للاستخدام من أي thread
+     */
+    public static SecureSessionManager getInstance(Context context) {
+        if (instance == null) {
+            synchronized (INSTANCE_LOCK) {
+                if (instance == null) {
+                    instance = new SecureSessionManager(context.getApplicationContext());
+                    Log.d(TAG, "✅ SecureSessionManager Singleton created");
+                }
+            }
+        }
+        return instance;
+    }
+    
+    /**
+     * ✅ إعادة تعيين النسخة الوحيدة
+     * تُستخدم فقط عند logout كامل أو اختبارات
+     */
+    public static void resetInstance() {
+        synchronized (INSTANCE_LOCK) {
+            instance = null;
+            Log.d(TAG, "🔄 SecureSessionManager Singleton reset");
+        }
+    }
+    
+    /**
+     * ⚠️ private constructor — استخدم getInstance()
+     */
+    private SecureSessionManager(Context context) {
         this.userPrefs = context.getApplicationContext().getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE);
         
         try {
@@ -212,54 +260,47 @@ public class SecureSessionManager {
     }
     
     /**
- * ✅ حفظ التوكن (JWT) — كان مفقوداً!
- * تُستدعى عند تسجيل الدخول الناجح
- */
-public void saveAuthToken(String token) {
-    if (token == null || token.isEmpty()) {
-        Log.w(TAG, "⚠️ Attempted to save empty auth token");
-        return;
+     * ✅ حفظ التوكن (JWT) — كان مفقوداً!
+     */
+    public void saveAuthToken(String token) {
+        if (token == null || token.isEmpty()) {
+            Log.w(TAG, "⚠️ Attempted to save empty auth token");
+            return;
+        }
+        try {
+            securePrefs.edit().putString(KEY_AUTH_TOKEN, token).apply();
+            cachedAuthToken = token;
+            tokenCacheTime = System.currentTimeMillis();
+            Log.d(TAG, "✅ Auth token saved (" + token.length() + " chars)");
+        } catch (Exception e) {
+            Log.e(TAG, "saveAuthToken error: " + e.getMessage());
+        }
     }
-    try {
-        securePrefs.edit().putString(KEY_AUTH_TOKEN, token).apply();
-        // ✅ تحديث التخزين المؤقت
-        cachedAuthToken = token;
-        tokenCacheTime = System.currentTimeMillis();
-        Log.d(TAG, "✅ Auth token saved (" + token.length() + " chars)");
-    } catch (Exception e) {
-        Log.e(TAG, "saveAuthToken error: " + e.getMessage());
-    }
-}
 
-/**
- * ✅ حفظ التوكن مع مدة صلاحية (expiresIn)
- * تُستدعى عند تسجيل الدخول للحصول على توكن مع تاريخ انتهاء
- */
-public void saveAuthToken(String token, long expiresInSeconds) {
-    if (token == null || token.isEmpty()) {
-        Log.w(TAG, "⚠️ Attempted to save empty auth token");
-        return;
+    public void saveAuthToken(String token, long expiresInSeconds) {
+        if (token == null || token.isEmpty()) {
+            Log.w(TAG, "⚠️ Attempted to save empty auth token");
+            return;
+        }
+        try {
+            long expiryTime = (expiresInSeconds > 0)
+                    ? (System.currentTimeMillis() + (expiresInSeconds * 1000L))
+                    : (System.currentTimeMillis() + (86400 * 1000L * 30));
+            
+            securePrefs.edit()
+                    .putString(KEY_AUTH_TOKEN, token)
+                    .putLong(KEY_TOKEN_EXPIRY, expiryTime)
+                    .apply();
+            
+            cachedAuthToken = token;
+            tokenCacheTime = System.currentTimeMillis();
+            Log.d(TAG, "✅ Auth token saved with expiry: " + expiresInSeconds + "s");
+        } catch (Exception e) {
+            Log.e(TAG, "saveAuthToken error: " + e.getMessage());
+        }
     }
-    try {
-        long expiryTime = (expiresInSeconds > 0)
-                ? (System.currentTimeMillis() + (expiresInSeconds * 1000L))
-                : (System.currentTimeMillis() + (86400 * 1000L * 30)); // 30 يوم افتراضي
-        
-        securePrefs.edit()
-                .putString(KEY_AUTH_TOKEN, token)
-                .putLong(KEY_TOKEN_EXPIRY, expiryTime)
-                .apply();
-        
-        cachedAuthToken = token;
-        tokenCacheTime = System.currentTimeMillis();
-        Log.d(TAG, "✅ Auth token saved with expiry: " + expiresInSeconds + "s");
-    } catch (Exception e) {
-        Log.e(TAG, "saveAuthToken error: " + e.getMessage());
-    }
-}
     
     public String getAuthToken() {
-        // ✅ استخدام التخزين المؤقت
         long now = System.currentTimeMillis();
         if (cachedAuthToken != null && (now - tokenCacheTime) < CACHE_VALIDITY_MS) {
             return cachedAuthToken;
@@ -298,9 +339,9 @@ public void saveAuthToken(String token, long expiresInSeconds) {
     }
     
     public void logoutUser() {
-    // ✅ تصفير Auto-Lock
-    setSessionLocked(false);
-    setLastAppActiveTime(0);
+        setSessionLocked(false);
+        setLastAppActiveTime(0);
+        
         boolean keepBiometric = isBiometricEnabled();
         String apiKey = getApiKey();
         String serverUrl = getServerUrl();
@@ -362,7 +403,6 @@ public void saveAuthToken(String token, long expiresInSeconds) {
     // ==================== إدارة المستخدم ====================
     
     public boolean isLoggedIn() {
-        // ✅ استخدام التخزين المؤقت
         long now = System.currentTimeMillis();
         if (cachedLoggedIn != null && (now - loggedInCacheTime) < CACHE_VALIDITY_MS) {
             return cachedLoggedIn;
@@ -373,7 +413,6 @@ public void saveAuthToken(String token, long expiresInSeconds) {
     }
     
     public String getUsername() {
-        // ✅ استخدام التخزين المؤقت
         long now = System.currentTimeMillis();
         if (cachedUsername != null && (now - usernameCacheTime) < CACHE_VALIDITY_MS) {
             return cachedUsername;
@@ -453,63 +492,44 @@ public void saveAuthToken(String token, long expiresInSeconds) {
                 Role.GATE_SECURITY.name().equals(role);
     }
     
-    
     // ═══════════════════════════════════════════════════════
-// ✅ الحقول الإضافية للمستخدم (Email, Phone, Username)
-// ═══════════════════════════════════════════════════════
+    // ✅ الحقول الإضافية للمستخدم (Email, Phone, Username)
+    // ═══════════════════════════════════════════════════════
 
-private static final String KEY_USER_EMAIL = "user_email";
-private static final String KEY_USER_PHONE = "user_phone";
+    private static final String KEY_USER_EMAIL = "user_email";
+    private static final String KEY_USER_PHONE = "user_phone";
 
-/**
- * ✅ الحصول على البريد الإلكتروني
- */
-public String getEmail() {
-    return userPrefs.getString(KEY_USER_EMAIL, "");
-}
-
-/**
- * ✅ حفظ البريد الإلكتروني
- */
-public void setEmail(String email) {
-    if (email != null) {
-        userPrefs.edit().putString(KEY_USER_EMAIL, email).apply();
+    public String getEmail() {
+        return userPrefs.getString(KEY_USER_EMAIL, "");
     }
-}
 
-/**
- * ✅ الحصول على رقم الهاتف
- */
-public String getPhone() {
-    return userPrefs.getString(KEY_USER_PHONE, "");
-}
-
-/**
- * ✅ حفظ رقم الهاتف
- */
-public void setPhone(String phone) {
-    if (phone != null) {
-        userPrefs.edit().putString(KEY_USER_PHONE, phone).apply();
+    public void setEmail(String email) {
+        if (email != null) {
+            userPrefs.edit().putString(KEY_USER_EMAIL, email).apply();
+        }
     }
-}
 
-/**
- * ✅ حفظ اسم المستخدم (Username)
- * ملاحظة: يختلف عن getUsername() الذي يقرأ من KEY_USERNAME
- */
-public void setUsername(String username) {
-    if (username != null && !username.isEmpty()) {
-        userPrefs.edit().putString(KEY_USERNAME, username).apply();
-        // ✅ تحديث التخزين المؤقت
-        cachedUsername = username;
-        usernameCacheTime = System.currentTimeMillis();
+    public String getPhone() {
+        return userPrefs.getString(KEY_USER_PHONE, "");
     }
-}
+
+    public void setPhone(String phone) {
+        if (phone != null) {
+            userPrefs.edit().putString(KEY_USER_PHONE, phone).apply();
+        }
+    }
+
+    public void setUsername(String username) {
+        if (username != null && !username.isEmpty()) {
+            userPrefs.edit().putString(KEY_USERNAME, username).apply();
+            cachedUsername = username;
+            usernameCacheTime = System.currentTimeMillis();
+        }
+    }
     
     // ==================== إدارة عنوان الخادم ====================
     
     public String getServerUrl() {
-        // ✅ استخدام التخزين المؤقت
         long now = System.currentTimeMillis();
         if (cachedServerUrl != null && (now - serverUrlCacheTime) < CACHE_VALIDITY_MS) {
             return cachedServerUrl;
@@ -528,7 +548,6 @@ public void setUsername(String username) {
         if (url == null || url.isEmpty()) return;
         String normalizedUrl = normalizeServerUrl(url);
         userPrefs.edit().putString(KEY_SERVER_URL, normalizedUrl).apply();
-        // ✅ تحديث التخزين المؤقت
         cachedServerUrl = normalizedUrl;
         serverUrlCacheTime = System.currentTimeMillis();
     }
@@ -554,14 +573,12 @@ public void setUsername(String username) {
     public void saveApiKey(String apiKey) {
         if (apiKey != null && !apiKey.isEmpty()) {
             securePrefs.edit().putString(KEY_API_KEY, apiKey).apply();
-            // ✅ تحديث التخزين المؤقت
             cachedApiKey = apiKey;
             apiKeyCacheTime = System.currentTimeMillis();
         }
     }
     
     public String getApiKey() {
-        // ✅ استخدام التخزين المؤقت
         long now = System.currentTimeMillis();
         if (cachedApiKey != null && (now - apiKeyCacheTime) < CACHE_VALIDITY_MS) {
             return cachedApiKey;
@@ -582,7 +599,6 @@ public void setUsername(String username) {
                 .remove(KEY_API_KEY_PREFIX)
                 .remove(KEY_API_KEY_CREATED_AT)
                 .apply();
-        // ✅ مسح التخزين المؤقت
         cachedApiKey = null;
         apiKeyCacheTime = 0;
     }
@@ -676,17 +692,10 @@ public void setUsername(String username) {
                 .apply();
     }
     
-    // ==================== الإصلاح 1: getLastBiometricBranchId ====================
-
-/**
- * ✅ إصلاح: افتراضي -1 بدلاً من 1
- * لمنع استخدام فرع #1 غير موجود
- */
-public int getLastBiometricBranchId() {
-    return userPrefs.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, -1);
-}
-
-
+    public int getLastBiometricBranchId() {
+        return userPrefs.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, -1);
+    }
+    
     public String getLastBiometricBranchName() {
         return userPrefs.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
     }
@@ -786,120 +795,92 @@ public int getLastBiometricBranchId() {
     }
     
     // ═══════════════════════════════════════════════════════
-// ✅ Auto-Lock Support (Inactivity Timeout)
-// ═══════════════════════════════════════════════════════
+    // ✅ Auto-Lock Support (Inactivity Timeout)
+    // ═══════════════════════════════════════════════════════
 
-private static final String KEY_LAST_ACTIVE_TIME = "last_app_active_time";
-private static final String KEY_SESSION_LOCKED = "session_locked";
+    private static final String KEY_LAST_ACTIVE_TIME = "last_app_active_time";
+    private static final String KEY_SESSION_LOCKED = "session_locked";
 
-/**
- * ✅ حفظ آخر وقت نشاط (يُستدعى عند أي تفاعل)
- */
-public void setLastAppActiveTime(long timestamp) {
-    try {
-        userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "setLastAppActiveTime error: " + e.getMessage());
+    public void setLastAppActiveTime(long timestamp) {
+        try {
+            userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "setLastAppActiveTime error: " + e.getMessage());
+        }
     }
-}
 
-/**
- * ✅ الحصول على آخر وقت نشاط
- */
-public long getLastAppActiveTime() {
-    try {
-        return userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0);
-    } catch (Exception e) {
-        return 0;
+    public long getLastAppActiveTime() {
+        try {
+            return userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0);
+        } catch (Exception e) {
+            return 0;
+        }
     }
-}
 
-/**
- * ✅ تحديث "آخر نشاط" (يُستدعى عند أي تفاعل)
- */
-public void touchActivity() {
-    setLastAppActiveTime(System.currentTimeMillis());
-}
-
-/**
- * ✅ قفل الجلسة (بدون إنهائها) — Lock ≠ Logout
- */
-public void setSessionLocked(boolean locked) {
-    try {
-        userPrefs.edit().putBoolean(KEY_SESSION_LOCKED, locked).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "setSessionLocked error: " + e.getMessage());
+    public void touchActivity() {
+        setLastAppActiveTime(System.currentTimeMillis());
     }
-}
 
-/**
- * ✅ هل الجلسة مقفلة؟
- */
-public boolean isSessionLocked() {
-    try {
-        return userPrefs.getBoolean(KEY_SESSION_LOCKED, false);
-    } catch (Exception e) {
-        return false;
+    public void setSessionLocked(boolean locked) {
+        try {
+            userPrefs.edit().putBoolean(KEY_SESSION_LOCKED, locked).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "setSessionLocked error: " + e.getMessage());
+        }
     }
-}
 
-/**
- * ✅ هل انتهت مهلة عدم النشاط؟
- * 
- * @param timeoutMs المهلة بالمللي ثانية (مثلاً 15 * 60 * 1000)
- */
-public boolean isInactivityTimeout(long timeoutMs) {
-    try {
-        long last = getLastAppActiveTime();
-        if (last <= 0) return false;
-        return (System.currentTimeMillis() - last) > timeoutMs;
-    } catch (Exception e) {
-        return false;
+    public boolean isSessionLocked() {
+        try {
+            return userPrefs.getBoolean(KEY_SESSION_LOCKED, false);
+        } catch (Exception e) {
+            return false;
+        }
     }
-}
 
-/**
- * ✅ فك قفل الجلسة (بعد نجاح Biometric)
- */
-public void unlockSession() {
-    try {
-        setSessionLocked(false);
-        touchActivity();
-        Log.d(TAG, "Session unlocked");
-    } catch (Exception e) {
-        Log.e(TAG, "unlockSession error: " + e.getMessage());
+    public boolean isInactivityTimeout(long timeoutMs) {
+        try {
+            long last = getLastAppActiveTime();
+            if (last <= 0) return false;
+            return (System.currentTimeMillis() - last) > timeoutMs;
+        } catch (Exception e) {
+            return false;
+        }
     }
-}
 
-/**
- * ✅ تصفير Auto-Lock (يُستدعى عند login ناجح)
- */
-public void resetAutoLock() {
-    try {
-        setSessionLocked(false);
-        touchActivity();
-        Log.d(TAG, "Auto-Lock reset");
-    } catch (Exception e) {
-        Log.e(TAG, "resetAutoLock error: " + e.getMessage());
+    public void unlockSession() {
+        try {
+            setSessionLocked(false);
+            touchActivity();
+            Log.d(TAG, "Session unlocked");
+        } catch (Exception e) {
+            Log.e(TAG, "unlockSession error: " + e.getMessage());
+        }
     }
-}
+
+    public void resetAutoLock() {
+        try {
+            setSessionLocked(false);
+            touchActivity();
+            Log.d(TAG, "Auto-Lock reset");
+        } catch (Exception e) {
+            Log.e(TAG, "resetAutoLock error: " + e.getMessage());
+        }
+    }
     
     // ==================== وظائف مساعدة ====================
     
     public void clearAll() {
-    securePrefs.edit().clear().apply();
-    userPrefs.edit().clear().apply();
-    // ✅ مسح التخزين المؤقت
-    cachedAuthToken = null;
-    cachedApiKey = null;
-    cachedLoggedIn = false;
-    cachedUsername = null;
-    cachedServerUrl = null;
-    deleteBiometricKey();
-    // ✅ تصفير Auto-Lock (مُضاف)
-    setSessionLocked(false);
-    setLastAppActiveTime(0);
-}
+        securePrefs.edit().clear().apply();
+        userPrefs.edit().clear().apply();
+        cachedAuthToken = null;
+        cachedApiKey = null;
+        cachedLoggedIn = false;
+        cachedUsername = null;
+        cachedServerUrl = null;
+        deleteBiometricKey();
+        setSessionLocked(false);
+        setLastAppActiveTime(0);
+    }
     
     public String getSessionSummary() {
         return "isLoggedIn=" + isLoggedIn() +
@@ -917,7 +898,6 @@ public void resetAutoLock() {
                     .remove(KEY_AUTH_TOKEN)
                     .remove(KEY_TOKEN_EXPIRY)
                     .apply();
-            // ✅ مسح التخزين المؤقت
             cachedAuthToken = null;
             tokenCacheTime = 0;
         } catch (Exception e) {
@@ -937,7 +917,6 @@ public void resetAutoLock() {
                     .remove(KEY_USERNAME)
                     .remove(KEY_USER_ROLE)
                     .apply();
-            // ✅ مسح التخزين المؤقت
             cachedAuthToken = null;
             cachedLoggedIn = false;
             cachedUsername = null;
@@ -950,84 +929,67 @@ public void resetAutoLock() {
     }
 
     public void saveApiKeyInfo(String apiKey, String keyId, String keyPrefix, String createdAt) {
-    securePrefs.edit()
-            .putString(KEY_API_KEY, apiKey)
-            .putString(KEY_API_KEY_ID, keyId)
-            .putString(KEY_API_KEY_PREFIX, keyPrefix)
-            .putString(KEY_API_KEY_CREATED_AT, createdAt)
-            .apply();
-    // ✅ تحديث التخزين المؤقت
-    cachedApiKey = apiKey;
-    apiKeyCacheTime = System.currentTimeMillis();
-}
-
-public String getApiKeyId() {
-    return securePrefs.getString(KEY_API_KEY_ID, "");
-}
-
-public String getApiKeyPrefix() {
-    return securePrefs.getString(KEY_API_KEY_PREFIX, "");
-}
-
-public void setBiometricConfirmEnabled(boolean enabled) {
-    userPrefs.edit().putBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, enabled).apply();
-}
-
-public boolean isBiometricConfirmEnabled() {
-    return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
-}
-// ==================== معرف الفرع ====================
-
-/**
- * ✅ حفظ معرف الفرع الحالي
- */
-public void setBranchId(int branchId) {
-    try {
-        userPrefs.edit().putInt(KEY_BRANCH_ID, branchId).apply();
-        Log.d(TAG, "Branch ID saved: " + branchId);
-    } catch (Exception e) {
-        Log.e(TAG, "setBranchId error: " + e.getMessage());
+        securePrefs.edit()
+                .putString(KEY_API_KEY, apiKey)
+                .putString(KEY_API_KEY_ID, keyId)
+                .putString(KEY_API_KEY_PREFIX, keyPrefix)
+                .putString(KEY_API_KEY_CREATED_AT, createdAt)
+                .apply();
+        cachedApiKey = apiKey;
+        apiKeyCacheTime = System.currentTimeMillis();
     }
-}
 
-
-// ==================== الإصلاح 2: getBranchId ====================
-
-/**
- * ✅ إصلاح: يفصل بوضوح بين "لم يُحفظ" و"محفوظ"
- */
-public int getBranchId() {
-    try {
-        int branchId = userPrefs.getInt(KEY_BRANCH_ID, -1);
-        if (branchId > 0) return branchId;
-
-        // ✅ محاولة من البيانات البيومترية (بعد الإصلاح = -1)
-        int bioBranchId = getLastBiometricBranchId();
-        if (bioBranchId > 0) return bioBranchId;
-
-        return -1;
-    } catch (Exception e) {
-        Log.e(TAG, "getBranchId error: " + e.getMessage());
-        return -1;
+    public String getApiKeyId() {
+        return securePrefs.getString(KEY_API_KEY_ID, "");
     }
-}
+
+    public String getApiKeyPrefix() {
+        return securePrefs.getString(KEY_API_KEY_PREFIX, "");
+    }
+
+    public void setBiometricConfirmEnabled(boolean enabled) {
+        userPrefs.edit().putBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, enabled).apply();
+    }
+
+    public boolean isBiometricConfirmEnabled() {
+        return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
+    }
     
-/**
- * ✅ حفظ اسم الفرع الحالي
- */
-public void setBranchName(String branchName) {
-    try {
-        userPrefs.edit().putString(KEY_BRANCH_NAME, branchName).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "setBranchName error: " + e.getMessage());
+    // ==================== معرف الفرع ====================
+
+    public void setBranchId(int branchId) {
+        try {
+            userPrefs.edit().putInt(KEY_BRANCH_ID, branchId).apply();
+            Log.d(TAG, "Branch ID saved: " + branchId);
+        } catch (Exception e) {
+            Log.e(TAG, "setBranchId error: " + e.getMessage());
+        }
     }
-}
 
-/**
- * ✅ الحصول على اسم الفرع الحالي
- */
-public String getBranchName() {
-    return userPrefs.getString(KEY_BRANCH_NAME, "");
-}
+    public int getBranchId() {
+        try {
+            int branchId = userPrefs.getInt(KEY_BRANCH_ID, -1);
+            if (branchId > 0) return branchId;
 
-}
+            int bioBranchId = getLastBiometricBranchId();
+            if (bioBranchId > 0) return bioBranchId;
+
+            return -1;
+        } catch (Exception e) {
+            Log.e(TAG, "getBranchId error: " + e.getMessage());
+            return -1;
+        }
+    }
+    
+    public void setBranchName(String branchName) {
+        try {
+            userPrefs.edit().putString(KEY_BRANCH_NAME, branchName).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "setBranchName error: " + e.getMessage());
+        }
+    }
+
+    public String getBranchName() {
+        return userPrefs.getString(KEY_BRANCH_NAME, "");
+    }
+    }
