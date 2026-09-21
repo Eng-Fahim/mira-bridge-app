@@ -1381,7 +1381,7 @@ public class MiraPosFragment extends MiraBaseFragment {
                     JSONObject customer = new JSONObject();
                     customer.put("name", payload.getString("customer_name"));
                     customer.put("phone", payload.getString("customer_phone"));
-                    customer.put("payment_method", data.paymentMethod);
+                    
                     payload.put("customer", customer);
 
                     JSONArray itemsArr = new JSONArray();
@@ -1398,13 +1398,38 @@ public class MiraPosFragment extends MiraBaseFragment {
                     }
                     payload.put("items", itemsArr);
 
-                    JSONObject payment = new JSONObject();
-                    payment.put("subtotal_usd", data.originalTotal);
-                    payment.put("discount_amount_usd", data.discountAmount);
-                    payment.put("final_amount_usd", data.finalAmount);
-                    payment.put("currency_code", "YER");
-                    payment.put("payment_method", data.paymentMethod);
-                    payload.put("payment", payment);
+                    // في executeCheckoutDirectly
+// ✅ الكود الجديد الصحيح
+String currencyCode = priceManager.getDefaultCurrency();
+double exchangeRate = priceManager.getExchangeRate(currencyCode);
+double subtotalLocal = priceManager.convertFromUSD(data.originalTotal, currencyCode);
+double discountLocal = priceManager.convertFromUSD(data.discountAmount, currencyCode);
+double finalLocal    = priceManager.convertFromUSD(data.finalAmount, currencyCode);
+
+// ✅ حماية من القيم الشاذة
+if (exchangeRate <= 0) {
+    Log.e(TAG, "⚠️ Invalid exchange rate, using fallback 530");
+    exchangeRate = 530.0;
+    subtotalLocal = data.originalTotal * exchangeRate;
+    discountLocal = data.discountAmount * exchangeRate;
+    finalLocal    = data.finalAmount * exchangeRate;
+}
+
+Log.d("POS_CHECKOUT", String.format(Locale.US,
+    "💰 Currency: %s | Rate: %.4f | USD: %.2f → Local: %.2f",
+    currencyCode, exchangeRate, data.finalAmount, finalLocal));
+
+JSONObject payment = new JSONObject();
+payment.put("subtotal_usd",         data.originalTotal);
+payment.put("subtotal",             subtotalLocal);        // ✅ محلي
+payment.put("discount_amount_usd",  data.discountAmount);
+payment.put("discount_amount",      discountLocal);        // ✅ محلي
+payment.put("final_amount_usd",     data.finalAmount);
+payment.put("final_amount",         finalLocal);           // ✅ محلي حقيقي
+payment.put("exchange_rate",        exchangeRate);         // ✅ حقيقي
+payment.put("currency_code",        currencyCode);         // ✅ من الإعدادات
+payment.put("payment_method",       data.paymentMethod);
+payload.put("payment", payment);
 
                     Log.e("POS_DEBUG", "🚨 SENDING CHECKOUT");
                     Log.e("POS_DEBUG", "URL: " + client.getApiUrl() + "pos/checkout");
@@ -2029,5 +2054,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     });
-
 } // ✅ نهاية الكلاس MiraPosFragment
