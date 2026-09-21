@@ -2989,7 +2989,7 @@ if (persistenceManager != null) {
     persistenceManager.cleanup();
 }
     shutdownExecutor();
-    inventoryDatabase = null;
+    //inventoryDatabase = null;
 }
     /**
      * إغلاق ExecutorService
@@ -3276,6 +3276,21 @@ private void showSessionPreviewDialog(JSONArray items, int expected, String cate
             .setMessage(preview)
             .setPositiveButton(isArabic ? "موافق" : "OK", null)
             .show();
+}
+
+// ==================== واجهات عامة للشريط الثانوي ====================
+
+/**
+ * ✅ فتح الأرشيف (تُستدعى من UHFMainActivity)
+ */
+public void showArchiveReportsPublic() {
+    try {
+        if (isAdded() && !isFragmentDestroyed) {
+            showArchiveReports();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "showArchiveReportsPublic error: " + e.getMessage());
+    }
 }
 
 } // ✅ نهاية الكلاس MiraInventoryProFragment
