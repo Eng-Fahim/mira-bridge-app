@@ -1,6 +1,8 @@
 package com.example.uhf.application;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.room.Room;
@@ -25,6 +27,7 @@ public class MiraApplication extends AppContext {
     private static volatile MiraApplication instance;
     private volatile InventoryDatabase inventoryDatabase;
     private volatile boolean isRestarting = false;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     @Override
     public void onCreate() {
@@ -32,35 +35,48 @@ public class MiraApplication extends AppContext {
         
         instance = this;
         
+        // ✅ 1. فقط الأشياء الخفيفة على Main Thread
         Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
-        
         Log.i(TAG, "MiraApplication Started: onCreate()");
         
-        // ✅ جديد: تهيئة Chainway SDK
-        initializeChainwaySdk();
+        // ✅ 2. تأجيل كل شيء آخر إلى background
+        // هذا يمنع ANR عند بدء التطبيق
         
-        initializeCoreServices();
-        initializeDatabase();
-        initializeExecutors();
-        logDeviceInfo();
+        new Thread(() -> {
+            try {
+                // ✅ Class.forName خفيف نسبياً — يمكن تركه
+                initializeChainwaySdk();
+                initializeExecutors();
+                logDeviceInfo();
+                
+                Log.d(TAG, "✅ Background init complete");
+            } catch (Exception e) {
+                Log.e(TAG, "Background init error", e);
+            }
+        }, "MiraApp-Init").start();
         
-        Log.d(TAG, "MiraApplication initialized successfully");
+        // ✅ 3. الخدمات الأساسية — تأجيل 500ms (بعد استقرار الواجهة)
+        mainHandler.postDelayed(() -> {
+            new Thread(() -> {
+                try {
+                    initializeCoreServices();
+                    initializeDatabase();
+                    Log.d(TAG, "✅ Delayed init complete");
+                } catch (Exception e) {
+                    Log.e(TAG, "Delayed init error", e);
+                }
+            }, "MiraApp-Services").start();
+        }, 500);
+        
+        Log.d(TAG, "MiraApplication onCreate finished — heavy init deferred");
     }
 
     /**
-     * ✅ تهيئة Chainway SDK (DeviceAPI_ver20251103)
-     * 
-     * معلومات مهمة:
-     * - المكتبة تحتوي على 3 ملفات .so:
-     *   • libDeviceAPIM.so (745 KB)  ← يُحمَّل تلقائياً عند init()
-     *   • libDeviceAPIQ.so (1000 KB) ← يُحمَّل حسب الإصدار
-     *   • libIDFingerprintAlg.so (367 KB) ← للبصمة
-     * - لا نحتاج System.loadLibrary() — SDK يدير التحميل
+     * ✅ تهيئة Chainway SDK
      */
     private void initializeChainwaySdk() {
         Log.i(TAG, "🔧 Initializing Chainway SDK...");
         
-        // ✅ 1. التحقق من وجود الكلاس الرئيسي
         try {
             Class<?> readerClass = Class.forName(
                 "com.rscja.deviceapi.RFIDWithUHFUART");
@@ -71,7 +87,6 @@ public class MiraApplication extends AppContext {
                        "Reader will fall back to simulator.");
         }
         
-        // ✅ 2. التحقق من وجود الفئات الإضافية
         String[] optionalClasses = {
             "com.rscja.deviceapi.entity.UHFTAGInfo",
             "com.imagealgorithmlab.fingerprint.FingerprintManager"
@@ -114,12 +129,18 @@ public class MiraApplication extends AppContext {
         }
     }
     
+    /**
+     * ✅ تهيئة الخدمات الأساسية — الآن على Background Thread
+     * 
+     * ⚠️ ملاحظة: هذه الدالة تُستدعى الآن من new Thread في onCreate
+     */
     private void initializeCoreServices() {
         Context appContext = getApplicationContext();
         
         try {
-            Log.d(TAG, "Initializing Core Services...");
+            Log.d(TAG, "Initializing Core Services (background)...");
             
+            // ✅ الآن على background thread — آمن
             SessionManager sessionManager = new SessionManager(appContext);
             MiraServerConfig serverConfig = MiraServerConfig.getInstance(appContext);
             MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
@@ -127,7 +148,7 @@ public class MiraApplication extends AppContext {
             MiraOrgProfileManager orgProfileManager = MiraOrgProfileManager.getInstance(appContext);
             PermissionManager permissionManager = PermissionManager.getInstance(appContext);
             
-            Log.d(TAG, "Core Services Initialized successfully");
+            Log.d(TAG, "✅ Core Services Initialized successfully");
             
         } catch (Exception e) {
             Log.e(TAG, "❌ Error initializing core services: " + e.getMessage(), e);
@@ -145,9 +166,9 @@ public class MiraApplication extends AppContext {
                 .fallbackToDestructiveMigration()
                 .build();
                 
-                Log.d(TAG, "Database Initialized: Success");
+                Log.d(TAG, "✅ Database Initialized: Success");
             } catch (Exception e) {
-                Log.e(TAG, "Database initialization failed: " + e.getMessage(), e);
+                Log.e(TAG, "❌ Database initialization failed: " + e.getMessage(), e);
             }
         }
     }
