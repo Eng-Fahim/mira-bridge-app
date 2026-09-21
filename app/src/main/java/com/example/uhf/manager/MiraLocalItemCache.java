@@ -117,6 +117,80 @@ public class MiraLocalItemCache {
         }
     }
     
+    /**
+     * ✅ إعادة القطعة إلى حالة "متاحة" بعد الإرجاع
+     * - تحذف علامة "مباع"
+     * - تحدّث حالة القطعة في الكاش
+     *
+     * @param identifier معرف القطعة (EPC / Serial / GTIN / Barcode)
+     */
+    public void markItemAsAvailable(String identifier) {
+        if (identifier == null || identifier.trim().isEmpty()) return;
+        
+        try {
+            String code = identifier.trim();
+            
+            // ✅ 1. احذف علامة "مباع" من SharedPreferences
+            prefs.edit()
+                 .remove("sold_" + code)
+                 .remove("item_sold_" + code)
+                 .apply();
+            
+            // ✅ 2. حدّث حالة القطعة في الكاش (JSONObject)
+            String itemsJson = prefs.getString(ITEMS_KEY, "{}");
+            JSONObject allItems = new JSONObject(itemsJson);
+            
+            boolean found = false;
+            java.util.Iterator<String> keys = allItems.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject item = allItems.optJSONObject(key);
+                if (item != null) {
+                    String itemEpc = item.optString("epc", "");
+                    String itemSerial = item.optString("serial", 
+                                        item.optString("serial_number", ""));
+                    String itemGtin = item.optString("gtin", 
+                                      item.optString("gtin13", ""));
+                    String itemBarcode = item.optString("barcode", "");
+                    String itemId = item.optString("id", 
+                                    item.optString("item_id", ""));
+                    
+                    // ✅ إذا تطابق أي من المعرفات
+                    if (code.equalsIgnoreCase(itemEpc) 
+                            || code.equalsIgnoreCase(itemSerial)
+                            || code.equalsIgnoreCase(itemGtin)
+                            || code.equalsIgnoreCase(itemBarcode)
+                            || code.equalsIgnoreCase(itemId)) {
+                        
+                        item.put("status", "available");
+                        item.put("vault_status", "in_stock");
+                        item.put("is_refunded", true);
+                        item.put("last_update", System.currentTimeMillis());
+                        allItems.put(key, item);
+                        found = true;
+                        Log.d(TAG, "✅ Item updated in cache: " + key);
+                    }
+                }
+            }
+            
+            // ✅ 3. احفظ التغييرات
+            prefs.edit().putString(ITEMS_KEY, allItems.toString()).apply();
+            
+            // ✅ 4. أعد تحميل الكاش في الذاكرة
+            itemCache.clear();
+            loadCache();
+            
+            if (found) {
+                Log.d(TAG, "✅ Item marked as available: " + code);
+            } else {
+                Log.d(TAG, "⚠️ Item not found in cache, but marks cleared: " + code);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "markItemAsAvailable error: " + e.getMessage(), e);
+        }
+    }
+    
     public void cacheAllItems(JSONArray items) {
         try {
             for (int i = 0; i < items.length(); i++) {
@@ -139,151 +213,152 @@ public class MiraLocalItemCache {
     }
     
     /**
- * ✅ البحث بالـ EPC
- */
-public JSONObject findByEpc(String epc, int branchId) {
-    try {
-        if (epc == null || epc.isEmpty()) return null;
-        
-        for (JSONObject item : itemCache.values()) {
-            String itemEpc = item.optString("epc", "");
-            if (itemEpc.equalsIgnoreCase(epc)) {
-                return item;
-            }
-        }
-        return null;
-    } catch (Exception e) {
-        Log.e(TAG, "findByEpc error: " + e.getMessage());
-        return null;
-    }
-}
-
-/**
- * ✅ البحث بالـ Serial Number
- */
-public JSONObject findBySerialNumber(String serial, int branchId) {
-    try {
-        if (serial == null || serial.isEmpty()) return null;
-        
-        for (JSONObject item : itemCache.values()) {
-            String itemSerial = item.optString("serial", item.optString("serial_number", ""));
-            if (itemSerial.equalsIgnoreCase(serial)) {
-                return item;
-            }
-        }
-        return null;
-    } catch (Exception e) {
-        Log.e(TAG, "findBySerialNumber error: " + e.getMessage());
-        return null;
-    }
-}
-
-/**
- * ✅ البحث بالـ GTIN
- */
-public JSONObject findByGtin(String gtin, int branchId) {
-    try {
-        if (gtin == null || gtin.isEmpty()) return null;
-        
-        for (JSONObject item : itemCache.values()) {
-            String itemGtin = item.optString("gtin", item.optString("gtin13", ""));
-            if (itemGtin.equalsIgnoreCase(gtin)) {
-                return item;
-            }
-        }
-        return null;
-    } catch (Exception e) {
-        Log.e(TAG, "findByGtin error: " + e.getMessage());
-        return null;
-    }
-}
-
-/**
- * ✅ البحث بالباركود
- */
-public JSONObject findByBarcode(String barcode, int branchId) {
-    try {
-        if (barcode == null || barcode.isEmpty()) return null;
-        
-        for (JSONObject item : itemCache.values()) {
-            String itemBarcode = item.optString("barcode", "");
-            if (itemBarcode.equalsIgnoreCase(barcode)) {
-                return item;
-            }
-        }
-        return null;
-    } catch (Exception e) {
-        Log.e(TAG, "findByBarcode error: " + e.getMessage());
-        return null;
-    }
-}
-
-/**
- * ✅ البحث الشامل - يبحث في جميع الحقول
- */
-public JSONObject findItemComprehensive(String code) {
-    try {
-        if (code == null || code.isEmpty()) return null;
-        
-        // ✅ 1. البحث المباشر في المفتاح
-        JSONObject directMatch = itemCache.get(code);
-        if (directMatch != null) {
-            Log.d(TAG, "✅ Direct match: " + code);
-            return directMatch;
-        }
-        
-        // ✅ 2. البحث في جميع الحقول
-        for (JSONObject item : itemCache.values()) {
-            String epc = item.optString("epc", "");
-            String serial = item.optString("serial", item.optString("serial_number", ""));
-            String gtin = item.optString("gtin", item.optString("gtin13", ""));
-            String barcode = item.optString("barcode", "");
-            String rfidEpc = item.optString("rfid_epc", "");
-            String itemId = item.optString("id", item.optString("item_id", ""));
+     * ✅ البحث بالـ EPC
+     */
+    public JSONObject findByEpc(String epc, int branchId) {
+        try {
+            if (epc == null || epc.isEmpty()) return null;
             
-            if (code.equalsIgnoreCase(epc) || 
-                code.equalsIgnoreCase(serial) || 
-                code.equalsIgnoreCase(gtin) || 
-                code.equalsIgnoreCase(barcode) || 
-                code.equalsIgnoreCase(rfidEpc) ||
-                code.equalsIgnoreCase(itemId)) {
-                Log.d(TAG, "✅ Found in field search: " + code);
-                return item;
-            }
-        }
-        
-        Log.d(TAG, "❌ Not found: " + code);
-        return null;
-    } catch (Exception e) {
-        Log.e(TAG, "findItemComprehensive error: " + e.getMessage());
-        return null;
-    }
-}
-
-/**
- * ✅ الحصول على جميع العناصر لفرع معين
- */
-public java.util.List<JSONObject> getAllItems(int branchId) {
-    java.util.List<JSONObject> items = new java.util.ArrayList<>();
-    try {
-        for (JSONObject item : itemCache.values()) {
-            // ✅ تجنب التكرار
-            boolean exists = false;
-            for (JSONObject existing : items) {
-                if (existing == item) {
-                    exists = true;
-                    break;
+            for (JSONObject item : itemCache.values()) {
+                String itemEpc = item.optString("epc", "");
+                if (itemEpc.equalsIgnoreCase(epc)) {
+                    return item;
                 }
             }
-            if (!exists) {
-                items.add(item);
-            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "findByEpc error: " + e.getMessage());
+            return null;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "getAllItems error: " + e.getMessage());
     }
-    return items;
-}
+
+    /**
+     * ✅ البحث بالـ Serial Number
+     */
+    public JSONObject findBySerialNumber(String serial, int branchId) {
+        try {
+            if (serial == null || serial.isEmpty()) return null;
+            
+            for (JSONObject item : itemCache.values()) {
+                String itemSerial = item.optString("serial", item.optString("serial_number", ""));
+                if (itemSerial.equalsIgnoreCase(serial)) {
+                    return item;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "findBySerialNumber error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ✅ البحث بالـ GTIN
+     */
+    public JSONObject findByGtin(String gtin, int branchId) {
+        try {
+            if (gtin == null || gtin.isEmpty()) return null;
+            
+            for (JSONObject item : itemCache.values()) {
+                String itemGtin = item.optString("gtin", item.optString("gtin13", ""));
+                if (itemGtin.equalsIgnoreCase(gtin)) {
+                    return item;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "findByGtin error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ✅ البحث بالباركود
+     */
+    public JSONObject findByBarcode(String barcode, int branchId) {
+        try {
+            if (barcode == null || barcode.isEmpty()) return null;
+            
+            for (JSONObject item : itemCache.values()) {
+                String itemBarcode = item.optString("barcode", "");
+                if (itemBarcode.equalsIgnoreCase(barcode)) {
+                    return item;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "findByBarcode error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ✅ البحث الشامل - يبحث في جميع الحقول
+     */
+    public JSONObject findItemComprehensive(String code) {
+        try {
+            if (code == null || code.isEmpty()) return null;
+            
+            // ✅ 1. البحث المباشر في المفتاح
+            JSONObject directMatch = itemCache.get(code);
+            if (directMatch != null) {
+                Log.d(TAG, "✅ Direct match: " + code);
+                return directMatch;
+            }
+            
+            // ✅ 2. البحث في جميع الحقول
+            for (JSONObject item : itemCache.values()) {
+                String epc = item.optString("epc", "");
+                String serial = item.optString("serial", item.optString("serial_number", ""));
+                String gtin = item.optString("gtin", item.optString("gtin13", ""));
+                String barcode = item.optString("barcode", "");
+                String rfidEpc = item.optString("rfid_epc", "");
+                String itemId = item.optString("id", item.optString("item_id", ""));
+                
+                if (code.equalsIgnoreCase(epc) || 
+                    code.equalsIgnoreCase(serial) || 
+                    code.equalsIgnoreCase(gtin) || 
+                    code.equalsIgnoreCase(barcode) || 
+                    code.equalsIgnoreCase(rfidEpc) ||
+                    code.equalsIgnoreCase(itemId)) {
+                    Log.d(TAG, "✅ Found in field search: " + code);
+                    return item;
+                }
+            }
+            
+            Log.d(TAG, "❌ Not found: " + code);
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "findItemComprehensive error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ✅ الحصول على جميع العناصر لفرع معين
+     */
+    public java.util.List<JSONObject> getAllItems(int branchId) {
+        java.util.List<JSONObject> items = new java.util.ArrayList<>();
+        try {
+            for (JSONObject item : itemCache.values()) {
+                // ✅ تجنب التكرار
+                boolean exists = false;
+                for (JSONObject existing : items) {
+                    if (existing == item) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    items.add(item);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "getAllItems error: " + e.getMessage());
+        }
+        return items;
+    }
+    
     private void saveCache() {
         try {
             JSONObject allItems = new JSONObject();
