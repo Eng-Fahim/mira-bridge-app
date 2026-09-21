@@ -103,20 +103,21 @@ public class DeviceDetector {
      * التدفق الكامل: اكتشاف → قدرات → Profile → تحقق → تسجيل
      */
     public static DeviceProfile configure(RFIDWithUHFUART reader) {
-        // ✅ فحص سريع - إذا لم يكن الجهاز موجوداً
-        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-            Log.i(TAG, "RFID device not present - skipping configuration");
-            profileStatus = ProfileStatus.FAILED;
-            lastError = "RFID device not present";
-            return null;
-        }
-        
-        if (reader == null) {
-            Log.e(TAG, "Reader is null - cannot configure");
-            profileStatus = ProfileStatus.FAILED;
-            lastError = "Reader is null";
-            return null;
-        }
+    // ✅ استخدم الحالة الديناميكية الجديدة
+    if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+        Log.i(TAG, "RFID device not present - skipping configuration");
+        profileStatus = ProfileStatus.FAILED;
+        lastError = "RFID device not present";
+        return null;
+    }
+    
+    if (reader == null) {
+        Log.e(TAG, "Reader is null - cannot configure");
+        profileStatus = ProfileStatus.FAILED;
+        lastError = "Reader is null";
+        return null;
+    }
+    
         
         detectionTime = System.currentTimeMillis();
         activeProfile = new DeviceProfile();
