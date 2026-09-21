@@ -1201,7 +1201,7 @@ private void fetchRecentActivity() {
                     ? branchesManager.getActiveBranchId() : 0;
 
             MiraApiClient.ApiResponse response =
-                    apiClient.getUnifiedActivity(branchId, 10);
+        apiClient.getUnifiedActivity(branchId, 15);
 
             mainHandler.post(() -> {
                 if (!isAdded() || response == null) return;
@@ -1250,6 +1250,18 @@ private void updateRecentActivityUI(JSONArray activities) {
 private void handleRecentActivityClick(JSONObject activity) {
     if (activity == null || !isAdded()) return;
     try {
+        // ✅ DEBUG
+        boolean hasItems = activity.has("items");
+        int itemsCount = 0;
+        try {
+            JSONArray items = activity.optJSONArray("items");
+            if (items != null) itemsCount = items.length();
+        } catch (Exception ignored) {}
+        
+        Log.d(TAG, "📋 Opening: type=" + activity.optString("type")
+                + ", hasItems=" + hasItems
+                + ", itemsCount=" + itemsCount);
+        
         ActivityDetailsBottomSheet sheet =
                 ActivityDetailsBottomSheet.newInstance(activity, isArabic);
         sheet.show(getParentFragmentManager(), "ActivityDetails");
@@ -1669,4 +1681,42 @@ public void onStop() {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
+    
+    private void initializeManagers() {
+    try {
+        if (!isAdded()) return;
+        Context context = requireContext();
+        apiClient = MiraApiClient.getInstance(context);
+        sessionManager = new SessionManager(context);
+        branchesManager = MiraBranchesManager.getInstance(context);
+        orgProfile = MiraOrgProfileManager.getInstance(context);
+        priceManager = MiraPriceManager.getInstance(context);
+        permissionManager = PermissionManager.getInstance(context);
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
+        lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
+        activityCache = new RecentActivityCache(context);
+
+        // ✅✅✅ إضافة جديدة: مسح الكاش القديم عند تغيير الإصدار
+        try {
+            android.content.SharedPreferences prefs = 
+                context.getSharedPreferences("mira_dashboard", Context.MODE_PRIVATE);
+            int currentVersion = 2;  // رُفعت من 1 إلى 2 (بسبب إضافة items)
+            int savedVersion = prefs.getInt("activity_cache_version", 0);
+            
+            if (savedVersion < currentVersion) {
+                if (activityCache != null) {
+                    activityCache.clear();
+                    Log.d(TAG, "🗑️ Old activity cache cleared (v" + savedVersion + " → v" + currentVersion + ")");
+                }
+                prefs.edit().putInt("activity_cache_version", currentVersion).apply();
+            }
+        } catch (Exception e) {
+            logNonFatal("initializeManagers.cacheVersion", e);
+        }
+        
+    } catch (Exception e) {
+        logNonFatal("initializeManagers", e);
+    }
+}
         }
