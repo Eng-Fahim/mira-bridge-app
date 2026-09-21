@@ -55,90 +55,101 @@ public class RFIDManager {
     }
 
     /**
-     * ✅ الاتصال التلقائي مع التحقق الفعلي
-     * @return true إذا نجح الاتصال
-     */
-    public synchronized boolean autoConnectAndBind(Context hostContext) {
-        try {
-            Log.i(TAG, "🔗 autoConnectAndBind() called");
-            
-            // ✅ 1. تحقق من العتاد
-            if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-                Log.e(TAG, "❌ RFID hardware not present");
-                return false;
-            }
-            
-            // ✅ 2. احصل على القارئ المشترك إذا موجود
-            com.rscja.deviceapi.RFIDWithUHFUART sharedReader = 
-                BaseTabFragmentActivity.getSharedReader();
-            
-            if (sharedReader != null) {
-                Log.i(TAG, "✅ Shared reader available");
-            }
-            
-            // ✅ 3. احصل على الجهاز النشط
-            RFIDDevice device = getActiveDevice();
-            if (device == null) {
-                Log.e(TAG, "❌ No active device");
-                return false;
-            }
-            
-            // ✅ 4. إذا كان SIMULATOR — لا تتصل
-            if (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
-                Log.w(TAG, "⚠️ Active device is SIMULATOR");
-                return false;
-            }
-            
-            // ✅ 5. نظّف القارئ القديم
-            if (activeReader != null && 
-                !(activeReader instanceof com.example.uhf.MiraRfid.readers.ChainwayReader)) {
-                try {
-                    activeReader.stopScan();
-                    activeReader.disconnect();
-                    activeReader.release();
-                } catch (Exception ignored) {}
-                activeReader = null;
-            }
-            
-            // ✅ 6. أنشئ القارئ إذا لزم
-            if (activeReader == null) {
-                activeReader = RFIDReaderFactory.create(device.getType(), 
-                    device.getAddress());
-                if (activeReader == null) {
-                    Log.e(TAG, "❌ Failed to create reader: " + device.getType());
-                    return false;
-                }
-            }
-            
-            // ✅ 7. ربط المستمع
-            if (listener != null) {
-                activeReader.setOnTagReadListener(listener);
-            }
-            
-            // ✅ 8. تهيئة + اتصال
-            if (!activeReader.isConnected()) {
-                if (!activeReader.initialize()) {
-                    Log.e(TAG, "❌ initialize() failed");
-                    return false;
-                }
-                
-                if (!activeReader.connect()) {
-                    Log.e(TAG, "❌ connect() failed");
-                    return false;
-                }
-            }
-            
-            // ✅ 9. تسجيل مستقبل الزناد
-            registerTriggerKeyReceiver();
-            
-            Log.i(TAG, "✅ autoConnectAndBind SUCCESS: " + device.getType());
-            return true;
-            
-        } catch (Exception e) {
-            Log.e(TAG, "❌ autoConnectAndBind exception", e);
+ * ✅ الاتصال التلقائي مع التحقق الفعلي
+ * @return true إذا نجح الاتصال
+ */
+public synchronized boolean autoConnectAndBind(Context hostContext) {
+    try {
+        Log.i(TAG, "🔗 autoConnectAndBind() called");
+        
+        // ═══════════════════════════════════════════════════
+        // ✅ 1. فحص دعم العتاد أولاً (أهم خطوة!)
+        // ═══════════════════════════════════════════════════
+        if (!com.example.uhf.tools.DeviceDetector.isRfidHardwareSupported()) {
+            Log.w(TAG, "⚠️ RFID hardware NOT supported — skipping auto-connect");
             return false;
         }
+        
+        // ✅ 2. تحقق من العتاد (الفكرة الديناميكية)
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            Log.w(TAG, "⚠️ RFID device not present yet");
+            return false;
+        }
+        
+        // ✅ 3. احصل على القارئ المشترك
+        com.rscja.deviceapi.RFIDWithUHFUART sharedReader = 
+            BaseTabFragmentActivity.getSharedReader();
+        
+        if (sharedReader == null) {
+            Log.w(TAG, "⚠️ Shared reader is null");
+            return false;
+        }
+        
+        Log.i(TAG, "✅ Shared reader available");
+        
+        // ✅ 4. احصل على الجهاز النشط
+        RFIDDevice device = getActiveDevice();
+        if (device == null) {
+            Log.e(TAG, "❌ No active device");
+            return false;
+        }
+        
+        // ✅ 5. إذا كان SIMULATOR — لا تتصل
+        if (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
+            Log.w(TAG, "⚠️ Active device is SIMULATOR");
+            return false;
+        }
+        
+        // ✅ 6. نظّف القارئ القديم
+        if (activeReader != null && 
+            !(activeReader instanceof com.example.uhf.MiraRfid.readers.ChainwayReader)) {
+            try {
+                activeReader.stopScan();
+                activeReader.disconnect();
+                activeReader.release();
+            } catch (Exception ignored) {}
+            activeReader = null;
+        }
+        
+        // ✅ 7. أنشئ القارئ إذا لزم
+        if (activeReader == null) {
+            activeReader = RFIDReaderFactory.create(device.getType(), 
+                device.getAddress());
+            if (activeReader == null) {
+                Log.e(TAG, "❌ Failed to create reader: " + device.getType());
+                return false;
+            }
+        }
+        
+        // ✅ 8. ربط المستمع
+        if (listener != null) {
+            activeReader.setOnTagReadListener(listener);
+        }
+        
+        // ✅ 9. تهيئة + اتصال
+        if (!activeReader.isConnected()) {
+            if (!activeReader.initialize()) {
+                Log.e(TAG, "❌ initialize() failed");
+                return false;
+            }
+            
+            if (!activeReader.connect()) {
+                Log.e(TAG, "❌ connect() failed");
+                return false;
+            }
+        }
+        
+        // ✅ 10. تسجيل مستقبل الزناد
+        registerTriggerKeyReceiver();
+        
+        Log.i(TAG, "✅ autoConnectAndBind SUCCESS: " + device.getType());
+        return true;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "❌ autoConnectAndBind exception", e);
+        return false;
     }
+}
 
     public void registerTriggerKeyReceiver() {
         if (isReceiverRegistered) return;
