@@ -5,6 +5,8 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.content.SharedPreferences;   // ← جديد
+import androidx.appcompat.app.AppCompatDelegate;  // ← جديد
 
 import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
@@ -84,51 +86,62 @@ public class MiraApplication extends AppContext {
     // ==================== Lifecycle ====================
 
     @Override
-    public void onCreate() {
-        super.onCreate();
-        // ✅✅✅ طبّق الثيم المحفوظ فوراً قبل أي شيء آخر
+public void onCreate() {
+    super.onCreate();
+    
+    // ✅✅✅ طبّق الثيم المحفوظ فوراً قبل أي شيء آخر
     applySavedTheme();
 
-        instance = this;
+    instance = this;
 
+    try {
+        // ✅ [إصلاح #8] حماية AppCrashHandler
         try {
-            // ✅ [إصلاح #8] حماية AppCrashHandler
-            try {
-                Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
-            } catch (Throwable t) {
-                Log.e(TAG, "AppCrashHandler init failed", t);
-            }
-
-            Log.i(TAG, "MiraApplication Started: onCreate()");
-
-            // ✅ 1. الخفيف فقط على Main
-            initializeChainwaySdk();
-            initializeExecutors();
-
-            // ✅ 2. الثقيل — بعد أول frame
-            scheduleHeavyInit();
-
-            Log.d(TAG, "MiraApplication onCreate finished — heavy init deferred");
-
+            Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
         } catch (Throwable t) {
-            Log.e(TAG, "onCreate catastrophic error", t);
-            // ✅ لا نُسقط التطبيق — نحاول المتابعة
+            Log.e(TAG, "AppCrashHandler init failed", t);
         }
-    }
 
+        Log.i(TAG, "MiraApplication Started: onCreate()");
+
+        // ✅ 1. الخفيف فقط على Main
+        initializeChainwaySdk();
+        initializeExecutors();
+
+        // ✅ 2. الثقيل — بعد أول frame
+        scheduleHeavyInit();
+
+        Log.d(TAG, "MiraApplication onCreate finished — heavy init deferred");
+
+    } catch (Throwable t) {
+        Log.e(TAG, "onCreate catastrophic error", t);
+    }
+}
 
 /**
- * ✅ تطبيق الثيم المحفوظ
+ * ✅✅✅ تطبيق الثيم المحفوظ — قبل أي شيء آخر
+ *
+ * يعمل بالتعاون مع:
+ * - values/themes.xml        (الفاتح)
+ * - values-night/themes.xml  (الداكن)
+ * - uiMode في AndroidManifest configChanges
  */
 private void applySavedTheme() {
     try {
-        SharedPreferences prefs = getSharedPreferences("app_theme", Context.MODE_PRIVATE);
-        int mode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        SharedPreferences prefs = getSharedPreferences(
+                "app_theme", Context.MODE_PRIVATE);
+        int mode = prefs.getInt(
+                "theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+
         AppCompatDelegate.setDefaultNightMode(mode);
         Log.i(TAG, "✅ Theme applied from prefs: " + mode);
+
     } catch (Exception e) {
         Log.e(TAG, "Failed to apply saved theme", e);
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        try {
+            AppCompatDelegate.setDefaultNightMode(
+                    AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        } catch (Exception ignored) {}
     }
 }
     /**
