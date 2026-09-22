@@ -218,31 +218,34 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     // ==================== Reading Source ====================
 
     private void startReadingSource(int generation) {
-        boolean hardwareStarted = false;
+    boolean hardwareStarted = false;
 
-        if (rfidManager != null) {
+    if (rfidManager != null) {
+        // ✅ [إصلاح حرج] انتظر جهوزية القارئ (بحد أقصى 3 ثواني)
+        Log.d(TAG, "⏳ Waiting for reader to be ready...");
+        boolean ready = rfidManager.waitForReaderReady(3000);
+
+        if (ready) {
+            Log.d(TAG, "✅ Reader ready — starting hardware scan");
             try {
-                if (rfidManager.getActiveDevice() != null) {
-                    MiraIRFIDReader.ReaderType type =
-                            rfidManager.getActiveDevice().getType();
-                    if (type != MiraIRFIDReader.ReaderType.SIMULATOR) {
-                        hardwareStarted = rfidManager.startScan();
-                    }
-                }
+                hardwareStarted = rfidManager.startScan();
             } catch (Exception e) {
                 Log.e(TAG, "hardware start error", e);
             }
-        }
-
-        if (!hardwareStarted) {
-            startSimulationLoop(generation);
-            Log.d(TAG, "🎯 Simulation mode started");
-        }
-
-        if (soundManager != null) {
-            soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
+        } else {
+            Log.w(TAG, "⚠️ Reader not ready after 3s — falling back to simulation");
         }
     }
+
+    if (!hardwareStarted) {
+        startSimulationLoop(generation);
+        Log.d(TAG, "🎯 Simulation mode started");
+    }
+
+    if (soundManager != null) {
+        soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
+    }
+}
 
     // ============================================================
     // ✅ RFID Listener Overrides — كل الدوال الخمس
