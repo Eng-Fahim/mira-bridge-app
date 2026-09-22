@@ -2126,13 +2126,14 @@ public void onCommitSuccess(JSONObject report) {
         showCommitSuccessDialog(finalReport);
     });
 }
-                   @Override
+                  @Override
 public void onCommitError(String error) {
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
         Log.e(TAG, "Commit failed: " + error);  // ← قراءة فقط ✅
         showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + error);  // ← قراءة فقط ✅
     });
+}
     }
 
 
