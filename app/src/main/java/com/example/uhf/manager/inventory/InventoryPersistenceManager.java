@@ -207,116 +207,167 @@ public class InventoryPersistenceManager {
         });
     }
 
-    // ==================== 3. Commit Inventory ====================
+   public void commitInventory(String sessionId,
+                             int branchId,
+                             int expectedCount,
+                             int totalReads,
+                             int scannedCount,
+                             List<ScannedItemDisplay> items,
+                             MiraApiClient apiClient,
+                             CommitCallback callback) {
 
-    public void commitInventory(String sessionId,
-                                 int branchId,
-                                 int expectedCount,
-                                 int totalReads,
-                                 int scannedCount,
-                                 List<ScannedItemDisplay> items,
-                                 MiraApiClient apiClient,
-                                 CommitCallback callback) {
-
-        if (!isCommitting.compareAndSet(false, true)) {
-            if (callback != null) {
-                callback.onCommitError(isArabic ?
-                        "جاري الإرسال بالفعل..." : "Already sending...");
-            }
-            return;
+    if (!isCommitting.compareAndSet(false, true)) {
+        if (callback != null) {
+            callback.onCommitError(isArabic ?
+                    "جاري الإرسال بالفعل..." : "Already sending...");
         }
+        return;
+    }
 
-        if (executor == null || executor.isShutdown() || apiClient == null) {
+    if (executor == null || executor.isShutdown() || apiClient == null) {
+        isCommitting.set(false);
+        if (callback != null) callback.onCommitError("Prerequisites not met");
+        return;
+    }
+
+    executor.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+
+            payload.put("session_id", sessionId);
+            payload.put("client_session_id", sessionId);
+            payload.put("branch_id", branchId);
+            payload.put("location", "Main Showroom");
+
+            payload.put("expected_count", expectedCount);
+            payload.put("total_scanned", totalReads);
+            payload.put("unique_count", scannedCount);
+            payload.put("found_count", scannedCount);
+            payload.put("missing_count", Math.max(0, expectedCount - scannedCount));
+            payload.put("unexpected_count", 0);
+
+            JSONArray itemsArray = new JSONArray();
+            JSONArray epcsArray = new JSONArray();
+
+            List<ScannedItemDisplay> snapshot = null;
+            if (items != null) {
+                snapshot = new ArrayList<>(items);
+            }
+
+            if (snapshot != null) {
+                for (ScannedItemDisplay item : snapshot) {
+                    JSONObject itemObj = new JSONObject();
+                    itemObj.put("code", item.epc);
+                    itemObj.put("serial", item.epc);
+                    itemObj.put("rssi", String.valueOf(item.rssi));
+                    itemsArray.put(itemObj);
+
+                    epcsArray.put(item.epc);
+                }
+            }
+
+            payload.put("items", itemsArray);
+            payload.put("scanned_epcs", epcsArray);
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.closeInventorySession(payload);
+
             isCommitting.set(false);
-            if (callback != null) callback.onCommitError("Prerequisites not met");
-            return;
-        }
 
-        executor.execute(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-
-                payload.put("session_id", sessionId);
-                payload.put("client_session_id", sessionId);
-                payload.put("branch_id", branchId);
-                payload.put("location", "Main Showroom");
-
-                payload.put("expected_count", expectedCount);
-                payload.put("total_scanned", totalReads);
-                payload.put("unique_count", scannedCount);
-                payload.put("found_count", scannedCount);
-                payload.put("missing_count", Math.max(0, expectedCount - scannedCount));
-                payload.put("unexpected_count", 0);
-
-                JSONArray itemsArray = new JSONArray();
-                JSONArray epcsArray = new JSONArray();
-
-                List<ScannedItemDisplay> snapshot = null;
-                if (items != null) {
-                    snapshot = new ArrayList<>(items);  // ✅ نسخة آمنة
+            // ✅✅✅ الكتلة المُصححة (بدون تكرار):
+            if (response != null && response.isSuccess) {
+                JSONObject report = extractBestReport(response);
+                
+                if (report == null) {
+                    Log.w(TAG, "⚠️ extractBestReport returned null — building local summary");
+                    report = buildLocalReportFromResponse(response);
                 }
-
-                if (snapshot != null) {
-                    for (ScannedItemDisplay item : snapshot) {
-                        JSONObject itemObj = new JSONObject();
-                        itemObj.put("code", item.epc);
-                        itemObj.put("serial", item.epc);
-                        itemObj.put("rssi", String.valueOf(item.rssi));
-                        itemsArray.put(itemObj);
-
-                        epcsArray.put(item.epc);
-                    }
-                }
-
-                payload.put("items", itemsArray);
-                payload.put("scanned_epcs", epcsArray);
-
-                MiraApiClient.ApiResponse response =
-                        apiClient.closeInventorySession(payload);
-
-                isCommitting.set(false);
-
-                if (response != null && response.isSuccess) {
-    JSONObject report = extractBestReport(response);
-    
-    Log.d(TAG, "📊 Final report: " + (report != null ? report.toString() : "null"));
-    
-    if (callback != null) {
-        callback.onCommitSuccess(report != null ? report : new JSONObject());
-    }
-                } else {
-                    String error = response != null ? response.error : "Unknown error";
-                    if (callback != null) {
-                        callback.onCommitError(error);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "commitInventory error: " + e.getMessage());
-                isCommitting.set(false);
+                
                 if (callback != null) {
-                    callback.onCommitError(e.getMessage());
+                    callback.onCommitSuccess(report);
+                }
+            } else {
+                String error = response != null ? response.error : "Unknown error";
+                if (callback != null) {
+                    callback.onCommitError(error);
                 }
             }
-        });
-    }
+            // ← ← ← نهاية الكتلة المُصححة
+
+        } catch (Exception e) {
+            Log.e(TAG, "commitInventory error: " + e.getMessage());
+            isCommitting.set(false);
+            if (callback != null) {
+                callback.onCommitError(e.getMessage());
+            }
+        }
+    });
+}
     
+    
+    /**
+ * ✅ بناء تقرير محلي إذا لم يُرجع السيرفر تقريراً صالحاً
+ */
+private JSONObject buildLocalReportFromResponse(MiraApiClient.ApiResponse response) {
+    try {
+        JSONObject report = new JSONObject();
+        
+        // ✅ محاولة استخراج المعلومات من response
+        JSONObject data = response.data;
+        if (data != null) {
+            // جرب أي حقل متاح
+            report.put("accuracy", data.optString("accuracy", "N/A"));
+            report.put("risk_level", data.optString("risk_level", "unknown"));
+            report.put("recommendation", data.optString("message", 
+                    isArabic ? "تم الاعتماد — راجع الأرشيف" : "Committed — check archive"));
+            report.put("expected_count", data.optInt("expected_count", 0));
+            report.put("found_count", data.optInt("found_count", 0));
+            report.put("missing_count", data.optInt("missing_count", 0));
+            report.put("session_id", data.optString("session_id", 
+                    data.optInt("session_id", 0) + ""));
+        } else {
+            report.put("accuracy", "N/A");
+            report.put("risk_level", "unknown");
+            report.put("recommendation", isArabic 
+                    ? "تم الاعتماد — راجع الأرشيف" 
+                    : "Committed — check archive");
+        }
+        
+        return report;
+    } catch (Exception e) {
+        Log.e(TAG, "buildLocalReportFromResponse error", e);
+        return new JSONObject();
+    }
+}
     /**
  * ✅ استخراج التقرير بأفضل شكل ممكن من response السيرفر
  * يدعم 5 أشكال مختلفة
  */
 private JSONObject extractBestReport(MiraApiClient.ApiResponse response) {
-    if (response == null || response.data == null) return null;
+    if (response == null || response.data == null) {
+        Log.w(TAG, "❌ extractBestReport: response or data is null");
+        return null;
+    }
     
     JSONObject data = response.data;
     
-    // ✅ محاولة 1: response.data.report
+    Log.d(TAG, "📊 Full server response: " + data.toString());
+    
+    // ✅ 0) فحص إذا كان response يحوي error
+    if (data.has("code") && data.has("message") && !data.has("report")) {
+        // ← هذا rest_no_route أو خطأ API
+        Log.e(TAG, "❌ Server returned error: " + data.optString("message"));
+        return null;
+    }
+    
+    // ✅ محاولة 1: data.report
     JSONObject report = data.optJSONObject("report");
     if (report != null && report.length() > 0) {
         Log.d(TAG, "✅ Found report in: data.report");
         return report;
     }
     
-    // ✅ محاولة 2: response.data.data.report
+    // ✅ محاولة 2: data.data.report
     JSONObject nested = data.optJSONObject("data");
     if (nested != null) {
         report = nested.optJSONObject("report");
@@ -325,29 +376,29 @@ private JSONObject extractBestReport(MiraApiClient.ApiResponse response) {
             return report;
         }
         
-        // ✅ محاولة 3: response.data.data (مباشرة)
-        if (nested.length() > 0 && nested.has("accuracy")) {
+        // ✅ محاولة 3: data.data (مباشرة)
+        if (nested.has("accuracy") || nested.has("expected_count")) {
             Log.d(TAG, "✅ Found report in: data.data");
             return nested;
         }
     }
     
-    // ✅ محاولة 4: response.data.summary
+    // ✅ محاولة 4: data.summary
     report = data.optJSONObject("summary");
     if (report != null && report.length() > 0) {
         Log.d(TAG, "✅ Found report in: data.summary");
         return report;
     }
     
-    // ✅ محاولة 5: response.data مباشرة
+    // ✅ محاولة 5: data مباشرة (يحتوي accuracy أو expected_count)
     if (data.has("accuracy") || data.has("expected_count") || data.has("found_count")) {
         Log.d(TAG, "✅ Using data directly as report");
         return data;
     }
     
-    // ❌ لم نجد شيئاً — أرجع data كما هو (قد يحتوي على IDs فقط)
-    Log.w(TAG, "⚠️ No valid report found — using raw data");
-    return data;
+    // ❌ لم نجد شيئاً
+    Log.w(TAG, "⚠️ No valid report found");
+    return null;  // ← ← ← إرجاع null بدلاً من data
 }
 
     // ==================== 4. Fetch Archive Reports ====================
