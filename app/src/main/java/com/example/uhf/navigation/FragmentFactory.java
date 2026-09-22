@@ -34,6 +34,8 @@ public class FragmentFactory {
             case "Branches": return new MiraBranchesManagementFragment();
             case "RfidBindings": return new MiraRfidBindingsFragment();
             case "SoundSettings": return new MiraSoundSettingsFragment();
+            // ✅ جديد: شاشة اللقطات
+            case "Snapshots": return new MiraSnapshotsFragment();
             default: return new MiraDashboardFragment();
         }
     }
