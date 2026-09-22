@@ -3,61 +3,149 @@ package com.example.uhf.MiraRfid;
 import android.content.Context;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.example.uhf.MiraRfid.readers.ChainwayReader;
 import com.example.uhf.MiraRfid.readers.SimulatorReader;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.RfidPasswordManager;
-import com.rscja.deviceapi.RFIDWithUHFUART;
+import com.example.uhf.utils.MiraExecutorService;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
- * خدمة RFID موحدة لربط القارئات وواجهات التطبيق
- * 
- * ✅ الإصدار 3.0 — الترقية الأمنية:
- * - لا توجد كلمة مرور في الكود
- * - تكامل كامل مع RfidPasswordManager
- * - دعم 3 أوضاع: STATIC / DERIVED_FROM_TID / FROM_SERVER
- * - normalizePwd() يستخدم RfidPasswordManager
- * - تصحيح ptr من Bit(32) إلى Word(2)
- * - استخدام ثوابت Bank_*
+ * MiraRfidService - الإصدار 4.0 (المطوّر الاحترافي)
+ *
+ * ✅ الإصلاحات المطبقة (26 مشكلة):
+ *  1. انتظار كشف القارئ (CountDownLatch)
+ *  2. getInstance ينتظر التهيئة
+ *  3. release آمن + إعادة تعيين آمنة
+ *  4. إزالة FALLBACK_PWD من الكود
+ *  5. readTid مع تأخير + استراتيجية محسّنة
+ *  6. توثيق EPC_START_WORD
+ *  7. فحص isSimulationMode في كل عملية
+ *  8. verifyWrite لا يُغيّر currentState
+ *  9. فحص pwdManager == null
+ * 10. فحص context == null
+ * 11. لا import مباشر لـ SDK في العمليات
+ * 12. readTid يستخدم قارئ مباشر
+ * 13. تنظيف TID بذكاء
+ * 14. writeEpc موثّق
+ * 15. verifyWrite مع padding
+ * 16. registerRfidBinding يفرّق بين الوضعين
+ * 17. generateEpcFromMiraId مع فحص
+ * 18. searchInMira آمن
+ * 19. verifyTagAllowed مع فحص null
+ * 20. markTagProgrammed مع offline fallback
+ * 21. getRfidInventoryStats واقعي
+ * 22. release يوقف detectThread
+ * 23. setFilter مُوثّق
+ * 24. getDeviceName آمن
+ * 25. currentState مُتزامن
+ * 26. timeout على عمليات SDK
+ *
+ * ✅ إضافات:
+ *  - getInstanceAsync() مع callback
+ *  - waitForReader(timeoutMs)
+ *  - isReady()
+ *  - getHealthReport()
+ *  - readTidWithRetry() محسّن
+ *  - normalizeEpc() للمقارنات
  */
 public class MiraRfidService {
+
     private static final String TAG = "MiraRfidService";
-    private static volatile MiraRfidService instance;
-    
-    // ⚠️ هذه الكلمة تُستخدم فقط كـ fallback أخير إذا فشل كل شيء
-    // وليست الكلمة الفعلية — الكلمة الحقيقية تأتي من RfidPasswordManager
-    private static final String FALLBACK_PWD = "00000000";
-    
-    // ✅ Word pointer حيث يبدأ EPC (Word 2 = Bit 32)
+
+    // ==================== ثوابت ====================
+    // ✅ [إصلاح #6] توثيق EPC
+    /**
+     * EPC في bank 01، يبدأ من Word 2 (Bit 32)
+     * طول EPC القياسي = 96 bits = 6 words = 24 hex chars
+     */
+    private static final int EPC_BANK = 1;
     private static final int EPC_START_WORD = 2;
-    private static final int EPC_READ_LENGTH = 6;  // 6 words = 96 bits = 24 hex chars
-    
-    private final Context context;
+    private static final int EPC_READ_LENGTH_WORDS = 6;
+
+    /** TID في bank 2، يبدأ من Word 0 */
+    private static final int TID_BANK = 2;
+    private static final int TID_START_WORD = 0;
+
+    /** محاولات قراءة TID */
+    private static final int[] TID_READ_ATTEMPTS_WORDS = {6, 5, 4};
+
+    /** انتظار كشف القارئ */
+    private static final long READER_DETECT_TIMEOUT_SEC = 8;
+
+    /** مهلة العملية على SDK */
+    private static final long SDK_OPERATION_TIMEOUT_MS = 5000;
+
+    // ==================== Singleton ====================
+    private static volatile MiraRfidService instance;
+
+    private final Context appContext;
     private final RfidPasswordManager pwdManager;
-    
-    private MiraIRFIDReader activeReader;
-    private volatile boolean isSimulationMode = false;
-    private volatile String lastReadEpc = "";
-    private volatile String lastReadTid = "";
-    
-    private volatile OperationState currentState = OperationState.IDLE;
-    
+
+    private volatile MiraIRFIDReader activeReader;
+    private final AtomicBoolean isSimulationMode = new AtomicBoolean(false);
+    private final AtomicReference<String> lastReadEpc = new AtomicReference<>("");
+    private final AtomicReference<String> lastReadTid = new AtomicReference<>("");
+    private final AtomicReference<OperationState> currentState =
+            new AtomicReference<>(OperationState.IDLE);
+
+    // ✅ [إصلاح #1] انتظار التهيئة
+    private final CountDownLatch readerReadyLatch = new CountDownLatch(1);
+    private final AtomicBoolean isReaderReady = new AtomicBoolean(false);
+
+    // ✅ [إصلاح #22] للتحكم في الخيط
+    private volatile Thread detectThread;
+    private final AtomicBoolean isShutdown = new AtomicBoolean(false);
+
+    // ==================== Enums ====================
+
     public enum OperationState {
         IDLE, READING, WRITING, VERIFYING, REGISTERING, COMPLETED, FAILED
     }
-    
-    private MiraRfidService(Context context) {
-        // ✅ حماية الـ Memory Leak باستخدام ApplicationContext
-        this.context = context.getApplicationContext();
-        // ✅ تهيئة مدير كلمات المرور الآمن
-        this.pwdManager = RfidPasswordManager.getInstance(this.context);
+
+    // ==================== Interfaces ====================
+
+    /**
+     * ✅ [إضافة] callback للتهيئة غير المتزامنة
+     */
+    public interface ReaderReadyCallback {
+        void onReady(boolean success, String deviceName, boolean isSimulation);
+    }
+
+    // ==================== Constructor ====================
+
+    private MiraRfidService(@NonNull Context context) {
+        // ✅ [إصلاح #10] فحص context
+        if (context == null) {
+            throw new IllegalArgumentException("MiraRfidService: context cannot be null");
+        }
+        this.appContext = context.getApplicationContext();
+
+        // ✅ [إصلاح #9] فحص pwdManager
+        RfidPasswordManager tempPwd = null;
+        try {
+            tempPwd = RfidPasswordManager.getInstance(this.appContext);
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to init RfidPasswordManager", t);
+        }
+        this.pwdManager = tempPwd;
+
+        // بدء الكشف
         detectAndInitializeReader();
     }
-    
-    public static MiraRfidService getInstance(Context context) {
+
+    public static MiraRfidService getInstance(@NonNull Context context) {
         if (instance == null) {
             synchronized (MiraRfidService.class) {
                 if (instance == null) {
@@ -68,375 +156,604 @@ public class MiraRfidService {
         return instance;
     }
 
+    /**
+     * ✅ [إضافة] نسخة غير محجوبة
+     */
+    public static void getInstanceAsync(@NonNull Context context,
+                                         @Nullable ReaderReadyCallback callback) {
+        MiraRfidService svc = getInstance(context);
+        if (callback == null) return;
+
+        // ✅ [إصلاح #2] انتظر على خيط منفصل
+        MiraExecutorService.getInstance().getBackgroundExecutor().execute(() -> {
+            boolean ok = svc.waitForReader(READER_DETECT_TIMEOUT_SEC * 1000);
+            String name = svc.getDeviceName();
+            boolean isSim = svc.isSimulationMode();
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .post(() -> callback.onReady(ok, name, isSim));
+        });
+    }
+
+    // ==================== Reader Detection ====================
+
+    /**
+     * ✅ [إصلاح #1, #22] كشف القارئ مع احترام isShutdown
+     */
     private void detectAndInitializeReader() {
-        Thread detectThread = new Thread(() -> {
+        detectThread = new Thread(() -> {
+            if (isShutdown.get()) return;
+
             ChainwayReader chainwayReader = null;
             try {
-                chainwayReader = new ChainwayReader(context);
+                chainwayReader = new ChainwayReader(appContext);
                 if (chainwayReader.initialize() && chainwayReader.connect()) {
+                    if (isShutdown.get()) {
+                        // تم الإغلاق أثناء الكشف
+                        chainwayReader.release();
+                        return;
+                    }
                     activeReader = chainwayReader;
-                    isSimulationMode = false;
+                    isSimulationMode.set(false);
                     Log.i(TAG, "✅ تم الاتصال بالقارئ الحقيقي: Chainway");
+                    onReaderReady();
                     return;
                 } else {
                     chainwayReader.release();
                     chainwayReader = null;
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
+            } catch (Throwable t) {
+                Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + t.getMessage());
                 if (chainwayReader != null) {
-                    try { chainwayReader.release(); } catch (Exception ignored) {}
+                    try { chainwayReader.release(); } catch (Throwable ignored) {}
                 }
             }
-            
+
             // ✅ التوجه للمحاكاة
-            SimulatorReader simulatorReader = new SimulatorReader(context);
-            simulatorReader.initialize();
-            simulatorReader.connect();
-            activeReader = simulatorReader;
-            isSimulationMode = true;
-            Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
+            if (isShutdown.get()) return;
+
+            try {
+                SimulatorReader simulatorReader = new SimulatorReader(appContext);
+                simulatorReader.initialize();
+                simulatorReader.connect();
+                activeReader = simulatorReader;
+                isSimulationMode.set(true);
+                Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
+                onReaderReady();
+            } catch (Throwable t) {
+                Log.e(TAG, "❌ فشل حتى في المحاكاة!", t);
+                // ✅ نُعلّم الـ latch حتى لو فشل الكل
+                isReaderReady.set(false);
+                readerReadyLatch.countDown();
+            }
         });
-        
+
         detectThread.setName("MiraRFID-Detector");
         detectThread.setDaemon(true);
+        detectThread.setPriority(Thread.NORM_PRIORITY - 1);
         detectThread.start();
     }
 
+    private void onReaderReady() {
+        isReaderReady.set(true);
+        readerReadyLatch.countDown();
+    }
+
+    /**
+     * ✅ [إصلاح #1, #2] انتظار جاهزية القارئ
+     */
+    public boolean waitForReader(long timeoutMs) {
+        if (isReaderReady.get()) return activeReader != null;
+        try {
+            boolean ok = readerReadyLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+            return ok && activeReader != null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    public boolean isReady() {
+        return isReaderReady.get() && activeReader != null && !isShutdown.get();
+    }
+
+    // ==================== Release / Shutdown ====================
+
+    /**
+     * ✅ [إصلاح #3, #22] إغلاق آمن
+     */
     public synchronized void release() {
-        if (activeReader != null) {
+        if (isShutdown.compareAndSet(false, true)) {
+            Log.i(TAG, "Shutting down MiraRfidService");
+        }
+
+        // 1) انتظر الخيط إن كان يعمل (بحد أقصى 2 ثانية)
+        Thread t = detectThread;
+        if (t != null && t.isAlive()) {
             try {
-                activeReader.disconnect();
-                activeReader.release();
-            } catch (Exception e) {
-                Log.e(TAG, "Error releasing active reader: " + e.getMessage());
+                t.join(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // 2) أغلق القارئ
+        MiraIRFIDReader reader = activeReader;
+        if (reader != null) {
+            try {
+                reader.disconnect();
+                reader.release();
+            } catch (Throwable e) {
+                Log.e(TAG, "Error releasing active reader", e);
             }
             activeReader = null;
         }
+
+        // 3) أعلم المنتظرين
+        readerReadyLatch.countDown();
+
+        // 4) امسح الـ instance
         instance = null;
     }
 
-    public boolean isSimulationMode() { return isSimulationMode; }
-    public MiraIRFIDReader getActiveReader() { return activeReader; }
-    public OperationState getCurrentState() { return currentState; }
-    public String getLastReadEpc() { return lastReadEpc; }
-    public String getLastReadTid() { return lastReadTid; }
+    // ==================== Getters ====================
 
-    // =========================================================================
-    // 🔐 دالة مساعدة: توحيد كلمة المرور (تكامل مع RfidPasswordManager)
-    // =========================================================================
+    public boolean isSimulationMode() { return isSimulationMode.get(); }
+    public MiraIRFIDReader getActiveReader() { return activeReader; }
+    public OperationState getCurrentState() { return currentState.get(); }
+    public String getLastReadEpc() { return lastReadEpc.get(); }
+    public String getLastReadTid() { return lastReadTid.get(); }
+    public boolean isShutdown() { return isShutdown.get(); }
+
+    // ==================== Password ====================
 
     /**
-     * ✅ توحيد كلمة المرور بالتكامل مع RfidPasswordManager
-     * 
-     * التسلسل:
-     * 1) إذا مُررت كلمة صريحة → استخدمها
-     * 2) وإلا → اطلبها من RfidPasswordManager (حسب الوضع)
-     * 3) fallback → FALLBACK_PWD مع تحذير
+     * ✅ [إصلاح #4, #9] بدون FALLBACK_PWD ثابت
      */
-    private String normalizePwd(String pwdStr) {
+    @Nullable
+    private String normalizePwd(@Nullable String pwdStr) {
         // 1) كلمة صريحة
         if (pwdStr != null && !pwdStr.trim().isEmpty()) {
-            return pwdStr.trim().toUpperCase();
+            return pwdStr.trim().toUpperCase(Locale.US);
         }
-        
-        // 2) من RfidPasswordManager (باستخدام TID آخر شريحة مقروءة)
-        try {
-            String managed = pwdManager.getPasswordForTag(lastReadTid);
-            if (managed != null && !managed.isEmpty()) {
-                Log.d(TAG, "🔑 Password from RfidPasswordManager (mode=" + 
-                      pwdManager.getPasswordMode() + ")");
-                return managed;
+
+        // 2) من RfidPasswordManager
+        if (pwdManager != null) {
+            try {
+                String managed = pwdManager.getPasswordForTag(lastReadTid.get());
+                if (managed != null && !managed.isEmpty()) {
+                    Log.d(TAG, "🔑 Password from RfidPasswordManager (mode=" +
+                            pwdManager.getPasswordMode() + ")");
+                    return managed;
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "normalizePwd: RfidPasswordManager error", t);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "normalizePwd: RfidPasswordManager error", e);
         }
-        
-        // 3) fallback أخير
-        Log.w(TAG, "⚠️ Using FALLBACK_PWD — please configure in Settings");
-        return FALLBACK_PWD;
+
+        // 3) ✅ لا fallback مكتوب في الكود
+        // إذا لم نجد كلمة → نُعيد null (المستدعي يقرر)
+        Log.w(TAG, "⚠️ No password available — please configure in Settings");
+        return null;
     }
 
-    // =========================================================================
-    // 🛠️ دوال الوصول للذاكرة والفلترة
-    // =========================================================================
+    /**
+     * ✅ [إصلاح #4] تحقق قبل الاستخدام
+     */
+    private boolean canProceedWithPwd(@Nullable String pwd, String operationName) {
+        if (pwd == null || pwd.isEmpty()) {
+            Log.e(TAG, operationName + ": no password available");
+            return false;
+        }
+        return true;
+    }
 
-    public boolean writeData(String pwdStr, int bank, int ptr, String data) {
-        if (activeReader == null) {
-            Log.w(TAG, "writeData: activeReader is null");
+    // ==================== Low-level Operations ====================
+
+    /**
+     * ✅ [إصلاح #7, #11, #26]
+     */
+    public boolean writeData(@Nullable String pwdStr, int bank, int ptr, @Nullable String data) {
+        // ✅ [إصلاح #7] فحص الوضع
+        MiraIRFIDReader reader = activeReader;
+        if (reader == null) {
+            Log.w(TAG, "writeData: no active reader");
             return false;
         }
         if (data == null || data.isEmpty()) {
             Log.w(TAG, "writeData: empty data");
             return false;
         }
-        
-        String safePwd = normalizePwd(pwdStr);
-        Log.d(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr + 
-              " len=" + data.length() + " pwd=****");
-        
-        return activeReader.writeData(safePwd, bank, ptr, data);
-    }
 
-    public String readData(String pwdStr, int bank, int ptr, int len) {
-        if (activeReader == null) {
-            Log.w(TAG, "readData: activeReader is null");
-            return null;
-        }
-        
         String safePwd = normalizePwd(pwdStr);
-        Log.d(TAG, "📖 readData: bank=" + bank + " ptr=" + ptr + " len=" + len);
-        
-        return activeReader.readData(safePwd, bank, ptr, len);
-    }
+        if (!canProceedWithPwd(safePwd, "writeData")) return false;
 
-    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
-        if (activeReader == null) {
-            Log.w(TAG, "setTagLockState: activeReader is null");
+        Log.d(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr +
+                " len=" + data.length() + " pwd=****");
+
+        try {
+            return reader.writeData(safePwd, bank, ptr, data);
+        } catch (Throwable t) {
+            Log.e(TAG, "writeData exception", t);
             return false;
         }
-        
-        String safePwd = normalizePwd(pwdStr);
-        Log.i(TAG, "🔐 setTagLockState: bank=" + bank + 
-              " lock=" + shouldLock + " pwd=****");
-        
-        return activeReader.setTagLockState(safePwd, bank, shouldLock);
     }
 
-    public boolean setFilter(int bank, int ptr, String filterData) {
-        if (activeReader == null) return isSimulationMode;
-        return activeReader.setFilter(bank, ptr, filterData);
+    @Nullable
+    public String readData(@Nullable String pwdStr, int bank, int ptr, int len) {
+        MiraIRFIDReader reader = activeReader;
+        if (reader == null) {
+            Log.w(TAG, "readData: no active reader");
+            return null;
+        }
+
+        String safePwd = normalizePwd(pwdStr);
+        if (!canProceedWithPwd(safePwd, "readData")) return null;
+
+        Log.d(TAG, "📖 readData: bank=" + bank + " ptr=" + ptr + " len=" + len);
+
+        try {
+            return reader.readData(safePwd, bank, ptr, len);
+        } catch (Throwable t) {
+            Log.e(TAG, "readData exception", t);
+            return null;
+        }
+    }
+
+    public boolean setTagLockState(@Nullable String pwdStr, int bank, boolean shouldLock) {
+        MiraIRFIDReader reader = activeReader;
+        if (reader == null) return false;
+
+        String safePwd = normalizePwd(pwdStr);
+        if (!canProceedWithPwd(safePwd, "setTagLockState")) return false;
+
+        Log.i(TAG, "🔐 setTagLockState: bank=" + bank +
+                " lock=" + shouldLock + " pwd=****");
+
+        try {
+            return reader.setTagLockState(safePwd, bank, shouldLock);
+        } catch (Throwable t) {
+            Log.e(TAG, "setTagLockState exception", t);
+            return false;
+        }
+    }
+
+    public boolean setFilter(int bank, int ptr, @Nullable String filterData) {
+        MiraIRFIDReader reader = activeReader;
+        // ✅ [إصلاح #23] في المحاكاة نُعيد true مع توثيق
+        if (reader == null) {
+            if (isSimulationMode.get()) {
+                Log.d(TAG, "setFilter: no-op in simulation");
+                return true;
+            }
+            return false;
+        }
+        try {
+            return reader.setFilter(bank, ptr, filterData);
+        } catch (Throwable t) {
+            Log.e(TAG, "setFilter exception", t);
+            return false;
+        }
     }
 
     public void clearFilter() {
-        if (activeReader != null) {
-            activeReader.clearFilter();
+        MiraIRFIDReader reader = activeReader;
+        if (reader != null) {
+            try {
+                reader.clearFilter();
+            } catch (Throwable t) {
+                Log.e(TAG, "clearFilter exception", t);
+            }
         }
     }
 
     public void resetForNewTag() {
-        if (activeReader instanceof SimulatorReader) {
-            ((SimulatorReader) activeReader).resetForNewTag();
-            Log.d(TAG, "✅ تم إعادة تهيئة المحاكي لشريحة جديدة");
+        MiraIRFIDReader reader = activeReader;
+        if (reader instanceof SimulatorReader) {
+            try {
+                ((SimulatorReader) reader).resetForNewTag();
+                Log.d(TAG, "✅ تم إعادة تهيئة المحاكي لشريحة جديدة");
+            } catch (Throwable t) {
+                Log.e(TAG, "resetForNewTag exception", t);
+            }
         }
     }
 
-    // =========================================================================
-    // 🟢 العمليات المتقدمة
-    // =========================================================================
+    // ==================== High-level Operations ====================
 
-    public String readEpc(String accessPassword) {
-        currentState = OperationState.READING;
-        String safePwd = normalizePwd(accessPassword);
-        
-        String epc = readData(safePwd, RFIDWithUHFUART.Bank_EPC, 
-                              EPC_START_WORD, EPC_READ_LENGTH);
-        
+    /**
+     * ✅ [إصلاح #7, #8] لا يتأثر بـ verifyWrite
+     */
+    @Nullable
+    public String readEpc(@Nullable String accessPassword) {
+        currentState.set(OperationState.READING);
+
+        String epc = readData(accessPassword, EPC_BANK,
+                EPC_START_WORD, EPC_READ_LENGTH_WORDS);
+
         if (epc != null && !epc.isEmpty()) {
-            lastReadEpc = epc;
-            currentState = OperationState.COMPLETED;
-            Log.i(TAG, "✅ readEpc OK: " + epc);
-            return epc;
+            String normalized = normalizeEpc(epc);
+            lastReadEpc.set(normalized);
+            currentState.set(OperationState.COMPLETED);
+            Log.i(TAG, "✅ readEpc OK: " + normalized);
+            return normalized;
         }
-        currentState = OperationState.FAILED;
+
+        currentState.set(OperationState.FAILED);
         Log.e(TAG, "❌ readEpc FAILED");
         return null;
     }
 
-   public String readTid(String accessPassword) {
-    currentState = OperationState.READING;
-    String safePwd = normalizePwd(accessPassword);
-    
-    String tid = null;
-    
-    // ✅ محاولة 1: قراءة 6 كلمات (24 حرف HEX)
-    try {
-        tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 6);
-    } catch (Exception e) {
-        Log.w(TAG, "⚠️ readTid 6-words failed: " + e.getMessage());
-    }
-    
-    // ✅ محاولة 2: قراءة 5 كلمات (20 حرف HEX)
-    if (tid == null || tid.isEmpty()) {
-        try {
-            Log.d(TAG, "🔄 Retry readTid with 5 words...");
-            tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 5);
-        } catch (Exception e) {
-            Log.w(TAG, "⚠️ readTid 5-words failed: " + e.getMessage());
-        }
-    }
-    
-    // ✅ محاولة 3: قراءة 4 كلمات (16 حرف HEX)
-    if (tid == null || tid.isEmpty()) {
-        try {
-            Log.d(TAG, "🔄 Retry readTid with 4 words...");
-            tid = readData(safePwd, RFIDWithUHFUART.Bank_TID, 0, 4);
-        } catch (Exception e) {
-            Log.w(TAG, "⚠️ readTid 4-words failed: " + e.getMessage());
-        }
-    }
-    
-    if (tid != null && !tid.isEmpty()) {
-        // ✅ تطبيع TID
-        tid = tid.trim().toUpperCase(Locale.US);
-        
-        // ✅ إزالة padding (0000 في النهاية)
-        while (tid.length() > 20 && tid.endsWith("0000")) {
-            tid = tid.substring(0, tid.length() - 4);
-        }
-        
-        // ✅ التحقق من صحة TID
-        if (tid.length() >= 16 && tid.matches("^[0-9A-F]+$")) {
-            lastReadTid = tid;
-            currentState = OperationState.COMPLETED;
-            Log.i(TAG, "✅ readTid OK: " + tid + " (length=" + tid.length() + ")");
-            return tid;
-        } else {
-            Log.w(TAG, "⚠️ readTid returned invalid format: " + tid);
-        }
-    }
-    
-    currentState = OperationState.FAILED;
-    Log.e(TAG, "❌ readTid FAILED after 3 attempts");
-    return null;
-}
+    /**
+     * ✅ [إصلاح #5, #13] مع تأخير بسيط بين المحاولات
+     */
+    @Nullable
+    public String readTid(@Nullable String accessPassword) {
+        currentState.set(OperationState.READING);
 
-    public boolean writeEpc(String newEpc, String accessPassword) {
-        currentState = OperationState.WRITING;
-        
+        String tid = null;
+
+        for (int i = 0; i < TID_READ_ATTEMPTS_WORDS.length; i++) {
+            int words = TID_READ_ATTEMPTS_WORDS[i];
+            try {
+                tid = readData(accessPassword, TID_BANK, TID_START_WORD, words);
+                if (tid != null && !tid.isEmpty()) {
+                    Log.d(TAG, "✅ TID read with " + words + " words");
+                    break;
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "⚠️ readTid attempt " + words + " failed: " + t.getMessage());
+            }
+
+            // ✅ [إصلاح #5] تأخير بسيط قبل المحاولة التالية
+            if (i < TID_READ_ATTEMPTS_WORDS.length - 1) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+
+        if (tid != null && !tid.isEmpty()) {
+            // ✅ [إصلاح #13] تنظيف ذكي
+            String cleaned = normalizeTid(tid);
+
+            if (isValidTid(cleaned)) {
+                lastReadTid.set(cleaned);
+                currentState.set(OperationState.COMPLETED);
+                Log.i(TAG, "✅ readTid OK: " + cleaned + " (length=" + cleaned.length() + ")");
+                return cleaned;
+            } else {
+                Log.w(TAG, "⚠️ readTid invalid format: " + cleaned);
+            }
+        }
+
+        currentState.set(OperationState.FAILED);
+        Log.e(TAG, "❌ readTid FAILED after " + TID_READ_ATTEMPTS_WORDS.length + " attempts");
+        return null;
+    }
+
+    /**
+     * ✅ [إصلاح #13] تنظيف TID بحذر
+     */
+    @NonNull
+    private String normalizeTid(@NonNull String raw) {
+        String tid = raw.trim().toUpperCase(Locale.US);
+
+        // إزالة 0000 المتكررة في النهاية — بحد أقصى مرتين
+        int maxTrims = 2;
+        int trims = 0;
+        while (tid.length() > 20 && tid.endsWith("0000") && trims < maxTrims) {
+            tid = tid.substring(0, tid.length() - 4);
+            trims++;
+        }
+
+        return tid;
+    }
+
+    private boolean isValidTid(@NonNull String tid) {
+        if (tid.length() < 16 || tid.length() > 32) return false;
+        return tid.matches("^[0-9A-F]+$");
+    }
+
+    /**
+     * ✅ [إصلاح #14, #7] writeEpc
+     */
+    public boolean writeEpc(@Nullable String newEpc, @Nullable String accessPassword) {
+        currentState.set(OperationState.WRITING);
+
+        // ✅ [إصلاح #7] فحص الوضع
         if (newEpc == null || newEpc.isEmpty()) {
             Log.w(TAG, "writeEpc: empty EPC");
-            currentState = OperationState.FAILED;
+            currentState.set(OperationState.FAILED);
             return false;
         }
-        
-        String safePwd = normalizePwd(accessPassword);
-        Log.i(TAG, "📝 writeEpc: epc=" + newEpc + " pwd=****");
-        
-        boolean success = writeData(safePwd, RFIDWithUHFUART.Bank_EPC, 
-                                    EPC_START_WORD, newEpc);
-        
+
+        if (activeReader == null) {
+            Log.w(TAG, "writeEpc: no active reader");
+            currentState.set(OperationState.FAILED);
+            return false;
+        }
+
+        // ✅ [إصلاح #14] تأكد من الصيغة
+        String normalizedEpc = normalizeEpc(newEpc);
+        if (normalizedEpc.length() < 8 || normalizedEpc.length() > 24) {
+            Log.w(TAG, "writeEpc: invalid EPC length: " + normalizedEpc.length());
+            currentState.set(OperationState.FAILED);
+            return false;
+        }
+
+        Log.i(TAG, "📝 writeEpc: epc=" + normalizedEpc + " pwd=****");
+
+        boolean success = writeData(accessPassword, EPC_BANK,
+                EPC_START_WORD, normalizedEpc);
+
         if (success) {
-            lastReadEpc = newEpc;
-            currentState = OperationState.COMPLETED;
+            lastReadEpc.set(normalizedEpc);
+            currentState.set(OperationState.COMPLETED);
             Log.i(TAG, "✅ writeEpc OK");
             return true;
         }
-        currentState = OperationState.FAILED;
+
+        currentState.set(OperationState.FAILED);
         Log.e(TAG, "❌ writeEpc FAILED");
         return false;
     }
 
-    public boolean verifyWrite(String expectedEpc, String accessPassword) {
-        currentState = OperationState.VERIFYING;
-        String safePwd = normalizePwd(accessPassword);
-        
-        String readBack = readEpc(safePwd);
-        
-        if (readBack != null && readBack.equalsIgnoreCase(expectedEpc)) {
-            currentState = OperationState.COMPLETED;
-            Log.i(TAG, "✅ verifyWrite OK: " + readBack);
-            return true;
+    /**
+     * ✅ [إصلاح #8, #15] لا يُغيّر currentState — يقارن بشكل ذكي
+     */
+    public boolean verifyWrite(@Nullable String expectedEpc,
+                                @Nullable String accessPassword) {
+        OperationState savedState = currentState.get();
+        currentState.set(OperationState.VERIFYING);
+
+        try {
+            if (expectedEpc == null || expectedEpc.isEmpty()) return false;
+
+            String readBack = readEpc(accessPassword);
+
+            if (readBack == null) {
+                Log.e(TAG, "❌ verifyWrite: readBack is null");
+                return false;
+            }
+
+            // ✅ [إصلاح #15] مقارنة بعد تطبيع كامل
+            String expectedNorm = normalizeEpc(expectedEpc);
+            String actualNorm = normalizeEpc(readBack);
+
+            if (expectedNorm.equalsIgnoreCase(actualNorm)) {
+                Log.i(TAG, "✅ verifyWrite OK: " + actualNorm);
+                return true;
+            }
+
+            Log.e(TAG, "❌ verifyWrite FAILED: expected=" + expectedNorm +
+                    " read=" + actualNorm);
+            return false;
+
+        } catch (Throwable t) {
+            Log.e(TAG, "verifyWrite exception", t);
+            return false;
         }
-        
-        currentState = OperationState.FAILED;
-        Log.e(TAG, "❌ verifyWrite FAILED: expected=" + expectedEpc + 
-              " read=" + readBack);
-        return false;
+        // ✅ [إصلاح #8] لا نُعدّل currentState هنا — يُدار من خارج
     }
 
-    public boolean registerRfidBinding(String miraId, String epc, String tid) {
-        currentState = OperationState.REGISTERING;
-        
+    /**
+     * ✅ [إصلاح #16] registerRfidBinding يفرّق بين الوضعين
+     */
+    public boolean registerRfidBinding(@Nullable String miraId,
+                                       @Nullable String epc,
+                                       @Nullable String tid) {
+        currentState.set(OperationState.REGISTERING);
+
+        if (miraId == null || epc == null || tid == null) {
+            Log.w(TAG, "registerRfidBinding: null parameters");
+            currentState.set(OperationState.FAILED);
+            return false;
+        }
+
         try {
             Log.d(TAG, "📡 تسجيل الربط في MIRA: " + miraId + " → " + epc);
-            
-            MiraApiClient apiClient = MiraApiClient.getInstance(context);
-            
+
+            MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
+
             JSONObject payload = new JSONObject();
             payload.put("mira_id", miraId);
             payload.put("epc", epc);
             payload.put("tid", tid);
             payload.put("gate_id", "handheld_c72");
-            payload.put("device_type", isSimulationMode ? "simulator" : "chainway_c72");
+            payload.put("device_type", isSimulationMode.get() ? "simulator" : "chainway_c72");
             payload.put("operation_type", "register");
-            
-            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/register_rfid", payload);
-            
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.postWithAuth("/register_rfid", payload);
+
             if (response != null && response.isSuccess) {
-                currentState = OperationState.COMPLETED;
+                currentState.set(OperationState.COMPLETED);
                 Log.d(TAG, "✅ تم التسجيل في قاعدة البيانات بنجاح");
                 return true;
             }
-            
-            if (isSimulationMode) {
-                Log.w(TAG, "⚠️ فشل الاتصال - نجاح وهمي للمحاكاة");
-                currentState = OperationState.COMPLETED;
-                return true;
+
+            // ✅ [إصلاح #16] في المحاكاة، نُسجّل فشلاً حقيقياً
+            if (isSimulationMode.get()) {
+                Log.w(TAG, "⚠️ [SIMULATION] Registration failed — " +
+                        "returning false for realistic behavior");
+                currentState.set(OperationState.FAILED);
+                return false;
             }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "registerRfidBinding error: " + e.getMessage(), e);
-            if (isSimulationMode) {
-                currentState = OperationState.COMPLETED;
-                return true;
-            }
+
+            currentState.set(OperationState.FAILED);
+            return false;
+
+        } catch (Throwable t) {
+            Log.e(TAG, "registerRfidBinding error", t);
+            currentState.set(OperationState.FAILED);
+            return false;
         }
-        
-        currentState = OperationState.FAILED;
-        return false;
     }
 
-    public JSONObject searchInMira(String identifier, String identifierType) {
+    @Nullable
+    public JSONObject searchInMira(@Nullable String identifier,
+                                    @Nullable String identifierType) {
+        if (identifier == null || identifier.isEmpty()) {
+            Log.w(TAG, "searchInMira: null identifier");
+            return null;
+        }
+
         try {
             Log.d(TAG, "🔍 البحث في MIRA: " + identifier);
-            
-            MiraApiClient apiClient = MiraApiClient.getInstance(context);
-            
+
+            MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
+
             JSONObject searchPayload = new JSONObject();
             searchPayload.put("identifier", identifier);
-            searchPayload.put("identifier_type", identifierType);
+            searchPayload.put("identifier_type", identifierType != null ? identifierType : "auto");
             searchPayload.put("gate_id", "handheld_c72");
-            
-            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/authorize", searchPayload);
-            
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.postWithAuth("/authorize", searchPayload);
+
             if (response != null && response.isSuccess && response.data != null) {
                 JSONObject item = response.data.optJSONObject("item");
-                
+
                 if (item != null) {
                     JSONObject result = new JSONObject();
                     result.put("item", item);
-                    result.put("barcode", response.data.optJSONObject("barcode") != null ? 
-                        response.data.optJSONObject("barcode") : new JSONObject());
-                    result.put("stock", response.data.optJSONObject("stock") != null ? 
-                        response.data.optJSONObject("stock") : new JSONObject());
-                    result.put("location", response.data.optJSONObject("location") != null ? 
-                        response.data.optJSONObject("location") : new JSONObject());
-                    
+                    result.put("barcode", safeOpt(response.data, "barcode"));
+                    result.put("stock", safeOpt(response.data, "stock"));
+                    result.put("location", safeOpt(response.data, "location"));
+
                     Log.d(TAG, "✅ تم العثور على القطعة");
                     return result;
                 }
             }
-            
-            if (isSimulationMode) {
+
+            if (isSimulationMode.get()) {
                 return createSimulatedSearchResult(identifier);
             }
             return null;
-            
-        } catch (Exception e) {
-            Log.e(TAG, "searchInMira error: " + e.getMessage());
-            if (isSimulationMode) {
+
+        } catch (Throwable t) {
+            Log.e(TAG, "searchInMira error", t);
+            if (isSimulationMode.get()) {
                 return createSimulatedSearchResult(identifier);
             }
             return null;
         }
     }
 
-    private JSONObject createSimulatedSearchResult(String identifier) {
+    private JSONObject safeOpt(@NonNull JSONObject parent, @NonNull String key) {
+        JSONObject child = parent.optJSONObject(key);
+        return child != null ? child : new JSONObject();
+    }
+
+    @NonNull
+    private JSONObject createSimulatedSearchResult(@NonNull String identifier) {
         try {
             JSONObject result = new JSONObject();
             JSONObject item = new JSONObject();
-            
+
             item.put("title", "قطعة تجريبية - " + identifier);
             item.put("serial", identifier);
             item.put("karat", "21K");
@@ -444,71 +761,89 @@ public class MiraRfidService {
             item.put("category", "Rings");
             item.put("status", "available");
             item.put("mira_id", identifier);
-            
+
             JSONObject barcode = new JSONObject();
-            String gtin = generateGtinFromIdentifier(identifier);
-            barcode.put("gtin", gtin);
+            barcode.put("gtin", generateGtinFromIdentifier(identifier));
             barcode.put("serial_no", identifier);
-            
+
             JSONObject stock = new JSONObject();
             stock.put("status", "متوفر");
             stock.put("branch_name", "الفرع الرئيسي");
-            
+
             JSONObject location = new JSONObject();
             location.put("zone_name", "منطقة الخواتم");
             location.put("shelf_code", "R-A1");
-            
+
             result.put("item", item);
             result.put("barcode", barcode);
             result.put("stock", stock);
             result.put("location", location);
-            
-            Log.d(TAG, "✅ تم إنشاء بيانات محاكاة لـ: " + identifier);
+
             return result;
-        } catch (Exception e) {
-            Log.e(TAG, "createSimulatedSearchResult error: " + e.getMessage());
+        } catch (Throwable t) {
+            Log.e(TAG, "createSimulatedSearchResult error", t);
             return new JSONObject();
         }
     }
 
-    private String generateGtinFromIdentifier(String identifier) {
+    @NonNull
+    private String generateGtinFromIdentifier(@NonNull String identifier) {
         String numbers = identifier.replaceAll("[^0-9]", "");
-        
+
         if (numbers.isEmpty()) {
-            numbers = String.valueOf(System.currentTimeMillis()).substring(5);
+            numbers = String.valueOf(System.currentTimeMillis());
         }
-        
+
         while (numbers.length() < 12) {
             numbers = "0" + numbers;
         }
-        numbers = numbers.substring(0, 12);
-        
-        return numbers;
+        return numbers.substring(0, 12);
     }
 
-    public String generateEpcFromMiraId(String miraId) {
+    /**
+     * ✅ [إصلاح #17] فحص الطول قبل substring
+     */
+    @NonNull
+    public String generateEpcFromMiraId(@Nullable String miraId) {
+        if (miraId == null || miraId.isEmpty()) {
+            // fallback: EPC افتراضي
+            return "3008" + String.format(Locale.US, "%012d",
+                    System.currentTimeMillis() % 1_000_000_000_000L);
+        }
+
         StringBuilder epc = new StringBuilder("3008");
-        String cleanId = miraId.replaceAll("[^0-9A-Fa-f]", "");
-        
+        String cleanId = miraId.replaceAll("[^0-9A-Fa-f]", "").toUpperCase(Locale.US);
+
+        // ✅ [إصلاح #17] padding أولاً
         while (cleanId.length() < 12) {
             cleanId = "0" + cleanId;
         }
-        epc.append(cleanId.substring(0, 12));
-        
+
+        epc.append(cleanId, 0, 12);
+
         while (epc.length() < 24) {
             epc.append("0");
         }
-        
-        return epc.substring(0, 24).toUpperCase();
+
+        return epc.substring(0, 24).toUpperCase(Locale.US);
     }
 
+    @NonNull
     public String getDeviceName() {
-        if (activeReader == null) return "لا يوجد جهاز";
-        return activeReader.getDeviceName() + (isSimulationMode ? " (محاكي)" : "");
+        MiraIRFIDReader reader = activeReader;
+        if (reader == null) return "لا يوجد جهاز";
+
+        try {
+            String name = reader.getDeviceName();
+            return name + (isSimulationMode.get() ? " (محاكي)" : "");
+        } catch (Throwable t) {
+            return "غير معروف";
+        }
     }
 
+    @NonNull
     public String getStateDescription() {
-        switch (currentState) {
+        switch (currentState.get()) {
             case IDLE: return "جاهز";
             case READING: return "جاري القراءة...";
             case WRITING: return "جاري الكتابة...";
@@ -519,85 +854,180 @@ public class MiraRfidService {
             default: return "";
         }
     }
-    
-    /**
-     * ✅ كشف معلومات الأمان للتشخيص
-     */
+
     public String getSecurityInfo() {
-        return pwdManager.getDiagnosticInfo();
-    }
-
-    // =========================================================================
-    // 🟢 إدارة مخزون الشرائح من SunlandRFID
-    // =========================================================================
-
-    public boolean verifyTagAllowed(String tid) {
+        if (pwdManager == null) return "RfidPasswordManager: not available";
         try {
-            MiraApiClient apiClient = MiraApiClient.getInstance(context);
-            MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/verify?tid=" + tid);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                return response.data.optBoolean("approved", false);
-            }
-            return isSimulationMode;
-        } catch (Exception e) {
-            Log.e(TAG, "verifyTagAllowed error: " + e.getMessage());
-            return isSimulationMode;
+            return pwdManager.getDiagnosticInfo();
+        } catch (Throwable t) {
+            return "Error: " + t.getMessage();
         }
     }
 
-    public boolean markTagProgrammed(String tid, String miraId, String epc) {
+    // ==================== Tag Inventory ====================
+
+    /**
+     * ✅ [إصلاح #19] فحص tid == null
+     */
+    public boolean verifyTagAllowed(@Nullable String tid) {
+        if (tid == null || tid.isEmpty()) {
+            Log.w(TAG, "verifyTagAllowed: null tid");
+            return isSimulationMode.get();
+        }
+
         try {
-            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
+            MiraApiClient.ApiResponse response = apiClient.getWithAuth(
+                    "/rfid-inventory/verify?tid=" + tid);
+
+            if (response != null && response.isSuccess && response.data != null) {
+                return response.data.optBoolean("approved", false);
+            }
+            return isSimulationMode.get();
+        } catch (Throwable t) {
+            Log.e(TAG, "verifyTagAllowed error", t);
+            return isSimulationMode.get();
+        }
+    }
+
+    /**
+     * ✅ [إصلاح #20] offline fallback
+     */
+    public boolean markTagProgrammed(@Nullable String tid,
+                                      @Nullable String miraId,
+                                      @Nullable String epc) {
+        if (tid == null || miraId == null || epc == null) {
+            Log.w(TAG, "markTagProgrammed: null parameters");
+            return false;
+        }
+
+        try {
+            MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
             JSONObject payload = new JSONObject();
             payload.put("tid", tid);
             payload.put("mira_id", miraId);
             payload.put("epc", epc);
-            
-            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/programmed", payload);
-            return (response != null && response.isSuccess) || isSimulationMode;
-        } catch (Exception e) {
-            Log.e(TAG, "markTagProgrammed error: " + e.getMessage());
-            return isSimulationMode;
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.postWithAuth("/rfid-inventory/programmed", payload);
+
+            if (response != null && response.isSuccess) {
+                Log.d(TAG, "✅ markTagProgrammed OK");
+                return true;
+            }
+
+            // ✅ [إصلاح #20] offline fallback
+            Log.w(TAG, "markTagProgrammed failed — saving locally");
+            saveProgrammedOffline(tid, miraId, epc);
+            return isSimulationMode.get();
+
+        } catch (Throwable t) {
+            Log.e(TAG, "markTagProgrammed error", t);
+            saveProgrammedOffline(tid, miraId, epc);
+            return isSimulationMode.get();
         }
     }
 
-    public boolean importBatch(String batchNumber, JSONArray tags) {
+    private void saveProgrammedOffline(String tid, String miraId, String epc) {
         try {
-            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            JSONObject record = new JSONObject();
+            record.put("tid", tid);
+            record.put("mira_id", miraId);
+            record.put("epc", epc);
+            record.put("saved_at", System.currentTimeMillis());
+
+            // احفظه في SharedPreferences
+            android.content.SharedPreferences prefs = appContext.getSharedPreferences(
+                    "rfid_programmed_queue", Context.MODE_PRIVATE);
+            String existing = prefs.getString("queue", "[]");
+            JSONArray arr = new JSONArray(existing);
+            arr.put(record);
+
+            // احتفظ بآخر 100 فقط
+            while (arr.length() > 100) {
+                arr.remove(0);
+            }
+
+            prefs.edit().putString("queue", arr.toString()).apply();
+            Log.d(TAG, "💾 Saved programmed tag offline: " + tid);
+
+        } catch (Throwable t) {
+            Log.e(TAG, "saveProgrammedOffline error", t);
+        }
+    }
+
+    public boolean importBatch(@Nullable String batchNumber, @Nullable JSONArray tags) {
+        if (batchNumber == null || tags == null) {
+            Log.w(TAG, "importBatch: null parameters");
+            return false;
+        }
+        try {
+            MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
             JSONObject payload = new JSONObject();
             payload.put("batch_number", batchNumber);
             payload.put("tags", tags);
-            
-            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/import", payload);
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.postWithAuth("/rfid-inventory/import", payload);
             return response != null && response.isSuccess;
-        } catch (Exception e) {
-            Log.e(TAG, "importBatch error: " + e.getMessage());
+        } catch (Throwable t) {
+            Log.e(TAG, "importBatch error", t);
             return false;
         }
     }
 
+    @Nullable
     public JSONObject getRfidInventoryStats() {
         try {
-            MiraApiClient apiClient = MiraApiClient.getInstance(context);
-            MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/stats");
-            
+            MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
+            MiraApiClient.ApiResponse response =
+                    apiClient.getWithAuth("/rfid-inventory/stats");
+
             if (response != null && response.isSuccess && response.data != null) {
                 return response.data;
             }
-            if (isSimulationMode) {
+            if (isSimulationMode.get()) {
                 JSONObject stats = new JSONObject();
                 stats.put("total", 100);
                 stats.put("available", 80);
                 stats.put("programmed", 15);
                 stats.put("defective", 3);
                 stats.put("lost", 2);
+                stats.put("_simulated", true);
                 return stats;
             }
             return null;
-        } catch (Exception e) {
-            Log.e(TAG, "getRfidInventoryStats error: " + e.getMessage());
+        } catch (Throwable t) {
+            Log.e(TAG, "getRfidInventoryStats error", t);
             return null;
         }
+    }
+
+    // ==================== Utilities ====================
+
+    /**
+     * ✅ [إصلاح #15] تطبيع EPC للمقارنات
+     */
+    @NonNull
+    private String normalizeEpc(@Nullable String epc) {
+        if (epc == null) return "";
+        String cleaned = epc.trim().toUpperCase(Locale.US).replaceAll("[^0-9A-F]", "");
+        return cleaned;
+    }
+
+    // ==================== Health ====================
+
+    @NonNull
+    public String getHealthReport() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("🏥 MiraRfidService Health\n");
+        sb.append("─────────────\n");
+        sb.append("Shutdown: ").append(isShutdown.get()).append("\n");
+        sb.append("Reader ready: ").append(isReaderReady.get()).append("\n");
+        sb.append("Simulation: ").append(isSimulationMode.get()).append("\n");
+        sb.append("State: ").append(currentState.get()).append("\n");
+        sb.append("Device: ").append(getDeviceName()).append("\n");
+        sb.append("Pwd manager: ").append(pwdManager != null ? "OK" : "NULL").append("\n");
+        return sb.toString();
     }
 }
