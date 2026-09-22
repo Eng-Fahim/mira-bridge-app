@@ -1942,17 +1942,36 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void applyAntennaPower(int dbm) {
-        try {
-            com.example.uhf.MiraRfid.RFIDManager rfidManager =
-                    com.example.uhf.MiraRfid.RFIDManager.getInstance(requireContext());
-            if (rfidManager != null && rfidManager.getActiveDevice() != null) {
-                Log.d(TAG, "Antenna power set to: " + dbm + " dBm");
-            }
-            showToast((isArabic ? "تم ضبط القدرة على " : "Power set to ") + dbm + " dBm");
-        } catch (Exception e) {
-            Log.e(TAG, "applyAntennaPower error", e);
+    try {
+        com.example.uhf.MiraRfid.RFIDManager rfidManager =
+                com.example.uhf.MiraRfid.RFIDManager.getInstance(requireContext());
+
+        if (rfidManager == null) {
+            Log.w(TAG, "RFIDManager is null");
+            return;
         }
+
+        boolean success = rfidManager.setPower(dbm);
+
+        if (success) {
+            Log.i(TAG, "✅ Power applied: " + dbm + " dBm");
+            showToast(isArabic
+                    ? "✅ تم ضبط القدرة على " + dbm + " dBm"
+                    : "✅ Power set to " + dbm + " dBm");
+        } else {
+            Log.w(TAG, "⚠️ Power apply failed");
+            showToast(isArabic
+                    ? "⚠️ فشل ضبط القدرة — تحقق من الاتصال بالقارئ"
+                    : "⚠️ Power control failed — check reader");
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "applyAntennaPower error", e);
+        showToast(isArabic
+                ? "⚠️ خطأ في ضبط القدرة"
+                : "⚠️ Power control error");
     }
+}
 
     private void showCategorySelectionDialog() {
         if (!isAdded() || isFragmentDestroyed) return;
