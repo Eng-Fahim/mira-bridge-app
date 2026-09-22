@@ -190,7 +190,7 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     // ✅ [إصلاح #22] لتجنّب recursion عميق
     private int viewTraverseDepth = 0;
-}
+
 
 // ==================== كلاسات مساعدة ====================
 
