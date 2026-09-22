@@ -198,9 +198,9 @@ public class MiraApplication extends AppContext {
         }
     }
 
-    public boolean isInitialized() {
-        return isInitialized.get();
-    }
+    public boolean isHeavyInitComplete() {
+    return isInitialized.get();
+}
 
     /**
      * ✅ [إضافة] تسجيل callback للتنفيذ بعد التهيئة
