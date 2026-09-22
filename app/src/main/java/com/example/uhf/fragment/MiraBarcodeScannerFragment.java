@@ -42,11 +42,42 @@ import com.google.mlkit.vision.common.InputImage;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * MiraBarcodeScannerFragment - الإصدار 2.0
+ *
+ * ✅ الإصلاحات المطبقة (18 مشكلة):
+ *  1. فحص barcodeScanner قبل الاستخدام
+ *  2. حماية من الاستخدام بعد close()
+ *  3. إغلاق imageProxy مرة واحدة فقط (AtomicBoolean)
+ *  4. عدم إنشاء executor جديد بدون سبب
+ *  5. إدارة toneGenerator بشكل صحيح
+ *  6. مزامنة isScanning مع onPause/onResume
+ *  7. منع إعادة تشغيل الكاميرا عند onResume إن كانت نشطة
+ *  8. فحص previewView قبل الاستخدام
+ *  9. محاولة popBackStack آمنة
+ * 10. تقليل SCAN_COOLDOWN إلى 800ms
+ * 11. حماية forwardToPOS من ClassCastException
+ * 12. دعم RTL في applyLanguage
+ * 13. hasCameraPermission آمنة
+ * 14. Toast آمن مع فحص getContext
+ * 15. منع إرسال الحدث مرتين
+ * 16. إلغاء الأنيميشن عند الإغلاق
+ * 17. ثوابت الألوان
+ * 18. تنظيف PreviewView
+ */
 public class MiraBarcodeScannerFragment extends Fragment {
 
     private static final String TAG = "MiraBarcodeScanner";
     private static final int CAMERA_PERMISSION_CODE = 1001;
+
+    // ✅ [إصلاح #10] تقليل cooldown
+    private static final long SCAN_COOLDOWN_MS = 800;
+
+    // ✅ [إصلاح #17] ثوابت الألوان
+    private static final int COLOR_READY = Color.parseColor("#38BDF8");    // أزرق
+    private static final int COLOR_SUCCESS = Color.parseColor("#4ADE80");  // أخضر
 
     // ==================== UI ====================
     private PreviewView previewView;
@@ -58,20 +89,21 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private ProcessCameraProvider cameraProvider;
     private Camera camera;
     private CameraControl cameraControl;
-    private boolean isFlashOn = false;
+    private volatile boolean isFlashOn = false;
     private ExecutorService cameraExecutor;
 
     // ==================== Scanner ====================
     private BarcodeScanner barcodeScanner;
     private ToneGenerator toneGenerator;
-    private boolean isScanning = true;
+    private volatile boolean isScanning = true;
+    private volatile boolean isViewDestroyed = false;
     private long lastScanTime = 0;
-    private static final long SCAN_COOLDOWN_MS = 1500;
 
     // ==================== Listeners & State ====================
     private OnBarcodeScannedListener barcodeListener;
     private boolean isArabic;
     private MiraOrgProfileManager orgProfile;
+    private android.content.Context appContext;
 
     // ==================== Interface ====================
 
@@ -96,11 +128,14 @@ public class MiraBarcodeScannerFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        isViewDestroyed = false;
+        appContext = requireContext().getApplicationContext();
+
         try {
-            isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-            if (getContext() != null) {
-                orgProfile = MiraOrgProfileManager.getInstance(getContext());
-            }
+            // ✅ [إصلاح #12] قراءة اللغة بشكل صحيح
+            isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
+
+            orgProfile = MiraOrgProfileManager.getInstance(appContext);
 
             // ربط العناصر
             previewView = view.findViewById(R.id.previewView);
@@ -111,48 +146,78 @@ public class MiraBarcodeScannerFragment extends Fragment {
             btnClose = view.findViewById(R.id.btnCloseScanner);
             btnFlash = view.findViewById(R.id.btnToggleFlash);
 
-            // تطبيق اللغة
-            applyLanguage();
+            // ✅ [إصلاح #8] فحص وجود العناصر الأساسية
+            if (previewView == null) {
+                Log.e(TAG, "previewView not found in layout!");
+                showErrorAndClose();
+                return;
+            }
+
+            // ✅ [إصلاح #12] دعم RTL
+            applyLanguageAndDirection(view);
 
             // أزرار
             if (btnClose != null) btnClose.setOnClickListener(v -> closeScanner());
             if (btnFlash != null) btnFlash.setOnClickListener(v -> toggleFlash());
 
-            // تهيئة
-            cameraExecutor = Executors.newSingleThreadExecutor();
-            toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
-            initBarcodeScanner();
-
-            // ✅ طلب الصلاحية أولاً
-            if (hasCameraPermission()) {
-                startCamera();
-            } else {
-                requestCameraPermission();
+            // ✅ [إصلاح #4/#5] تهيئة الموارد مرة واحدة فقط
+            if (cameraExecutor == null || cameraExecutor.isShutdown()) {
+                cameraExecutor = Executors.newSingleThreadExecutor();
+            }
+            if (toneGenerator == null) {
+                try {
+                    toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
+                } catch (Exception e) {
+                    Log.w(TAG, "ToneGenerator init failed: " + e.getMessage());
+                }
             }
 
-            startScanAnimation();
+            // ✅ [إصلاح #1] تهيئة barcodeScanner مع فحص
+            if (initBarcodeScanner()) {
+                // طلب الصلاحية أولاً
+                if (hasCameraPermission()) {
+                    startCamera();
+                } else {
+                    requestCameraPermission();
+                }
+                startScanAnimation();
+            } else {
+                Log.e(TAG, "Failed to init barcode scanner");
+                showErrorAndClose();
+            }
 
         } catch (Exception e) {
             Log.e(TAG, "Error in onViewCreated: " + e.getMessage(), e);
+            showErrorAndClose();
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        isViewDestroyed = false;
+
         try {
-            // ✅ إعادة تشغيل الكاميرا إذا كانت الصلاحية موجودة
+            // ✅ [إصلاح #6] استئناف المسح
+            isScanning = true;
+
+            // ✅ [إصلاح #7] إعادة تشغيل الكاميرا فقط عند الحاجة
             if (hasCameraPermission() && cameraProvider == null) {
                 startCamera();
             }
-            
+
+            // ✅ إعادة تشغيل الأنيميشن
+            if (scanLine != null && isScanning) {
+                startScanAnimation();
+            }
+
             // معالجة زر الرجوع
             if (getView() != null) {
                 getView().setFocusableInTouchMode(true);
                 getView().requestFocus();
                 getView().setOnKeyListener((v, keyCode, event) -> {
                     if (event.getAction() == android.view.KeyEvent.ACTION_UP
-                        && keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                            && keyCode == android.view.KeyEvent.KEYCODE_BACK) {
                         closeScanner();
                         return true;
                     }
@@ -167,13 +232,23 @@ public class MiraBarcodeScannerFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
-        // ✅ إيقاف الكاميرا مؤقتاً
+
+        // ✅ [إصلاح #6] إيقاف المسح مع إيقاف الكاميرا
+        isScanning = false;
+
         if (cameraProvider != null) {
             try {
                 cameraProvider.unbindAll();
             } catch (Exception e) {
                 Log.e(TAG, "Error unbinding camera: " + e.getMessage());
             }
+        }
+
+        // ✅ [إصلاح #16] إلغاء الأنيميشن
+        if (scanLine != null) {
+            try {
+                scanLine.animate().cancel();
+            } catch (Exception ignored) {}
         }
     }
 
@@ -186,13 +261,12 @@ public class MiraBarcodeScannerFragment extends Fragment {
         if (requestCode == CAMERA_PERMISSION_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
-                Toast.makeText(getContext(),
-                    isArabic ? "✅ تم منح صلاحية الكاميرا" : "✅ Camera permission granted",
-                    Toast.LENGTH_SHORT).show();
+                // ✅ [إصلاح #14] Toast آمن
+                showToastSafe(isArabic ? "✅ تم منح صلاحية الكاميرا" : "✅ Camera permission granted",
+                        Toast.LENGTH_SHORT);
             } else {
-                Toast.makeText(getContext(),
-                    isArabic ? "❌ صلاحية الكاميرا مطلوبة" : "❌ Camera permission required",
-                    Toast.LENGTH_LONG).show();
+                showToastSafe(isArabic ? "❌ صلاحية الكاميرا مطلوبة" : "❌ Camera permission required",
+                        Toast.LENGTH_LONG);
                 closeScanner();
             }
         }
@@ -200,10 +274,21 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     // ==================== Language ====================
 
-    private void applyLanguage() {
+    /**
+     * ✅ [إصلاح #12] تطبيق اللغة + اتجاه RTL
+     */
+    private void applyLanguageAndDirection(View root) {
         try {
+            // اتجاه
+            if (root != null) {
+                root.setLayoutDirection(isArabic ?
+                        View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+            }
+
+            // نصوص
             if (tvScanStatus != null) {
                 tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
+                tvScanStatus.setTextColor(COLOR_READY);
             }
             if (btnFlash != null) {
                 btnFlash.setContentDescription(isArabic ? "فلاش" : "Flash");
@@ -218,7 +303,10 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     // ==================== Barcode Scanner Init ====================
 
-    private void initBarcodeScanner() {
+    /**
+     * ✅ [إصلاح #1] يعيد true إذا نجحت التهيئة
+     */
+    private boolean initBarcodeScanner() {
         try {
             BarcodeScannerOptions options = new BarcodeScannerOptions.Builder()
                     .setBarcodeFormats(
@@ -229,52 +317,83 @@ public class MiraBarcodeScannerFragment extends Fragment {
                             Barcode.FORMAT_AZTEC, Barcode.FORMAT_PDF417
                     ).build();
             barcodeScanner = BarcodeScanning.getClient(options);
+            return barcodeScanner != null;
         } catch (Exception e) {
             Log.e(TAG, "Error initializing barcode scanner: " + e.getMessage());
+            return false;
         }
     }
 
     // ==================== Camera ====================
 
+    /**
+     * ✅ [إصلاح #13] فحص آمن للسياق
+     */
     private boolean hasCameraPermission() {
-        return ContextCompat.checkSelfPermission(requireContext(),
-                Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        try {
+            if (appContext == null) return false;
+            return ContextCompat.checkSelfPermission(appContext, Manifest.permission.CAMERA)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            Log.e(TAG, "hasCameraPermission error: " + e.getMessage());
+            return false;
+        }
     }
 
     private void requestCameraPermission() {
-        ActivityCompat.requestPermissions(requireActivity(),
-                new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+        try {
+            if (isAdded() && getActivity() != null) {
+                ActivityCompat.requestPermissions(requireActivity(),
+                        new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "requestCameraPermission error: " + e.getMessage());
+        }
     }
 
     private void startCamera() {
         try {
-            ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(requireContext());
+            if (previewView == null || cameraExecutor == null || cameraExecutor.isShutdown()) {
+                Log.e(TAG, "Cannot start camera: missing resources");
+                showErrorAndClose();
+                return;
+            }
+
+            ListenableFuture<ProcessCameraProvider> future =
+                    ProcessCameraProvider.getInstance(requireContext());
+
             future.addListener(() -> {
                 try {
+                    if (isViewDestroyed || previewView == null) return;
+
                     cameraProvider = future.get();
 
-                    // ✅ إعداد المعاينة
+                    // إعداد المعاينة
                     Preview preview = new Preview.Builder()
                             .setTargetResolution(new Size(1280, 720))
                             .build();
                     preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-                    // ✅ إعداد التحليل
+                    // إعداد التحليل
                     ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                             .setTargetResolution(new Size(1280, 720))
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build();
                     imageAnalysis.setAnalyzer(cameraExecutor, this::analyzeImage);
 
-                    // ✅ اختيار الكاميرا الخلفية
+                    // اختيار الكاميرا الخلفية
                     CameraSelector selector = new CameraSelector.Builder()
                             .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                             .build();
 
-                    // ✅ ربط الكاميرا
+                    // ربط الكاميرا
                     cameraProvider.unbindAll();
-                    camera = cameraProvider.bindToLifecycle(this, selector, preview, imageAnalysis);
+                    camera = cameraProvider.bindToLifecycle(
+                            MiraBarcodeScannerFragment.this, selector, preview, imageAnalysis);
                     cameraControl = camera.getCameraControl();
+
+                    // ✅ [إصلاح #6] استئناف المسح عند نجاح الكاميرا
+                    isScanning = true;
 
                     Log.d(TAG, "Camera started successfully");
 
@@ -283,6 +402,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
                     showErrorAndClose();
                 }
             }, ContextCompat.getMainExecutor(requireContext()));
+
         } catch (Exception e) {
             Log.e(TAG, "Error getting camera provider: " + e.getMessage(), e);
             showErrorAndClose();
@@ -291,36 +411,66 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     // ==================== Image Analysis ====================
 
+    /**
+     * ✅ [إصلاح #3] إغلاق imageProxy مرة واحدة فقط
+     */
     private void analyzeImage(@NonNull ImageProxy imageProxy) {
-        if (!isScanning || imageProxy.getImage() == null) {
-            imageProxy.close();
+        // ✅ [إصلاح #1] فحص barcodeScanner
+        if (barcodeScanner == null || !isScanning || isViewDestroyed
+                || imageProxy.getImage() == null) {
+            closeImageProxySafely(imageProxy);
             return;
         }
 
-        @SuppressWarnings("UnsafeOptInUsageError")
-        InputImage inputImage = InputImage.fromMediaImage(
-                imageProxy.getImage(), imageProxy.getImageInfo().getRotationDegrees());
+        // ✅ [إصلاح #3] ضمان إغلاق واحد
+        final AtomicBoolean closed = new AtomicBoolean(false);
+        final Runnable closeOnce = () -> {
+            if (closed.compareAndSet(false, true)) {
+                closeImageProxySafely(imageProxy);
+            }
+        };
 
-        barcodeScanner.process(inputImage)
-                .addOnSuccessListener(barcodes -> {
-                    try {
-                        if (!barcodes.isEmpty() && isScanning) {
-                            for (Barcode barcode : barcodes) {
-                                String rawValue = barcode.getRawValue();
-                                if (rawValue != null && !rawValue.isEmpty()) {
-                                    onBarcodeDetected(rawValue, barcode.getFormat());
-                                    break;
+        try {
+            @SuppressWarnings("UnsafeOptInUsageError")
+            InputImage inputImage = InputImage.fromMediaImage(
+                    imageProxy.getImage(), imageProxy.getImageInfo().getRotationDegrees());
+
+            barcodeScanner.process(inputImage)
+                    .addOnSuccessListener(barcodes -> {
+                        try {
+                            if (!barcodes.isEmpty() && isScanning && !isViewDestroyed) {
+                                for (Barcode barcode : barcodes) {
+                                    String rawValue = barcode.getRawValue();
+                                    if (rawValue != null && !rawValue.isEmpty()) {
+                                        onBarcodeDetected(rawValue, barcode.getFormat());
+                                        break;
+                                    }
                                 }
                             }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Process success error: " + e.getMessage());
+                        } finally {
+                            closeOnce.run();
                         }
-                    } finally {
-                        imageProxy.close();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Scan error: " + e.getMessage());
-                    imageProxy.close();
-                });
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Scan error: " + e.getMessage());
+                        closeOnce.run();
+                    })
+                    .addOnCanceledListener(closeOnce::run);
+
+        } catch (Exception e) {
+            Log.e(TAG, "analyzeImage error: " + e.getMessage());
+            closeOnce.run();
+        }
+    }
+
+    private void closeImageProxySafely(ImageProxy imageProxy) {
+        try {
+            if (imageProxy != null) imageProxy.close();
+        } catch (Exception e) {
+            Log.e(TAG, "closeImageProxy error: " + e.getMessage());
+        }
     }
 
     // ==================== Detection ====================
@@ -330,14 +480,12 @@ public class MiraBarcodeScannerFragment extends Fragment {
         if (now - lastScanTime < SCAN_COOLDOWN_MS) return;
         lastScanTime = now;
 
-        try {
-            toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 150);
-        } catch (Exception e) {
-            Log.e(TAG, "Error playing tone: " + e.getMessage());
-        }
+        // صوت
+        playBeepSafe();
 
         String formatName = getBarcodeFormatName(format);
 
+        // تحديث الواجهة
         safeRun(() -> {
             try {
                 if (tvScannedData != null) {
@@ -346,37 +494,72 @@ public class MiraBarcodeScannerFragment extends Fragment {
                 }
                 if (tvScanStatus != null) {
                     tvScanStatus.setText(isArabic ? "✅ تم المسح" : "✅ Scanned");
-                    tvScanStatus.setTextColor(Color.parseColor("#4ADE80"));
+                    tvScanStatus.setTextColor(COLOR_SUCCESS);
                 }
-                tvScannedData.postDelayed(() -> {
-                    if (tvScannedData != null) tvScannedData.setVisibility(View.GONE);
-                    if (tvScanStatus != null) {
-                        tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
-                        tvScanStatus.setTextColor(Color.parseColor("#38BDF8"));
-                    }
-                }, 2000);
+
+                if (tvScannedData != null) {
+                    tvScannedData.postDelayed(() -> {
+                        if (isViewDestroyed || tvScannedData == null) return;
+                        tvScannedData.setVisibility(View.GONE);
+                        if (tvScanStatus != null) {
+                            tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
+                            tvScanStatus.setTextColor(COLOR_READY);
+                        }
+                    }, 2000);
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error updating UI: " + e.getMessage());
             }
         });
 
-        if (barcodeListener != null) barcodeListener.onBarcodeScanned(data, formatName);
-        forwardToPOS(data);
+        // ✅ [إصلاح #15] إخطار listener فقط (لأنه هو الذي يمرر بدوره)
+        if (barcodeListener != null) {
+            try {
+                barcodeListener.onBarcodeScanned(data, formatName);
+            } catch (Exception e) {
+                Log.e(TAG, "barcodeListener error: " + e.getMessage());
+            }
+        } else {
+            // إذا لم يوجد listener، مرر إلى POS كخيار احتياطي
+            forwardToPOS(data);
+        }
     }
 
+    /**
+     * ✅ [إصلاح #11] حماية من ClassCastException
+     */
     private void forwardToPOS(String data) {
         try {
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity activity = (UHFMainActivity) getActivity();
-                Fragment pos = activity.getSupportFragmentManager().findFragmentByTag("POS Mode");
-                if (pos instanceof MiraPosFragment && pos.isVisible()) {
+            if (!isAdded() || getActivity() == null) return;
+            if (!(getActivity() instanceof UHFMainActivity)) return;
+
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+            Fragment pos = activity.getSupportFragmentManager().findFragmentByTag("POS Mode");
+
+            // ✅ [إصلاح #11] فحص instanceof قبل cast
+            if (pos instanceof MiraPosFragment && pos.isVisible()) {
+                try {
                     ((MiraPosFragment) pos).onBarcodeScanned(data);
-                } else {
+                } catch (Exception e) {
+                    Log.w(TAG, "POS forward failed, falling back", e);
                     activity.onTagRead(data);
                 }
+            } else {
+                activity.onTagRead(data);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error forwarding to POS: " + e.getMessage());
+        }
+    }
+
+    private void playBeepSafe() {
+        try {
+            if (toneGenerator != null) {
+                toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 150);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error playing tone: " + e.getMessage());
         }
     }
 
@@ -385,60 +568,110 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private void closeScanner() {
         try {
             isScanning = false;
+            isViewDestroyed = true;
+
+            // ✅ [إصلاح #16] إلغاء الأنيميشن
+            if (scanLine != null) {
+                try {
+                    scanLine.animate().cancel();
+                } catch (Exception ignored) {}
+            }
+
+            // إطفاء الفلاش
             if (cameraControl != null) {
                 try {
                     cameraControl.enableTorch(false);
+                    isFlashOn = false;
                 } catch (Exception e) {
                     Log.e(TAG, "Error disabling torch: " + e.getMessage());
                 }
             }
+
+            // فصل الكاميرا
             if (cameraProvider != null) {
-                cameraProvider.unbindAll();
-                cameraProvider = null;
+                try {
+                    cameraProvider.unbindAll();
+                    cameraProvider = null;
+                } catch (Exception e) {
+                    Log.e(TAG, "Error unbinding: " + e.getMessage());
+                }
             }
-            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
-                getParentFragmentManager().popBackStack();
-            } else if (getActivity() != null) {
+
+            // ✅ [إصلاح #9] popBackStack آمن
+            if (!isAdded()) return;
+
+            androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
+            if (fm.getBackStackEntryCount() > 0) {
+                try {
+                    fm.popBackStack();
+                } catch (Exception e) {
+                    Log.e(TAG, "popBackStack error: " + e.getMessage());
+                    fallbackClose();
+                }
+            } else {
+                fallbackClose();
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing scanner: " + e.getMessage());
+            fallbackClose();
+        }
+    }
+
+    private void fallbackClose() {
+        try {
+            if (isAdded() && getActivity() != null) {
                 getActivity().onBackPressed();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error closing scanner: " + e.getMessage());
-            if (getActivity() != null) getActivity().onBackPressed();
+            Log.e(TAG, "fallbackClose error: " + e.getMessage());
         }
     }
 
     private void showErrorAndClose() {
         safeRun(() -> {
-            Toast.makeText(getContext(),
-                isArabic ? "❌ تعذر تشغيل الكاميرا" : "❌ Failed to start camera",
-                Toast.LENGTH_LONG).show();
+            showToastSafe(isArabic ? "❌ تعذر تشغيل الكاميرا" : "❌ Failed to start camera",
+                    Toast.LENGTH_LONG);
             closeScanner();
         });
     }
 
     // ==================== Animation ====================
 
+    /**
+     * ✅ [إصلاح #16] فحص isScanning و isViewDestroyed قبل الأنيميشن
+     */
     private void startScanAnimation() {
-    if (scanLine == null || scannerOverlay == null) return;
-    try {
-        // ✅ إعادة تعيين الموضع الأولي
-        scanLine.setTranslationY(0);
-        
-        // ✅ تحريك الخط من الأعلى إلى الأسفل داخل الإطار
-        scanLine.post(() -> {
-            scanLine.animate()
-                .translationY(scannerOverlay.getHeight() - 2)
-                .setDuration(2000)
-                .withEndAction(() -> {
-                    scanLine.setTranslationY(0);
-                    if (isScanning) startScanAnimation();
-                })
-                .start();
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "Error starting animation: " + e.getMessage());
+        if (scanLine == null || scannerOverlay == null || isViewDestroyed || !isScanning) return;
+
+        try {
+            scanLine.animate().cancel();
+            scanLine.setTranslationY(0);
+
+            scanLine.post(() -> {
+                if (isViewDestroyed || !isScanning || scanLine == null || scannerOverlay == null) return;
+
+                int height = scannerOverlay.getHeight();
+                if (height <= 0) {
+                    // إعادة المحاولة عند جهوزية القياس
+                    scanLine.postDelayed(this::startScanAnimation, 100);
+                    return;
+                }
+
+                scanLine.animate()
+                        .translationY(height - 2)
+                        .setDuration(2000)
+                        .withEndAction(() -> {
+                            if (scanLine == null || isViewDestroyed || !isScanning) return;
+                            scanLine.setTranslationY(0);
+                            startScanAnimation();
+                        })
+                        .start();
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting animation: " + e.getMessage());
+        }
     }
-}
 
     // ==================== Flash ====================
 
@@ -447,10 +680,10 @@ public class MiraBarcodeScannerFragment extends Fragment {
             if (cameraControl != null) {
                 isFlashOn = !isFlashOn;
                 cameraControl.enableTorch(isFlashOn);
-                Toast.makeText(getContext(),
-                    isFlashOn ? (isArabic ? "🔦 تم تشغيل الفلاش" : "🔦 Flash On")
-                              : (isArabic ? "🔌 تم إطفاء الفلاش" : "🔌 Flash Off"),
-                    Toast.LENGTH_SHORT).show();
+                showToastSafe(
+                        isFlashOn ? (isArabic ? "🔦 تم تشغيل الفلاش" : "🔦 Flash On")
+                                  : (isArabic ? "🔌 تم إطفاء الفلاش" : "🔌 Flash Off"),
+                        Toast.LENGTH_SHORT);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error toggling flash: " + e.getMessage());
@@ -460,8 +693,33 @@ public class MiraBarcodeScannerFragment extends Fragment {
     // ==================== Helpers ====================
 
     private void safeRun(Runnable r) {
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(r);
+        try {
+            if (isAdded() && getActivity() != null && !isViewDestroyed) {
+                getActivity().runOnUiThread(() -> {
+                    try {
+                        if (isAdded() && !isViewDestroyed) {
+                            r.run();
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "safeRun inner error: " + e.getMessage());
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "safeRun error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ [إصلاح #14] Toast آمن
+     */
+    private void showToastSafe(String msg, int duration) {
+        try {
+            if (isAdded() && appContext != null) {
+                Toast.makeText(appContext, msg, duration).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "showToastSafe error: " + e.getMessage());
         }
     }
 
@@ -475,35 +733,108 @@ public class MiraBarcodeScannerFragment extends Fragment {
             case Barcode.FORMAT_CODE_39: return "Code-39";
             case Barcode.FORMAT_UPC_A: return "UPC-A";
             case Barcode.FORMAT_UPC_E: return "UPC-E";
-            case Barcode.FORMAT_AZTEC: return "Aztec";
+            case Barcode.FORMAT_AZETC: return "Aztec";
             case Barcode.FORMAT_PDF417: return "PDF417";
             default: return "Barcode";
         }
     }
 
-    public void pauseScanning() { isScanning = false; }
-    public void resumeScanning() { isScanning = true; lastScanTime = 0; }
+    public void pauseScanning() {
+        isScanning = false;
+        if (scanLine != null) {
+            try { scanLine.animate().cancel(); } catch (Exception ignored) {}
+        }
+    }
+
+    public void resumeScanning() {
+        if (isViewDestroyed) return;
+        isScanning = true;
+        lastScanTime = 0;
+        startScanAnimation();
+    }
 
     // ==================== Cleanup ====================
+
+    /**
+     * ✅ [إصلاح #2] فصل onDestroyView عن onDestroy
+     * ✅ [إصلاح #18] تنظيف كامل
+     */
+    @Override
+    public void onDestroyView() {
+        isViewDestroyed = true;
+        isScanning = false;
+
+        // إلغاء الأنيميشن
+        if (scanLine != null) {
+            try { scanLine.animate().cancel(); } catch (Exception ignored) {}
+        }
+
+        // فصل الكاميرا
+        if (cameraProvider != null) {
+            try {
+                cameraProvider.unbindAll();
+                cameraProvider = null;
+            } catch (Exception e) {
+                Log.e(TAG, "unbindAll error in onDestroyView: " + e.getMessage());
+            }
+        }
+        cameraControl = null;
+        camera = null;
+
+        // ✅ [إصلاح #18] تنظيف المراجع UI
+        previewView = null;
+        scannerOverlay = null;
+        scanLine = null;
+        tvScanStatus = null;
+        tvScannedData = null;
+        btnClose = null;
+        btnFlash = null;
+
+        super.onDestroyView();
+    }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
+
+        // إطفاء الفلاش
         try {
             if (cameraControl != null) {
                 cameraControl.enableTorch(false);
             }
-            if (cameraExecutor != null) {
+        } catch (Exception ignored) {}
+
+        // ✅ [إصلاح #4] إغلاق executor بأمان
+        if (cameraExecutor != null) {
+            try {
                 cameraExecutor.shutdown();
+            } catch (Exception e) {
+                Log.e(TAG, "executor shutdown error: " + e.getMessage());
             }
-            if (barcodeScanner != null) {
-                barcodeScanner.close();
-            }
-            if (toneGenerator != null) {
-                toneGenerator.release();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error in cleanup: " + e.getMessage());
+            cameraExecutor = null;
         }
+
+        // ✅ [إصلاح #2] إغلاق barcodeScanner بحماية
+        if (barcodeScanner != null) {
+            try {
+                barcodeScanner.close();
+            } catch (Exception e) {
+                Log.e(TAG, "barcodeScanner close error: " + e.getMessage());
+            }
+            barcodeScanner = null;
+        }
+
+        // ✅ [إصلاح #5] إغلاق toneGenerator
+        if (toneGenerator != null) {
+            try {
+                toneGenerator.release();
+            } catch (Exception e) {
+                Log.e(TAG, "toneGenerator release error: " + e.getMessage());
+            }
+            toneGenerator = null;
+        }
+
+        // تنظيف appContext
+        appContext = null;
     }
 }
