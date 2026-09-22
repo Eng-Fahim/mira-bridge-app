@@ -86,6 +86,8 @@ public class MiraApplication extends AppContext {
     @Override
     public void onCreate() {
         super.onCreate();
+        // ✅✅✅ طبّق الثيم المحفوظ فوراً قبل أي شيء آخر
+    applySavedTheme();
 
         instance = this;
 
@@ -114,6 +116,21 @@ public class MiraApplication extends AppContext {
         }
     }
 
+
+/**
+ * ✅ تطبيق الثيم المحفوظ
+ */
+private void applySavedTheme() {
+    try {
+        SharedPreferences prefs = getSharedPreferences("app_theme", Context.MODE_PRIVATE);
+        int mode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        AppCompatDelegate.setDefaultNightMode(mode);
+        Log.i(TAG, "✅ Theme applied from prefs: " + mode);
+    } catch (Exception e) {
+        Log.e(TAG, "Failed to apply saved theme", e);
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+    }
+}
     /**
      * ✅ [إصلاح #2, #3] جدولة التهيئة الثقيلة بعد أول frame
      */
