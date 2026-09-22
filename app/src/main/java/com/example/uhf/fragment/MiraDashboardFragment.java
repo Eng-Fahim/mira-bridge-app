@@ -23,13 +23,12 @@ import androidx.constraintlayout.motion.widget.MotionLayout;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
+
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
-import com.example.uhf.adapter.ActivityTimelineAdapter;   // ✅ جديد
+//import com.example.uhf.adapter.ActivityTimelineAdapter;   // ✅ جديد
 
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
@@ -109,8 +108,9 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvLiveStatusText;
 
     // ✅ Recent Activity
-    private RecyclerView rvRecentActivity;
-    private ActivityTimelineAdapter recentActivityAdapter;
+    //private RecyclerView rvRecentActivity;
+    //private ActivityTimelineAdapter recentActivityAdapter;
+    private android.widget.LinearLayout llRecentActivity;
     private TextView tvViewAllActivity;
 
     // ═══════════════════════════════════════════════════════
@@ -329,24 +329,13 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
 
             // ✅ Recent Activity
-            rvRecentActivity = v.findViewById(R.id.rvRecentActivity);
+            llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
-
-            if (rvRecentActivity != null) {
-                rvRecentActivity.setLayoutManager(new LinearLayoutManager(requireContext()));
-                recentActivityAdapter = new ActivityTimelineAdapter(
-                        isArabic,
-                        activity -> handleRecentActivityClick(activity));
-                rvRecentActivity.setAdapter(recentActivityAdapter);
-                rvRecentActivity.setItemViewCacheSize(10);  // ✅ يحفظ 10 Views في الذاكرة
-                rvRecentActivity.setHasFixedSize(true);
-                
-            }
-
             if (tvViewAllActivity != null) {
-            tvViewAllActivity.setOnClickListener(v2 ->
+    tvViewAllActivity.setOnClickListener(v2 ->
             navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
-            }
+}
+            
 
             // ═══════════════════════════════════════
             // Listeners
@@ -1221,19 +1210,147 @@ private void fetchRecentActivity() {
 /**
  * ✅ تحديث واجهة آخر العمليات
  */
+/**
+ * ✅ تحديث واجهة آخر العمليات — LinearLayout
+ */
 private void updateRecentActivityUI(JSONArray activities) {
-    if (activities == null || recentActivityAdapter == null) return;
+    if (activities == null || llRecentActivity == null) {
+        Log.w(TAG, "⚠️ updateRecentActivityUI: null refs (activities="
+                + (activities != null)
+                + ", llRecentActivity=" + (llRecentActivity != null) + ")");
+        return;
+    }
+
     try {
-        List<JSONObject> list = new ArrayList<>();
+        // ✅ امسح العناصر القديمة
+        llRecentActivity.removeAllViews();
+
         int max = Math.min(activities.length(), 10);
+        Log.d(TAG, "📊 Rendering " + max + " activities");
+
         for (int i = 0; i < max; i++) {
-            list.add(activities.getJSONObject(i));
+            JSONObject item = activities.getJSONObject(i);
+
+            // ✅ inflate item_activity_timeline
+            View itemView = getLayoutInflater().inflate(
+                    R.layout.item_activity_timeline,
+                    llRecentActivity,
+                    false);
+
+            // ✅ اربط البيانات
+            bindActivityToView(itemView, item);
+
+            // ✅ onClick
+            itemView.setOnClickListener(v -> handleRecentActivityClick(item));
+
+            // ✅ أضف إلى LinearLayout
+            llRecentActivity.addView(itemView);
         }
-        // ✅ submitList تعمل في الخلفية عبر DiffUtil
-        recentActivityAdapter.submitList(list);
-    } catch (JSONException e) {
+
+        Log.d(TAG, "✅ Rendered " + max + " activities successfully");
+
+    } catch (Exception e) {
         logNonFatal("updateRecentActivityUI", e);
     }
+}
+
+/**
+ * ✅ ربط بيانات العملية بـ View
+ */
+private void bindActivityToView(View v, JSONObject item) {
+    if (v == null || item == null) return;
+
+    try {
+        // ✅ ابحث عن العناصر
+        TextView tvIcon = v.findViewById(R.id.tvActivityIcon);
+        TextView tvTitle = v.findViewById(R.id.tvActivityTitle);
+        TextView tvDetails = v.findViewById(R.id.tvActivityDetails);
+        TextView tvUser = v.findViewById(R.id.tvActivityUser);
+        TextView tvTime = v.findViewById(R.id.tvActivityTime);
+        TextView tvAmount = v.findViewById(R.id.tvActivityAmount);
+        TextView tvStatusChip = v.findViewById(R.id.tvActivityStatusChip);
+
+        // ✅ استخرج البيانات
+        String icon = item.optString("icon", "⚙️");
+        String title = isArabic
+                ? item.optString("title_ar", "")
+                : item.optString("title_en", "");
+        if (title.isEmpty()) {
+            title = item.optString("title_ar",
+                    item.optString("title_en", ""));
+        }
+
+        String details = isArabic
+                ? item.optString("details_ar", "")
+                : item.optString("details_en", "");
+        if (details.isEmpty()) {
+            details = item.optString("details_ar",
+                    item.optString("details_en", ""));
+        }
+
+        String user = item.optString("user", "—");
+        String timestamp = item.optString("timestamp", "");
+        double amount = item.optDouble("amount", 0);
+        String currency = item.optString("currency", "USD");
+        double accuracy = item.optDouble("accuracy", -1);
+
+        // ✅ طبّق
+        if (tvIcon != null) tvIcon.setText(icon);
+        if (tvTitle != null) tvTitle.setText(title);
+        if (tvDetails != null) tvDetails.setText(details);
+        if (tvUser != null) tvUser.setText("👤 " + user);
+        if (tvTime != null) tvTime.setText(extractTime(timestamp));
+
+        // ✅ المبلغ أو الدقة
+        if (tvAmount != null) {
+            if (amount > 0) {
+                tvAmount.setVisibility(View.VISIBLE);
+                tvAmount.setText(String.format(Locale.US, "%,.2f %s", amount, currency));
+            } else if (accuracy >= 0) {
+                tvAmount.setVisibility(View.VISIBLE);
+                tvAmount.setText(String.format(Locale.US, "🎯 %.1f%%", accuracy));
+            } else {
+                tvAmount.setVisibility(View.GONE);
+            }
+        }
+
+        // ✅ chip الحالة
+        if (tvStatusChip != null) {
+            String status = item.optString("status", "neutral");
+            if ("danger".equals(status)) {
+                tvStatusChip.setVisibility(View.VISIBLE);
+                tvStatusChip.setText(isArabic ? "⚠️ حرج" : "⚠️ Critical");
+                tvStatusChip.setTextColor(0xFFDC2626);
+            } else if ("warning".equals(status)) {
+                tvStatusChip.setVisibility(View.VISIBLE);
+                tvStatusChip.setText(isArabic ? "⚠️ تحذير" : "⚠️ Warning");
+                tvStatusChip.setTextColor(0xFFF59E0B);
+            } else {
+                tvStatusChip.setVisibility(View.GONE);
+            }
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "bindActivityToView error", e);
+    }
+}
+
+/**
+ * ✅ استخراج الوقت من timestamp
+ */
+private String extractTime(String dateStr) {
+    if (dateStr == null || dateStr.isEmpty()) return "";
+    try {
+        // "2026-09-22 14:30:00" → "14:30"
+        String[] parts = dateStr.split(" ");
+        if (parts.length >= 2) {
+            String[] timeParts = parts[1].split(":");
+            if (timeParts.length >= 2) {
+                return timeParts[0] + ":" + timeParts[1];
+            }
+        }
+    } catch (Exception ignored) {}
+    return dateStr;
 }
     /**
  * ✅ عند النقر على عملية → فتح Bottom Sheet التفاصيل
@@ -1652,7 +1769,7 @@ public void onStop() {
         try {
             unregisterDataRefreshReceiver();
             stopAutoRefresh();
-
+            llRecentActivity = null;
             if (branchesManager != null && branchListener != null) {
                 branchesManager.removeListener(branchListener);
                 branchListener = null;
@@ -1732,3 +1849,4 @@ public void onStop() {
     }
 }
         }
+        
