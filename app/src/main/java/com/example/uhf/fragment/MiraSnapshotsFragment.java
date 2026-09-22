@@ -56,6 +56,7 @@ public class MiraSnapshotsFragment extends Fragment {
     private MaterialButton btnCompareMode;
     private MaterialButton btnDeleteAll;
     private SwipeRefreshLayout swipeRefresh;
+    private MaterialButton btnBack;
 
     // ==================== Managers ====================
     private InventorySnapshotManager snapshotManager;
@@ -148,15 +149,16 @@ public class MiraSnapshotsFragment extends Fragment {
     // ==================== Init ====================
 
     private void initViews(View view) {
-        rvSnapshots = view.findViewById(R.id.rvSnapshots);
-        layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
-        tvStatsHeader = view.findViewById(R.id.tvStatsHeader);
-        btnCompareMode = view.findViewById(R.id.btnCompareMode);
-        btnDeleteAll = view.findViewById(R.id.btnDeleteAll);
-        swipeRefresh = view.findViewById(R.id.swipeRefresh);
-
-        // ✅ زر الرجوع في الـ Toolbar? — سنستخدم OnBackPressedDispatcher أو UHFMainActivity
-    }
+    rvSnapshots = view.findViewById(R.id.rvSnapshots);
+    layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
+    tvStatsHeader = view.findViewById(R.id.tvStatsHeader);
+    btnCompareMode = view.findViewById(R.id.btnCompareMode);
+    btnDeleteAll = view.findViewById(R.id.btnDeleteAll);
+    swipeRefresh = view.findViewById(R.id.swipeRefresh);
+    
+    // ✅ جديد
+    btnBack = view.findViewById(R.id.btnBack);
+}
 
     private void setupRecyclerView() {
         if (rvSnapshots == null) return;
@@ -172,21 +174,39 @@ public class MiraSnapshotsFragment extends Fragment {
     }
 
     private void setupListeners() {
-        // ✅ Compare Mode
-        if (btnCompareMode != null) {
-            btnCompareMode.setOnClickListener(v -> toggleCompareMode());
-        }
-
-        // ✅ Delete All
-        if (btnDeleteAll != null) {
-            btnDeleteAll.setOnClickListener(v -> confirmDeleteAll());
-        }
-
-        // ✅ Swipe Refresh
-        if (swipeRefresh != null) {
-            swipeRefresh.setOnRefreshListener(this::refreshSnapshots);
-        }
+    if (btnCompareMode != null) {
+        btnCompareMode.setOnClickListener(v -> toggleCompareMode());
     }
+
+    if (btnDeleteAll != null) {
+        btnDeleteAll.setOnClickListener(v -> confirmDeleteAll());
+    }
+
+    if (swipeRefresh != null) {
+        swipeRefresh.setOnRefreshListener(this::refreshSnapshots);
+    }
+    
+    // ✅ جديد: زر الرجوع
+    if (btnBack != null) {
+        btnBack.setOnClickListener(v -> handleBackNavigation());
+    }
+}
+
+/**
+ * ✅ الرجوع للشاشة السابقة
+ */
+private void handleBackNavigation() {
+    try {
+        if (!isAdded() || getActivity() == null) return;
+
+        // ✅ OnBackPressedDispatcher يُفوّض الأمر إلى NavigationManager تلقائياً
+        requireActivity().getOnBackPressedDispatcher().onBackPressed();
+
+    } catch (Exception e) {
+        Log.e(TAG, "handleBackNavigation error", e);
+    }
+}
+
 
     // ==================== Load ====================
 
