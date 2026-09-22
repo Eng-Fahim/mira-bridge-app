@@ -131,6 +131,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraOrgProfileManager orgProfileManager;
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    
+    // ✅ قفل التنقل أثناء الجرد
+    private volatile boolean navigationLocked = false;
 
     private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener =
             this::updateAppTitle;
@@ -208,7 +211,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-       // AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
 
         try {
@@ -1184,29 +1187,63 @@ fabActionCenter.setOnLongClickListener(v -> {
         }
 
         if (quickNav != null) {
-            quickNav.setOnItemSelectedListener(item -> {
-                int id = item.getItemId();
-                String tag = getFragmentTagForNavItem(id);
-                if (tag == null || tag.isEmpty()) return false;
+    quickNav.setOnItemSelectedListener(item -> {
+        int id = item.getItemId();
+        String tag = getFragmentTagForNavItem(id);
+        if (tag == null || tag.isEmpty()) return false;
 
-                // ✅ تجاهل إذا كان نفس التبويب الحالي
-                if (navigationManager != null
-                        && tag.equals(navigationManager.getCurrentFragmentTag())) {
-                    return true;
-                }
-
-                // ✅ استخدم loadFragmentDirectly (يمسح Back Stack)
-                Fragment fragment = navigationManager != null
-                        ? navigationManager.createFragmentByTag(tag)
-                        : FragmentFactory.createFragmentByTag(tag);
-
-                if (fragment != null) {
-                    loadFragmentDirectly(fragment, tag);
-                    return true;
-                }
-                return false;
-            });
+        // ✅ تجاهل إذا كان نفس التبويب الحالي
+        if (navigationManager != null
+                && tag.equals(navigationManager.getCurrentFragmentTag())) {
+            return true;
         }
+
+        // ✅✅✅ حماية: منع التنقل أثناء الجرد
+        if (navigationLocked || isInventoryActive()) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" 
+                                       : "⚠️ Inventory Active")
+                    .setMessage(isArabic
+                            ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
+                              "هل تريد إيقاف الجرد والانتقال؟"
+                            : "Cannot navigate during active inventory.\n\n" +
+                              "Stop inventory and proceed?")
+                    .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
+                            (d, w) -> {
+                                stopActiveInventory();
+                                setNavigationLocked(false);
+                                mainHandler.postDelayed(() -> {
+                                    Fragment fragment = navigationManager != null
+                                            ? navigationManager.createFragmentByTag(tag)
+                                            : FragmentFactory.createFragmentByTag(tag);
+                                    if (fragment != null) {
+                                        loadFragmentDirectly(fragment, tag);
+                                    }
+                                }, 500);
+                            })
+                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
+                            (d, w) -> {
+                                // ✅ إعادة التحديد للتبويب الحالي
+                                String currentTag = navigationManager != null
+                                        ? navigationManager.getCurrentFragmentTag() : "";
+                                updateBottomNavSelectionByTag(currentTag);
+                            })
+                    .setCancelable(false)
+                    .show();
+            return false;  // ← رفض التنقل
+        }
+
+        Fragment fragment = navigationManager != null
+                ? navigationManager.createFragmentByTag(tag)
+                : FragmentFactory.createFragmentByTag(tag);
+
+        if (fragment != null) {
+            loadFragmentDirectly(fragment, tag);
+            return true;
+        }
+        return false;
+    });
+}
     } catch (Exception e) {
         Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
@@ -2192,9 +2229,68 @@ private void showQuickActionMenu() {
             Log.e(TAG, "Navigation to login error: " + e.getMessage());
         }
     }
+    
+    /**
+ * ✅ قفل/فك التنقل أثناء الجرد
+ * - يعطّل BottomNav
+ * - يعطّل FAB
+ * - يعطّل Toolbar actions
+ */
+public void setNavigationLocked(boolean locked) {
+    try {
+        this.navigationLocked = locked;
+        
+        // ✅ 1) تعطيل Bottom Navigation
+        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+        if (nav != null) {
+            nav.setEnabled(!locked);
+            nav.setAlpha(locked ? 0.4f : 1.0f);
+            
+            Menu menu = nav.getMenu();
+            if (menu != null) {
+                for (int i = 0; i < menu.size(); i++) {
+                    menu.getItem(i).setEnabled(!locked);
+                }
+            }
+        }
+        
+        // ✅ 2) تعطيل FAB
+        FloatingActionButton fab = findViewById(R.id.fabActionCenter);
+        if (fab != null) {
+            fab.setEnabled(!locked);
+            fab.setAlpha(locked ? 0.4f : 1.0f);
+        }
+        
+        // ✅ 3) تعطيل Toolbar menu items
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null && toolbar.getMenu() != null) {
+            Menu menu = toolbar.getMenu();
+            for (int i = 0; i < menu.size(); i++) {
+                menu.getItem(i).setEnabled(!locked);
+            }
+        }
+        
+        // ✅ 4) تعطيل Secondary Toolbar
+        if (secondaryToolbarManager != null) {
+            Menu menu = secondaryToolbarManager.getCurrentMenu();
+            if (menu != null) {
+                for (int i = 0; i < menu.size(); i++) {
+                    menu.getItem(i).setEnabled(!locked);
+                }
+            }
+        }
+        
+        Log.d(TAG, "🔒 Navigation " + (locked ? "LOCKED" : "UNLOCKED"));
+    } catch (Exception e) {
+        Log.e(TAG, "setNavigationLocked error", e);
+    }
+}
+
+public boolean isNavigationLocked() {
+    return navigationLocked;
+}
 
     // ==================== التنظيف والتدمير ====================
-
 
 
     @Override
@@ -2293,4 +2389,4 @@ private void pulseFab(View fab) {
         Log.e(TAG, "pulseFab error: " + e.getMessage());
     }
 }
-}
+                    }
