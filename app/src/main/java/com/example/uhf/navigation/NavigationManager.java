@@ -28,6 +28,9 @@ import java.util.List;
  * ✅ logs تفصيلية للتشخيص
  * ✅ آمن ضد Process Death و Configuration Change
  * ✅ يدعم BackPressInterceptor (للجرد النشط)
+ *
+ * ✅ جديد في هذه النسخة:
+ * - إضافة TAG_SNAPSHOTS (شاشة لقطات المخزون)
  */
 public class NavigationManager {
 
@@ -56,6 +59,9 @@ public class NavigationManager {
     public static final String TAG_BRANCHES          = "Branches";
     public static final String TAG_RFID_BINDINGS     = "RfidBindings";
     public static final String TAG_SOUND_SETTINGS    = "SoundSettings";
+
+    // ✅ جديد: شاشة لقطات المخزون
+    public static final String TAG_SNAPSHOTS         = "Snapshots";
 
     // ==================== قائمة التبويبات الرئيسية ====================
     private static final String[] ROOT_TAGS = {
@@ -326,6 +332,8 @@ public class NavigationManager {
             case TAG_BRANCHES:          return new MiraBranchesManagementFragment();
             case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
             case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
+            // ✅ جديد: شاشة اللقطات
+            case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
             default:
                 log("Unknown tag: " + tag + ", falling back to Dashboard");
                 return new MiraDashboardFragment();
