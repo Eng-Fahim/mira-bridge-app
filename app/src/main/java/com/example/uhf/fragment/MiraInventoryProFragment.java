@@ -2206,21 +2206,52 @@ public void onCommitSuccess(JSONObject report) {
 private void navigateToSnapshots() {
     try {
         if (!isAdded() || isFragmentDestroyed) return;
+        if (getActivity() == null) return;
 
-        if (getActivity() instanceof BaseTabFragmentActivity) {
-            com.example.uhf.manager.NavigationManager nav =
-                    com.example.uhf.manager.NavigationManager.getInstance();
-            if (nav != null) {
-                nav.navigateTo("SNAPSHOTS");
-            } else {
-                showToast(isArabic ? "⚠️ التنقل غير جاهز" : "⚠️ Navigation not ready");
+        // ✅ 1) حاول استخدام NavigationManager من الـ Activity
+        com.example.uhf.navigation.NavigationManager nav = null;
+
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                nav = ((UHFMainActivity) getActivity()).getNavigationManager();
+            } else if (getActivity() instanceof BaseTabFragmentActivity) {
+                nav = ((BaseTabFragmentActivity) getActivity()).getNavigationManager();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "getNavigationManager not available: " + e.getMessage());
+            nav = null;
+        }
+
+        // ✅ 2) إذا وُجد — استخدمه (الطريقة المثالية)
+        if (nav != null) {
+            String tag = com.example.uhf.navigation.NavigationManager.TAG_SNAPSHOTS;
+            androidx.fragment.app.Fragment fragment = nav.createFragmentByTag(tag);
+
+            if (fragment != null) {
+                nav.loadFragmentDirectly(fragment, tag);
+                Log.d(TAG, "✅ Navigated to Snapshots via NavigationManager");
+                return;
             }
         }
+
+        // ✅ 3) Fallback: استخدام FragmentManager مباشرة
+        Log.w(TAG, "Using FragmentManager fallback for Snapshots");
+
+        MiraSnapshotsFragment snapshotsFragment = new MiraSnapshotsFragment();
+
+        getActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(android.R.id.content, snapshotsFragment, "Snapshots")
+                .addToBackStack("Snapshots")
+                .commit();
+
+        Log.d(TAG, "✅ Navigated to Snapshots via FragmentManager");
+
     } catch (Exception e) {
         Log.e(TAG, "navigateToSnapshots error", e);
+        showToast(isArabic ? "⚠️ خطأ في التنقل" : "⚠️ Navigation error");
     }
 }
-
     // ================================================================
     //  Print
     // ================================================================
