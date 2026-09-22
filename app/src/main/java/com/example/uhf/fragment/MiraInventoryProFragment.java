@@ -32,6 +32,7 @@ import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.ModernScannedItemsAdapter;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.dialog.inventory.InventoryDialogsManager;
+import com.example.uhf.model.InventorySnapshot;  // ← ✅ جديد
 import com.example.uhf.engine.MiraInventoryEngine;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
