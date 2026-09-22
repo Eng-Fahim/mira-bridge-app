@@ -2050,92 +2050,93 @@ private JSONObject buildLocalCommitSummary() {
 }
 
     private void commitInventoryToServer() {
-        if (!isAdded() || isFragmentDestroyed) return;
+    if (!isAdded() || isFragmentDestroyed) return;
 
-        if (persistenceManager == null || inventoryEngine == null || apiClient == null) {
-            showToast("⚠️ غير جاهز");
-            return;
-        }
-
-        if (persistenceManager.isCommittingNow()) {
-            showToast(isArabic ? "⏳ جاري الإرسال بالفعل..." : "⏳ Already sending...");
-            return;
-        }
-
-        showToast(isArabic ? "⏳ جاري إرسال البيانات..." : "⏳ Sending...");
-
-        int scanned = inventoryEngine.getUniqueCount();
-        int totalReads = inventoryEngine.getTotalReads();
-        int branchId = getActiveBranchId();
-
-        persistenceManager.commitInventory(
-                inventoryEngine.getClientSessionId(),
-                branchId,
-                expectedCount,
-                totalReads,
-                scanned,
-                scannedItemsDisplayList,
-                apiClient,
-                new InventoryPersistenceManager.CommitCallback() {
-                   @Override
-public void onCommitSuccess(JSONObject report) {
-    mainHandler.post(() -> {
-        if (!isAdded() || isFragmentDestroyed) return;
-
-        // ✅ 1) نبني متغير محلي جديد (final/effectively final)
-        final JSONObject finalReport;
-        
-        if (report == null || report.length() == 0) {
-            Log.w(TAG, "⚠️ Empty report from server — building local summary");
-            finalReport = buildLocalCommitSummary();
-        } else {
-            finalReport = report;
-        }
-
-        // ✅ 2) حفظ التقرير من السيرفر
-        lastServerReport = finalReport;
-
-        showToast(isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير"
-                           : "✅ Inventory committed successfully");
-
-        // ✅ 3) Sound + Haptic
-        if (feedbackHelper != null) {
-            try { 
-                feedbackHelper.hapticFeedback(SoundManager.FeedbackType.COMPLETED); 
-            } catch (Exception ignored) {}
-        }
-        if (soundManager != null) {
-            soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-        }
-
-        // ✅ 4) عطّل الأزرار
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setEnabled(false);
-            btnGenerateReport.setAlpha(0.5f);
-        }
-        if (btnCommitSession != null) {
-            btnCommitSession.setEnabled(false);
-            btnCommitSession.setText(isArabic ? "✅ معتمد" : "✅ Committed");
-            btnCommitSession.setAlpha(0.7f);
-        }
-
-        // ✅✅✅ 5) حفظ لقطة تلقائية
-        autoSaveSnapshotAfterCommit(finalReport);
-
-        // ✅ 6) عرض النافذة
-        showCommitSuccessDialog(finalReport);
-    });
-}
-                  @Override
-public void onCommitError(String error) {
-    mainHandler.post(() -> {
-        if (!isAdded() || isFragmentDestroyed) return;
-        Log.e(TAG, "Commit failed: " + error);  // ← قراءة فقط ✅
-        showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + error);  // ← قراءة فقط ✅
-    });
-}
+    if (persistenceManager == null || inventoryEngine == null || apiClient == null) {
+        showToast("⚠️ غير جاهز");
+        return;
     }
 
+    if (persistenceManager.isCommittingNow()) {
+        showToast(isArabic ? "⏳ جاري الإرسال بالفعل..." : "⏳ Already sending...");
+        return;
+    }
+
+    showToast(isArabic ? "⏳ جاري إرسال البيانات..." : "⏳ Sending...");
+
+    int scanned = inventoryEngine.getUniqueCount();
+    int totalReads = inventoryEngine.getTotalReads();
+    int branchId = getActiveBranchId();
+
+    persistenceManager.commitInventory(
+            inventoryEngine.getClientSessionId(),
+            branchId,
+            expectedCount,
+            totalReads,
+            scanned,
+            scannedItemsDisplayList,
+            apiClient,
+            new InventoryPersistenceManager.CommitCallback() {
+                @Override
+                public void onCommitSuccess(JSONObject report) {
+                    mainHandler.post(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+
+                        // ✅ متغير محلي جديد (final)
+                        final JSONObject finalReport;
+
+                        if (report == null || report.length() == 0) {
+                            Log.w(TAG, "⚠️ Empty report from server — building local summary");
+                            finalReport = buildLocalCommitSummary();
+                        } else {
+                            finalReport = report;
+                        }
+
+                        // ✅ حفظ التقرير من السيرفر
+                        lastServerReport = finalReport;
+
+                        showToast(isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير"
+                                           : "✅ Inventory committed successfully");
+
+                        // ✅ Sound + Haptic
+                        if (feedbackHelper != null) {
+                            try {
+                                feedbackHelper.hapticFeedback(SoundManager.FeedbackType.COMPLETED);
+                            } catch (Exception ignored) {}
+                        }
+                        if (soundManager != null) {
+                            soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+                        }
+
+                        // ✅ عطّل الأزرار
+                        if (btnGenerateReport != null) {
+                            btnGenerateReport.setEnabled(false);
+                            btnGenerateReport.setAlpha(0.5f);
+                        }
+                        if (btnCommitSession != null) {
+                            btnCommitSession.setEnabled(false);
+                            btnCommitSession.setText(isArabic ? "✅ معتمد" : "✅ Committed");
+                            btnCommitSession.setAlpha(0.7f);
+                        }
+
+                        // ✅ لقطة تلقائية
+                        autoSaveSnapshotAfterCommit(finalReport);
+
+                        // ✅ عرض النافذة
+                        showCommitSuccessDialog(finalReport);
+                    });
+                }
+
+                @Override
+                public void onCommitError(String error) {
+                    mainHandler.post(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+                        Log.e(TAG, "Commit failed: " + error);
+                        showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + error);
+                    });
+                }
+            });
+}
 
     private void showCommitSuccessDialog(JSONObject report) {
     if (!isAdded() || isFragmentDestroyed) return;
