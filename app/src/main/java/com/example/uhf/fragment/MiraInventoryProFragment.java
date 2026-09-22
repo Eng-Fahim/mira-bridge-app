@@ -202,6 +202,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private volatile int currentLiveFilter = 0;
     private volatile int lastScannedForAnimation = 0;
     private JSONObject lastServerReport = null;
+    // ✅ لقطة تلقائية
+    private boolean autoSnapshotEnabled = true;  // يمكن تعطيلها من الإعدادات
     
     // ✅ [إصلاح] throttle ديناميكي
     private long scanStartTime = 0;
@@ -2018,37 +2020,48 @@ private void updateButtonsState() {
                 scannedItemsDisplayList,
                 apiClient,
                 new InventoryPersistenceManager.CommitCallback() {
-                    @Override
+                   @Override
 public void onCommitSuccess(JSONObject report) {
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
-        
-        showToast(isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير بنجاح"
+
+        // ✅ 1) إذا كان التقرير فارغاً — اعرض ملخصاً محلياً
+        if (report == null || report.length() == 0) {
+            Log.w(TAG, "⚠️ Empty report from server — building local summary");
+            report = buildLocalCommitSummary();
+        }
+
+        // ✅ 2) حفظ التقرير من السيرفر
+        lastServerReport = report;
+
+        showToast(isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير"
                            : "✅ Inventory committed successfully");
-        
-        // ✅ Haptic + Sound
+
+        // ✅ 3) Sound + Haptic
         if (feedbackHelper != null) {
-            try {
-                feedbackHelper.hapticFeedback(SoundManager.FeedbackType.COMPLETED);
+            try { 
+                feedbackHelper.hapticFeedback(SoundManager.FeedbackType.COMPLETED); 
             } catch (Exception ignored) {}
         }
         if (soundManager != null) {
             soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
         }
-        
-        // ✅ تعطيل زر التقرير
+
+        // ✅ 4) عطّل الأزرار
         if (btnGenerateReport != null) {
             btnGenerateReport.setEnabled(false);
             btnGenerateReport.setAlpha(0.5f);
         }
-        
-        // ✅ تحديث زر الاعتماد
         if (btnCommitSession != null) {
             btnCommitSession.setEnabled(false);
             btnCommitSession.setText(isArabic ? "✅ معتمد" : "✅ Committed");
             btnCommitSession.setAlpha(0.7f);
         }
-        
+
+        // ✅✅✅ 5) حفظ لقطة تلقائية (الأهم!)
+        autoSaveSnapshotAfterCommit(report);
+
+        // ✅ 6) عرض النافذة
         showCommitSuccessDialog(report);
     });
 }
@@ -2863,7 +2876,137 @@ private void navigateToSnapshots() {
             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
             .show();
 }
+/**
+ * ✅ حفظ لقطة تلقائية بعد الاعتماد الناجح
+ * - يحمي من فقدان البيانات
+ * - يعمل offline
+ * - اسم تلقائي ذكي
+ */
+private void autoSaveSnapshotAfterCommit(JSONObject serverReport) {
+    try {
+        if (!autoSnapshotEnabled) {
+            Log.d(TAG, "Auto-snapshot disabled — skipping");
+            return;
+        }
+        
+        if (snapshotManager == null || inventoryEngine == null) {
+            Log.w(TAG, "autoSaveSnapshot: prerequisites missing");
+            return;
+        }
 
+        final int scanned = inventoryEngine.getUniqueCount();
+        if (scanned == 0) {
+            Log.d(TAG, "autoSaveSnapshot: no items — skipping");
+            return;
+        }
+
+        // ✅ اسم تلقائي احترافي
+        final String autoName = buildAutoSnapshotName();
+        
+        final String branchName = branchesManager != null
+                ? branchesManager.getActiveBranchDisplayName() : "";
+        final String mode = (selectedCategoryFilter != null 
+                && !selectedCategoryFilter.isEmpty()) ? "category" : "full";
+        final String user = getCurrentUserName();
+
+        ioExecutor.execute(() -> {
+            try {
+                InventorySnapshot snapshot = snapshotManager.createSnapshot(
+                        inventoryEngine.getClientSessionId(),
+                        scannedItemsDisplayList,
+                        expectedCount,
+                        branchName,
+                        mode,
+                        user,
+                        autoName);
+
+                // ✅ ملاحظات من التقرير (إن وُجد)
+                StringBuilder notes = new StringBuilder();
+                notes.append(isArabic 
+                        ? "لقطة تلقائية بعد الاعتماد" 
+                        : "Auto-snapshot after commit");
+                
+                if (serverReport != null && serverReport.length() > 0) {
+                    String accuracy = serverReport.optString("accuracy", "");
+                    String risk = serverReport.optString("risk_level", "");
+                    
+                    if (!accuracy.isEmpty()) {
+                        notes.append(" • ").append(isArabic ? "دقة: " : "Accuracy: ")
+                             .append(accuracy).append("%");
+                    }
+                    if (!risk.isEmpty() && !"unknown".equals(risk)) {
+                        notes.append(" • ").append(isArabic ? "خطر: " : "Risk: ")
+                             .append(risk);
+                    }
+                }
+                
+                snapshot.setNotes(notes.toString());
+
+                boolean saved = snapshotManager.saveSnapshot(snapshot);
+
+                mainHandler.post(() -> {
+                    if (!isAdded() || isFragmentDestroyed) return;
+                    if (saved) {
+                        Log.i(TAG, "✅ Auto-snapshot saved: " + autoName);
+                        
+                        // ✅ Toast خفيف (اختياري)
+                        showToast(isArabic 
+                                ? "📸 تم حفظ لقطة تلقائية" 
+                                : "📸 Auto-snapshot saved");
+                    } else {
+                        Log.w(TAG, "Auto-snapshot save failed");
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "autoSaveSnapshotAfterCommit error", e);
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "autoSaveSnapshotAfterCommit outer error", e);
+    }
+}
+
+/**
+ * ✅ بناء اسم تلقائي احترافي
+ * الصيغة: "2026-09-23 14:30 — الفرع الرئيسي [كامل]"
+ */
+private String buildAutoSnapshotName() {
+    try {
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
+                "yyyy-MM-dd HH:mm", Locale.US);
+        String dateTime = sdf.format(new java.util.Date());
+
+        String branch = branchesManager != null
+                ? branchesManager.getActiveBranchDisplayName() : "";
+        if (branch == null) branch = "";
+
+        // ✅ وصف الوضع
+        String modeLabel;
+        if (selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty()) {
+            modeLabel = selectedCategoryFilter;  // مثل: "21K"
+        } else if (expectedCount == 0) {
+            modeLabel = isArabic ? "أعمى" : "Blind";
+        } else {
+            modeLabel = isArabic ? "كامل" : "Full";
+        }
+
+        // ✅ الصيغة النهائية
+        StringBuilder sb = new StringBuilder();
+        sb.append(dateTime);
+        
+        if (!branch.isEmpty()) {
+            sb.append(" — ").append(branch);
+        }
+        
+        sb.append(" [").append(modeLabel).append("]");
+        
+        return sb.toString();
+
+    } catch (Exception e) {
+        Log.e(TAG, "buildAutoSnapshotName error", e);
+        return "Auto-" + System.currentTimeMillis();
+    }
+}
 private String getCurrentUserName() {
     try {
         com.example.uhf.tools.SessionManager sm = 
