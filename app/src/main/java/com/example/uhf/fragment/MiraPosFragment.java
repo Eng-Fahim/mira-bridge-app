@@ -1711,4 +1711,425 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     });
 
-} // ✅ نهاية الكلاس MiraPosFragment
+  
+    // ═══════════════════════════════════════════════════════════
+    // ✅ دوال مساعدة (كانت ناقصة في الملف)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * ✅ عرض Toast آمن من أي خيط
+     */
+    private void showToast(String msg) {
+        if (msg == null || msg.isEmpty()) return;
+        safeRun(() -> {
+            try {
+                if (getContext() != null && isAdded()) {
+                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "showToast error: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * ✅ تنفيذ على الـ UI thread بأمان
+     */
+    private void safeRun(Runnable r) {
+        try {
+            if (isAdded() && getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (isAdded() && !isRemoving() && !isDetached()) {
+                        try {
+                            r.run();
+                        } catch (Exception e) {
+                            Log.e(TAG, "safeRun inner error: " + e.getMessage());
+                        }
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "safeRun error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ تشغيل صوت التنبيه
+     */
+    private void playAlertSound(int id) {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).playSound(id);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "playAlertSound error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ الحصول على رقم الفرع النشط
+     */
+    private int getActiveBranchId() {
+        try {
+            return branchesManager != null ? branchesManager.getActiveBranchId() : 1;
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+    /**
+     * ✅ فحص صلاحية POS
+     */
+    private boolean hasPosPermission() {
+        try {
+            return permissionManager != null && (
+                    permissionManager.canView("pos")
+                    || permissionManager.isPosOperator()
+                    || permissionManager.isManager()
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "hasPosPermission error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * ✅ تحويل رمز العيار إلى رقم
+     */
+    private int getKaratNumber(String karat) {
+        if (karat == null) return 21;
+        String clean = karat.trim().toUpperCase(Locale.US).replace("K", "");
+        try {
+            int num = Integer.parseInt(clean);
+            if (num >= 10 && num <= 24) return num;
+        } catch (NumberFormatException ignored) {}
+        return 21;
+    }
+
+    /**
+     * ✅ إيقاف مسح RFID
+     */
+    private void stopRFIDScan() {
+        try {
+            if (rfidManager == null) return;
+            isRFIDScanActive = false;
+            rfidManager.stopScan();
+        } catch (Exception e) {
+            Log.e(TAG, "stopRFIDScan error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ بدء مسح RFID
+     */
+    private void startRFIDScan() {
+        try {
+            if (rfidManager == null) return;
+            isRFIDScanActive = true;
+            rfidManager.startScan();
+        } catch (Exception e) {
+            Log.e(TAG, "startRFIDScan error: " + e.getMessage());
+            isRFIDScanActive = false;
+        }
+    }
+
+    /**
+     * ✅ تبديل وضع RFID
+     */
+    private void toggleRFIDMode() {
+        try {
+            if (!isAdded() || rfidManager == null) return;
+
+            isRFIDModeActive = !isRFIDModeActive;
+            if (isRFIDModeActive) {
+                startRFIDScan();
+                if (btnPosRFIDMode != null)
+                    btnPosRFIDMode.setText(isArabic ? "📡 RFID نشط" : "📡 RFID Active");
+                if (tvCartStatus != null)
+                    tvCartStatus.setText(isArabic ? "📡 جاهز لمسح RFID..." : "📡 Ready for RFID...");
+            } else {
+                stopRFIDScan();
+                if (btnPosRFIDMode != null)
+                    btnPosRFIDMode.setText(isArabic ?
+                            getString(R.string.pos_scan_rfid) : "📡 Scan RFID");
+                if (tvCartStatus != null)
+                    tvCartStatus.setText(isArabic ?
+                            getString(R.string.pos_ready_scan) : "Ready to scan...");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "toggleRFIDMode error: " + e.getMessage());
+            isRFIDModeActive = false;
+        }
+    }
+
+    /**
+     * ✅ استقبال شريحة RFID
+     */
+    public void onRingScanned(String epc) {
+        try {
+            if (epc == null || epc.trim().isEmpty()) return;
+            if (!isRFIDScanActive) return;
+
+            long currentTime = System.currentTimeMillis();
+            Long lastTime = lastScannedTimes.get(epc);
+            if (lastTime != null && (currentTime - lastTime < SCAN_COOLDOWN_MS)) return;
+            lastScannedTimes.put(epc, currentTime);
+
+            if (scannedEpcs.contains(epc)) {
+                showToast(isArabic ? "⚠️ مضافة مسبقاً!" : "⚠️ Already in cart!");
+                playAlertSound(2);
+                return;
+            }
+            processRingEpc(epc, "rfid");
+        } catch (Exception e) {
+            Log.e(TAG, "onRingScanned error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ استقبال باركود
+     */
+    public void onBarcodeScanned(String data) {
+        try {
+            if (data == null || data.trim().isEmpty()) return;
+
+            long currentTime = System.currentTimeMillis();
+            Long lastTime = lastScannedTimes.get(data);
+            if (lastTime != null && (currentTime - lastTime < SCAN_COOLDOWN_MS)) return;
+            lastScannedTimes.put(data, currentTime);
+
+            if (scannedEpcs.contains(data)) {
+                showToast(isArabic ? "⚠️ مضافة مسبقاً!" : "⚠️ Already in cart!");
+                playAlertSound(2);
+                return;
+            }
+            processRingEpc(data, "barcode");
+        } catch (Exception e) {
+            Log.e(TAG, "onBarcodeScanned error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ إرسال EPC يدوياً
+     */
+    private void submitManualEpc() {
+        try {
+            if (!hasPosPermission()) {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                return;
+            }
+
+            UIHelper.hideKeyboard(getActivity());
+            String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
+
+            if (!epc.isEmpty()) {
+                if (scannedEpcs.contains(epc)) {
+                    showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
+                    playAlertSound(2);
+                    return;
+                }
+                processRingEpc(epc, "manual");
+                if (etManualEpc != null) etManualEpc.setText("");
+            } else {
+                showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "submitManualEpc error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ فتح ماسح الباركود
+     */
+    private void openBarcodeScanner() {
+        try {
+            if (!isAdded() || getContext() == null) return;
+            FragmentManager fm = getParentFragmentManager();
+            if (fm == null || fm.isStateSaved()) return;
+
+            MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
+            sf.setOnBarcodeScannedListener((data, format) -> {
+                try {
+                    if (isAdded() && fm.getBackStackEntryCount() > 0) {
+                        fm.popBackStack();
+                    }
+
+                    if (etManualEpc != null) etManualEpc.setText(data);
+
+                    mainHandler.postDelayed(() -> {
+                        if (isAdded() && data != null && !data.isEmpty()) {
+                            processRingEpc(data, "barcode");
+                            if (etManualEpc != null) etManualEpc.setText("");
+                        }
+                    }, 200);
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Barcode callback error: " + e.getMessage());
+                }
+            });
+
+            int containerId = android.R.id.content;
+            try {
+                View view = getView();
+                if (view != null && view.getParent() instanceof View) {
+                    containerId = ((View) view.getParent()).getId();
+                }
+            } catch (Exception ignored) {}
+
+            if (!fm.isStateSaved()) {
+                fm.beginTransaction()
+                        .replace(containerId, sf)
+                        .addToBackStack("barcode_scanner")
+                        .commit();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
+            showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+        }
+    }
+
+    /**
+     * ✅ تهيئة الميزان الذكي
+     */
+    private void initSmartScale() {
+        try {
+            scaleManager = new SmartScaleManager(requireContext(),
+                    new SmartScaleManager.ScaleCallback() {
+                @Override
+                public void onWeightReceived(double weight) {
+                    liveScaleWeight = weight;
+                    safeRun(() -> {
+                        if (tvScaleStatus != null) {
+                            tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", weight));
+                            tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
+                        }
+                        updateCartItemsScaleWeight(weight);
+                    });
+                }
+
+                @Override
+                public void onScaleConnected(String name) {
+                    safeRun(() -> {
+                        if (tvScaleStatus != null) {
+                            tvScaleStatus.setText("⚖️ " + name);
+                            tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
+                        }
+                        showToast(isArabic ? "✅ تم الاتصال: " + name : "✅ Connected: " + name);
+                    });
+                }
+
+                @Override
+                public void onScaleDisconnected() {
+                    liveScaleWeight = 0.0;
+                    safeRun(() -> {
+                        if (tvScaleStatus != null) {
+                            tvScaleStatus.setText(isArabic ? "⚖️ غير متصل" : "⚖️ Offline");
+                            tvScaleStatus.setTextColor(Color.parseColor("#E74C3C"));
+                        }
+                    });
+                }
+
+                @Override
+                public void onScaleError(String error) {
+                    Log.e(TAG, "Scale Error: " + error);
+                }
+            });
+
+            simulationHelper = new ScaleSimulationHelper(requireContext(),
+                    new ScaleSimulationHelper.SimulationCallback() {
+                @Override
+                public void onWeightReceived(double weight, String label) {
+                    safeRun(() -> {
+                        liveScaleWeight = weight;
+                        if (tvScaleStatus != null) {
+                            tvScaleStatus.setText(String.format(Locale.US,
+                                    "⚖️ %.2fg (محاكاة)", weight));
+                            tvScaleStatus.setTextColor(Color.parseColor("#2ECC71"));
+                        }
+                        updateCartItemsScaleWeight(weight);
+                        showToast("📦 " + label + ": " + weight + "g");
+                    });
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "initSmartScale error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ تحديث وزن أول قطعة في السلة
+     */
+    private void updateCartItemsScaleWeight(double currentScaleWeight) {
+        if (cartList.isEmpty() || currentScaleWeight <= 0) return;
+
+        try {
+            CartItem topItem = cartList.get(0);
+            if (topItem.scaleWeight != currentScaleWeight) {
+                topItem.scaleWeight = currentScaleWeight;
+                if (priceManager != null && topItem.weight > 0) {
+                    topItem.price = priceManager.calculateGoldPrice(
+                            getKaratNumber(topItem.karat), currentScaleWeight);
+                }
+                if (cartAdapter != null) {
+                    cartAdapter.notifyItemChanged(0);
+                }
+                updateCartSummary();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "updateCartItemsScaleWeight error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ عرض رسالة نجاح/فشل مع بطاقة
+     */
+    private void showSuccessMessage(String title, String message, boolean isSuccess) {
+        try {
+            Context ctx = getContext();
+            if (ctx == null || !isAdded()) return;
+
+            MaterialCardView cardView = new MaterialCardView(ctx);
+            cardView.setRadius(24);
+            cardView.setCardElevation(10);
+
+            LinearLayout layout = new LinearLayout(ctx);
+            layout.setOrientation(LinearLayout.VERTICAL);
+            layout.setPadding(40, 30, 40, 30);
+            layout.setGravity(android.view.Gravity.CENTER);
+
+            TextView tvIcon = new TextView(ctx);
+            tvIcon.setText(isSuccess ? "✅" : "❌");
+            tvIcon.setTextSize(48);
+            tvIcon.setGravity(android.view.Gravity.CENTER);
+            layout.addView(tvIcon);
+
+            TextView tvTitle = new TextView(ctx);
+            tvTitle.setText(title);
+            tvTitle.setTextSize(18);
+            tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvTitle.setGravity(android.view.Gravity.CENTER);
+            tvTitle.setPadding(0, 12, 0, 8);
+            tvTitle.setTextColor(isSuccess ? 0xFF22C55E : 0xFFEF4444);
+            layout.addView(tvTitle);
+
+            TextView tvMessage = new TextView(ctx);
+            tvMessage.setText(message);
+            tvMessage.setTextSize(14);
+            tvMessage.setGravity(android.view.Gravity.CENTER);
+            tvMessage.setPadding(0, 4, 0, 16);
+            tvMessage.setTextColor(0xFF555555);
+            layout.addView(tvMessage);
+
+            cardView.addView(layout);
+
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
+            builder.setView(cardView);
+            builder.setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss());
+            builder.setCancelable(false);
+            builder.show();
+        } catch (Exception e) {
+            Log.e(TAG, "showSuccessMessage error: " + e.getMessage());
+        }
+    }
+
+} // ✅ نهاية الكلاس MiraPosFragment  
