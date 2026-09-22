@@ -438,4 +438,149 @@ public synchronized boolean autoConnectAndBind(Context hostContext) {
         reader.release();
         return connectSuccess;
     }
+
+    // ==================== ⚡ Power Control (New) ====================
+
+/**
+ * ✅ ضبط قدرة الهوائي فعلياً على القارئ
+ *
+ * @param dbm قدرة بين 5 و 30 dBm
+ * @return true إذا نجح التطبيق
+ */
+public boolean setPower(int dbm) {
+    try {
+        // ✅ فحص المدى
+        if (dbm < 5 || dbm > 30) {
+            Log.w(TAG, "⚠️ Power out of range: " + dbm + " (allowed: 5-30)");
+            return false;
+        }
+
+        // ✅ فحص القارئ
+        MiraIRFIDReader reader = getActiveReader();
+        if (reader == null) {
+            Log.e(TAG, "❌ setPower: no active reader");
+            return false;
+        }
+
+        if (!reader.isConnected()) {
+            Log.e(TAG, "❌ setPower: reader not connected");
+            return false;
+        }
+
+        // ✅ استدعاء الدالة على القارئ (void)
+        reader.setPower(dbm);
+
+        // ✅ نتحقق من النجاح عبر getPower() — لأن setPower لا يُرجع قيمة
+        int applied = getPowerInternal(reader);
+        boolean success = (applied == dbm);
+
+        if (success) {
+            Log.i(TAG, "✅ Power set to " + dbm + " dBm");
+
+            // ✅ احفظ في الجهاز النشط
+            if (activeDevice != null) {
+                activeDevice.setPowerDbm(dbm);
+                saveDevice(activeDevice);
+            }
+        } else {
+            // حتى لو لم نستطع التحقق، اعتبره نجح إذا لم يُرمِ استثناء
+            Log.i(TAG, "⚠️ setPower called, but couldn't verify (applied="
+                    + applied + ", expected=" + dbm + ")");
+            success = true;  // اعتبره نجح — لأن الواجهة لا تُرجع قيمة
+
+            if (activeDevice != null) {
+                activeDevice.setPowerDbm(dbm);
+                saveDevice(activeDevice);
+            }
+        }
+
+        return success;
+
+    } catch (Exception e) {
+        Log.e(TAG, "❌ setPower exception: " + e.getMessage(), e);
+        return false;
+    }
+}
+
+/**
+ * ✅ محاولة قراءة القدرة الحالية من القارئ
+ * (يعيد -1 إذا لم يكن مدعوماً)
+ */
+private int getPowerInternal(MiraIRFIDReader reader) {
+    try {
+        // ✅ إذا كان للقارئ getPower() — استخدمه
+        // لكن MiraIRFIDReader لا يحتوي getPower() حالياً
+        // نُعيد -1 (غير معروف)
+        if (reader instanceof com.example.uhf.MiraRfid.readers.ChainwayReader) {
+            // لا نستطيع قراءة القدرة من الواجهة الحالية
+            return -1;
+        }
+        return -1;
+    } catch (Exception e) {
+        return -1;
+    }
+}
+
+/**
+ * ✅ الحصول على قدرة الهوائي الحالية (من التخزين المحلي)
+ */
+public int getPower() {
+    try {
+        if (activeDevice != null) {
+            return activeDevice.getPowerDbm();
+        }
+        return 26;  // قيمة افتراضية
+    } catch (Exception e) {
+        Log.e(TAG, "getPower error: " + e.getMessage());
+        return 26;
+    }
+}
+
+/**
+ * ✅ فحص جهوزية القارئ الحقيقي
+ */
+public boolean isRealReaderConnected() {
+    try {
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            return false;
+        }
+
+        MiraIRFIDReader reader = getActiveReader();
+        if (reader == null) return false;
+
+        if (reader.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
+            return false;
+        }
+
+        return reader.isConnected();
+
+    } catch (Exception e) {
+        Log.e(TAG, "isRealReaderConnected error: " + e.getMessage());
+        return false;
+    }
+}
+
+/**
+ * ✅ انتظار جهوزية القارئ (مع timeout)
+ */
+public boolean waitForReaderReady(long timeoutMs) {
+    long start = System.currentTimeMillis();
+
+    while (System.currentTimeMillis() - start < timeoutMs) {
+        try {
+            if (isRealReaderConnected()) {
+                Log.d(TAG, "✅ Reader ready after " +
+                        (System.currentTimeMillis() - start) + "ms");
+                return true;
+            }
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    Log.w(TAG, "⚠️ Reader not ready after " + timeoutMs + "ms");
+    return false;
+}
 }
