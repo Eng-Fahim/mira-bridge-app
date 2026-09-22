@@ -530,6 +530,22 @@
                 app:icon="@android:drawable/ic_menu_revert"
                 app:iconGravity="textStart"
                 app:iconSize="18dp" />
+                
+                <!-- ✅ عرض اللقطات (في الأعلى — ليس داخل الـ Dock) -->
+                <com.google.android.material.button.MaterialButton
+    android:id="@+id/btnViewSnapshots"
+    style="@style/Widget.Material3.Button.TonalButton"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginTop="8dp"
+    android:text="📂 عرض اللقطات السابقة"
+    android:textSize="13sp"
+    android:textStyle="bold"
+    app:cornerRadius="14dp"
+    app:icon="@android:drawable/ic_menu_gallery"
+    app:iconGravity="textStart"
+    app:iconSize="18dp" />
 
             <!-- ==================== 8. SEARCH & FILTER (مخفي) ==================== -->
             <LinearLayout
@@ -667,20 +683,7 @@
                 app:iconSize="20dp"
                 android:contentDescription="Report" />
                 
-                <!-- ✅ جديد: زر "عرض اللقطات" -->
-<com.google.android.material.button.MaterialButton
-    android:id="@+id/btnViewSnapshots"
-    style="@style/Widget.Material3.Button.TextButton"
-    android:layout_width="match_parent"
-    android:layout_height="48dp"
-    android:layout_marginHorizontal="12dp"
-    android:layout_marginTop="4dp"
-    android:text="📂 عرض اللقطات السابقة"
-    android:textSize="13sp"
-    android:textStyle="bold"
-    app:icon="@android:drawable/ic_menu_gallery"
-    app:iconGravity="textStart"
-    app:iconSize="18dp" />
+               
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnArchiveReportsCompact"
                 style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
