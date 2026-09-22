@@ -69,22 +69,16 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * MiraIdentityStudioFragment - الإصدار الاحترافي 4.0
+ * MiraIdentityStudioFragment - الإصدار 5.0 (متكامل 100%)
  *
- * ✅ الإصلاحات المطبقة (13 مشكلة):
- *  1. إزالة كود TID المكرر في finalizeItemIdentity
- *  2. توحيد onRfidScanned مع activateRFIDModeForEncoding (TID فقط)
- *  3. تحقق كامل في openBarcodeScannerForEPC
- *  4. تجنب getContext() في خيوط خلفية (appContext محفوظ)
- *  5. restoreDraftIfExists يحترم isFormLocked
- *  6. توثيق Setters الفارغة في saveCurrentDraftAsync
- *  7. إرسال TID كـ epc أيضاً في buildPayload
- *  8. تحقق مرن + رسالة واضحة لطول TID
- *  9. resetFormForNextScan دائماً على main thread
- * 10. onPhotosUpdated يفحص isAdded + binding
- * 11. معالجة شاملة لاستثناءات RFID
- * 12. منع تكرار الحوارات (loadingDialog guard)
- * 13. تنظيف كامل في onDestroyView
+ * ✅ تكامل كامل مع:
+ *   - IdentityFormManager v3.0 (DraftInfo + Callbacks + Stats)
+ *   - IdentityPhotoManager v3.0 (PhotoCallback + CompressionResult + Stats)
+ *   - PhotosAdapter v3.0 (submitList + ClickListener + destroy)
+ *   - IdentitySyncManager v4.0 (DetailedSyncCallback + Stats)
+ *   - MiraBarcodeScannerFragment v2.0
+ *
+ * ✅ كل الإصلاحات السابقة (13) + تكامل النسخ المطوّرة
  */
 public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
@@ -95,7 +89,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private static final int MIN_TID_LENGTH = 12;
     private static final int MAX_TID_LENGTH = 32;
     private static final int MAX_PHOTOS = 5;
-    private static final String DEFAULT_EPC_PLACEHOLDER = "";
 
     // ==================== الحالة ====================
     private FragmentMiraIdentityStudioBinding binding;
@@ -105,19 +98,19 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private MiraPriceManager priceManager;
     private PermissionManager permissionManager;
 
-    // ✅ المديرون
+    // ✅ المديرون (النسخ المطوّرة)
     private IdentityFormManager formManager;
     private IdentityPhotoManager photoManager;
     private IdentitySyncManager syncManager;
     private PhotosAdapter photosAdapter;
 
-    // ✅ مدير الخيوط المشترك
+    // ✅ مدير الخيوط
     private MiraExecutorService miraExecutor;
 
-    // ✅ سياق التطبيق (للاستخدام في الخيوط الخلفية)
+    // ✅ السياق
     private Context appContext;
 
-    // ✅ Handler + Runnables
+    // ✅ Handler
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable rfidTimeoutRunnable;
     private final Runnable autoSyncRunnable = this::performAutoSync;
@@ -127,7 +120,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private volatile boolean isRfidScanning = false;
     private volatile boolean isFormLocked = false;
     private boolean isArabic = true;
-    private AlertDialog activeLoadingDialog;  // ← منع تكرار الحوارات
+    private AlertDialog activeLoadingDialog;
 
     // ✅ Launchers
     private ActivityResultLauncher<Uri> takePhotoLauncher;
@@ -150,13 +143,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // ✅ حفظ appContext فوراً
         if (getContext() != null) {
             appContext = getContext().getApplicationContext();
         }
 
         try {
-            // استعادة الحالة
             if (savedInstanceState != null) {
                 isFormLocked = savedInstanceState.getBoolean("is_form_locked", false);
                 isRfidScanning = savedInstanceState.getBoolean("is_rfid_scanning", false);
@@ -168,6 +159,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             setupPhotoLaunchers();
             applyLanguage();
             setupPhotosRecyclerView();
+            setupDraftNotificationCallback();
 
             view.post(() -> {
                 if (!isAdded() || binding == null) return;
@@ -182,12 +174,27 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
                     if (miraExecutor != null && miraExecutor.isHealthy()) {
                         miraExecutor.getSingleThreadExecutor().execute(() -> {
-                            restoreDraftIfExists();
+                            // ✅ تنظيف المسودات القديمة
+                            if (formManager != null) {
+                                formManager.cleanupOldDrafts();
+                            }
+
+                            // ✅ فحص المسودة وإشعار المستخدم
+                            if (formManager != null) {
+                                formManager.checkAndNotifyDraft();
+                            }
+
+                            // ✅ تنظيف الملفات اليتيمة
+                            if (photoManager != null) {
+                                photoManager.cleanupOrphanFiles(null);
+                            }
+
                             safeRun(this::updatePendingSyncBadge);
                         });
                     }
 
                     Log.d(TAG, "✅ IdentityStudio initialization complete");
+
                 } catch (Exception e) {
                     Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
                 }
@@ -198,6 +205,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
+    /**
+     * ✅ تهيئة كل المكونات مع النسخ المطوّرة
+     */
     private void initializeComponents() {
         if (appContext == null && getContext() != null) {
             appContext = getContext().getApplicationContext();
@@ -215,32 +225,96 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
         miraExecutor = MiraExecutorService.getInstance();
 
+        // ✅ IdentityFormManager v3.0
         formManager = new IdentityFormManager(appContext);
-        photoManager = new IdentityPhotoManager(appContext, miraExecutor.getBackgroundExecutor());
-        syncManager = new IdentitySyncManager(appContext, miraExecutor.getBackgroundExecutor());
+
+        // ✅ IdentityPhotoManager v3.0
+        photoManager = new IdentityPhotoManager(
+                appContext,
+                miraExecutor.getBackgroundExecutor());
+
+        // ✅ IdentitySyncManager v4.0
+        syncManager = new IdentitySyncManager(
+                appContext,
+                miraExecutor.getBackgroundExecutor());
+    }
+
+    /**
+     * ✅ إعداد DraftNotificationCallback
+     */
+    private void setupDraftNotificationCallback() {
+        if (formManager == null) return;
+
+        formManager.setNotificationCallback(new IdentityFormManager.DraftNotificationCallback() {
+            @Override
+            public void onDraftFound(@NonNull IdentityFormManager.DraftInfo info,
+                                      @NonNull String ageText) {
+                safeRun(() -> showDraftFoundDialog(info, ageText));
+            }
+
+            @Override
+            public void onDraftRestored(@NonNull IdentityFormManager.DraftInfo info) {
+                safeRun(() -> {
+                    showToast(isArabic ? "📝 تم استعادة المسودة" : "📝 Draft restored");
+                    onPhotosUpdated();
+                });
+            }
+
+            @Override
+            public void onDraftExpired(@NonNull IdentityFormManager.DraftInfo info) {
+                safeRun(() -> {
+                    if (isAdded()) {
+                        showToast(isArabic ? "🧹 تم حذف مسودة قديمة"
+                                           : "🧹 Old draft removed");
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * ✅ حوار عرض المسودة المحفوظة
+     */
+    private void showDraftFoundDialog(IdentityFormManager.DraftInfo info, String ageText) {
+        if (!isAdded() || getContext() == null) return;
+
+        try {
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(isArabic ? "📝 مسودة محفوظة" : "📝 Saved Draft")
+                    .setMessage(formManager.getDraftSummary())
+                    .setPositiveButton(isArabic ? "استعادة" : "Restore",
+                            (d, w) -> restoreDraftIfExists())
+                    .setNegativeButton(isArabic ? "تجاهل" : "Discard",
+                            (d, w) -> {
+                                if (formManager != null) formManager.clearDraft();
+                                showToast(isArabic ? "🗑️ تم حذف المسودة"
+                                                   : "🗑️ Draft discarded");
+                            })
+                    .setCancelable(false)
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showDraftFoundDialog error: " + e.getMessage());
+        }
     }
 
     // ==================== إدارة النموذج ====================
 
     /**
-     * ✅ [إصلاح #5] restoreDraftIfExists يحترم isFormLocked
+     * ✅ استعادة المسودة مع فحص isFormLocked
      */
     private void restoreDraftIfExists() {
-        if (binding == null || formManager == null) {
-            Log.w(TAG, "restoreDraftIfExists skipped: binding or formManager is null");
-            return;
-        }
+        if (binding == null || formManager == null) return;
 
-        // ✅ [إصلاح #5] لا تستعد المسودة إذا كان النموذج مقفلاً
         if (isFormLocked) {
             Log.i(TAG, "restoreDraftIfExists skipped: form is locked");
             return;
         }
 
         try {
+            final List<String> photoPaths = new ArrayList<>();
+
             boolean restored = formManager.restoreDraft(
                     new IdentityFormManager.FormData() {
-                        // ===== Getters =====
                         @Override public String getEpc() { return safeGet(binding != null ? binding.etEpc : null); }
                         @Override public String getTitle() { return safeGet(binding != null ? binding.etTitle : null); }
                         @Override public String getGrossWeight() { return safeGet(binding != null ? binding.etGrossWeight : null); }
@@ -252,7 +326,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         @Override public String getStoneCount() { return safeGet(binding != null ? binding.etStoneCount : null); }
                         @Override public String getStoneValue() { return safeGet(binding != null ? binding.etStoneValue : null); }
 
-                        // ===== Setters =====
                         @Override public void setEpc(String value) {
                             safeRun(() -> { if (binding != null && binding.etEpc != null && value != null) binding.etEpc.setText(value); });
                         }
@@ -278,13 +351,17 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                             safeRun(() -> { if (binding != null && binding.switchHasStones != null) binding.switchHasStones.setChecked(value); });
                         }
                     },
-                    photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>()
+                    photoPaths
             );
 
             if (restored) {
+                // ✅ استعادة الصور مع فحص الوجود
+                if (photoManager != null && !photoPaths.isEmpty()) {
+                    photoManager.restoreFromSavedPaths(photoPaths, photoCallback);
+                }
+
                 safeRun(() -> {
                     if (!isAdded() || binding == null) return;
-                    showToast(isArabic ? "📝 تم استعادة المسودة المحفوظة" : "📝 Draft restored");
                     onPhotosUpdated();
                 });
             }
@@ -294,14 +371,16 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     /**
-     * ✅ [إصلاح #6] Setters فارغة موثّقة (الحفظ لا يحتاج setters)
+     * ✅ حفظ المسودة مع Setters موثّقة
      */
     private void saveCurrentDraftAsync() {
         final FragmentMiraIdentityStudioBinding b = binding;
         if (formManager == null || b == null) return;
 
+        final List<String> paths = photoManager != null ?
+                photoManager.getPhotoPaths() : new ArrayList<>();
+
         formManager.saveDraft(new IdentityFormManager.FormData() {
-            // ===== Getters (تُقرأ من main thread) =====
             @Override public String getEpc() { return safeGet(b.etEpc); }
             @Override public String getTitle() { return safeGet(b.etTitle); }
             @Override public String getGrossWeight() { return safeGet(b.etGrossWeight); }
@@ -311,46 +390,125 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             @Override public String getStoneCount() { return safeGet(b.etStoneCount); }
             @Override public String getStoneValue() { return safeGet(b.etStoneValue); }
 
-            // ===== Setters: فارغة عن قصد =====
-            // عند الحفظ لا نحتاج لكتابة أي قيمة في الواجهة،
-            // الحفظ يقرأ فقط. تم تنفيذ الواجهة لأنها مشتركة.
-            @Override public void setEpc(String v) { /* no-op: save-only */ }
-            @Override public void setTitle(String v) { /* no-op: save-only */ }
-            @Override public void setGrossWeight(String v) { /* no-op: save-only */ }
-            @Override public void setStoneType(String v) { /* no-op: save-only */ }
-            @Override public void setStoneWeight(String v) { /* no-op: save-only */ }
-            @Override public void setStoneCount(String v) { /* no-op: save-only */ }
-            @Override public void setStoneValue(String v) { /* no-op: save-only */ }
-            @Override public void setHasStones(boolean v) { /* no-op: save-only */ }
-        }, photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
+            // Setters فارغة عن قصد — save-only
+            @Override public void setEpc(String v) { /* no-op */ }
+            @Override public void setTitle(String v) { /* no-op */ }
+            @Override public void setGrossWeight(String v) { /* no-op */ }
+            @Override public void setStoneType(String v) { /* no-op */ }
+            @Override public void setStoneWeight(String v) { /* no-op */ }
+            @Override public void setStoneCount(String v) { /* no-op */ }
+            @Override public void setStoneValue(String v) { /* no-op */ }
+            @Override public void setHasStones(boolean v) { /* no-op */ }
+        }, paths);
     }
 
-    private String safeGet(android.widget.TextView tv) {
+    private String safeGet(TextView tv) {
         return tv != null && tv.getText() != null ? tv.getText().toString() : "";
     }
 
     // ==================== إدارة الصور ====================
 
+    /**
+     * ✅ setupPhotosRecyclerView مع النسخة المطوّرة
+     */
     private void setupPhotosRecyclerView() {
         if (binding == null || binding.rvPhotosPreview == null) return;
 
+        // ✅ إنشاء Adapter الجديد (يفضل requireContext)
         photosAdapter = new PhotosAdapter(
-                photoManager.getPhotoPaths(),
-                miraExecutor.getImageExecutor(),
-                position -> {
+                requireContext(),
+                photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>(),
+                (position, path) -> {
                     if (isFormLocked) {
                         showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
                         return;
                     }
-                    photoManager.removePhoto(position);
-                    photosAdapter.notifyItemRemoved(position);
-                    photosAdapter.notifyItemRangeChanged(position, photoManager.getPhotoCount());
-                    updatePhotosCountText();
+                    if (photoManager != null) {
+                        photoManager.removePhoto(position, false, photoCallback);
+                    }
                 });
+
+        // ✅ مستمع النقر للمعاينة (اختياري)
+        photosAdapter.setOnPhotoClickListener((position, path, sourceView) -> {
+            showPhotoPreviewDialog(path);
+        });
 
         binding.rvPhotosPreview.setLayoutManager(
                 new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
         binding.rvPhotosPreview.setAdapter(photosAdapter);
+    }
+
+    /**
+     * ✅ PhotoCallback لإعلام UI بعد عمليات الصور
+     */
+    private final IdentityPhotoManager.PhotoCallback photoCallback =
+            new IdentityPhotoManager.PhotoCallback() {
+        @Override
+        public void onPhotoAdded(@NonNull String path, int totalCount) {
+            safeRun(() -> {
+                if (photosAdapter != null && photoManager != null) {
+                    photosAdapter.submitList(photoManager.getPhotoPaths());
+                }
+                updatePhotosCountText();
+                if (binding != null && binding.rvPhotosPreview != null) {
+                    binding.rvPhotosPreview.setVisibility(
+                            (photoManager != null && photoManager.getPhotoCount() > 0)
+                                    ? View.VISIBLE : View.GONE);
+                }
+            });
+        }
+
+        @Override
+        public void onPhotoRemoved(@NonNull String path, int totalCount) {
+            safeRun(() -> {
+                if (photosAdapter != null && photoManager != null) {
+                    photosAdapter.submitList(photoManager.getPhotoPaths());
+                }
+                updatePhotosCountText();
+                if (binding != null && binding.rvPhotosPreview != null) {
+                    binding.rvPhotosPreview.setVisibility(
+                            (photoManager != null && photoManager.getPhotoCount() > 0)
+                                    ? View.VISIBLE : View.GONE);
+                }
+            });
+        }
+
+        @Override
+        public void onError(@NonNull String message) {
+            safeRun(() -> showToast("❌ " + message));
+        }
+    };
+
+    /**
+     * ✅ حوار معاينة الصورة
+     */
+    private void showPhotoPreviewDialog(@NonNull String path) {
+        if (!isAdded() || getContext() == null) return;
+
+        try {
+            BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
+            View view = getLayoutInflater().inflate(R.layout.dialog_photo_preview, null);
+            dialog.setContentView(view);
+
+            ImageView ivPreview = view.findViewById(R.id.ivPreview);
+            MaterialButton btnClose = view.findViewById(R.id.btnClosePreview);
+
+            if (ivPreview != null) {
+                Glide.with(this)
+                        .load(new File(path))
+                        .placeholder(R.drawable.placeholder_image)
+                        .error(R.drawable.ic_error_outline)
+                        .into(ivPreview);
+            }
+
+            if (btnClose != null) {
+                btnClose.setOnClickListener(v -> dialog.dismiss());
+            }
+
+            dialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "showPhotoPreviewDialog error: " + e.getMessage());
+        }
     }
 
     private void setupPhotoLaunchers() {
@@ -365,11 +523,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         takePhotoLauncher = registerForActivityResult(
                 new ActivityResultContracts.TakePicture(),
                 success -> {
-                    if (success) {
-                        miraExecutor.getImageExecutor().execute(() -> {
-                            photoManager.compressAndAddPhoto(currentPhotoPath);
-                            safeRun(this::onPhotosUpdated);
-                        });
+                    if (success && photoManager != null) {
+                        // ✅ يستخدم PhotoCallback
+                        photoManager.compressAndAddPhoto(currentPhotoPath, photoCallback);
                     }
                 }
         );
@@ -377,28 +533,25 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         pickImageLauncher = registerForActivityResult(
                 new ActivityResultContracts.OpenMultipleDocuments(),
                 uris -> {
-                    if (uris != null && !uris.isEmpty()) {
-                        miraExecutor.getImageExecutor().execute(() -> {
-                            for (Uri uri : uris) {
-                                photoManager.copyAndAddPhoto(uri);
-                            }
-                            safeRun(this::onPhotosUpdated);
-                        });
+                    if (uris != null && !uris.isEmpty() && photoManager != null) {
+                        for (Uri uri : uris) {
+                            // ✅ يستخدم PhotoCallback
+                            photoManager.copyAndAddPhoto(uri, photoCallback);
+                        }
                     }
                 }
         );
     }
 
-    /**
-     * ✅ [إصلاح #10] onPhotosUpdated يفحص isAdded + binding
-     */
     private void onPhotosUpdated() {
         if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
 
-        if (photosAdapter != null) photosAdapter.notifyDataSetChanged();
+        if (photosAdapter != null && photoManager != null) {
+            photosAdapter.submitList(photoManager.getPhotoPaths());
+        }
         updatePhotosCountText();
 
-        if (binding.rvPhotosPreview != null) {
+        if (binding.rvPhotosPreview != null && photoManager != null) {
             binding.rvPhotosPreview.setVisibility(
                     photoManager.getPhotoCount() == 0 ? View.GONE : View.VISIBLE);
         }
@@ -407,7 +560,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private void updatePhotosCountText() {
         try {
             if (binding == null || binding.tvPhotosCount == null) return;
-            int count = photoManager.getPhotoCount();
+            int count = photoManager != null ? photoManager.getPhotoCount() : 0;
             binding.tvPhotosCount.setText(count == 0 ?
                     (isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet") :
                     (isArabic ? "تم إرفاق (" + count + "/" + MAX_PHOTOS + ") صور"
@@ -517,7 +670,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             binding.etEpc.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    if (binding != null) {
+                    if (binding != null && binding.tvStatusBadge != null) {
                         binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING");
                     }
                 }
@@ -589,7 +742,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
                     return;
                 }
-                if (photoManager.getPhotoCount() >= MAX_PHOTOS) {
+                if (photoManager != null && photoManager.getPhotoCount() >= MAX_PHOTOS) {
                     showToast(isArabic ? "⚠️ الحد الأقصى " + MAX_PHOTOS + " صور"
                                        : "⚠️ Maximum " + MAX_PHOTOS + " photos");
                     return;
@@ -650,12 +803,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     // ==================== RFID ====================
 
     /**
-     * ✅ [إصلاح #2] توحيد منطق RFID عبر دالة واحدة
-     * ✅ [إصلاح #11] معالجة شاملة للاستثناءات
+     * ✅ دالة موحّدة لمعالجة RFID
      */
     private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
         if (appContext == null) {
-            Log.e(TAG, "processRfidTagAsync: appContext is null");
             safeRun(() -> {
                 playErrorSound();
                 showErrorDialog(
@@ -674,7 +825,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 final String tid = rfidService.readTid(null);
                 final boolean isSim = rfidService.isSimulationMode();
 
-                // ✅ [إصلاح #8] تحقق مرن + رسالة واضحة
                 if (tid == null || tid.trim().isEmpty()) {
                     safeRun(() -> {
                         playErrorSound();
@@ -690,7 +840,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
                 final String normalizedTid = tid.trim().toUpperCase(Locale.US);
 
-                // ✅ [إصلاح #8] تحقق من الطول مع رسالة واضحة
                 if (normalizedTid.length() < MIN_TID_LENGTH) {
                     safeRun(() -> {
                         playErrorSound();
@@ -719,10 +868,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     return;
                 }
 
-                // ✅ التحقق من اعتماد الشريحة
                 final boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(normalizedTid);
-
-                // ✅ التحقق من التكرار
                 final boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedTid);
 
                 safeRun(() -> {
@@ -757,7 +903,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         return;
                     }
 
-                    // ✅ حفظ TID في الحقل (المعرّف الأساسي)
                     if (binding.etEpc != null) {
                         binding.etEpc.setText(normalizedTid);
                         binding.etEpc.setTag(normalizedTid);
@@ -796,7 +941,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             if (!(getActivity() instanceof UHFMainActivity)) return;
             UHFMainActivity activity = (UHFMainActivity) getActivity();
 
-            // ✅ إعادة تهيئة المحاكي لشريحة جديدة
             if (appContext != null) {
                 MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
                 rfidService.resetForNewTag();
@@ -810,12 +954,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
 
             activity.setActiveRfidListener(epc -> {
-                // ⚠️ تجاهل EPC — نستخدم TID فقط
                 final String scannedEpc = epc != null ?
                         epc.trim().toUpperCase(Locale.US) : "";
                 Log.i(TAG, "📡 RFID event received (EPC ignored: " + scannedEpc + ")");
-
-                // ✅ [إصلاح #2] استخدم الدالة الموحدة
                 processRfidTagAsync(true);
             });
 
@@ -855,10 +996,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    /**
-     * ✅ [إصلاح #2] onRfidScanned موحّد مع activateRFIDModeForEncoding
-     * يستخدم TID فقط (تماماً مثل المسار الآخر)
-     */
     public void onRfidScanned(String epc) {
         if (!isAdded() || getActivity() == null) return;
 
@@ -866,7 +1003,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 epc.trim().toUpperCase(Locale.US) : "";
         Log.i(TAG, "📡 onRfidScanned (EPC ignored: " + scannedEpc + ")");
 
-        // ✅ [إصلاح #2] استخدم نفس المنطق الموحّد
         processRfidTagAsync(false);
     }
 
@@ -995,9 +1131,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== الباركود ====================
 
-    /**
-     * ✅ [إصلاح #3] تحقق كامل للباركود: فارغ + تكرار + تحقق من الطول
-     */
     private void openBarcodeScannerForEPC() {
         try {
             if (!isAdded() || getActivity() == null) return;
@@ -1014,7 +1147,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
             MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
             sf.setOnBarcodeScannedListener((data, format) -> {
-                // ✅ [إصلاح #3] التحقق الأول: البيانات فارغة
                 if (data == null || data.trim().isEmpty()) {
                     safeRun(() -> {
                         playErrorSound();
@@ -1025,7 +1157,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
                 final String scannedCode = data.trim().toUpperCase(Locale.US);
 
-                // ✅ [إصلاح #3] التحقق الثاني: الطول المنطقي
                 if (scannedCode.length() < 6 || scannedCode.length() > 128) {
                     safeRun(() -> {
                         playErrorSound();
@@ -1038,7 +1169,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     return;
                 }
 
-                // ✅ [إصلاح #3] التحقق الثالث: التكرار (خيط خلفي)
                 miraExecutor.getBackgroundExecutor().execute(() -> {
                     final boolean isDuplicate = syncManager.isEpcDuplicateLocally(scannedCode);
 
@@ -1062,7 +1192,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                             Log.i(TAG, "✅ Barcode accepted: " + scannedCode);
                         }
 
-                        // إغلاق الماسح
                         try {
                             if (fm.getBackStackEntryCount() > 0) fm.popBackStack();
                         } catch (Exception e) {
@@ -1094,12 +1223,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== الحفظ والتكويد ====================
 
-    /**
-     * ✅ [إصلاح #1] حذف كود TID المكرر
-     * ✅ [إصلاح #7] إرسال TID كـ epc أيضاً
-     * ✅ [إصلاح #8] تحقق مرن + رسالة واضحة
-     * ✅ [إصلاح #12] منع تكرار الحوارات
-     */
     private void finalizeItemIdentity() {
         if (isFormLocked) {
             showToast(isArabic ? "⛔ العملية قيد التنفيذ..." : "⛔ Operation in progress...");
@@ -1182,7 +1305,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
             setFormEnabled(false);
 
-            // ✅ [إصلاح #12] إغلاق أي حوار سابق قبل فتح جديد
             dismissDialog(activeLoadingDialog);
             activeLoadingDialog = showProfessionalLoadingDialog(
                     isArabic ? "🔄 جاري التكويد وإنشاء الأكواد المجهرية..."
@@ -1203,15 +1325,15 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             final String selectedCategory = getSelectedCategory();
             final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
             final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-            final List<String> finalPhotoPaths = new ArrayList<>(photoManager.getPhotoPaths());
+            final List<String> finalPhotoPaths = new ArrayList<>(
+                    photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
             final int currentUserId = getCurrentUserId();
 
-            // ==================== ✅ [إصلاح #1] استخراج TID (بدون تكرار) ====================
+            // ✅ استخراج TID
             String tidFromField = binding.etEpc.getText() != null
                     ? binding.etEpc.getText().toString().trim().toUpperCase(Locale.US)
                     : "";
 
-            // ✅ [إصلاح #8] تحقق مرن + رسالة واضحة
             if (tidFromField.isEmpty()) {
                 safeRun(() -> {
                     dismissDialog(activeLoadingDialog);
@@ -1266,10 +1388,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 return;
             }
 
-            // ✅ TID النهائي من الحقل فقط
             final String tid = tidFromField;
-
-            // ✅ [إصلاح #7] GTIN = TID دائماً (لأن TID هو المعرّف الأساسي الآن)
             final String gtin = tid;
 
             final boolean isSim;
@@ -1289,7 +1408,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
             Log.i(TAG, "✅ Proceeding with TID=" + tid + " | GTIN=" + gtin + " | SIM=" + isSim);
 
-            // ==================== 4) إرسال البيانات للسيرفر ====================
+            // ==================== 4) إرسال البيانات ====================
             miraExecutor.getBackgroundExecutor().execute(() -> {
                 try {
                     JSONObject payload = buildPayload(
@@ -1339,7 +1458,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                             activeLoadingDialog = null;
 
                             if (networkError) {
-                                // حفظ offline
                                 miraExecutor.getSingleThreadExecutor().execute(() -> {
                                     syncManager.saveEncodeOffline(payload);
                                     safeRun(this::updatePendingSyncBadge);
@@ -1360,11 +1478,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         return;
                     }
 
-                    // ==================== 6) نجاح السيرفر → كتابة EPC ====================
+                    // ==================== 6) كتابة EPC ====================
                     Log.i(TAG, "✅ Server OK — Starting hardware encoding sequence");
-                    Log.i(TAG, "📡 TID=" + tid + " | Identifier=" + finalIdentifier + " | SIM=" + isSim);
 
-                    // ✅ استخدام appContext بدلاً من getContext()
                     MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
 
                     String miraId = (finalResponseData != null) ?
@@ -1373,7 +1489,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     String newEpc = rfidService.generateEpcFromMiraId(miraId);
                     Log.i(TAG, "🎯 Generated new EPC: " + newEpc + " (from mira_id=" + miraId + ")");
 
-                    // 6.1: كتابة EPC
                     boolean writeOk = rfidService.writeEpc(newEpc, null);
                     boolean alreadyEncoded = false;
 
@@ -1390,33 +1505,18 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         }
                     }
 
-                    // 6.2: التحقق
                     boolean verifyOk = writeOk && rfidService.verifyWrite(newEpc, null);
-                    if (verifyOk) {
-                        Log.i(TAG, "✅ verifyWrite OK — EPC confirmed on tag: " + newEpc);
-                    } else if (writeOk) {
-                        Log.w(TAG, "⚠️ verifyWrite failed — EPC may not be stable");
-                    }
 
-                    // 6.3: قفل EPC Bank
                     boolean lockOk = false;
                     if (verifyOk && !alreadyEncoded) {
                         lockOk = rfidService.setTagLockState(null, 1, true);
-                        if (lockOk) {
-                            Log.i(TAG, "🔒 EPC Bank locked successfully");
-                        } else {
-                            Log.w(TAG, "⚠️ setTagLockState failed — tag remains writable");
-                        }
                     } else if (alreadyEncoded) {
-                        Log.i(TAG, "ℹ️ Skipped lock — tag was pre-encoded");
                         lockOk = true;
                     }
 
-                    // 6.4: إبلاغ السيرفر
                     if (lockOk || verifyOk) {
                         try {
-                            boolean marked = rfidService.markTagProgrammed(tid, miraId, newEpc);
-                            Log.i(TAG, "📤 markTagProgrammed: " + (marked ? "OK" : "FAILED"));
+                            rfidService.markTagProgrammed(tid, miraId, newEpc);
                         } catch (Exception e) {
                             Log.w(TAG, "markTagProgrammed exception", e);
                         }
@@ -1443,8 +1543,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                                     apiClient.postWithAuth("/items/update-rfid", updatePayload);
                             if (updateResp != null && updateResp.isSuccess) {
                                 Log.i(TAG, "✅ RFID metadata synced to server");
-                            } else {
-                                Log.w(TAG, "⚠️ RFID metadata sync failed");
                             }
                         } catch (Exception e) {
                             Log.w(TAG, "Failed to update RFID metadata", e);
@@ -1457,14 +1555,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         activeLoadingDialog = null;
                         playSuccessSound();
 
-                        // إزالة المسودة
                         miraExecutor.getSingleThreadExecutor().execute(() ->
                                 syncManager.removePendingEncode(finalIdentifier));
                         if (formManager != null) formManager.clearDraft();
 
                         notifyDashboardUpdate("encode_success");
 
-                        // رفع الصور
                         if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
                             uploadItemImages(finalServerItemId, finalPhotoPaths);
                         }
@@ -1491,7 +1587,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                             binding.etEpc.setText("");
                         }
 
-                        // رسائل الحالة
                         if (finalWrite && finalVerify && finalLock) {
                             if (finalWasPreEncoded) {
                                 showToast(isArabic ?
@@ -1619,9 +1714,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         return true;
     }
 
-    /**
-     * ✅ [إصلاح #7] إرسال TID كـ epc أيضاً (وليس فارغاً)
-     */
     private JSONObject buildPayload(
             String epc, String title, String karat, double grossWeight, double netWeight,
             double stoneWeightCarats, int stoneCount, double stoneValue, String stoneType,
@@ -1632,8 +1724,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
         JSONObject payload = new JSONObject();
 
-        // ==================== 1) البيانات الأساسية ====================
-        // ✅ [إصلاح #7] TID هو المعرّف الأساسي — يُرسل في كل الحقول
         if (epc != null && !epc.isEmpty()) {
             payload.put("epc", epc);
         }
@@ -1645,7 +1735,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         payload.put("branch_id", branchId);
         payload.put("user_id", userId);
 
-        // ==================== 2) الأوزان ====================
         payload.put("gross_weight", grossWeight);
         payload.put("net_weight", netWeight);
         payload.put("stone_weight", stoneWeightCarats);
@@ -1653,7 +1742,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         payload.put("stone_value", stoneValue);
         payload.put("stone_type", stoneType);
 
-        // ==================== 3) التسعير ====================
         payload.put("gold_price_per_gram", details.gramPrice);
         payload.put("gold_value", details.baseGoldCost);
         payload.put("making_per_gram", priceManager.getMakingCharge(karatNum));
@@ -1662,7 +1750,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         payload.put("profit_margin", priceManager.getProfitMargin(karatNum));
         payload.put("profit_amount", details.profitAmount);
 
-        // ==================== 4) الأسعار والعملة ====================
         payload.put("retail_price_usd", priceUSD);
         payload.put("retail_price", priceUSD);
         payload.put("retail_price_local", priceLocal);
@@ -1671,9 +1758,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         payload.put("exchange_rate", exchangeRate);
         payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
 
-        // ==================== 5) RFID ====================
         if (tid != null && !tid.isEmpty()) {
-            // ✅ [إصلاح #7] أرسل TID كـ epc أيضاً
             payload.put("epc", tid);
             payload.put("tid", tid);
             payload.put("rfid_tid", tid);
@@ -1681,7 +1766,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
         if (gtin != null && !gtin.isEmpty()) {
             payload.put("gtin", gtin);
-            Log.i(TAG, "📤 Sending GTIN for search: " + gtin);
         }
 
         payload.put("rfid_epc_original", "");
@@ -1689,7 +1773,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         payload.put("rfid_locked", false);
         payload.put("rfid_verified", false);
 
-        // ==================== 6) الصور ====================
         if (!photoPathsList.isEmpty()) {
             JSONArray imagesArray = new JSONArray();
             for (String path : photoPathsList) {
@@ -1868,7 +1951,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         if (tvIdTitle != null) tvIdTitle.setText(title);
         if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
 
-        // عرض صورة القطعة
         ImageView imgIdentityPhoto = view.findViewById(R.id.imgIdentityPhoto);
         if (imgIdentityPhoto != null && photos != null && !photos.isEmpty()) {
             String firstPhotoPath = photos.get(0);
@@ -1897,7 +1979,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice));
         }
 
-        // بيانات الأحجار
         TextView tvIdStonesInfo = view.findViewById(R.id.tvIdStonesInfo);
         if (tvIdStonesInfo != null) {
             if (stoneWeightCarats > 0 || stoneValue > 0 || stoneCount > 0) {
@@ -1954,7 +2035,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> {
                 successDialog.dismiss();
-                // ✅ [إصلاح #9] resetFormForNextScan دائماً على main thread
                 safeRun(this::resetFormForNextScan);
             });
         }
@@ -1964,11 +2044,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== إعادة تعيين النموذج ====================
 
-    /**
-     * ✅ [إصلاح #9] resetFormForNextScan دائماً على main thread
-     */
     private void resetFormForNextScan() {
-        // ✅ [إصلاح #9] ضمان main thread
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post(this::resetFormForNextScan);
             return;
@@ -1978,7 +2054,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             unlockFormFast();
             setFormEnabled(true);
 
-            // ✅ إعادة تهيئة المحاكي
             if (appContext != null) {
                 MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
                 rfidService.resetForNewTag();
@@ -2002,7 +2077,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             binding.chip21K.setChecked(true);
             binding.etEpc.requestFocus();
 
-            photoManager.clearPhotos();
+            // ✅ مسح الصور (بدون حذف الملفات)
+            if (photoManager != null) {
+                photoManager.clearPhotos(false);
+            }
             onPhotosUpdated();
 
             if (formManager != null) {
@@ -2105,13 +2183,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== أدوات مساعدة ====================
 
-    /**
-     * ✅ [إصلاح #12] استخدام activeLoadingDialog لمنع تكرار الحوارات
-     */
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
         if (getContext() == null || !isAdded()) return null;
 
-        // ✅ [إصلاح #12] إغلاق أي حوار سابق
         dismissDialog(activeLoadingDialog);
 
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
@@ -2285,6 +2359,23 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
 
             scheduleAutoSync();
+
+            // ✅ فحص دوري للمسودات القديمة + تنظيف الصور اليتيمة
+            if (miraExecutor != null && miraExecutor.isHealthy()) {
+                miraExecutor.getBackgroundExecutor().execute(() -> {
+                    try {
+                        if (formManager != null) {
+                            formManager.cleanupOldDrafts();
+                        }
+                        if (photoManager != null) {
+                            photoManager.cleanupOrphanFiles(
+                                    photoManager.getPhotoPaths());
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "onResume cleanup error: " + e.getMessage());
+                    }
+                });
+            }
         } catch (Exception e) {
             Log.e(TAG, "onResume error: " + e.getMessage(), e);
         }
@@ -2315,17 +2406,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    /**
-     * ✅ [إصلاح #13] تنظيف كامل وشامل
-     */
     @Override
     public void onDestroyView() {
         Log.d(TAG, "onDestroyView: cleaning up");
 
-        // 1) إيقاف RFID أولاً (قبل إزالة callbacks)
+        // 1) إيقاف RFID أولاً
         stopRfidScanningMode();
 
-        // 2) ✅ [إصلاح #12] إغلاق أي حوار تحميل نشط
+        // 2) إغلاق حوار التحميل
         dismissDialog(activeLoadingDialog);
         activeLoadingDialog = null;
 
@@ -2353,20 +2441,25 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             binding.rvPhotosPreview.clearOnScrollListeners();
         }
 
-        // 6) تفريغ الـ Adapter
+        // 6) ✅ تنظيف photosAdapter بالكامل
         if (photosAdapter != null) {
-            photosAdapter.clearListeners();
+            photosAdapter.destroy();
             photosAdapter = null;
         }
 
-        // 7) إلغاء الـ Runnable المعلّق
+        // 7) إلغاء callback formManager
+        if (formManager != null) {
+            formManager.setNotificationCallback(null);
+        }
+
+        // 8) إلغاء الـ Runnable المعلّق
         View v = getView();
         if (v != null && onResumeRunnable != null) {
             v.removeCallbacks(onResumeRunnable);
             onResumeRunnable = null;
         }
 
-        // 8) أخيراً: إلغاء binding
+        // 9) إلغاء binding
         binding = null;
 
         super.onDestroyView();
