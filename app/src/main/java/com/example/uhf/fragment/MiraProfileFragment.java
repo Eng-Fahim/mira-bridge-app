@@ -221,27 +221,34 @@ if (radioThemeGroup != null) {
         } else if (checkedId == R.id.radioThemeLight) {
             newMode = AppCompatDelegate.MODE_NIGHT_NO;
         } else {
-            return;  // معرّف غير معروف
-        }
-
-        // هل هو نفس الوضع الحالي؟
-        int currentMode = AppCompatDelegate.getDefaultNightMode();
-        if (currentMode == newMode) {
-            Log.d(TAG, "Theme unchanged: " + newMode);
             return;
         }
 
+        int currentMode = AppCompatDelegate.getDefaultNightMode();
+        if (currentMode == newMode) return;
+
         Log.i(TAG, "Theme changing: " + currentMode + " → " + newMode);
 
-        // 1) احفظ في SharedPreferences بشكل مضمون
+        // 1) احفظ
         saveThemePreferenceSync(newMode);
 
-        // 2) طبّق الوضع الجديد
+        // 2) طبّق
         AppCompatDelegate.setDefaultNightMode(newMode);
 
-        // 3) أظهر إشعاراً
+        // 3) إشعار
         showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
 
+        // 4) ✅ أعِد إنشاء الـ Activity
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            try {
+                if (getActivity() != null && !getActivity().isFinishing() 
+                        && !getActivity().isDestroyed()) {
+                    getActivity().recreate();
+                }
+            } catch (Exception e) {
+                logNonFatal("recreate", e);
+            }
+        }, 150);
     });
 }
     }
