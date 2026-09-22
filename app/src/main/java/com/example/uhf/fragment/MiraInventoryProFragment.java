@@ -201,7 +201,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private volatile String selectedCategoryFilter = null;
     private volatile int currentLiveFilter = 0;
     private volatile int lastScannedForAnimation = 0;
-
+    private JSONObject lastServerReport = null;
+    
     // ✅ [إصلاح] throttle ديناميكي
     private long scanStartTime = 0;
     private volatile boolean pendingUiUpdate = false;
@@ -214,7 +215,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     
     private MaterialButton btnTakeSnapshot;
     private InventorySnapshotManager snapshotManager;
-
+    
+    
+    
     // ==================== Collections (Thread-safe) ====================
     private final List<ScannedItemDisplay> scannedItemsDisplayList =
             new CopyOnWriteArrayList<>();
@@ -2061,48 +2064,85 @@ public void onCommitSuccess(JSONObject report) {
     }
 
     private void showCommitSuccessDialog(JSONObject report) {
-        if (!isAdded() || isFragmentDestroyed || report == null) return;
+    if (!isAdded() || isFragmentDestroyed) return;
 
-        try {
-            String accuracy = report.optString("accuracy", "0");
-            String riskLevel = report.optString("risk_level", "unknown");
-            String recommendation = report.optString("recommendation", "");
+    try {
+        // ✅ استخراج مرن يدعم كل الأشكال
+        String accuracy = extractString(report, "accuracy", "100");
+        String riskLevel = extractString(report, "risk_level", 
+                extractString(report, "risk", "none"));
+        String recommendation = extractString(report, "recommendation", 
+                extractString(report, "message",
+                        isArabic ? "تم الاعتماد بنجاح" : "Committed successfully"));
 
-            String message = isArabic ?
-                    String.format(
-                            "✅ تم اعتماد الجرد بنجاح:\n\n" +
-                            "• الدقة: %s%%\n" +
-                            "• مستوى الخطورة: %s\n" +
-                            "• التوصية: %s",
-                            accuracy, riskLevel, recommendation) :
-                    String.format(
-                            "✅ Inventory committed successfully:\n\n" +
-                            "• Accuracy: %s%%\n" +
-                            "• Risk Level: %s\n" +
-                            "• Recommendation: %s",
-                            accuracy, riskLevel, recommendation);
+        int expected = extractInt(report, "expected_count",
+                extractInt(report, "expected", expectedCount));
+        int found = extractInt(report, "found_count",
+                extractInt(report, "unique_count",
+                        extractInt(report, "scanned_count",
+                                inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0)));
+        int missing = extractInt(report, "missing_count",
+                Math.max(0, expected - found));
 
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(isArabic ? "🎉 نجاح العملية" : "🎉 Success")
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "🖨️ طباعة التقرير" : "🖨️ Print Report",
-                            (dialog, which) -> printCurrentReport())
-                    .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                    .show();
-            // ✅ بعد نجاح الاعتماد — عطّل زر الاعتماد
-    if (btnCommitSession != null) {
-        btnCommitSession.setEnabled(false);
-        btnCommitSession.setText(isArabic ? "✅ معتمد" : "✅ Committed");
-        btnCommitSession.setAlpha(0.7f);
-    }
-    if (btnGenerateReport != null) {
-        btnGenerateReport.setEnabled(false);
-        btnGenerateReport.setAlpha(0.5f);
-    }
-        } catch (Exception e) {
-            Log.e(TAG, "showCommitSuccessDialog error", e);
+        // ✅ بناء التقرير
+        StringBuilder sb = new StringBuilder();
+        sb.append(isArabic ? "✅ تم اعتماد الجرد بنجاح:\n\n" : "✅ Inventory committed:\n\n");
+        sb.append(isArabic ? "• الدقة: " : "• Accuracy: ").append(accuracy).append("%\n");
+        sb.append(isArabic ? "• مستوى الخطورة: " : "• Risk Level: ").append(riskLevel).append("\n");
+
+        if (expected > 0) {
+            sb.append(isArabic ? "• المتوقع: " : "• Expected: ").append(expected).append("\n");
+            sb.append(isArabic ? "• الممسوح: " : "• Found: ").append(found).append("\n");
+            if (missing > 0) {
+                sb.append(isArabic ? "• المفقود: " : "• Missing: ").append(missing).append("\n");
+            }
         }
+
+        sb.append("\n").append(isArabic ? "• " : "• ").append(recommendation);
+
+        String message = sb.toString();
+
+        // ✅ حفظ التقرير لعرضه لاحقاً عند الطباعة
+        lastServerReport = report;
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "🎉 نجاح العملية" : "🎉 Success")
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print",
+                        (dialog, which) -> printCurrentReport())
+                .setNeutralButton(isArabic ? "📂 الأرشيف" : "📂 Archive",
+                        (dialog, which) -> showArchiveReports())
+                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                .setCancelable(false)
+                .show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "showCommitSuccessDialog error", e);
+        showToast(isArabic ? "✅ تم الاعتماد" : "✅ Committed");
     }
+}
+
+// ✅ دوال مساعدة آمنة
+private String extractString(JSONObject obj, String key, String defaultValue) {
+    if (obj == null) return defaultValue;
+    try {
+        Object value = obj.opt(key);
+        if (value == null) return defaultValue;
+        String str = String.valueOf(value).trim();
+        return str.isEmpty() ? defaultValue : str;
+    } catch (Exception e) {
+        return defaultValue;
+    }
+}
+
+private int extractInt(JSONObject obj, String key, int defaultValue) {
+    if (obj == null) return defaultValue;
+    try {
+        return obj.optInt(key, defaultValue);
+    } catch (Exception e) {
+        return defaultValue;
+    }
+}
 
     private void showArchiveReports() {
         if (!isAdded() || isFragmentDestroyed) return;
@@ -2249,10 +2289,61 @@ private void navigateToSnapshots() {
     // ================================================================
 
     private void printCurrentReport() {
-        if (printManager != null) {
-            printManager.printCurrentReport();
+    if (printManager == null) return;
+
+    try {
+        // ✅ إذا كان لدينا تقرير من السيرفر — استخدمه
+        if (lastServerReport != null && lastServerReport.length() > 0) {
+            Log.d(TAG, "📊 Printing from server report");
+            
+            int expected = extractInt(lastServerReport, "expected_count", expectedCount);
+            int found = extractInt(lastServerReport, "found_count",
+                    inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0);
+            int missing = extractInt(lastServerReport, "missing_count",
+                    Math.max(0, expected - found));
+
+            InventoryReport serverReport = new InventoryReport(
+                    0,
+                    extractString(lastServerReport, "session_id",
+                            extractString(lastServerReport, "client_session_id",
+                                    inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SESS-LOCAL")),
+                    extractString(lastServerReport, "date",
+                            getCurrentDateTimeString()),
+                    expected,
+                    found,
+                    missing,
+                    extractString(lastServerReport, "status",
+                            isArabic ? "مكتمل" : "Completed")
+            );
+
+            printManager.printArchivedReport(serverReport);
+            return;
         }
+
+        // ✅ Fallback: التقرير المحلي
+        Log.d(TAG, "📊 Printing local report");
+        
+        int expected = expectedCount;
+        int found = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+        int missing = Math.max(0, expected - found);
+
+        InventoryReport localReport = new InventoryReport(
+                0,
+                inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SESS-LOCAL",
+                getCurrentDateTimeString(),
+                expected,
+                found,
+                missing,
+                isArabic ? "جارية" : "In progress"
+        );
+
+        printManager.printArchivedReport(localReport);
+
+    } catch (Exception e) {
+        Log.e(TAG, "printCurrentReport error", e);
+        showToast(isArabic ? "⚠️ فشل الطباعة" : "⚠️ Print failed");
     }
+}
 
     private void printSingleItemLabel(ScannedItemDisplay item) {
         if (printManager != null && item != null) {
