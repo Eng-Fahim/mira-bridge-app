@@ -49,6 +49,9 @@ import com.example.uhf.utils.InventoryAnimationHelper;
 import com.example.uhf.utils.MiraExecutorService;
 import com.example.uhf.utils.RFIDCodeUtils;
 import com.example.uhf.utils.SoundManager;
+import com.example.uhf.manager.inventory.InventorySnapshotManager;
+
+
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -202,6 +205,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     // ✅ [إصلاح] aggregates (O(1))
     private volatile double aggregateTotalWeight = 0.0;
     private volatile double aggregateTotalValue = 0.0;
+    
+    
+    private MaterialButton btnTakeSnapshot;
+    private InventorySnapshotManager snapshotManager;
 
     // ==================== Collections (Thread-safe) ====================
     private final List<ScannedItemDisplay> scannedItemsDisplayList =
@@ -267,6 +274,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
             ioExecutor = backgroundExecutor;
         }
+        
+        try {
+    snapshotManager = new InventorySnapshotManager(requireContext(), ioExecutor);
+} catch (Exception e) {
+    Log.e(TAG, "snapshotManager error", e);
+}
+
 
         // ✅ Locale + RTL
         try {
@@ -446,6 +460,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         progressScanned = view.findViewById(R.id.progressScanned);
         tvScannedCount = view.findViewById(R.id.tvScannedCount);
         tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
+        
+        btnTakeSnapshot = view.findViewById(R.id.btnTakeSnapshot);
+
 
         // Status Header
         statusDot = view.findViewById(R.id.statusDot);
@@ -573,11 +590,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
 
         // Report
-if (btnGenerateReport != null) {
-    btnGenerateReport.setOnClickListener(v -> printCurrentReport());  // ✅
-    btnGenerateReport.setEnabled(false);
-}
-
+        if (btnGenerateReport != null) {
+        btnGenerateReport.setOnClickListener(v -> printCurrentReport());  // ✅
+        btnGenerateReport.setEnabled(false);
+        }
+        
+        if (btnTakeSnapshot != null) {
+        btnTakeSnapshot.setOnClickListener(v -> takeSnapshot());
+        }
         // Archive
         if (btnArchiveReports != null) {
             btnArchiveReports.setOnClickListener(v -> showArchiveReports());
@@ -1646,14 +1666,13 @@ private void updateButtonsState() {
         btnCommitSession.setAlpha(canCommit ? 1.0f : 0.5f);
     }
     
-    
-    
     // ✅ زر التقرير
     if (btnGenerateReport != null) {
-    boolean canReport = hasItems && !isScanning;  // ← إضافة !isScanning
-    btnGenerateReport.setEnabled(canReport);
-    btnGenerateReport.setAlpha(canReport ? 1.0f : 0.5f);
+        boolean canReport = hasItems && !isScanning;
+        btnGenerateReport.setEnabled(canReport);
+        btnGenerateReport.setAlpha(canReport ? 1.0f : 0.5f);
     }
+    
     // ✅ زر القائمة
     if (btnOpenItemsList != null) {
         btnOpenItemsList.setEnabled(hasItems);
@@ -1674,6 +1693,13 @@ private void updateButtonsState() {
     }
     if (btnArchiveReportsCompact != null) {
         btnArchiveReportsCompact.setEnabled(!isScanning && canEdit);
+    }
+    
+    // ✅ [جديد] زر اللقطة
+    if (btnTakeSnapshot != null) {
+        boolean canSnapshot = hasItems && !isScanning;
+        btnTakeSnapshot.setEnabled(canSnapshot);
+        btnTakeSnapshot.setAlpha(canSnapshot ? 1.0f : 0.5f);
     }
 }
     // ================================================================
@@ -2499,6 +2525,86 @@ public void onCommitSuccess(JSONObject report) {
             return "";
         }
     }
+    private void takeSnapshot() {
+    if (snapshotManager == null) {
+        showToast(isArabic ? "⚠️ مدير اللقطات غير جاهز" : "⚠️ Snapshot manager not ready");
+        return;
+    }
+    
+    int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+    if (scanned == 0) {
+        showToast(isArabic ? "⚠️ لا توجد مسوحات لحفظها" : "⚠️ No scans to save");
+        return;
+    }
+    
+    // ✅ طلب اسم مخصص
+    android.widget.EditText input = new android.widget.EditText(requireContext());
+    input.setHint(isArabic ? "اسم اللقطة (اختياري)" : "Snapshot name (optional)");
+    input.setPadding(40, 40, 40, 40);
+    
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📸 حفظ لقطة" : "📸 Save Snapshot")
+            .setMessage(isArabic
+                    ? "سيتم حفظ " + scanned + " قطعة في لقطة جديدة"
+                    : "Will save " + scanned + " items")
+            .setView(input)
+            .setPositiveButton(isArabic ? "حفظ" : "Save", (d, w) -> {
+                String name = input.getText().toString().trim();
+                
+                final String branchName = branchesManager != null
+                        ? branchesManager.getActiveBranchDisplayName() : "";
+                final String mode = (selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty())
+                        ? "category" : "full";
+                final String user = getCurrentUserName();
+                
+                ioExecutor.execute(() -> {
+                    try {
+                        InventorySnapshot snapshot = snapshotManager.createSnapshot(
+                                inventoryEngine != null ? inventoryEngine.getClientSessionId() : "",
+                                scannedItemsDisplayList,
+                                expectedCount,
+                                branchName,
+                                mode,
+                                user,
+                                name.isEmpty() ? null : name);
+                        
+                        boolean saved = snapshotManager.saveSnapshot(snapshot);
+                        
+                        mainHandler.post(() -> {
+                            if (!isAdded() || isFragmentDestroyed) return;
+                            if (saved) {
+                                showToast(isArabic ? "✅ تم حفظ اللقطة" : "✅ Snapshot saved");
+                                if (soundManager != null) {
+                                    soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+                                }
+                            } else {
+                                showToast(isArabic ? "❌ فشل الحفظ" : "❌ Save failed");
+                            }
+                        });
+                    } catch (Exception e) {
+                        Log.e(TAG, "takeSnapshot error", e);
+                        mainHandler.post(() -> {
+                            if (!isAdded() || isFragmentDestroyed) return;
+                            showToast(isArabic ? "❌ خطأ" : "❌ Error");
+                        });
+                    }
+                });
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+}
+
+private String getCurrentUserName() {
+    try {
+        com.example.uhf.tools.SessionManager sm = 
+                new com.example.uhf.tools.SessionManager(requireContext());
+        String name = sm.getDisplayName();
+        return name != null ? name : sm.getUsername();
+    } catch (Exception e) {
+        return "";
+    }
+}
+    
 
     private String getDeviceId() {
         try {
