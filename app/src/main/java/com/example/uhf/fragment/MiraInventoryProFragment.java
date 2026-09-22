@@ -1143,7 +1143,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         });
     }
 
-    private void stopScanning() {
+    public void stopScanning() {
         if (!isScanning) return;
 
         Log.d(TAG, "⏹️ stopScanning called");
