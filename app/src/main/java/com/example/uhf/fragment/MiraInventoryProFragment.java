@@ -2001,6 +2001,53 @@ private void updateButtonsState() {
         dialogsManager.setExpectedCount(expectedCount);
         dialogsManager.showCommitConfirmationDialog(scanned);
     }
+    
+    /**
+ * ✅ بناء ملخص محلي للتقرير (عند فشل السيرفر أو عدم إرجاع بيانات)
+ */
+private JSONObject buildLocalCommitSummary() {
+    try {
+        JSONObject summary = new JSONObject();
+        int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+        
+        // ✅ حساب الدقة
+        String accuracy;
+        if (expectedCount > 0) {
+            accuracy = String.valueOf(Math.min(100, (scanned * 100) / expectedCount));
+        } else {
+            accuracy = "100";
+        }
+        
+        // ✅ مستوى الخطورة
+        String riskLevel;
+        int variance = Math.abs(expectedCount - scanned);
+        if (variance == 0) {
+            riskLevel = "none";
+        } else if (variance <= 2) {
+            riskLevel = "low";
+        } else if (variance <= 10) {
+            riskLevel = "medium";
+        } else {
+            riskLevel = "high";
+        }
+        
+        summary.put("accuracy", accuracy);
+        summary.put("risk_level", riskLevel);
+        summary.put("recommendation", isArabic 
+                ? "تم الاعتماد — التقرير متاح في الأرشيف"
+                : "Committed — report available in archive");
+        summary.put("expected_count", expectedCount);
+        summary.put("found_count", scanned);
+        summary.put("missing_count", Math.max(0, expectedCount - scanned));
+        summary.put("unexpected_count", Math.max(0, scanned - expectedCount));
+        summary.put("closed_at", getCurrentDateTimeString());
+        
+        return summary;
+    } catch (Exception e) {
+        Log.e(TAG, "buildLocalCommitSummary error", e);
+        return new JSONObject();
+    }
+}
 
     private void commitInventoryToServer() {
         if (!isAdded() || isFragmentDestroyed) return;
@@ -2085,6 +2132,7 @@ public void onCommitSuccess(JSONObject report) {
                     }
                 });
     }
+
 
     private void showCommitSuccessDialog(JSONObject report) {
     if (!isAdded() || isFragmentDestroyed) return;
