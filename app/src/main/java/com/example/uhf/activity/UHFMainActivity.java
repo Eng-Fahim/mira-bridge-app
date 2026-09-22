@@ -208,7 +208,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+       // AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
 
         try {
@@ -2293,4 +2293,4 @@ private void pulseFab(View fab) {
         Log.e(TAG, "pulseFab error: " + e.getMessage());
     }
 }
-                    }
+}
