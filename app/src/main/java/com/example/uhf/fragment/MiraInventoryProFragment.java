@@ -983,6 +983,11 @@ public void onScanStarted() {
         // Timer
         scanStartTime = SystemClock.elapsedRealtime();
         mainHandler.post(timerRunnable);
+        
+        // ✅✅✅ قفل التنقل
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setNavigationLocked(true);
+        }
 
         // ✅ تحديث الأزرار
         updateButtonsState();
@@ -1030,7 +1035,12 @@ public void onScanStopped() {
         }
 
         showToast(isArabic ? "🛑 تم إيقاف المسح" : "🛑 Scan stopped");
-
+        
+        
+        // ✅✅✅ فك القفل
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setNavigationLocked(false);
+        }
         updateUI();
         syncOfflineTransactions();
         updateButtonsState();
