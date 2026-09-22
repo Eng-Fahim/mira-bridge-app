@@ -733,7 +733,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
             case Barcode.FORMAT_CODE_39: return "Code-39";
             case Barcode.FORMAT_UPC_A: return "UPC-A";
             case Barcode.FORMAT_UPC_E: return "UPC-E";
-            case Barcode.FORMAT_AZETC: return "Aztec";
+            case Barcode.FORMAT_AZTEC: return "Aztec";
             case Barcode.FORMAT_PDF417: return "PDF417";
             default: return "Barcode";
         }
