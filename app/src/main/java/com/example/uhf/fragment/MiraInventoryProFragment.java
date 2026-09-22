@@ -2208,33 +2208,25 @@ private void navigateToSnapshots() {
         if (!isAdded() || isFragmentDestroyed) return;
         if (getActivity() == null) return;
 
-        // ✅ 1) حاول استخدام NavigationManager من الـ Activity
-        com.example.uhf.navigation.NavigationManager nav = null;
+        // ✅ الحصول على NavigationManager من UHFMainActivity فقط
+        // (لأنها الوحيدة التي تحتوي على getNavigationManager())
+        if (getActivity() instanceof UHFMainActivity) {
+            com.example.uhf.navigation.NavigationManager nav =
+                    ((UHFMainActivity) getActivity()).getNavigationManager();
 
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                nav = ((UHFMainActivity) getActivity()).getNavigationManager();
-            } else if (getActivity() instanceof BaseTabFragmentActivity) {
-                nav = ((BaseTabFragmentActivity) getActivity()).getNavigationManager();
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "getNavigationManager not available: " + e.getMessage());
-            nav = null;
-        }
+            if (nav != null) {
+                String tag = com.example.uhf.navigation.NavigationManager.TAG_SNAPSHOTS;
+                androidx.fragment.app.Fragment fragment = nav.createFragmentByTag(tag);
 
-        // ✅ 2) إذا وُجد — استخدمه (الطريقة المثالية)
-        if (nav != null) {
-            String tag = com.example.uhf.navigation.NavigationManager.TAG_SNAPSHOTS;
-            androidx.fragment.app.Fragment fragment = nav.createFragmentByTag(tag);
-
-            if (fragment != null) {
-                nav.loadFragmentDirectly(fragment, tag);
-                Log.d(TAG, "✅ Navigated to Snapshots via NavigationManager");
-                return;
+                if (fragment != null) {
+                    nav.loadFragmentDirectly(fragment, tag);
+                    Log.d(TAG, "✅ Navigated to Snapshots via NavigationManager");
+                    return;
+                }
             }
         }
 
-        // ✅ 3) Fallback: استخدام FragmentManager مباشرة
+        // ✅ Fallback: استخدام FragmentManager مباشرة
         Log.w(TAG, "Using FragmentManager fallback for Snapshots");
 
         MiraSnapshotsFragment snapshotsFragment = new MiraSnapshotsFragment();
