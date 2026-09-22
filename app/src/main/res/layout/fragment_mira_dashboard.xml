@@ -860,16 +860,12 @@
                 </LinearLayout>
 
                 <!-- RecyclerView لآخر العمليات -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvRecentActivity"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    android:nestedScrollingEnabled="true"
-                    android:overScrollMode="never"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:itemCount="3"
-                    tools:listitem="@layout/item_activity_timeline" />
+                <LinearLayout
+    android:id="@+id/llRecentActivity"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="14dp"
+    android:orientation="vertical" />
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
