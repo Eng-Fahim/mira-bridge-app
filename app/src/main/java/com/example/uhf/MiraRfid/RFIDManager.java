@@ -545,12 +545,17 @@ public boolean isRealReaderConnected() {
             return false;
         }
 
+        RFIDDevice device = getActiveDevice();
+        if (device == null) return false;
+        if (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
+            return false;
+        }
+
         MiraIRFIDReader reader = getActiveReader();
         if (reader == null) return false;
 
-        if (reader.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
-            return false;
-        }
+        // ✅ حذف السطر الذي يستخدم reader.getType()
+        // (النوع موجود في device — تم الفحص أعلاه)
 
         return reader.isConnected();
 
