@@ -2082,14 +2082,18 @@ public void onCommitSuccess(JSONObject report) {
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
 
-        // ✅ 1) إذا كان التقرير فارغاً — اعرض ملخصاً محلياً
+        // ✅ 1) نبني متغير محلي جديد (final/effectively final)
+        final JSONObject finalReport;
+        
         if (report == null || report.length() == 0) {
             Log.w(TAG, "⚠️ Empty report from server — building local summary");
-            report = buildLocalCommitSummary();
+            finalReport = buildLocalCommitSummary();
+        } else {
+            finalReport = report;
         }
 
         // ✅ 2) حفظ التقرير من السيرفر
-        lastServerReport = report;
+        lastServerReport = finalReport;
 
         showToast(isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير"
                            : "✅ Inventory committed successfully");
@@ -2115,22 +2119,20 @@ public void onCommitSuccess(JSONObject report) {
             btnCommitSession.setAlpha(0.7f);
         }
 
-        // ✅✅✅ 5) حفظ لقطة تلقائية (الأهم!)
-        autoSaveSnapshotAfterCommit(report);
+        // ✅✅✅ 5) حفظ لقطة تلقائية
+        autoSaveSnapshotAfterCommit(finalReport);
 
         // ✅ 6) عرض النافذة
-        showCommitSuccessDialog(report);
+        showCommitSuccessDialog(finalReport);
     });
 }
-                    @Override
-                    public void onCommitError(String error) {
-                        mainHandler.post(() -> {
-                            if (!isAdded() || isFragmentDestroyed) return;
-                            Log.e(TAG, "Commit failed: " + error);
-                            showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + error);
-                        });
-                    }
-                });
+                   @Override
+public void onCommitError(String error) {
+    mainHandler.post(() -> {
+        if (!isAdded() || isFragmentDestroyed) return;
+        Log.e(TAG, "Commit failed: " + error);  // ← قراءة فقط ✅
+        showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + error);  // ← قراءة فقط ✅
+    });
     }
 
 
