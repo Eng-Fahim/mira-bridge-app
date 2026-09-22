@@ -12,6 +12,7 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
 import com.example.uhf.manager.IdentitySyncManager;
@@ -21,22 +22,20 @@ import com.google.android.material.textfield.TextInputEditText;
 import org.json.JSONObject;
 
 /**
- * 🏗️ EditSyncItemDialog - نافذة تعديل سجل المزامنة
- * 
- * الميزات:
- * - تعديل كل الحقول القابلة للتعديل
- * - التحقق من صحة المدخلات
- * - إرجاع السجل المُحدَّث عبر Callback
- * 
+ * EditSyncItemDialog - الإصدار 2.0
+ *
+ * ✅ يتوافق مع SyncLogItem الجديد (immutable)
+ * ✅ يستخدم Builder لإنشاء نسخة جديدة بدلاً من تعديل الأصل
+ *
  * @author Mira Team
- * @version 1.0
+ * @version 2.0
  */
 public class EditSyncItemDialog extends Dialog {
 
     private static final String TAG = "EditSyncItemDialog";
 
     public interface OnSaveListener {
-        void onSave(IdentitySyncManager.SyncLogItem updatedItem);
+        void onSave(@NonNull IdentitySyncManager.SyncLogItem updatedItem);
     }
 
     private final IdentitySyncManager.SyncLogItem originalItem;
@@ -44,14 +43,14 @@ public class EditSyncItemDialog extends Dialog {
     private final OnSaveListener saveListener;
 
     // Views
-    private TextInputEditText etTitle, etEpc, etWeight, etPrice, etKarat, 
+    private TextInputEditText etTitle, etEpc, etWeight, etPrice, etKarat,
             etCategory, etLocation;
     private MaterialButton btnCancel, btnSave;
 
     public EditSyncItemDialog(@NonNull Context context,
-                              IdentitySyncManager.SyncLogItem item,
+                              @Nullable IdentitySyncManager.SyncLogItem item,
                               boolean isArabic,
-                              OnSaveListener listener) {
+                              @Nullable OnSaveListener listener) {
         super(context);
         this.originalItem = item;
         this.isArabic = isArabic;
@@ -99,6 +98,12 @@ public class EditSyncItemDialog extends Dialog {
             if (etKarat != null) etKarat.setText(originalItem.karat);
             if (etCategory != null) etCategory.setText(originalItem.category);
             if (etLocation != null) etLocation.setText(originalItem.location);
+
+            // ✅ EPC غير قابل للتعديل
+            if (etEpc != null) {
+                etEpc.setEnabled(false);
+                etEpc.setFocusable(false);
+            }
         } catch (Exception e) {
             Log.e(TAG, "populateFields error: " + e.getMessage());
         }
@@ -113,13 +118,17 @@ public class EditSyncItemDialog extends Dialog {
             btnSave.setOnClickListener(v -> handleSave());
         }
 
-        // إغلاق بالضغط خارج النافذة
         setCancelable(true);
         setCanceledOnTouchOutside(true);
     }
 
     private void handleSave() {
         try {
+            if (originalItem == null) {
+                showError(isArabic ? "السجل غير موجود" : "Item not found");
+                return;
+            }
+
             // ✅ قراءة القيم
             String newTitle = getText(etTitle);
             String newWeightStr = getText(etWeight);
@@ -138,7 +147,7 @@ public class EditSyncItemDialog extends Dialog {
             try {
                 newWeight = Double.parseDouble(newWeightStr);
                 if (newWeight <= 0) {
-                    showError(isArabic ? "الوزن يجب أن يكون أكبر من صفر" : 
+                    showError(isArabic ? "الوزن يجب أن يكون أكبر من صفر" :
                                         "Weight must be greater than zero");
                     return;
                 }
@@ -151,7 +160,7 @@ public class EditSyncItemDialog extends Dialog {
             try {
                 newPrice = Double.parseDouble(newPriceStr);
                 if (newPrice < 0) {
-                    showError(isArabic ? "السعر لا يمكن أن يكون سالباً" : 
+                    showError(isArabic ? "السعر لا يمكن أن يكون سالباً" :
                                         "Price cannot be negative");
                     return;
                 }
@@ -160,8 +169,15 @@ public class EditSyncItemDialog extends Dialog {
                 return;
             }
 
-            // ✅ بناء الـ Payload المحدّث
-            JSONObject newPayload = new JSONObject(originalItem.payload.toString());
+            // ==================== ✅ بناء Payload جديد ====================
+            JSONObject newPayload;
+            try {
+                newPayload = new JSONObject(originalItem.payload.toString());
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to copy payload — creating new", e);
+                newPayload = new JSONObject();
+            }
+
             newPayload.put("title", newTitle);
             newPayload.put("gross_weight", newWeight);
             newPayload.put("retail_price_usd", newPrice);
@@ -170,18 +186,36 @@ public class EditSyncItemDialog extends Dialog {
             newPayload.put("category", newCategory);
             newPayload.put("location", newLocation);
 
-            // ✅ تحديث الـ Model
-            originalItem.title = newTitle;
-            originalItem.grossWeight = newWeight;
-            originalItem.priceUSD = newPrice;
-            originalItem.karat = newKarat;
-            originalItem.category = newCategory;
-            originalItem.location = newLocation;
-            originalItem.payload = newPayload;
+            // ==================== ✅ [الإصلاح] استخدام Builder ====================
+            // بدلاً من تعديل originalItem (immutable)
+            IdentitySyncManager.SyncLogItem updatedItem =
+                    new IdentitySyncManager.SyncLogItem.Builder()
+                            .id(originalItem.id)
+                            .epc(originalItem.epc)
+                            .title(newTitle)
+                            .karat(newKarat)
+                            .grossWeight(newWeight)
+                            .priceUSD(newPrice)
+                            .category(newCategory)
+                            .location(newLocation)
+                            .branchId(originalItem.branchId)
+                            .userId(originalItem.userId)
+                            .savedAt(originalItem.savedAt)
+                            .lastAttempt(originalItem.lastAttempt)
+                            .nextRetryAt(originalItem.nextRetryAt)
+                            .attempts(originalItem.attempts)
+                            .status(originalItem.status)
+                            .lastError(originalItem.lastError)
+                            .payload(newPayload)
+                            .build();
 
             // ✅ إبلاغ الـ Listener
             if (saveListener != null) {
-                saveListener.onSave(originalItem);
+                try {
+                    saveListener.onSave(updatedItem);
+                } catch (Exception e) {
+                    Log.e(TAG, "saveListener.onSave error", e);
+                }
             }
 
             dismiss();
@@ -198,6 +232,8 @@ public class EditSyncItemDialog extends Dialog {
     }
 
     private void showError(String message) {
-        Toast.makeText(getContext(), "⚠️ " + message, Toast.LENGTH_SHORT).show();
+        try {
+            Toast.makeText(getContext(), "⚠️ " + message, Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) {}
     }
 }
