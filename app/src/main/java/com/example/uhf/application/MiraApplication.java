@@ -387,30 +387,29 @@ public class MiraApplication extends AppContext {
      * ✅ [إصلاح #1] مضمون + fallback
      */
     @NonNull
-    public static MiraApplication getInstance() {
-        MiraApplication local = instance;
-        if (local == null) {
-            synchronized (MiraApplication.class) {
-                local = instance;
-                if (local == null) {
-                    // Fallback: حاول من AppContext
-                    if (AppContext.getInstance() instanceof MiraApplication) {
-                        local = (MiraApplication) AppContext.getInstance();
-                        instance = local;
-                    }
+public static MiraApplication getInstance() {
+    MiraApplication local = instance;
+    if (local == null) {
+        synchronized (MiraApplication.class) {
+            local = instance;
+            if (local == null) {
+                // Fallback: حاول من AppContext
+                AppContext ctx = AppContext.tryGetInstance();
+                if (ctx instanceof MiraApplication) {
+                    local = (MiraApplication) ctx;
+                    instance = local;
                 }
             }
         }
-
-        if (local == null) {
-            // ❌ لا يمكن أن يحدث هذا بعد onCreate
-            // رمي استثناء واضح أفضل من NPE صامت
-            throw new IllegalStateException(
-                    "MiraApplication not initialized. " +
-                    "Ensure it's declared in AndroidManifest.xml");
-        }
-        return local;
     }
+
+    if (local == null) {
+        throw new IllegalStateException(
+                "MiraApplication not initialized. " +
+                "Ensure it's declared in AndroidManifest.xml");
+    }
+    return local;
+}
 
     /**
      * ✅ [إضافة] نسخة آمنة بدون استثناء
