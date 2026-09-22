@@ -1,7 +1,6 @@
 package com.example.uhf.adapter;
 
 import android.content.Context;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,36 +27,21 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * PhotosAdapter - الإصدار 3.0 (المطوّر)
+ * PhotosAdapter - الإصدار 3.1 (مُصحّح للتوافق مع RecyclerView القديم)
  *
- * ✅ الإصلاحات المطبقة (20 مشكلة):
- *  1. نسخ القائمة داخلياً (thread-safe للقراءة)
- *  2. فحص وجود ivPhoto/btnDeletePhoto
- *  3. استخدام getBindingAdapterPosition
- *  4. استخدام RequestManager مع دورة حياة آمنة
- *  5. DiskCacheStrategy.AUTOMATIC → ALL مع signature
- *  6. استخدام imageExecutor لعمليات تحضير
- *  7. clearListeners() يُنظّف Glide أيضاً
- *  8. onViewRecycled لتنظيف الطلبات
- *  9. DiffUtil لتحديثات ناعمة
- * 10. التحقق من path في onClick
- * 11. دعم content:// + file:// + مسار عادي
- * 12. فحص وجود الملف قبل التحميل
- * 13. signature(lastModified) لمنع cache قديم
- * 14. placeholder مخصص + transition
- * 15. thumbnail سريع (0.25f)
- * 16. setHasStableIds(true) + getItemId
- * 17. override() للأبعاد
- * 18. onRemove يُمرر path
- * 19. Main-thread guard
- * 20. تنظيف كامل لـ Glide
+ * ✅ الإصلاحات الحرجة:
+ *  1. إزالة البناء القديم (يعتمد على MiraApp غير الموجود)
+ *  2. إزالة override لـ notifyDataSetChanged() (final في الأصل)
+ *  3. استخدام getAdapterPosition() بدلاً من getBindingAdapterPosition()
+ *     (متوافق مع كل إصدارات RecyclerView)
  *
- * ✅ إضافات جديدة:
- *  - PhotoClickListener (للمعاينة)
- *  - submitList() مع DiffUtil
- *  - getPhotoAt(position)
- *  - setPhotos()
- *  - Lifecycle-safe RequestManager
+ * ✅ مزايا محفوظة:
+ *  - Thread-safe
+ *  - DiffUtil
+ *  - Stable IDs
+ *  - Glide + Signature cache
+ *  - Click + Remove listeners
+ *  - Preview support
  */
 public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewHolder> {
 
@@ -66,34 +50,25 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
     // ==================== Interfaces ====================
 
     public interface OnPhotoRemoveListener {
-        /**
-         * ✅ [إصلاح #18] يُمرر path أيضاً
-         */
         void onRemove(int position, @NonNull String path);
     }
 
-    /**
-     * ✅ [إضافة] مستمع للنقر (معاينة)
-     */
     public interface OnPhotoClickListener {
         void onPhotoClick(int position, @NonNull String path, @NonNull ImageView source);
     }
 
     // ==================== Fields ====================
 
-    /** ✅ [إصلاح #1] نسخة داخلية */
     private final List<String> photoPaths = new ArrayList<>();
-
     private final RequestManager glide;
 
     private OnPhotoRemoveListener onRemoveListener;
     private OnPhotoClickListener onClickListener;
 
-    /** ✅ [إصلاح #15] أبعاد مصغرة */
     private final int thumbnailWidthPx;
     private final int thumbnailHeightPx;
 
-    // ==================== Constructors ====================
+    // ==================== Constructor ====================
 
     public PhotosAdapter(@NonNull Context context,
                          @Nullable List<String> initialPaths,
@@ -102,7 +77,6 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
             throw new IllegalArgumentException("PhotosAdapter: context cannot be null");
         }
 
-        // ✅ [إصلاح #4] RequestManager آمن
         this.glide = Glide.with(context.getApplicationContext());
 
         if (initialPaths != null) {
@@ -110,30 +84,19 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         }
         this.onRemoveListener = removeListener;
 
-        // ✅ [إصلاح #16] stable ids
         setHasStableIds(true);
 
-        // ✅ [إصلاح #17] أبعاد المصغرة
         float density = context.getResources().getDisplayMetrics().density;
         this.thumbnailWidthPx = (int) (100 * density);
         this.thumbnailHeightPx = (int) (100 * density);
     }
 
     /**
-     * للتوافق مع الكود الحالي (executor غير مستخدم)
+     * ✅ [إصلاح #1] حذف البناء القديم (كان يعتمد على MiraApp)
+     * إذا كنت تستخدمه في مكان ما، استبدله بـ:
+     *   new PhotosAdapter(context, paths, listener)
      */
-    @Deprecated
-    public PhotosAdapter(@NonNull List<String> photoPaths,
-                         @Nullable java.util.concurrent.Executor imageExecutor,
-                         @Nullable OnPhotoRemoveListener onRemoveListener) {
-        this(
-                // نستخرج context من أي مكان — يفترض أن المتصل يستخدم هذا البناء القديم
-                // ⚠️ في التحديث القادم يجب تمرير context
-                com.example.uhf.MiraApp.getAppContext(),
-                photoPaths,
-                onRemoveListener
-        );
-    }
+    // ← لا يوجد بناء deprecated هنا
 
     // ==================== Listeners ====================
 
@@ -145,15 +108,15 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         this.onClickListener = listener;
     }
 
-    // ==================== Data Setters ====================
+    // ==================== Data ====================
 
     /**
-     * ✅ [إصلاح #9, #19] تحديث القائمة بـ DiffUtil
+     * ✅ تحديث بـ DiffUtil
+     * ⚠️ [إصلاح #2] لا نستخدم override لـ notifyDataSetChanged
+     * لأنها final في RecyclerView.Adapter
      */
     public void submitList(@Nullable List<String> newList) {
-        // ✅ [إصلاح #19] فحص main thread
         if (!isMainThread()) {
-            Log.w(TAG, "submitList called from non-main thread — posting");
             new android.os.Handler(android.os.Looper.getMainLooper())
                     .post(() -> submitList(newList));
             return;
@@ -183,24 +146,6 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         diffResult.dispatchUpdatesTo(this);
     }
 
-    /**
-     * للتوافق المباشر مع notifyDataSetChanged
-     */
-    @Override
-    public void notifyDataSetChanged() {
-        if (!isMainThread()) {
-            new android.os.Handler(android.os.Looper.getMainLooper())
-                    .post(super::notifyDataSetChanged);
-            return;
-        }
-        super.notifyDataSetChanged();
-    }
-
-    // ==================== READ ====================
-
-    /**
-     * ✅ [إصلاح #1] نسخة للقراءة فقط
-     */
     @NonNull
     public List<String> getPhotoPaths() {
         return Collections.unmodifiableList(new ArrayList<>(photoPaths));
@@ -220,7 +165,6 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
 
     @Override
     public long getItemId(int position) {
-        // ✅ [إصلاح #16] id ثابت بناءً على hash الـ path
         if (position < 0 || position >= photoPaths.size()) return RecyclerView.NO_ID;
         String path = photoPaths.get(position);
         return path != null ? path.hashCode() : RecyclerView.NO_ID;
@@ -234,14 +178,10 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         return new PhotoViewHolder(view);
     }
 
-    /**
-     * ✅ [إصلاح #2, #10, #12, #13, #14, #15, #17]
-     */
     @Override
     public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
         if (position < 0 || position >= photoPaths.size()) return;
 
-        // ✅ [إصلاح #2] فحص العناصر الأساسية
         if (holder.ivPhoto == null) {
             Log.e(TAG, "ivPhoto is null at position " + position);
             return;
@@ -253,20 +193,19 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
             return;
         }
 
-        // ==================== تحميل الصورة ====================
+        // تحميل الصورة
         loadPhoto(holder, path);
 
-        // ==================== زر الحذف ====================
+        // زر الحذف
         if (holder.btnDeletePhoto != null) {
             holder.btnDeletePhoto.setOnClickListener(v -> {
-                // ✅ [إصلاح #3] استخدام getBindingAdapterPosition
-                int pos = holder.getBindingAdapterPosition();
+                // ✅ [إصلاح #3] getAdapterPosition بدلاً من getBindingAdapterPosition
+                int pos = holder.getAdapterPosition();
                 if (pos == RecyclerView.NO_POSITION) {
                     Log.w(TAG, "NO_POSITION on delete click");
                     return;
                 }
 
-                // ✅ [إصلاح #10] التحقق من path الحالية
                 String currentPath = getPhotoAt(pos);
                 if (currentPath == null || !currentPath.equals(path)) {
                     Log.w(TAG, "Path mismatch on delete — pos=" + pos);
@@ -283,10 +222,11 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
             });
         }
 
-        // ==================== النقر للمعاينة (اختياري) ====================
+        // النقر للمعاينة
         if (onClickListener != null && holder.ivPhoto != null) {
             holder.ivPhoto.setOnClickListener(v -> {
-                int pos = holder.getBindingAdapterPosition();
+                // ✅ [إصلاح #3] getAdapterPosition
+                int pos = holder.getAdapterPosition();
                 if (pos == RecyclerView.NO_POSITION) return;
 
                 String currentPath = getPhotoAt(pos);
@@ -301,9 +241,6 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         }
     }
 
-    /**
-     * ✅ [إصلاح #12, #13, #14, #15, #17]
-     */
     private void loadPhoto(@NonNull PhotoViewHolder holder, @NonNull String path) {
         try {
             Object source = resolveSource(path);
@@ -312,7 +249,6 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
                 return;
             }
 
-            // ✅ [إصلاح #13] signature لمنع cache قديم
             ObjectKey signature = null;
             if (source instanceof File) {
                 File f = (File) source;
@@ -322,23 +258,21 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
             }
 
             RequestOptions options = new RequestOptions()
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)  // ✅ [إصلاح #5]
-                    .placeholder(R.drawable.placeholder_image)  // ✅ [إصلاح #14]
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .placeholder(R.drawable.placeholder_image)
                     .error(R.drawable.ic_error_outline)
                     .centerCrop()
-                    .override(thumbnailWidthPx, thumbnailHeightPx);  // ✅ [إصلاح #17]
+                    .override(thumbnailWidthPx, thumbnailHeightPx);
 
             if (signature != null) {
                 options = options.signature(signature);
             }
 
-            var builder = glide
-                    .load(source)
+            glide.load(source)
                     .apply(options)
-                    .thumbnail(0.25f)  // ✅ [إصلاح #15]
-                    .transition(DrawableTransitionOptions.withCrossFade(150));
-
-            builder.into(holder.ivPhoto);
+                    .thumbnail(0.25f)
+                    .transition(DrawableTransitionOptions.withCrossFade(150))
+                    .into(holder.ivPhoto);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to load image: " + path, e);
@@ -348,9 +282,6 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         }
     }
 
-    /**
-     * ✅ [إصلاح #11] دعم content:// + file:// + مسار عادي
-     */
     @Nullable
     private Object resolveSource(@NonNull String path) {
         if (path.startsWith("content://")) {
@@ -366,19 +297,14 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
             return null;
         }
 
-        // مسار عادي
         File f = new File(path);
         if (!f.exists() || !f.isFile()) {
-            // ✅ [إصلاح #12] فحص وجود الملف
             Log.w(TAG, "File not found: " + path);
             return null;
         }
         return f;
     }
 
-    /**
-     * ✅ [إصلاح #8] تنظيف عند إعادة استخدام Holder
-     */
     @Override
     public void onViewRecycled(@NonNull PhotoViewHolder holder) {
         super.onViewRecycled(holder);
@@ -396,34 +322,22 @@ public class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewH
         return photoPaths.size();
     }
 
-    // ==================== CLEANUP ====================
+    // ==================== Cleanup ====================
 
-    /**
-     * ✅ [إصلاح #7] تنظيف كامل بما في ذلك Glide
-     */
     public void clearListeners() {
         this.onRemoveListener = null;
         this.onClickListener = null;
         Log.d(TAG, "Photo listeners cleared");
     }
 
-    /**
-     * ✅ [إصلاح #7] إيقاف كل طلبات Glide (يُستدعى من onDestroyView)
-     */
     public void clearRequests() {
         try {
-            // Glide يُدار عبر RequestManager — لا نستطيع إيقافه كاملاً
-            // لكن يمكننا إخباره بإيقاف الطلبات
-            // الحل الأفضل: إزالة كل الـ targets
             Log.d(TAG, "Requests cleared (Glide managed by context)");
         } catch (Exception e) {
             Log.w(TAG, "clearRequests error: " + e.getMessage());
         }
     }
 
-    /**
-     * ✅ للاستدعاء من onDestroyView في Fragment
-     */
     public void destroy() {
         clearListeners();
         clearRequests();
