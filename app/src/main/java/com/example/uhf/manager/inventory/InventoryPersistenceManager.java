@@ -277,15 +277,13 @@ public class InventoryPersistenceManager {
                 isCommitting.set(false);
 
                 if (response != null && response.isSuccess) {
-                    JSONObject report = response.data != null ?
-                            response.data.optJSONObject("report") : null;
-                    if (report == null && response.data != null) {
-                        report = response.data;
-                    }
-
-                    if (callback != null) {
-                        callback.onCommitSuccess(report != null ? report : new JSONObject());
-                    }
+    JSONObject report = extractBestReport(response);
+    
+    Log.d(TAG, "📊 Final report: " + (report != null ? report.toString() : "null"));
+    
+    if (callback != null) {
+        callback.onCommitSuccess(report != null ? report : new JSONObject());
+    }
                 } else {
                     String error = response != null ? response.error : "Unknown error";
                     if (callback != null) {
@@ -301,6 +299,56 @@ public class InventoryPersistenceManager {
             }
         });
     }
+    
+    /**
+ * ✅ استخراج التقرير بأفضل شكل ممكن من response السيرفر
+ * يدعم 5 أشكال مختلفة
+ */
+private JSONObject extractBestReport(MiraApiClient.ApiResponse response) {
+    if (response == null || response.data == null) return null;
+    
+    JSONObject data = response.data;
+    
+    // ✅ محاولة 1: response.data.report
+    JSONObject report = data.optJSONObject("report");
+    if (report != null && report.length() > 0) {
+        Log.d(TAG, "✅ Found report in: data.report");
+        return report;
+    }
+    
+    // ✅ محاولة 2: response.data.data.report
+    JSONObject nested = data.optJSONObject("data");
+    if (nested != null) {
+        report = nested.optJSONObject("report");
+        if (report != null && report.length() > 0) {
+            Log.d(TAG, "✅ Found report in: data.data.report");
+            return report;
+        }
+        
+        // ✅ محاولة 3: response.data.data (مباشرة)
+        if (nested.length() > 0 && nested.has("accuracy")) {
+            Log.d(TAG, "✅ Found report in: data.data");
+            return nested;
+        }
+    }
+    
+    // ✅ محاولة 4: response.data.summary
+    report = data.optJSONObject("summary");
+    if (report != null && report.length() > 0) {
+        Log.d(TAG, "✅ Found report in: data.summary");
+        return report;
+    }
+    
+    // ✅ محاولة 5: response.data مباشرة
+    if (data.has("accuracy") || data.has("expected_count") || data.has("found_count")) {
+        Log.d(TAG, "✅ Using data directly as report");
+        return data;
+    }
+    
+    // ❌ لم نجد شيئاً — أرجع data كما هو (قد يحتوي على IDs فقط)
+    Log.w(TAG, "⚠️ No valid report found — using raw data");
+    return data;
+}
 
     // ==================== 4. Fetch Archive Reports ====================
 
