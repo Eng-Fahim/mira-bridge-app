@@ -242,17 +242,6 @@ if (radioThemeGroup != null) {
         // 3) أظهر إشعاراً
         showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
 
-        // 4) أعد بناء الـ Activity بعد تأخير بسيط
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            try {
-                if (getActivity() != null && !getActivity().isFinishing() 
-                        && !getActivity().isDestroyed()) {
-                    getActivity().recreate();
-                }
-            } catch (Exception e) {
-                logNonFatal("recreate", e);
-            }
-        }, 200);
     });
 }
     }
