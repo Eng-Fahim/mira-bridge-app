@@ -208,34 +208,53 @@ public class MiraProfileFragment extends Fragment {
         }
 
         // ✅✅✅ إصلاح 1: تغيير الثيم فورياً
-        if (radioThemeGroup != null) {
-            radioThemeGroup.setOnCheckedChangeListener((group, checkedId) -> {
-                if (isDestroyed.get() || isBindingTheme) return;
+        // ✅✅✅ إصلاح: تغيير الثيم فورياً + حفظ مضمون
+if (radioThemeGroup != null) {
+    radioThemeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+        if (isDestroyed.get() || isBindingTheme || !isAdded()) return;
 
-                int mode;
-                if (checkedId == R.id.radioThemeDark) {
-                    mode = AppCompatDelegate.MODE_NIGHT_YES;
-                } else if (checkedId == R.id.radioThemeSystem) {
-                    mode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
-                } else {
-                    mode = AppCompatDelegate.MODE_NIGHT_NO;
-                }
+        int newMode;
+        if (checkedId == R.id.radioThemeDark) {
+            newMode = AppCompatDelegate.MODE_NIGHT_YES;
+        } else if (checkedId == R.id.radioThemeSystem) {
+            newMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+        } else if (checkedId == R.id.radioThemeLight) {
+            newMode = AppCompatDelegate.MODE_NIGHT_NO;
+        } else {
+            return;  // معرّف غير معروف
+        }
 
-                // إذا كان نفس الوضع الحالي، لا تفعل شيئاً
-                int currentMode = AppCompatDelegate.getDefaultNightMode();
-                if (currentMode == mode) return;
+        // هل هو نفس الوضع الحالي؟
+        int currentMode = AppCompatDelegate.getDefaultNightMode();
+        if (currentMode == newMode) {
+            Log.d(TAG, "Theme unchanged: " + newMode);
+            return;
+        }
 
-                saveThemePreference(mode);
+        Log.i(TAG, "Theme changing: " + currentMode + " → " + newMode);
 
-                // ✅ إعادة بناء الـ Activity لتطبيق الثيم فوراً
-                if (getActivity() != null && !getActivity().isFinishing()) {
-                    AppCompatDelegate.setDefaultNightMode(mode);
-                    // Toast قبل recreate لأن الـ Fragment سيُعاد إنشاؤه
-                    showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
+        // 1) احفظ في SharedPreferences بشكل مضمون
+        saveThemePreferenceSync(newMode);
+
+        // 2) طبّق الوضع الجديد
+        AppCompatDelegate.setDefaultNightMode(newMode);
+
+        // 3) أظهر إشعاراً
+        showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
+
+        // 4) أعد بناء الـ Activity بعد تأخير بسيط
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            try {
+                if (getActivity() != null && !getActivity().isFinishing() 
+                        && !getActivity().isDestroyed()) {
                     getActivity().recreate();
                 }
-            });
-        }
+            } catch (Exception e) {
+                logNonFatal("recreate", e);
+            }
+        }, 200);
+    });
+}
     }
 
     private void toggleSection(LinearLayout layout, ImageView arrow) {
@@ -283,35 +302,54 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void loadThemePreference() {
-        try {
-            if (getContext() == null) return;
-            SharedPreferences prefs = requireContext().getSharedPreferences("app_theme", Context.MODE_PRIVATE);
-            int mode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+    try {
+        if (getContext() == null || radioThemeGroup == null) return;
 
-            isBindingTheme = true;
-            if (mode == AppCompatDelegate.MODE_NIGHT_NO && radioThemeLight != null) {
-                radioThemeLight.setChecked(true);
-            } else if (mode == AppCompatDelegate.MODE_NIGHT_YES && radioThemeDark != null) {
-                radioThemeDark.setChecked(true);
-            } else if (radioThemeSystem != null) {
-                radioThemeSystem.setChecked(true);
-            }
-            isBindingTheme = false;
-        } catch (Exception e) {
-            isBindingTheme = false;
-            logNonFatal("loadThemePreference", e);
-        }
-    }
+        SharedPreferences prefs = requireContext()
+                .getSharedPreferences("app_theme", Context.MODE_PRIVATE);
+        int mode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
 
-    private void saveThemePreference(int mode) {
-        try {
-            if (getContext() == null) return;
-            SharedPreferences prefs = requireContext().getSharedPreferences("app_theme", Context.MODE_PRIVATE);
-            prefs.edit().putInt("theme_mode", mode).apply();
-        } catch (Exception e) {
-            logNonFatal("saveThemePreference", e);
+        // ✅ اختر ID مناسب
+        int selectedId;
+        if (mode == AppCompatDelegate.MODE_NIGHT_NO) {
+            selectedId = R.id.radioThemeLight;
+        } else if (mode == AppCompatDelegate.MODE_NIGHT_YES) {
+            selectedId = R.id.radioThemeDark;
+        } else {
+            selectedId = R.id.radioThemeSystem;
         }
+
+        // ✅ امنع المستمع من التنفيذ
+        isBindingTheme = true;
+
+        // ✅ استخدم check() بدلاً من setChecked()
+        radioThemeGroup.check(selectedId);
+
+        Log.d(TAG, "Theme loaded: mode=" + mode + ", id=" + selectedId);
+
+    } catch (Exception e) {
+        logNonFatal("loadThemePreference", e);
+    } finally {
+        // ✅ دائماً يُعاد التعيين
+        isBindingTheme = false;
     }
+}
+
+    /**
+ * ✅ حفظ الثيم بشكل مضمون (commit بدلاً من apply)
+ */
+private void saveThemePreferenceSync(int mode) {
+    try {
+        if (getContext() == null) return;
+        SharedPreferences prefs = requireContext()
+                .getSharedPreferences("app_theme", Context.MODE_PRIVATE);
+        // ✅ commit() — متزامن ومضمون
+        boolean saved = prefs.edit().putInt("theme_mode", mode).commit();
+        Log.d(TAG, "Theme saved: mode=" + mode + ", success=" + saved);
+    } catch (Exception e) {
+        logNonFatal("saveThemePreferenceSync", e);
+    }
+}
 
     private void loadUserAvatar() {
         executeSafely(() -> {
