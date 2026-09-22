@@ -291,4 +291,11 @@
 <color name="activity_warning_bg">#FEF3C7</color>
 <color name="activity_neutral">#6B7280</color>
 <color name="activity_neutral_bg">#F3F4F6</color>
+
+<color name="inventory_stop_red">#DC2626</color>
+<color name="success_green">#16A34A</color>
+<color name="warning_amber">#F59E0B</color>
+<color name="info_blue">#3B82F6</color>
+<color name="text_primary">#0F172A</color>
+<color name="text_secondary">#6B7280</color>
 </resources>
