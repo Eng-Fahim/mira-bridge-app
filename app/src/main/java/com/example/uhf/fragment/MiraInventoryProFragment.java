@@ -468,6 +468,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         // Gold Metrics
         tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
         tvTotalValue = view.findViewById(R.id.tvTotalValue);
+        
+        // في initViews:
+        MaterialButton btnClearSession = view.findViewById(R.id.btnClearSession);
+        if (btnClearSession != null) {
+        btnClearSession.setOnClickListener(v -> confirmResetSession());
+        }
 
         // Action Dock
         btnPowerControl = view.findViewById(R.id.btnPowerControl);
@@ -567,10 +573,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
 
         // Report
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
-            btnGenerateReport.setEnabled(false);
-        }
+if (btnGenerateReport != null) {
+    btnGenerateReport.setOnClickListener(v -> printCurrentReport());  // ✅
+    btnGenerateReport.setEnabled(false);
+}
 
         // Archive
         if (btnArchiveReports != null) {
@@ -870,7 +876,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             // Timer
             scanStartTime = SystemClock.elapsedRealtime();
             mainHandler.post(timerRunnable);
+            
+            updateButtonsState();
         });
+        
     }
 
     @Override
@@ -910,7 +919,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
             updateUI();
             syncOfflineTransactions();
+            updateButtonsState();
         });
+        
     }
 
     @Override
@@ -1003,16 +1014,21 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     // ================================================================
 
     @Override
-    public void onPowerChanged(int newPowerDbm) {
-        currentPowerDbm = newPowerDbm;
-        if (scanController != null) {
-            scanController.setCurrentPowerDbm(newPowerDbm);
-        }
-        applyAntennaPower(newPowerDbm);
-        if (btnPowerControl != null) {
-            btnPowerControl.setText("⚡ " + newPowerDbm + " dBm");
-        }
+public void onPowerChanged(int newPowerDbm) {
+    currentPowerDbm = newPowerDbm;
+    if (scanController != null) {
+        scanController.setCurrentPowerDbm(newPowerDbm);
     }
+    applyAntennaPower(newPowerDbm);
+    
+    // ✅ حدّث الزرين
+    if (btnPowerControl != null) {
+        btnPowerControl.setText("⚡ " + newPowerDbm + " dBm");
+    }
+    if (btnPowerControlCompact != null) {
+        btnPowerControlCompact.setText("⚡ " + newPowerDbm + " dBm");
+    }
+}
 
     @Override
     public void onSessionReset() {
@@ -1249,68 +1265,90 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void clearAllLists() {
-        try {
-            synchronized (scannedItemsDisplayList) {
-                scannedItemsDisplayList.clear();
-            }
-            aggregateTotalWeight = 0;
-            aggregateTotalValue = 0;
-
-            if (modernAdapter != null) {
-                modernAdapter.submitList(new ArrayList<>());
-                modernAdapter.resetAnimationTracker();
-            }
-
-            if (rvInventoryItems != null) {
-                rvInventoryItems.scrollToPosition(0);
-            }
-
-            if (tvScannedCount != null) tvScannedCount.setText("0");
-            if (tvItemCount != null) tvItemCount.setText("0");
-            if (progressScanned != null) progressScanned.setProgress(0);
-            if (tvProgressPercent != null) tvProgressPercent.setText("0%");
-            if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
-
-            if (feedbackHelper != null) feedbackHelper.resetDebounce();
-
-            lastScannedForAnimation = 0;
-        } catch (Exception e) {
-            Log.e(TAG, "clearAllLists error", e);
+    try {
+        synchronized (scannedItemsDisplayList) {
+            scannedItemsDisplayList.clear();
         }
+        aggregateTotalWeight = 0;
+        aggregateTotalValue = 0;
+
+        if (modernAdapter != null) {
+            modernAdapter.submitList(new ArrayList<>());
+            modernAdapter.resetAnimationTracker();
+        }
+
+        if (rvInventoryItems != null) {
+            rvInventoryItems.scrollToPosition(0);
+        }
+
+        // ✅ إعادة تعيين كل العدادات
+        if (tvScannedCount != null) tvScannedCount.setText("0");
+        if (tvItemCount != null) tvItemCount.setText("0");
+        if (tvVariance != null) {
+            tvVariance.setText("—");
+            tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                    R.color.text_secondary));
+        }
+        if (tvAccuracy != null) tvAccuracy.setText("—");
+        if (progressScanned != null) progressScanned.setProgress(0);
+        if (tvProgressPercent != null) tvProgressPercent.setText("0%");
+        if (tvTotalWeight != null) tvTotalWeight.setText("0.00 g");
+        if (tvTotalValue != null) tvTotalValue.setText("$0.00");
+        if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
+
+        if (feedbackHelper != null) feedbackHelper.resetDebounce();
+
+        lastScannedForAnimation = 0;
+        
+        // ✅ تحديث حالة الأزرار
+        updateButtonsState();
+    } catch (Exception e) {
+        Log.e(TAG, "clearAllLists error", e);
     }
+}
 
     private void updateMainToggleButton(boolean scanning) {
-        if (btnMainToggleScan == null) return;
+    if (btnMainToggleScan == null) return;
 
-        try {
-            if (scanning) {
-                btnMainToggleScan.setText(isArabic ? "⏹️ إيقاف الجرد" : "⏹️ Stop Scan");
-                try {
-                    btnMainToggleScan.setIcon(requireContext().getDrawable(
-                            android.R.drawable.ic_media_pause));
-                } catch (Exception ignored) {}
-                try {
-                    btnMainToggleScan.setBackgroundTintList(
-                            ContextCompat.getColorStateList(requireContext(),
-                                    android.R.color.holo_red_dark));
-                } catch (Exception e) {
-                    // fallback: لا نغير اللون
-                    Log.w(TAG, "setBackgroundTintList error", e);
-                }
-            } else {
-                btnMainToggleScan.setText(isArabic ? "▶️ بدء جرد RFID" : "▶️ Start RFID Scan");
-                try {
-                    btnMainToggleScan.setIcon(requireContext().getDrawable(
-                            android.R.drawable.ic_media_play));
-                } catch (Exception ignored) {}
-                try {
-                    btnMainToggleScan.setBackgroundTintList(null);
-                } catch (Exception ignored) {}
+    try {
+        if (scanning) {
+            btnMainToggleScan.setText(isArabic ? "⏹️ إيقاف الجرد" : "⏹️ Stop Scan");
+            
+            try {
+                btnMainToggleScan.setIcon(requireContext().getDrawable(
+                        android.R.drawable.ic_media_pause));
+            } catch (Exception ignored) {}
+            
+            // ✅ إصلاح اللون
+            try {
+                int redColor = ContextCompat.getColor(requireContext(),
+                        R.color.inventory_stop_red);
+                btnMainToggleScan.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(redColor));
+            } catch (Exception e) {
+                Log.w(TAG, "setBackgroundTintList failed", e);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "updateMainToggleButton error", e);
+            
+        } else {
+            btnMainToggleScan.setText(isArabic ? "▶️ بدء جرد RFID" : "▶️ Start RFID Scan");
+            
+            try {
+                btnMainToggleScan.setIcon(requireContext().getDrawable(
+                        android.R.drawable.ic_media_play));
+            } catch (Exception ignored) {}
+            
+            // ✅ إعادة اللون الأصلي
+            try {
+                int primaryColor = ContextCompat.getColor(requireContext(),
+                        R.color.colorPrimary);
+                btnMainToggleScan.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(primaryColor));
+            } catch (Exception ignored) {}
         }
+    } catch (Exception e) {
+        Log.e(TAG, "updateMainToggleButton error", e);
     }
+}
 
     private void showFatalErrorDialog(String title, String message) {
         if (!isAdded() || isFragmentDestroyed) return;
@@ -1501,7 +1539,55 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             Log.e(TAG, "updateLastScanCard error", e);
         }
     }
-
+    
+    
+/**
+ * ✅ تحديث حالة جميع الأزرار بناءً على الحالة الحالية
+ */
+private void updateButtonsState() {
+    if (!isAdded() || isFragmentDestroyed) return;
+    
+    int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+    boolean hasItems = scanned > 0;
+    boolean canEdit = canEditInventory();
+    
+    // ✅ زر الاعتماد
+    if (btnCommitSession != null) {
+        boolean canCommit = hasItems && !isScanning && canEdit;
+        btnCommitSession.setEnabled(canCommit);
+        btnCommitSession.setAlpha(canCommit ? 1.0f : 0.5f);
+    }
+    
+    
+    
+    // ✅ زر التقرير
+    if (btnGenerateReport != null) {
+    boolean canReport = hasItems && !isScanning;  // ← إضافة !isScanning
+    btnGenerateReport.setEnabled(canReport);
+    btnGenerateReport.setAlpha(canReport ? 1.0f : 0.5f);
+    }
+    // ✅ زر القائمة
+    if (btnOpenItemsList != null) {
+        btnOpenItemsList.setEnabled(hasItems);
+        btnOpenItemsList.setAlpha(hasItems ? 1.0f : 0.5f);
+    }
+    
+    // ✅ زر الطاقة
+    if (btnPowerControl != null) {
+        btnPowerControl.setEnabled(!isScanning && canEdit);
+    }
+    if (btnPowerControlCompact != null) {
+        btnPowerControlCompact.setEnabled(!isScanning && canEdit);
+    }
+    
+    // ✅ زر الأرشيف
+    if (btnArchiveReports != null) {
+        btnArchiveReports.setEnabled(!isScanning && canEdit);
+    }
+    if (btnArchiveReportsCompact != null) {
+        btnArchiveReportsCompact.setEnabled(!isScanning && canEdit);
+    }
+}
     // ================================================================
     //  UI Updates
     // ================================================================
@@ -1539,73 +1625,110 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void updateUI() {
-        if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
+    if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
 
-        int scanned = inventoryEngine.getUniqueCount();
+    int scanned = inventoryEngine.getUniqueCount();
 
-        if (tvScannedCount != null) {
+    // ✅ عدد الممسوحات — مع Animation
+    if (tvScannedCount != null) {
+        String newText = String.valueOf(scanned);
+        if (!newText.equals(tvScannedCount.getText().toString())) {
             if (animationHelper != null) {
                 animationHelper.animateNumberChange(
                         tvScannedCount, lastScannedForAnimation, scanned);
             } else {
-                tvScannedCount.setText(String.valueOf(scanned));
+                tvScannedCount.setText(newText);
             }
         }
-
-        if (tvItemCount != null) tvItemCount.setText(String.valueOf(scanned));
-
-        if (expectedCount > 0) {
-            int progress = Math.min(
-                    (int) (((float) scanned / expectedCount) * 100), 100);
-
-            if (progressScanned != null && animationHelper != null) {
-                int previousProgress = progressScanned.getProgress();
-                if (progress != previousProgress) {
-                    animationHelper.animateProgressBar(
-                            progressScanned, previousProgress, progress);
-                }
-            } else if (progressScanned != null) {
-                progressScanned.setProgress(progress);
-            }
-
-            if (tvProgressPercent != null && animationHelper != null) {
-                animationHelper.animateProgressText(tvProgressPercent, progress);
-            } else if (tvProgressPercent != null) {
-                tvProgressPercent.setText(progress + "%");
-            }
-
-            if (tvVariance != null) {
-                tvVariance.setText(String.valueOf(Math.max(0, expectedCount - scanned)));
-            }
-            if (tvAccuracy != null) tvAccuracy.setText(progress + "%");
-
-            if (scanned >= expectedCount && isScanning) {
-                stopScanning();
-                if (soundManager != null) {
-                    soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-                }
-                if (animationHelper != null) {
-                    animationHelper.celebrateCompletion(
-                            tvProgressPercent, progressScanned, tvScannedCount);
-                }
-                showToast(isArabic ? "🎉 اكتمل جرد جميع المواد المتوقعة!"
-                                   : "🎉 All expected items scanned!");
-            }
-        } else if (tvProgressPercent != null) {
-            tvProgressPercent.setText("—");
-        }
-
-        if (tvEmptyState != null) {
-            tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
-        }
-
-        if (tvInventoryStatus != null && isScanning) {
-            tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (" : "📡 Scanning... (")
-                    + scanned + ")");
-        }
-
-        lastScannedForAnimation = scanned;
     }
+    if (tvItemCount != null) tvItemCount.setText(String.valueOf(scanned));
+
+    // ✅ النسبة والتقدم
+    if (expectedCount > 0) {
+        int progress = Math.min((int) (((float) scanned / expectedCount) * 100), 100);
+
+        if (progressScanned != null && animationHelper != null) {
+            int prev = progressScanned.getProgress();
+            if (progress != prev) {
+                animationHelper.animateProgressBar(progressScanned, prev, progress);
+            }
+        } else if (progressScanned != null) {
+            progressScanned.setProgress(progress);
+        }
+
+        if (tvProgressPercent != null && animationHelper != null) {
+            animationHelper.animateProgressText(tvProgressPercent, progress);
+        } else if (tvProgressPercent != null) {
+            tvProgressPercent.setText(progress + "%");
+        }
+
+        // ✅ الدقة
+        if (tvAccuracy != null) {
+            tvAccuracy.setText(progress + "%");
+            int color = progress >= 100
+                    ? ContextCompat.getColor(requireContext(), R.color.success_green)
+                    : progress >= 70
+                    ? ContextCompat.getColor(requireContext(), R.color.warning_amber)
+                    : ContextCompat.getColor(requireContext(), R.color.text_primary);
+            tvAccuracy.setTextColor(color);
+        }
+
+        // ✅ الفارق (Variance) — مع تحسين
+        if (tvVariance != null) {
+            int variance = expectedCount - scanned;
+            if (variance > 0) {
+                tvVariance.setText("−" + variance);
+                tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                        R.color.warning_amber));
+            } else if (variance < 0) {
+                tvVariance.setText("+" + Math.abs(variance));
+                tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                        R.color.info_blue));
+            } else {
+                tvVariance.setText("0");
+                tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                        R.color.success_green));
+            }
+        }
+
+        // ✅ إكمال الجرد
+        if (scanned >= expectedCount && isScanning) {
+            stopScanning();
+            if (soundManager != null) {
+                soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+            }
+            if (animationHelper != null) {
+                animationHelper.celebrateCompletion(
+                        tvProgressPercent, progressScanned, tvScannedCount);
+            }
+            showToast(isArabic ? "🎉 اكتمل جرد جميع المواد المتوقعة!"
+                               : "🎉 All expected items scanned!");
+        }
+    } else {
+        // ✅ جرد أعمى — لا توجد توقعات
+        if (tvProgressPercent != null) tvProgressPercent.setText("—");
+        if (tvAccuracy != null) tvAccuracy.setText("—");
+        if (tvVariance != null) {
+            tvVariance.setText("—");
+            tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                    R.color.text_secondary));
+        }
+    }
+
+    if (tvEmptyState != null) {
+        tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
+    }
+
+    if (tvInventoryStatus != null && isScanning) {
+        tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (" : "📡 Scanning... (")
+                + scanned + ")");
+    }
+
+    lastScannedForAnimation = scanned;
+    
+    // ✅ تحديث حالة الأزرار
+    updateButtonsState();
+}
 
     private void updateTotalWeightAndValue() {
         final double finalWeight = aggregateTotalWeight;
@@ -1742,6 +1865,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                             (dialog, which) -> printCurrentReport())
                     .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
                     .show();
+            // ✅ بعد نجاح الاعتماد — عطّل زر الاعتماد
+    if (btnCommitSession != null) {
+        btnCommitSession.setEnabled(false);
+        btnCommitSession.setText(isArabic ? "✅ معتمد" : "✅ Committed");
+        btnCommitSession.setAlpha(0.7f);
+    }
+    if (btnGenerateReport != null) {
+        btnGenerateReport.setEnabled(false);
+        btnGenerateReport.setAlpha(0.5f);
+    }
         } catch (Exception e) {
             Log.e(TAG, "showCommitSuccessDialog error", e);
         }
@@ -2190,6 +2323,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         } catch (Exception e) {
             Log.e(TAG, "applyRestoredSession error", e);
         }
+        updateButtonsState();
     }
 
     private void confirmResetSession() {
