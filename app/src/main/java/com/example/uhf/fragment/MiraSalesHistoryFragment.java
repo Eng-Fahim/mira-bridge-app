@@ -532,27 +532,62 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
 
     private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
-        List<MiraSaleItem> items = new ArrayList<>();
-        for (int i = 0; i < sales.length(); i++) {
-            JSONObject sale = sales.optJSONObject(i);
-            if (sale == null) continue;
+    List<MiraSaleItem> items = new ArrayList<>();
+    for (int i = 0; i < sales.length(); i++) {
+        JSONObject sale = sales.optJSONObject(i);
+        if (sale == null) continue;
 
-            MiraSaleItem item = new MiraSaleItem();
-            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
-            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
-            item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
-            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
-            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
-            item.date = sale.optString("created_at", sale.optString("date", ""));
-            item.branchId = sale.optInt("branch_id", 0);
-            item.refundStatus = sale.optString("refund_status", sale.optString("status", "completed"));
-            item.refundReason = sale.optString("refund_reason", "");
-            item.refundedAt = sale.optString("refunded_at", "");
-            item.rawJson = sale.toString();
-            items.add(item);
+        MiraSaleItem item = new MiraSaleItem();
+        item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
+        item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
+        
+        // ✅ اقرأ العملة
+        item.currency = sale.optString("currency", sale.optString("currency_code", "USD"));
+        
+        // ✅ اقرأ السعر بالدولار أولاً
+        double amountUsd = sale.optDouble("final_amount_usd", 
+                            sale.optDouble("total_amount_usd", 0));
+        
+        // ✅ اقرأ السعر المحلي
+        double amountLocal = sale.optDouble("final_amount", 
+                              sale.optDouble("total_amount", 
+                                sale.optDouble("amount", 0)));
+        
+        // ✅ إذا كان USD موجوداً، استخدمه
+        if (amountUsd > 0) {
+            item.amountUSD = amountUsd;
+            item.amount = amountUsd;  // للتوافق
+        } else {
+            // ✅ حوّل من المحلي إلى USD
+            String currency = item.currency != null ? item.currency.toUpperCase() : "USD";
+            if ("USD".equals(currency)) {
+                item.amountUSD = amountLocal;
+            } else if ("YER".equals(currency)) {
+                double rate = (priceManager != null) ? priceManager.getExchangeRate("YER") : 530.0;
+                if (rate <= 0) rate = 530.0;
+                item.amountUSD = amountLocal / rate;
+            } else if ("SAR".equals(currency)) {
+                double rate = (priceManager != null) ? priceManager.getExchangeRate("SAR") : 3.75;
+                if (rate <= 0) rate = 3.75;
+                item.amountUSD = amountLocal / rate;
+            } else {
+                item.amountUSD = amountLocal;
+            }
+            item.amount = item.amountUSD;
         }
-        return items;
+        
+        item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
+        item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
+        item.date = sale.optString("created_at", sale.optString("date", ""));
+        item.branchId = sale.optInt("branch_id", 0);
+        item.refundStatus = sale.optString("refund_status", sale.optString("status", "completed"));
+        item.refundReason = sale.optString("refund_reason", "");
+        item.refundedAt = sale.optString("refunded_at", "");
+        item.rawJson = sale.toString();
+        items.add(item);
     }
+    return items;
+}
 
     private void saveSalesOffline(JSONArray sales, int page) {
         try {
@@ -595,21 +630,23 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
 
     private void updateSummaryCards(List<MiraSaleItem> list) {
-        double totalRevenue = 0;
-        for (MiraSaleItem item : list) {
-            totalRevenue += item.amount;
-        }
-
-        if (tvTotalRevenue != null) {
-            tvTotalRevenue.setText(priceManager.formatPriceDefault(totalRevenue));
-        }
-        if (tvInvoicesCount != null) {
-            tvInvoicesCount.setText(String.format(Locale.US, "%,d", totalItems > 0 ? totalItems : list.size()));
-        }
-        if (tvShowingCount != null) {
-            tvShowingCount.setText(String.format(Locale.US, "%,d", list.size()));
-        }
+    double totalRevenueUSD = 0;
+    for (MiraSaleItem item : list) {
+        // ✅ استخدم القيمة بالدولار
+        totalRevenueUSD += item.amountUSD;
     }
+
+    if (tvTotalRevenue != null) {
+        // ✅ formatPriceDefault يتوقع USD ويحوّل → نعرض بالسعر الحالي
+        tvTotalRevenue.setText(priceManager.formatPriceDefault(totalRevenueUSD));
+    }
+    if (tvInvoicesCount != null) {
+        tvInvoicesCount.setText(String.format(Locale.US, "%,d", totalItems > 0 ? totalItems : list.size()));
+    }
+    if (tvShowingCount != null) {
+        tvShowingCount.setText(String.format(Locale.US, "%,d", list.size()));
+    }
+}
 
     private void showLoadingState() {
         if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.VISIBLE);
@@ -681,6 +718,8 @@ public class MiraSalesHistoryFragment extends Fragment {
     static class MiraSaleItem {
         String saleId, customerName, paymentMethod, date, rawJson;
         double amount;
+        double amountUSD;        // ✅ جديد: القيمة بالدولار
+        String currency;         // ✅ جديد: عملة الفاتورة
         int itemCount;
         int branchId;
         String refundStatus;
@@ -756,15 +795,20 @@ public class MiraSalesHistoryFragment extends Fragment {
         public VH onCreateViewHolder(@NonNull ViewGroup p, int t) {
             return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_mira_sale, p, false));
         }
+@Override
+public void onBindViewHolder(@NonNull VH h, int pos) {
+    MiraSaleItem s = items.get(pos);
 
-        @Override
-        public void onBindViewHolder(@NonNull VH h, int pos) {
-            MiraSaleItem s = items.get(pos);
-
-            if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
-            if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
-            if (h.tvAmount != null) h.tvAmount.setText(priceManager.formatPriceDefault(s.amount));
-            if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
+    if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
+    if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
+    
+    // ✅ استخدم amountUSD (بالدولار) — CartAdapter يحوّل عند العرض
+    if (h.tvAmount != null) {
+        double amountToShow = s.amountUSD > 0 ? s.amountUSD : s.amount;
+        h.tvAmount.setText(priceManager.formatPriceDefault(amountToShow));
+    }
+    
+    if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
 
             if (h.tvStatus != null) {
                 String status = s.refundStatus != null ? s.refundStatus : "completed";
