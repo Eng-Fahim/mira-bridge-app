@@ -570,7 +570,7 @@ private void startScanSession(TransferData transfer, String phase, ScanMethod me
     
     // ✅ أنشئ الحوار
     ScanProgressDialog dialog = new ScanProgressDialog(
-        requireContext(),
+        requireActivity(),  
         isArabic,
         transfer.id,
         transfer.transferNumber,
@@ -1347,4 +1347,4 @@ private ScanProgressDialog scanProgressDialog;
             }
         }
     }
-        }
+}
