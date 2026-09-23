@@ -3,99 +3,106 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
+    android:background="?attr/colorSurface"
     android:gravity="center"
-    android:padding="24dp"
-    android:background="?attr/colorSurface">
+    android:orientation="vertical"
+    android:padding="@dimen/space_6">
 
-    <!-- أيقونة القفل الكبيرة -->
+    <!-- ═══════════════════════════════════════════════════════
+         أيقونة القفل الكبيرة
+         ═══════════════════════════════════════════════════════ -->
     <ImageView
         android:id="@+id/ivLockIcon"
         android:layout_width="80dp"
         android:layout_height="80dp"
-        android:layout_marginBottom="16dp"
-        android:src="@drawable/ic_lock_secure"
+        android:layout_marginBottom="@dimen/space_4"
         android:contentDescription="@string/security_icon"
-        app:tint="?attr/colorPrimary" />
+        android:importantForAccessibility="yes"
+        android:src="@drawable/ic_lock_secure"
+        app:tint="@color/text_gold_accent" />
 
-    <!-- العنوان الرئيسي -->
+    <!-- ═══════════════════════════════════════════════════════
+         العنوان الرئيسي
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:id="@+id/tvLockTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:gravity="center"
         android:text="@string/session_locked_title"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:textColor="?attr/colorOnSurface"
-        android:gravity="center" />
+        android:textAppearance="@style/TextAppearance.App.Headline.Small"
+        android:textColor="?attr/colorOnSurface" />
 
-    <!-- الوصف -->
+    <!-- ═══════════════════════════════════════════════════════
+         الوصف
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:id="@+id/tvLockMessage"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="@dimen/space_3"
         android:gravity="center"
-        android:textSize="14sp"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:lineSpacingExtra="4dp"
-        android:text="@string/session_locked_message" />
+        android:text="@string/session_locked_message"
+        android:textAppearance="@style/TextAppearance.App.Body.Medium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
-    <!-- معلومات إضافية (اختياري) -->
+    <!-- ═══════════════════════════════════════════════════════
+         بطاقة المعلومات الإضافية
+         ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutInfo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal"
-        android:gravity="center"
+        android:layout_marginTop="@dimen/space_4"
         android:background="?attr/colorSurfaceVariant"
-        android:padding="12dp">
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="@dimen/space_3">
 
         <TextView
             android:id="@+id/tvInfoIcon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="🕐"
-            android:textSize="14sp" />
+            android:textSize="16sp" />
 
         <TextView
             android:id="@+id/tvInfoText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:textSize="12sp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:text="@string/session_locked_info" />
+            android:layout_marginStart="@dimen/space_2"
+            android:text="@string/session_locked_info"
+            android:textAppearance="@style/TextAppearance.App.Label.Medium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
 
-    <!-- زر الفتح بالبصمة (الأساسي) -->
+    <!-- ═══════════════════════════════════════════════════════
+         زر الفتح بالبصمة (الأساسي)
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnBiometricUnlock"
+        style="@style/AppButtonStyle"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="24dp"
+        android:layout_height="@dimen/button_height"
+        android:layout_marginTop="@dimen/space_6"
         android:text="@string/unlock_with_biometric"
-        android:textSize="15sp"
-        android:textStyle="bold"
         app:icon="@drawable/ic_fingerprint"
         app:iconGravity="textStart"
-        app:iconPadding="12dp"
-        app:cornerRadius="12dp"
-        app:backgroundTint="?attr/colorPrimary" />
+        app:iconPadding="@dimen/space_3" />
 
-    <!-- زر تسجيل الخروج (ثانوي) -->
+    <!-- ═══════════════════════════════════════════════════════
+         زر تسجيل الخروج (الثانوي)
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnLogout"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
+        style="@style/AppButtonStyle.Text"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp"
+        android:layout_height="@dimen/button_height_sm"
+        android:layout_marginTop="@dimen/space_2"
         android:text="@string/logout"
-        android:textSize="14sp"
         android:textColor="?attr/colorOnSurfaceVariant"
         app:icon="@drawable/ic_logout"
         app:iconGravity="textStart"
-        app:iconPadding="8dp" />
-
+        app:iconPadding="@dimen/space_2"
+        app:iconTint="?attr/colorOnSurfaceVariant" />
 </LinearLayout>
