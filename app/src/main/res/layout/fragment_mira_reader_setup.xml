@@ -3,168 +3,203 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
+    android:background="?attr/colorSurface"
     android:orientation="vertical">
 
+    <!-- ═══════════════════════════════════════════════════════
+         العنوان الرئيسي
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp"
+        android:padding="@dimen/screen_padding_h"
         android:text="🔌 إعدادات قارئ RFID"
-        android:textColor="?attr/colorOnBackground"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:textAppearance="@style/TextAppearance.App.Title.Large"
+        android:textColor="?attr/colorOnSurface" />
 
+    <!-- حالة الجهاز النشط -->
     <TextView
         android:id="@+id/tvActiveDeviceStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp"
+        android:paddingHorizontal="@dimen/screen_padding_h"
+        android:paddingBottom="@dimen/space_2"
         android:text="لا يوجد جهاز نشط"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp" />
+        android:textAppearance="@style/TextAppearance.App.Body.Small"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
-    <!-- الصف الأول: اكتشاف وإضافة -->
+    <!-- ═══════════════════════════════════════════════════════
+         الصف الأول: اكتشاف وإضافة
+         ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp">
+        android:paddingHorizontal="@dimen/screen_padding_h"
+        android:paddingVertical="@dimen/space_2">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDetectAuto"
+            style="@style/AppButtonStyle"
             android:layout_width="0dp"
-            android:layout_height="46dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginEnd="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
             android:text="🔍 اكتشاف تلقائي"
-            android:textColor="?attr/colorOnPrimary"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+            app:icon="@drawable/ic_search"
+            app:iconGravity="textStart"
+            app:iconPadding="@dimen/space_2" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAddReader"
+            style="@style/AppButtonStyle"
             android:layout_width="0dp"
-            android:layout_height="46dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginStart="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
             android:text="➕ إضافة"
-            android:textColor="?attr/colorOnPrimary"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+            app:icon="@drawable/ic_add"
+            app:iconGravity="textStart"
+            app:iconPadding="@dimen/space_2" />
     </LinearLayout>
 
-    <!-- الصف الثاني: اختبار وبحث بلوتوث -->
+    <!-- ═══════════════════════════════════════════════════════
+         الصف الثاني: اختبار وبحث بلوتوث
+         ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp">
+        android:paddingHorizontal="@dimen/screen_padding_h"
+        android:paddingBottom="@dimen/space_2">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTestConnection"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginEnd="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
             android:text="📡 اختبار اتصال"
             android:textColor="?attr/colorPrimary"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+            app:icon="@drawable/ic_signal"
+            app:iconGravity="textStart"
+            app:iconPadding="@dimen/space_2"
+            app:iconTint="?attr/colorPrimary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnBluetoothScan"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginStart="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
             android:text="🔗 بحث بلوتوث"
             android:textColor="?attr/colorPrimary"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+            app:icon="@drawable/ic_bluetooth"
+            app:iconGravity="textStart"
+            app:iconPadding="@dimen/space_2"
+            app:iconTint="?attr/colorPrimary" />
     </LinearLayout>
 
-    <!-- الصف الثالث: الصوت والاهتزاز -->
+    <!-- ═══════════════════════════════════════════════════════
+         الصف الثالث: الصوت والاهتزاز
+         ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp">
+        android:paddingHorizontal="@dimen/screen_padding_h"
+        android:paddingBottom="@dimen/space_2">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSoundToggle"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="@dimen/button_height_sm"
+            android:layout_marginEnd="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
             android:text="🔊 الصوت: مفعل"
             android:textColor="?attr/colorPrimary"
-            android:textSize="11sp"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+            android:textSize="12sp"
+            app:icon="@drawable/ic_volume_on"
+            app:iconGravity="textStart"
+            app:iconPadding="@dimen/space_1"
+            app:iconSize="@dimen/icon_sm"
+            app:iconTint="?attr/colorPrimary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnVibrationToggle"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="@dimen/button_height_sm"
+            android:layout_marginStart="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
             android:text="📳 الاهتزاز: مفعل"
             android:textColor="?attr/colorPrimary"
-            android:textSize="11sp"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
-            
+            android:textSize="12sp"
+            app:icon="@drawable/ic_vibration"
+            app:iconGravity="textStart"
+            app:iconPadding="@dimen/space_1"
+            app:iconSize="@dimen/icon_sm"
+            app:iconTint="?attr/colorPrimary" />
     </LinearLayout>
 
-<com.google.android.material.button.MaterialButton
-    android:id="@+id/btnAdvancedSettings"
-    android:layout_width="match_parent"
-    android:layout_height="42dp"
-    android:layout_marginHorizontal="16dp"
-    android:layout_marginBottom="8dp"
-    android:text="⚙️ الإعدادات المتقدمة للقارئ"
-    android:textColor="?attr/colorOnSecondary"
-    app:backgroundTint="?attr/colorSecondary"
-    app:cornerRadius="8dp" />
-    
-    
-    <!-- بعد زر الإعدادات المتقدمة -->
-<com.google.android.material.button.MaterialButton
-    android:id="@+id/btnApplySettings"
-    android:layout_width="match_parent"
-    android:layout_height="42dp"
-    android:layout_marginHorizontal="16dp"
-    android:layout_marginBottom="8dp"
-    android:text="🔄 تطبيق الإعدادات الآن"
-    android:textColor="?attr/colorOnTertiary"
-    app:backgroundTint="?attr/colorTertiary"
-    app:cornerRadius="8dp" />
+    <!-- ═══════════════════════════════════════════════════════
+         زر الإعدادات المتقدمة
+         ═══════════════════════════════════════════════════════ -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAdvancedSettings"
+        style="@style/AppButtonStyle.Tonal"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/button_height"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginBottom="@dimen/space_2"
+        android:text="⚙️ الإعدادات المتقدمة للقارئ"
+        app:icon="@drawable/ic_settings"
+        app:iconGravity="textStart"
+        app:iconPadding="@dimen/space_2" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         زر تطبيق الإعدادات
+         ═══════════════════════════════════════════════════════ -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnApplySettings"
+        style="@style/AppButtonStyle"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/button_height"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginBottom="@dimen/space_4"
+        android:text="🔄 تطبيق الإعدادات الآن"
+        app:icon="@drawable/ic_refresh"
+        app:iconGravity="textStart"
+        app:iconPadding="@dimen/space_2" />
+
+    <!-- ═══════════════════════════════════════════════════════
+         عنوان "الأجهزة المحفوظة"
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp"
+        android:paddingHorizontal="@dimen/screen_padding_h"
+        android:paddingTop="@dimen/space_2"
+        android:paddingBottom="@dimen/space_2"
         android:text="الأجهزة المحفوظة"
+        android:textAppearance="@style/TextAppearance.App.Label.Medium"
         android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:letterSpacing="0.08"
+        android:textAllCaps="true" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         قائمة الأجهزة
+         ═══════════════════════════════════════════════════════ -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvReaderDevices"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingHorizontal="8dp" />
+        android:clipToPadding="false"
+        android:paddingHorizontal="@dimen/space_2"
+        android:paddingBottom="@dimen/space_4" />
 
 </LinearLayout>
