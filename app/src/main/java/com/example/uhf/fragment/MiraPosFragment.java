@@ -433,29 +433,32 @@ private void setupKeyboardVisibilityListener(View view) {
                 int keypadHeight = screenHeight - r.bottom;
                 boolean isKeyboardVisible = keypadHeight > screenHeight * 0.15;
 
-                if (isKeyboardVisible && etManualEpc != null
-                        && etManualEpc.hasFocus()) {
-                    etManualEpc.postDelayed(() -> {
-                        try {
-                            View scrollView = findNestedScrollView(view, 0);
-                            if (scrollView instanceof androidx.core.widget.NestedScrollView) {
-                                int targetY = etManualEpc.getTop() - 100;
-                                ((androidx.core.widget.NestedScrollView) scrollView)
-                                        .smoothScrollTo(0, Math.max(0, targetY));
+                // ✅ عند ظهور الكيبورد — مرر إلى حقل البحث
+                if (isKeyboardVisible && etManualEpc != null && etManualEpc.hasFocus()) {
+                    NestedScrollView scrollView = view.findViewById(R.id.posScrollView);
+                    if (scrollView != null) {
+                        scrollView.postDelayed(() -> {
+                            try {
+                                View target = tilManualEpc != null ? tilManualEpc : etManualEpc;
+                                if (target != null) {
+                                    int targetY = target.getTop();
+                                    scrollView.smoothScrollTo(0, Math.max(0, targetY - 50));
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "smoothScrollTo error", e);
                             }
-                        } catch (Exception e) {
-                            Log.e(TAG, "smoothScrollTo error: " + e.getMessage());
-                        }
-                    }, 200);
+                        }, 150);
+                    }
                 }
 
+                // ✅ إخفاء الحالة الفارغة عند ظهور الكيبورد
                 if (layoutCartEmptyState != null) {
                     layoutCartEmptyState.setVisibility(
                             (cartList.isEmpty() && !isKeyboardVisible)
                                     ? View.VISIBLE : View.GONE);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Keyboard listener error: " + e.getMessage());
+                Log.e(TAG, "Keyboard listener error", e);
             }
         };
 
@@ -463,24 +466,25 @@ private void setupKeyboardVisibilityListener(View view) {
 
         if (etManualEpc != null) {
             etManualEpc.setOnFocusChangeListener((v, hasFocus) -> {
-                if (hasFocus && getActivity() != null) {
+                if (hasFocus) {
                     v.postDelayed(() -> {
                         try {
-                            View rv = getView();
-                            if (rv != null) {
-                                Rect rect = new Rect();
-                                v.getDrawingRect(rect);
-                                rv.requestRectangleOnScreen(rect, true);
+                            NestedScrollView scrollView = view.findViewById(R.id.posScrollView);
+                            if (scrollView != null) {
+                                View target = tilManualEpc != null ? tilManualEpc : etManualEpc;
+                                if (target != null) {
+                                    scrollView.smoothScrollTo(0, Math.max(0, target.getTop() - 50));
+                                }
                             }
                         } catch (Exception e) {
-                            Log.e(TAG, "scroll to input error: " + e.getMessage());
+                            Log.e(TAG, "scroll to input error", e);
                         }
                     }, 300);
                 }
             });
         }
     } catch (Exception e) {
-        Log.e(TAG, "setupKeyboardVisibilityListener error: " + e.getMessage());
+        Log.e(TAG, "setupKeyboardVisibilityListener error", e);
     }
 }
 
@@ -497,21 +501,7 @@ private void removeKeyboardListener() {
     }
 }
 
-/**
- * ✅ [إصلاح #22] حد أقصى للعمق
- */
-private View findNestedScrollView(View view, int depth) {
-    if (depth > MAX_VIEW_DEPTH) return null;
-    if (view instanceof androidx.core.widget.NestedScrollView) return view;
-    if (view instanceof ViewGroup) {
-        ViewGroup group = (ViewGroup) view;
-        for (int i = 0; i < group.getChildCount(); i++) {
-            View result = findNestedScrollView(group.getChildAt(i), depth + 1);
-            if (result != null) return result;
-        }
-    }
-    return null;
-}
+
 
 // ==================== Views ====================
 
