@@ -252,6 +252,7 @@ private static final class RefundEligibility {
 @Override
 public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                          @Nullable Bundle savedInstanceState) {
+    
     try {
         return inflater.inflate(R.layout.fragment_mira_pos, container, false);
     } catch (Exception e) {
@@ -260,12 +261,23 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     }
 }
 
-@Override
+@@Override
 public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
 
     try {
         Context ctx = requireContext().getApplicationContext();
+
+        // ✅✅✅ حل نهائي - امسح الكاش القديم مرة واحدة
+        try {
+            MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
+            if (cache != null) {
+                cache.clearCache();
+                Log.e(TAG, "🗑️ CACHE CLEARED SUCCESSFULLY");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Cache clear error: " + e.getMessage());
+        }
 
         // ✅ تهيئة المديرين
         branchesManager = MiraBranchesManager.getInstance(ctx);
@@ -290,7 +302,6 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
                 @Override
                 public void onTagRead(String epc, int rssi) {
-                    // ✅ [إصلاح #26] فحص isRFIDScanActive
                     if (isRFIDScanActive && isRFIDModeActive) {
                         onRingScanned(epc);
                     }
