@@ -113,7 +113,7 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Uhfuartdemo"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
+            android:windowSoftInputMode="adjustResize|stateUnspecified" />
 
         <!-- ==================== المستقبلات ==================== -->
         <receiver
@@ -170,17 +170,17 @@
             android:foregroundServiceType="dataSync|connectedDevice" />
 
         <!-- ==================== مستقبل زر الزناد Chainway ==================== -->
-<receiver
-    android:name="com.example.uhf.MiraRfid.TriggerKeyReceiver"
-    android:exported="true"
-    android:enabled="true">
-    <intent-filter android:priority="1000">
-        <action android:name="android.intent.action.FUN_KEY" />
-        <action android:name="com.rscja.android.ACTION_UHF_KEY" />
-        <action android:name="com.chainway.uhf.ACTION_KEY" />
-        <action android:name="android.intent.action.SCAN" />
-    </intent-filter>
-</receiver>
+        <receiver
+            android:name="com.example.uhf.MiraRfid.TriggerKeyReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.FUN_KEY" />
+                <action android:name="com.rscja.android.ACTION_UHF_KEY" />
+                <action android:name="com.chainway.uhf.ACTION_KEY" />
+                <action android:name="android.intent.action.SCAN" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
