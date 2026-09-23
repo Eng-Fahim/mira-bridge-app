@@ -4,16 +4,18 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
+    android:background="?attr/colorSurface"
     android:orientation="vertical">
 
-    <!-- ==================== HEADER BAR (ثابت) ==================== -->
+    <!-- ═══════════════════════════════════════════════════════
+         HEADER BAR
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardBackgroundColor="?attr/colorSurface"
         app:cardCornerRadius="0dp"
-        app:cardElevation="3dp"
+        app:cardElevation="@dimen/elevation_1"
         app:strokeWidth="0dp">
 
         <LinearLayout
@@ -21,89 +23,81 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="12dp">
+            android:paddingHorizontal="@dimen/screen_padding_h"
+            android:paddingVertical="@dimen/space_3">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/pos_title"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="17sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.App.Title.Medium"
+                android:textColor="?attr/colorOnSurface" />
 
             <TextView
                 android:id="@+id/tvPosScaleStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_status_badge"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp"
+                android:paddingHorizontal="@dimen/space_3"
+                android:paddingVertical="@dimen/space_1"
                 android:text="@string/pos_scale_searching"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                android:textColor="?attr/colorPrimary" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- ==================== SCAN ACTIONS BAR (ثابت) ==================== -->
+    <!-- ═══════════════════════════════════════════════════════
+         SCAN ACTIONS BAR
+         ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/colorSurface"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp">
+        android:paddingHorizontal="@dimen/space_3"
+        android:paddingTop="@dimen/space_2"
+        android:paddingBottom="@dimen/space_1">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnOpenScanner"
-            style="@style/Widget.MaterialComponents.Button"
+            style="@style/AppButtonStyle"
             android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_marginEnd="6dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginEnd="@dimen/space_1"
             android:layout_weight="1"
             android:text="@string/pos_scan_gs1"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="12dp"
-            app:iconPadding="8dp" />
+            app:iconPadding="@dimen/space_2" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPosRFIDMode"
-            style="@style/Widget.MaterialComponents.Button"
+            style="@style/AppButtonStyle"
             android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_marginStart="6dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginStart="@dimen/space_1"
             android:layout_weight="1"
             android:text="@string/pos_scan_rfid"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="12dp"
-            app:iconPadding="8dp" />
+            app:iconPadding="@dimen/space_2" />
     </LinearLayout>
 
-    <!-- ==================== زر المرتجع (ثابت) ==================== -->
+    <!-- ═══════════════════════════════════════════════════════
+         REFUND BUTTON
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnPosRefund"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        style="@style/AppButtonStyle.Outlined"
         android:layout_width="match_parent"
-        android:layout_height="40dp"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="4dp"
+        android:layout_height="@dimen/button_height_sm"
+        android:layout_marginHorizontal="@dimen/space_3"
+        android:layout_marginTop="@dimen/space_1"
         android:text="🔄 مرتجع مبيعات"
         android:textColor="?attr/colorSecondary"
-        android:textSize="12sp"
-        app:cornerRadius="8dp"
         app:strokeColor="?attr/colorSecondary" />
 
-    <!-- ==================== NestedScrollView للمحتوى القابل للتمرير ==================== -->
+    <!-- ═══════════════════════════════════════════════════════
+         NESTED SCROLL
+         ═══════════════════════════════════════════════════════ -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/posScrollView"
         android:layout_width="match_parent"
@@ -119,50 +113,43 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- ==================== STATUS STRIP ==================== -->
+            <!-- STATUS STRIP -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/colorSurfaceVariant"
                 android:gravity="center"
-                android:paddingVertical="6dp">
+                android:paddingVertical="@dimen/space_2">
 
                 <TextView
                     android:id="@+id/tvPosCartStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/pos_ready_scan"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
 
-            <!-- ==================== MANUAL INPUT ==================== -->
+            <!-- MANUAL INPUT -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/colorSurface"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="10dp">
+                android:paddingHorizontal="@dimen/space_3"
+                android:paddingVertical="@dimen/space_3">
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilPosManualEpc"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                    style="@style/AppTextInputStyle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="@dimen/space_2"
                     android:layout_weight="1"
                     android:hint="@string/pos_manual_hint"
                     app:boxBackgroundColor="?attr/colorSurfaceVariant"
-                    app:boxCornerRadiusBottomEnd="10dp"
-                    app:boxCornerRadiusBottomStart="10dp"
-                    app:boxCornerRadiusTopEnd="10dp"
-                    app:boxCornerRadiusTopStart="10dp"
-                    app:boxStrokeColor="?attr/colorPrimary"
                     app:endIconMode="clear_text"
-                    app:hintTextColor="?attr/colorPrimary"
                     app:errorEnabled="true">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -173,28 +160,22 @@
                         android:inputType="text"
                         android:maxLines="1"
                         android:singleLine="true"
+                        android:textAppearance="@style/TextAppearance.App.Body.Medium"
                         android:textColor="?attr/colorOnSurface"
-                        android:textColorHint="?attr/colorOnSurfaceVariant"
-                        android:textDirection="ltr"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textDirection="ltr" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPosAddManual"
+                    style="@style/AppButtonStyle"
                     android:layout_width="wrap_content"
-                    android:layout_height="48dp"
+                    android:layout_height="@dimen/button_height_sm"
                     android:minWidth="76dp"
-                    android:paddingHorizontal="16dp"
-                    android:text="@string/pos_add"
-                    android:textColor="?attr/colorOnPrimary"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    app:backgroundTint="?attr/colorPrimary"
-                    app:cornerRadius="10dp" />
+                    android:paddingHorizontal="@dimen/space_4"
+                    android:text="@string/pos_add" />
             </LinearLayout>
 
-            <!-- ==================== CART ==================== -->
+            <!-- CART -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -206,9 +187,9 @@
                     android:layout_height="wrap_content"
                     android:clipToPadding="false"
                     android:nestedScrollingEnabled="false"
-                    android:paddingHorizontal="12dp"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp"
+                    android:paddingHorizontal="@dimen/space_3"
+                    android:paddingTop="@dimen/space_2"
+                    android:paddingBottom="@dimen/space_2"
                     tools:listitem="@layout/item_pos_cart_row" />
 
                 <LinearLayout
@@ -218,7 +199,7 @@
                     android:layout_gravity="center"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="24dp"
+                    android:padding="@dimen/space_6"
                     android:visibility="visible">
 
                     <TextView
@@ -230,38 +211,37 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="@dimen/space_3"
                         android:text="@string/pos_ready_scan"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
             </FrameLayout>
 
-            <!-- ==================== SUMMARY FOOTER ==================== -->
+            <!-- SUMMARY FOOTER -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="16dp"
+                android:layout_marginHorizontal="@dimen/space_3"
+                android:layout_marginTop="@dimen/space_2"
+                android:layout_marginBottom="@dimen/space_4"
                 app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="6dp"
-                app:strokeColor="?attr/colorOutline"
-                app:strokeWidth="1dp">
+                app:cardCornerRadius="@dimen/radius_xl"
+                app:cardElevation="@dimen/elevation_3"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="@dimen/stroke_normal">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="@dimen/space_3">
 
-                    <!-- Item Count + Total Amount -->
+                    <!-- Item Count + Total -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="10dp"
+                        android:layout_marginBottom="@dimen/space_3"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
@@ -275,18 +255,16 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/pos_item_count"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
 
                             <TextView
                                 android:id="@+id/tvPosItemCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="0"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="22sp"
-                                android:textStyle="bold" />
+                                android:textAppearance="@style/TextAppearance.App.Headline.Small"
+                                android:textColor="?attr/colorOnSurface" />
                         </LinearLayout>
 
                         <LinearLayout
@@ -299,22 +277,21 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/pos_total_amount"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
 
                             <TextView
                                 android:id="@+id/tvPosTotalAmount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/pos_default_amount"
+                                android:textAppearance="@style/TextAppearance.App.Display.Medium"
                                 android:textColor="?attr/colorPrimary"
-                                android:textSize="24sp"
-                                android:textStyle="bold" />
+                                android:textDirection="ltr" />
                         </LinearLayout>
                     </LinearLayout>
 
-                    <!-- Clear + Checkout Buttons -->
+                    <!-- Clear + Checkout -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -322,36 +299,24 @@
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnPosClearCart"
-                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            style="@style/AppButtonStyle.Outlined"
                             android:layout_width="100dp"
-                            android:layout_height="50dp"
-                            android:layout_marginEnd="8dp"
+                            android:layout_height="@dimen/button_height"
+                            android:layout_marginEnd="@dimen/space_2"
                             android:text="@string/pos_clear"
                             android:textColor="?attr/colorError"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            app:cornerRadius="12dp"
-                            app:strokeColor="?attr/colorError"
-                            app:strokeWidth="1.5dp" />
+                            app:strokeColor="?attr/colorError" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnPosCheckout"
+                            style="@style/AppButtonStyle"
                             android:layout_width="0dp"
-                            android:layout_height="50dp"
+                            android:layout_height="@dimen/button_height"
                             android:layout_weight="1"
-                            android:text="@string/pos_checkout"
-                            android:textColor="?attr/colorOnPrimary"
-                            android:textSize="15sp"
-                            android:textStyle="bold"
-                            app:backgroundTint="?attr/colorPrimary"
-                            app:cornerRadius="12dp"
-                            app:elevation="4dp" />
+                            android:text="@string/pos_checkout" />
                     </LinearLayout>
-
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
 </LinearLayout>
