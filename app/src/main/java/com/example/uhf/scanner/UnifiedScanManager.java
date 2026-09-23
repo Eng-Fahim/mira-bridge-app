@@ -290,36 +290,42 @@ public class UnifiedScanManager {
      * ✅ إلغاء الجلسة (بدون إتمام)
      */
     public void cancelSession() {
-        if (!sessionActive) return;
-        
-        final int transferId = currentTransferId;
-        final String phase = currentPhase;
-        
-        executor.execute(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.executeRequest(
-                    "DELETE",
-                    "transfers/" + transferId + "/scan-session?phase=" + phase,
-                    null, true,
-                    10_000, 10_000
-                );
-                
-                Log.d(TAG, "Session cancelled");
-                
-            } catch (Exception e) {
-                Log.e(TAG, "cancelSession error: " + e.getMessage());
-            }
+    if (!sessionActive) return;
+    
+    final int transferId = currentTransferId;
+    final String phase = currentPhase;
+    
+    executor.execute(() -> {
+        try {
+            // ✅ استخدم DELETE مع ApiClient
+            // ملاحظة: MiraApiClient لا يوفر DELETE حالياً — استخدم updateTransfer بقيمة status
+            // أو استخدم executeRequest إذا كانت public
             
-            mainHandler.post(() -> {
-                sessionActive = false;
-                scannedIdentifiers.clear();
-                
-                if (currentCallback != null) {
-                    currentCallback.onSessionCancelled();
-                }
-            });
+            // ✅ الحل المؤقت: استخدم HTTP مباشرة أو تجاهل الخطأ
+            // الأفضل: استخدام getWithAuth في endpoint مخصص
+            
+            // ✅ الحل الآن: نُنشئ Endpoint يستخدم POST بدلاً من DELETE
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth(
+                "/transfers/" + transferId + "/scan-session/cancel",
+                new JSONObject()
+            );
+            
+            Log.d(TAG, "Session cancelled: " + (response != null ? response.code : "no response"));
+            
+        } catch (Exception e) {
+            Log.e(TAG, "cancelSession error: " + e.getMessage());
+        }
+        
+        mainHandler.post(() -> {
+            sessionActive = false;
+            scannedIdentifiers.clear();
+            
+            if (currentCallback != null) {
+                currentCallback.onSessionCancelled();
+            }
         });
-    }
+    });
+}
     
     /**
      * ✅ جلب حالة المسح الحالية من السيرفر
