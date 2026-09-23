@@ -2,8 +2,10 @@ package com.example.uhf.activity;
 
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.AppWatchdog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
@@ -58,7 +60,6 @@ import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
 import com.example.uhf.manager.SecondaryToolbarManager;
 
-
 import androidx.lifecycle.ProcessLifecycleOwner;
 import com.example.uhf.application.AppLifecycleObserver;
 import androidx.biometric.BiometricManager;
@@ -101,21 +102,28 @@ import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.fragment.MiraGateSettingsFragment;
 import com.example.uhf.fragment.MiraRfidSettingsFragment;
 
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import com.google.android.material.badge.BadgeDrawable;
 
 /**
- * UHFMainActivity — النسخة المتوافقة مع NavigationManager الجديد
+ * UHFMainActivity — النسخة النهائية مع عداد التحويلات الواردة
  *
- * ✅ يستخدم OnBackPressedDispatcher بدلاً من onBackPressed()
+ * ✅ يستخدم OnBackPressedDispatcher
  * ✅ NavigationManager هو المسؤول الوحيد عن التنقل
- * ✅ لا يوجد Hide/Show — فقط Replace
- * ✅ لا يوجد تنظيف يدوي للفراغمنتس
- * ✅ currentFragmentTag يُقرأ دائماً من NavigationManager
+ * ✅ عداد تحويلات واردة احترافي مع Badge + كاش محلي
+ * ✅ Throttle لمنع الطلبات المتكررة
  */
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
+
+    // ==================== ✅ ثوابت عداد التحويلات ====================
+    private static final long TRANSFER_REFRESH_INTERVAL = 60_000L; // كل 60 ثانية
+    private static final long MIN_TRANSFER_REFRESH_INTERVAL = 3_000L; // Throttle: 3 ثواني
+    private static final String PREFS_TRANSFERS_BADGE = "transfers_badge_prefs";
+    private static final String KEY_LAST_TRANSFERS_COUNT = "last_transfers_count";
 
     private int loadingCounter = 0;
 
@@ -132,14 +140,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraOrgProfileManager orgProfileManager;
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    
-    // ✅ قفل التنقل أثناء الجرد
+
     private volatile boolean navigationLocked = false;
 
     private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener =
             this::updateAppTitle;
 
-    // ✅ مراجع الـ Fragments النشطة
     private MiraPosFragment activePOSFragment = null;
     private MiraIdentityStudioFragment activeEncodingFragment = null;
     private MiraInventoryProFragment activeInventoryFragment = null;
@@ -152,9 +158,34 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
-    private static final long INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 دقيقة
-    
+    private static final long INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+
     private AppLifecycleObserver appLifecycleObserver;
+
+    // ==================== ✅ متغيرات عداد التحويلات ====================
+    private int incomingTransfersCount = 0;
+    private long lastTransferRefreshTime = 0;
+    private final Handler transferCountHandler = new Handler(Looper.getMainLooper());
+
+    private final Runnable transferRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            refreshIncomingTransfersCount();
+            transferCountHandler.postDelayed(this, TRANSFER_REFRESH_INTERVAL);
+        }
+    };
+
+    private final BroadcastReceiver transfersUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null) return;
+            String action = intent.getAction();
+            if ("com.example.uhf.REFRESH_TRANSFERS".equals(action)
+                    || "com.example.uhf.REFRESH_DASHBOARD".equals(action)) {
+                refreshIncomingTransfersCountThrottled();
+            }
+        }
+    };
 
     public interface OnRfidScannedListener {
         void onRfidScanned(String epc);
@@ -201,6 +232,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 : "Dashboard";
     }
 
+    public int getIncomingTransfersCount() {
+        return incomingTransfersCount;
+    }
+
     // ==================== دورة الحياة ====================
 
     @Override
@@ -209,48 +244,40 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         MiraLanguageHelper.applyLanguage(newBase, savedLang);
         super.attachBaseContext(newBase);
     }
-    
-    /**
- * ✅ قراءة الثيم المحفوظ وتطبيقه
- */
-private void applySavedTheme() {
-    try {
-        SharedPreferences prefs = getSharedPreferences("app_theme", Context.MODE_PRIVATE);
-        int savedMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        
-        int currentMode = AppCompatDelegate.getDefaultNightMode();
-        
-        if (currentMode != savedMode) {
-            Log.d(TAG, "Applying saved theme: " + modeToString(savedMode));
-            AppCompatDelegate.setDefaultNightMode(savedMode);
-        } else {
-            Log.d(TAG, "Theme already correct: " + modeToString(savedMode));
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "applySavedTheme error: " + e.getMessage());
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-    }
-}
 
-/**
- * ✅ تحويل mode إلى نص للتشخيص
- */
-private String modeToString(int mode) {
-    switch (mode) {
-        case AppCompatDelegate.MODE_NIGHT_NO: return "LIGHT";
-        case AppCompatDelegate.MODE_NIGHT_YES: return "DARK";
-        case AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM: return "SYSTEM";
-        default: return "UNKNOWN(" + mode + ")";
+    private void applySavedTheme() {
+        try {
+            SharedPreferences prefs = getSharedPreferences("app_theme", Context.MODE_PRIVATE);
+            int savedMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+
+            int currentMode = AppCompatDelegate.getDefaultNightMode();
+
+            if (currentMode != savedMode) {
+                Log.d(TAG, "Applying saved theme: " + modeToString(savedMode));
+                AppCompatDelegate.setDefaultNightMode(savedMode);
+            } else {
+                Log.d(TAG, "Theme already correct: " + modeToString(savedMode));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applySavedTheme error: " + e.getMessage());
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        }
     }
-}
-    
+
+    private String modeToString(int mode) {
+        switch (mode) {
+            case AppCompatDelegate.MODE_NIGHT_NO: return "LIGHT";
+            case AppCompatDelegate.MODE_NIGHT_YES: return "DARK";
+            case AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM: return "SYSTEM";
+            default: return "UNKNOWN(" + mode + ")";
+        }
+    }
+
     @Override
-protected void onCreate(Bundle savedInstanceState) {
-    // ✅✅✅ قراءة الثيم المحفوظ (بدلاً من التصفير)
-    applySavedTheme();
-    
-    super.onCreate(savedInstanceState);
-    try {
+    protected void onCreate(Bundle savedInstanceState) {
+        applySavedTheme();
+        super.onCreate(savedInstanceState);
+        try {
             sessionManager = new SessionManager(getApplicationContext());
             if (!sessionManager.isLoggedIn()) {
                 navigateToLogin();
@@ -283,7 +310,6 @@ protected void onCreate(Bundle savedInstanceState) {
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             permissionManager = PermissionManager.getInstance(getApplicationContext());
 
-            // ✅ 1) تهيئة NavigationManager بالطريقة الجديدة
             navigationManager = new NavigationManager(
                     getSupportFragmentManager(),
                     permissionManager,
@@ -291,12 +317,10 @@ protected void onCreate(Bundle savedInstanceState) {
             );
             navigationManager.attachToActivity(this);
 
-            // ✅ 2) تسجيل OnBackPressedDispatcher
             androidx.activity.OnBackPressedCallback backCallback =
                     navigationManager.createBackPressedCallback();
             getOnBackPressedDispatcher().addCallback(this, backCallback);
 
-            // ✅ 3) ربط Interceptor لمنطق "الجرد النشط"
             navigationManager.setBackPressInterceptor(() -> {
                 if (isInventoryActive()) {
                     checkInventoryLockAndExecute(() -> navigationManager.goToDashboard());
@@ -332,7 +356,6 @@ protected void onCreate(Bundle savedInstanceState) {
             setupQuickNav();
             setupOrgProfileListener();
 
-            // ✅ 4) تحميل الشاشة الأولى
             if (savedInstanceState == null) {
                 navigationManager.loadFragmentDirectly(
                         new MiraDashboardFragment(),
@@ -344,28 +367,41 @@ protected void onCreate(Bundle savedInstanceState) {
                 Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
                 navigationManager.loadFragmentDirectly(savedFragment, savedTag);
             }
-            
-            // ✅ تسجيل AppLifecycleObserver (Process-Level)
-try {
-    if (sessionManager != null) {
-        appLifecycleObserver = new AppLifecycleObserver(sessionManager);
-        ProcessLifecycleOwner.get().getLifecycle().addObserver(appLifecycleObserver);
-    }
-} catch (Exception e) {
-    Log.e(TAG, "AppLifecycleObserver init error: " + e.getMessage());
-}
 
-            // ✅ 5) مزامنة الواجهة مع NavigationManager
+            try {
+                if (sessionManager != null) {
+                    appLifecycleObserver = new AppLifecycleObserver(sessionManager);
+                    ProcessLifecycleOwner.get().getLifecycle().addObserver(appLifecycleObserver);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "AppLifecycleObserver init error: " + e.getMessage());
+            }
+
             syncUIWithNavigation();
+
+            // ✅ تسجيل BroadcastReceiver
+            try {
+                LocalBroadcastManager lbm = LocalBroadcastManager.getInstance(this);
+                IntentFilter filter = new IntentFilter();
+                filter.addAction("com.example.uhf.REFRESH_TRANSFERS");
+                filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
+                lbm.registerReceiver(transfersUpdateReceiver, filter);
+                Log.d(TAG, "✅ Transfers counter receiver registered");
+            } catch (Exception e) {
+                Log.e(TAG, "Register transfers receiver error: " + e.getMessage());
+            }
+
+            // ✅ استعادة آخر قيمة للعداد من الكاش المحلي
+            int cachedCount = loadTransfersCountLocally();
+            if (cachedCount > 0) {
+                mainHandler.postDelayed(() -> updateTransfersBadge(cachedCount), 500);
+            }
 
         } catch (Exception e) {
             Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * ✅ مزامنة الواجهة (Toolbar، BottomNav) مع الحالة الحالية في NavigationManager
-     */
     private void syncUIWithNavigation() {
         if (navigationManager == null) return;
         String tag = navigationManager.getCurrentFragmentTag();
@@ -439,7 +475,6 @@ try {
         secondaryToolbarManager.setOnMenuItemClickListener((item, currentTag) -> {
             int id = item.getItemId();
 
-            // ==================== Dashboard ====================
             if (id == R.id.action_device_status) {
                 showHardwareOptionsDialog();
                 return true;
@@ -452,10 +487,7 @@ try {
             } else if (id == R.id.action_quick_access_settings) {
                 loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
                 return true;
-            }
-
-            // ==================== Inventory ====================
-            else if (id == R.id.action_inventory_power) {
+            } else if (id == R.id.action_inventory_power) {
                 if (activeInventoryFragment != null
                         && activeInventoryFragment.isAdded()
                         && !activeInventoryFragment.isRemoving()) {
@@ -489,10 +521,7 @@ try {
             } else if (id == R.id.action_inventory_archive) {
                 showInventoryArchiveDialog();
                 return true;
-            }
-
-            // ==================== POS ====================
-            else if (id == R.id.action_pos_cart) {
+            } else if (id == R.id.action_pos_cart) {
                 showPOSCartDialog();
                 return true;
             } else if (id == R.id.action_pos_search) {
@@ -504,10 +533,7 @@ try {
             } else if (id == R.id.action_pos_receipt) {
                 showPOSReceiptDialog();
                 return true;
-            }
-
-            // ==================== Transfers ====================
-            else if (id == R.id.action_transfers_sync) {
+            } else if (id == R.id.action_transfers_sync) {
                 performDataSync();
                 return true;
             } else if (id == R.id.action_transfers_export) {
@@ -686,299 +712,264 @@ try {
         }, 1500);
     }
 
+    // ==================== دورة الحياة (مصححة) ====================
+
     @Override
-public void onResume() {
-    super.onResume();
-    loadingCounter = 0;
-    forceHideLoadingImmediate();
+    public void onResume() {
+        super.onResume();
+        loadingCounter = 0;
+        forceHideLoadingImmediate();
 
-    // ✅ 1. فحص Auto-Lock أولاً
-    if (!checkAutoLock()) {
-        return;  // تم عرض شاشة القفل
-    }
-
-    updateToolbarTitle();
-    if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
-
-    // ✅ مزامنة الواجهة
-    syncUIWithNavigation();
-}
-
-/**
- * ✅ فحص Auto-Lock
- * @return true إذا كان التطبيق جاهزاً، false إذا تم عرض شاشة القفل
- */
-private boolean checkAutoLock() {
-    try {
-        if (sessionManager == null) return true;
-        if (!sessionManager.isLoggedIn()) return true;
-
-        // إذا كانت الجلسة مقفلة أو انتهت المهلة
-        if (sessionManager.isSessionLocked()
-                || sessionManager.isInactivityTimeout(INACTIVITY_TIMEOUT_MS)) {
-
-            Log.d(TAG, "🔒 Auto-Lock triggered");
-            sessionManager.setSessionLocked(true);
-
-            // عرض شاشة القفل بعد تأخير بسيط (لضمان استقرار النشاط)
-            mainHandler.postDelayed(this::showAutoLockDialog, 300);
-            return false;
-        }
-
-        // تحديث "آخر نشاط"
-        sessionManager.touchActivity();
-        return true;
-    } catch (Exception e) {
-        Log.e(TAG, "checkAutoLock error: " + e.getMessage());
-        return true;
-    }
-}
-
-/**
- * ✅ حوار القفل مع خيارين: بصمة / logout
- */
-/**
- * ✅ حوار القفل الاحترافي (Material Design)
- */
-private void showAutoLockDialog() {
-    if (isFinishing() || isDestroyed()) return;
-    if (!isActivityAlive()) return;
-
-    try {
-        // ✅ استخدام BottomSheetDialog بدلاً من AlertDialog
-        BottomSheetDialog lockDialog = new BottomSheetDialog(
-                this,
-                R.style.TransparentBottomSheetDialog  // استايل موجود لديك
-        );
-
-        View view = getLayoutInflater().inflate(
-                R.layout.dialog_session_locked,
-                null
-        );
-        lockDialog.setContentView(view);
-
-        // ✅ منع الإغلاق عند النقر خارج النافذة
-        lockDialog.setCancelable(false);
-        lockDialog.setCanceledOnTouchOutside(false);
-
-        // ✅ ربط العناصر
-        MaterialButton btnBiometricUnlock = view.findViewById(R.id.btnBiometricUnlock);
-        MaterialButton btnLogout = view.findViewById(R.id.btnLogout);
-        TextView tvLockTitle = view.findViewById(R.id.tvLockTitle);
-        TextView tvLockMessage = view.findViewById(R.id.tvLockMessage);
-
-        // ✅ تعيين النصوص بناءً على اللغة
-        if (isArabic) {
-            tvLockTitle.setText("🔒 تم قفل الجلسة مؤقتاً");
-            tvLockMessage.setText(
-                "لحماية بياناتك، تم قفل الجلسة تلقائياً بعد فترة من عدم النشاط.\n\n" +
-                "يرجى التحقق من هويتك للمتابعة بأمان."
-            );
-            btnBiometricUnlock.setText("فتح بالبصمة");
-            btnLogout.setText("تسجيل الخروج");
-        } else {
-            tvLockTitle.setText("🔒 Session Locked");
-            tvLockMessage.setText(
-                "For your security, your session has been locked due to inactivity.\n\n" +
-                "Please verify your identity to continue."
-            );
-            btnBiometricUnlock.setText("Unlock with Fingerprint");
-            btnLogout.setText("Logout");
-        }
-
-        // ✅ زر الفتح بالبصمة
-        btnBiometricUnlock.setOnClickListener(v -> {
-            lockDialog.dismiss();
-            triggerBiometricUnlock();
-        });
-
-        // ✅ زر تسجيل الخروج
-        btnLogout.setOnClickListener(v -> {
-            lockDialog.dismiss();
-            performFullLogout();
-        });
-
-        // ✅ عرض النافذة
-        lockDialog.show();
-
-    } catch (Exception e) {
-        Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
-    }
-}
-
-/**
- * ✅ Biometric Unlock
- */
-private void triggerBiometricUnlock() {
-    try {
-        // التحقق من توفر البصمة
-        BiometricManager bm = BiometricManager.from(this);
-        int canAuth = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
-
-        if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
-            Log.w(TAG, "Biometric not available, using password");
-            performFullLogout();
+        if (!checkAutoLock()) {
             return;
         }
 
-        Executor executor = ContextCompat.getMainExecutor(this);
-
-        BiometricPrompt prompt = new BiometricPrompt(this, executor,
-                new BiometricPrompt.AuthenticationCallback() {
-                    @Override
-                    public void onAuthenticationSucceeded(
-                            @NonNull BiometricPrompt.AuthenticationResult result) {
-                        Log.d(TAG, "✅ Biometric unlock success");
-                        sessionManager.unlockSession();
-                        Toast.makeText(UHFMainActivity.this,
-                                isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
-                                Toast.LENGTH_SHORT).show();
-                    }
-
-                    @Override
-public void onAuthenticationError(int code, @NonNull CharSequence msg) {
-    Log.e(TAG, "Biometric error: " + code + " - " + msg);
-    
-    if (code == BiometricPrompt.ERROR_USER_CANCELED
-            || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-            || code == BiometricPrompt.ERROR_CANCELED) {
-        
-        // ✅ إعادة عرض شاشة القفل بدلاً من تسجيل الخروج فوراً
-        mainHandler.postDelayed(() -> {
-            if (isActivityAlive()) {
-                showAutoLockDialog();
-            }
-        }, 300);
+        updateToolbarTitle();
+        if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
+        syncUIWithNavigation();
+        // ✅ لا يوجد تشغيل للعداد هنا (في onStart فقط)
     }
-}
 
-                    @Override
-                    public void onAuthenticationFailed() {
-                        Log.w(TAG, "Biometric failed");
-                        Toast.makeText(UHFMainActivity.this,
-                                isArabic ? "❌ لم يتم التعرف على البصمة" : "❌ Fingerprint not recognized",
-                                Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-        BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
-        .setTitle(isArabic ? "التحقق من الهوية" : "Identity Verification")
-        .setSubtitle(isArabic 
-                ? "استخدم بصمة الإصبع للمتابعة بأمان" 
-                : "Use fingerprint to continue securely")
-        .setDescription(isArabic
-                ? "بياناتك محمية بتشفير AES-256"
-                : "Your data is protected with AES-256 encryption")
-        .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
-        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-        .build();
-
-        prompt.authenticate(info);
-
-    } catch (Exception e) {
-        Log.e(TAG, "triggerBiometricUnlock error: " + e.getMessage(), e);
-        performFullLogout();
-    }
-}
-
-/**
- * ✅ Logout كامل
- */
-private void performFullLogout() {
-    try {
-        if (sessionManager != null) {
-            sessionManager.logoutUser();
-        }
-        Intent intent = new Intent(this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        intent.putExtra("session_expired", true);
-        startActivity(intent);
-        finish();
-    } catch (Exception e) {
-        Log.e(TAG, "performFullLogout error: " + e.getMessage());
-    }
-}
-
-/**
- * ✅ تُستدعى قبل تسجيل الخروج لتنظيف الموارد
- * تستدعيها MiraProfileFragment.performLogout()
- */
-public void onPreLogout() {
-    try {
-        Log.d(TAG, "🔓 onPreLogout: cleaning up resources...");
-
-        // 1. إخفاء الـ Loading فوراً
-        forceHideLoadingImmediate();
-
-        // 2. إيقاف أي جرد نشط
-        stopActiveInventory();
-
-        // 3. إيقاف الـ Hardware
-        if (hardwareManager != null) {
-            try {
-                hardwareManager.stopScan();
-            } catch (Exception e) {
-                Log.w(TAG, "stopScan error: " + e.getMessage());
-            }
-        }
-
-        // 4. تنظيف الـ Fragments النشطة
-        clearActiveListeners();
-
-        // 5. إلغاء جميع المهام المؤجلة
-        if (mainHandler != null) {
-            mainHandler.removeCallbacksAndMessages(null);
-        }
-
-        // 6. إزالة مستمعي البروفايل
-        if (orgProfileManager != null && orgProfileListener != null) {
-            orgProfileManager.removeListener(orgProfileListener);
-        }
-
-        Log.d(TAG, "✅ onPreLogout: cleanup complete");
-    } catch (Exception e) {
-        Log.e(TAG, "onPreLogout error: " + e.getMessage(), e);
-    }
-}
-
-
-/**
- * ✅ مساعد للتحقق من صحة النشاط
- */
-private boolean isActivityAlive() {
-    return !isFinishing() && !isDestroyed();
-}
-
-@Override
-public void onUserInteraction() {
-    super.onUserInteraction();
-    // ✅ أي تفاعل = نشاط
-    if (sessionManager != null) {
-        sessionManager.touchActivity();
-    }
-}
-    
     @Override
-public void onPause() {
-    super.onPause();
-
-    // ✅ حفظ آخر نشاط
-    if (sessionManager != null) {
-        sessionManager.touchActivity();
+    protected void onStart() {
+        super.onStart();
+        // ✅ تشغيل العداد هنا فقط
+        transferCountHandler.removeCallbacks(transferRefreshRunnable);
+        transferCountHandler.post(transferRefreshRunnable);
     }
 
-    forceHideLoadingImmediate();
-    AppWatchdog.getInstance().stopMonitoring();
-    if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // ✅ إيقاف العداد هنا فقط
+        transferCountHandler.removeCallbacks(transferRefreshRunnable);
+    }
 
-    try {
-        if (hardwareManager != null) {
-            hardwareManager.stopScan();
+    private boolean checkAutoLock() {
+        try {
+            if (sessionManager == null) return true;
+            if (!sessionManager.isLoggedIn()) return true;
+
+            if (sessionManager.isSessionLocked()
+                    || sessionManager.isInactivityTimeout(INACTIVITY_TIMEOUT_MS)) {
+
+                Log.d(TAG, "🔒 Auto-Lock triggered");
+                sessionManager.setSessionLocked(true);
+                mainHandler.postDelayed(this::showAutoLockDialog, 300);
+                return false;
+            }
+
+            sessionManager.touchActivity();
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "checkAutoLock error: " + e.getMessage());
+            return true;
         }
-    } catch (Exception e) {
-        Log.w(TAG, "Error stopping scan in onPause: " + e.getMessage());
     }
-}
+
+    private void showAutoLockDialog() {
+        if (isFinishing() || isDestroyed()) return;
+        if (!isActivityAlive()) return;
+
+        try {
+            BottomSheetDialog lockDialog = new BottomSheetDialog(
+                    this, R.style.TransparentBottomSheetDialog);
+
+            View view = getLayoutInflater().inflate(
+                    R.layout.dialog_session_locked, null);
+            lockDialog.setContentView(view);
+
+            lockDialog.setCancelable(false);
+            lockDialog.setCanceledOnTouchOutside(false);
+
+            MaterialButton btnBiometricUnlock = view.findViewById(R.id.btnBiometricUnlock);
+            MaterialButton btnLogout = view.findViewById(R.id.btnLogout);
+            TextView tvLockTitle = view.findViewById(R.id.tvLockTitle);
+            TextView tvLockMessage = view.findViewById(R.id.tvLockMessage);
+
+            if (isArabic) {
+                tvLockTitle.setText("🔒 تم قفل الجلسة مؤقتاً");
+                tvLockMessage.setText(
+                        "لحماية بياناتك، تم قفل الجلسة تلقائياً بعد فترة من عدم النشاط.\n\n" +
+                                "يرجى التحقق من هويتك للمتابعة بأمان.");
+                btnBiometricUnlock.setText("فتح بالبصمة");
+                btnLogout.setText("تسجيل الخروج");
+            } else {
+                tvLockTitle.setText("🔒 Session Locked");
+                tvLockMessage.setText(
+                        "For your security, your session has been locked due to inactivity.\n\n" +
+                                "Please verify your identity to continue.");
+                btnBiometricUnlock.setText("Unlock with Fingerprint");
+                btnLogout.setText("Logout");
+            }
+
+            btnBiometricUnlock.setOnClickListener(v -> {
+                lockDialog.dismiss();
+                triggerBiometricUnlock();
+            });
+
+            btnLogout.setOnClickListener(v -> {
+                lockDialog.dismiss();
+                performFullLogout();
+            });
+
+            lockDialog.show();
+
+        } catch (Exception e) {
+            Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
+        }
+    }
+
+    private void triggerBiometricUnlock() {
+        try {
+            BiometricManager bm = BiometricManager.from(this);
+            int canAuth = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+
+            if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
+                Log.w(TAG, "Biometric not available, using password");
+                performFullLogout();
+                return;
+            }
+
+            Executor executor = ContextCompat.getMainExecutor(this);
+
+            BiometricPrompt prompt = new BiometricPrompt(this, executor,
+                    new BiometricPrompt.AuthenticationCallback() {
+                        @Override
+                        public void onAuthenticationSucceeded(
+                                @NonNull BiometricPrompt.AuthenticationResult result) {
+                            Log.d(TAG, "✅ Biometric unlock success");
+                            sessionManager.unlockSession();
+                            Toast.makeText(UHFMainActivity.this,
+                                    isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onAuthenticationError(int code, @NonNull CharSequence msg) {
+                            Log.e(TAG, "Biometric error: " + code + " - " + msg);
+
+                            if (code == BiometricPrompt.ERROR_USER_CANCELED
+                                    || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                                    || code == BiometricPrompt.ERROR_CANCELED) {
+
+                                mainHandler.postDelayed(() -> {
+                                    if (isActivityAlive()) {
+                                        showAutoLockDialog();
+                                    }
+                                }, 300);
+                            }
+                        }
+
+                        @Override
+                        public void onAuthenticationFailed() {
+                            Log.w(TAG, "Biometric failed");
+                            Toast.makeText(UHFMainActivity.this,
+                                    isArabic ? "❌ لم يتم التعرف على البصمة" : "❌ Fingerprint not recognized",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
+
+            BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+                    .setTitle(isArabic ? "التحقق من الهوية" : "Identity Verification")
+                    .setSubtitle(isArabic
+                            ? "استخدم بصمة الإصبع للمتابعة بأمان"
+                            : "Use fingerprint to continue securely")
+                    .setDescription(isArabic
+                            ? "بياناتك محمية بتشفير AES-256"
+                            : "Your data is protected with AES-256 encryption")
+                    .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .build();
+
+            prompt.authenticate(info);
+
+        } catch (Exception e) {
+            Log.e(TAG, "triggerBiometricUnlock error: " + e.getMessage(), e);
+            performFullLogout();
+        }
+    }
+
+    private void performFullLogout() {
+        try {
+            if (sessionManager != null) {
+                sessionManager.logoutUser();
+            }
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            intent.putExtra("session_expired", true);
+            startActivity(intent);
+            finish();
+        } catch (Exception e) {
+            Log.e(TAG, "performFullLogout error: " + e.getMessage());
+        }
+    }
+
+    public void onPreLogout() {
+        try {
+            Log.d(TAG, "🔓 onPreLogout: cleaning up resources...");
+
+            forceHideLoadingImmediate();
+            stopActiveInventory();
+
+            if (hardwareManager != null) {
+                try {
+                    hardwareManager.stopScan();
+                } catch (Exception e) {
+                    Log.w(TAG, "stopScan error: " + e.getMessage());
+                }
+            }
+
+            clearActiveListeners();
+
+            if (mainHandler != null) {
+                mainHandler.removeCallbacksAndMessages(null);
+            }
+
+            if (orgProfileManager != null && orgProfileListener != null) {
+                orgProfileManager.removeListener(orgProfileListener);
+            }
+
+            Log.d(TAG, "✅ onPreLogout: cleanup complete");
+        } catch (Exception e) {
+            Log.e(TAG, "onPreLogout error: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean isActivityAlive() {
+        return !isFinishing() && !isDestroyed();
+    }
+
+    @Override
+    public void onUserInteraction() {
+        super.onUserInteraction();
+        if (sessionManager != null) {
+            sessionManager.touchActivity();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+
+        if (sessionManager != null) {
+            sessionManager.touchActivity();
+        }
+
+        // ✅ لا يوجد إيقاف للعداد هنا (في onStop فقط)
+
+        forceHideLoadingImmediate();
+        AppWatchdog.getInstance().stopMonitoring();
+        if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
+
+        try {
+            if (hardwareManager != null) {
+                hardwareManager.stopScan();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error stopping scan in onPause: " + e.getMessage());
+        }
+    }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -1004,7 +995,6 @@ public void onPause() {
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        // ✅ اقرأ من NavigationManager (المصدر الموثوق)
         String tag = navigationManager != null
                 ? navigationManager.getCurrentFragmentTag()
                 : "Dashboard";
@@ -1082,35 +1072,34 @@ public void onPause() {
         }
     }
 
-    // ==================== التنقل (مُبسّط — يعتمد على NavigationManager) ====================
+    // ==================== التنقل ====================
 
     public void loadFragment(Fragment fragment, String tag) {
         loadFragment(fragment, tag, true);
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (isFinishing() || isDestroyed()) return;
-    if (navigationManager == null) return;
+        if (isFinishing() || isDestroyed()) return;
+        if (navigationManager == null) return;
 
-    // ✅ لا showLoading() — التنقل فوري
-    navigationManager.loadFragment(fragment, tag, addToBackStack);
-    this.currentFragment = fragment;
+        navigationManager.loadFragment(fragment, tag, addToBackStack);
+        this.currentFragment = fragment;
 
-    updateBottomNavSelectionByTag(tag);
-    updateSecondaryToolbar(tag);
-}
+        updateBottomNavSelectionByTag(tag);
+        updateSecondaryToolbar(tag);
+    }
 
-public void loadFragmentDirectly(Fragment fragment, String tag) {
-    if (isFinishing() || isDestroyed()) return;
-    if (navigationManager == null) return;
+    public void loadFragmentDirectly(Fragment fragment, String tag) {
+        if (isFinishing() || isDestroyed()) return;
+        if (navigationManager == null) return;
 
-    // ✅ لا showLoading() — التنقل فوري
-    navigationManager.loadFragmentDirectly(fragment, tag);
-    this.currentFragment = fragment;
+        navigationManager.loadFragmentDirectly(fragment, tag);
+        this.currentFragment = fragment;
 
-    updateBottomNavSelectionByTag(tag);
-    updateSecondaryToolbar(tag);
-}
+        updateBottomNavSelectionByTag(tag);
+        updateSecondaryToolbar(tag);
+    }
+
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
     }
@@ -1179,7 +1168,6 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
                     return;
                 }
 
-                // ✅ استخدم FragmentManager للحصول على الـ Fragment الحالي
                 Fragment currentFragment = navigationManager != null
                         ? navigationManager.getCurrentFragment()
                         : null;
@@ -1196,94 +1184,89 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         });
     }
 
-    // ==================== التنقل السريع (BottomNav) ====================
+    // ==================== التنقل السريع ====================
 
     private void setupQuickNav() {
-    try {
-        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+        try {
+            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-        if (fabActionCenter != null) {
-            boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
-            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-            fabActionCenter.setEnabled(hasQuickActions);
-            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-            // ✅ Tooltip عند الضغط المطوّل
-fabActionCenter.setOnLongClickListener(v -> {
-    Toast.makeText(UHFMainActivity.this,
-            isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
-            Toast.LENGTH_SHORT).show();
-    return true;
-});
+            if (fabActionCenter != null) {
+                boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
+                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+                fabActionCenter.setEnabled(hasQuickActions);
+                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+                fabActionCenter.setOnLongClickListener(v -> {
+                    Toast.makeText(UHFMainActivity.this,
+                            isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
+                            Toast.LENGTH_SHORT).show();
+                    return true;
+                });
 
-            // ✅ Pulse Animation لجذب الانتباه
-            if (hasQuickActions) {
-                pulseFab(fabActionCenter);
+                if (hasQuickActions) {
+                    pulseFab(fabActionCenter);
+                }
             }
+
+            if (quickNav != null) {
+                quickNav.setOnItemSelectedListener(item -> {
+                    int id = item.getItemId();
+                    String tag = getFragmentTagForNavItem(id);
+                    if (tag == null || tag.isEmpty()) return false;
+
+                    if (navigationManager != null
+                            && tag.equals(navigationManager.getCurrentFragmentTag())) {
+                        return true;
+                    }
+
+                    if (navigationLocked || isInventoryActive()) {
+                        new MaterialAlertDialogBuilder(this)
+                                .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل"
+                                        : "⚠️ Inventory Active")
+                                .setMessage(isArabic
+                                        ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
+                                        "هل تريد إيقاف الجرد والانتقال؟"
+                                        : "Cannot navigate during active inventory.\n\n" +
+                                        "Stop inventory and proceed?")
+                                .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
+                                        (d, w) -> {
+                                            stopActiveInventory();
+                                            setNavigationLocked(false);
+                                            mainHandler.postDelayed(() -> {
+                                                Fragment fragment = navigationManager != null
+                                                        ? navigationManager.createFragmentByTag(tag)
+                                                        : FragmentFactory.createFragmentByTag(tag);
+                                                if (fragment != null) {
+                                                    loadFragmentDirectly(fragment, tag);
+                                                }
+                                            }, 500);
+                                        })
+                                .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
+                                        (d, w) -> {
+                                            String currentTag = navigationManager != null
+                                                    ? navigationManager.getCurrentFragmentTag() : "";
+                                            updateBottomNavSelectionByTag(currentTag);
+                                        })
+                                .setCancelable(false)
+                                .show();
+                        return false;
+                    }
+
+                    Fragment fragment = navigationManager != null
+                            ? navigationManager.createFragmentByTag(tag)
+                            : FragmentFactory.createFragmentByTag(tag);
+
+                    if (fragment != null) {
+                        loadFragmentDirectly(fragment, tag);
+                        return true;
+                    }
+                    return false;
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
         }
-
-        if (quickNav != null) {
-    quickNav.setOnItemSelectedListener(item -> {
-        int id = item.getItemId();
-        String tag = getFragmentTagForNavItem(id);
-        if (tag == null || tag.isEmpty()) return false;
-
-        // ✅ تجاهل إذا كان نفس التبويب الحالي
-        if (navigationManager != null
-                && tag.equals(navigationManager.getCurrentFragmentTag())) {
-            return true;
-        }
-
-        // ✅✅✅ حماية: منع التنقل أثناء الجرد
-        if (navigationLocked || isInventoryActive()) {
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" 
-                                       : "⚠️ Inventory Active")
-                    .setMessage(isArabic
-                            ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
-                              "هل تريد إيقاف الجرد والانتقال؟"
-                            : "Cannot navigate during active inventory.\n\n" +
-                              "Stop inventory and proceed?")
-                    .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
-                            (d, w) -> {
-                                stopActiveInventory();
-                                setNavigationLocked(false);
-                                mainHandler.postDelayed(() -> {
-                                    Fragment fragment = navigationManager != null
-                                            ? navigationManager.createFragmentByTag(tag)
-                                            : FragmentFactory.createFragmentByTag(tag);
-                                    if (fragment != null) {
-                                        loadFragmentDirectly(fragment, tag);
-                                    }
-                                }, 500);
-                            })
-                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
-                            (d, w) -> {
-                                // ✅ إعادة التحديد للتبويب الحالي
-                                String currentTag = navigationManager != null
-                                        ? navigationManager.getCurrentFragmentTag() : "";
-                                updateBottomNavSelectionByTag(currentTag);
-                            })
-                    .setCancelable(false)
-                    .show();
-            return false;  // ← رفض التنقل
-        }
-
-        Fragment fragment = navigationManager != null
-                ? navigationManager.createFragmentByTag(tag)
-                : FragmentFactory.createFragmentByTag(tag);
-
-        if (fragment != null) {
-            loadFragmentDirectly(fragment, tag);
-            return true;
-        }
-        return false;
-    });
-}
-    } catch (Exception e) {
-        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
-}
 
     private String getFragmentTagForNavItem(int itemId) {
         if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
@@ -1354,7 +1337,6 @@ fabActionCenter.setOnLongClickListener(v -> {
 
         PermissionManager pm = permissionManager;
 
-        // ==================== الشريط الرئيسي ====================
         MenuItem goldRates = menu.findItem(R.id.action_gold_rates);
         if (goldRates != null) goldRates.setVisible(pm.canViewGoldRates());
 
@@ -1392,7 +1374,6 @@ fabActionCenter.setOnLongClickListener(v -> {
         MenuItem logout = menu.findItem(R.id.action_logout);
         if (logout != null) logout.setVisible(true);
 
-        // ==================== الشريط الثانوي ====================
         MenuItem deviceStatus = menu.findItem(R.id.action_device_status);
         if (deviceStatus != null) deviceStatus.setVisible(true);
 
@@ -1515,42 +1496,39 @@ fabActionCenter.setOnLongClickListener(v -> {
     }
 
     private void showSystemVersionDialog() {
-    String miraSystemVersion = "MIRA ID™ v1.4.8 (Enterprise)";
-    String hwVer = null;
-    String modelName = Build.MODEL;
+        String miraSystemVersion = "MIRA ID™ v1.4.8 (Enterprise)";
+        String hwVer = null;
+        String modelName = Build.MODEL;
 
-    // ✅ استخدام الحالة الديناميكية
-    if (BaseTabFragmentActivity.isRfidDevicePresent() && mReader != null) {
-        try {
-            hwVer = mReader.getHardwareVersion();
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
+        if (BaseTabFragmentActivity.isRfidDevicePresent() && mReader != null) {
+            try {
+                hwVer = mReader.getHardwareVersion();
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
+            }
         }
+
+        StringBuilder message = new StringBuilder();
+        message.append("MIRA Trust Architecture™\n");
+        message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
+        message.append(isArabic ? "📱 الجهاز: " : "📱 Device: ").append(modelName).append("\n");
+        message.append(isArabic ? "📦 النسخة: " : "📦 Version: ").append(miraSystemVersion).append("\n");
+
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected");
+        } else if (hwVer == null || hwVer.trim().isEmpty()) {
+            message.append(isArabic ? "📡 العتاد: غير متهيئ" : "📡 Hardware: Not Configured");
+        } else {
+            message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
+            message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "حول النظام | System Info" : "About System")
+                .setMessage(message.toString())
+                .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
+                .show();
     }
-
-    StringBuilder message = new StringBuilder();
-    message.append("MIRA Trust Architecture™\n");
-    message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
-    message.append(isArabic ? "📱 الجهاز: " : "📱 Device: ").append(modelName).append("\n");
-    message.append(isArabic ? "📦 النسخة: " : "📦 Version: ").append(miraSystemVersion).append("\n");
-
-    if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-        message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected");
-    } else if (hwVer == null || hwVer.trim().isEmpty()) {
-        message.append(isArabic ? "📡 العتاد: غير متهيئ" : "📡 Hardware: Not Configured");
-    } else {
-        message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
-        message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
-    }
-
-    new MaterialAlertDialogBuilder(this)
-            .setTitle(isArabic ? "حول النظام | System Info" : "About System")
-            .setMessage(message.toString())
-            .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
-            .show();
-}
-
-    // ==================== حوارات التولبار الثانوي ====================
 
     private void showInventoryStatsDialog() {
         try {
@@ -1572,11 +1550,11 @@ fabActionCenter.setOnLongClickListener(v -> {
 
             String message = isArabic
                     ? "📊 الأصناف الممسوحة: " + scannedCount + "\n" +
-                      "📡 الحالة: " + status + "\n" +
-                      "⏱️ آخر تحديث: الآن"
+                    "📡 الحالة: " + status + "\n" +
+                    "⏱️ آخر تحديث: الآن"
                     : "📊 Scanned items: " + scannedCount + "\n" +
-                      "📡 Status: " + status + "\n" +
-                      "⏱️ Last updated: just now";
+                    "📡 Status: " + status + "\n" +
+                    "⏱️ Last updated: just now";
 
             new MaterialAlertDialogBuilder(this)
                     .setTitle(isArabic ? "📊 إحصائيات الجلسة" : "📊 Live Stats")
@@ -1683,16 +1661,16 @@ fabActionCenter.setOnLongClickListener(v -> {
         new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "📤 تصدير التحويلات" : "📤 Export Transfers")
                 .setMessage(isArabic
-                    ? "سيتم تصدير قائمة التحويلات الحالية بصيغة:\n\n" +
-                      "• Excel (XLSX)\n" +
-                      "• PDF\n" +
-                      "• CSV\n\n" +
-                      "🚧 قيد التطوير"
-                    : "Exports transfers list as:\n\n" +
-                      "• Excel (XLSX)\n" +
-                      "• PDF\n" +
-                      "• CSV\n\n" +
-                      "🚧 Under Development")
+                        ? "سيتم تصدير قائمة التحويلات الحالية بصيغة:\n\n" +
+                        "• Excel (XLSX)\n" +
+                        "• PDF\n" +
+                        "• CSV\n\n" +
+                        "🚧 قيد التطوير"
+                        : "Exports transfers list as:\n\n" +
+                        "• Excel (XLSX)\n" +
+                        "• PDF\n" +
+                        "• CSV\n\n" +
+                        "🚧 Under Development")
                 .setPositiveButton(isArabic ? "موافق" : "OK", null)
                 .show();
     }
@@ -1701,16 +1679,16 @@ fabActionCenter.setOnLongClickListener(v -> {
         new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "📥 استيراد التحويلات" : "📥 Import Transfers")
                 .setMessage(isArabic
-                    ? "سيتم استيراد قائمة التحويلات من:\n\n" +
-                      "• ملف Excel\n" +
-                      "• ملف CSV\n" +
-                      "• من سيرفر آخر\n\n" +
-                      "🚧 قيد التطوير"
-                    : "Imports transfers from:\n\n" +
-                      "• Excel file\n" +
-                      "• CSV file\n" +
-                      "• Another server\n\n" +
-                      "🚧 Under Development")
+                        ? "سيتم استيراد قائمة التحويلات من:\n\n" +
+                        "• ملف Excel\n" +
+                        "• ملف CSV\n" +
+                        "• من سيرفر آخر\n\n" +
+                        "🚧 قيد التطوير"
+                        : "Imports transfers from:\n\n" +
+                        "• Excel file\n" +
+                        "• CSV file\n" +
+                        "• Another server\n\n" +
+                        "🚧 Under Development")
                 .setPositiveButton(isArabic ? "موافق" : "OK", null)
                 .show();
     }
@@ -2103,18 +2081,15 @@ fabActionCenter.setOnLongClickListener(v -> {
 
     // ==================== قائمة الإجراءات السريعة ====================
 
-  /**
- * ✅ عرض قائمة الإجراءات السريعة (BottomSheetDialogFragment احترافي)
- */
-private void showQuickActionMenu() {
-    try {
-        QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
-        sheet.show(getSupportFragmentManager(), "QuickActions");
-        Log.d(TAG, "✅ QuickActions bottom sheet shown");
-    } catch (Exception e) {
-        Log.e(TAG, "showQuickActionMenu error: " + e.getMessage(), e);
+    private void showQuickActionMenu() {
+        try {
+            QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
+            sheet.show(getSupportFragmentManager(), "QuickActions");
+            Log.d(TAG, "✅ QuickActions bottom sheet shown");
+        } catch (Exception e) {
+            Log.e(TAG, "showQuickActionMenu error: " + e.getMessage(), e);
+        }
     }
-}
 
     private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
                                         boolean allowed, Fragment fragment, String tag) {
@@ -2265,79 +2240,67 @@ private void showQuickActionMenu() {
             Log.e(TAG, "Navigation to login error: " + e.getMessage());
         }
     }
-    
-    /**
- * ✅ قفل/فك التنقل أثناء الجرد
- * - يعطّل BottomNav
- * - يعطّل FAB
- * - يعطّل Toolbar actions
- */
-public void setNavigationLocked(boolean locked) {
-    try {
-        this.navigationLocked = locked;
-        
-        // ✅ 1) تعطيل Bottom Navigation
-        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-        if (nav != null) {
-            nav.setEnabled(!locked);
-            nav.setAlpha(locked ? 0.4f : 1.0f);
-            
-            Menu menu = nav.getMenu();
-            if (menu != null) {
-                for (int i = 0; i < menu.size(); i++) {
-                    menu.getItem(i).setEnabled(!locked);
-                }
-            }
-        }
-        
-        // ✅ 2) تعطيل FAB
-        FloatingActionButton fab = findViewById(R.id.fabActionCenter);
-        if (fab != null) {
-            fab.setEnabled(!locked);
-            fab.setAlpha(locked ? 0.4f : 1.0f);
-        }
-        
-        // ✅ 3) تعطيل Toolbar menu items
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null && toolbar.getMenu() != null) {
-            Menu menu = toolbar.getMenu();
-            for (int i = 0; i < menu.size(); i++) {
-                menu.getItem(i).setEnabled(!locked);
-            }
-        }
-        
-        // ✅ 4) تعطيل Secondary Toolbar
-        if (secondaryToolbarManager != null) {
-            Menu menu = secondaryToolbarManager.getCurrentMenu();
-            if (menu != null) {
-                for (int i = 0; i < menu.size(); i++) {
-                    menu.getItem(i).setEnabled(!locked);
-                }
-            }
-        }
-        
-        Log.d(TAG, "🔒 Navigation " + (locked ? "LOCKED" : "UNLOCKED"));
-    } catch (Exception e) {
-        Log.e(TAG, "setNavigationLocked error", e);
-    }
-}
 
-public boolean isNavigationLocked() {
-    return navigationLocked;
-}
+    public void setNavigationLocked(boolean locked) {
+        try {
+            this.navigationLocked = locked;
+
+            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+            if (nav != null) {
+                nav.setEnabled(!locked);
+                nav.setAlpha(locked ? 0.4f : 1.0f);
+
+                Menu menu = nav.getMenu();
+                if (menu != null) {
+                    for (int i = 0; i < menu.size(); i++) {
+                        menu.getItem(i).setEnabled(!locked);
+                    }
+                }
+            }
+
+            FloatingActionButton fab = findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setEnabled(!locked);
+                fab.setAlpha(locked ? 0.4f : 1.0f);
+            }
+
+            MaterialToolbar toolbar = findViewById(R.id.toolbar);
+            if (toolbar != null && toolbar.getMenu() != null) {
+                Menu menu = toolbar.getMenu();
+                for (int i = 0; i < menu.size(); i++) {
+                    menu.getItem(i).setEnabled(!locked);
+                }
+            }
+
+            if (secondaryToolbarManager != null) {
+                Menu menu = secondaryToolbarManager.getCurrentMenu();
+                if (menu != null) {
+                    for (int i = 0; i < menu.size(); i++) {
+                        menu.getItem(i).setEnabled(!locked);
+                    }
+                }
+            }
+
+            Log.d(TAG, "🔒 Navigation " + (locked ? "LOCKED" : "UNLOCKED"));
+        } catch (Exception e) {
+            Log.e(TAG, "setNavigationLocked error", e);
+        }
+    }
+
+    public boolean isNavigationLocked() {
+        return navigationLocked;
+    }
 
     // ==================== التنظيف والتدمير ====================
-
 
     @Override
     protected void onDestroy() {
         try {
-        // ✅ إزالة AppLifecycleObserver
-        if (appLifecycleObserver != null) {
-            ProcessLifecycleOwner.get().getLifecycle()
-                    .removeObserver(appLifecycleObserver);
-            appLifecycleObserver = null;
-        }
+            if (appLifecycleObserver != null) {
+                ProcessLifecycleOwner.get().getLifecycle()
+                        .removeObserver(appLifecycleObserver);
+                appLifecycleObserver = null;
+            }
             if (notificationManager != null) notificationManager.cleanup();
             if (soundManager != null) soundManager.cleanup();
             if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
@@ -2365,11 +2328,18 @@ public boolean isNavigationLocked() {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage(), e);
         }
 
+        // ✅ إلغاء تسجيل BroadcastReceiver
+        try {
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(transfersUpdateReceiver);
+        } catch (Exception ignored) {}
+
+        // ✅ إيقاف Handlers
+        if (transferCountHandler != null) {
+            transferCountHandler.removeCallbacksAndMessages(null);
+        }
+
         super.onDestroy();
     }
-
-    // ✅ ملاحظة: تم حذف cleanupOldFragments() نهائياً
-    // ✅ NavigationManager الجديد يتولى التنظيف تلقائياً عبر replace()
 
     // ==================== التفاعل مع الكيبورد ====================
 
@@ -2396,33 +2366,171 @@ public boolean isNavigationLocked() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
-    
-    
-    /**
- * ✅ نبضات FAB لجذب انتباه المستخدم
- * - 3 نبضات عند فتح الشاشة الرئيسية
- * - تبدأ بعد 1.5 ثانية من الفتح
- */
-private void pulseFab(View fab) {
-    try {
-        if (fab == null) return;
 
-        android.animation.ObjectAnimator scaleX = android.animation.ObjectAnimator
-                .ofFloat(fab, "scaleX", 1f, 1.15f, 1f);
-        android.animation.ObjectAnimator scaleY = android.animation.ObjectAnimator
-                .ofFloat(fab, "scaleY", 1f, 1.15f, 1f);
+    private void pulseFab(View fab) {
+        try {
+            if (fab == null) return;
 
-        scaleX.setDuration(600);
-        scaleY.setDuration(600);
-        scaleX.setRepeatCount(2);
-        scaleY.setRepeatCount(2);
-        scaleX.setStartDelay(1500);
-        scaleY.setStartDelay(1500);
+            android.animation.ObjectAnimator scaleX = android.animation.ObjectAnimator
+                    .ofFloat(fab, "scaleX", 1f, 1.15f, 1f);
+            android.animation.ObjectAnimator scaleY = android.animation.ObjectAnimator
+                    .ofFloat(fab, "scaleY", 1f, 1.15f, 1f);
 
-        scaleX.start();
-        scaleY.start();
-    } catch (Exception e) {
-        Log.e(TAG, "pulseFab error: " + e.getMessage());
+            scaleX.setDuration(600);
+            scaleY.setDuration(600);
+            scaleX.setRepeatCount(2);
+            scaleY.setRepeatCount(2);
+            scaleX.setStartDelay(1500);
+            scaleY.setStartDelay(1500);
+
+            scaleX.start();
+            scaleY.start();
+        } catch (Exception e) {
+            Log.e(TAG, "pulseFab error: " + e.getMessage());
+        }
     }
-}
+
+    // ==================== ✅ دوال عداد التحويلات الواردة ====================
+
+    /**
+     * Throttled: منع الطلبات المتكررة خلال 3 ثواني
+     */
+    private void refreshIncomingTransfersCountThrottled() {
+        long now = System.currentTimeMillis();
+        if (now - lastTransferRefreshTime < MIN_TRANSFER_REFRESH_INTERVAL) {
+            Log.d(TAG, "⏳ Throttled: skipping refresh (elapsed: " + (now - lastTransferRefreshTime) + "ms)");
+            return;
+        }
+        lastTransferRefreshTime = now;
+        refreshIncomingTransfersCount();
+    }
+
+    /**
+     * جلب عدد التحويلات الواردة للفرع الحالي
+     * يعمل في Thread منفصل
+     */
+    private void refreshIncomingTransfersCount() {
+        if (branchesManager == null || !branchesManager.hasActiveBranch()) {
+            Log.d(TAG, "No active branch → skip transfer count");
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                MiraApiClient apiClient = MiraApiClient.getInstance(getApplicationContext());
+                MiraApiClient.ApiResponse response = apiClient.getIncomingTransfersCount();
+
+                int count = 0;
+                if (response != null && response.isSuccess && response.data != null) {
+                    count = response.data.optInt("count", 0);
+                } else {
+                    // ✅ في حالة الفشل، استخدم آخر قيمة محفوظة
+                    count = loadTransfersCountLocally();
+                    Log.d(TAG, "API failed, using cached count: " + count);
+                }
+
+                final int finalCount = count;
+                mainHandler.post(() -> updateTransfersBadge(finalCount));
+
+            } catch (Exception e) {
+                Log.e(TAG, "refreshIncomingTransfersCount error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * تحديث الـ Badge على أيقونة التحويلات
+     */
+    private void updateTransfersBadge(int count) {
+        try {
+            this.incomingTransfersCount = count;
+
+            // ✅ حفظ القيمة محلياً
+            saveTransfersCountLocally(count);
+
+            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+            if (nav == null) return;
+
+            BadgeDrawable badge = nav.getOrCreateBadge(R.id.nav_transfers);
+
+            if (count > 0) {
+                badge.setVisible(true);
+                badge.setNumber(count);
+                badge.setBackgroundColor(
+                        getResources().getColor(android.R.color.holo_red_dark));
+                badge.setBadgeTextColor(
+                        getResources().getColor(android.R.color.white));
+
+                pulseNavItem(nav, R.id.nav_transfers);
+            } else {
+                badge.setVisible(false);
+                badge.clearNumber();
+            }
+
+            Log.d(TAG, "✅ Transfers badge updated: " + count);
+        } catch (Exception e) {
+            Log.e(TAG, "updateTransfersBadge error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * تأثير نبض خفيف على أيقونة التنقل
+     */
+    private void pulseNavItem(BottomNavigationView nav, int itemId) {
+        try {
+            View itemView = null;
+            for (int i = 0; i < nav.getChildCount(); i++) {
+                View child = nav.getChildAt(i);
+                if (child instanceof com.google.android.material.navigation.NavigationBarItemView) {
+                    com.google.android.material.navigation.NavigationBarItemView navItem =
+                            (com.google.android.material.navigation.NavigationBarItemView) child;
+                    if (navItem.getItemData() != null && navItem.getItemData().getItemId() == itemId) {
+                        itemView = navItem;
+                        break;
                     }
+                }
+            }
+
+            if (itemView == null) return;
+
+            android.animation.ObjectAnimator scaleX = android.animation.ObjectAnimator
+                    .ofFloat(itemView, "scaleX", 1f, 1.15f, 1f);
+            android.animation.ObjectAnimator scaleY = android.animation.ObjectAnimator
+                    .ofFloat(itemView, "scaleY", 1f, 1.15f, 1f);
+
+            scaleX.setDuration(400);
+            scaleY.setDuration(400);
+            scaleX.setRepeatCount(1);
+            scaleY.setRepeatCount(1);
+            scaleX.start();
+            scaleY.start();
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * ✅ حفظ عدد التحويلات محلياً
+     */
+    private void saveTransfersCountLocally(int count) {
+        try {
+            getSharedPreferences(PREFS_TRANSFERS_BADGE, Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_LAST_TRANSFERS_COUNT, count)
+                    .apply();
+        } catch (Exception e) {
+            Log.w(TAG, "saveTransfersCountLocally error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ استعادة عدد التحويلات من الكاش المحلي
+     */
+    private int loadTransfersCountLocally() {
+        try {
+            return getSharedPreferences(PREFS_TRANSFERS_BADGE, Context.MODE_PRIVATE)
+                    .getInt(KEY_LAST_TRANSFERS_COUNT, 0);
+        } catch (Exception e) {
+            Log.w(TAG, "loadTransfersCountLocally error: " + e.getMessage());
+            return 0;
+        }
+    }
+                                }
