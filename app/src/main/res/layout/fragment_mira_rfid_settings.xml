@@ -9,47 +9,49 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="@dimen/screen_padding_h">
 
-        <!-- ==================== العنوان ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             العنوان الرئيسي
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="@string/pwd_settings_title"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="8dp" />
+            android:textAppearance="@style/TextAppearance.App.Headline.Small"
+            android:textColor="@color/text_gold_accent" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/space_6"
             android:text="@string/pwd_settings_subtitle"
-            android:textSize="14sp"
-            android:textColor="?android:attr/textColorSecondary"
-            android:layout_marginBottom="24dp" />
+            android:textAppearance="@style/TextAppearance.App.Body.Medium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
-        <!-- ==================== وضع كلمة المرور ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             بطاقة وضع كلمة المرور
+             ═══════════════════════════════════════════════════════ -->
         <com.google.android.material.card.MaterialCardView
+            style="@style/AppCardViewStyle.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardElevation="2dp"
-            app:cardCornerRadius="12dp">
+            android:layout_marginBottom="@dimen/space_4">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/space_4">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/space_3"
                     android:text="@string/pwd_mode_label"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="12dp" />
+                    android:textAppearance="@style/TextAppearance.App.Title.Small"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <RadioGroup
                     android:id="@+id/rgPasswordMode"
@@ -61,181 +63,186 @@
                         android:id="@+id/rbModeStatic"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:paddingVertical="@dimen/space_2"
                         android:text="@string/pwd_mode_static"
-                        android:paddingVertical="8dp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Large" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_8"
+                        android:layout_marginBottom="@dimen/space_2"
                         android:text="@string/pwd_mode_static_desc"
-                        android:textSize="12sp"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:layout_marginStart="32dp"
-                        android:layout_marginBottom="8dp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Small"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <!-- الوضع 2: مشتقة من TID -->
                     <RadioButton
                         android:id="@+id/rbModeDerived"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:paddingVertical="@dimen/space_2"
                         android:text="@string/pwd_mode_derived"
-                        android:paddingVertical="8dp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Large" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_8"
+                        android:layout_marginBottom="@dimen/space_2"
                         android:text="@string/pwd_mode_derived_desc"
-                        android:textSize="12sp"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:layout_marginStart="32dp"
-                        android:layout_marginBottom="8dp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Small"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <!-- الوضع 3: من السيرفر -->
                     <RadioButton
                         android:id="@+id/rbModeServer"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:paddingVertical="@dimen/space_2"
                         android:text="@string/pwd_mode_server"
-                        android:paddingVertical="8dp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Large" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_8"
                         android:text="@string/pwd_mode_server_desc"
-                        android:textSize="12sp"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:layout_marginStart="32dp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Small"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                 </RadioGroup>
-
             </LinearLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== حقل كلمة المرور ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             حقل كلمة المرور
+             ═══════════════════════════════════════════════════════ -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilPassword"
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="@dimen/space_4"
             android:hint="@string/pwd_field_hint"
             app:endIconMode="password_toggle"
-            app:helperText="@string/pwd_hint_8_hex"
-            app:boxStrokeColor="?attr/colorPrimary">
+            app:helperText="@string/pwd_hint_8_hex">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etPassword"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:digits="0123456789ABCDEFabcdef"
+                android:fontFamily="monospace"
                 android:inputType="textPassword"
                 android:maxLength="8"
-                android:digits="0123456789ABCDEFabcdef"
-                android:fontFamily="monospace" />
-
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- ==================== أزرار رئيسية ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             الأزرار الرئيسية
+             ═══════════════════════════════════════════════════════ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="@dimen/space_4"
+            android:orientation="horizontal">
 
-            <!-- ✅ أيقونة الحفظ: ic_menu_save (موجودة في @android) -->
+            <!-- زر الحفظ -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSavePassword"
+                style="@style/AppButtonStyle"
                 android:layout_width="0dp"
+                android:layout_height="@dimen/button_height"
+                android:layout_marginEnd="@dimen/space_2"
                 android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
                 android:text="@string/pwd_save"
                 app:icon="@android:drawable/ic_menu_save" />
 
-            <!-- ✅ أيقونة البحث: ic_menu_search (موجودة في @android) -->
+            <!-- زر الاختبار -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnTestPassword"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/AppButtonStyle.Outlined"
                 android:layout_width="0dp"
+                android:layout_height="@dimen/button_height"
                 android:layout_weight="1"
-                android:layout_height="wrap_content"
                 android:text="@string/pwd_test_on_tag"
                 app:icon="@android:drawable/ic_menu_search" />
-
         </LinearLayout>
 
-        <!-- ==================== إدارة Salt (نسخ احتياطي) ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             بطاقة إدارة Salt (نسخ احتياطي)
+             ═══════════════════════════════════════════════════════ -->
         <com.google.android.material.card.MaterialCardView
+            style="@style/AppCardViewStyle.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardElevation="1dp"
-            app:cardCornerRadius="12dp">
+            android:layout_marginBottom="@dimen/space_4">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/space_4">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/space_2"
                     android:text="@string/pwd_backup_title"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="8dp" />
+                    android:textAppearance="@style/TextAppearance.App.Title.Small"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/space_3"
                     android:text="@string/pwd_backup_desc"
-                    android:textSize="12sp"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:layout_marginBottom="12dp" />
+                    android:textAppearance="@style/TextAppearance.App.Body.Small"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
-                    <!-- ✅ تصدير: ic_menu_upload (موجودة في @android) -->
+                    <!-- زر التصدير -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnExportSalt"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        style="@style/AppButtonStyle.Text"
                         android:layout_width="0dp"
+                        android:layout_height="@dimen/button_height_sm"
+                        android:layout_marginEnd="@dimen/space_1"
                         android:layout_weight="1"
-                        android:layout_height="wrap_content"
                         android:text="@string/pwd_export_salt"
                         app:icon="@android:drawable/ic_menu_upload" />
 
-                    <!-- ✅ استيراد: ic_menu_save (بديل ic_menu_download غير الموجود) -->
+                    <!-- زر الاستيراد -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnImportSalt"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        style="@style/AppButtonStyle.Text"
                         android:layout_width="0dp"
+                        android:layout_height="@dimen/button_height_sm"
+                        android:layout_marginStart="@dimen/space_1"
                         android:layout_weight="1"
-                        android:layout_height="wrap_content"
                         android:text="@string/pwd_import_salt"
                         app:icon="@android:drawable/ic_menu_save" />
-
                 </LinearLayout>
-
             </LinearLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== منطقة الخطر (إعادة تعيين) ==================== -->
-        <!-- ✅ ic_menu_close_clear_cancel (موجودة في @android) -->
+        <!-- ═══════════════════════════════════════════════════════
+             منطقة الخطر: إعادة تعيين
+             ═══════════════════════════════════════════════════════ -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnResetAll"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
+            style="@style/AppButtonStyle.Text"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="@dimen/button_height_sm"
             android:text="@string/pwd_reset_all"
-            android:textColor="?attr/colorError"
+            android:textColor="@color/danger_500"
             app:icon="@android:drawable/ic_menu_close_clear_cancel"
-            app:iconTint="?attr/colorError" />
-
+            app:iconTint="@color/danger_500" />
     </LinearLayout>
-
 </ScrollView>
