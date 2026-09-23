@@ -10,211 +10,215 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:padding="@dimen/space_5">
 
-        <!-- Header -->
+        <!-- ═══════════════════════════════════════════════════════
+             Header
+             ═══════════════════════════════════════════════════════ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/space_5"
             android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:layout_marginBottom="20dp">
+            android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="@dimen/icon_lg"
+                android:layout_height="@dimen/icon_lg"
+                android:importantForAccessibility="no"
                 android:src="@drawable/ic_edit_profile"
-                app:tint="?attr/colorPrimary" />
+                app:tint="@color/text_gold_accent" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_3"
                 android:layout_weight="1"
-                android:layout_marginStart="10dp"
                 android:text="تعديل بيانات المنشأة"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.App.Title.Large"
+                android:textColor="?attr/colorOnSurface" />
         </LinearLayout>
 
-        <!-- ==================== القسم 1: المعلومات الأساسية ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             القسم 1: المعلومات الأساسية
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="📋 المعلومات الأساسية"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="@color/text_gold_accent" />
 
         <!-- اسم المنشأة بالعربي -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:hint="اسم المنشأة بالعربي *"
-            app:boxStrokeColor="?attr/colorPrimary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="اسم المنشأة بالعربي *">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditNameAr"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="text"
-                android:maxLines="1" />
+                android:textColor="?attr/colorOnSurface" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- اسم المنشأة بالإنجليزي -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:hint="Facility Name (English)"
-            app:boxStrokeColor="?attr/colorPrimary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="Facility Name (English)">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditNameEn"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="text"
-                android:maxLines="1" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- الشعار / Slogan -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:hint="الشعار (Slogan)"
-            app:boxStrokeColor="?attr/colorPrimary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="الشعار (Slogan)">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditSlogan"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="text"
-                android:maxLines="1" />
+                android:textColor="?attr/colorOnSurface" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- ==================== القسم 2: معلومات الاتصال ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             القسم 2: معلومات الاتصال
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginTop="@dimen/space_2"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="📞 معلومات الاتصال"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="@color/text_gold_accent" />
 
         <!-- رقم الهاتف -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="@dimen/space_3"
             android:hint="رقم الهاتف"
-            app:boxStrokeColor="?attr/colorPrimary"
-            app:prefixText="+"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            app:prefixText="+">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditPhone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="phone"
-                android:maxLines="1" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- البريد الإلكتروني -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:hint="البريد الإلكتروني"
-            app:boxStrokeColor="?attr/colorPrimary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="البريد الإلكتروني">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditEmail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textEmailAddress"
-                android:maxLines="1" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- العنوان -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:hint="العنوان"
-            app:boxStrokeColor="?attr/colorPrimary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="العنوان">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditAddress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPostalAddress"
-                android:maxLines="2" />
+                android:maxLines="2"
+                android:textColor="?attr/colorOnSurface" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- الموقع الإلكتروني -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="@dimen/space_3"
             android:hint="الموقع الإلكتروني"
-            app:boxStrokeColor="?attr/colorPrimary"
-            app:prefixText="https://"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            app:prefixText="https://">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditWebsite"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textUri"
-                android:maxLines="1" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- ==================== القسم 3: المعلومات القانونية ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             القسم 3: المعلومات القانونية
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginTop="@dimen/space_2"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="⚖️ المعلومات القانونية"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="@color/text_gold_accent" />
 
         <!-- الرقم الضريبي -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp"
-            android:hint="الرقم الضريبي"
-            app:boxStrokeColor="?attr/colorPrimary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            android:layout_marginBottom="@dimen/space_1"
+            android:hint="الرقم الضريبي">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditTax"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="text"
-                android:maxLines="1" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- ملاحظة الحقول الإلزامية -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginTop="@dimen/space_1"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="* الحقول المميزة بعلامة النجمة إلزامية"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="11sp" />
+            android:textAppearance="@style/TextAppearance.App.Label.Small"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
