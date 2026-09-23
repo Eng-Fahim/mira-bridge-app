@@ -225,7 +225,7 @@
     </style>
 
     <!-- ═══════════════════════════════════════════════════════════════
-         🔤 TEXT APPEARANCE (كانت في themes.xml الأصلي)
+         🔤 TEXT APPEARANCE
          ═══════════════════════════════════════════════════════════════ -->
     <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
@@ -256,7 +256,6 @@
         <item name="android:textSize">16sp</item>
     </style>
 
-    <!-- 🆕 إضافات جديدة (اختيارية - استخدمها للعناوين الكبيرة) -->
     <style name="AppTextAppearance.Display" parent="TextAppearance.Material3.DisplaySmall">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -327,30 +326,49 @@
         <item name="android:textStyle">bold</item>
         <item name="android:textSize">15sp</item>
     </style>
-    
-    <!-- ═══════════════════════════════════════════════════════
-     🎯 ICON BUTTON (Tonal) — للاستخدام في الـ FAB والأدوات
-     ═══════════════════════════════════════════════════════ -->
-<style name="AppButtonStyle.IconTonal" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
-    <item name="backgroundTint">@color/md_secondary_container</item>
-    <item name="iconTint">@color/md_on_secondary_container</item>
-    <item name="cornerRadius">@dimen/radius_full</item>
-    <item name="android:insetTop">0dp</item>
-    <item name="android:insetBottom">0dp</item>
-    <item name="android:minWidth">0dp</item>
-    <item name="android:minHeight">0dp</item>
-</style>
 
-<!-- 🎯 ICON BUTTON (Primary) — للأزرار الرئيسية -->
-<style name="AppButtonStyle.IconPrimary" parent="Widget.Material3.Button.IconButton.Filled">
-    <item name="backgroundTint">@color/md_primary</item>
-    <item name="iconTint">@color/md_on_primary</item>
-    <item name="cornerRadius">@dimen/radius_full</item>
-    <item name="android:insetTop">0dp</item>
-    <item name="android:insetBottom">0dp</item>
-    <item name="android:minWidth">0dp</item>
-    <item name="android:minHeight">0dp</item>
-</style>
+    <!-- 🎯 ICON BUTTON (Tonal) -->
+    <style name="AppButtonStyle.IconTonal" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
+        <item name="backgroundTint">@color/md_secondary_container</item>
+        <item name="iconTint">@color/md_on_secondary_container</item>
+        <item name="cornerRadius">@dimen/radius_full</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+    </style>
+
+    <!-- 🎯 ICON BUTTON (Primary) -->
+    <style name="AppButtonStyle.IconPrimary" parent="Widget.Material3.Button.IconButton.Filled">
+        <item name="backgroundTint">@color/md_primary</item>
+        <item name="iconTint">@color/md_on_primary</item>
+        <item name="cornerRadius">@dimen/radius_full</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+    </style>
+
+    <!-- Segmented Control -->
+    <style name="AppButtonStyle.Segmented" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">0dp</item>
+        <item name="strokeColor">@color/gold_500</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/text_gold_accent</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="iconTint">@color/text_gold_accent</item>
+    </style>
+
+    <!-- Success (لزر الاعتماد) -->
+    <style name="AppButtonStyle.Success" parent="AppButtonStyle">
+        <item name="backgroundTint">@color/success_500</item>
+        <item name="android:textColor">@color/pure_white</item>
+    </style>
 
     <!-- ═══════════════════════════════════════════════════════════════
          🎯 RADIO / CHECKBOX / CHIP / TAB
@@ -398,7 +416,7 @@
     </style>
 
     <!-- ═══════════════════════════════════════════════════════════════
-         🎯 NAV INDICATOR (اسم مختلف عن CustomActiveIndicator في styles.xml)
+         🎯 NAV INDICATOR
          ═══════════════════════════════════════════════════════════════ -->
     <style name="CustomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/state_layer_gold_hover</item>
