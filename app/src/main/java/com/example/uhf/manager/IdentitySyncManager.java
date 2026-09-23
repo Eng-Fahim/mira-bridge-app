@@ -751,8 +751,7 @@ public class IdentitySyncManager {
                             payload.put(META_SYNCED_AT, System.currentTimeMillis());
                             if (callback != null) callback.onItemSynced(i, totalCount, epc);
                         } else {
-                            String errorMsg = (response != null && response.error != null) ?
-                                    response.error : "Unknown error";
+                            String errorMsg = extractCleanErrorMessage(response);
                             payload.put(META_STATUS, STATUS_FAILED);
                             payload.put(META_LAST_ERROR, errorMsg);
                             // ✅ [إصلاح #17] جدول إعادة المحاولة التالية
@@ -870,8 +869,7 @@ public class IdentitySyncManager {
                     deleteSyncLog(id);
                     if (callback != null) callback.onSuccess(item.epc);
                 } else {
-                    String errorMsg = (response != null && response.error != null) ?
-                            response.error : "Unknown error";
+                    String errorMsg = extractCleanErrorMessage(response);
                     payload.put(META_STATUS, STATUS_FAILED);
                     payload.put(META_LAST_ERROR, errorMsg);
                     payload.put(META_NEXT_RETRY_AT,
@@ -1068,6 +1066,76 @@ public class IdentitySyncManager {
             return false;
         }
     }
+    
+    /**
+ * ✅ استخراج رسالة خطأ نظيفة من MiraApiClient.ApiResponse
+ * يدعم 4 أشكال:
+ * - response.data.error.message (عربي)
+ * - response.data.error.message_en (إنجليزي)
+ * - response.data.message (جذر)
+ * - response.error (نص مباشر)
+ */
+private String extractCleanErrorMessage(MiraApiClient.ApiResponse response) {
+    if (response == null) return "Unknown error";
+
+    // ✅ 1) response.data.error.message
+    if (response.data != null) {
+        try {
+            org.json.JSONObject errorObj = response.data.optJSONObject("error");
+            if (errorObj != null) {
+                String msgAr = errorObj.optString("message", "");
+                String msgEn = errorObj.optString("message_en", "");
+                String msg = msgAr.isEmpty() ? msgEn : msgAr;
+
+                // ✅ أضف suggestion
+                org.json.JSONObject details = errorObj.optJSONObject("details");
+                if (details != null) {
+                    String suggestion = details.optString("suggestion", "");
+                    if (!suggestion.isEmpty() && !msg.contains(suggestion)) {
+                        msg += "\n\n💡 " + suggestion;
+                    }
+                }
+                if (!msg.isEmpty()) return msg;
+            }
+
+            // ✅ 2) response.data.message (جذر)
+            String rootMsg = response.data.optString("message", "");
+            if (!rootMsg.isEmpty() && !rootMsg.startsWith("{")) {
+                return rootMsg;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "extractCleanErrorMessage: data parse error", e);
+        }
+    }
+
+    // ✅ 3) response.message
+    if (response.message != null && !response.message.isEmpty()
+            && !response.message.startsWith("{")) {
+        return response.message;
+    }
+
+    // ✅ 4) response.error (نص)
+    if (response.error != null && !response.error.isEmpty()
+            && !response.error.startsWith("{")) {
+        return response.error;
+    }
+
+    // ✅ 5) إذا كان error يحتوي JSON — حاول استخراجه
+    if (response.error != null && response.error.trim().startsWith("{")) {
+        try {
+            org.json.JSONObject json = new org.json.JSONObject(response.error);
+            org.json.JSONObject errorObj = json.optJSONObject("error");
+            if (errorObj != null) {
+                String msgAr = errorObj.optString("message", "");
+                String msgEn = errorObj.optString("message_en", "");
+                String msg = msgAr.isEmpty() ? msgEn : msgAr;
+                if (!msg.isEmpty()) return msg;
+            }
+        } catch (Exception ignored) {}
+    }
+
+    return "❌ فشل العملية";
+}
 
     private long calculateBackoffDelay(int attempts) {
         long delay = INITIAL_RETRY_DELAY_MS * (long) Math.pow(2, attempts);
