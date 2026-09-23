@@ -417,7 +417,7 @@ public class MiraApiClient {
     }
 
     // ==================== المُنفِّذ الموحَّد للطلبات ====================
-    private ApiResponse executeRequest(String method,
+    public ApiResponse executeRequest(String method,
                                        String endpoint,
                                        JSONObject payload,
                                        boolean requiresAuth,
@@ -2168,4 +2168,4 @@ public void refreshUrl() {
             return t;
         }
     }
-}
+    }
