@@ -261,7 +261,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     }
 }
 
-@@Override
+@Override
 public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
 
@@ -708,7 +708,14 @@ private void processRingEpc(final String code, final String source) {
 }
 
 /**
- * ✅ [إصلاح #27] toast واحد فقط
+ * ✅ parseItemResponse - الإصدار المُصحح النهائي
+ * 
+ * المنطق (نفس الكود القديم الذي كان يعمل):
+ * 1. يقرأ retail_price_local أولاً (الأدق للعرض المحلي)
+ * 2. إذا لم يوجد، يقرأ retail_price (الذي كان يعمل في القديم)
+ * 3. إذا لم يوجد، يقرأ retail_price_usd
+ * 4. إذا لم يوجد، يقرأ price (generic)
+ * 5. حماية إضافية: إذا كان السعر > 100 مليون، تجاهله
  */
 private void parseItemResponse(String code, JSONObject data) {
     try {
@@ -719,6 +726,9 @@ private void parseItemResponse(String code, JSONObject data) {
             updateCartSummary();
             return;
         }
+
+        // ✅ Logging للتشخيص (احذفه لاحقاً بعد التأكد)
+        Log.e(TAG, "🔥 RAW ITEM JSON: " + item.toString());
 
         String vaultStatus = item.optString("status",
                 item.optString("vault_status", "")).toLowerCase();
@@ -739,78 +749,103 @@ private void parseItemResponse(String code, JSONObject data) {
         double weight = item.optDouble("weight",
                 item.optDouble("gross_weight",
                         item.optDouble("gross_weight_grams", 0)));
-        // ✅ [إصلاح] استخراج السعر بشكل صريح مع التحقق
-double priceUSD = item.optDouble("retail_price_usd", 0);
-double priceLocal = item.optDouble("retail_price_local", 0);
-double priceLegacy = item.optDouble("retail_price", 0);
-double priceGeneric = item.optDouble("price", 0);
 
-// ✅ اختر السعر الأنسب (الأولوية للـ local ثم USD ثم legacy)
-double price = priceLocal > 0 ? priceLocal
-             : priceUSD > 0 ? priceUSD
-             : priceLegacy > 0 ? priceLegacy
-             : priceGeneric;
+        // ✅✅✅ [الإصلاح الجذري] - استخراج السعر بالترتيب الصحيح
+        // الأولوية: retail_price_local → retail_price → retail_price_usd → price
+        double priceLocal   = item.optDouble("retail_price_local", 0);
+        double priceMain    = item.optDouble("retail_price", 0);
+        double priceUSD     = item.optDouble("retail_price_usd", 0);
+        double priceGeneric = item.optDouble("price", 0);
 
-// ✅ Logging تفصيلي للتشخيص
-Log.d(TAG, "💰 PRICE PARSING for: " + title);
-Log.d(TAG, "   - retail_price_local = " + priceLocal);
-Log.d(TAG, "   - retail_price_usd = " + priceUSD);
-Log.d(TAG, "   - retail_price (legacy) = " + priceLegacy);
-Log.d(TAG, "   - price (generic) = " + priceGeneric);
-Log.d(TAG, "   ✅ SELECTED PRICE = " + price);
+        // ✅ Logging تفصيلي
+        Log.e(TAG, "💰 PRICE FIELDS for: " + title);
+        Log.e(TAG, "   - retail_price_local = " + priceLocal);
+        Log.e(TAG, "   - retail_price (main) = " + priceMain);
+        Log.e(TAG, "   - retail_price_usd = " + priceUSD);
+        Log.e(TAG, "   - price (generic) = " + priceGeneric);
 
-// ✅ [إصلاح] لا تحسب إلا إذا كان السعر صفراً فعلاً ووزن موجود
-if (price <= 0 && weight > 0 && priceManager != null) {
-    Log.w(TAG, "⚠️ Price is 0, calculating dynamically for " + title);
-    price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
-    Log.d(TAG, "   → Calculated price = " + price);
-}
+        // ✅ اختيار السعر بالترتيب: local → main → usd → generic
+        double price = 0;
+        String priceSource = "none";
 
-// ✅ حماية نهائية: إذا كان السعر لا يزال 0 أو سالباً
-if (price <= 0) {
-    Log.e(TAG, "🚨 CRITICAL: Price is still 0 for " + title + "! Item will be marked as unavailable.");
-    // ⚠️ لا تستخدم قيمة عشوائية، فقط اجعل السعر 0 والقطعة غير متاحة
-    // بدلاً من عرض رقم ضخم خاطئ
-}
+        // 1. الأولوية للـ retail_price_local
+        if (priceLocal > 0 && priceLocal < 100_000_000) {
+            price = priceLocal;
+            priceSource = "retail_price_local";
+        }
+        // 2. ثم retail_price (الذي كان يعمل في الكود القديم)
+        else if (priceMain > 0 && priceMain < 100_000_000) {
+            price = priceMain;
+            priceSource = "retail_price";
+        }
+        // 3. ثم retail_price_usd
+        else if (priceUSD > 0 && priceUSD < 100_000_000) {
+            price = priceUSD;
+            priceSource = "retail_price_usd";
+        }
+        // 4. ثم price (generic)
+        else if (priceGeneric > 0 && priceGeneric < 100_000_000) {
+            price = priceGeneric;
+            priceSource = "price";
+        }
+        // 5. إذا كانت كل القيم ضخمة (> 100M)، فهي أكواد EPC وليست أسعار
+        else {
+            Log.e(TAG, "🚨 ALL PRICE FIELDS ARE INVALID OR SUSPICIOUS!");
+            Log.e(TAG, "   priceLocal=" + priceLocal 
+                + ", priceMain=" + priceMain 
+                + ", priceUSD=" + priceUSD 
+                + ", priceGeneric=" + priceGeneric);
+            price = 0;
+            priceSource = "invalid";
+        }
 
+        Log.e(TAG, "   ✅ SELECTED PRICE = " + price + " (from: " + priceSource + ")");
+
+        // ✅ حساب ديناميكي إذا كان السعر 0
+        if (price <= 0 && weight > 0 && priceManager != null) {
+            Log.w(TAG, "⚠️ Price is 0, calculating dynamically for " + title);
+            price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
+            Log.e(TAG, "   → Calculated price = " + price);
+        }
+
+        // ✅ بناء CartItem
         CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
-        price, isAvailable, vaultStatus.toUpperCase());
+                price, isAvailable, vaultStatus.toUpperCase());
 
-// ✅ استخراج مرن — يدعم كل الأسماء الممكنة
-cartItem.serialNo = extractString(item,
-        "serial", "serial_number", "serialNo", "sn");
-cartItem.gtin = extractString(item,
-        "gtin", "gtin13", "barcode", "code");
-cartItem.location = extractString(item,
-        "location", "current_location", "zone");
+        // ✅ استخراج مرن — يدعم كل الأسماء الممكنة
+        cartItem.serialNo = extractString(item,
+                "serial", "serial_number", "serialNo", "sn");
+        cartItem.gtin = extractString(item,
+                "gtin", "gtin13", "barcode", "code");
+        cartItem.location = extractString(item,
+                "location", "current_location", "zone");
 
-// ✅ استخراج item_id
-cartItem.itemId = item.optInt("id",
-        item.optInt("item_id",
-                item.optInt("product_id", 0)));
+        // ✅ استخراج item_id
+        cartItem.itemId = item.optInt("id",
+                item.optInt("item_id",
+                        item.optInt("product_id", 0)));
 
-// ✅ حفظ TID (إذا وُجد)
-String tid = extractString(item,
-        "tid", "tag_tid", "rfid_tid");
-if (!tid.isEmpty() && cartItem.serialNo.isEmpty()) {
-    // إذا لم يوجد serial، استخدم tid
-    cartItem.serialNo = tid;
-}
+        // ✅ حفظ TID (إذا وُجد)
+        String tid = extractString(item,
+                "tid", "tag_tid", "rfid_tid");
+        if (!tid.isEmpty() && cartItem.serialNo.isEmpty()) {
+            cartItem.serialNo = tid;
+        }
 
-// ✅ حفظ EPC الأصلي إذا وُجد
-String rfidEpc = extractString(item,
-        "rfid_epc", "epc_final");
-if (!rfidEpc.isEmpty()) {
-    // استخدم EPC الفعلي
-    cartItem.epc = rfidEpc;
-}
+        // ✅ حفظ EPC الأصلي إذا وُجد
+        String rfidEpc = extractString(item,
+                "rfid_epc", "epc_final");
+        if (!rfidEpc.isEmpty()) {
+            cartItem.epc = rfidEpc;
+        }
 
-Log.d(TAG, "📍 Parsed cart item: " +
-        "epc=" + cartItem.epc +
-        ", serial=" + cartItem.serialNo +
-        ", gtin=" + cartItem.gtin +
-        ", tid=" + tid +
-        ", item_id=" + cartItem.itemId);
+        Log.e(TAG, "📍 Parsed cart item: " +
+                "epc=" + cartItem.epc +
+                ", serial=" + cartItem.serialNo +
+                ", gtin=" + cartItem.gtin +
+                ", tid=" + tid +
+                ", item_id=" + cartItem.itemId +
+                ", price=" + cartItem.price);
 
         boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo,
                 cartItem.gtin);
@@ -847,7 +882,7 @@ Log.d(TAG, "📍 Parsed cart item: " +
             showToast(isArabic ? "✅ تمت الإضافة: " + title : "✅ Added: " + title);
         });
     } catch (Exception e) {
-        Log.e(TAG, "Parse error: " + e.getMessage());
+        Log.e(TAG, "Parse error: " + e.getMessage(), e);
         showToast(isArabic ? "❌ خطأ في معالجة القطعة" : "❌ Error processing item");
         updateCartSummary();
     }
