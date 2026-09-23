@@ -26,6 +26,7 @@ import android.graphics.Typeface;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
+import android.content.SharedPreferences;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -208,13 +209,48 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         MiraLanguageHelper.applyLanguage(newBase, savedLang);
         super.attachBaseContext(newBase);
     }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    
+    /**
+ * ✅ قراءة الثيم المحفوظ وتطبيقه
+ */
+private void applySavedTheme() {
+    try {
+        SharedPreferences prefs = getSharedPreferences("app_theme", Context.MODE_PRIVATE);
+        int savedMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        
+        int currentMode = AppCompatDelegate.getDefaultNightMode();
+        
+        if (currentMode != savedMode) {
+            Log.d(TAG, "Applying saved theme: " + modeToString(savedMode));
+            AppCompatDelegate.setDefaultNightMode(savedMode);
+        } else {
+            Log.d(TAG, "Theme already correct: " + modeToString(savedMode));
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "applySavedTheme error: " + e.getMessage());
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        super.onCreate(savedInstanceState);
+    }
+}
 
-        try {
+/**
+ * ✅ تحويل mode إلى نص للتشخيص
+ */
+private String modeToString(int mode) {
+    switch (mode) {
+        case AppCompatDelegate.MODE_NIGHT_NO: return "LIGHT";
+        case AppCompatDelegate.MODE_NIGHT_YES: return "DARK";
+        case AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM: return "SYSTEM";
+        default: return "UNKNOWN(" + mode + ")";
+    }
+}
+    
+    @Override
+protected void onCreate(Bundle savedInstanceState) {
+    // ✅✅✅ قراءة الثيم المحفوظ (بدلاً من التصفير)
+    applySavedTheme();
+    
+    super.onCreate(savedInstanceState);
+    try {
             sessionManager = new SessionManager(getApplicationContext());
             if (!sessionManager.isLoggedIn()) {
                 navigateToLogin();
