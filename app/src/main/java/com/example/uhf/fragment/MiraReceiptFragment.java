@@ -153,12 +153,9 @@ public class MiraReceiptFragment extends DialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // ✅ دوال مساعدة آمنة لقراءة JSON
+    // دوال مساعدة آمنة لقراءة JSON
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * ✅ استخراج نص آمن (يتجاهل null, "null", "", JSONObject.NULL)
-     */
     private String safeString(JSONObject obj, String key, String defaultValue) {
         if (obj == null || key == null) return defaultValue;
         try {
@@ -174,9 +171,6 @@ public class MiraReceiptFragment extends DialogFragment {
         }
     }
 
-    /**
-     * ✅ إيجاد أول قيمة غير فارغة من مجموعة مفاتيح
-     */
     private String findFirstNonEmpty(JSONObject obj, String... keys) {
         if (obj == null || keys == null) return "—";
         for (String key : keys) {
@@ -188,9 +182,6 @@ public class MiraReceiptFragment extends DialogFragment {
         return "—";
     }
 
-    /**
-     * ✅ استخراج رقم آمن (يدعم Number و String)
-     */
     private double safeDouble(JSONObject obj, String key, double defaultValue) {
         if (obj == null || key == null) return defaultValue;
         try {
@@ -207,9 +198,21 @@ public class MiraReceiptFragment extends DialogFragment {
         }
     }
 
-    /**
-     * ✅ تنسيق آمن للسعر
-     */
+    private boolean safeBoolean(JSONObject obj, String key, boolean defaultValue) {
+        if (obj == null || key == null) return defaultValue;
+        try {
+            Object val = obj.opt(key);
+            if (val == null || val == JSONObject.NULL) return defaultValue;
+            if (val instanceof Boolean) return (Boolean) val;
+            String s = String.valueOf(val).trim().toLowerCase();
+            if ("true".equals(s) || "1".equals(s) || "yes".equals(s)) return true;
+            if ("false".equals(s) || "0".equals(s) || "no".equals(s)) return false;
+            return defaultValue;
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
     private String safeFormatPrice(double amount) {
         try {
             if (priceManager != null) {
@@ -222,6 +225,15 @@ public class MiraReceiptFragment extends DialogFragment {
         } catch (Exception e) {
             return String.format(Locale.US, "%,.2f", amount);
         }
+    }
+
+    private String escapeHtml(String input) {
+        if (input == null) return "";
+        return input.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+                    .replace("'", "&#39;");
     }
 
     // ═══════════════════════════════════════════════════════
@@ -398,7 +410,7 @@ public class MiraReceiptFragment extends DialogFragment {
          .append(".warranty-box { font-size: 10px; font-weight: bold; text-align: center; margin: 10px 0; padding: 6px; border-radius: 6px; border: 1px dashed #38a169; background: #f0fff4; color: #22543d; }")
          .append(".footer-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; }")
          .append(".qr-box { text-align: center; }")
-         .append(".qr-box img { width: 80dp; height: 80dp; border: 1px solid #e2e8f0; padding: 2px; border-radius: 4px; }")
+         .append(".qr-box img { width: 80px; height: 80px; border: 1px solid #e2e8f0; padding: 2px; border-radius: 4px; }")
          .append(".signatures { display: flex; gap: 20px; }")
          .append(".sig-box { text-align: center; width: 100px; font-size: 9px; font-weight: bold; color: #4a5568; }")
          .append(".sig-line { border-top: 1px solid #a0aec0; margin-top: 30px; padding-top: 3px; }")
@@ -415,7 +427,6 @@ public class MiraReceiptFragment extends DialogFragment {
             JSONObject customerObj = t.optJSONObject("customer");
             JSONObject paymentObj = t.optJSONObject("payment");
 
-            // ✅ قراءة آمنة للبيانات الأساسية
             String sellerName = findFirstNonEmpty(t, "seller_name", "seller", "cashier_name", "created_by");
             if ("—".equals(sellerName)) sellerName = "—";
 
@@ -429,7 +440,7 @@ public class MiraReceiptFragment extends DialogFragment {
             if (branchName.isEmpty()) branchName = isArabic ? "الفرع الرئيسي" : "Main Branch";
 
             String saleNumber = findFirstNonEmpty(t, "sale_number", "invoice_number", "receipt_number", "id");
-            String dateStr = findFirstNonEmpty(t, "timestamp", "created_at");
+            String dateStr = findFirstNonEmpty(t, "timestamp", "created_at", "sale_date");
             if ("—".equals(dateStr)) {
                 dateStr = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date());
             }
@@ -447,7 +458,7 @@ public class MiraReceiptFragment extends DialogFragment {
 
             String currency = safeString(t, "currency",
                     paymentObj != null ? safeString(paymentObj, "currency_code", "") : "");
-            if (currency.isEmpty() && priceManager != null) currency = priceManager.getCurrencySymbol("YER");
+            if (currency.isEmpty() && priceManager != null) currency = priceManager.getDefaultCurrency();
             if (currency.isEmpty()) currency = defaultCurrency;
 
             String currencyName = paymentObj != null ? safeString(paymentObj, "currency_name", "") : "";
@@ -459,12 +470,26 @@ public class MiraReceiptFragment extends DialogFragment {
                 }
             }
 
+            // ✅ قراءة exchange_rate
             double exchangeRate = safeDouble(t, "exchange_rate",
-                    paymentObj != null ? safeDouble(paymentObj, "exchange_rate", 1.0) : 1.0);
-            if (priceManager != null && exchangeRate == 1.0) {
-                try { exchangeRate = priceManager.getExchangeRate(currency); } catch (Exception ignored) {}
+                    paymentObj != null ? safeDouble(paymentObj, "exchange_rate", 0) : 0);
+
+            if (exchangeRate <= 1.0 && priceManager != null) {
+                try {
+                    double pmRate = priceManager.getExchangeRate(currency);
+                    if (pmRate > 1.0) {
+                        exchangeRate = pmRate;
+                        Log.d(TAG, "✅ exchangeRate from priceManager: " + exchangeRate);
+                    }
+                } catch (Exception ignored) {}
             }
-            if (exchangeRate <= 0) exchangeRate = 1.0;
+
+            if (exchangeRate <= 1.0) {
+                exchangeRate = 530.0;
+                Log.d(TAG, "⚠️ exchangeRate fallback to 530");
+            }
+
+            Log.d(TAG, "💱 Final exchange rate: " + exchangeRate + " for " + currency);
 
             String refundStatus = findFirstNonEmpty(t, "refund_status", "status");
             if ("—".equals(refundStatus)) refundStatus = "completed";
@@ -472,7 +497,7 @@ public class MiraReceiptFragment extends DialogFragment {
             boolean isFullyRefunded = "refunded".equals(refundStatus) || "fully_refunded".equals(refundStatus);
             boolean isPartiallyRefunded = "partially_refunded".equals(refundStatus);
 
-            // Header
+            // ═══ Header ═══
             h.append("<div class='header'>")
              .append("<div class='brand-box'>")
              .append("<div class='org-name'>").append(escapeHtml(orgName)).append("</div>")
@@ -482,7 +507,7 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("</div>")
              .append("</div>");
 
-            // Title Bar
+            // ═══ Title Bar ═══
             String titleText = isFullyRefunded ? (isArabic ? "🔄 سند مرتجع مبيعات كلي" : "FULL RETURN INVOICE") :
                                isPartiallyRefunded ? (isArabic ? "⚠️ سند مرتجع مبيعات جزئي" : "PARTIAL RETURN INVOICE") :
                                (isArabic ? "🧾 سند بيع مجوهرات" : "JEWELRY INVOICE");
@@ -498,7 +523,7 @@ public class MiraReceiptFragment extends DialogFragment {
                 h.append("<div class='refund-alert'>🚨 تنبيه: هذه الفاتورة مرتجعة بالكامل والمبلغ مرجع للعميل.</div>");
             }
 
-            // Info Grid
+            // ═══ Info Grid ═══
             h.append("<div class='info-grid'><table>")
              .append("<tr>")
              .append("<td class='label'>").append(isArabic ? "اسم العميل:" : "Customer:").append("</td><td class='value'>").append(escapeHtml(customer)).append("</td>")
@@ -511,7 +536,7 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'>").append(escapeHtml(branchName)).append("</td>")
              .append("</tr></table></div>");
 
-            // Items
+            // ═══ Items ═══
             JSONArray items = t.optJSONArray("items");
             if (items == null) items = t.optJSONArray("sold_items");
             if (items == null) items = t.optJSONArray("products");
@@ -525,7 +550,7 @@ public class MiraReceiptFragment extends DialogFragment {
                  .append("<th>").append(isArabic ? "الرقم التسلسلي / RFID" : "Serial / Tag").append("</th>")
                  .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>")
                  .append("<th>").append(isArabic ? "الوزن (جرام)" : "Weight (g)").append("</th>")
-                 .append("<th>").append(isArabic ? "المجوهرات / الصياغة" : "Labor/Stone").append("</th>")
+                 .append("<th>").append(isArabic ? "الصياغة" : "Labor").append("</th>")
                  .append("<th>").append(isArabic ? "الإجمالي" : "Total").append("</th>")
                  .append("</tr></thead><tbody>");
 
@@ -549,7 +574,6 @@ public class MiraReceiptFragment extends DialogFragment {
                                           safeDouble(it, "sale_price",
                                           safeDouble(it, "price", 0)));
 
-                    // ✅ قراءة آمنة لرقم القطعة (Serial / RFID / EPC / Barcode)
                     String serial = findFirstNonEmpty(it,
                             "serial_number",
                             "serial_no",
@@ -590,39 +614,99 @@ public class MiraReceiptFragment extends DialogFragment {
                 h.append("</tbody></table>");
             }
 
-            // Totals
+            // ═══ Totals ═══
             double subtotalUSD = safeDouble(t, "subtotal_usd",
-                    paymentObj != null ? safeDouble(paymentObj, "subtotal_usd", 0) : safeDouble(t, "subtotal", 0));
-            double discountUSD = safeDouble(t, "discount_amount_usd",
-                    paymentObj != null ? safeDouble(paymentObj, "discount_amount_usd", 0) : safeDouble(t, "discount", 0));
-            double finalUSD = safeDouble(t, "final_amount_usd",
-                    paymentObj != null ? safeDouble(paymentObj, "final_amount_usd", subtotalUSD - discountUSD) : (subtotalUSD - discountUSD));
-            double finalLocal = safeDouble(t, "final_amount_local",
-                    paymentObj != null ? safeDouble(paymentObj, "final_amount_local", finalUSD * exchangeRate) : finalUSD * exchangeRate);
+                    paymentObj != null ? safeDouble(paymentObj, "subtotal_usd",
+                    safeDouble(t, "subtotal", 0)) : safeDouble(t, "subtotal", 0));
 
-            h.append("<div class='summary-container'>")
-             .append("<div class='notes-box'>")
+            double discountUSD = safeDouble(t, "discount_amount_usd",
+                    safeDouble(t, "discount_usd",
+                    paymentObj != null ? safeDouble(paymentObj, "discount_amount_usd",
+                    safeDouble(t, "discount", 0)) : safeDouble(t, "discount", 0)));
+
+            double finalUSD = safeDouble(t, "final_amount_usd",
+                    safeDouble(t, "total_amount_usd",
+                    safeDouble(t, "total_usd",
+                    paymentObj != null ? safeDouble(paymentObj, "final_amount_usd",
+                    subtotalUSD - discountUSD) : (subtotalUSD - discountUSD))));
+
+            double finalLocal = safeDouble(t, "final_amount",
+                    safeDouble(t, "total_amount",
+                    safeDouble(t, "final_amount_local",
+                    safeDouble(t, "total",
+                    paymentObj != null ? safeDouble(paymentObj, "final_amount",
+                    paymentObj != null ? safeDouble(paymentObj, "final_amount_local", 0) : 0) : 0))));
+
+            if (finalLocal <= 0 && finalUSD > 0) {
+                finalLocal = finalUSD * exchangeRate;
+                Log.d(TAG, "⚠️ finalLocal calculated: " + finalLocal + " = " + finalUSD + " × " + exchangeRate);
+            }
+
+            h.append("<div class='summary-container'>");
+
+            // ✅ Notes box
+            h.append("<div class='notes-box'>")
              .append("<b>📌 ").append(isArabic ? "ملاحظات وإرشادات الضمان:" : "Terms & Conditions:").append("</b><br>")
              .append("1. ").append(isArabic ? "المجوهرات المباعة مضمونة من عيوب التصنيع لمدة عام كامل." : "Jewelry guaranteed against defects for 1 year.").append("<br>")
              .append("2. ").append(isArabic ? "عند إعادة البيع أو الاستبدال يجب إحضار هذا السند الأصلي." : "Original invoice required for resale or exchange.").append("<br>")
              .append("3. ").append(isArabic ? "صافي الوزن المباع المتبقي: " : "Net Active Weight: ").append("<b>").append(String.format(Locale.US, "%.3f g", totalWeightSum)).append("</b>")
-             .append("</div>")
+             .append("</div>");
 
-             .append("<div class='totals-box'><table class='totals-table'>")
-             .append("<tr><td class='label'>").append(isArabic ? "المبلغ الإجمالي:" : "Subtotal:").append("</td><td class='value' style='text-align:left;'>").append(safeFormatPrice(subtotalUSD)).append("</td></tr>");
+            // ✅ Totals box
+            h.append("<div class='totals-box'><table class='totals-table'>");
 
+            // ✅ Subtotal
+            h.append("<tr><td class='label'>")
+             .append(isArabic ? "المبلغ الإجمالي:" : "Subtotal:")
+             .append("</td><td class='value' style='text-align:left;'>")
+             .append(safeFormatPrice(subtotalUSD))
+             .append("</td></tr>");
+
+            // ✅ Discount
             if (discountUSD > 0) {
-                h.append("<tr><td class='label'>").append(isArabic ? "الخصم الممنوح:" : "Discount:").append("</td><td class='value' style='text-align:left; color:#e53e3e;'>- ").append(safeFormatPrice(discountUSD)).append("</td></tr>");
+                h.append("<tr><td class='label'>")
+                 .append(isArabic ? "الخصم الممنوح:" : "Discount:")
+                 .append("</td><td class='value' style='text-align:left; color:#e53e3e;'>- ")
+                 .append(safeFormatPrice(discountUSD))
+                 .append("</td></tr>");
             }
 
-            h.append("<tr class='grand-total'><td class='label' style='color:#0d1b2a;'>").append(isArabic ? "💰 الصافي المستحق:" : "💰 Net Total:").append("</td><td class='value' style='text-align:left; color:#0d1b2a;'>").append(safeFormatPrice(finalUSD)).append("</td></tr>")
-             .append("</table></div></div>");
+            // ✅ Grand Total
+            String displayAmount;
+            String displayCurrencyLabel;
 
-            // Tafqeet
+            if (finalLocal > 0 && Math.abs(finalLocal - finalUSD) > 0.01) {
+                displayAmount = String.format(Locale.US, "%,.2f", finalLocal);
+                displayCurrencyLabel = currency;
+            } else {
+                displayAmount = String.format(Locale.US, "%,.2f", finalUSD);
+                displayCurrencyLabel = "USD";
+            }
+
+            Log.d(TAG, "💵 Display amount: " + displayAmount + " " + displayCurrencyLabel
+                    + " (finalLocal=" + finalLocal + ", finalUSD=" + finalUSD + ")");
+
+            h.append("<tr class='grand-total'><td class='label' style='color:#0d1b2a;'>")
+             .append(isArabic ? "💰 الصافي المستحق:" : "💰 Net Total:")
+             .append("</td><td class='value' style='text-align:left; color:#0d1b2a;'>")
+             .append(displayAmount)
+             .append(" <span style='font-size:11px; color:#c59b27;'>")
+             .append(displayCurrencyLabel)
+             .append("</span>")
+             .append("</td></tr>");
+
+            // ✅ Close totals table + summary container
+            h.append("</table></div></div>");
+
+            // ═══ Tafqeet ═══
             if (finalUSD > 0 || finalLocal > 0) {
                 try {
-                    boolean isLocal = "YER".equalsIgnoreCase(currency) || "SAR".equalsIgnoreCase(currency) || "AED".equalsIgnoreCase(currency);
-                    String amountInWords = ArabicNumberToWords.convert(isLocal ? finalLocal : finalUSD, currencyName);
+                    boolean isLocal = "YER".equalsIgnoreCase(currency)
+                            || "SAR".equalsIgnoreCase(currency)
+                            || "AED".equalsIgnoreCase(currency);
+                    double amountForWords = isLocal && finalLocal > 0 ? finalLocal : finalUSD;
+
+                    String amountInWords = ArabicNumberToWords.convert(amountForWords, currencyName);
 
                     h.append("<div class='tafqeet-box'>")
                      .append("<b>").append(isArabic ? "مبلغ الفاتورة كتابةً: " : "Amount in words: ").append("</b>")
@@ -633,12 +717,12 @@ public class MiraReceiptFragment extends DialogFragment {
                 }
             }
 
-            // Warranty
+            // ═══ Warranty ═══
             h.append("<div class='warranty-box'>")
              .append("🛡️ ").append(isArabic ? "سند موثق برقم تسلسلي مع الضمان المالي والتصنيعي للمجوهرات" : "Certified Gold & Jewelry Transaction Guarantee")
              .append("</div>");
 
-            // Footer
+            // ═══ Footer ═══
             String qrData = Uri.encode("Org:" + orgName + "|Invoice:" + saleNumber + "|Total:" + finalUSD + "|Weight:" + totalWeightSum + "g");
             String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
 
@@ -666,36 +750,6 @@ public class MiraReceiptFragment extends DialogFragment {
          .append("</div></body></html>");
 
         webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
-    }
-
-    /**
-     * ✅ استخراج Boolean آمن
-     */
-    private boolean safeBoolean(JSONObject obj, String key, boolean defaultValue) {
-        if (obj == null || key == null) return defaultValue;
-        try {
-            Object val = obj.opt(key);
-            if (val == null || val == JSONObject.NULL) return defaultValue;
-            if (val instanceof Boolean) return (Boolean) val;
-            String s = String.valueOf(val).trim().toLowerCase();
-            if ("true".equals(s) || "1".equals(s) || "yes".equals(s)) return true;
-            if ("false".equals(s) || "0".equals(s) || "no".equals(s)) return false;
-            return defaultValue;
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    /**
-     * ✅ Escape HTML لمنع كسر الصفحة
-     */
-    private String escapeHtml(String input) {
-        if (input == null) return "";
-        return input.replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                    .replace("\"", "&quot;")
-                    .replace("'", "&#39;");
     }
 
     private void closeFragment() {
