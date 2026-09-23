@@ -230,13 +230,15 @@ if (radioThemeGroup != null) {
         Log.i(TAG, "Theme changing: " + currentMode + " → " + newMode);
 
         // 1) احفظ
-        saveThemePreferenceSync(newMode);
+saveThemePreferenceSync(newMode);
 
-        // 2) طبّق
-        AppCompatDelegate.setDefaultNightMode(newMode);
+// 2) طبّق
+AppCompatDelegate.setDefaultNightMode(newMode);
 
-        // 3) إشعار
-        showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
+// ✅ 3) تأكد من الحفظ قبل recreate
+try {
+    Thread.sleep(50);   // ← نمنح commit وقتاً للكتابة
+} catch (InterruptedException ignored) {}
 
         // 4) ✅ أعِد إنشاء الـ Activity
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
