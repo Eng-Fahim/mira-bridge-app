@@ -698,69 +698,127 @@ if (btnGenerateReport != null) {
     }
 
     private void setupSegmentedControl() {
-        if (segmentedModes == null) return;
+    if (segmentedModes == null) return;
 
-        segmentedModes.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-            if (!isChecked) return;
+    // ✅ نمط الزر النشط/غير النشط
+    int activeBg = ContextCompat.getColor(requireContext(), R.color.gold_500);
+    int inactiveBg = ContextCompat.getColor(requireContext(), R.color.pure_white);
+    int activeText = ContextCompat.getColor(requireContext(), R.color.pure_white);
+    int inactiveText = ContextCompat.getColor(requireContext(), R.color.text_gold_accent);
 
-            if (checkedId == R.id.btnModeFull) {
-                selectedCategoryFilter = null;
-                Log.d(TAG, "Mode: Full");
-                if (!isScanning && scannedItemsDisplayList.isEmpty()) {
-                    showToast(isArabic ? "🎯 جاهز للجرد الكامل"
-                                       : "🎯 Ready for Full Inventory");
-                }
-            } else if (checkedId == R.id.btnModeCategory) {
-                if (isScanning) {
-                    new MaterialAlertDialogBuilder(requireContext())
-                            .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" : "⚠️ Inventory Running")
-                            .setMessage(isArabic ?
-                                    "لتغيير الفئة، يجب إيقاف الجرد الحالي.\nهل تريد المتابعة؟" :
-                                    "To change category, stop the current inventory.\nContinue?")
-                            .setPositiveButton(isArabic ? "إيقاف ومتابعة" : "Stop & Continue",
-                                    (d, w) -> {
-                                        stopScanning();
-                                        mainHandler.postDelayed(
-                                                this::showCategorySelectionDialog, 500);
-                                    })
-                            .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
-                                    (d, w) -> {
-                                        if (segmentedModes != null && btnModeFull != null) {
-                                            segmentedModes.check(R.id.btnModeFull);
-                                        }
-                                    })
-                            .show();
-                } else {
-                    showCategorySelectionDialog();
-                }
-            } else if (checkedId == R.id.btnModeBlind) {
-                selectedCategoryFilter = null;
-                if (!isScanning) {
-                    startBlindInventory();
-                } else {
-                    new MaterialAlertDialogBuilder(requireContext())
-                            .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" : "⚠️ Inventory Running")
-                            .setMessage(isArabic ?
-                                    "هل تريد إيقاف الجرد الحالي وبدء الجرد الأعمى؟" :
-                                    "Stop current inventory and start blind inventory?")
-                            .setPositiveButton(isArabic ? "متابعة" : "Continue",
-                                    (d, w) -> {
-                                        stopScanning();
-                                        mainHandler.postDelayed(
-                                                this::startBlindInventory, 500);
-                                    })
-                            .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
-                                    (d, w) -> {
-                                        if (segmentedModes != null && btnModeFull != null) {
-                                            segmentedModes.check(R.id.btnModeFull);
-                                        }
-                                    })
-                            .show();
-                }
+    // ✅ تحديث ألوان كل الأزرار بناءً على الزر النشط
+    Runnable updateStyles = new Runnable() {
+        @Override
+        public void run() {
+            int checkedId = segmentedModes.getCheckedButtonId();
+            MaterialButton[] buttons = {btnModeFull, btnModeCategory, btnModeBlind};
+            
+            for (MaterialButton btn : buttons) {
+                if (btn == null) continue;
+                boolean isActive = btn.getId() == checkedId;
+                
+                btn.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(
+                                isActive ? activeBg : inactiveBg));
+                btn.setTextColor(isActive ? activeText : inactiveText);
+                btn.setIconTint(
+                        android.content.res.ColorStateList.valueOf(
+                                isActive ? activeText : inactiveText));
             }
-        });
-    }
+        }
+    };
 
+    // ✅ تحديث فوري للزر النشط الافتراضي
+    mainHandler.post(updateStyles);
+
+    // ✅ مستمع التغيير
+    segmentedModes.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+        if (!isChecked) return;
+
+        // تحديث الألوان أولاً
+        updateStyles.run();
+
+        // ✅ منطق كل وضع
+        if (checkedId == R.id.btnModeFull) {
+            selectedCategoryFilter = null;
+            Log.d(TAG, "Mode: Full");
+            if (!isScanning && scannedItemsDisplayList.isEmpty()) {
+                showToast(isArabic ? "🎯 جاهز للجرد الكامل"
+                                   : "🎯 Ready for Full Inventory");
+            }
+        } else if (checkedId == R.id.btnModeCategory) {
+            if (isScanning) {
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" : "⚠️ Inventory Running")
+                        .setMessage(isArabic ?
+                                "لتغيير الفئة، يجب إيقاف الجرد الحالي.\nهل تريد المتابعة؟" :
+                                "To change category, stop the current inventory.\nContinue?")
+                        .setPositiveButton(isArabic ? "إيقاف ومتابعة" : "Stop & Continue",
+                                (d, w) -> {
+                                    stopScanning();
+                                    mainHandler.postDelayed(
+                                            this::showCategorySelectionDialog, 500);
+                                })
+                        .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
+                                (d, w) -> {
+                                    if (segmentedModes != null && btnModeFull != null) {
+                                        segmentedModes.check(R.id.btnModeFull);
+                                    }
+                                })
+                        .show();
+            } else {
+                showCategorySelectionDialog();
+            }
+        } else if (checkedId == R.id.btnModeBlind) {
+            selectedCategoryFilter = null;
+            if (!isScanning) {
+                startBlindInventory();
+            } else {
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" : "⚠️ Inventory Running")
+                        .setMessage(isArabic ?
+                                "هل تريد إيقاف الجرد الحالي وبدء الجرد الأعمى؟" :
+                                "Stop current inventory and start blind inventory?")
+                        .setPositiveButton(isArabic ? "متابعة" : "Continue",
+                                (d, w) -> {
+                                    stopScanning();
+                                    mainHandler.postDelayed(
+                                            this::startBlindInventory, 500);
+                                })
+                        .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
+                                (d, w) -> {
+                                    if (segmentedModes != null && btnModeFull != null) {
+                                        segmentedModes.check(R.id.btnModeFull);
+                                    }
+                                })
+                        .show();
+            }
+        }
+    });
+}
+
+
+/**
+ * ✅ تحريك الأرقام بنعومة (Count Up)
+ */
+private void animateCount(TextView textView, int from, int to) {
+    if (textView == null || from == to) {
+        if (textView != null) textView.setText(String.valueOf(to));
+        return;
+    }
+    try {
+        android.animation.ValueAnimator animator =
+                android.animation.ValueAnimator.ofInt(from, to);
+        animator.setDuration(400);
+        animator.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        animator.addUpdateListener(animation ->
+                textView.setText(String.valueOf(animation.getAnimatedValue()))
+        );
+        animator.start();
+    } catch (Exception e) {
+        textView.setText(String.valueOf(to));
+    }
+}
     // ==================== Print Manager Callback ====================
 
     private void setupPrintManagerCallback() {
