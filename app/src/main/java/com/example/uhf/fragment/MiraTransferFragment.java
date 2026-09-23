@@ -37,6 +37,16 @@ import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.SecureSessionManager;
 import com.example.uhf.api.MiraApiClient;
 
+import com.example.uhf.scanner.UnifiedScanManager;
+import com.example.uhf.scanner.RfidScanHandler;
+import com.example.uhf.scanner.BarcodeScanHandler;
+import com.example.uhf.scanner.ManualInputHandler;
+import com.example.uhf.scanner.ScanMethod;
+import com.example.uhf.scanner.ScanResult;
+import com.example.uhf.dialog.ScanMethodDialog;
+import com.example.uhf.dialog.ScanProgressDialog;
+import com.example.uhf.dialog.BarcodeCameraDialog;
+
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.chip.Chip;
@@ -86,6 +96,12 @@ public class MiraTransferFragment extends Fragment {
     private TextView tvScanCounter;
     private AlertDialog loadingDialog;
     private ToneGenerator toneGenerator;
+    
+    // ✅ متغيرات المسح الجديدة
+    private UnifiedScanManager unifiedScanManager;
+    private RfidScanHandler rfidScanHandler;
+    private BarcodeScanHandler barcodeScanHandler;
+    private ManualInputHandler manualInputHandler;
 
     private final BroadcastReceiver refreshReceiver = new BroadcastReceiver() {
         @Override
@@ -118,6 +134,13 @@ public class MiraTransferFragment extends Fragment {
         offlineCache = context.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         sessionManager = new SessionManager(context);
         
+        
+        // ✅ تهيئة مديري المسح
+    unifiedScanManager = UnifiedScanManager.getInstance(requireContext());
+    rfidScanHandler = new RfidScanHandler(requireActivity());
+    barcodeScanHandler = new BarcodeScanHandler(requireContext());
+    manualInputHandler = new ManualInputHandler(requireContext());
+
         try {
             toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
         } catch (Exception ignored) {}
@@ -456,28 +479,160 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void handleTransferAction(TransferData t, String action) {
-        selectedTransfer = t;
-        switch (action) {
-            case "approve": 
-                if (canApproveTransfer()) approveTransfer(t);
-                else showAccessDenied();
-                break;
-            case "receive": 
-                if (canReceiveTransfer(t)) receiveTransfer(t);
-                else showUserMessage(isArabic ? "⛔ غير مصرح" : "⛔ Not Authorized", isArabic ? "فقط الفرع المستقبل (" + t.toBranch + ") يمكنه تأكيد الاستلام." : "Only the receiving branch (" + t.toBranch + ") can confirm receipt.");
-                break;
-            case "scan": 
-                showScanItemsDialogForTransfer(t); 
-                break;
-            case "items":
-                showTransferItems(t);
-                break;
-        }
+    selectedTransfer = t;
+    switch (action) {
+        case "approve":
+            if (canApproveTransfer()) {
+                // ✅ بدل الإرسال الفوري → اختر طريقة المسح
+                openScanMethodForDispatch(t);
+            } else {
+                showAccessDenied();
+            }
+            break;
+            
+        case "receive":
+            if (canReceiveTransfer(t)) {
+                // ✅ بدل الاستلام الفوري → اختر طريقة المسح
+                openScanMethodForReceive(t);
+            } else {
+                showUserMessage(
+                    isArabic ? "⛔ غير مصرح" : "⛔ Not Authorized",
+                    isArabic ? "فقط الفرع المستقبل يمكنه التأكيد." 
+                             : "Only receiving branch can confirm."
+                );
+            }
+            break;
+            
+        case "scan":
+            // ✅ المسح القديم (لسان التحويل)
+            showScanItemsDialogForTransfer(t);
+            break;
+            
+        case "items":
+            showTransferItems(t);
+            break;
     }
+}
 
     private void showAccessDenied() {
         showUserMessage(isArabic ? "⛔ لا تملك صلاحية" : "⛔ Access Denied", isArabic ? "عذراً، ليس لديك صلاحية لتنفيذ هذا الإجراء." : "Sorry, you don't have permission to perform this action.");
     }
+    
+    // ============================================
+// ✅ دوال المسح الجديدة (RFID + GS1 + Manual)
+// ============================================
+
+/**
+ * ✅ فتح حوار اختيار طريقة المسح للإرسال
+ */
+private void openScanMethodForDispatch(TransferData transfer) {
+    if (transfer == null) return;
+    
+    ScanMethodDialog dialog = new ScanMethodDialog(
+        requireContext(),
+        isArabic,
+        method -> {
+            // ✅ ابدأ جلسة المسح بالطريقة المختارة
+            startScanSession(transfer, "dispatch", method);
+        }
+    );
+    
+    dialog.show();
+}
+
+/**
+ * ✅ فتح حوار اختيار طريقة المسح للاستلام
+ */
+private void openScanMethodForReceive(TransferData transfer) {
+    if (transfer == null) return;
+    
+    ScanMethodDialog dialog = new ScanMethodDialog(
+        requireContext(),
+        isArabic,
+        method -> {
+            // ✅ ابدأ جلسة المسح بالطريقة المختارة
+            startScanSession(transfer, "receive", method);
+        }
+    );
+    
+    dialog.show();
+}
+
+/**
+ * ✅ بدء جلسة مسح فعلية
+ */
+private void startScanSession(TransferData transfer, String phase, ScanMethod method) {
+    if (transfer == null) return;
+    if (!isAdded() || getContext() == null) return;
+    
+    Log.d(TAG, "Starting scan session: " + transfer.transferNumber 
+        + " | phase=" + phase + " | method=" + method);
+    
+    // ✅ أنشئ الحوار
+    ScanProgressDialog dialog = new ScanProgressDialog(
+        requireContext(),
+        isArabic,
+        transfer.id,
+        transfer.transferNumber,
+        phase,
+        new ScanProgressDialog.OnScanCompletedListener() {
+            @Override
+            public void onCompleted(int scannedCount) {
+                Log.d(TAG, "✅ Scan completed: " + scannedCount + " items");
+                
+                if (!isAdded() || getContext() == null) return;
+                
+                // ✅ أغلق الحوار
+                if (scanProgressDialog != null && scanProgressDialog.isShowing()) {
+                    scanProgressDialog.dismiss();
+                }
+                
+                // ✅ رسالة نجاح
+                String message = isArabic
+                    ? "✅ تم " + (phase.equals("dispatch") ? "الإرسال" : "الاستلام") 
+                        + " بنجاح (" + scannedCount + " قطعة)"
+                    : "✅ " + (phase.equals("dispatch") ? "Dispatched" : "Received") 
+                        + " successfully (" + scannedCount + " items)";
+                
+                showSuccessMessage(
+                    phase.equals("dispatch") ? "تم الإرسال" : "تم الاستلام",
+                    message
+                );
+                
+                // ✅ أعد تحميل القائمة
+                loadTransfers();
+                notifyDashboardUpdate();
+            }
+            
+            @Override
+            public void onCancelled() {
+                Log.d(TAG, "Scan cancelled");
+                Toast.makeText(getContext(),
+                    isArabic ? "تم إلغاء المسح" : "Scan cancelled",
+                    Toast.LENGTH_SHORT).show();
+            }
+            
+            @Override
+            public void onError(String message) {
+                Log.e(TAG, "Scan error: " + message);
+                
+                if (!isAdded() || getContext() == null) return;
+                
+                showErrorMessage(
+                    isArabic ? "فشل المسح" : "Scan Failed",
+                    message
+                );
+            }
+        }
+    );
+    
+    // ✅ احفظ المرجع وأظهر
+    scanProgressDialog = dialog;
+    dialog.show();
+}
+
+// ✅ متغير مرجعي
+private ScanProgressDialog scanProgressDialog;
 
     private void showTransferActions(TransferData t) {
         if (!isAdded() || getContext() == null || t == null) return;
@@ -487,19 +642,21 @@ public class MiraTransferFragment extends Fragment {
         options.add(ar("📦 عرض وإدارة القطع (" + t.itemCount + ")", "📦 View & Manage Items (" + t.itemCount + ")"));
         
         if ("draft".equals(t.status) || "pending".equals(t.status)) {
-            if (canCreateTransfer()) {
-                options.add(ar("➕ إضافة قطعة للشحنة", "➕ Add Item to Transfer"));
-            }
-            if (canApproveTransfer()) {
-                options.add(ar("✅ اعتماد وتجهيز الشحنة", "✅ Approve & Dispatch"));
-            }
-            options.add(ar("🚫 إلغاء الشحنة بالكامل", "🚫 Cancel Entire Transfer"));
-        } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
-            if (canReceiveTransfer(t)) {
-                options.add(ar("📥 استلام الشحنة", "📥 Receive Shipment"));
-            }
-            options.add(ar("🔍 تدقيق ميداني", "🔍 Field Scan Audit"));
-        }
+    if (canCreateTransfer()) {
+        options.add(ar("➕ إضافة قطعة للشحنة", "➕ Add Item"));
+    }
+    if (canApproveTransfer()) {
+        // ✅ غيّر النص ليعكس أن المسح إلزامي
+        options.add(ar("📤 إرسال الشحنة (مسح إلزامي)", "📤 Dispatch (Scan required)"));
+    }
+    options.add(ar("🚫 إلغاء الشحنة بالكامل", "🚫 Cancel Entire Transfer"));
+} else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
+    if (canReceiveTransfer(t)) {
+        // ✅ غيّر النص ليعكس أن المسح إلزامي
+        options.add(ar("📥 استلام الشحنة (مسح إلزامي)", "📥 Receive (Scan required)"));
+    }
+    options.add(ar("🔍 تدقيق ميداني", "🔍 Field Scan Audit"));
+}
         
         options.add(ar("📋 عرض التفاصيل", "📋 View Details"));
 
@@ -507,23 +664,35 @@ public class MiraTransferFragment extends Fragment {
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle((t.transferNumber != null ? t.transferNumber : "TR-" + t.id) + " (" + t.fromBranch + " ➔ " + t.toBranch + ")")
             .setItems(items, (dialog, which) -> {
-                String sel = items[which];
-                if (sel.contains("عرض وإدارة") || sel.contains("View & Manage")) {
-                    showTransferItems(t);
-                } else if (sel.contains("إضافة قطعة") || sel.contains("Add Item")) {
-                    showScanItemsDialogForTransfer(t);
-                } else if (sel.contains("اعتماد") || sel.contains("Approve")) {
-                    if (canApproveTransfer()) approveTransfer(t);
-                    else showAccessDenied();
-                } else if (sel.contains("استلام") || sel.contains("Receive")) {
-                    if (canReceiveTransfer(t)) receiveTransfer(t);
-                    else showUserMessage(isArabic ? "⛔ غير مصرح" : "⛔ Not Allowed", isArabic ? "لا يجوز للفرع المرسل استلام الشحنة!" : "Sending branch cannot receive shipment!");
-                } else if (sel.contains("إلغاء الشحنة") || sel.contains("Cancel Entire")) {
-                    cancelTransfer(t);
-                } else if (sel.contains("تفاصيل") || sel.contains("Details")) {
-                    showTransferDetails(t);
-                }
-            })
+    String sel = items[which];
+    if (sel.contains("عرض وإدارة") || sel.contains("View & Manage")) {
+        showTransferItems(t);
+    } else if (sel.contains("إضافة قطعة") || sel.contains("Add Item")) {
+        showScanItemsDialogForTransfer(t);
+    } else if (sel.contains("إرسال") || sel.contains("Dispatch")) {
+        // ✅ الجديد — مسح إلزامي
+        if (canApproveTransfer()) {
+            openScanMethodForDispatch(t);
+        } else {
+            showAccessDenied();
+        }
+    } else if (sel.contains("استلام") || sel.contains("Receive")) {
+        // ✅ الجديد — مسح إلزامي
+        if (canReceiveTransfer(t)) {
+            openScanMethodForReceive(t);
+        } else {
+            showUserMessage(
+                isArabic ? "⛔ غير مصرح" : "⛔ Not Allowed",
+                isArabic ? "لا يجوز للفرع المرسل استلام الشحنة!" 
+                         : "Sending branch cannot receive!"
+            );
+        }
+    } else if (sel.contains("إلغاء الشحنة") || sel.contains("Cancel Entire")) {
+        cancelTransfer(t);
+    } else if (sel.contains("تفاصيل") || sel.contains("Details")) {
+        showTransferDetails(t);
+    }
+})
             .setNegativeButton(ar("إغلاق", "Close"), null).show();
     }
 
@@ -1178,4 +1347,4 @@ public class MiraTransferFragment extends Fragment {
             }
         }
     }
-}
+        }
