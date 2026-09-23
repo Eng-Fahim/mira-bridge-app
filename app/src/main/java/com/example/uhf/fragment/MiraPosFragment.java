@@ -420,6 +420,8 @@ public void onDestroy() {
 }
 // ==================== Keyboard Listener ====================
 
+// ==================== Keyboard Listener ====================
+
 private void setupKeyboardVisibilityListener(View view) {
     try {
         final View rootView = view.getRootView();
@@ -435,7 +437,8 @@ private void setupKeyboardVisibilityListener(View view) {
 
                 // ✅ عند ظهور الكيبورد — مرر إلى حقل البحث
                 if (isKeyboardVisible && etManualEpc != null && etManualEpc.hasFocus()) {
-                    NestedScrollView scrollView = view.findViewById(R.id.posScrollView);
+                    androidx.core.widget.NestedScrollView scrollView =
+                            view.findViewById(R.id.posScrollView);
                     if (scrollView != null) {
                         scrollView.postDelayed(() -> {
                             try {
@@ -445,7 +448,7 @@ private void setupKeyboardVisibilityListener(View view) {
                                     scrollView.smoothScrollTo(0, Math.max(0, targetY - 50));
                                 }
                             } catch (Exception e) {
-                                Log.e(TAG, "smoothScrollTo error", e);
+                                Log.e(TAG, "smoothScrollTo error: " + e.getMessage());
                             }
                         }, 150);
                     }
@@ -458,7 +461,7 @@ private void setupKeyboardVisibilityListener(View view) {
                                     ? View.VISIBLE : View.GONE);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Keyboard listener error", e);
+                Log.e(TAG, "Keyboard listener error: " + e.getMessage());
             }
         };
 
@@ -469,22 +472,24 @@ private void setupKeyboardVisibilityListener(View view) {
                 if (hasFocus) {
                     v.postDelayed(() -> {
                         try {
-                            NestedScrollView scrollView = view.findViewById(R.id.posScrollView);
+                            androidx.core.widget.NestedScrollView scrollView =
+                                    view.findViewById(R.id.posScrollView);
                             if (scrollView != null) {
                                 View target = tilManualEpc != null ? tilManualEpc : etManualEpc;
                                 if (target != null) {
-                                    scrollView.smoothScrollTo(0, Math.max(0, target.getTop() - 50));
+                                    int targetY = target.getTop();
+                                    scrollView.smoothScrollTo(0, Math.max(0, targetY - 50));
                                 }
                             }
                         } catch (Exception e) {
-                            Log.e(TAG, "scroll to input error", e);
+                            Log.e(TAG, "scroll to input error: " + e.getMessage());
                         }
                     }, 300);
                 }
             });
         }
     } catch (Exception e) {
-        Log.e(TAG, "setupKeyboardVisibilityListener error", e);
+        Log.e(TAG, "setupKeyboardVisibilityListener error: " + e.getMessage());
     }
 }
 
@@ -500,7 +505,6 @@ private void removeKeyboardListener() {
         Log.e(TAG, "removeKeyboardListener error: " + e.getMessage());
     }
 }
-
 
 
 // ==================== Views ====================
