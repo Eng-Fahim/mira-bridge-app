@@ -83,7 +83,6 @@
         <item name="colorOnSurface">@color/md_on_surface</item>
         <item name="colorSurfaceVariant">@color/md_surface_variant</item>
         <item name="colorOnSurfaceVariant">@color/md_on_surface_variant</item>
-        <item name="colorSurfaceTint">@color/md_surface_tint</item>
         <item name="colorSurfaceInverse">@color/md_inverse_surface</item>
         <item name="colorOnSurfaceInverse">@color/md_inverse_on_surface</item>
         <item name="colorSurfaceBright">@color/md_surface_bright</item>
@@ -96,8 +95,7 @@
 
         <item name="colorOutline">@color/md_outline</item>
         <item name="colorOutlineVariant">@color/md_outline_variant</item>
-        <item name="colorScrim">@color/md_scrim</item>
-
+       
         <!-- 🎭 State Layers -->
         <item name="colorControlHighlight">@color/state_layer_gold_pressed</item>
         <item name="colorControlActivated">@color/md_primary</item>
