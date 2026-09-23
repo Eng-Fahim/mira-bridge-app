@@ -3,124 +3,116 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_mira_dialog"
     android:orientation="vertical"
-    android:padding="20dp"
-    android:background="@drawable/bg_mira_dialog">
+    android:padding="@dimen/space_5">
 
-    <!-- العنوان مع أيقونة الهاتف/الملاحة -->
+    <!-- العنوان الرئيسي -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/space_4"
         android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:layout_marginBottom="16dp">
+        android:orientation="horizontal">
 
         <ImageView
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="@dimen/icon_lg"
+            android:layout_height="@dimen/icon_lg"
+            android:importantForAccessibility="no"
             android:src="@drawable/ic_info"
-            app:tint="#D4AF37" />
+            app:tint="@color/text_gold_accent" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:fontFamily="@font/cairo"
+            android:layout_marginStart="@dimen/space_3"
             android:text="معلومات الجهاز و UHF"
-            android:textColor="#D4AF37"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title.Large"
+            android:textColor="@color/text_gold_accent" />
     </LinearLayout>
 
-    <!-- قسم بيانات الهاتف -->
+    <!-- قسم بيئة التشغيل -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:fontFamily="@font/cairo"
         android:text="📱 بيئة التشغيل"
-        android:textColor="#AAAAAA"
-        android:textSize="13sp"
-        android:textStyle="bold" />
+        android:textAppearance="@style/TextAppearance.App.Label.Medium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:letterSpacing="0.08"
+        android:textAllCaps="true" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="14dp"
-        android:background="#2C2C2E"
+        android:layout_marginTop="@dimen/space_2"
+        android:layout_marginBottom="@dimen/space_4"
+        android:background="?attr/colorSurfaceVariant"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="@dimen/space_3">
 
         <TextView
             android:id="@+id/tv_device_model"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/cairo"
             android:text="الموديل: SM-S908U"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textAppearance="@style/TextAppearance.App.Body.Medium"
+            android:textColor="?attr/colorOnSurface"
+            android:textDirection="ltr" />
 
         <TextView
             android:id="@+id/tv_device_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:fontFamily="@font/cairo"
+            android:layout_marginTop="@dimen/space_1"
             android:text="الحالة: متصل عبر Bluetooth / Serial"
-            android:textColor="#34C759"
-            android:textSize="13sp" />
+            android:textAppearance="@style/TextAppearance.App.Body.Small"
+            android:textColor="@color/success_500" />
     </LinearLayout>
 
-    <!-- قسم وحدة RFID / UHF -->
+    <!-- قسم قارئ RFID / UHF -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:fontFamily="@font/cairo"
         android:text="📡 قارئ RFID / UHF"
-        android:textColor="#AAAAAA"
-        android:textSize="13sp"
-        android:textStyle="bold" />
+        android:textAppearance="@style/TextAppearance.App.Label.Medium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:letterSpacing="0.08"
+        android:textAllCaps="true" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="18dp"
-        android:background="#2C2C2E"
+        android:layout_marginTop="@dimen/space_2"
+        android:layout_marginBottom="@dimen/space_5"
+        android:background="?attr/colorSurfaceVariant"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="@dimen/space_3">
 
         <TextView
             android:id="@+id/tv_uhf_software"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/cairo"
             android:text="البرمجيات (Software): v2.4.1"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textAppearance="@style/TextAppearance.App.Body.Medium"
+            android:textColor="?attr/colorOnSurface"
+            android:textDirection="ltr" />
 
         <TextView
             android:id="@+id/tv_uhf_hardware"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:fontFamily="@font/cairo"
+            android:layout_marginTop="@dimen/space_1"
             android:text="العتاد (Hardware): Chainway C72 Module"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textAppearance="@style/TextAppearance.App.Body.Medium"
+            android:textColor="?attr/colorOnSurface"
+            android:textDirection="ltr" />
     </LinearLayout>
 
     <!-- زر الإغلاق -->
-    <Button
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_close_dialog"
-        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+        style="@style/AppButtonStyle"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:backgroundTint="#D4AF37"
-        android:fontFamily="@font/cairo"
-        android:text="إغلاق"
-        android:textColor="#1C1C1E"
-        android:textSize="15sp"
-        android:textStyle="bold" />
-
+        android:layout_height="@dimen/button_height"
+        android:text="إغلاق" />
 </LinearLayout>
