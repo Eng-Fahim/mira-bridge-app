@@ -1,43 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout 
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="@dimen/space_6">
 
+    <!-- ═══════════════════════════════════════════════════════
+         العنوان الرئيسي
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/space_4"
         android:text="🔍 البحث في التقارير"
-        android:textColor="#1a237e"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
+        android:textAppearance="@style/TextAppearance.App.Title.Large"
+        android:textColor="@color/text_gold_accent" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         حقل البحث
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.textfield.TextInputLayout
+        style="@style/AppTextInputStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="اكتب اسم التقرير..."
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        app:endIconMode="clear_text">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etSearchReports"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:imeOptions="actionSearch"
             android:inputType="text"
-            android:maxLines="1"
-            android:imeOptions="actionSearch" />
-
+            android:textColor="?attr/colorOnSurface" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- ═══════════════════════════════════════════════════════
+         ملاحظة توضيحية
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/space_2"
         android:text="سيتم البحث في العناوين والأوصاف"
-        android:textColor="#999999"
-        android:textSize="11sp" />
+        android:textAppearance="@style/TextAppearance.App.Label.Small"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
 </LinearLayout>
