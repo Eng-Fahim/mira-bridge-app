@@ -1,46 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- الطبقة الأساسية: تدرّج ذهبي معدني -->
+    <!-- الطبقة 1: التدرج الذهبي المعدني الغني -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="135"
-                android:centerColor="#E5C158"
-                android:endColor="#B8942E"
-                android:startColor="#F5D77E"
+                android:startColor="#FADB7F"
+                android:centerColor="#D4AF37"
+                android:endColor="#AA820A"
                 android:type="linear" />
             <corners android:radius="24dp" />
         </shape>
     </item>
 
-    <!-- الطبقة الثانية: لمعان علوي (يعطي إحساس المعدن) -->
+    <!-- الطبقة 2: انعكاس الإضاءة المعدنية العلوي (Specular Highlight) -->
     <item
-        android:bottom="50%"
+        android:bottom="45%"
         android:top="0dp">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
+                android:startColor="#50FFFFFF"
                 android:endColor="#00FFFFFF"
-                android:startColor="#40FFFFFF"
                 android:type="linear" />
             <corners
-                android:bottomLeftRadius="0dp"
-                android:bottomRightRadius="0dp"
                 android:topLeftRadius="24dp"
-                android:topRightRadius="24dp" />
+                android:topRightRadius="24dp"
+                android:bottomLeftRadius="0dp"
+                android:bottomRightRadius="0dp" />
         </shape>
     </item>
 
-    <!-- الطبقة الثالثة: لمعان سفلي خفيف -->
+    <!-- الطبقة 3: الظل السفلي المدمج لإبراز العمق -->
     <item
-        android:bottom="0dp"
-        android:top="80%">
+        android:top="75%"
+        android:bottom="0dp">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="90"
-                android:endColor="#20000000"
-                android:startColor="#00000000"
+                android:startColor="#33000000"
+                android:endColor="#00000000"
                 android:type="linear" />
             <corners
                 android:bottomLeftRadius="24dp"
