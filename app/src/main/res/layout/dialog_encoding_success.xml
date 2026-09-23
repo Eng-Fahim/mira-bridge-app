@@ -4,182 +4,208 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp"
-    android:background="?attr/colorSurface">
+    android:padding="@dimen/space_5">
 
-    <!-- مقبض السحب -->
+    <!-- ═══════════════════════════════════════════════════════
+         مقبض السحب
+         ═══════════════════════════════════════════════════════ -->
     <View
         android:layout_width="40dp"
         android:layout_height="4dp"
         android:layout_gravity="center"
+        android:layout_marginBottom="@dimen/space_4"
         android:background="?attr/colorOutline"
-        android:layout_marginBottom="16dp" />
+        android:alpha="0.4" />
 
-    <!-- أيقونة النجاح -->
+    <!-- ═══════════════════════════════════════════════════════
+         أيقونة النجاح
+         ═══════════════════════════════════════════════════════ -->
     <ImageView
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="@dimen/icon_2xl"
+        android:layout_height="@dimen/icon_2xl"
         android:layout_gravity="center"
-        android:src="@android:drawable/checkbox_on_background"
-        app:tint="?attr/colorPrimary"
-        android:layout_marginBottom="10dp" />
+        android:layout_marginBottom="@dimen/space_2"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_check_circle"
+        app:tint="@color/gold_500" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         عنوان النجاح
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:text="تم تكويد القطعة بنجاح!"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:textAppearance="@style/TextAppearance.App.Title.Large"
+        android:textColor="?attr/colorOnSurface" />
 
-    <!-- ✅ صورة القطعة -->
+    <!-- ═══════════════════════════════════════════════════════
+         صورة القطعة
+         ═══════════════════════════════════════════════════════ -->
     <ImageView
         android:id="@+id/imgSummaryPhoto"
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:layout_gravity="center"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="@dimen/space_3"
+        android:contentDescription="صورة القطعة"
         android:scaleType="centerCrop"
         android:src="@drawable/placeholder_image"
-        android:visibility="gone"
-        android:contentDescription="صورة القطعة" />
+        android:visibility="gone" />
 
-    <!-- بطاقة موجز البيانات -->
+    <!-- ═══════════════════════════════════════════════════════
+         بطاقة ملخص البيانات
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="20dp"
+        android:layout_marginTop="@dimen/space_4"
+        android:layout_marginBottom="@dimen/space_5"
         app:cardBackgroundColor="?attr/colorSurfaceVariant"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="0dp">
+        app:cardCornerRadius="@dimen/radius_md"
+        app:cardElevation="@dimen/elevation_0">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:padding="@dimen/space_4">
 
+            <!-- عنوان القطعة -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="عنوان القطعة:"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
                 <TextView
                     android:id="@+id/tvSummaryTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_4"
                     android:text="خاتم ذهب عيار 21"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textStyle="bold"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.App.Label.Large"
+                    android:textColor="?attr/colorOnSurface" />
             </LinearLayout>
 
+            <!-- EPC / MIRA ID -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="@dimen/space_2"
                 android:orientation="horizontal">
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="رمز EPC / MIRA ID:"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
                 <TextView
                     android:id="@+id/tvSummaryEpc"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_4"
+                    android:fontFamily="monospace"
                     android:text="E20000001234"
-                    android:textColor="?attr/colorPrimary"
-                    android:textStyle="bold"
-                    android:textSize="12sp"
-                    android:fontFamily="monospace" />
+                    android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                    android:textColor="@color/text_gold_accent"
+                    android:textDirection="ltr" />
             </LinearLayout>
 
+            <!-- الوزن -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="@dimen/space_2"
                 android:orientation="horizontal">
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="الوزن القائم:"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
                 <TextView
                     android:id="@+id/tvSummaryWeight"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_4"
                     android:text="4.52 جرام"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textStyle="bold"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.App.Label.Large"
+                    android:textColor="?attr/colorOnSurface" />
             </LinearLayout>
 
-            <!-- ✅ السعر الجديد -->
+            <!-- السعر النهائي -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="@dimen/space_2"
                 android:orientation="horizontal">
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="السعر النهائي:"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
                 <TextView
                     android:id="@+id/tvSummaryPrice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_4"
                     android:text="0.00"
-                    android:textColor="?attr/colorPrimary"
-                    android:textStyle="bold"
-                    android:textSize="16sp" />
+                    android:textAppearance="@style/TextAppearance.App.Title.Medium"
+                    android:textColor="@color/text_gold_accent"
+                    android:textDirection="ltr" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- الخيارات الثلاثة -->
+    <!-- ═══════════════════════════════════════════════════════
+         زر عرض الهوية الرقمية
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnViewDigitalIdentity"
+        style="@style/AppButtonStyle"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="💎 عرض الهوية الرقمية للقطعة"
-        android:textStyle="bold"
-        android:textColor="?attr/colorOnPrimary"
-        app:backgroundTint="?attr/colorPrimary"
-        app:cornerRadius="10dp" />
+        android:layout_height="@dimen/button_height"
+        android:text="💎 عرض الهوية الرقمية للقطعة" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         زر تكويد قطعة جديدة
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnNewEncode"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        style="@style/AppButtonStyle.Outlined"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_marginTop="8dp"
-        android:text="➕ تكويد قطعة جديدة"
-        android:textColor="?attr/colorPrimary"
-        app:strokeColor="?attr/colorPrimary"
-        app:cornerRadius="10dp" />
+        android:layout_height="@dimen/button_height"
+        android:layout_marginTop="@dimen/space_2"
+        android:text="➕ تكويد قطعة جديدة" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         زر الإغلاق
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnCloseDialog"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
+        style="@style/AppButtonStyle.Text"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:layout_marginTop="4dp"
+        android:layout_height="@dimen/button_height_sm"
+        android:layout_marginTop="@dimen/space_1"
         android:text="إلغاء / إغلاق"
         android:textColor="?attr/colorOnSurfaceVariant" />
 
