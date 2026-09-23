@@ -10,71 +10,71 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:padding="@dimen/space_5">
 
-        <!-- Header -->
+        <!-- ═══════════════════════════════════════════════════════
+             Header
+             ═══════════════════════════════════════════════════════ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/space_5"
             android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:layout_marginBottom="20dp">
+            android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="@dimen/icon_lg"
+                android:layout_height="@dimen/icon_lg"
+                android:importantForAccessibility="no"
                 android:src="@drawable/ic_edit_profile"
-                app:tint="?attr/colorPrimary" />
+                app:tint="@color/text_gold_accent" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_3"
                 android:layout_weight="1"
-                android:layout_marginStart="10dp"
                 android:text="تعديل الملف الشخصي"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.App.Title.Large"
+                android:textColor="?attr/colorOnSurface" />
         </LinearLayout>
 
-        <!-- ==================== القسم 1: المعلومات الشخصية ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             القسم 1: المعلومات الشخصية
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="👤 المعلومات الشخصية"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="@color/text_gold_accent" />
 
-        <!-- الاسم المعروض -->
+        <!-- الاسم الكامل -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilEditDisplayName"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:hint="الاسم الكامل *"
-            app:boxStrokeColor="?attr/colorPrimary">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="الاسم الكامل *">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditDisplayName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPersonName"
-                android:maxLines="1"
                 android:textColor="?attr/colorOnSurface" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- اسم المستخدم -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilEditUsername"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="@dimen/space_3"
             android:hint="اسم المستخدم"
-            app:boxStrokeColor="?attr/colorPrimary"
             app:prefixText="@">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -82,68 +82,67 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="text"
-                android:maxLines="1"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- ==================== القسم 2: معلومات الاتصال ==================== -->
+        <!-- ═══════════════════════════════════════════════════════
+             القسم 2: معلومات الاتصال
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginTop="@dimen/space_2"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="📞 معلومات الاتصال"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="@color/text_gold_accent" />
 
         <!-- رقم الهاتف -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilEditUserPhone"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:hint="رقم الهاتف"
-            app:boxStrokeColor="?attr/colorPrimary">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="رقم الهاتف">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditUserPhone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="phone"
-                android:maxLines="1"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- البريد الإلكتروني -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilEditUserEmail"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:hint="البريد الإلكتروني"
-            app:boxStrokeColor="?attr/colorPrimary">
+            android:layout_marginBottom="@dimen/space_3"
+            android:hint="البريد الإلكتروني">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditUserEmail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textEmailAddress"
-                android:maxLines="1"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- ملاحظة -->
+        <!-- ملاحظة الحقول الإلزامية -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginTop="@dimen/space_1"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="* الحقول المميزة بعلامة النجمة إلزامية"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="11sp" />
+            android:textAppearance="@style/TextAppearance.App.Label.Small"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
