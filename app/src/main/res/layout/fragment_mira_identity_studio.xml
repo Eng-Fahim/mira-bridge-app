@@ -3,35 +3,36 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:background="?android:attr/colorBackground">
+    android:background="?attr/colorSurface"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="@dimen/screen_padding_h">
 
-        <!-- بطاقة الحالة والـ RFID -->
+        <!-- ═══════════════════════════════════════════════════════
+             بطاقة الحالة والـ RFID
+             ═══════════════════════════════════════════════════════ -->
         <com.google.android.material.card.MaterialCardView
+            style="@style/AppCardViewStyle.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="1dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="@dimen/space_4">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="@dimen/space_4">
 
+                <!-- رأس البطاقة -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <TextView
                         android:id="@+id/tvStepTitle"
@@ -39,56 +40,52 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/step_title"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="@style/TextAppearance.App.Title.Small"
+                        android:textColor="@color/text_gold_accent" />
 
                     <TextView
                         android:id="@+id/tvStatusBadge"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/waiting"
                         android:background="@drawable/bg_status_badge"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="4dp"
-                        android:textSize="10sp" />
+                        android:paddingHorizontal="@dimen/space_3"
+                        android:paddingVertical="@dimen/space_1"
+                        android:text="@string/waiting"
+                        android:textAppearance="@style/TextAppearance.App.Label.Small"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- زر عرض المعلقة -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnViewPending"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/AppButtonStyle.Outlined"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
+                    android:layout_height="@dimen/button_height_sm"
+                    android:layout_marginTop="@dimen/space_2"
                     android:text="@string/btn_view_pending"
-                    android:textColor="?attr/colorPrimary"
-                    app:strokeColor="?attr/colorPrimary"
-                    app:cornerRadius="8dp"
-                    app:icon="@android:drawable/ic_menu_upload"
-                    app:iconTint="?attr/colorPrimary" />
+                    app:icon="@android:drawable/ic_menu_upload" />
 
+                <!-- حقل EPC -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilEpc"
+                    style="@style/AppTextInputStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/space_3"
                     android:hint="@string/hint_epc"
-                    app:endIconMode="custom"
                     app:endIconDrawable="@android:drawable/ic_menu_camera"
-                    app:endIconTint="?attr/colorPrimary">
+                    app:endIconMode="custom">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etEpc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:maxLines="1"
                         android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp"
-                        android:textDirection="ltr"
-                        android:maxLines="1" />
+                        android:textDirection="ltr" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- معرفات TID و GS1 النصية البرمجية -->
+                <!-- معرفات مخفية (تُملأ برمجياً) -->
                 <TextView
                     android:id="@+id/tvTidCode"
                     android:layout_width="wrap_content"
@@ -101,40 +98,39 @@
                     android:layout_height="wrap_content"
                     android:visibility="gone" />
 
+                <!-- زر مسح RFID -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnScanRfid"
+                    style="@style/AppButtonStyle"
                     android:layout_width="match_parent"
-                    android:layout_height="46dp"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/identity_scan_rfid"
-                    android:textColor="?attr/colorOnPrimary"
-                    app:backgroundTint="?attr/colorPrimary"
-                    app:cornerRadius="8dp" />
-
+                    android:layout_height="@dimen/button_height"
+                    android:layout_marginTop="@dimen/space_3"
+                    android:text="@string/identity_scan_rfid" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- التصنيف -->
+        <!-- ═══════════════════════════════════════════════════════
+             قسم التصنيف
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="@string/classify_item"
-            android:textColor="?attr/colorOnBackground"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="?attr/colorOnSurface" />
 
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/chipGroupTypes"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:singleSelection="true"
+            app:chipSpacingHorizontal="@dimen/space_1"
             app:selectionRequired="true"
-            app:chipSpacingHorizontal="4dp">
+            app:singleSelection="true">
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipRing"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
@@ -142,91 +138,95 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipSet"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/set" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipBracelet"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/bracelet" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipNecklace"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/necklace" />
         </com.google.android.material.chip.ChipGroup>
 
+        <!-- حقل العنوان -->
         <com.google.android.material.textfield.TextInputLayout
+            style="@style/AppTextInputStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="@dimen/space_3"
             android:hint="@string/hint_title">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnSurface"
-                android:maxLines="2" />
+                android:maxLines="2"
+                android:textColor="?attr/colorOnSurface" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- حاوية الاقتراحات الأفقية -->
+        <!-- اقتراحات أفقية -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="@dimen/space_2"
             android:scrollbars="none">
 
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/chipGroupSuggestions"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:singleLine="true"
-                app:chipSpacingHorizontal="4dp" />
+                app:chipSpacingHorizontal="@dimen/space_1"
+                app:singleLine="true" />
         </HorizontalScrollView>
 
+        <!-- ═══════════════════════════════════════════════════════
+             قسم مواصفات المعدن
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="@string/metal_specs"
-            android:textColor="?attr/colorOnBackground"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"/>
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="?attr/colorOnSurface" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
             android:text="@string/karat"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:layout_marginTop="8dp"/>
+            android:textAppearance="@style/TextAppearance.App.Label.Medium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/chipGroupKarat"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:singleSelection="true"
+            app:chipSpacingHorizontal="@dimen/space_1"
             app:selectionRequired="true"
-            app:chipSpacingHorizontal="4dp">
+            app:singleSelection="true">
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip24K"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/karat_24" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip21K"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
@@ -234,34 +234,34 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip18K"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/karat_18" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip14K"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/karat_14" />
         </com.google.android.material.chip.ChipGroup>
 
+        <!-- بطاقة الوزن والقيمة -->
         <com.google.android.material.card.MaterialCardView
+            style="@style/AppCardViewStyle.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="1dp">
+            android:layout_marginTop="@dimen/space_4">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="@dimen/space_4">
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/AppTextInputStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/gross_weight_label">
@@ -270,18 +270,17 @@
                         android:id="@+id/etGrossWeight"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:textSize="20sp"
-                        android:textColor="?attr/colorPrimary"
                         android:gravity="center"
-                        android:textStyle="bold" />
+                        android:inputType="numberDecimal"
+                        android:textAppearance="@style/TextAppearance.App.Title.Large"
+                        android:textColor="@color/text_gold_accent" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="?attr/colorOutline"
-                    android:layout_marginVertical="10dp"/>
+                    android:layout_marginVertical="@dimen/space_3"
+                    android:background="?attr/colorOutlineVariant" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -290,84 +289,83 @@
 
                     <TextView
                         android:layout_width="0dp"
-                        android:layout_weight="1"
                         android:layout_height="wrap_content"
+                        android:layout_weight="1"
                         android:text="@string/estimated_gold_value"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
                         android:id="@+id/tvEstimatedGoldValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_4"
                         android:text="@string/identity_default_value"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="@style/TextAppearance.App.Label.Large"
+                        android:textColor="@color/text_gold_accent"
+                        android:textDirection="ltr" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- ═══════════════════════════════════════════════════════
+             قسم الأحجار
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="@string/stones_title"
-            android:textColor="?attr/colorOnBackground"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"/>
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="?attr/colorOnSurface" />
 
-        <!-- حاوية الأحجار -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/layoutStonesContainer"
+            style="@style/AppCardViewStyle.Outlined"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clickable="true"
             android:focusable="true"
-            android:foreground="?attr/selectableItemBackground"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="10dp"
-            app:cardElevation="1dp">
+            android:foreground="?attr/selectableItemBackground">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:padding="12dp">
+                android:orientation="horizontal"
+                android:padding="@dimen/space_3">
 
                 <LinearLayout
                     android:layout_width="0dp"
-                    android:layout_weight="1"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/has_stones"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="@style/TextAppearance.App.Label.Large"
+                        android:textColor="?attr/colorOnSurface" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_1"
                         android:text="@string/toggle_stones_hint"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="9sp"
-                        android:layout_marginTop="2dp" />
+                        android:textAppearance="@style/TextAppearance.App.Body.Small"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
                 <TextView
                     android:id="@+id/tvSummaryPrice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:textColor="?attr/colorPrimary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+                    android:layout_marginEnd="@dimen/space_2"
+                    android:textAppearance="@style/TextAppearance.App.Label.Large"
+                    android:textColor="@color/text_gold_accent"
+                    android:textDirection="ltr" />
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switchHasStones"
@@ -378,15 +376,17 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- تفاصيل الأحجار -->
         <LinearLayout
             android:id="@+id/layoutStonesDetails"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_3"
             android:orientation="vertical"
-            android:visibility="gone"
-            android:layout_marginTop="10dp">
+            android:visibility="gone">
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/stone_type_hint">
@@ -401,14 +401,15 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp">
+                android:layout_marginTop="@dimen/space_2"
+                android:orientation="horizontal">
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/AppTextInputStyle"
                     android:layout_width="0dp"
-                    android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="4dp"
+                    android:layout_marginEnd="@dimen/space_1"
+                    android:layout_weight="1"
                     android:hint="@string/stone_weight_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -420,10 +421,11 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/AppTextInputStyle"
                     android:layout_width="0dp"
-                    android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
+                    android:layout_marginStart="@dimen/space_1"
+                    android:layout_weight="1"
                     android:hint="@string/stone_count_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -436,9 +438,10 @@
             </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="@dimen/space_2"
                 android:hint="@string/identity_stone_value_hint">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -450,49 +453,46 @@
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
+        <!-- ═══════════════════════════════════════════════════════
+             قسم الصور
+             ═══════════════════════════════════════════════════════ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:layout_marginBottom="@dimen/space_2"
             android:text="@string/photos_title"
-            android:textColor="?attr/colorOnBackground"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"/>
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="?attr/colorOnSurface" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAddPhotos"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/button_height_sm"
             android:text="@string/btn_add_photos"
-            android:textColor="?attr/colorPrimary"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp"
-            app:icon="@android:drawable/ic_menu_camera"
-            app:iconTint="?attr/colorPrimary" />
+            app:icon="@android:drawable/ic_menu_camera" />
 
         <TextView
             android:id="@+id/tvPhotosCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/no_photos"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="11sp"
             android:layout_gravity="center"
-            android:layout_marginTop="4dp" />
+            android:layout_marginTop="@dimen/space_1"
+            android:text="@string/no_photos"
+            android:textAppearance="@style/TextAppearance.App.Body.Small"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
-        <!-- الـ RecyclerView المعالجة للتحكم بالتمرير وارتفاع محدد -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvPhotosPreview"
             android:layout_width="match_parent"
             android:layout_height="100dp"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal"
+            android:layout_marginTop="@dimen/space_2"
             android:nestedScrollingEnabled="false"
+            android:orientation="horizontal"
             android:visibility="gone" />
 
-        <!-- الصور المقترنة البرمجية المدمجة بدون حاوية وهمية -->
+        <!-- صور مخفية (تُملأ برمجياً) -->
         <ImageView
             android:id="@+id/imgGs1DataMatrix"
             android:layout_width="0dp"
@@ -517,29 +517,26 @@
             android:layout_height="0dp"
             android:visibility="gone" />
 
+        <!-- ═══════════════════════════════════════════════════════
+             زر الحفظ
+             ═══════════════════════════════════════════════════════ -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSaveIdentity"
+            style="@style/AppButtonStyle"
             android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="14dp"
-            android:layout_marginBottom="12dp"
+            android:layout_height="@dimen/button_height_lg"
+            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginBottom="@dimen/space_3"
             android:text="@string/btn_save_identity"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnPrimary"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="10dp"
-            app:icon="@android:drawable/ic_menu_save"
-            app:iconTint="?attr/colorOnPrimary" />
+            app:icon="@android:drawable/ic_menu_save" />
 
         <TextView
             android:id="@+id/tvPendingSyncCount"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="12sp"
-            android:textStyle="bold"
+            android:textAppearance="@style/TextAppearance.App.Label.Medium"
+            android:textColor="@color/text_gold_accent"
             android:visibility="gone" />
 
     </LinearLayout>
