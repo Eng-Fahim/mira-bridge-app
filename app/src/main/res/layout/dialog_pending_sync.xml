@@ -3,62 +3,74 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF"
+    android:background="?attr/colorSurface"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="@dimen/space_4">
 
+    <!-- ═══════════════════════════════════════════════════════
+         العنوان الرئيسي
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="📦 الطلبات المحفوظة محلياً"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="#1F2937"
+        android:layout_marginBottom="@dimen/space_4"
         android:gravity="center"
-        android:layout_marginBottom="16dp" />
+        android:text="📦 الطلبات المحفوظة محلياً"
+        android:textAppearance="@style/TextAppearance.App.Title.Large"
+        android:textColor="?attr/colorOnSurface" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         عداد الطلبات
+         ═══════════════════════════════════════════════════════ -->
     <TextView
         android:id="@+id/tvPendingCount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="عدد الطلبات: 0"
-        android:textSize="14sp"
-        android:textColor="#64748B"
+        android:layout_marginBottom="@dimen/space_4"
         android:gravity="center"
-        android:layout_marginBottom="16dp" />
+        android:text="عدد الطلبات: 0"
+        android:textAppearance="@style/TextAppearance.App.Body.Medium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         قائمة الطلبات المعلقة
+         ═══════════════════════════════════════════════════════ -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvPendingItems"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_2" />
 
+    <!-- ═══════════════════════════════════════════════════════
+         أزرار الإجراء
+         ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="16dp">
+        android:layout_marginTop="@dimen/space_4"
+        android:orientation="horizontal">
 
+        <!-- زر مزامنة الكل (بالذهبي الأساسي) -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSyncAll"
+            style="@style/AppButtonStyle"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginEnd="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="🔄 مزامنة الكل"
-            android:textColor="#FFFFFF"
-            app:backgroundTint="#059669"
-            app:cornerRadius="8dp" />
+            android:text="🔄 مزامنة الكل" />
 
+        <!-- زر الإغلاق -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnClosePending"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginStart="@dimen/space_1"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="إغلاق"
-            app:cornerRadius="8dp" />
+            android:text="إغلاق" />
     </LinearLayout>
 
 </LinearLayout>
