@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ═══════════════════════════════════════════════════════
+         📐 TYPOGRAPHY SCALE — مقياس الخطوط (Type Scale)
+         يعتمد على Cairo font + أوزان مُحسّنة عربياً
+         ═══════════════════════════════════════════════════════ -->
+
+    <!-- Display — للشاشات الترحيبية والأرقام الضخمة -->
+    <style name="TextAppearance.App.Display.Large" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">52sp</item>
+        <item name="android:lineHeight">64sp</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="TextAppearance.App.Display.Medium" parent="TextAppearance.Material3.DisplayMedium">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">42sp</item>
+        <item name="android:lineHeight">52sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <!-- Headline — لعناوين الشاشات الرئيسية -->
+    <style name="TextAppearance.App.Headline.Large" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">32sp</item>
+        <item name="android:lineHeight">40sp</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="TextAppearance.App.Headline.Small" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:lineHeight">32sp</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <!-- Title — لعناوين الكروت -->
+    <style name="TextAppearance.App.Title.Large" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:lineHeight">28sp</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="TextAppearance.App.Title.Medium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:lineHeight">24sp</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="TextAppearance.App.Title.Small" parent="TextAppearance.Material3.TitleSmall">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:lineHeight">20sp</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <!-- Body — للنصوص العادية (الحد الأدنى 14sp) -->
+    <style name="TextAppearance.App.Body.Large" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:lineHeight">24sp</item>
+        <item name="android:textFontWeight">400</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="TextAppearance.App.Body.Medium" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:lineHeight">22sp</item>
+        <item name="android:textFontWeight">400</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="TextAppearance.App.Body.Small" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:lineHeight">16sp</item>
+        <item name="android:textFontWeight">400</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <!-- Label — للتسميات والأزرار -->
+    <style name="TextAppearance.App.Label.Large" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:lineHeight">20sp</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="TextAppearance.App.Label.Medium" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:lineHeight">16sp</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:letterSpacing">0.04</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <style name="TextAppearance.App.Label.Small" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:lineHeight">14sp</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:textColor">@color/text_tertiary</item>
+    </style>
+
+    <!-- 🏷️ Special: Text on gold background -->
+    <style name="TextAppearance.App.OnGold" parent="TextAppearance.App.Label.Large">
+        <item name="android:textColor">@color/text_on_gold</item>
+        <item name="android:textFontWeight">700</item>
+    </style>
+
+</resources>
