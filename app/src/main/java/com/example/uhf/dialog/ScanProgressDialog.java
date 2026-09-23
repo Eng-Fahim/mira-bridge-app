@@ -463,7 +463,10 @@ public class ScanProgressDialog extends Dialog {
                         Log.d(TAG, "📷 Barcode scanned: " + rawBarcode);
                         
                         // ✅ عالج الباركود
-                        BarcodeScanHandler handler = new BarcodeScanHandler(context);
+                        // ✅ استخدم الحقل الموجود بدلاً من إنشاء جديد
+if (barcodeHandler != null) {
+    barcodeHandler.processRawBarcode(rawBarcode);
+}
                         handler.processRawBarcode(rawBarcode);
                     }
                     
