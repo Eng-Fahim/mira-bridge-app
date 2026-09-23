@@ -480,44 +480,37 @@ public class MiraBarcodeScannerFragment extends Fragment {
     if (now - lastScanTime < SCAN_COOLDOWN_MS) return;
     lastScanTime = now;
 
-    // 1. إيقاف المسح فوراً لمنع تكرار القراءة
+    // 1. إيقاف المسح
     isScanning = false;
     playBeepSafe();
 
     String formatName = getBarcodeFormatName(format);
 
-    // 2. تحديث الواجهة (اختياري - لإظهار النتيجة للمستخدم للحظة)
+    // 2. تحديث الواجهة (اختياري)
     safeRun(() -> {
         try {
-            if (tvScannedData != null) {
-                tvScannedData.setText(formatName + ": " + data);
-                tvScannedData.setVisibility(View.VISIBLE);
-            }
             if (tvScanStatus != null) {
                 tvScanStatus.setText(isArabic ? "✅ تم المسح" : "✅ Scanned");
                 tvScanStatus.setTextColor(COLOR_SUCCESS);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating UI: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
     });
 
-    // 3. ✅✅✅ الحل الجذري: إغلاق الشاشة فوراً قبل إرسال النتيجة
-    // هذا يضمن عودة المستخدم لشاشة POS مباشرة
-    closeScanner();
-
-    // 4. إرسال النتيجة بعد إغلاق الشاشة بقليل (لضمان عودة الواجهة)
-    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-        if (barcodeListener != null) {
-            try {
-                barcodeListener.onBarcodeScanned(data, formatName);
-            } catch (Exception e) {
-                Log.e(TAG, "barcodeListener error: " + e.getMessage());
-            }
-        } else {
-            forwardToPOS(data);
+    // 3. ✅✅✅ إرسال النتيجة فوراً وقبل أي إغلاق
+    if (barcodeListener != null) {
+        try {
+            barcodeListener.onBarcodeScanned(data, formatName);
+        } catch (Exception e) {
+            Log.e(TAG, "barcodeListener error: " + e.getMessage());
         }
-    }, 150); // تأخير بسيط جداً (150ms) لضمان اكتمال إغلاق الشاشة
+    } else {
+        forwardToPOS(data);
+    }
+
+    // 4. إغلاق الشاشة بعد تأخير بسيط جداً (50ms) لضمان معالجة البيانات
+    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+        closeScanner();
+    }, 50);
 }
 
     /**
