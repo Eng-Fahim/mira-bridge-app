@@ -327,6 +327,30 @@
         <item name="android:textStyle">bold</item>
         <item name="android:textSize">15sp</item>
     </style>
+    
+    <!-- ═══════════════════════════════════════════════════════
+     🎯 ICON BUTTON (Tonal) — للاستخدام في الـ FAB والأدوات
+     ═══════════════════════════════════════════════════════ -->
+<style name="AppButtonStyle.IconTonal" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
+    <item name="backgroundTint">@color/md_secondary_container</item>
+    <item name="iconTint">@color/md_on_secondary_container</item>
+    <item name="cornerRadius">@dimen/radius_full</item>
+    <item name="android:insetTop">0dp</item>
+    <item name="android:insetBottom">0dp</item>
+    <item name="android:minWidth">0dp</item>
+    <item name="android:minHeight">0dp</item>
+</style>
+
+<!-- 🎯 ICON BUTTON (Primary) — للأزرار الرئيسية -->
+<style name="AppButtonStyle.IconPrimary" parent="Widget.Material3.Button.IconButton.Filled">
+    <item name="backgroundTint">@color/md_primary</item>
+    <item name="iconTint">@color/md_on_primary</item>
+    <item name="cornerRadius">@dimen/radius_full</item>
+    <item name="android:insetTop">0dp</item>
+    <item name="android:insetBottom">0dp</item>
+    <item name="android:minWidth">0dp</item>
+    <item name="android:minHeight">0dp</item>
+</style>
 
     <!-- ═══════════════════════════════════════════════════════════════
          🎯 RADIO / CHECKBOX / CHIP / TAB
