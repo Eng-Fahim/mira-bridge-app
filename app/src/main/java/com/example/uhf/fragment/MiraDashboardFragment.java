@@ -418,77 +418,90 @@ applySalesVisibility();
     // ═══════════════════════════════════════════════════════
 
     private void updateHeroBalance() {
-        try {
-            if (tvHeroBalance == null) return;
+    try {
+        if (tvHeroBalance == null) return;
 
-            double totalValue = currentInventoryValue;
-            int itemCount = currentItemCount;
-            double totalWeight = currentTotalWeight;
+        double totalValue = currentInventoryValue;
+        int itemCount = currentItemCount;
+        double totalWeight = currentTotalWeight;
 
-            // حساب من سعر الذهب إذا القيمة صفر
-            if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
-                double price24 = priceManager.getGoldPricePerGram(24);
-                if (price24 > 0) {
-                    totalValue = totalWeight * price24;
-                }
+        // حساب من سعر الذهب إذا القيمة صفر
+        if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+            double price24 = priceManager.getGoldPricePerGram(24);
+            if (price24 > 0) {
+                totalValue = totalWeight * price24;
             }
+        }
 
-            // ✅ عرض القيمة — مع الإخفاء
-            if (isHeroHidden) {
-                tvHeroBalance.setText("••••••••");
-            } else {
-                tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
-            }
+        // ✅ عرض القيمة — مع الإخفاء
+        if (isHeroHidden) {
+            tvHeroBalance.setText("••••••••");
+        } else {
+            tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+        }
 
-            // Subtitle يظهر دائماً
-            if (tvHeroSubtitle != null) {
-                tvHeroSubtitle.setText(String.format(
-                        "👑 %d قطعة • %.1fg", itemCount, totalWeight));
-            }
+        // Subtitle يظهر دائماً
+        if (tvHeroSubtitle != null) {
+            tvHeroSubtitle.setText(String.format(
+                    "👑 %d قطعة • %.1fg", itemCount, totalWeight));
+        }
 
-            // ═══════════════════════════════════════════════════════
-            // ✅ عرض القيمة بـ 3 عملات
-            // ═══════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════
+        // ✅ احصل على أسعار الصرف الحالية
+        // ═══════════════════════════════════════════════════════
+        double sarRate = (priceManager != null) 
+            ? priceManager.getExchangeRate("SAR") 
+            : 3.75;
+        double yerRate = (priceManager != null) 
+            ? priceManager.getExchangeRate("YER") 
+            : 530.0;
+        
+        // ✅ حماية من سعر صرف = 0
+        if (sarRate <= 0) sarRate = 3.75;
+        if (yerRate <= 0) yerRate = 530.0;
 
-            // 1. بالدولار الأمريكي
-            String usdText;
-            if (isHeroHidden) {
-                usdText = "••••••";
-            } else {
-                usdText = String.format(Locale.US, "%,.2f", totalValue);
-            }
-            if (tvHeroValueUSD != null) {
-                tvHeroValueUSD.setText(usdText);
-            }
+        // ═══════════════════════════════════════════════════════
+        // 1. بالدولار الأمريكي
+        // ═══════════════════════════════════════════════════════
+        if (tvHeroValueUSD != null) {
+            String usdText = isHeroHidden 
+                ? "••••••" 
+                : String.format(Locale.US, "%,.2f", totalValue);
+            tvHeroValueUSD.setText(usdText);
+        }
 
-            // 2. بالريال السعودي (USD × 3.75)
+        // ═══════════════════════════════════════════════════════
+        // 2. بالريال السعودي
+        // ═══════════════════════════════════════════════════════
+        if (tvHeroValueSAR != null) {
             String sarText;
             if (isHeroHidden) {
                 sarText = "••••••";
             } else {
-                double sarValue = totalValue * 3.75;
+                double sarValue = totalValue * sarRate;
                 sarText = String.format(Locale.US, "%,.2f", sarValue);
             }
-            if (tvHeroValueSAR != null) {
-                tvHeroValueSAR.setText(sarText);
-            }
+            tvHeroValueSAR.setText(sarText);
+        }
 
-            // 3. بالريال اليمني (USD × 530)
+        // ═══════════════════════════════════════════════════════
+        // 3. بالريال اليمني
+        // ═══════════════════════════════════════════════════════
+        if (tvHeroValueYER != null) {
             String yerText;
             if (isHeroHidden) {
                 yerText = "••••••";
             } else {
-                double yerValue = totalValue * 530.0;
+                double yerValue = totalValue * yerRate;
                 yerText = String.format(Locale.US, "%,.0f", yerValue);
             }
-            if (tvHeroValueYER != null) {
-                tvHeroValueYER.setText(yerText);
-            }
-
-        } catch (Exception e) {
-            logNonFatal("updateHeroBalance", e);
+            tvHeroValueYER.setText(yerText);
         }
+
+    } catch (Exception e) {
+        logNonFatal("updateHeroBalance", e);
     }
+}
 
     private void toggleHeroVisibility() {
     if (!isAdded() || tvHeroBalance == null) return;
@@ -541,19 +554,42 @@ applySalesVisibility();
     }
 
     private void applySalesData(JSONObject sales) {
-        if (sales == null || tvSalesToday == null) return;
+    if (sales == null || tvSalesToday == null) return;
 
-        if (isSalesHidden) {
-            setText(tvSalesToday, "••••••");
-            setText(tvSalesMonth, "••••••");
-            setText(tvSalesYear, "••••••");
-            return;
-        }
-
-        setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
-        setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
-        setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
+    if (isSalesHidden) {
+        setText(tvSalesToday, "••••••");
+        setText(tvSalesMonth, "••••••");
+        setText(tvSalesYear, "••••••");
+        return;
     }
+
+    // ✅ اقرأ العملة من الاستجابة
+    String currency = sales.optString("currency", "YER");
+    double rate = sales.optDouble("exchange_rate", 530.0);
+    
+    double todayLocal = sales.optDouble("today", 0.0);
+    double monthLocal = sales.optDouble("month", 0.0);
+    double yearLocal = sales.optDouble("year", 0.0);
+    
+    // ✅ اعرض مباشرةً إذا كانت محلية
+    setText(tvSalesToday, formatLocalCurrency(todayLocal, currency));
+    setText(tvSalesMonth, formatLocalCurrency(monthLocal, currency));
+    setText(tvSalesYear, formatLocalCurrency(yearLocal, currency));
+}
+
+/**
+ * ✅ تنسيق سعر محلي مباشرة
+ */
+private String formatLocalCurrency(double amount, String currency) {
+    if (amount <= 0) return "—";
+    try {
+        NumberFormat nf = NumberFormat.getNumberInstance(Locale.US);
+        nf.setMaximumFractionDigits(0);
+        return nf.format(amount) + " " + currency;
+    } catch (Exception e) {
+        return "—";
+    }
+}
 
     // ═══════════════════════════════════════════════════════
     // Alerts
@@ -1583,15 +1619,23 @@ private void handleRecentActivityClick(JSONObject activity) {
         }
     }
 
-    private String formatCurrency(double amount) {
-        try {
-            if (amount <= 0) return "—";
-            if (priceManager != null) return priceManager.formatPriceDefault(amount);
-            return getCurrencyFormatter().format(amount);
-        } catch (Exception e) {
-            return "—";
-        }
+    /**
+ * ✅ [إصلاح] تنسيق العملة
+ * - القيم القادمة من السيرفر (sales.today, month, year) بالريال اليمني
+ * - لا نحولها، فقط نعرضها
+ */
+private String formatCurrency(double amount) {
+    try {
+        if (amount <= 0) return "—";
+        
+        // ✅ السعر محلي بالفعل (YER) — لا تحويل
+        NumberFormat nf = NumberFormat.getNumberInstance(Locale.US);
+        nf.setMaximumFractionDigits(0);
+        return nf.format(amount) + " YER";
+    } catch (Exception e) {
+        return "—";
     }
+}
 
     private String formatWeight(double weightInGrams) {
         if (weightInGrams <= 0) return "0.0 g";
