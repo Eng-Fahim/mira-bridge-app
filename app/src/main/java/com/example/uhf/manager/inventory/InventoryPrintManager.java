@@ -189,25 +189,52 @@ public class InventoryPrintManager {
      * ✅ طباعة تقرير من الأرشيف
      */
     public void printArchivedReport(InventoryReport report) {
-        if (report == null) return;
-
-        try {
-            List<ScannedItemDisplay> snapshotList = getSafeScannedItems();
-
-            PrintUtils.printReportWithQRCode(
-                    context,
-                    report,
-                    snapshotList,
-                    isArabic,
-                    null
-            );
-
-            Log.d(TAG, "✅ Archived report printed: " + report.sessionId);
-        } catch (Exception e) {
-            Log.e(TAG, "printArchivedReport error", e);
-            showError(isArabic ? "فشل الطباعة" : "Print failed");
-        }
+    if (report == null) {
+        Log.e(TAG, "printArchivedReport: report is null");
+        showError(isArabic ? "لا يوجد تقرير للطباعة" : "No report to print");
+        return;
     }
+
+    try {
+        Log.d(TAG, "🖨️ printArchivedReport called: session=" + report.sessionId);
+        
+        List<ScannedItemDisplay> snapshotList = getSafeScannedItems();
+        Log.d(TAG, "   Items: " + snapshotList.size());
+
+        if (snapshotList.isEmpty()) {
+            // ✅ اسمح بالطباعة حتى بدون عناصر (ملخص فقط)
+            Log.w(TAG, "No items — printing summary only");
+        }
+
+        PrintUtils.printReportWithQRCode(
+                context,
+                report,
+                snapshotList,
+                isArabic,
+                new PrintUtils.PrintCallback() {
+                    @Override
+                    public void onPrintStarted() {
+                        Log.d(TAG, "✅ Print started");
+                    }
+
+                    @Override
+                    public void onPrintCompleted() {
+                        Log.d(TAG, "✅ Print preview opened");
+                    }
+
+                    @Override
+                    public void onPrintError(String error) {
+                        Log.e(TAG, "❌ Print error: " + error);
+                    }
+                }
+        );
+
+    } catch (Exception e) {
+        Log.e(TAG, "printArchivedReport error", e);
+        showError(isArabic ? "فشل الطباعة: " + e.getMessage() 
+                           : "Print failed: " + e.getMessage());
+    }
+}
 
     // ==================== 4. طباعة تقرير مخصص ====================
 
