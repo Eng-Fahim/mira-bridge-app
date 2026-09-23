@@ -510,7 +510,7 @@
 <!-- 💰 Finance -->
 <color name="profit_green">#16A34A</color>
 <color name="loss_red">#DC2626</color>
-<color name="neutral_gray">#6B7280</color>
+
 <color name="profit">#16A34A</color>
 <color name="loss">#DC2626</color>
 
