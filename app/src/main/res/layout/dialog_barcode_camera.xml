@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <!-- ✅ معاينة الكاميرا -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:scaleType="fillCenter" />
+
+    <!-- ✅ إطار المسح (مربع شفاف) -->
+    <View
+        android:id="@+id/scanningFrame"
+        android:layout_width="260dp"
+        android:layout_height="260dp"
+        android:background="@drawable/bg_scanning_frame"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.45" />
+
+    <!-- ✅ شريط علوي (خلفية سوداء شبه شفافة) -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="#99000000"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📷 مسح الباركود"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnCloseCamera"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_circle_dark"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="8dp"
+            android:text="✕"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- ✅ شريط سفلي (الحالة والتلميح) -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="#99000000"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="20dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/tvBarcodeStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="وجّه الكاميرا نحو الباركود"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvBarcodeHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="GS1 DataMatrix أو QR Code"
+            android:textColor="#B0B0B0"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tvLastScan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="#3381C784"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
