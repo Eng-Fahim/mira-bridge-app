@@ -2364,7 +2364,11 @@ private void navigateToSnapshots() {
     // ================================================================
 
     private void printCurrentReport() {
-    if (printManager == null) return;
+    if (printManager == null) {
+        Log.e(TAG, "printCurrentReport: printManager is null");
+        showToast(isArabic ? "⚠️ مدير الطباعة غير جاهز" : "⚠️ Print manager not ready");
+        return;
+    }
 
     try {
         // ✅ إذا كان لدينا تقرير من السيرفر — استخدمه
@@ -2392,6 +2396,8 @@ private void navigateToSnapshots() {
             );
 
             printManager.printArchivedReport(serverReport);
+            showToast(isArabic ? "🖨️ جاري تحضير الطباعة..." 
+                               : "🖨️ Preparing print...");
             return;
         }
 
@@ -2413,6 +2419,8 @@ private void navigateToSnapshots() {
         );
 
         printManager.printArchivedReport(localReport);
+        showToast(isArabic ? "🖨️ جاري تحضير الطباعة..." 
+                           : "🖨️ Preparing print...");
 
     } catch (Exception e) {
         Log.e(TAG, "printCurrentReport error", e);
