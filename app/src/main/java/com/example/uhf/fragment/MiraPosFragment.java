@@ -736,13 +736,43 @@ private void parseItemResponse(String code, JSONObject data) {
         }
 
         CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
-                price, isAvailable, vaultStatus.toUpperCase());
-        cartItem.serialNo = item.optString("serial",
-                item.optString("serial_number", ""));
-        cartItem.gtin = item.optString("gtin", item.optString("gtin13", ""));
-        cartItem.location = item.optString("location",
-                item.optString("current_location", ""));
-        cartItem.itemId = item.optInt("id", item.optInt("item_id", 0));
+        price, isAvailable, vaultStatus.toUpperCase());
+
+// ✅ استخراج مرن — يدعم كل الأسماء الممكنة
+cartItem.serialNo = extractString(item,
+        "serial", "serial_number", "serialNo", "sn");
+cartItem.gtin = extractString(item,
+        "gtin", "gtin13", "barcode", "code");
+cartItem.location = extractString(item,
+        "location", "current_location", "zone");
+
+// ✅ استخراج item_id
+cartItem.itemId = item.optInt("id",
+        item.optInt("item_id",
+                item.optInt("product_id", 0)));
+
+// ✅ حفظ TID (إذا وُجد)
+String tid = extractString(item,
+        "tid", "tag_tid", "rfid_tid");
+if (!tid.isEmpty() && cartItem.serialNo.isEmpty()) {
+    // إذا لم يوجد serial، استخدم tid
+    cartItem.serialNo = tid;
+}
+
+// ✅ حفظ EPC الأصلي إذا وُجد
+String rfidEpc = extractString(item,
+        "rfid_epc", "epc_final");
+if (!rfidEpc.isEmpty()) {
+    // استخدم EPC الفعلي
+    cartItem.epc = rfidEpc;
+}
+
+Log.d(TAG, "📍 Parsed cart item: " +
+        "epc=" + cartItem.epc +
+        ", serial=" + cartItem.serialNo +
+        ", gtin=" + cartItem.gtin +
+        ", tid=" + tid +
+        ", item_id=" + cartItem.itemId);
 
         boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo,
                 cartItem.gtin);
@@ -783,6 +813,22 @@ private void parseItemResponse(String code, JSONObject data) {
         showToast(isArabic ? "❌ خطأ في معالجة القطعة" : "❌ Error processing item");
         updateCartSummary();
     }
+}
+
+/**
+ * ✅ استخراج String من JSON بأسماء متعددة
+ */
+private String extractString(JSONObject obj, String... keys) {
+    if (obj == null || keys == null) return "";
+    for (String key : keys) {
+        try {
+            String value = obj.optString(key, "");
+            if (value != null && !value.isEmpty() && !"null".equals(value)) {
+                return value;
+            }
+        } catch (Exception ignored) {}
+    }
+    return "";
 }
 
 private boolean isItemAlreadyInCart(String epc, String serialNo, String gtin) {
@@ -1026,35 +1072,25 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     customer.put("phone", customerPhone);
     payload.put("customer", customer);
 
-    // ✅ بيانات القطع (كاملة)
+    // ✅ بيانات القطع (باستخدام CartItem.toJson())
     JSONArray itemsArr = new JSONArray();
     for (CartItem item : cartList) {
         if (item == null) continue;
 
-        JSONObject obj = new JSONObject();
-        obj.put("epc", item.epc != null ? item.epc : "");
-        obj.put("serial_no", item.serialNo != null ? item.serialNo : "");
-        obj.put("gtin", item.gtin != null ? item.gtin : "");
-        obj.put("title", item.name != null ? item.name : "");
-        obj.put("karat", item.karat != null ? item.karat : "21K");
+        JSONObject obj = item.toJson();
 
-        // ✅ الوزن (يستخدم scaleWeight إذا موجود، وإلا weight)
-        double finalWeight = item.scaleWeight > 0 ? item.scaleWeight : item.weight;
-        obj.put("weight", finalWeight);
-        obj.put("gross_weight", finalWeight);
-
-        obj.put("price_usd", item.price);
-        obj.put("item_id", item.itemId);
-        obj.put("location", item.location != null ? item.location : "");
-
-        // ✅ TID إن وُجد
-        if (item.epc != null && !item.epc.isEmpty()) {
-            obj.put("tid", item.epc);  // يمكن تعديله حسب مصدر TID
+        // ✅ إذا لم يوجد serialNo، استخدم EPC أو TID
+        if (obj.optString("serial_no", "").isEmpty()) {
+            String fallback = !item.tid.isEmpty() ? item.tid
+                    : !item.rfidEpc.isEmpty() ? item.rfidEpc
+                    : item.epc;
+            obj.put("serial_no", fallback);
         }
 
         itemsArr.put(obj);
     }
     payload.put("items", itemsArr);
+    payload.put("item_count", cartList.size());
 
     // ✅ بيانات الدفع
     String currencyCode = priceManager.getDefaultCurrency();
@@ -1068,26 +1104,24 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     double discountLocal = priceManager.convertFromUSD(discountUsd, currencyCode);
     double finalLocal = priceManager.convertFromUSD(finalUsd, currencyCode);
 
-    // ✅ Fallback
     if (exchangeRate <= 0) {
-        Log.e(TAG, "⚠️ Invalid exchange rate, using fallback 530");
         exchangeRate = 530.0;
         subtotalLocal = subtotalUsd * exchangeRate;
         discountLocal = discountUsd * exchangeRate;
         finalLocal = finalUsd * exchangeRate;
     }
 
-    // ✅ على الجذر (للاستخدام المباشر)
+    // ✅ على الجذر
     payload.put("subtotal_usd", subtotalUsd);
     payload.put("discount_usd", discountUsd);
     payload.put("total_usd", finalUsd);
-    payload.put("total_amount_usd", finalUsd);   // ← لتوافق السيرفر
+    payload.put("total_amount_usd", finalUsd);
     payload.put("subtotal", subtotalLocal);
     payload.put("discount", discountLocal);
     payload.put("total", finalLocal);
-    payload.put("total_amount", finalLocal);     // ← لتوافق السيرفر
+    payload.put("total_amount", finalLocal);
 
-    // ✅ بيانات الدفع التفصيلية
+    // ✅ على payment
     JSONObject payment = new JSONObject();
     payment.put("subtotal_usd", subtotalUsd);
     payment.put("discount_amount_usd", discountUsd);
@@ -1100,13 +1134,9 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
     payload.put("payment", payment);
 
-    // ✅ ملاحظات
     if (data.notes != null && !data.notes.isEmpty()) {
         payload.put("notes", data.notes);
     }
-
-    // ✅ إجمالي الأصناف
-    payload.put("item_count", cartList.size());
 
     Log.d("POS_DEBUG", "🚨 CHECKOUT PAYLOAD:\n" + payload.toString(2));
 
@@ -2181,5 +2211,4 @@ private void restoreItemToCache(String code, RefundItem item) {
             Log.e(TAG, "showSuccessMessage error: " + e.getMessage());
         }
     }
-
-} // ✅ نهاية الكلاس MiraPosFragment  
+    } // ✅ نهاية الكلاس MiraPosFragment  
