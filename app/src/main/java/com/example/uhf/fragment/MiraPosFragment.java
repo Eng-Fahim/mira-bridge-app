@@ -1134,9 +1134,8 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
     payload.put("payment", payment);
 
-    if (data.notes != null && !data.notes.isEmpty()) {
-        payload.put("notes", data.notes);
-    }
+    // ✅ ملاحظة افتراضية (بدل notes)
+payload.put("notes", isArabic ? "بيع POS" : "POS Sale");
 
     Log.d("POS_DEBUG", "🚨 CHECKOUT PAYLOAD:\n" + payload.toString(2));
 
