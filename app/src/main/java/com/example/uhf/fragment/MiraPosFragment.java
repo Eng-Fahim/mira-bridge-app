@@ -728,12 +728,39 @@ private void parseItemResponse(String code, JSONObject data) {
         double weight = item.optDouble("weight",
                 item.optDouble("gross_weight",
                         item.optDouble("gross_weight_grams", 0)));
-        double price = item.optDouble("retail_price",
-                item.optDouble("retail_price_usd", item.optDouble("price", 0)));
+        // ✅ [إصلاح] استخراج السعر بشكل صريح مع التحقق
+double priceUSD = item.optDouble("retail_price_usd", 0);
+double priceLocal = item.optDouble("retail_price_local", 0);
+double priceLegacy = item.optDouble("retail_price", 0);
+double priceGeneric = item.optDouble("price", 0);
 
-        if (price <= 0 && weight > 0 && priceManager != null) {
-            price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
-        }
+// ✅ اختر السعر الأنسب (الأولوية للـ local ثم USD ثم legacy)
+double price = priceLocal > 0 ? priceLocal
+             : priceUSD > 0 ? priceUSD
+             : priceLegacy > 0 ? priceLegacy
+             : priceGeneric;
+
+// ✅ Logging تفصيلي للتشخيص
+Log.d(TAG, "💰 PRICE PARSING for: " + title);
+Log.d(TAG, "   - retail_price_local = " + priceLocal);
+Log.d(TAG, "   - retail_price_usd = " + priceUSD);
+Log.d(TAG, "   - retail_price (legacy) = " + priceLegacy);
+Log.d(TAG, "   - price (generic) = " + priceGeneric);
+Log.d(TAG, "   ✅ SELECTED PRICE = " + price);
+
+// ✅ [إصلاح] لا تحسب إلا إذا كان السعر صفراً فعلاً ووزن موجود
+if (price <= 0 && weight > 0 && priceManager != null) {
+    Log.w(TAG, "⚠️ Price is 0, calculating dynamically for " + title);
+    price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
+    Log.d(TAG, "   → Calculated price = " + price);
+}
+
+// ✅ حماية نهائية: إذا كان السعر لا يزال 0 أو سالباً
+if (price <= 0) {
+    Log.e(TAG, "🚨 CRITICAL: Price is still 0 for " + title + "! Item will be marked as unavailable.");
+    // ⚠️ لا تستخدم قيمة عشوائية، فقط اجعل السعر 0 والقطعة غير متاحة
+    // بدلاً من عرض رقم ضخم خاطئ
+}
 
         CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
         price, isAvailable, vaultStatus.toUpperCase());
