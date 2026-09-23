@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -17,10 +18,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.scanner.BarcodeScanHandler;
 import com.example.uhf.scanner.ManualInputHandler;
 import com.example.uhf.scanner.RfidScanHandler;
 import com.example.uhf.scanner.ScanMethod;
@@ -34,7 +37,7 @@ import java.util.Locale;
 /**
  * ✅ حوار عرض تقدم المسح
  * - يعرض: متوقع / ممسوح
- * - يسمح بالتبديل بين الطرق الثلاث
+ * - يسمح بالتبديل بين الطرق الثلاث (RFID / GS1 / Manual)
  * - يكتمل عند مسح كل القطع
  */
 public class ScanProgressDialog extends Dialog {
@@ -60,7 +63,6 @@ public class ScanProgressDialog extends Dialog {
     private Button btnRfid, btnGs1, btnManual;
     private Button btnComplete, btnCancel;
     
-    // Manual input (inline)
     private LinearLayout layoutManualInput;
     private EditText etManualInput;
     private Button btnSubmitManual;
@@ -68,16 +70,17 @@ public class ScanProgressDialog extends Dialog {
     
     // ==================== State ====================
     
-    private final Context context;
+    private final AppCompatActivity activity;
     private final boolean isArabic;
     private final int transferId;
     private final String transferNumber;
-    private final String phase; // "dispatch" or "receive"
+    private final String phase;
     private final OnScanCompletedListener listener;
     
     private UnifiedScanManager scanManager;
     private RfidScanHandler rfidHandler;
     private ManualInputHandler manualHandler;
+    private BarcodeScanHandler barcodeHandler;
     
     private ScanMethod activeMethod = ScanMethod.RFID;
     private int expectedCount = 0;
@@ -86,16 +89,19 @@ public class ScanProgressDialog extends Dialog {
     private final List<ScanResult> scannedItems = new ArrayList<>();
     private ScanItemsAdapter adapter;
     
+    private boolean sessionCompleted = false;
+    private boolean isDismissing = false;
+    
     // ==================== Constructor ====================
     
-    public ScanProgressDialog(@NonNull Context context,
+    public ScanProgressDialog(@NonNull AppCompatActivity activity,
                               boolean isArabic,
                               int transferId,
                               String transferNumber,
                               String phase,
                               OnScanCompletedListener listener) {
-        super(context);
-        this.context = context;
+        super(activity);
+        this.activity = activity;
         this.isArabic = isArabic;
         this.transferId = transferId;
         this.transferNumber = transferNumber;
@@ -127,13 +133,16 @@ public class ScanProgressDialog extends Dialog {
         initViews();
         setupRecyclerView();
         setupListeners();
+        highlightButton(btnRfid);
         
-        // ✅ ابدأ الجلسة
         startSession();
     }
     
     @Override
     public void dismiss() {
+        if (isDismissing) return;
+        isDismissing = true;
+        
         try {
             if (rfidHandler != null && rfidHandler.isScanning()) {
                 rfidHandler.stopScanning();
@@ -146,9 +155,11 @@ public class ScanProgressDialog extends Dialog {
     // ==================== Init ====================
     
     private void initManagers() {
+        Context context = activity;
         scanManager = UnifiedScanManager.getInstance(context);
-        rfidHandler = new RfidScanHandler(context);
+        rfidHandler = new RfidScanHandler(activity);
         manualHandler = new ManualInputHandler(context);
+        barcodeHandler = new BarcodeScanHandler(context);
     }
     
     private void initViews() {
@@ -164,21 +175,17 @@ public class ScanProgressDialog extends Dialog {
         btnComplete = findViewById(R.id.btnCompleteScan);
         btnCancel = findViewById(R.id.btnCancelScan);
         
-        // Manual inline
         layoutManualInput = findViewById(R.id.layoutManualInput);
         etManualInput = findViewById(R.id.etManualInput);
         btnSubmitManual = findViewById(R.id.btnSubmitManual);
         btnCloseManual = findViewById(R.id.btnCloseManualInput);
         
-        // ✅ النصوص
         updateLabels();
     }
     
     private void updateLabels() {
         if (isArabic) {
-            tvTitle.setText(phase.equals("dispatch") 
-                ? "📤 إرسال الشحنة" 
-                : "📥 استلام الشحنة");
+            tvTitle.setText(phase.equals("dispatch") ? "📤 إرسال الشحنة" : "📥 استلام الشحنة");
             tvPhaseLabel.setText(transferNumber);
             btnRfid.setText("📡 RFID");
             btnGs1.setText("📷 كاميرا");
@@ -187,10 +194,9 @@ public class ScanProgressDialog extends Dialog {
             btnCancel.setText("إلغاء");
             etManualInput.setHint("EPC / Serial / item_id");
             btnSubmitManual.setText("إضافة");
+            btnCloseManual.setText("إغلاق");
         } else {
-            tvTitle.setText(phase.equals("dispatch") 
-                ? "📤 Dispatch Shipment" 
-                : "📥 Receive Shipment");
+            tvTitle.setText(phase.equals("dispatch") ? "📤 Dispatch Shipment" : "📥 Receive Shipment");
             tvPhaseLabel.setText(transferNumber);
             btnRfid.setText("📡 RFID");
             btnGs1.setText("📷 Camera");
@@ -199,6 +205,7 @@ public class ScanProgressDialog extends Dialog {
             btnCancel.setText("Cancel");
             etManualInput.setHint("EPC / Serial / item_id");
             btnSubmitManual.setText("Add");
+            btnCloseManual.setText("Close");
         }
         
         updateCounter();
@@ -208,7 +215,6 @@ public class ScanProgressDialog extends Dialog {
         String text = String.format(Locale.US, "%d / %d", scannedCount, expectedCount);
         tvCounter.setText(text);
         
-        // ✅ لون حسب الحالة
         if (expectedCount > 0 && scannedCount >= expectedCount) {
             tvCounter.setTextColor(Color.parseColor("#4CAF50"));
             btnComplete.setEnabled(true);
@@ -222,7 +228,7 @@ public class ScanProgressDialog extends Dialog {
     
     private void setupRecyclerView() {
         adapter = new ScanItemsAdapter(scannedItems, isArabic);
-        rvScannedItems.setLayoutManager(new LinearLayoutManager(context));
+        rvScannedItems.setLayoutManager(new LinearLayoutManager(activity));
         rvScannedItems.setAdapter(adapter);
     }
     
@@ -250,13 +256,18 @@ public class ScanProgressDialog extends Dialog {
                     updateCounter();
                     
                     Log.d(TAG, "✅ Session started. Expected: " + expectedCount);
+                    
+                    showStatusMessage(
+                        isArabic ? "✅ بدأت الجلسة — ابدأ المسح" 
+                                 : "✅ Session started — begin scanning",
+                        "#4CAF50"
+                    );
                 }
                 
                 @Override
                 public void onSessionError(String error) {
                     Log.e(TAG, "Session error: " + error);
-                    tvStatusMessage.setText("❌ " + error);
-                    tvStatusMessage.setVisibility(View.VISIBLE);
+                    showStatusMessage("❌ " + error, "#F44336");
                     
                     if (listener != null) {
                         listener.onError(error);
@@ -266,6 +277,7 @@ public class ScanProgressDialog extends Dialog {
                 @Override
                 public void onSessionCompleted(int count) {
                     Log.d(TAG, "✅ Session completed. Scanned: " + count);
+                    sessionCompleted = true;
                     
                     if (listener != null) {
                         listener.onCompleted(count);
@@ -293,7 +305,6 @@ public class ScanProgressDialog extends Dialog {
                 updateCounter();
                 showStatusMessage(result.getMessage(), "#4CAF50");
                 
-                // ✅ إذا اكتمل الكل
                 if (result.isAllScanned()) {
                     showStatusMessage(
                         isArabic ? "✅ كل القطع ممسوحة — جاهز للإتمام" 
@@ -327,19 +338,15 @@ public class ScanProgressDialog extends Dialog {
                 break;
                 
             case ERROR:
-                showStatusMessage(
-                    "❌ " + result.getMessage(),
-                    "#F44336"
-                );
+                showStatusMessage("❌ " + result.getMessage(), "#F44336");
                 break;
         }
     }
     
     private void addScannedItem(ScanResult result) {
-        // ✅ أضف للقائمة إن لم يكن موجوداً
         for (ScanResult r : scannedItems) {
-            if (r.getItemId().equals(result.getItemId())) {
-                return; // موجود
+            if (r.getItemId() != null && r.getItemId().equals(result.getItemId())) {
+                return;
             }
         }
         
@@ -357,7 +364,6 @@ public class ScanProgressDialog extends Dialog {
         } catch (Exception ignored) {}
         tvStatusMessage.setVisibility(View.VISIBLE);
         
-        // ✅ اخفِ بعد 3 ثواني
         tvStatusMessage.postDelayed(() -> {
             if (tvStatusMessage != null) {
                 tvStatusMessage.setVisibility(View.GONE);
@@ -375,9 +381,13 @@ public class ScanProgressDialog extends Dialog {
         btnComplete.setOnClickListener(v -> completeSession());
         btnCancel.setOnClickListener(v -> cancelAndDismiss());
         
-        // Manual input
         btnSubmitManual.setOnClickListener(v -> submitManualInput());
         btnCloseManual.setOnClickListener(v -> hideManualInput());
+        
+        etManualInput.setOnEditorActionListener((v, actionId, event) -> {
+            submitManualInput();
+            return true;
+        });
     }
     
     private void switchMethod(ScanMethod method) {
@@ -385,22 +395,19 @@ public class ScanProgressDialog extends Dialog {
         
         Log.d(TAG, "Switching method to: " + method);
         
-        // 1) أوقف RFID
         stopRfidIfActive();
+        hideManualInput();
         
         activeMethod = method;
         scanManager.setCurrentMethod(method);
         
-        // 2) أظهر الحالة الجديدة
         switch (method) {
             case RFID:
-                hideManualInput();
                 startRfidScanning();
                 highlightButton(btnRfid);
                 break;
                 
             case GS1:
-                hideManualInput();
                 openBarcodeCamera();
                 highlightButton(btnGs1);
                 break;
@@ -453,45 +460,43 @@ public class ScanProgressDialog extends Dialog {
     // ==================== GS1 Camera ====================
     
     private void openBarcodeCamera() {
-    try {
-        BarcodeCameraDialog cameraDialog = new BarcodeCameraDialog(
-            activity,
-            isArabic,
-            new BarcodeCameraDialog.OnBarcodeScannedListener() {
-                @Override
-                public void onBarcodeScanned(String rawBarcode) {
-                    Log.d(TAG, "📷 Barcode scanned: " + rawBarcode);
+        try {
+            BarcodeCameraDialog cameraDialog = new BarcodeCameraDialog(
+                activity,
+                isArabic,
+                new BarcodeCameraDialog.OnBarcodeScannedListener() {
+                    @Override
+                    public void onBarcodeScanned(String rawBarcode) {
+                        Log.d(TAG, "📷 Barcode scanned: " + rawBarcode);
+                        
+                        // ✅ استخدم الحقل الموجود
+                        if (barcodeHandler != null) {
+                            barcodeHandler.processRawBarcode(rawBarcode);
+                        }
+                    }
                     
-                    // ✅ استخدم الحقل الموجود بدلاً من إنشاء handler جديد
-                    if (barcodeHandler != null) {
-                        barcodeHandler.processRawBarcode(rawBarcode);
-                    } else {
-                        Log.e(TAG, "barcodeHandler is null!");
+                    @Override
+                    public void onClosed() {
+                        Log.d(TAG, "Camera dialog closed");
                     }
                 }
-                
-                @Override
-                public void onClosed() {
-                    Log.d(TAG, "Camera dialog closed");
-                }
-            }
-        );
-        
-        cameraDialog.show();
-        
-        showStatusMessage(
-            isArabic ? "📷 وجّه الكاميرا نحو الباركود" 
-                     : "📷 Point camera at barcode",
-            "#388E3C"
-        );
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Camera open error: " + e.getMessage());
-        Toast.makeText(activity,
-            isArabic ? "خطأ في فتح الكاميرا" : "Camera error",
-            Toast.LENGTH_SHORT).show();
+            );
+            
+            cameraDialog.show();
+            
+            showStatusMessage(
+                isArabic ? "📷 وجّه الكاميرا نحو الباركود" 
+                         : "📷 Point camera at barcode",
+                "#388E3C"
+            );
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Camera open error: " + e.getMessage());
+            Toast.makeText(activity,
+                isArabic ? "خطأ في فتح الكاميرا" : "Camera error",
+                Toast.LENGTH_SHORT).show();
+        }
     }
-}
     
     // ==================== Manual Input ====================
     
@@ -499,14 +504,11 @@ public class ScanProgressDialog extends Dialog {
         layoutManualInput.setVisibility(View.VISIBLE);
         etManualInput.requestFocus();
         
-        // ✅ أظهر الكيبورد
         try {
-            android.view.inputmethod.InputMethodManager imm = 
-                (android.view.inputmethod.InputMethodManager) 
-                context.getSystemService(Context.INPUT_METHOD_SERVICE);
+            InputMethodManager imm = (InputMethodManager)
+                activity.getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) {
-                imm.showSoftInput(etManualInput, 
-                    android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                imm.showSoftInput(etManualInput, InputMethodManager.SHOW_IMPLICIT);
             }
         } catch (Exception ignored) {}
     }
@@ -516,14 +518,11 @@ public class ScanProgressDialog extends Dialog {
         etManualInput.setText("");
         etManualInput.clearFocus();
         
-        // ✅ اخفِ الكيبورد
         try {
-            android.view.inputmethod.InputMethodManager imm = 
-                (android.view.inputmethod.InputMethodManager) 
-                context.getSystemService(Context.INPUT_METHOD_SERVICE);
+            InputMethodManager imm = (InputMethodManager)
+                activity.getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) {
-                imm.hideSoftInputFromWindow(
-                    etManualInput.getWindowToken(), 0);
+                imm.hideSoftInputFromWindow(etManualInput.getWindowToken(), 0);
             }
         } catch (Exception ignored) {}
     }
@@ -538,11 +537,8 @@ public class ScanProgressDialog extends Dialog {
         }
         
         Log.d(TAG, "⌨️ Manual input: " + input);
-        
-        // ✅ أرسل للمسح
         manualHandler.submit(input);
         
-        // ✅ امسح الحقل
         etManualInput.setText("");
         etManualInput.requestFocus();
     }
@@ -566,18 +562,15 @@ public class ScanProgressDialog extends Dialog {
         );
         
         stopRfidIfActive();
-        
-        // ✅ استدعِ الإتمام
         scanManager.completeSession();
     }
     
     private void cancelAndDismiss() {
-        // ✅ اسأل قبل الإلغاء
-        new androidx.appcompat.app.AlertDialog.Builder(context)
+        new androidx.appcompat.app.AlertDialog.Builder(activity)
             .setTitle(isArabic ? "إلغاء المسح؟" : "Cancel scan?")
             .setMessage(isArabic 
-                ? "سيتم إلغاء جلسة المسح الحالية"
-                : "Current scan session will be cancelled")
+                ? "سيتم إلغاء جلسة المسح الحالية وعدم حفظ التغييرات."
+                : "Current scan session will be cancelled.")
             .setPositiveButton(
                 isArabic ? "نعم" : "Yes",
                 (d, w) -> {
@@ -592,9 +585,6 @@ public class ScanProgressDialog extends Dialog {
     
     // ==================== Adapter ====================
     
-    /**
-     * ✅ Adapter لعرض القطع الممسوحة
-     */
     private static class ScanItemsAdapter extends RecyclerView.Adapter<ScanItemsAdapter.VH> {
         
         private final List<ScanResult> items;
@@ -620,10 +610,9 @@ public class ScanProgressDialog extends Dialog {
             h.tvIndex.setText(String.valueOf(position + 1));
             h.tvTitle.setText(item.getTitle() != null && !item.getTitle().isEmpty()
                 ? item.getTitle() 
-                : "قطعة");
-            h.tvSerial.setText(item.getSerial());
+                : (isArabic ? "قطعة" : "Item"));
+            h.tvSerial.setText(item.getSerial() != null ? item.getSerial() : "");
             
-            // ✅ Karat + Weight
             StringBuilder sb = new StringBuilder();
             if (item.getGoldKarat() != null && !item.getGoldKarat().isEmpty()) {
                 sb.append(item.getGoldKarat());
@@ -634,33 +623,21 @@ public class ScanProgressDialog extends Dialog {
             }
             h.tvDetails.setText(sb.toString());
             
-            // ✅ أيقونة الطريقة
             String methodIcon;
-            switch (item.getMethod()) {
-                case "rfid": methodIcon = "📡"; break;
-                case "gs1": methodIcon = "📷"; break;
-                case "manual": methodIcon = "⌨️"; break;
-                default: methodIcon = "✅"; break;
-            }
+            if ("rfid".equals(item.getMethod())) methodIcon = "📡";
+            else if ("gs1".equals(item.getMethod())) methodIcon = "📷";
+            else if ("manual".equals(item.getMethod())) methodIcon = "⌨️";
+            else methodIcon = "✅";
             h.tvMethodIcon.setText(methodIcon);
             
-            // ✅ لون البطاقة
             int color;
             switch (item.getStatus()) {
-                case SCANNED:
-                    color = Color.parseColor("#E8F5E9"); // أخضر فاتح
-                    break;
+                case SCANNED: color = Color.parseColor("#E8F5E9"); break;
                 case ALREADY_SCANNED:
-                case EXTRA:
-                    color = Color.parseColor("#FFF3E0"); // برتقالي فاتح
-                    break;
+                case EXTRA: color = Color.parseColor("#FFF3E0"); break;
                 case NOT_FOUND:
-                case ERROR:
-                    color = Color.parseColor("#FFEBEE"); // أحمر فاتح
-                    break;
-                default:
-                    color = Color.parseColor("#F5F5F5");
-                    break;
+                case ERROR: color = Color.parseColor("#FFEBEE"); break;
+                default: color = Color.parseColor("#F5F5F5"); break;
             }
             h.itemView.setBackgroundColor(color);
         }
