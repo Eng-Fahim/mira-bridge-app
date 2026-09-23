@@ -4,26 +4,28 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="?attr/colorSurface"
+    android:orientation="vertical"
     tools:layoutDirection="rtl">
 
-    <!-- Header Toolbar -->
+    <!-- ═══════════════════════════════════════════════════════
+         Header Toolbar
+         ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        app:cardBackgroundColor="?attr/colorPrimaryContainer"
         app:cardCornerRadius="0dp"
-        app:cardElevation="2dp"
-        app:strokeWidth="0dp"
-        app:cardBackgroundColor="?attr/colorPrimaryContainer">
+        app:cardElevation="@dimen/elevation_2"
+        app:strokeWidth="0dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="14dp">
+            android:paddingHorizontal="@dimen/screen_padding_h"
+            android:paddingVertical="@dimen/space_4">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -35,73 +37,76 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/transfers_title"
-                    android:textColor="?attr/colorOnPrimaryContainer"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="@style/TextAppearance.App.Title.Medium"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
 
                 <TextView
                     android:id="@+id/tvTransferCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="?attr/colorOnPrimaryContainer"
-                    android:textSize="12sp"
-                    android:alpha="0.85" />
+                    android:layout_marginTop="@dimen/space_1"
+                    android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnNewTransfer"
+                style="@style/AppButtonStyle"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="@dimen/button_height_sm"
                 android:text="@string/new_transfer"
                 android:textSize="12sp"
-                app:cornerRadius="10dp"
                 app:icon="@android:drawable/ic_input_add"
-                app:iconGravity="start" />
+                app:iconGravity="textStart"
+                app:iconSize="@dimen/icon_sm" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Filter Chips dynamically generated via Java -->
+    <!-- ═══════════════════════════════════════════════════════
+         Filter Chips (تُولَّد ديناميكياً في Java)
+         ═══════════════════════════════════════════════════════ -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="8dp"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        android:paddingHorizontal="@dimen/space_3"
+        android:paddingVertical="@dimen/space_2"
+        android:scrollbars="none">
 
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/chipGroupFilters"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:singleLine="true"
-            app:singleSelection="true"
+            app:chipSpacingHorizontal="@dimen/space_2"
             app:selectionRequired="true"
-            app:chipSpacingHorizontal="8dp">
-            <!-- سيتم توليد الـ Chips وتحديث أعدادها وألوانها ديناميكياً في Java -->
-        </com.google.android.material.chip.ChipGroup>
+            app:singleLine="true"
+            app:singleSelection="true" />
     </HorizontalScrollView>
 
-    <!-- Fast RFID Scan Action Trigger -->
+    <!-- ═══════════════════════════════════════════════════════
+         زر مسح RFID السريع
+         ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="12dp"
-        android:paddingBottom="8dp">
+        android:paddingHorizontal="@dimen/space_3"
+        android:paddingBottom="@dimen/space_2">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanItems"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/AppButtonStyle.Tonal"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/button_height"
             android:text="@string/scan_verify"
             android:textSize="13sp"
             app:icon="@android:drawable/ic_menu_search"
-            app:iconGravity="start"
-            app:cornerRadius="10dp" />
+            app:iconGravity="textStart"
+            app:iconSize="@dimen/icon_md" />
     </LinearLayout>
 
-    <!-- قائمة التحويلات -->
+    <!-- ═══════════════════════════════════════════════════════
+         قائمة التحويلات
+         ═══════════════════════════════════════════════════════ -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -111,38 +116,37 @@
             android:id="@+id/rvTransfers"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="8dp"
             android:clipToPadding="false"
-            android:layoutAnimation="@anim/layout_animation_fall_down" />
+            android:padding="@dimen/space_2" />
 
-        <!-- حالة فارغة -->
+        <!-- الحالة الفارغة -->
         <LinearLayout
             android:id="@+id/emptyStateContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:orientation="vertical"
             android:gravity="center"
+            android:orientation="vertical"
             android:visibility="gone">
 
             <TextView
                 android:id="@+id/tvEmptyTransfers"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="@string/no_transfers"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="14sp"
-                android:gravity="center" />
+                android:textAppearance="@style/TextAppearance.App.Body.Large"
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="اضغط على تحويل جديد للبدء"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
+                android:layout_marginTop="@dimen/space_1"
                 android:alpha="0.7"
-                android:gravity="center" />
+                android:gravity="center"
+                android:text="اضغط على تحويل جديد للبدء"
+                android:textAppearance="@style/TextAppearance.App.Body.Small"
+                android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
     </FrameLayout>
 
