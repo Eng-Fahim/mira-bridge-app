@@ -2078,51 +2078,48 @@ private void restoreItemToCache(String code, RefundItem item) {
      * ✅ فتح ماسح الباركود
      */
     private void openBarcodeScanner() {
-        try {
-            if (!isAdded() || getContext() == null) return;
-            FragmentManager fm = getParentFragmentManager();
-            if (fm == null || fm.isStateSaved()) return;
+    try {
+        if (!isAdded() || getContext() == null) return;
+        FragmentManager fm = getParentFragmentManager();
+        if (fm == null || fm.isStateSaved()) return;
 
-            MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
-            sf.setOnBarcodeScannedListener((data, format) -> {
-                try {
-                    if (isAdded() && fm.getBackStackEntryCount() > 0) {
-                        fm.popBackStack();
-                    }
-
-                    if (etManualEpc != null) etManualEpc.setText(data);
-
-                    mainHandler.postDelayed(() -> {
-                        if (isAdded() && data != null && !data.isEmpty()) {
-                            processRingEpc(data, "barcode");
-                            if (etManualEpc != null) etManualEpc.setText("");
-                        }
-                    }, 200);
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Barcode callback error: " + e.getMessage());
-                }
-            });
-
-            int containerId = android.R.id.content;
+        MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
+        sf.setOnBarcodeScannedListener((data, format) -> {
             try {
-                View view = getView();
-                if (view != null && view.getParent() instanceof View) {
-                    containerId = ((View) view.getParent()).getId();
-                }
-            } catch (Exception ignored) {}
+                // ✅ ملاحظة: لا نستدعي popBackStack هنا لأن الماسح أغلق نفسه بالفعل
+                
+                // تفريغ الحقل
+                if (etManualEpc != null) etManualEpc.setText(data);
 
-            if (!fm.isStateSaved()) {
-                fm.beginTransaction()
-                        .replace(containerId, sf)
-                        .addToBackStack("barcode_scanner")
-                        .commit();
+                // معالجة الكود
+                if (isAdded() && data != null && !data.isEmpty()) {
+                    processRingEpc(data, "barcode");
+                    if (etManualEpc != null) etManualEpc.setText("");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Barcode callback error: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
-            showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+        });
+
+        int containerId = android.R.id.content;
+        try {
+            View view = getView();
+            if (view != null && view.getParent() instanceof View) {
+                containerId = ((View) view.getParent()).getId();
+            }
+        } catch (Exception ignored) {}
+
+        if (!fm.isStateSaved()) {
+            fm.beginTransaction()
+                    .replace(containerId, sf)
+                    .addToBackStack("barcode_scanner")
+                    .commit();
         }
+    } catch (Exception e) {
+        Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
+        showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
     }
+}
 
     /**
      * ✅ تهيئة الميزان الذكي
