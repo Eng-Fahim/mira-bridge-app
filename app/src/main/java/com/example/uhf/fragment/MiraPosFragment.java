@@ -268,16 +268,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     try {
         Context ctx = requireContext().getApplicationContext();
 
-        // ✅✅✅ حل نهائي - امسح الكاش القديم مرة واحدة
-        try {
-            MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
-            if (cache != null) {
-                cache.clearCache();
-                Log.e(TAG, "🗑️ CACHE CLEARED SUCCESSFULLY");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Cache clear error: " + e.getMessage());
-        }
+        
 
         // ✅ تهيئة المديرين
         branchesManager = MiraBranchesManager.getInstance(ctx);
