@@ -476,43 +476,38 @@ public class MiraBarcodeScannerFragment extends Fragment {
     // ==================== Detection ====================
 
     private void onBarcodeDetected(String data, int format) {
-        long now = System.currentTimeMillis();
-        if (now - lastScanTime < SCAN_COOLDOWN_MS) return;
-        lastScanTime = now;
+    long now = System.currentTimeMillis();
+    if (now - lastScanTime < SCAN_COOLDOWN_MS) return;
+    lastScanTime = now;
 
-        // صوت
-        playBeepSafe();
+    // 1. إيقاف المسح فوراً لمنع تكرار القراءة
+    isScanning = false;
+    playBeepSafe();
 
-        String formatName = getBarcodeFormatName(format);
+    String formatName = getBarcodeFormatName(format);
 
-        // تحديث الواجهة
-        safeRun(() -> {
-            try {
-                if (tvScannedData != null) {
-                    tvScannedData.setText(formatName + ": " + data);
-                    tvScannedData.setVisibility(View.VISIBLE);
-                }
-                if (tvScanStatus != null) {
-                    tvScanStatus.setText(isArabic ? "✅ تم المسح" : "✅ Scanned");
-                    tvScanStatus.setTextColor(COLOR_SUCCESS);
-                }
-
-                if (tvScannedData != null) {
-                    tvScannedData.postDelayed(() -> {
-                        if (isViewDestroyed || tvScannedData == null) return;
-                        tvScannedData.setVisibility(View.GONE);
-                        if (tvScanStatus != null) {
-                            tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
-                            tvScanStatus.setTextColor(COLOR_READY);
-                        }
-                    }, 2000);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error updating UI: " + e.getMessage());
+    // 2. تحديث الواجهة (اختياري - لإظهار النتيجة للمستخدم للحظة)
+    safeRun(() -> {
+        try {
+            if (tvScannedData != null) {
+                tvScannedData.setText(formatName + ": " + data);
+                tvScannedData.setVisibility(View.VISIBLE);
             }
-        });
+            if (tvScanStatus != null) {
+                tvScanStatus.setText(isArabic ? "✅ تم المسح" : "✅ Scanned");
+                tvScanStatus.setTextColor(COLOR_SUCCESS);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating UI: " + e.getMessage());
+        }
+    });
 
-        // ✅ [إصلاح #15] إخطار listener فقط (لأنه هو الذي يمرر بدوره)
+    // 3. ✅✅✅ الحل الجذري: إغلاق الشاشة فوراً قبل إرسال النتيجة
+    // هذا يضمن عودة المستخدم لشاشة POS مباشرة
+    closeScanner();
+
+    // 4. إرسال النتيجة بعد إغلاق الشاشة بقليل (لضمان عودة الواجهة)
+    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
         if (barcodeListener != null) {
             try {
                 barcodeListener.onBarcodeScanned(data, formatName);
@@ -520,10 +515,10 @@ public class MiraBarcodeScannerFragment extends Fragment {
                 Log.e(TAG, "barcodeListener error: " + e.getMessage());
             }
         } else {
-            // إذا لم يوجد listener، مرر إلى POS كخيار احتياطي
             forwardToPOS(data);
         }
-    }
+    }, 150); // تأخير بسيط جداً (150ms) لضمان اكتمال إغلاق الشاشة
+}
 
     /**
      * ✅ [إصلاح #11] حماية من ClassCastException
