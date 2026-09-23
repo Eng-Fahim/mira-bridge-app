@@ -18,7 +18,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -70,7 +70,7 @@ public class ScanProgressDialog extends Dialog {
     
     // ==================== State ====================
     
-    private final AppCompatActivity activity;
+    private final FragmentActivity activity;
     private final boolean isArabic;
     private final int transferId;
     private final String transferNumber;
@@ -94,7 +94,7 @@ public class ScanProgressDialog extends Dialog {
     
     // ==================== Constructor ====================
     
-    public ScanProgressDialog(@NonNull AppCompatActivity activity,
+    public ScanProgressDialog(@NonNull FragmentActivity activity,
                               boolean isArabic,
                               int transferId,
                               String transferNumber,
