@@ -992,9 +992,14 @@ private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
 /**
  * ✅ بناء الـ payload في دالة منفصلة
  */
+/**
+ * ✅ بناء الـ payload بشكل كامل واحترافي
+ * يُرسل كل البيانات المطلوبة للسيرفر
+ */
 private JSONObject buildCheckoutPayload(MiraApiClient client,
                                          POSCheckoutDialog.POSCheckoutData data)
         throws Exception {
+
     JSONObject payload = new JSONObject();
     payload.put("action", "COMPLETE_POS_SALE");
     payload.put("gate_id", client.getGateId());
@@ -1002,9 +1007,16 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
     payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
 
-    String customerName = data.customerName != null && !data.customerName.isEmpty()
-            ? data.customerName : "عميل نقدي";
-    String customerPhone = data.customerPhone != null ? data.customerPhone : "-";
+    // ✅ بيانات العميل
+    String customerName = (data.customerName != null && !data.customerName.trim().isEmpty())
+            ? data.customerName.trim()
+            : (isArabic ? "عميل نقدي" : "Cash Customer");
+
+    String customerPhone = (data.customerPhone != null && !data.customerPhone.trim().isEmpty()
+            && !"—".equals(data.customerPhone.trim())
+            && !"-".equals(data.customerPhone.trim()))
+            ? data.customerPhone.trim()
+            : "";
 
     payload.put("customer_name", customerName);
     payload.put("customer_phone", customerPhone);
@@ -1014,45 +1026,89 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     customer.put("phone", customerPhone);
     payload.put("customer", customer);
 
+    // ✅ بيانات القطع (كاملة)
     JSONArray itemsArr = new JSONArray();
     for (CartItem item : cartList) {
+        if (item == null) continue;
+
         JSONObject obj = new JSONObject();
-        obj.put("epc", item.epc);
-        obj.put("title", item.name);
-        obj.put("karat", item.karat);
-        obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+        obj.put("epc", item.epc != null ? item.epc : "");
+        obj.put("serial_no", item.serialNo != null ? item.serialNo : "");
+        obj.put("gtin", item.gtin != null ? item.gtin : "");
+        obj.put("title", item.name != null ? item.name : "");
+        obj.put("karat", item.karat != null ? item.karat : "21K");
+
+        // ✅ الوزن (يستخدم scaleWeight إذا موجود، وإلا weight)
+        double finalWeight = item.scaleWeight > 0 ? item.scaleWeight : item.weight;
+        obj.put("weight", finalWeight);
+        obj.put("gross_weight", finalWeight);
+
         obj.put("price_usd", item.price);
         obj.put("item_id", item.itemId);
-        obj.put("serial_no", item.serialNo);
+        obj.put("location", item.location != null ? item.location : "");
+
+        // ✅ TID إن وُجد
+        if (item.epc != null && !item.epc.isEmpty()) {
+            obj.put("tid", item.epc);  // يمكن تعديله حسب مصدر TID
+        }
+
         itemsArr.put(obj);
     }
     payload.put("items", itemsArr);
 
+    // ✅ بيانات الدفع
     String currencyCode = priceManager.getDefaultCurrency();
     double exchangeRate = priceManager.getExchangeRate(currencyCode);
-    double subtotalLocal = priceManager.convertFromUSD(data.originalTotal, currencyCode);
-    double discountLocal = priceManager.convertFromUSD(data.discountAmount, currencyCode);
-    double finalLocal = priceManager.convertFromUSD(data.finalAmount, currencyCode);
 
+    double subtotalUsd = data.originalTotal;
+    double discountUsd = data.discountAmount;
+    double finalUsd = data.finalAmount;
+
+    double subtotalLocal = priceManager.convertFromUSD(subtotalUsd, currencyCode);
+    double discountLocal = priceManager.convertFromUSD(discountUsd, currencyCode);
+    double finalLocal = priceManager.convertFromUSD(finalUsd, currencyCode);
+
+    // ✅ Fallback
     if (exchangeRate <= 0) {
         Log.e(TAG, "⚠️ Invalid exchange rate, using fallback 530");
         exchangeRate = 530.0;
-        subtotalLocal = data.originalTotal * exchangeRate;
-        discountLocal = data.discountAmount * exchangeRate;
-        finalLocal = data.finalAmount * exchangeRate;
+        subtotalLocal = subtotalUsd * exchangeRate;
+        discountLocal = discountUsd * exchangeRate;
+        finalLocal = finalUsd * exchangeRate;
     }
 
+    // ✅ على الجذر (للاستخدام المباشر)
+    payload.put("subtotal_usd", subtotalUsd);
+    payload.put("discount_usd", discountUsd);
+    payload.put("total_usd", finalUsd);
+    payload.put("total_amount_usd", finalUsd);   // ← لتوافق السيرفر
+    payload.put("subtotal", subtotalLocal);
+    payload.put("discount", discountLocal);
+    payload.put("total", finalLocal);
+    payload.put("total_amount", finalLocal);     // ← لتوافق السيرفر
+
+    // ✅ بيانات الدفع التفصيلية
     JSONObject payment = new JSONObject();
-    payment.put("subtotal_usd", data.originalTotal);
+    payment.put("subtotal_usd", subtotalUsd);
+    payment.put("discount_amount_usd", discountUsd);
+    payment.put("final_amount_usd", finalUsd);
     payment.put("subtotal", subtotalLocal);
-    payment.put("discount_amount_usd", data.discountAmount);
     payment.put("discount_amount", discountLocal);
-    payment.put("final_amount_usd", data.finalAmount);
     payment.put("final_amount", finalLocal);
     payment.put("exchange_rate", exchangeRate);
     payment.put("currency_code", currencyCode);
-    payment.put("payment_method", data.paymentMethod);
+    payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
     payload.put("payment", payment);
+
+    // ✅ ملاحظات
+    if (data.notes != null && !data.notes.isEmpty()) {
+        payload.put("notes", data.notes);
+    }
+
+    // ✅ إجمالي الأصناف
+    payload.put("item_count", cartList.size());
+
+    Log.d("POS_DEBUG", "🚨 CHECKOUT PAYLOAD:\n" + payload.toString(2));
 
     return payload;
 }
