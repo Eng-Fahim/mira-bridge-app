@@ -389,7 +389,94 @@
     <color name="viewfinder_frame">#FF000000</color>
     <color name="viewfinder_laser">#FFFF0000</color>
     <color name="viewfinder_mask">#60000000</color>
+<!-- ═══════════════════════════════════════════════════════════════
+     🎯 PART 5 — COMPLETE LEGACY COLOR PALETTE
+     جميع الألوان القديمة المحتملة — أضفها كلها لتفادي أي خطأ
+     ═══════════════════════════════════════════════════════════════ -->
 
+<!-- Amber / Warning -->
+<color name="warning_amber">#FFA000</color>
+<color name="warning_amber_dark">#F57C00</color>
+<color name="warning_amber_light">#FFC107</color>
+<color name="amber">#FFC107</color>
+<color name="amber_dark">#FF8F00</color>
+
+<!-- Blue / Info -->
+<color name="info_blue">#2196F3</color>
+<color name="info_blue_dark">#1976D2</color>
+<color name="info_blue_light">#64B5F6</color>
+<color name="info">#2196F3</color>
+<color name="info_dark">#1976D2</color>
+
+<!-- Green / Success -->
+<color name="success_green">#4CAF50</color>
+<color name="success_green_dark">#388E3C</color>
+<color name="success_green_light">#81C784</color>
+<color name="success">#4CAF50</color>
+<color name="success_dark">#388E3C</color>
+
+<!-- Red / Error / Danger -->
+<color name="error_red">#F44336</color>
+<color name="error_red_dark">#D32F2F</color>
+<color name="error_red_light">#EF5350</color>
+<color name="danger_red">#F44336</color>
+<color name="error">#F44336</color>
+
+<!-- Gray / Neutral -->
+<color name="neutral_gray">#9E9E9E</color>
+<color name="neutral_gray_dark">#616161</color>
+<color name="neutral_gray_light">#E0E0E0</color>
+<color name="neutral">#9E9E9E</color>
+
+<!-- Teal / Cyan -->
+<color name="teal_primary">#009688</color>
+<color name="teal_dark">#00796B</color>
+<color name="cyan_primary">#00BCD4</color>
+
+<!-- Purple / Deep Purple -->
+<color name="purple_primary">#9C27B0</color>
+<color name="deep_purple">#673AB7</color>
+<color name="deep_purple_dark">#512DA8</color>
+
+<!-- Indigo / Blue -->
+<color name="indigo_primary">#3F51B5</color>
+<color name="blue_primary">#2196F3</color>
+<color name="blue_dark">#1976D2</color>
+<color name="blue_accent">#448AFF</color>
+
+<!-- Orange / Pink -->
+<color name="orange_primary">#FF9800</color>
+<color name="orange_dark">#F57C00</color>
+<color name="pink_primary">#E91E63</color>
+<color name="pink_dark">#C2185B</color>
+
+<!-- Lime / Light Green -->
+<color name="lime_primary">#CDDC39</color>
+<color name="light_green">#8BC34A</color>
+
+<!-- Brown / Gray -->
+<color name="brown_primary">#795548</color>
+<color name="blue_gray">#607D8B</color>
+<color name="blue_gray_dark">#455A64</color>
+
+<!-- 🌟 Shimmer / Skeleton -->
+<color name="shimmer_start">#F1F5F9</color>
+<color name="shimmer_end">#E2E8F0</color>
+<color name="skeleton_bg">#F1F5F9</color>
+<color name="placeholder_bg">#E2E8F0</color>
+
+<!-- 🌟 Border / Divider Variants -->
+<color name="divider">#E2E8F0</color>
+<color name="divider_dark">#CBD5E1</color>
+<color name="border">#E2E8F0</color>
+<color name="separator">#E2E8F0</color>
+
+<!-- 🌟 Text Variants -->
+<color name="text_hint">#94A3B8</color>
+<color name="text_disabled">#CBD5E1</color>
+<color name="text_white">#FFFFFF</color>
+<color name="text_black">#000000</color>
+<color name="text_link">#0284C7</color>
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
