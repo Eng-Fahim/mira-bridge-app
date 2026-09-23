@@ -30,6 +30,46 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    - name: 🔍 Check Missing Colors (Pre-Build Validation)
+      run: |
+        echo "═══════════════════════════════════════════════════════"
+        echo "🔍 Checking for missing color resources..."
+        echo "═══════════════════════════════════════════════════════"
+        
+        # Extract all R.color.* from Java files
+        grep -rhoE "R\.color\.[a-zA-Z_0-9]+" app/src/main/java/ 2>/dev/null \
+          | sed 's/R\.color\.//' | sort -u > /tmp/needed_colors.txt
+        
+        # Extract all @color/* from XML files
+        grep -rhoE "@color/[a-zA-Z_0-9]+" app/src/main/res/ 2>/dev/null \
+          | sed 's|@color/||' | sort -u >> /tmp/needed_colors.txt
+        
+        # Unique list
+        sort -u /tmp/needed_colors.txt -o /tmp/needed_colors.txt
+        
+        # Extract defined colors from colors.xml
+        grep -oE 'name="[a-zA-Z_0-9]+"' app/src/main/res/values/colors.xml 2>/dev/null \
+          | sed 's/name="//;s/"//' | sort -u > /tmp/defined_colors.txt
+        
+        # Find missing colors
+        comm -23 /tmp/needed_colors.txt /tmp/defined_colors.txt > /tmp/missing_colors.txt
+        
+        if [ -s /tmp/missing_colors.txt ]; then
+          echo ""
+          echo "❌ MISSING COLORS DETECTED:"
+          echo "─────────────────────────────"
+          cat /tmp/missing_colors.txt
+          echo ""
+          echo "Total needed:   $(wc -l < /tmp/needed_colors.txt)"
+          echo "Total defined:  $(wc -l < /tmp/defined_colors.txt)"
+          echo "Total missing:  $(wc -l < /tmp/missing_colors.txt)"
+          echo ""
+          echo "⚠️  Add these colors to app/src/main/res/values/colors.xml"
+          exit 1
+        else
+          echo "✅ All colors are defined! ($(wc -l < /tmp/defined_colors.txt) colors)"
+        fi
+
     - name: Build Release APK
       run: ./gradlew :app:assembleRelease --stacktrace
 
