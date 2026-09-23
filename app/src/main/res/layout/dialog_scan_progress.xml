@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    android:background="@drawable/bg_dialog_rounded"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- ════════════════ الرأس ════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvScanProgressTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📤 إرسال الشحنة"
+                android:textColor="#212121"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvScanPhaseLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="TRF-XXX"
+                android:textColor="#757575"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvScanCounter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#E3F2FD"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:text="0 / 0"
+            android:textColor="#1976D2"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- ════════════════ رسالة الحالة ════════════════ -->
+    <TextView
+        android:id="@+id/tvScanStatusMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="#F5F5F5"
+        android:padding="10dp"
+        android:text=""
+        android:textColor="#616161"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <!-- ════════════════ أزرار الطرق الثلاث ════════════════ -->
+    <LinearLayout
+        android:id="@+id/layoutMethodButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        android:weightSum="3">
+
+        <Button
+            android:id="@+id/btnMethodRfid"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="#1976D2"
+            android:text="📡 RFID"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnMethodGs1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_weight="1"
+            android:background="#EEEEEE"
+            android:text="📷 كاميرا"
+            android:textColor="#616161"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnMethodManual"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="#EEEEEE"
+            android:text="⌨️ يدوي"
+            android:textColor="#616161"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- ════════════════ الإدخال اليدوي (inline) ════════════════ -->
+    <LinearLayout
+        android:id="@+id/layoutManualInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="#F5F5F5"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/etManualInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:drawable/edit_text"
+            android:hint="EPC / Serial / item_id"
+            android:imeOptions="actionDone"
+            android:inputType="text"
+            android:padding="12dp"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSubmitManual"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="#1976D2"
+                android:text="إضافة"
+                android:textColor="#FFFFFF" />
+
+            <Button
+                android:id="@+id/btnCloseManualInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="#EEEEEE"
+                android:text="إغلاق"
+                android:textColor="#616161" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ════════════════ قائمة القطع الممسوحة ════════════════ -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="القطع الممسوحة:"
+        android:textColor="#424242"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvScannedItems"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_marginTop="6dp"
+        android:background="#FAFAFA"
+        android:clipToPadding="false"
+        android:padding="4dp" />
+
+    <!-- ════════════════ الأزرار ════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnCancelScan"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="#F5F5F5"
+            android:text="إلغاء"
+            android:textColor="#616161" />
+
+        <Button
+            android:id="@+id/btnCompleteScan"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:background="#4CAF50"
+            android:enabled="false"
+            android:alpha="0.5"
+            android:text="✅ إتمام"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+</LinearLayout>
