@@ -453,45 +453,45 @@ public class ScanProgressDialog extends Dialog {
     // ==================== GS1 Camera ====================
     
     private void openBarcodeCamera() {
-        try {
-            BarcodeCameraDialog cameraDialog = new BarcodeCameraDialog(
-                context,
-                isArabic,
-                new BarcodeCameraDialog.OnBarcodeScannedListener() {
-                    @Override
-                    public void onBarcodeScanned(String rawBarcode) {
-                        Log.d(TAG, "📷 Barcode scanned: " + rawBarcode);
-                        
-                        // ✅ عالج الباركود
-                        // ✅ استخدم الحقل الموجود بدلاً من إنشاء جديد
-if (barcodeHandler != null) {
-    barcodeHandler.processRawBarcode(rawBarcode);
-}
-                        handler.processRawBarcode(rawBarcode);
-                    }
+    try {
+        BarcodeCameraDialog cameraDialog = new BarcodeCameraDialog(
+            activity,
+            isArabic,
+            new BarcodeCameraDialog.OnBarcodeScannedListener() {
+                @Override
+                public void onBarcodeScanned(String rawBarcode) {
+                    Log.d(TAG, "📷 Barcode scanned: " + rawBarcode);
                     
-                    @Override
-                    public void onClosed() {
-                        Log.d(TAG, "Camera dialog closed");
+                    // ✅ استخدم الحقل الموجود بدلاً من إنشاء handler جديد
+                    if (barcodeHandler != null) {
+                        barcodeHandler.processRawBarcode(rawBarcode);
+                    } else {
+                        Log.e(TAG, "barcodeHandler is null!");
                     }
                 }
-            );
-            
-            cameraDialog.show();
-            
-            showStatusMessage(
-                isArabic ? "📷 وجّه الكاميرا نحو الباركود" 
-                         : "📷 Point camera at barcode",
-                "#388E3C"
-            );
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Camera open error: " + e.getMessage());
-            Toast.makeText(context,
-                isArabic ? "خطأ في فتح الكاميرا" : "Camera error",
-                Toast.LENGTH_SHORT).show();
-        }
+                
+                @Override
+                public void onClosed() {
+                    Log.d(TAG, "Camera dialog closed");
+                }
+            }
+        );
+        
+        cameraDialog.show();
+        
+        showStatusMessage(
+            isArabic ? "📷 وجّه الكاميرا نحو الباركود" 
+                     : "📷 Point camera at barcode",
+            "#388E3C"
+        );
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Camera open error: " + e.getMessage());
+        Toast.makeText(activity,
+            isArabic ? "خطأ في فتح الكاميرا" : "Camera error",
+            Toast.LENGTH_SHORT).show();
     }
+}
     
     // ==================== Manual Input ====================
     
