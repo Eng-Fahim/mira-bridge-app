@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout 
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -11,19 +11,70 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- ✅ Header - الإحصائيات -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- ✅ Toolbar (Header + زر إغلاق)                       -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/headerBar"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="8dp"
+            android:background="?attr/colorSurface"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnClose"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:contentDescription="إغلاق"
+                app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                app:iconSize="22dp"
+                app:iconTint="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:fontFamily="@font/cairo"
+                android:text="📊 سجل المزامنة"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRefresh"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:contentDescription="تحديث"
+                app:icon="@android:drawable/ic_menu_rotate"
+                app:iconSize="22dp"
+                app:iconTint="?attr/colorOnSurface" />
+        </LinearLayout>
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- ✅ Header - الإحصائيات                                -->
+        <!-- ══════════════════════════════════════════════════════ -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/statsCard"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="12dp"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             app:cardBackgroundColor="?attr/colorPrimaryContainer"
             app:cardCornerRadius="16dp"
             app:cardElevation="2dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+            app:layout_constraintTop_toBottomOf="@id/headerBar">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -34,8 +85,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <ImageView
                         android:layout_width="28dp"
@@ -50,11 +101,11 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
+                        android:fontFamily="@font/cairo"
                         android:text="📊 سجل المزامنة"
                         android:textColor="?attr/colorOnPrimaryContainer"
                         android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:fontFamily="@font/cairo" />
+                        android:textStyle="bold" />
 
                     <ProgressBar
                         android:id="@+id/progressBar"
@@ -69,25 +120,27 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:textColor="?attr/colorOnPrimaryContainer"
-                    android:textSize="11sp"
                     android:fontFamily="monospace"
                     android:lineSpacingExtra="3dp"
-                    android:text="Last Sync: Never&#10;Pending: 0" />
+                    android:text="Last Sync: Never&#10;Pending: 0"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="11sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ✅ زر مزامنة الكل -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- ✅ زر مزامنة الكل                                     -->
+        <!-- ══════════════════════════════════════════════════════ -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSyncAll"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_marginHorizontal="12dp"
             android:layout_marginTop="10dp"
+            android:fontFamily="@font/cairo"
             android:text="🔄 مزامنة الكل"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:fontFamily="@font/cairo"
             app:cornerRadius="12dp"
             app:icon="@android:drawable/ic_menu_rotate"
             app:iconGravity="textStart"
@@ -96,7 +149,9 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/statsCard" />
 
-        <!-- ✅ قائمة السجلات -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- ✅ قائمة السجلات                                      -->
+        <!-- ══════════════════════════════════════════════════════ -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvSyncLogs"
             android:layout_width="0dp"
@@ -110,7 +165,9 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/btnSyncAll" />
 
-        <!-- ✅ حالة فارغة -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- ✅ حالة فارغة                                          -->
+        <!-- ══════════════════════════════════════════════════════ -->
         <LinearLayout
             android:id="@+id/layoutEmptyState"
             android:layout_width="wrap_content"
@@ -134,19 +191,19 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:fontFamily="@font/cairo"
                 android:text="لا توجد سجلات معلقة"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="14sp"
-                android:fontFamily="@font/cairo" />
+                android:textSize="14sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:fontFamily="@font/cairo"
                 android:text="جميع التكويدات تمت مزامنتها"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                android:fontFamily="@font/cairo" />
+                android:textSize="12sp" />
         </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
