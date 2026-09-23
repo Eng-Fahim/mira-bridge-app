@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- الطبقة 1: التدرج الذهبي المعدني الغني -->
+    <!-- الطبقة الأساسية: تدرج ذهبي -->
     <item>
         <shape android:shape="rectangle">
             <gradient
@@ -14,9 +14,9 @@
         </shape>
     </item>
 
-    <!-- الطبقة 2: انعكاس الإضاءة المعدنية العلوي (Specular Highlight) -->
+    <!-- الطبقة الثانية: لمعان علوي (60dp من الأعلى) -->
     <item
-        android:bottom="45%"
+        android:bottom="200dp"
         android:top="0dp">
         <shape android:shape="rectangle">
             <gradient
@@ -26,16 +26,14 @@
                 android:type="linear" />
             <corners
                 android:topLeftRadius="24dp"
-                android:topRightRadius="24dp"
-                android:bottomLeftRadius="0dp"
-                android:bottomRightRadius="0dp" />
+                android:topRightRadius="24dp" />
         </shape>
     </item>
 
-    <!-- الطبقة 3: الظل السفلي المدمج لإبراز العمق -->
+    <!-- الطبقة الثالثة: ظل سفلي (60dp من الأسفل) -->
     <item
-        android:top="75%"
-        android:bottom="0dp">
+        android:bottom="0dp"
+        android:top="260dp">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="90"
@@ -44,9 +42,7 @@
                 android:type="linear" />
             <corners
                 android:bottomLeftRadius="24dp"
-                android:bottomRightRadius="24dp"
-                android:topLeftRadius="0dp"
-                android:topRightRadius="0dp" />
+                android:bottomRightRadius="24dp" />
         </shape>
     </item>
 
