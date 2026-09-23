@@ -3,172 +3,178 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:fillViewport="true"
-    android:background="@android:color/transparent">
+    android:fillViewport="true">
 
     <com.google.android.material.card.MaterialCardView
+        style="@style/AppCardViewStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="8dp"
-        app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="6dp">
+        android:layout_margin="@dimen/space_2">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/space_4">
 
-            <!-- العنوان -->
+            <!-- ═══════════════════════════════════════════════════════
+                 عنوان النافذة
+                 ═══════════════════════════════════════════════════════ -->
             <TextView
                 android:id="@+id/tvDialogTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="إتمام عملية البيع"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="@dimen/space_3"
                 android:gravity="center"
-                android:layout_marginBottom="12dp"/>
+                android:text="إتمام عملية البيع"
+                android:textAppearance="@style/TextAppearance.App.Title.Large"
+                android:textColor="@color/text_gold_accent" />
 
-            <!-- ملخص الفاتورة -->
+            <!-- ═══════════════════════════════════════════════════════
+                 بطاقة ملخص الفاتورة
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="14dp"
+                android:layout_marginBottom="@dimen/space_4"
                 app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="0dp">
+                app:cardCornerRadius="@dimen/radius_lg"
+                app:cardElevation="@dimen/elevation_0">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="@dimen/space_3">
 
+                    <!-- عدد القطع -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
+                        android:layout_marginBottom="@dimen/space_1"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="4dp">
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="0dp"
-                            android:layout_weight="1"
                             android:layout_height="wrap_content"
+                            android:layout_weight="1"
                             android:text="عدد القطع:"
-                            android:textSize="13sp"
-                            android:textColor="?attr/colorOnSurfaceVariant"/>
+                            android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
 
                         <TextView
                             android:id="@+id/tvItemCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0 قطعة"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:textColor="?attr/colorOnSurface"/>
+                            android:textAppearance="@style/TextAppearance.App.Label.Large"
+                            android:textColor="?attr/colorOnSurface" />
                     </LinearLayout>
 
+                    <!-- الإجمالي الفرعي -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
+                        android:layout_marginBottom="@dimen/space_1"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="4dp">
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="0dp"
-                            android:layout_weight="1"
                             android:layout_height="wrap_content"
+                            android:layout_weight="1"
                             android:text="الإجمالي الفرعي:"
-                            android:textSize="13sp"
-                            android:textColor="?attr/colorOnSurfaceVariant"/>
+                            android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
 
                         <TextView
                             android:id="@+id/tvSubtotal"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0 YER"
-                            android:textSize="13sp"
-                            android:textColor="?attr/colorOnSurface"/>
+                            android:textAppearance="@style/TextAppearance.App.Label.Large"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textDirection="ltr" />
                     </LinearLayout>
 
+                    <!-- قيمة الخصم -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="0dp"
-                            android:layout_weight="1"
                             android:layout_height="wrap_content"
+                            android:layout_weight="1"
                             android:text="قيمة الخصم:"
-                            android:textSize="13sp"
-                            android:textColor="?attr/colorOnSurfaceVariant"/>
+                            android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
 
                         <TextView
                             android:id="@+id/tvDiscountAmount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0 YER"
-                            android:textSize="13sp"
-                            android:textColor="#E53935"/>
+                            android:textAppearance="@style/TextAppearance.App.Label.Large"
+                            android:textColor="@color/danger_500"
+                            android:textDirection="ltr" />
                     </LinearLayout>
 
+                    <!-- فاصل -->
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="?attr/colorOutline"
-                        android:layout_marginVertical="8dp"/>
+                        android:layout_marginVertical="@dimen/space_2"
+                        android:background="?attr/colorOutlineVariant" />
 
+                    <!-- المبلغ الصافي -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="0dp"
-                            android:layout_weight="1"
                             android:layout_height="wrap_content"
+                            android:layout_weight="1"
                             android:text="المبلغ الصافي:"
-                            android:textSize="15sp"
-                            android:textStyle="bold"
-                            android:textColor="?attr/colorOnSurface"/>
+                            android:textAppearance="@style/TextAppearance.App.Label.Large"
+                            android:textColor="?attr/colorOnSurface" />
 
                         <TextView
                             android:id="@+id/tvFinalTotal"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0 YER"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:textColor="?attr/colorPrimary"/>
+                            android:textAppearance="@style/TextAppearance.App.Headline.Small"
+                            android:textColor="@color/text_gold_accent"
+                            android:textDirection="ltr" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- بيانات العميل -->
+            <!-- ═══════════════════════════════════════════════════════
+                 قسم بيانات العميل
+                 ═══════════════════════════════════════════════════════ -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/space_2"
                 android:text="👤 بيانات العميل"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginBottom="6dp"/>
+                android:textAppearance="@style/TextAppearance.App.Title.Small"
+                android:textColor="@color/text_gold_accent" />
 
             <!-- اسم العميل (إلزامي) -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilCustomerName"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="@dimen/space_2"
                 app:errorEnabled="true">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -177,16 +183,16 @@
                     android:layout_height="wrap_content"
                     android:hint="اسم العميل *"
                     android:inputType="textPersonName"
-                    android:textSize="14sp"/>
+                    android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- رقم الهاتف (إلزامي) -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilCustomerPhone"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="@dimen/space_2"
                 app:errorEnabled="true">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -195,15 +201,15 @@
                     android:layout_height="wrap_content"
                     android:hint="رقم الهاتف *"
                     android:inputType="phone"
-                    android:textSize="14sp"/>
+                    android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- البريد الإلكتروني (اختياري) -->
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="@dimen/space_2">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etCustomerEmail"
@@ -211,15 +217,16 @@
                     android:layout_height="wrap_content"
                     android:hint="البريد الإلكتروني (اختياري)"
                     android:inputType="textEmailAddress"
-                    android:textSize="14sp"/>
+                    android:textColor="?attr/colorOnSurface"
+                    android:textDirection="ltr" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- العنوان (اختياري) -->
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="@dimen/space_2">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etCustomerAddress"
@@ -227,15 +234,15 @@
                     android:layout_height="wrap_content"
                     android:hint="العنوان (اختياري)"
                     android:inputType="text"
-                    android:textSize="14sp"/>
+                    android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- ملاحظات (اختياري) -->
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="@dimen/space_3">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etCustomerNotes"
@@ -243,55 +250,71 @@
                     android:layout_height="wrap_content"
                     android:hint="ملاحظات (اختياري)"
                     android:inputType="textMultiLine"
-                    android:minLines="2"
                     android:maxLines="3"
-                    android:textSize="14sp"/>
+                    android:minLines="2"
+                    android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- طريقة الدفع والخصم -->
+            <!-- ═══════════════════════════════════════════════════════
+                 قسم طريقة الدفع والخصم
+                 ═══════════════════════════════════════════════════════ -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/space_2"
                 android:text="💳 طريقة الدفع والخصم"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginBottom="6dp"/>
+                android:textAppearance="@style/TextAppearance.App.Title.Small"
+                android:textColor="@color/text_gold_accent" />
 
-            <Spinner
-                android:id="@+id/spPaymentMethod"
+            <!-- قائمة اختيار طريقة الدفع -->
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginBottom="6dp"/>
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/space_2"
+                android:hint="طريقة الدفع">
 
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    android:id="@+id/spPaymentMethod"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:textColor="?attr/colorOnSurface" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- رقم الحساب (يظهر شرطياً) -->
             <TextView
                 android:id="@+id/tvAccountNumber"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text=""
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:layout_marginBottom="@dimen/space_3"
                 android:gravity="center"
-                android:layout_marginBottom="10dp"/>
+                android:text=""
+                android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
+            <!-- نسبة الخصم -->
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="@dimen/space_4"
+                android:hint="نسبة الخصم"
                 app:suffixText="%">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDiscount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="نسبة الخصم"
                     android:inputType="numberDecimal"
                     android:text="0"
-                    android:textSize="14sp"/>
+                    android:textColor="?attr/colorOnSurface"
+                    android:textDirection="ltr" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- أزرار الإجراء -->
+            <!-- ═══════════════════════════════════════════════════════
+                 أزرار الإجراء
+                 ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -299,25 +322,22 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCancelCheckout"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/AppButtonStyle.Outlined"
                     android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_marginEnd="@dimen/space_2"
                     android:layout_weight="1"
-                    android:layout_height="48dp"
                     android:text="إلغاء"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    app:strokeColor="?attr/colorOutline"
-                    app:cornerRadius="8dp"
-                    android:layout_marginEnd="8dp"/>
+                    app:strokeColor="?attr/colorOutline" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnConfirmCheckout"
+                    style="@style/AppButtonStyle"
                     android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
                     android:layout_weight="2"
-                    android:layout_height="48dp"
-                    android:text="تأكيد البيع ✓"
-                    android:textColor="?attr/colorOnPrimary"
-                    app:backgroundTint="?attr/colorPrimary"
-                    app:cornerRadius="8dp"/>
+                    android:text="تأكيد البيع ✓" />
             </LinearLayout>
 
         </LinearLayout>
