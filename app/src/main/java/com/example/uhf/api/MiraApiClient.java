@@ -1674,6 +1674,15 @@ public class MiraApiClient {
         }
         return getWithAuth(url);
     }
+    
+    /**
+ * ✅ جلب عدد التحويلات الواردة للفرع الحالي فقط (بدون جلب كل التحويلات)
+ * - يستخدم endpoint مخصص أسرع بكثير من getTransfers
+ * - يُرجع العدد الإجمالي للتحويلات بحالة in_transit أو approved
+ */
+public ApiResponse getIncomingTransfersCount() {
+    return getWithAuth("/transfers/incoming/count");
+}
 
     public ApiResponse createTransfer(JSONObject payload) {
         return postWithAuth("/transfers", payload);
