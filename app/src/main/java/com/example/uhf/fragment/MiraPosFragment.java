@@ -706,16 +706,14 @@ private void processRingEpc(final String code, final String source) {
         pendingEpcs.remove(cleanCode);
     }
 }
-
 /**
  * ✅ parseItemResponse - الإصدار المُصحح النهائي
  * 
- * المنطق (نفس الكود القديم الذي كان يعمل):
- * 1. يقرأ retail_price_local أولاً (الأدق للعرض المحلي)
- * 2. إذا لم يوجد، يقرأ retail_price (الذي كان يعمل في القديم)
- * 3. إذا لم يوجد، يقرأ retail_price_usd
- * 4. إذا لم يوجد، يقرأ price (generic)
- * 5. حماية إضافية: إذا كان السعر > 100 مليون، تجاهله
+ * الحل الجذري:
+ * - CartItem.price يجب أن يكون دائماً بالدولار (USD)
+ * - CartAdapter.formatPriceDefault() يحوّل من USD → العملة المحلية
+ * - لذلك نستخدم retail_price_usd مباشرةً
+ * - إذا لم يوجد USD، نحوّل من retail_price_local / exchange_rate
  */
 private void parseItemResponse(String code, JSONObject data) {
     try {
@@ -726,9 +724,6 @@ private void parseItemResponse(String code, JSONObject data) {
             updateCartSummary();
             return;
         }
-
-        // ✅ Logging للتشخيص (احذفه لاحقاً بعد التأكد)
-        Log.e(TAG, "🔥 RAW ITEM JSON: " + item.toString());
 
         String vaultStatus = item.optString("status",
                 item.optString("vault_status", "")).toLowerCase();
@@ -750,58 +745,57 @@ private void parseItemResponse(String code, JSONObject data) {
                 item.optDouble("gross_weight",
                         item.optDouble("gross_weight_grams", 0)));
 
-        // ✅✅✅ [الإصلاح الجذري] - استخراج السعر بالترتيب الصحيح
-        // الأولوية: retail_price_local → retail_price → retail_price_usd → price
+        // ✅✅✅ [الحل النهائي] استخراج السعر - الأولوية للدولار
         double priceLocal   = item.optDouble("retail_price_local", 0);
         double priceMain    = item.optDouble("retail_price", 0);
         double priceUSD     = item.optDouble("retail_price_usd", 0);
         double priceGeneric = item.optDouble("price", 0);
 
-        // ✅ Logging تفصيلي
         Log.e(TAG, "💰 PRICE FIELDS for: " + title);
         Log.e(TAG, "   - retail_price_local = " + priceLocal);
         Log.e(TAG, "   - retail_price (main) = " + priceMain);
         Log.e(TAG, "   - retail_price_usd = " + priceUSD);
         Log.e(TAG, "   - price (generic) = " + priceGeneric);
 
-        // ✅ اختيار السعر بالترتيب: local → main → usd → generic
+        // ✅ CartItem.price يجب أن يكون دائماً بالدولار
+        // لأن CartAdapter يحوّل من USD → العملة المحلية عند العرض
         double price = 0;
         String priceSource = "none";
 
-        // 1. الأولوية للـ retail_price_local
-        if (priceLocal > 0 && priceLocal < 100_000_000) {
-            price = priceLocal;
-            priceSource = "retail_price_local";
+        // 1. الأولوية لـ retail_price_usd (بالدولار مباشرة)
+        if (priceUSD > 0 && priceUSD < 100_000_000) {
+            price = priceUSD;
+            priceSource = "retail_price_usd";
         }
-        // 2. ثم retail_price (الذي كان يعمل في الكود القديم)
+        // 2. إذا لم يوجد USD، حوّل من Local إلى USD
+        else if (priceLocal > 0 && priceLocal < 100_000_000) {
+            double exchangeRate = (priceManager != null)
+                    ? priceManager.getExchangeRate("YER")
+                    : 530.0;
+            if (exchangeRate <= 0) exchangeRate = 530.0;
+            price = priceLocal / exchangeRate;
+            priceSource = "retail_price_local/" + exchangeRate;
+        }
+        // 3. fallback: retail_price
         else if (priceMain > 0 && priceMain < 100_000_000) {
             price = priceMain;
             priceSource = "retail_price";
         }
-        // 3. ثم retail_price_usd
-        else if (priceUSD > 0 && priceUSD < 100_000_000) {
-            price = priceUSD;
-            priceSource = "retail_price_usd";
-        }
-        // 4. ثم price (generic)
+        // 4. fallback: price generic
         else if (priceGeneric > 0 && priceGeneric < 100_000_000) {
             price = priceGeneric;
             priceSource = "price";
         }
-        // 5. إذا كانت كل القيم ضخمة (> 100M)، فهي أكواد EPC وليست أسعار
+        // 5. كل القيم ضخمة → غير صالحة (أكواد EPC)
         else {
-            Log.e(TAG, "🚨 ALL PRICE FIELDS ARE INVALID OR SUSPICIOUS!");
-            Log.e(TAG, "   priceLocal=" + priceLocal 
-                + ", priceMain=" + priceMain 
-                + ", priceUSD=" + priceUSD 
-                + ", priceGeneric=" + priceGeneric);
+            Log.e(TAG, "🚨 ALL PRICE FIELDS INVALID OR SUSPICIOUS!");
             price = 0;
             priceSource = "invalid";
         }
 
-        Log.e(TAG, "   ✅ SELECTED PRICE = " + price + " (from: " + priceSource + ")");
+        Log.e(TAG, "   ✅ SELECTED PRICE (USD) = " + price + " (from: " + priceSource + ")");
 
-        // ✅ حساب ديناميكي إذا كان السعر 0
+        // ✅ حساب ديناميكي فقط إذا كان السعر 0
         if (price <= 0 && weight > 0 && priceManager != null) {
             Log.w(TAG, "⚠️ Price is 0, calculating dynamically for " + title);
             price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
@@ -812,7 +806,7 @@ private void parseItemResponse(String code, JSONObject data) {
         CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
                 price, isAvailable, vaultStatus.toUpperCase());
 
-        // ✅ استخراج مرن — يدعم كل الأسماء الممكنة
+        // ✅ استخراج مرن
         cartItem.serialNo = extractString(item,
                 "serial", "serial_number", "serialNo", "sn");
         cartItem.gtin = extractString(item,
@@ -820,19 +814,18 @@ private void parseItemResponse(String code, JSONObject data) {
         cartItem.location = extractString(item,
                 "location", "current_location", "zone");
 
-        // ✅ استخراج item_id
         cartItem.itemId = item.optInt("id",
                 item.optInt("item_id",
                         item.optInt("product_id", 0)));
 
-        // ✅ حفظ TID (إذا وُجد)
+        // ✅ حفظ TID
         String tid = extractString(item,
                 "tid", "tag_tid", "rfid_tid");
         if (!tid.isEmpty() && cartItem.serialNo.isEmpty()) {
             cartItem.serialNo = tid;
         }
 
-        // ✅ حفظ EPC الأصلي إذا وُجد
+        // ✅ حفظ EPC الأصلي
         String rfidEpc = extractString(item,
                 "rfid_epc", "epc_final");
         if (!rfidEpc.isEmpty()) {
@@ -845,7 +838,7 @@ private void parseItemResponse(String code, JSONObject data) {
                 ", gtin=" + cartItem.gtin +
                 ", tid=" + tid +
                 ", item_id=" + cartItem.itemId +
-                ", price=" + cartItem.price);
+                ", price(USD)=" + cartItem.price);
 
         boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo,
                 cartItem.gtin);
@@ -2208,29 +2201,34 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ تحديث وزن أول قطعة في السلة
-     */
-    private void updateCartItemsScaleWeight(double currentScaleWeight) {
-        if (cartList.isEmpty() || currentScaleWeight <= 0) return;
+/**
+ * ✅ [إصلاح] تحديث وزن القطعة الأولى في السلة
+ * - لا يعيد حساب السعر (نحتفظ بالسعر من السيرفر)
+ * - فقط يحدّث الوزن المعروض
+ */
+private void updateCartItemsScaleWeight(double currentScaleWeight) {
+    if (cartList.isEmpty() || currentScaleWeight <= 0) return;
 
-        try {
-            CartItem topItem = cartList.get(0);
-            if (topItem.scaleWeight != currentScaleWeight) {
-                topItem.scaleWeight = currentScaleWeight;
-                if (priceManager != null && topItem.weight > 0) {
-                    topItem.price = priceManager.calculateGoldPrice(
-                            getKaratNumber(topItem.karat), currentScaleWeight);
-                }
-                if (cartAdapter != null) {
-                    cartAdapter.notifyItemChanged(0);
-                }
-                updateCartSummary();
+    try {
+        CartItem topItem = cartList.get(0);
+        if (topItem.scaleWeight != currentScaleWeight) {
+            topItem.scaleWeight = currentScaleWeight;
+
+            // ✅ لا تعد حساب السعر — احتفظ بالسعر من السيرفر
+            // (كان: topItem.price = priceManager.calculateGoldPrice(...))
+
+            if (cartAdapter != null) {
+                cartAdapter.notifyItemChanged(0);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "updateCartItemsScaleWeight error: " + e.getMessage());
+            updateCartSummary();
+
+            Log.d(TAG, "⚖️ Updated scale weight: " + currentScaleWeight
+                    + "g (price kept: " + topItem.price + " USD)");
         }
+    } catch (Exception e) {
+        Log.e(TAG, "updateCartItemsScaleWeight error: " + e.getMessage());
     }
+}
 
     /**
      * ✅ عرض رسالة نجاح/فشل مع بطاقة
