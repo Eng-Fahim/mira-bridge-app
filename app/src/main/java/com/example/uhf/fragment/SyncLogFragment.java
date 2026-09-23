@@ -345,16 +345,16 @@ public class SyncLogFragment extends Fragment {
                     }
 
                     @Override
-                    public void onError(String epc, String error) {
-                        handler.post(() -> {
-                            if (!isAdded() || !isViewActive) return;
-                            showLoading(false);
-                            showErrorDialog(
-                                    isArabic ? "❌ فشل الإرسال" : "❌ Send Failed",
-                                    error != null ? error : "Unknown error");
-                            loadSyncLogsAsync();
-                        });
-                    }
+public void onError(String epc, String error) {
+    handler.post(() -> {
+        if (!isAdded() || !isViewActive) return;
+        showLoading(false);
+        showErrorDialog(
+                isArabic ? "❌ فشل الإرسال" : "❌ Send Failed",
+                cleanErrorMessage(error));   // ← ✅ جديد
+        loadSyncLogsAsync();
+    });
+}
                 });
     }
 
@@ -444,10 +444,10 @@ public class SyncLogFragment extends Fragment {
                     .append(item.getFormattedNextRetry()).append("\n");
         }
 
-        if (item.lastError != null && !item.lastError.isEmpty()) {
-            sb.append("\n❌ ").append(isArabic ? "آخر خطأ: " : "Last error: ")
-                    .append(item.lastError);
-        }
+       if (item.lastError != null && !item.lastError.isEmpty()) {
+    sb.append("\n❌ ").append(isArabic ? "آخر خطأ: " : "Last error: ")
+            .append(cleanErrorMessage(item.lastError));   // ← ✅ جديد
+}
 
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "📋 تفاصيل السجل" : "📋 Record Details")
@@ -473,63 +473,62 @@ public class SyncLogFragment extends Fragment {
     }
 
     private void performSyncAll() {
-        if (syncManager == null) return;
+    if (syncManager == null) return;
 
-        showLoading(true);
-        showToast(isArabic ? "⏳ جاري المزامنة..." : "⏳ Syncing...");
+    showLoading(true);
+    showToast(isArabic ? "⏳ جاري المزامنة..." : "⏳ Syncing...");
 
-        int branchId = (branchesManager != null) ?
-                branchesManager.getActiveBranchId() : 1;
+    int branchId = (branchesManager != null) ?
+            branchesManager.getActiveBranchId() : 1;
 
-        syncManager.syncPendingEncodesDetailed(branchId,
-                new IdentitySyncManager.DetailedSyncCallback() {
-                    @Override
-                    public void onSyncStart(int totalCount) {
-                        Log.i(TAG, "Sync started: " + totalCount + " items");
-                    }
+    syncManager.syncPendingEncodesDetailed(branchId,
+            new IdentitySyncManager.DetailedSyncCallback() {
+                @Override
+                public void onSyncStart(int totalCount) {
+                    Log.i(TAG, "Sync started: " + totalCount + " items");
+                }
 
-                    @Override
-                    public void onItemSynced(int itemIndex, int totalCount, String epc) {
-                        Log.d(TAG, "✅ " + (itemIndex + 1) + "/" + totalCount + " - " + epc);
-                    }
+                @Override
+                public void onItemSynced(int itemIndex, int totalCount, String epc) {
+                    Log.d(TAG, "✅ " + (itemIndex + 1) + "/" + totalCount + " - " + epc);
+                }
 
-                    @Override
-                    public void onItemFailed(int itemIndex, int totalCount, String epc,
-                                             String error) {
-                        Log.w(TAG, "❌ Failed: " + epc + " - " + error);
-                    }
+                @Override
+                public void onItemFailed(int itemIndex, int totalCount, String epc,
+                                         String error) {
+                    Log.w(TAG, "❌ Failed: " + epc + " - " + error);
+                }
 
-                    @Override
-                    public void onSyncComplete(int syncedCount, int failedCount) {
-                        handler.post(() -> {
-                            if (!isAdded() || !isViewActive) return;
-                            showLoading(false);
+                @Override
+                public void onSyncComplete(int syncedCount, int failedCount) {
+                    handler.post(() -> {
+                        if (!isAdded() || !isViewActive) return;
+                        showLoading(false);
 
-                            String msg = isArabic ?
-                                    "✅ تمت المزامنة: " + syncedCount +
-                                            (failedCount > 0 ? " | فشل: " + failedCount : "") :
-                                    "✅ Synced: " + syncedCount +
-                                            (failedCount > 0 ? " | Failed: " + failedCount : "");
+                        String msg = isArabic ?
+                                "✅ تمت المزامنة: " + syncedCount +
+                                        (failedCount > 0 ? " | فشل: " + failedCount : "") :
+                                "✅ Synced: " + syncedCount +
+                                        (failedCount > 0 ? " | Failed: " + failedCount : "");
 
-                            showToast(msg);
-                            loadSyncLogsAsync();
-                            notifyDashboardUpdate("sync_all");
-                        });
-                    }
+                        showToast(msg);
+                        loadSyncLogsAsync();
+                        notifyDashboardUpdate("sync_all");
+                    });
+                }
 
-                    @Override
-                    public void onSyncError(String error) {
-                        handler.post(() -> {
-                            if (!isAdded() || !isViewActive) return;
-                            showLoading(false);
-                            showErrorDialog(
-                                    isArabic ? "❌ خطأ في المزامنة" : "❌ Sync Error",
-                                    error != null ? error : "Unknown error");
-                        });
-                    }
-                });
-    }
-
+                @Override
+                public void onSyncError(String error) {
+                    handler.post(() -> {
+                        if (!isAdded() || !isViewActive) return;
+                        showLoading(false);
+                        showErrorDialog(
+                                isArabic ? "❌ خطأ في المزامنة" : "❌ Sync Error",
+                                cleanErrorMessage(error));
+                    });
+                }
+            });
+}   // ← ← ← ✅ قوس إغلاق performSyncAll
     // ==================== Utilities ====================
 
     private void notifyDashboardUpdate(String source) {
@@ -550,7 +549,46 @@ public class SyncLogFragment extends Fragment {
             Log.e(TAG, "notifyDashboardUpdate error: " + e.getMessage());
         }
     }
-
+/**
+ * ✅ تنظيف رسالة الخطأ قبل العرض
+ * يغطي السجلات القديمة (JSON) والسجلات الجديدة (نص)
+ */
+private String cleanErrorMessage(String rawError) {
+    if (rawError == null || rawError.isEmpty()) return "";
+    
+    String trimmed = rawError.trim();
+    if (!trimmed.startsWith("{")) return rawError;
+    
+    try {
+        org.json.JSONObject json = new org.json.JSONObject(trimmed);
+        
+        org.json.JSONObject errorObj = json.optJSONObject("error");
+        if (errorObj != null) {
+            String msgAr = errorObj.optString("message", "");
+            String msgEn = errorObj.optString("message_en", "");
+            String msg = isArabic ? msgAr : msgEn;
+            if (msg.isEmpty()) msg = msgAr.isEmpty() ? msgEn : msgAr;
+            
+            org.json.JSONObject details = errorObj.optJSONObject("details");
+            if (details != null) {
+                String suggestion = details.optString("suggestion", "");
+                if (!suggestion.isEmpty() && !msg.contains(suggestion)) {
+                    msg += "\n\n💡 " + suggestion;
+                }
+            }
+            
+            if (!msg.isEmpty()) return msg;
+        }
+        
+        String rootMsg = json.optString("message", "");
+        if (!rootMsg.isEmpty()) return rootMsg;
+        
+    } catch (Exception e) {
+        Log.w(TAG, "cleanErrorMessage: not valid JSON");
+    }
+    
+    return rawError;
+}
     private void showToast(String msg) {
         try {
             if (getContext() != null && isAdded()) {
