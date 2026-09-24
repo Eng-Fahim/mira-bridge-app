@@ -56,14 +56,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import android.graphics.Color;
-
-
-
 public class MiraDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboardFragment";
@@ -81,14 +73,6 @@ public class MiraDashboardFragment extends Fragment {
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final long SWIPE_REFRESH_TIMEOUT_MS = 15 * 1000;
-    
-    private LineChart goldPriceChart;  // في أعلى الكلاس
-    
-    private TextView tvSalesTodayItems, tvSalesMonthItems, tvSalesYearItems;
-    
-    // في أعلى الكلاس
-    private LineChart heroSparkline;  // ← ✅ LineChart بدل View
-
 
     // ═══════════════════════════════════════════════════════
     // State
@@ -96,9 +80,6 @@ public class MiraDashboardFragment extends Fragment {
     private JSONObject lastSalesData = null;
     private boolean isHeroHidden = true;
     private boolean isSalesHidden = true;
-    
-    private TextView tvRefreshCountdown;
-    private View viewStatusDot;
 
     // ═══════════════════════════════════════════════════════
     // UI Elements
@@ -118,7 +99,7 @@ public class MiraDashboardFragment extends Fragment {
     private CardView cardGoldPrices;
     
 
-    private View heroBalanceCard;
+    private View heroBalanceCard, heroSparkline;
     private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
     private TextView tvHeroValueYER, tvHeroValueSAR, tvHeroValueUSD;
     private View alertsStrip;
@@ -264,8 +245,8 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         showShimmer(false);
 
         isViewInitialized = true;
-
-        // ✅ حركة دخول للبطاقة الذهبية
+        
+        // ✅ حركة دخول
         View heroCard = view.findViewById(R.id.heroBalanceCard);
         if (heroCard != null) {
             heroCard.setAlpha(0f);
@@ -279,10 +260,6 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
         // ✅ عرض الكاش فوراً
         loadOfflineData();
-        
-        // ✅ ارسم الرسوم البيانية من البيانات المحفوظة مسبقاً
-renderGoldPriceHistory();
-renderInventoryHistory();
 
         // ✅ ping مؤجل
         mainHandler.postDelayed(() -> {
@@ -292,12 +269,15 @@ renderInventoryHistory();
         }, 2000);
 
         syncOrgProfileFromServer(false);
-
+        
+        // ❌ لا fetchData هنا — onResume سيفعل ذلك
+        // ❌ لا fetchRecentActivity هنا — onResume سيفعل ذلك
+        
         startAutoRefresh();
-
+        
         // ✅ الوقت 0 → onResume سيجلب
         lastDataFetchTime = 0;
-
+        
     } catch (Throwable e) {
         logNonFatal("onViewCreated", e);
     }
@@ -316,16 +296,6 @@ renderInventoryHistory();
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-            goldPriceChart = v.findViewById(R.id.goldPriceChart);
-            if (goldPriceChart != null) {
-            setupGoldPriceChart();
-            }
-            
-// في initViews
-tvSalesTodayItems = v.findViewById(R.id.tvSalesTodayItems);
-tvSalesMonthItems = v.findViewById(R.id.tvSalesMonthItems);
-tvSalesYearItems = v.findViewById(R.id.tvSalesYearItems);
-            
 
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
@@ -341,12 +311,6 @@ tvSalesYearItems = v.findViewById(R.id.tvSalesYearItems);
 
             heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
             heroSparkline = v.findViewById(R.id.heroSparkline);
-            setupHeroSparkline();
-            
-            tvRefreshCountdown = v.findViewById(R.id.tvRefreshCountdown);
-            viewStatusDot = v.findViewById(R.id.viewStatusDot);
-            
-            
             tvHeroBalance = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend = v.findViewById(R.id.tvHeroTrend);
             tvHeroSubtitle = v.findViewById(R.id.tvHeroSubtitle);
@@ -443,226 +407,11 @@ applySalesVisibility();
             logNonFatal("initViews", e);
         }
     }
-    
-    
-    /**
- * ✅ إعداد Hero Sparkline Chart
- */
-private void setupHeroSparkline() {
-    if (heroSparkline == null) {
-        Log.w(TAG, "heroSparkline is null — skipping setup");
-        return;
-    }
-    
-    heroSparkline.getDescription().setEnabled(false);
-    heroSparkline.setTouchEnabled(false);
-    heroSparkline.setDragEnabled(false);
-    heroSparkline.setScaleEnabled(false);
-    heroSparkline.setPinchZoom(false);
-    heroSparkline.getLegend().setEnabled(false);
-    heroSparkline.getAxisLeft().setEnabled(false);
-    heroSparkline.getAxisRight().setEnabled(false);
-    heroSparkline.getXAxis().setEnabled(false);
-    heroSparkline.setViewPortOffsets(0, 0, 0, 0);
-    heroSparkline.setDrawGridBackground(false);
-    heroSparkline.setDrawBorders(false);
-    heroSparkline.setNoDataText("");
-}
 
 
     private void updateHeader() {
         // Greeting Card محذوف
     }
-    
-    
-    private void setupGoldPriceChart() {
-    if (goldPriceChart == null) return;
-    
-    goldPriceChart.getDescription().setEnabled(false);
-    goldPriceChart.setTouchEnabled(false);
-    goldPriceChart.setDragEnabled(false);
-    goldPriceChart.setScaleEnabled(false);
-    goldPriceChart.setPinchZoom(false);
-    goldPriceChart.getLegend().setEnabled(false);
-    goldPriceChart.getAxisLeft().setEnabled(false);
-    goldPriceChart.getAxisRight().setEnabled(false);
-    goldPriceChart.getXAxis().setEnabled(false);
-    goldPriceChart.setViewPortOffsets(0, 0, 0, 0);
-    goldPriceChart.setDrawGridBackground(false);
-    goldPriceChart.setDrawBorders(false);
-}
-
-
-/**
- * ✅ حفظ تاريخ أسعار الذهب (آخر 30 قراءة)
- * يُخزّن في SharedPreferences (JSON array)
- */
-private void saveGoldPriceHistory(double price24, double price21, double price18) {
-    try {
-        if (goldCachePrefs == null) return;
-        
-        // ✅ اقرأ التاريخ الحالي
-        String historyJson = goldCachePrefs.getString("gold_price_history", "[]");
-        JSONArray history = new JSONArray(historyJson);
-        
-        // ✅ أضف القراءة الجديدة
-        JSONObject entry = new JSONObject();
-        entry.put("timestamp", System.currentTimeMillis());
-        entry.put("p24", price24);
-        entry.put("p21", price21);
-        entry.put("p18", price18);
-        
-        history.put(entry);
-        
-        // ✅ احتفظ بآخر 30 قراءة فقط
-        while (history.length() > 30) {
-            history.remove(0);
-        }
-        
-        // ✅ احفظ
-        goldCachePrefs.edit()
-                .putString("gold_price_history", history.toString())
-                .apply();
-        
-        Log.d(TAG, "✅ Saved gold price history: " + history.length() + " entries");
-        
-    } catch (Exception e) {
-        logNonFatal("saveGoldPriceHistory", e);
-    }
-}
-
-
-/**
- * ✅ رسم تاريخ أسعار الذهب على goldPriceChart
- */
-private void renderGoldPriceHistory() {
-    try {
-        if (goldPriceChart == null || goldCachePrefs == null) return;
-        
-        String historyJson = goldCachePrefs.getString("gold_price_history", "[]");
-        JSONArray history = new JSONArray(historyJson);
-        
-        if (history.length() < 2) {
-            Log.d(TAG, "⏭️ Not enough history to render chart");
-            return;
-        }
-        
-        List<Entry> entries = new ArrayList<>();
-        for (int i = 0; i < history.length(); i++) {
-            JSONObject entry = history.getJSONObject(i);
-            double price = entry.optDouble("p24", 0);
-            if (price > 0) {
-                entries.add(new Entry(i, (float) price));
-            }
-        }
-        
-        if (entries.isEmpty()) return;
-        
-        // ✅ إعداد الرسم
-        LineDataSet dataSet = new LineDataSet(entries, "Gold 24K");
-        dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-        dataSet.setCubicIntensity(0.2f);
-        dataSet.setDrawCircles(false);
-        dataSet.setDrawValues(false);
-        dataSet.setLineWidth(2f);
-        dataSet.setColor(ContextCompat.getColor(requireContext(), R.color.text_gold_accent));
-        dataSet.setDrawFilled(true);
-        dataSet.setFillColor(ContextCompat.getColor(requireContext(), R.color.gold_200));
-        dataSet.setFillAlpha(50);
-        
-        goldPriceChart.setData(new LineData(dataSet));
-        goldPriceChart.invalidate();
-        
-        Log.d(TAG, "✅ Rendered " + entries.size() + " gold price points");
-        
-    } catch (Exception e) {
-        logNonFatal("renderGoldPriceHistory", e);
-    }
-}
-
-
-/**
- * ✅ حفظ تاريخ قيمة المخزون (آخر 30 قراءة)
- * يُخزّن في offlineCache (JSON array)
- */
-private void saveInventoryHistory(double value, int itemCount, double weight) {
-    try {
-        if (offlineCache == null) return;
-        
-        String historyJson = offlineCache.getString("inventory_history", "[]");
-        JSONArray history = new JSONArray(historyJson);
-        
-        JSONObject entry = new JSONObject();
-        entry.put("timestamp", System.currentTimeMillis());
-        entry.put("value", value);
-        entry.put("count", itemCount);
-        entry.put("weight", weight);
-        
-        history.put(entry);
-        
-        while (history.length() > 30) {
-            history.remove(0);
-        }
-        
-        offlineCache.edit()
-                .putString("inventory_history", history.toString())
-                .apply();
-        
-        Log.d(TAG, "✅ Saved inventory history: " + history.length() + " entries");
-        
-    } catch (Exception e) {
-        logNonFatal("saveInventoryHistory", e);
-    }
-}
-
-
-/**
- * ✅ رسم تاريخ قيمة المخزون على heroSparkline
- */
-private void renderInventoryHistory() {
-    try {
-        if (heroSparkline == null || offlineCache == null) return;
-        
-        String historyJson = offlineCache.getString("inventory_history", "[]");
-        JSONArray history = new JSONArray(historyJson);
-        
-        if (history.length() < 2) {
-            Log.d(TAG, "⏭️ Not enough inventory history to render");
-            return;
-        }
-        
-        List<Entry> entries = new ArrayList<>();
-        for (int i = 0; i < history.length(); i++) {
-            JSONObject entry = history.getJSONObject(i);
-            double value = entry.optDouble("value", 0);
-            if (value > 0) {
-                entries.add(new Entry(i, (float) value));
-            }
-        }
-        
-        if (entries.isEmpty()) return;
-        
-        // ✅ إعداد الرسم
-        LineDataSet dataSet = new LineDataSet(entries, "Inventory Value");
-        dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-        dataSet.setCubicIntensity(0.2f);
-        dataSet.setDrawCircles(false);
-        dataSet.setDrawValues(false);
-        dataSet.setLineWidth(2f);
-        dataSet.setColor(Color.WHITE);
-        dataSet.setDrawFilled(true);
-        dataSet.setFillColor(Color.WHITE);
-        dataSet.setFillAlpha(40);
-        
-        heroSparkline.setData(new LineData(dataSet));
-        heroSparkline.invalidate();
-        
-        Log.d(TAG, "✅ Rendered " + entries.size() + " inventory points");
-        
-    } catch (Exception e) {
-        logNonFatal("renderInventoryHistory", e);
-    }
-}
 
     // ═══════════════════════════════════════════════════════
     // Hero Balance
@@ -1113,37 +862,28 @@ private void renderInventoryHistory() {
     }
 
     private void displayGoldPrices(GoldPriceData data) {
-    try {
-        setGoldPrice(tvKarat24, "24K", data.price24);
-        setGoldPrice(tvKarat21, "21K", data.price21);
-        setGoldPrice(tvKarat18, "18K", data.price18);
+        try {
+            setGoldPrice(tvKarat24, "24K", data.price24);
+            setGoldPrice(tvKarat21, "21K", data.price21);
+            setGoldPrice(tvKarat18, "18K", data.price18);
 
-        if (tvOuncePrice != null && data.ouncePrice > 0) {
-            tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", data.ouncePrice));
-        }
-        if (tvPriceSource != null) {
-            tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
-        }
-        if (tvLastUpdate != null) {
-            SimpleDateFormat fmt = getTimeFormatter();
-            String time = fmt.format(new Date());
-            tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
-        }
-        if (tvRefreshCountdown != null) {
-            tvRefreshCountdown.setText(isArabic
-                    ? "التحديث بعد 30 ث"
-                    : "Refresh in 30s");
-        }
+            if (tvOuncePrice != null && data.ouncePrice > 0) {
+                tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", data.ouncePrice));
+            }
+            if (tvPriceSource != null) {
+                tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
+            }
+            if (tvLastUpdate != null) {
+                SimpleDateFormat fmt = getTimeFormatter();
+                String time = fmt.format(new Date());
+                tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+            }
 
-        // ✅ جديد: احفظ وارسم التاريخ
-        saveGoldPriceHistory(data.price24, data.price21, data.price18);
-        renderGoldPriceHistory();
-
-        calculateTrend(data.price24);
-    } catch (Exception e) {
-        logNonFatal("displayGoldPrices", e);
+            calculateTrend(data.price24);
+        } catch (Exception e) {
+            logNonFatal("displayGoldPrices", e);
+        }
     }
-}
 
     private void displayGoldPricesFromCache() {
         try {
@@ -1372,36 +1112,32 @@ private void renderInventoryHistory() {
     }
 
     private void processData(JSONObject data) {
-    try {
-        JSONObject inv = data.optJSONObject("inventory");
-        if (inv != null) {
-            int itemCount = inv.optInt("total_items", 0);
-            double weight = inv.optDouble("total_weight", 0.0);
-            double value = inv.optDouble("total_value", 0.0);
+        try {
+            JSONObject inv = data.optJSONObject("inventory");
+            if (inv != null) {
+                int itemCount = inv.optInt("total_items", 0);
+                double weight = inv.optDouble("total_weight", 0.0);
+                double value = inv.optDouble("total_value", 0.0);
 
-            setText(tvTotalItems, String.valueOf(itemCount));
-            setText(tvTotalWeight, formatWeight(weight));
+                setText(tvTotalItems, String.valueOf(itemCount));
+                setText(tvTotalWeight, formatWeight(weight));
 
-            currentItemCount = itemCount;
-            currentTotalWeight = weight;
-            currentInventoryValue = value;
-            updateHeroBalance();
+                currentItemCount = itemCount;
+                currentTotalWeight = weight;
+                currentInventoryValue = value;
+                updateHeroBalance();
+            }
 
-            // ✅ جديد: احفظ وارسم التاريخ
-            saveInventoryHistory(value, itemCount, weight);
-            renderInventoryHistory();
+            JSONObject sales = data.optJSONObject("sales");
+            if (sales != null) {
+                lastSalesData = sales;
+                setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
+                applySalesData(sales);
+            }
+        } catch (Exception e) {
+            logNonFatal("processData", e);
         }
-
-        JSONObject sales = data.optJSONObject("sales");
-        if (sales != null) {
-            lastSalesData = sales;
-            setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
-            applySalesData(sales);
-        }
-    } catch (Exception e) {
-        logNonFatal("processData", e);
     }
-}
 
     // ═══════════════════════════════════════════════════════
     // ✅ Recent Activity (NEW)
@@ -1787,23 +1523,22 @@ private void handleRecentActivityClick(JSONObject activity) {
     }
 
     private String getFragmentTagForAction(String actionId) {
-    if (actionId == null) return "";
-    switch (actionId) {
-        case "identity": return "IdentityStudio";
-        case "radar": return "Radar";
-        case "gate": return "SecureGate";
-        case "reports": return "Reports";
-        case "accounting": return "Accounting";
-        case "transfers": return "Transfers";
-        case "admin_hub": return "AdminHub";
-        case "sales_history": return "SalesHistory";
-        case "server_config": return "ServerConfig";
-        case "gold_rates": return "GoldRates";
-        case "users": return "UsersManagement";
-        default: return actionId;
+        if (actionId == null) return "";
+        switch (actionId) {
+            case "identity": return "IdentityStudio";
+            case "radar": return "Radar";
+            case "gate": return "SecureGate";
+            case "reports": return "Reports";
+            case "accounting": return "Accounting";
+            case "transfers": return "Transfers";
+            case "admin_hub": return "AdminHub";
+            case "sales_history": return "SalesHistory";
+            case "server_config": return "ServerConfig";
+            case "gold_rates": return "GoldRates";
+            case "users": return "UsersManagement";
+            default: return actionId;
+        }
     }
-}
-
 
     private void handleQuickAction(String actionId) {
         try {
@@ -1875,28 +1610,6 @@ private void handleRecentActivityClick(JSONObject activity) {
     private void setText(TextView tv, String text) {
         if (tv != null) tv.setText(text);
     }
-
-
-public void updateHeroSparkline(List<Entry> entries) {
-    if (heroSparkline == null || entries == null || entries.isEmpty()) return;
-
-    LineDataSet dataSet = new LineDataSet(entries, "Inventory Trend");
-    dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER); // انحناء انسيابي ناعم
-    dataSet.setCubicIntensity(0.2f);
-    dataSet.setDrawCircles(false);                  // إخفاء النقاط
-    dataSet.setDrawValues(false);                   // إخفاء الأرقام
-    dataSet.setLineWidth(2f);
-    dataSet.setColor(Color.WHITE);                  // لون الخط أبيض ليتناسب مع البطاقة الذهبية
-
-    // تعبئة شفافة أسفل المنحنى
-    dataSet.setDrawFilled(true);
-    dataSet.setFillColor(Color.WHITE);
-    dataSet.setFillAlpha(40); 
-
-    LineData lineData = new LineData(dataSet);
-    heroSparkline.setData(lineData);
-    heroSparkline.invalidate(); // إعادة الرسم
-}
 
     // ═══════════════════════════════════════════════════════
     // Lifecycle (Resume/Pause/Destroy)
