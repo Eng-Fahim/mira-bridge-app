@@ -866,38 +866,36 @@ public class MiraPosFragment extends MiraBaseFragment {
             // ═══════════════════════════════════════════════════════
             // ✅ Pre-compute على UI Thread
             // ═══════════════════════════════════════════════════════
-            final String currencyCode;
-            final double exchangeRate;
-            final double subtotalLocal;
-            final double discountLocal;
-            final double finalLocal;
+            // ✅ [الحل] Pre-compute مع متغيرات غير final
+String _currencyCode = "YER";
+double _exchangeRate = 530.0;
 
-            try {
-                long t0 = System.currentTimeMillis();
+try {
+    long t0 = System.currentTimeMillis();
 
-                currencyCode = priceManager != null
-                        ? priceManager.getDefaultCurrency() : "YER";
-                Log.e(CHECKOUT_TRACE, "3️⃣ currencyCode=" + currencyCode);
+    if (priceManager != null) {
+        _currencyCode = priceManager.getDefaultCurrency();
+        Log.e(CHECKOUT_TRACE, "3️⃣ currencyCode=" + _currencyCode);
 
-                exchangeRate = priceManager != null
-                        ? priceManager.getExchangeRate(currencyCode) : 530.0;
-                Log.e(CHECKOUT_TRACE, "4️⃣ exchangeRate=" + exchangeRate);
+        _exchangeRate = priceManager.getExchangeRate(_currencyCode);
+        Log.e(CHECKOUT_TRACE, "4️⃣ exchangeRate=" + _exchangeRate);
+    }
 
-                subtotalLocal = data.originalTotal * exchangeRate;
-                discountLocal = data.discountAmount * exchangeRate;
-                finalLocal = data.finalAmount * exchangeRate;
+    long elapsed = System.currentTimeMillis() - t0;
+    Log.e(CHECKOUT_TRACE, "5️⃣ Pre-compute took: " + elapsed + "ms");
 
-                long elapsed = System.currentTimeMillis() - t0;
-                Log.e(CHECKOUT_TRACE, "5️⃣ Pre-compute took: " + elapsed + "ms");
+} catch (Exception e) {
+    Log.e(CHECKOUT_TRACE, "❌ Pre-compute error: " + e.getMessage(), e);
+    _currencyCode = "YER";
+    _exchangeRate = 530.0;
+}
 
-            } catch (Exception e) {
-                Log.e(CHECKOUT_TRACE, "❌ Pre-compute error: " + e.getMessage(), e);
-                currencyCode = "YER";
-                exchangeRate = 530.0;
-                subtotalLocal = data.originalTotal * 530.0;
-                discountLocal = data.discountAmount * 530.0;
-                finalLocal = data.finalAmount * 530.0;
-            }
+// ✅ الآن final — لا يمكن إعادة إسنادها
+final String currencyCode = _currencyCode;
+final double exchangeRate = _exchangeRate;
+final double subtotalLocal = data.originalTotal * exchangeRate;
+final double discountLocal = data.discountAmount * exchangeRate;
+final double finalLocal = data.finalAmount * exchangeRate;
 
             setButtonsEnabled(false);
             Log.e(CHECKOUT_TRACE, "6️⃣ buttons disabled");
@@ -2125,4 +2123,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             Log.e(TAG, "showSuccessMessage error: " + e.getMessage());
         }
     }
-                }
+}
