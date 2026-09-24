@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- تدرج داكن -->
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:angle="90"
-                android:startColor="#0F0C29"
-                android:centerColor="#302B63"
-                android:endColor="#24243E"
+                android:angle="135"
+                android:startColor="#0B0B0C"
+                android:centerColor="#161618"
+                android:endColor="#0B0B0C"
                 android:type="linear" />
         </shape>
     </item>
