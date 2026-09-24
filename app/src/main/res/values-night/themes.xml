@@ -93,7 +93,7 @@
         <item name="colorOnSurface">@color/text_light_primary</item>
         <item name="colorSurfaceVariant">@color/chocolate_soft</item>
         <item name="colorOnSurfaceVariant">@color/text_light_secondary</item>
-        <item name="colorSurfaceTint">@color/gold_luxury</item>
+        
 
         <!-- ✅ إصلاح: Inverse Surface (يمثل الوضع الفاتح) -->
         <item name="colorSurfaceInverse">@color/surface_inverse_dark</item>
@@ -111,7 +111,7 @@
         <!-- 🔲 الحدود — ✅ إصلاح: outlineVariant أفتح -->
         <item name="colorOutline">@color/border_dark_warm</item>
         <item name="colorOutlineVariant">@color/border_dark_medium</item>
-        <item name="colorScrim">@color/pure_black</item>
+        
 
         <!-- 💫 State Layers -->
         <item name="android:colorControlHighlight">@color/state_layer_gold_pressed</item>
