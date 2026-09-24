@@ -32,12 +32,13 @@
         android:background="?attr/colorSurface"
         app:elevation="@dimen/elevation_0">
 
-        <!-- 🆕 STATUS STRIP — ذهبي أنيق (بدل الأزرق) -->
+        <!-- STATUS STRIP — ذهبي متّصل -->
         <LinearLayout
             android:id="@+id/statusBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/gold_500"
+            android:elevation="@dimen/elevation_1"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="@dimen/space_3"
@@ -85,7 +86,7 @@
                 android:textDirection="ltr" />
         </LinearLayout>
 
-        <!-- 🆕 SEGMENTED CONTROL -->
+        <!-- SEGMENTED CONTROL -->
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/segmentedModes"
             android:layout_width="match_parent"
@@ -139,13 +140,15 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- 🆕 LAST SCAN CARD — أقصر وأكثر أناقة -->
+            <!-- ═══════════════════════════════════════════════════════
+                 LAST SCAN CARD
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/lastScanCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_2"
+                android:layout_marginTop="@dimen/space_3"
                 app:cardBackgroundColor="?attr/colorPrimaryContainer"
                 app:cardCornerRadius="@dimen/card_radius"
                 app:cardElevation="@dimen/elevation_2"
@@ -204,7 +207,7 @@
                         android:textColor="?attr/colorOnPrimaryContainer"
                         android:textDirection="ltr" />
 
-                    <!-- 🆕 ترتيب RTL صحيح: العيار • الوزن • الإشارة -->
+                    <!-- ترتيب RTL صحيح -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -270,7 +273,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 🆕 PROGRESS BAR CARD — 3 مناطق مرتبة -->
+            <!-- ═══════════════════════════════════════════════════════
+                 PROGRESS BAR CARD
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/AppCardViewStyle.Outlined"
                 android:layout_width="match_parent"
@@ -318,11 +323,11 @@
                         android:progressBackgroundTint="?attr/colorSurfaceVariant"
                         android:progressTint="@color/gold_500" />
 
-                    <!-- 🆕 3 مناطق: العدد / الدقة / الفرق -->
+                    <!-- 3 مناطق: العدد / الدقة / الفرق -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
+                        android:layout_marginTop="@dimen/space_4"
                         android:baselineAligned="false"
                         android:orientation="horizontal"
                         android:weightSum="3">
@@ -342,7 +347,8 @@
                                 android:text="0"
                                 android:textAppearance="@style/TextAppearance.App.Title.Large"
                                 android:textColor="@color/text_gold_accent"
-                                android:textDirection="ltr" />
+                                android:textDirection="ltr"
+                                android:textSize="24sp" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -375,9 +381,11 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="—"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                android:textAppearance="@style/TextAppearance.App.Title.Medium"
                                 android:textColor="@color/success_500"
-                                android:textDirection="ltr" />
+                                android:textDirection="ltr"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -400,9 +408,11 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="—"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                android:textAppearance="@style/TextAppearance.App.Title.Medium"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textDirection="ltr" />
+                                android:textDirection="ltr"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -415,7 +425,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 🆕 GOLD METRICS ROW — القيمة ذهبية بارزة -->
+            <!-- ═══════════════════════════════════════════════════════
+                 GOLD METRICS ROW — القيمة ذهبية بارزة
+                 ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -462,7 +474,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 🆕 القيمة (ذهبية بارزة) -->
+                <!-- القيمة (ذهبية بارزة) -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -500,7 +512,9 @@
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
-            <!-- ALERTS ROW -->
+            <!-- ═══════════════════════════════════════════════════════
+                 ALERTS ROW
+                 ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/alertsRow"
                 android:layout_width="match_parent"
@@ -524,7 +538,9 @@
                     android:textColor="?attr/colorOnSurface" />
             </LinearLayout>
 
-            <!-- 🆕 ACTION BUTTONS — رئيسي + 3 أيقونات -->
+            <!-- ═══════════════════════════════════════════════════════
+                 ACTION BUTTONS — رئيسي + 3 أيقونات
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnOpenItemsList"
                 style="@style/AppButtonStyle"
@@ -542,62 +558,48 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/space_3"
                 android:layout_marginTop="@dimen/space_2"
-                android:orientation="horizontal">
+                android:baselineAligned="false"
+                android:orientation="horizontal"
+                android:weightSum="3">
 
+                <!-- زر 1: حفظ لقطة -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnTakeSnapshot"
-                    style="@style/AppButtonStyle.Tonal"
+                    style="@style/AppButtonStyle.IconTonal"
                     android:layout_width="0dp"
                     android:layout_height="@dimen/button_height"
                     android:layout_marginEnd="@dimen/space_1"
                     android:layout_weight="1"
                     android:contentDescription="حفظ لقطة"
                     app:icon="@android:drawable/ic_menu_camera"
-                    app:iconGravity="textStart"
-                    app:iconSize="@dimen/icon_md"
-                    android:text="📸" />
+                    app:iconSize="@dimen/icon_lg" />
 
+                <!-- زر 2: بدء جرد جديد -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnClearSession"
-                    style="@style/AppButtonStyle.Tonal"
+                    style="@style/AppButtonStyle.IconTonal"
                     android:layout_width="0dp"
                     android:layout_height="@dimen/button_height"
                     android:layout_marginHorizontal="@dimen/space_1"
                     android:layout_weight="1"
                     android:contentDescription="بدء جرد جديد"
                     app:icon="@android:drawable/ic_menu_revert"
-                    app:iconGravity="textStart"
-                    app:iconSize="@dimen/icon_md"
-                    android:text="🔄" />
+                    app:iconSize="@dimen/icon_lg" />
 
+                <!-- زر 3: عرض اللقطات -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnViewSnapshots"
-                    style="@style/AppButtonStyle.Tonal"
+                    style="@style/AppButtonStyle.IconTonal"
                     android:layout_width="0dp"
                     android:layout_height="@dimen/button_height"
                     android:layout_marginStart="@dimen/space_1"
                     android:layout_weight="1"
                     android:contentDescription="عرض اللقطات"
                     app:icon="@android:drawable/ic_menu_gallery"
-                    app:iconGravity="textStart"
-                    app:iconSize="@dimen/icon_md"
-                    android:text="📂" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnGenerateReport"
-                    style="@style/AppButtonStyle.Tonal"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/button_height"
-                    android:layout_marginStart="@dimen/space_1"
-                    android:layout_weight="1"
-                    android:contentDescription="تقرير"
-                    app:icon="@android:drawable/ic_menu_edit"
-                    app:iconGravity="textStart"
-                    app:iconSize="@dimen/icon_md"
-                    android:text="✏️" />
+                    app:iconSize="@dimen/icon_lg" />
             </LinearLayout>
 
-            <!-- SEARCH & FILTER (مخفي) -->
+            <!-- SEARCH & FILTER (مخفي — للتوافق مع Java) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
@@ -654,7 +656,7 @@
                 android:layout_height="0dp"
                 android:visibility="gone" />
 
-            <!-- HIDDEN CONTAINERS -->
+            <!-- HIDDEN CONTAINERS (للتوافق مع Java) -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="0dp"
@@ -674,13 +676,19 @@
                     android:id="@+id/btnArchiveReports"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
+
+                <!-- ✅ زر التقرير (مخفي — نُقل للأزرار الأيقونية) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnGenerateReport"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
     <!-- ═══════════════════════════════════════════════════════
-         🆕 FLOATING DOCK — 3 أزرار فقط
+         FLOATING DOCK
          ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
@@ -742,6 +750,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="@dimen/button_height"
                 android:layout_marginStart="@dimen/space_2"
+                android:enabled="false"
                 android:text="اعتماد"
                 app:icon="@android:drawable/ic_menu_save"
                 app:iconSize="@dimen/icon_sm" />
