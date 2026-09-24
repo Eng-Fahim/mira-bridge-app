@@ -626,6 +626,16 @@
 <color name="text_error">#DC2626</color>
 <color name="text_warning">#F59E0B</color>
 <color name="text_info">#0284C7</color>
+
+   <!-- ✅ اللون الذهبي المُعزَّز في الفاتح -->
+<color name="gold_luxury_dark_deep">#3D2E00</color>
+<color name="chocolate_dark_deep">#3E2723</color>
+<color name="error_container_deep">#601410</color>
+<color name="error_luxury_light">#F9DEDC</color>
+
+<!-- ✅ للنصوص على الذهبي -->
+<color name="text_on_gold">#3D2E00</color>
+<color name="text_gold_accent">#8B6914</color> 
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
