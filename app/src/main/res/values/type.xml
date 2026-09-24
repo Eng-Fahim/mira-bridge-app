@@ -137,5 +137,100 @@
         <item name="android:textColor">@color/text_on_gold</item>
         <item name="android:textFontWeight">700</item>
     </style>
+<!-- ═══════════════════════════════════════════════════════
+     🔢 NUMBER STYLES — للأرقام فقط
+     ═══════════════════════════════════════════════════════ -->
 
+<!-- ✅ رقم ضخم (Hero Balance) -->
+<style name="TextAppearance.App.Number.Hero">
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:textSize">34sp</item>
+    <item name="android:lineHeight">42sp</item>
+    <item name="android:textFontWeight">600</item>
+    <item name="android:letterSpacing">0</item>
+    <item name="android:fontFeatureSettings">"tnum"</item>
+    <item name="android:textDirection">ltr</item>
+    <item name="android:textColor">@color/text_primary</item>
+</style>
+
+<!-- ✅ رقم كبير (بطاقات القيمة) -->
+<style name="TextAppearance.App.Number.Large">
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:textSize">24sp</item>
+    <item name="android:lineHeight">32sp</item>
+    <item name="android:textFontWeight">600</item>
+    <item name="android:letterSpacing">0</item>
+    <item name="android:fontFeatureSettings">"tnum"</item>
+    <item name="android:textDirection">ltr</item>
+    <item name="android:textColor">@color/text_primary</item>
+</style>
+
+<!-- ✅ رقم متوسط (العدّادات) -->
+<style name="TextAppearance.App.Number.Medium">
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:textSize">18sp</item>
+    <item name="android:lineHeight">24sp</item>
+    <item name="android:textFontWeight">600</item>
+    <item name="android:letterSpacing">0</item>
+    <item name="android:fontFeatureSettings">"tnum"</item>
+    <item name="android:textDirection">ltr</item>
+    <item name="android:textColor">@color/text_primary</item>
+</style>
+
+<!-- ✅ رقم صغير -->
+<style name="TextAppearance.App.Number.Small">
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:textSize">14sp</item>
+    <item name="android:lineHeight">18sp</item>
+    <item name="android:textFontWeight">600</item>
+    <item name="android:letterSpacing">0</item>
+    <item name="android:fontFeatureSettings">"tnum"</item>
+    <item name="android:textDirection">ltr</item>
+    <item name="android:textColor">@color/text_primary</item>
+</style>
+
+<!-- ✅ رقم دقيق (dBm, EPC, النسب) -->
+<style name="TextAppearance.App.Number.Mono">
+    <item name="android:fontFamily">monospace</item>
+    <item name="android:textSize">14sp</item>
+    <item name="android:lineHeight">18sp</item>
+    <item name="android:textFontWeight">600</item>
+    <item name="android:letterSpacing">0</item>
+    <item name="android:fontFeatureSettings">"tnum"</item>
+    <item name="android:textDirection">ltr</item>
+    <item name="android:textColor">@color/text_primary</item>
+</style>
+
+<!-- ✅ رقم على خلفية ذهبية (أبيض + ظل) -->
+<style name="TextAppearance.App.Number.OnGold.Hero">
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:textSize">34sp</item>
+    <item name="android:lineHeight">42sp</item>
+    <item name="android:textFontWeight">600</item>
+    <item name="android:letterSpacing">0</item>
+    <item name="android:fontFeatureSettings">"tnum"</item>
+    <item name="android:textDirection">ltr</item>
+    <item name="android:textColor">@color/pure_white</item>
+    <item name="android:shadowColor">#40000000</item>
+    <item name="android:shadowDx">0</item>
+    <item name="android:shadowDy">2</item>
+    <item name="android:shadowRadius">4</item>
+</style>
+
+<style name="TextAppearance.App.Number.OnGold.Medium">
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:textSize">15sp</item>
+    <item name="android:lineHeight">20sp</item>
+    <item name="android:textFontWeight">600</item>
+    <item name="android:letterSpacing">0</item>
+    <item name="android:fontFeatureSettings">"tnum"</item>
+    <item name="android:textDirection">ltr</item>
+    <item name="android:textColor">@color/pure_white</item>
+</style>
 </resources>
