@@ -259,8 +259,24 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         }
 
         // ✅ عرض الكاش فوراً
-        loadOfflineData();
+        // ✅ عرض الكاش فوراً
+loadOfflineData();
 
+// ✅ استرجاع آخر العمليات من الكاش المحلي فوراً
+if (isAdded() && llRecentActivity != null && activityCache != null) {
+    try {
+        JSONArray cached = activityCache.load();
+        if (cached != null && cached.length() > 0) {
+            updateRecentActivityUI(cached);
+            Log.d(TAG, "✅ Restored " + cached.length() 
+                    + " activities from cache in onViewCreated");
+        } else {
+            Log.d(TAG, "⚠️ No cached activities to restore");
+        }
+    } catch (Exception e) {
+        logNonFatal("onViewCreated.restoreActivities", e);
+    }
+}
         // ✅ ping مؤجل
         mainHandler.postDelayed(() -> {
             if (isAdded() && isResumed()) {
@@ -1682,15 +1698,31 @@ public void onResume() {
 
             // ✅ fetchRecentActivity فقط إذا الكاش منتهي
             if (!isCacheValid) {
-                Log.d(TAG, "🔄 Fetching recent activity (cache expired)");
-                mainHandler.postDelayed(() -> {
-                    if (isAdded() && isResumed()) {
-                        fetchRecentActivity();
-                    }
-                }, 800);
-            } else {
-                Log.d(TAG, "⏭️ Skipping fetchRecentActivity (cache valid)");
+    Log.d(TAG, "🔄 Fetching recent activity (cache expired)");
+    mainHandler.postDelayed(() -> {
+        if (isAdded() && isResumed()) {
+            fetchRecentActivity();
+        }
+    }, 800);
+} else {
+    Log.d(TAG, "⏭️ Skipping fetchRecentActivity (cache valid)");
+    
+    // ✅ حماية إضافية: أعِد الرسم إذا كانت القائمة فارغة
+    if (isAdded() && llRecentActivity != null 
+            && llRecentActivity.getChildCount() == 0
+            && activityCache != null) {
+        try {
+            JSONArray cached = activityCache.load();
+            if (cached != null && cached.length() > 0) {
+                updateRecentActivityUI(cached);
+                Log.d(TAG, "✅ Re-rendered " + cached.length() 
+                        + " activities in onResume");
             }
+        } catch (Exception e) {
+            logNonFatal("onResume.restoreActivities", e);
+        }
+    }
+}
 
             // ✅ fetchLiveGoldPrices فقط إذا مرت 30 دقيقة
             if (timeSinceLastGoldFetch > 30 * 60 * 1000) {
@@ -1764,37 +1796,37 @@ public void onStop() {
 }
 
     @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        try {
-            unregisterDataRefreshReceiver();
-            stopAutoRefresh();
-            llRecentActivity = null;
-            if (branchesManager != null && branchListener != null) {
-                branchesManager.removeListener(branchListener);
-                branchListener = null;
-            }
-            if (orgProfile != null && profileListener != null) {
-                orgProfile.removeListener(profileListener);
-            }
+public void onDestroyView() {
+    super.onDestroyView();
+    try {
+        unregisterDataRefreshReceiver();
+        stopAutoRefresh();
+        llRecentActivity = null;
+        if (branchesManager != null && branchListener != null) {
+            branchesManager.removeListener(branchListener);
+            branchListener = null;
+        }
+        if (orgProfile != null && profileListener != null) {
+            orgProfile.removeListener(profileListener);
+        }
 
-            cancelFuture(dataFuture);
-            cancelFuture(goldPriceFuture);
-            cancelFuture(pingFuture);
+        cancelFuture(dataFuture);
+        cancelFuture(goldPriceFuture);
+        cancelFuture(pingFuture);
 
+        // ✅ احذف الرسائل المُحدَّدة فقط
+        if (mainHandler != null) {
+            mainHandler.removeCallbacks(autoRefreshRunnable);
             if (swipeTimeoutRunnable != null) {
                 mainHandler.removeCallbacks(swipeTimeoutRunnable);
             }
-            if (mainHandler != null) {
-                mainHandler.removeCallbacksAndMessages(null);
-            }
-
-            isViewInitialized = false;
-        } catch (Exception e) {
-            logNonFatal("onDestroyView", e);
         }
-    }
 
+        isViewInitialized = false;
+    } catch (Exception e) {
+        logNonFatal("onDestroyView", e);
+    }
+}
     private void cancelFuture(Future<?> future) {
         try {
             if (future != null && !future.isDone()) future.cancel(true);
