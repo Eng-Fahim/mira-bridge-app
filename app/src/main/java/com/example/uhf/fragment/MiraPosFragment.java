@@ -184,9 +184,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     // ✅ [إصلاح #21] مرجع للـ bottomSheet
     private BottomSheetDialog activeCartSheet;
 
-    // ✅ [إصلاح #23] مرجع للـ keyboard listener
-    private ViewTreeObserver.OnGlobalLayoutListener keyboardListener;
-    private View keyboardRootView;
+    
 
     // ✅ [إصلاح #22] لتجنّب recursion عميق
     private int viewTraverseDepth = 0;
@@ -260,15 +258,12 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         return null;
     }
 }
-
 @Override
 public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
 
     try {
         Context ctx = requireContext().getApplicationContext();
-
-        
 
         // ✅ تهيئة المديرين
         branchesManager = MiraBranchesManager.getInstance(ctx);
@@ -322,7 +317,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         applyPermissions();
         initSmartScale();
         updateCartSummary();
-        setupKeyboardVisibilityListener(view);
+        // ✅ تم حذف setupKeyboardVisibilityListener(view) — لم نعد بحاجة إليه
 
     } catch (Exception e) {
         Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
@@ -380,8 +375,7 @@ public void onDestroyView() {
         if (scaleManager != null) scaleManager.cleanup();
         if (simulationHelper != null) simulationHelper.cleanup();
 
-        // ✅ [إصلاح #23] إزالة keyboard listener
-        removeKeyboardListener();
+        // ✅ تم حذف removeKeyboardListener() — لم نعد بحاجة إليه
 
         // ✅ [إصلاح #21] إغلاق bottomSheet
         if (activeCartSheet != null && activeCartSheet.isShowing()) {
@@ -408,7 +402,6 @@ public void onDestroyView() {
         Log.e(TAG, "onDestroyView error: " + e.getMessage());
     }
 }
-
 @Override
 public void onDestroy() {
     super.onDestroy();
@@ -418,93 +411,6 @@ public void onDestroy() {
         // لا نُطلق rfidManager — Singleton مشترك
     } catch (Exception e) {
         Log.e(TAG, "onDestroy error: " + e.getMessage());
-    }
-}
-// ==================== Keyboard Listener ====================
-
-// ==================== Keyboard Listener ====================
-
-private void setupKeyboardVisibilityListener(View view) {
-    try {
-        final View rootView = view.getRootView();
-        keyboardRootView = rootView;
-
-        keyboardListener = () -> {
-            try {
-                Rect r = new Rect();
-                rootView.getWindowVisibleDisplayFrame(r);
-                int screenHeight = rootView.getHeight();
-                int keypadHeight = screenHeight - r.bottom;
-                boolean isKeyboardVisible = keypadHeight > screenHeight * 0.15;
-
-                // ✅ عند ظهور الكيبورد — مرر إلى حقل البحث
-                if (isKeyboardVisible && etManualEpc != null && etManualEpc.hasFocus()) {
-                    androidx.core.widget.NestedScrollView scrollView =
-                            view.findViewById(R.id.posScrollView);
-                    if (scrollView != null) {
-                        scrollView.postDelayed(() -> {
-                            try {
-                                View target = tilManualEpc != null ? tilManualEpc : etManualEpc;
-                                if (target != null) {
-                                    int targetY = target.getTop();
-                                    scrollView.smoothScrollTo(0, Math.max(0, targetY - 50));
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "smoothScrollTo error: " + e.getMessage());
-                            }
-                        }, 150);
-                    }
-                }
-
-                // ✅ إخفاء الحالة الفارغة عند ظهور الكيبورد
-                if (layoutCartEmptyState != null) {
-                    layoutCartEmptyState.setVisibility(
-                            (cartList.isEmpty() && !isKeyboardVisible)
-                                    ? View.VISIBLE : View.GONE);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Keyboard listener error: " + e.getMessage());
-            }
-        };
-
-        rootView.getViewTreeObserver().addOnGlobalLayoutListener(keyboardListener);
-
-        if (etManualEpc != null) {
-            etManualEpc.setOnFocusChangeListener((v, hasFocus) -> {
-                if (hasFocus) {
-                    v.postDelayed(() -> {
-                        try {
-                            androidx.core.widget.NestedScrollView scrollView =
-                                    view.findViewById(R.id.posScrollView);
-                            if (scrollView != null) {
-                                View target = tilManualEpc != null ? tilManualEpc : etManualEpc;
-                                if (target != null) {
-                                    int targetY = target.getTop();
-                                    scrollView.smoothScrollTo(0, Math.max(0, targetY - 50));
-                                }
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "scroll to input error: " + e.getMessage());
-                        }
-                    }, 300);
-                }
-            });
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "setupKeyboardVisibilityListener error: " + e.getMessage());
-    }
-}
-
-private void removeKeyboardListener() {
-    try {
-        if (keyboardRootView != null && keyboardListener != null) {
-            keyboardRootView.getViewTreeObserver()
-                    .removeOnGlobalLayoutListener(keyboardListener);
-        }
-        keyboardRootView = null;
-        keyboardListener = null;
-    } catch (Exception e) {
-        Log.e(TAG, "removeKeyboardListener error: " + e.getMessage());
     }
 }
 
@@ -532,6 +438,12 @@ private void bindViews(View view) {
             if (scaleManager != null) scaleManager.showSettingsDialog();
         });
     }
+
+    // ✅ منع الحقل من أخذ التركيز تلقائياً عند فتح الشاشة
+    if (etManualEpc != null) {
+        etManualEpc.clearFocus();
+    }
+
     applyLanguage();
 }
 
@@ -2048,31 +1960,38 @@ private void restoreItemToCache(String code, RefundItem item) {
     /**
      * ✅ إرسال EPC يدوياً
      */
-    private void submitManualEpc() {
-        try {
-            if (!hasPosPermission()) {
-                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+   private void submitManualEpc() {
+    try {
+        if (!hasPosPermission()) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
+
+        UIHelper.hideKeyboard(getActivity());
+
+        String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
+
+        if (!epc.isEmpty()) {
+            if (scannedEpcs.contains(epc)) {
+                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
+                playAlertSound(2);
                 return;
             }
+            processRingEpc(epc, "manual");
+            if (etManualEpc != null) etManualEpc.setText("");
 
-            UIHelper.hideKeyboard(getActivity());
-            String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
-
-            if (!epc.isEmpty()) {
-                if (scannedEpcs.contains(epc)) {
-                    showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
-                    playAlertSound(2);
-                    return;
-                }
-                processRingEpc(epc, "manual");
-                if (etManualEpc != null) etManualEpc.setText("");
-            } else {
-                showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
+            // ✅ إخفاء الكيبورد وإزالة التركيز بعد الإضافة
+            if (getActivity() != null && etManualEpc != null) {
+                UIHelper.hideKeyboard(getActivity());
+                etManualEpc.clearFocus();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "submitManualEpc error: " + e.getMessage());
+        } else {
+            showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
         }
+    } catch (Exception e) {
+        Log.e(TAG, "submitManualEpc error: " + e.getMessage());
     }
+}
 
     /**
      * ✅ فتح ماسح الباركود
