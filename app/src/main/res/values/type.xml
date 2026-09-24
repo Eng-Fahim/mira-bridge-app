@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <!-- ═══════════════════════════════════════════════════════
-         📐 TYPOGRAPHY SCALE — مقياس الخطوط (Type Scale)
-         يعتمد على Cairo font + أوزان مُحسّنة عربياً
+         📐 TYPOGRAPHY SCALE — Type Scale (v3.0)
+         Cairo + Tabular Numbers للأرقام
          ═══════════════════════════════════════════════════════ -->
 
-    <!-- Display — للشاشات الترحيبية والأرقام الضخمة -->
+    <!-- ═══════════════════════════════════════════
+         📱 DISPLAY — للشاشات الترحيبية
+         ═══════════════════════════════════════════ -->
     <style name="TextAppearance.App.Display.Large" parent="TextAppearance.Material3.DisplayLarge">
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
@@ -26,7 +29,9 @@
         <item name="android:textColor">@color/text_primary</item>
     </style>
 
-    <!-- Headline — لعناوين الشاشات الرئيسية -->
+    <!-- ═══════════════════════════════════════════
+         📰 HEADLINE — عناوين الشاشات
+         ═══════════════════════════════════════════ -->
     <style name="TextAppearance.App.Headline.Large" parent="TextAppearance.Material3.HeadlineLarge">
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
@@ -45,7 +50,9 @@
         <item name="android:textColor">@color/text_primary</item>
     </style>
 
-    <!-- Title — لعناوين الكروت -->
+    <!-- ═══════════════════════════════════════════
+         📌 TITLE — عناوين الكروت
+         ═══════════════════════════════════════════ -->
     <style name="TextAppearance.App.Title.Large" parent="TextAppearance.Material3.TitleLarge">
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
@@ -73,7 +80,9 @@
         <item name="android:textColor">@color/text_primary</item>
     </style>
 
-    <!-- Body — للنصوص العادية (الحد الأدنى 14sp) -->
+    <!-- ═══════════════════════════════════════════
+         📝 BODY — النصوص العادية
+         ═══════════════════════════════════════════ -->
     <style name="TextAppearance.App.Body.Large" parent="TextAppearance.Material3.BodyLarge">
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
@@ -101,7 +110,9 @@
         <item name="android:textColor">@color/text_secondary</item>
     </style>
 
-    <!-- Label — للتسميات والأزرار -->
+    <!-- ═══════════════════════════════════════════
+         🏷️ LABEL — التسميات والأزرار
+         ═══════════════════════════════════════════ -->
     <style name="TextAppearance.App.Label.Large" parent="TextAppearance.Material3.LabelLarge">
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
@@ -132,105 +143,102 @@
         <item name="android:textColor">@color/text_tertiary</item>
     </style>
 
-    <!-- 🏷️ Special: Text on gold background -->
+    <!-- ═══════════════════════════════════════════
+         🏷️ SPECIAL — على الخلفية الذهبية
+         ═══════════════════════════════════════════ -->
     <style name="TextAppearance.App.OnGold" parent="TextAppearance.App.Label.Large">
         <item name="android:textColor">@color/text_on_gold</item>
         <item name="android:textFontWeight">700</item>
     </style>
-<!-- ═══════════════════════════════════════════════════════
-     🔢 NUMBER STYLES — للأرقام فقط
-     ═══════════════════════════════════════════════════════ -->
 
-<!-- ✅ رقم ضخم (Hero Balance) -->
-<style name="TextAppearance.App.Number.Hero">
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
-    <item name="android:textSize">34sp</item>
-    <item name="android:lineHeight">42sp</item>
-    <item name="android:textFontWeight">600</item>
-    <item name="android:letterSpacing">0</item>
-    <item name="android:fontFeatureSettings">"tnum"</item>
-    <item name="android:textDirection">ltr</item>
-    <item name="android:textColor">@color/text_primary</item>
-</style>
+    <!-- ═══════════════════════════════════════════════════════
+         🔢 NUMBER STYLES — للأرقام
+         ═══════════════════════════════════════════════════════ -->
 
-<!-- ✅ رقم كبير (بطاقات القيمة) -->
-<style name="TextAppearance.App.Number.Large">
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
-    <item name="android:textSize">24sp</item>
-    <item name="android:lineHeight">32sp</item>
-    <item name="android:textFontWeight">600</item>
-    <item name="android:letterSpacing">0</item>
-    <item name="android:fontFeatureSettings">"tnum"</item>
-    <item name="android:textDirection">ltr</item>
-    <item name="android:textColor">@color/text_primary</item>
-</style>
+    <!-- ✅ الأساسي — Parent للأرقام -->
+    <style name="TextAppearance.App.Number" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:lineHeight">22sp</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:fontFeatureSettings">"tnum"</item>
+        <item name="android:textDirection">ltr</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
 
-<!-- ✅ رقم متوسط (العدّادات) -->
-<style name="TextAppearance.App.Number.Medium">
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
-    <item name="android:textSize">18sp</item>
-    <item name="android:lineHeight">24sp</item>
-    <item name="android:textFontWeight">600</item>
-    <item name="android:letterSpacing">0</item>
-    <item name="android:fontFeatureSettings">"tnum"</item>
-    <item name="android:textDirection">ltr</item>
-    <item name="android:textColor">@color/text_primary</item>
-</style>
+    <!-- ✅ الأساسي على الذهبي -->
+    <style name="TextAppearance.App.Number.OnGold">
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:lineHeight">22sp</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:fontFeatureSettings">"tnum"</item>
+        <item name="android:textDirection">ltr</item>
+        <item name="android:textColor">@color/pure_white</item>
+    </style>
 
-<!-- ✅ رقم صغير -->
-<style name="TextAppearance.App.Number.Small">
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
-    <item name="android:textSize">14sp</item>
-    <item name="android:lineHeight">18sp</item>
-    <item name="android:textFontWeight">600</item>
-    <item name="android:letterSpacing">0</item>
-    <item name="android:fontFeatureSettings">"tnum"</item>
-    <item name="android:textDirection">ltr</item>
-    <item name="android:textColor">@color/text_primary</item>
-</style>
+    <!-- ✅ الرقم الضخم -->
+    <style name="TextAppearance.App.Number.Hero" parent="TextAppearance.App.Number">
+        <item name="android:textSize">34sp</item>
+        <item name="android:lineHeight">42sp</item>
+    </style>
 
-<!-- ✅ رقم دقيق (dBm, EPC, النسب) -->
-<style name="TextAppearance.App.Number.Mono">
-    <item name="android:fontFamily">monospace</item>
-    <item name="android:textSize">14sp</item>
-    <item name="android:lineHeight">18sp</item>
-    <item name="android:textFontWeight">600</item>
-    <item name="android:letterSpacing">0</item>
-    <item name="android:fontFeatureSettings">"tnum"</item>
-    <item name="android:textDirection">ltr</item>
-    <item name="android:textColor">@color/text_primary</item>
-</style>
+    <!-- ✅ الرقم الكبير -->
+    <style name="TextAppearance.App.Number.Large" parent="TextAppearance.App.Number">
+        <item name="android:textSize">24sp</item>
+        <item name="android:lineHeight">32sp</item>
+    </style>
 
-<!-- ✅ رقم على خلفية ذهبية (أبيض + ظل) -->
-<style name="TextAppearance.App.Number.OnGold.Hero">
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
-    <item name="android:textSize">34sp</item>
-    <item name="android:lineHeight">42sp</item>
-    <item name="android:textFontWeight">600</item>
-    <item name="android:letterSpacing">0</item>
-    <item name="android:fontFeatureSettings">"tnum"</item>
-    <item name="android:textDirection">ltr</item>
-    <item name="android:textColor">@color/pure_white</item>
-    <item name="android:shadowColor">#40000000</item>
-    <item name="android:shadowDx">0</item>
-    <item name="android:shadowDy">2</item>
-    <item name="android:shadowRadius">4</item>
-</style>
+    <!-- ✅ الرقم المتوسط -->
+    <style name="TextAppearance.App.Number.Medium" parent="TextAppearance.App.Number">
+        <item name="android:textSize">18sp</item>
+        <item name="android:lineHeight">24sp</item>
+    </style>
 
-<style name="TextAppearance.App.Number.OnGold.Medium">
-    <item name="android:fontFamily">@font/cairo</item>
-    <item name="fontFamily">@font/cairo</item>
-    <item name="android:textSize">15sp</item>
-    <item name="android:lineHeight">20sp</item>
-    <item name="android:textFontWeight">600</item>
-    <item name="android:letterSpacing">0</item>
-    <item name="android:fontFeatureSettings">"tnum"</item>
-    <item name="android:textDirection">ltr</item>
-    <item name="android:textColor">@color/pure_white</item>
-</style>
+    <!-- ✅ الرقم الصغير -->
+    <style name="TextAppearance.App.Number.Small" parent="TextAppearance.App.Number">
+        <item name="android:textSize">14sp</item>
+        <item name="android:lineHeight">18sp</item>
+    </style>
+
+    <!-- ✅ الرقم Mono (dBm, EPC) -->
+    <style name="TextAppearance.App.Number.Mono" parent="TextAppearance.App.Number">
+        <item name="android:fontFamily">monospace</item>
+        <item name="fontFamily">monospace</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:lineHeight">18sp</item>
+    </style>
+
+    <!-- ✅ الرقم الضخم على الذهبي -->
+    <style name="TextAppearance.App.Number.OnGold.Hero" parent="TextAppearance.App.Number.OnGold">
+        <item name="android:textSize">34sp</item>
+        <item name="android:lineHeight">42sp</item>
+        <item name="android:shadowColor">#40000000</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">2</item>
+        <item name="android:shadowRadius">4</item>
+    </style>
+
+    <!-- ✅ الرقم الكبير على الذهبي -->
+    <style name="TextAppearance.App.Number.OnGold.Large" parent="TextAppearance.App.Number.OnGold">
+        <item name="android:textSize">24sp</item>
+        <item name="android:lineHeight">32sp</item>
+    </style>
+
+    <!-- ✅ الرقم المتوسط على الذهبي -->
+    <style name="TextAppearance.App.Number.OnGold.Medium" parent="TextAppearance.App.Number.OnGold">
+        <item name="android:textSize">15sp</item>
+        <item name="android:lineHeight">20sp</item>
+    </style>
+
+    <!-- ✅ الرقم الصغير على الذهبي -->
+    <style name="TextAppearance.App.Number.OnGold.Small" parent="TextAppearance.App.Number.OnGold">
+        <item name="android:textSize">13sp</item>
+        <item name="android:lineHeight">18sp</item>
+    </style>
+
 </resources>
