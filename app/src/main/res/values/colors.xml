@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <!-- ═══════════════════════════════════════════════════════════════
-         🏛️ PART 1 — SEMANTIC DESIGN TOKENS (النظام الجديد)
-         المصدر الوحيد للحقيقة — استخدم هذه فقط في الكود الجديد
+         🏛️ PART 1 — SEMANTIC DESIGN TOKENS
+         المصدر الوحيد للحقيقة
          ═══════════════════════════════════════════════════════════════ -->
 
-    <!-- 🥇 GOLD FAMILY — 7 درجات متوافقة WCAG -->
+    <!-- 🥇 GOLD FAMILY -->
     <color name="gold_50">#FFFBF0</color>
     <color name="gold_100">#FDF3D7</color>
     <color name="gold_200">#F5D77E</color>
@@ -14,7 +15,7 @@
     <color name="gold_700">#8B6914</color>
     <color name="gold_900">#3D2E00</color>
 
-    <!-- 🌑 INK FAMILY — 10 درجات -->
+    <!-- 🌑 INK FAMILY -->
     <color name="ink_50">#F8FAFC</color>
     <color name="ink_100">#F1F5F9</color>
     <color name="ink_200">#E2E8F0</color>
@@ -116,10 +117,6 @@
     <color name="state_layer_gold_hover">#14C59B27</color>
     <color name="state_layer_gold_pressed">#29C59B27</color>
 
-    <!-- Shimmer -->
-    <color name="shimmer_base">@color/ink_100</color>
-    <color name="shimmer_highlight">@color/ink_50</color>
-
     <!-- Overlay -->
     <color name="overlay_dark_40">#66000000</color>
     <color name="overlay_dark_70">#B3000000</color>
@@ -142,9 +139,12 @@
     <color name="border_strong">@color/ink_300</color>
     <color name="border_gold">@color/gold_200</color>
 
+    <!-- Shimmer -->
+    <color name="shimmer_base">@color/ink_100</color>
+    <color name="shimmer_highlight">@color/ink_50</color>
+
     <!-- ═══════════════════════════════════════════════════════════════
          🔄 PART 4 — BACKWARD COMPATIBILITY LAYER
-         ⚠️  كل الألوان القديمة موجودة هنا — لا تحذفها حتى تنتهي من الترحيل
          ═══════════════════════════════════════════════════════════════ -->
 
     <!-- 🎨 Brand & FAB -->
@@ -227,8 +227,10 @@
     <color name="gold_luxury_light">@color/gold_300</color>
     <color name="gold_luxury_soft">@color/gold_50</color>
     <color name="gold_luxury_highlight">@color/gold_200</color>
+    <color name="gold_luxury_dark_deep">@color/gold_900</color>
     <color name="chocolate">@color/ink_900</color>
     <color name="chocolate_dark">#020617</color>
+    <color name="chocolate_dark_deep">#3E2723</color>
     <color name="chocolate_light">@color/ink_700</color>
     <color name="chocolate_soft">@color/ink_100</color>
     <color name="cream_warm">@color/ink_50</color>
@@ -240,7 +242,9 @@
     <color name="text_dark_secondary">@color/ink_600</color>
     <color name="text_muted_warm">@color/ink_500</color>
     <color name="error_luxury">@color/danger_500</color>
+    <color name="error_luxury_light">#F9DEDC</color>
     <color name="error_container_luxury">@color/danger_50</color>
+    <color name="error_container_deep">#601410</color>
     <color name="success_luxury">@color/success_500</color>
     <color name="warning_luxury">@color/warning_500</color>
     <color name="info_luxury">@color/info_500</color>
@@ -367,7 +371,7 @@
     <color name="sliding_menu_item_pressed">#FF39393B</color>
     <color name="sliding_menu_item">#00000000</color>
 
-    <!-- 📷 ZXing (Barcode Scanner) — 22 لوناً -->
+    <!-- 📷 ZXing (Barcode Scanner) -->
     <color name="contents_text">#FF000000</color>
     <color name="encode_view">#FFFFFFFF</color>
     <color name="help_button_view">#FFCCCCCC</color>
@@ -389,253 +393,241 @@
     <color name="viewfinder_frame">#FF000000</color>
     <color name="viewfinder_laser">#FFFF0000</color>
     <color name="viewfinder_mask">#60000000</color>
-<!-- ═══════════════════════════════════════════════════════════════
-     🎯 PART 5 — COMPLETE LEGACY COLOR PALETTE
-     جميع الألوان القديمة المحتملة — أضفها كلها لتفادي أي خطأ
-     ═══════════════════════════════════════════════════════════════ -->
 
-<!-- Amber / Warning -->
-<color name="warning_amber">#FFA000</color>
-<color name="warning_amber_dark">#F57C00</color>
-<color name="warning_amber_light">#FFC107</color>
-<color name="amber">#FFC107</color>
-<color name="amber_dark">#FF8F00</color>
+    <!-- ═══════════════════════════════════════════════════════════════
+         🎯 PART 5 — COMPLETE LEGACY COLOR PALETTE
+         ═══════════════════════════════════════════════════════════════ -->
 
-<!-- Blue / Info -->
-<color name="info_blue">#2196F3</color>
-<color name="info_blue_dark">#1976D2</color>
-<color name="info_blue_light">#64B5F6</color>
-<color name="info">#2196F3</color>
-<color name="info_dark">#1976D2</color>
+    <!-- Amber / Warning -->
+    <color name="warning_amber">#FFA000</color>
+    <color name="warning_amber_dark">#F57C00</color>
+    <color name="warning_amber_light">#FFC107</color>
+    <color name="amber">#FFC107</color>
+    <color name="amber_dark">#FF8F00</color>
 
-<!-- Green / Success -->
-<color name="success_green">#4CAF50</color>
-<color name="success_green_dark">#388E3C</color>
-<color name="success_green_light">#81C784</color>
-<color name="success">#4CAF50</color>
-<color name="success_dark">#388E3C</color>
+    <!-- Blue / Info -->
+    <color name="info_blue">#2196F3</color>
+    <color name="info_blue_dark">#1976D2</color>
+    <color name="info_blue_light">#64B5F6</color>
+    <color name="info">#2196F3</color>
+    <color name="info_dark">#1976D2</color>
 
-<!-- Red / Error / Danger -->
-<color name="error_red">#F44336</color>
-<color name="error_red_dark">#D32F2F</color>
-<color name="error_red_light">#EF5350</color>
-<color name="danger_red">#F44336</color>
-<color name="error">#F44336</color>
+    <!-- Green / Success -->
+    <color name="success_green">#4CAF50</color>
+    <color name="success_green_dark">#388E3C</color>
+    <color name="success_green_light">#81C784</color>
+    <color name="success">#4CAF50</color>
+    <color name="success_dark">#388E3C</color>
 
-<!-- Gray / Neutral -->
-<color name="neutral_gray">#9E9E9E</color>
-<color name="neutral_gray_dark">#616161</color>
-<color name="neutral_gray_light">#E0E0E0</color>
-<color name="neutral">#9E9E9E</color>
+    <!-- Red / Error / Danger -->
+    <color name="error_red">#F44336</color>
+    <color name="error_red_dark">#D32F2F</color>
+    <color name="error_red_light">#EF5350</color>
+    <color name="danger_red">#F44336</color>
+    <color name="error">#F44336</color>
 
-<!-- Teal / Cyan -->
-<color name="teal_primary">#009688</color>
-<color name="teal_dark">#00796B</color>
-<color name="cyan_primary">#00BCD4</color>
+    <!-- Gray / Neutral -->
+    <color name="neutral_gray">#9E9E9E</color>
+    <color name="neutral_gray_dark">#616161</color>
+    <color name="neutral_gray_light">#E0E0E0</color>
+    <color name="neutral">#9E9E9E</color>
 
-<!-- Purple / Deep Purple -->
-<color name="purple_primary">#9C27B0</color>
-<color name="deep_purple">#673AB7</color>
-<color name="deep_purple_dark">#512DA8</color>
+    <!-- Teal / Cyan -->
+    <color name="teal_primary">#009688</color>
+    <color name="teal_dark">#00796B</color>
+    <color name="cyan_primary">#00BCD4</color>
 
-<!-- Indigo / Blue -->
-<color name="indigo_primary">#3F51B5</color>
-<color name="blue_primary">#2196F3</color>
-<color name="blue_dark">#1976D2</color>
-<color name="blue_accent">#448AFF</color>
+    <!-- Purple / Deep Purple -->
+    <color name="purple_primary">#9C27B0</color>
+    <color name="deep_purple">#673AB7</color>
+    <color name="deep_purple_dark">#512DA8</color>
 
-<!-- Orange / Pink -->
-<color name="orange_primary">#FF9800</color>
-<color name="orange_dark">#F57C00</color>
-<color name="pink_primary">#E91E63</color>
-<color name="pink_dark">#C2185B</color>
+    <!-- Indigo / Blue -->
+    <color name="indigo_primary">#3F51B5</color>
+    <color name="blue_primary">#2196F3</color>
+    <color name="blue_dark">#1976D2</color>
+    <color name="blue_accent">#448AFF</color>
 
-<!-- Lime / Light Green -->
-<color name="lime_primary">#CDDC39</color>
-<color name="light_green">#8BC34A</color>
+    <!-- Orange / Pink -->
+    <color name="orange_primary">#FF9800</color>
+    <color name="orange_dark">#F57C00</color>
+    <color name="pink_primary">#E91E63</color>
+    <color name="pink_dark">#C2185B</color>
 
-<!-- Brown / Gray -->
-<color name="brown_primary">#795548</color>
-<color name="blue_gray">#607D8B</color>
-<color name="blue_gray_dark">#455A64</color>
+    <!-- Lime / Light Green -->
+    <color name="lime_primary">#CDDC39</color>
+    <color name="light_green">#8BC34A</color>
 
-<!-- 🌟 Shimmer / Skeleton -->
-<color name="shimmer_start">#F1F5F9</color>
-<color name="shimmer_end">#E2E8F0</color>
-<color name="skeleton_bg">#F1F5F9</color>
-<color name="placeholder_bg">#E2E8F0</color>
+    <!-- Brown / Gray -->
+    <color name="brown_primary">#795548</color>
+    <color name="blue_gray">#607D8B</color>
+    <color name="blue_gray_dark">#455A64</color>
 
-<!-- 🌟 Border / Divider Variants -->
-<color name="divider">#E2E8F0</color>
-<color name="divider_dark">#CBD5E1</color>
-<color name="border">#E2E8F0</color>
-<color name="separator">#E2E8F0</color>
+    <!-- 🌟 Shimmer / Skeleton -->
+    <color name="shimmer_start">#F1F5F9</color>
+    <color name="shimmer_end">#E2E8F0</color>
+    <color name="skeleton_bg">#F1F5F9</color>
+    <color name="placeholder_bg">#E2E8F0</color>
 
-<!-- 🌟 Text Variants -->
-<color name="text_hint">#94A3B8</color>
-<color name="text_disabled">#CBD5E1</color>
-<color name="text_white">#FFFFFF</color>
-<color name="text_black">#000000</color>
-<color name="text_link">#0284C7</color>
+    <!-- 🌟 Border / Divider Variants -->
+    <color name="divider">#E2E8F0</color>
+    <color name="divider_dark">#CBD5E1</color>
+    <color name="border">#E2E8F0</color>
+    <color name="separator">#E2E8F0</color>
 
+    <!-- 🌟 Text Variants -->
+    <color name="text_hint">#94A3B8</color>
+    <color name="text_disabled">#CBD5E1</color>
+    <color name="text_white">#FFFFFF</color>
+    <color name="text_black">#000000</color>
+    <color name="text_link">#0284C7</color>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     🆕 PART 6 — COMPREHENSIVE LEGACY COLORS
-     قائمة شاملة بكل الألوان المحتملة في الكود القديم
-     ═══════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════
+         🆕 PART 6 — COMPREHENSIVE LEGACY COLORS
+         ═══════════════════════════════════════════════════════════════ -->
 
-<!-- 🔴 Inventory / Stock Status -->
-<color name="inventory_stop_red">#DC2626</color>
-<color name="inventory_stop">#DC2626</color>
-<color name="inventory_warning">#F59E0B</color>
-<color name="inventory_safe">#16A34A</color>
-<color name="inventory_low">#F59E0B</color>
-<color name="inventory_empty">#94A3B8</color>
-<color name="inventory_ok">#16A34A</color>
+    <!-- 🔴 Inventory / Stock Status -->
+    <color name="inventory_stop_red">#DC2626</color>
+    <color name="inventory_stop">#DC2626</color>
+    <color name="inventory_warning">#F59E0B</color>
+    <color name="inventory_safe">#16A34A</color>
+    <color name="inventory_low">#F59E0B</color>
+    <color name="inventory_empty">#94A3B8</color>
+    <color name="inventory_ok">#16A34A</color>
 
-<!-- 🟢 Online/Offline -->
-<color name="online_green">#16A34A</color>
-<color name="offline_red">#DC2626</color>
-<color name="online">#16A34A</color>
-<color name="offline">#DC2626</color>
-<color name="connecting_yellow">#F59E0B</color>
+    <!-- 🟢 Online/Offline -->
+    <color name="online_green">#16A34A</color>
+    <color name="offline_red">#DC2626</color>
+    <color name="online">#16A34A</color>
+    <color name="offline">#DC2626</color>
+    <color name="connecting_yellow">#F59E0B</color>
 
-<!-- 📊 Chart / Graph -->
-<color name="chart_color_1">#3B82F6</color>
-<color name="chart_color_2">#10B981</color>
-<color name="chart_color_3">#F59E0B</color>
-<color name="chart_color_4">#EF4444</color>
-<color name="chart_color_5">#8B5CF6</color>
+    <!-- 📊 Chart / Graph -->
+    <color name="chart_color_1">#3B82F6</color>
+    <color name="chart_color_2">#10B981</color>
+    <color name="chart_color_3">#F59E0B</color>
+    <color name="chart_color_4">#EF4444</color>
+    <color name="chart_color_5">#8B5CF6</color>
 
-<!-- 💰 Finance -->
-<color name="profit_green">#16A34A</color>
-<color name="loss_red">#DC2626</color>
+    <!-- 💰 Finance -->
+    <color name="profit_green">#16A34A</color>
+    <color name="loss_red">#DC2626</color>
+    <color name="profit">#16A34A</color>
+    <color name="loss">#DC2626</color>
 
-<color name="profit">#16A34A</color>
-<color name="loss">#DC2626</color>
+    <!-- 🏷️ Tags / Badges -->
+    <color name="badge_red">#DC2626</color>
+    <color name="badge_green">#16A34A</color>
+    <color name="badge_blue">#3B82F6</color>
+    <color name="badge_yellow">#F59E0B</color>
+    <color name="badge_purple">#8B5CF6</color>
 
-<!-- 🏷️ Tags / Badges -->
-<color name="badge_red">#DC2626</color>
-<color name="badge_green">#16A34A</color>
-<color name="badge_blue">#3B82F6</color>
-<color name="badge_yellow">#F59E0B</color>
-<color name="badge_purple">#8B5CF6</color>
+    <!-- 📱 UI States -->
+    <color name="selected_item">#E0F2FE</color>
+    <color name="pressed_state">#1F000000</color>
+    <color name="disabled_state">#61000000</color>
+    <color name="focused_state">#1F000000</color>
+    <color name="highlight_yellow">#FEF3C7</color>
+    <color name="highlight_blue">#DBEAFE</color>
+    <color name="highlight_green">#DCFCE7</color>
+    <color name="highlight_red">#FEE2E2</color>
 
-<!-- 📱 UI States -->
-<color name="selected_item">#E0F2FE</color>
-<color name="pressed_state">#1F000000</color>
-<color name="disabled_state">#61000000</color>
-<color name="focused_state">#1F000000</color>
-<color name="highlight_yellow">#FEF3C7</color>
-<color name="highlight_blue">#DBEAFE</color>
-<color name="highlight_green">#DCFCE7</color>
-<color name="highlight_red">#FEE2E2</color>
+    <!-- 🔔 Notifications -->
+    <color name="notification_red">#EF4444</color>
+    <color name="notification_green">#10B981</color>
+    <color name="notification_blue">#3B82F6</color>
+    <color name="notification_yellow">#F59E0B</color>
 
-<!-- 🔔 Notifications -->
-<color name="notification_red">#EF4444</color>
-<color name="notification_green">#10B981</color>
-<color name="notification_blue">#3B82F6</color>
-<color name="notification_yellow">#F59E0B</color>
+    <!-- 📦 Product / Item -->
+    <color name="item_available">#16A34A</color>
+    <color name="item_sold">#DC2626</color>
+    <color name="item_reserved">#F59E0B</color>
+    <color name="item_draft">#6B7280</color>
 
-<!-- 📦 Product / Item -->
-<color name="item_available">#16A34A</color>
-<color name="item_sold">#DC2626</color>
-<color name="item_reserved">#F59E0B</color>
-<color name="item_draft">#6B7280</color>
+    <!-- 🎯 Priority Levels -->
+    <color name="priority_high">#DC2626</color>
+    <color name="priority_medium">#F59E0B</color>
+    <color name="priority_low">#16A34A</color>
+    <color name="priority_critical">#991B1B</color>
 
-<!-- 🎯 Priority Levels -->
-<color name="priority_high">#DC2626</color>
-<color name="priority_medium">#F59E0B</color>
-<color name="priority_low">#16A34A</color>
-<color name="priority_critical">#991B1B</color>
+    <!-- 🔐 Security / Gates -->
+    <color name="gate_open">#16A34A</color>
+    <color name="gate_closed">#DC2626</color>
+    <color name="gate_locked">#6B7280</color>
+    <color name="security_alarm">#EF4444</color>
 
-<!-- 🔐 Security / Gates -->
-<color name="gate_open">#16A34A</color>
-<color name="gate_closed">#DC2626</color>
-<color name="gate_locked">#6B7280</color>
-<color name="security_alarm">#EF4444</color>
+    <!-- 🧾 Invoice / Receipt -->
+    <color name="invoice_paid">#16A34A</color>
+    <color name="invoice_pending">#F59E0B</color>
+    <color name="invoice_overdue">#DC2626</color>
+    <color name="invoice_draft">#6B7280</color>
 
-<!-- 🧾 Invoice / Receipt -->
-<color name="invoice_paid">#16A34A</color>
-<color name="invoice_pending">#F59E0B</color>
-<color name="invoice_overdue">#DC2626</color>
-<color name="invoice_draft">#6B7280</color>
+    <!-- 📅 Calendar / Date -->
+    <color name="date_today">#3B82F6</color>
+    <color name="date_weekend">#EF4444</color>
+    <color name="date_holiday">#F59E0B</color>
+    <color name="date_selected">#C59B27</color>
 
-<!-- 📅 Calendar / Date -->
-<color name="date_today">#3B82F6</color>
-<color name="date_weekend">#EF4444</color>
-<color name="date_holiday">#F59E0B</color>
-<color name="date_selected">#C59B27</color>
+    <!-- 🔔 Alert Severity -->
+    <color name="alert_critical">#991B1B</color>
+    <color name="alert_high">#DC2626</color>
+    <color name="alert_medium">#F59E0B</color>
+    <color name="alert_low">#3B82F6</color>
+    <color name="alert_info">#0284C7</color>
 
-<!-- 🔔 Alert Severity -->
-<color name="alert_critical">#991B1B</color>
-<color name="alert_high">#DC2626</color>
-<color name="alert_medium">#F59E0B</color>
-<color name="alert_low">#3B82F6</color>
-<color name="alert_info">#0284C7</color>
+    <!-- 📊 Progress / Loading -->
+    <color name="progress_track">#E2E8F0</color>
+    <color name="progress_fill">#C59B27</color>
+    <color name="progress_complete">#16A34A</color>
+    <color name="progress_error">#DC2626</color>
 
-<!-- 📊 Progress / Loading -->
-<color name="progress_track">#E2E8F0</color>
-<color name="progress_fill">#C59B27</color>
-<color name="progress_complete">#16A34A</color>
-<color name="progress_error">#DC2626</color>
+    <!-- 🎨 Gold Karat Variants -->
+    <color name="karat_24">#C59B27</color>
+    <color name="karat_22">#D4A932</color>
+    <color name="karat_21">#E5C158</color>
+    <color name="karat_18">#F5D77E</color>
+    <color name="karat_14">#FDF3D7</color>
 
-<!-- 🎨 Gold Karat Variants -->
-<color name="karat_24">#C59B27</color>
-<color name="karat_22">#D4A932</color>
-<color name="karat_21">#E5C158</color>
-<color name="karat_18">#F5D77E</color>
-<color name="karat_14">#FDF3D7</color>
+    <!-- 🌟 Material Design Legacy -->
+    <color name="md_amber_500">#FFC107</color>
+    <color name="md_amber_700">#FFA000</color>
+    <color name="md_blue_500">#2196F3</color>
+    <color name="md_blue_700">#1976D2</color>
+    <color name="md_green_500">#4CAF50</color>
+    <color name="md_green_700">#388E3C</color>
+    <color name="md_red_500">#F44336</color>
+    <color name="md_red_700">#D32F2F</color>
+    <color name="md_gray_500">#9E9E9E</color>
+    <color name="md_gray_700">#616161</color>
 
-<!-- 🌟 Material Design Legacy -->
-<color name="md_amber_500">#FFC107</color>
-<color name="md_amber_700">#FFA000</color>
-<color name="md_blue_500">#2196F3</color>
-<color name="md_blue_700">#1976D2</color>
-<color name="md_green_500">#4CAF50</color>
-<color name="md_green_700">#388E3C</color>
-<color name="md_red_500">#F44336</color>
-<color name="md_red_700">#D32F2F</color>
-<color name="md_gray_500">#9E9E9E</color>
-<color name="md_gray_700">#616161</color>
+    <!-- 🎨 Common Naming Patterns -->
+    <color name="color_red">#DC2626</color>
+    <color name="color_green">#16A34A</color>
+    <color name="color_blue">#3B82F6</color>
+    <color name="color_yellow">#F59E0B</color>
+    <color name="color_orange">#F97316</color>
+    <color name="color_purple">#8B5CF6</color>
+    <color name="color_pink">#EC4899</color>
+    <color name="color_teal">#14B8A6</color>
+    <color name="color_indigo">#6366F1</color>
+    <color name="color_cyan">#06B6D4</color>
 
-<!-- 🎨 Common Naming Patterns -->
-<color name="color_red">#DC2626</color>
-<color name="color_green">#16A34A</color>
-<color name="color_blue">#3B82F6</color>
-<color name="color_yellow">#F59E0B</color>
-<color name="color_orange">#F97316</color>
-<color name="color_purple">#8B5CF6</color>
-<color name="color_pink">#EC4899</color>
-<color name="color_teal">#14B8A6</color>
-<color name="color_indigo">#6366F1</color>
-<color name="color_cyan">#06B6D4</color>
+    <!-- 🆕 Button / Action -->
+    <color name="button_primary">#C59B27</color>
+    <color name="button_secondary">#475569</color>
+    <color name="button_danger">#DC2626</color>
+    <color name="button_success">#16A34A</color>
+    <color name="button_disabled">#CBD5E1</color>
 
-<!-- 🆕 Button / Action -->
-<color name="button_primary">#C59B27</color>
-<color name="button_secondary">#475569</color>
-<color name="button_danger">#DC2626</color>
-<color name="button_success">#16A34A</color>
-<color name="button_disabled">#CBD5E1</color>
+    <!-- 🆕 Text Emphasis -->
+    <color name="text_emphasis_high">#0F172A</color>
+    <color name="text_emphasis_medium">#475569</color>
+    <color name="text_emphasis_low">#94A3B8</color>
+    <color name="text_success">#16A34A</color>
+    <color name="text_error">#DC2626</color>
+    <color name="text_warning">#F59E0B</color>
+    <color name="text_info">#0284C7</color>
 
-<!-- 🆕 Text Emphasis -->
-<color name="text_emphasis_high">#0F172A</color>
-<color name="text_emphasis_medium">#475569</color>
-<color name="text_emphasis_low">#94A3B8</color>
-<color name="text_success">#16A34A</color>
-<color name="text_error">#DC2626</color>
-<color name="text_warning">#F59E0B</color>
-<color name="text_info">#0284C7</color>
-
-   <!-- ✅ اللون الذهبي المُعزَّز في الفاتح -->
-<color name="gold_luxury_dark_deep">#3D2E00</color>
-<color name="chocolate_dark_deep">#3E2723</color>
-<color name="error_container_deep">#601410</color>
-<color name="error_luxury_light">#F9DEDC</color>
-
-<!-- ✅ للنصوص على الذهبي -->
-<color name="text_on_gold">#3D2E00</color>
-<color name="text_gold_accent">#8B6914</color> 
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
