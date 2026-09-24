@@ -2,71 +2,173 @@
 <resources>
 
     <!-- ═══════════════════════════════════════════════════
-         🌙 Luxury Jewelry Dark Palette v2.0
+         🌙 LUXURY JEWELRY — Dark Palette v3.0
          ═══════════════════════════════════════════════════ -->
 
-    <color name="toolbar_background">#161618</color>
-    <!-- الذهبي -->
+    <!-- 🎨 Pure Colors -->
+    <color name="pure_white">#FFFFFF</color>
+    <color name="pure_black">#000000</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- 🥇 GOLD FAMILY (مصدر الحقيقة الوحيد) -->
     <color name="gold_luxury">#E8C766</color>
     <color name="gold_luxury_dark">#B8860B</color>
     <color name="gold_luxury_light">#F5D77E</color>
     <color name="gold_luxury_soft">#3D2F00</color>
     <color name="gold_luxury_highlight">#FFE082</color>
+    <color name="gold_luxury_dark_deep">#2E1A00</color>
 
-    <!-- بني شوكولاتة -->
+    <!-- 🍫 CHOCOLATE FAMILY -->
     <color name="chocolate">#D7CCC8</color>
     <color name="chocolate_dark">#4E342E</color>
     <color name="chocolate_light">#BCAAA4</color>
     <color name="chocolate_soft">#221F1C</color>
+    <color name="chocolate_dark_deep">#2E1A12</color>
 
-    <!-- أسود فاخر -->
+    <!-- 🌑 BLACK FAMILY -->
     <color name="black_luxury">#0B0B0C</color>
     <color name="black_soft">#141210</color>
     <color name="black_highlight">#1A1816</color>
 
-    <!-- رمادي داكن دافئ -->
+    <!-- 🌫️ GRAY FAMILY -->
     <color name="gray_dark_warm">#161618</color>
     <color name="gray_warm">#2C2A28</color>
     <color name="gray_light_warm">#3F3325</color>
 
-    <!-- نصوص -->
+    <!-- 📝 TEXT -->
     <color name="text_light_primary">#F9FAFB</color>
     <color name="text_light_secondary">#D7CCC8</color>
     <color name="text_muted_warm">#A1887F</color>
 
-    <!-- حدود -->
+    <!-- 🔲 BORDERS -->
     <color name="border_dark_warm">#3F3325</color>
+    <color name="border_dark_medium">#3A2E22</color>       <!-- ✅ أفتح قليلاً -->
     <color name="border_dark">#2E241B</color>
 
-    <!-- أخطاء وناجح -->
+    <!-- ✅ حالة / Status -->
+    <color name="success_500">#81C784</color>
+    <color name="success_50">#1B3D1F</color>
+    <color name="success_700">#4CAF50</color>
+
+    <color name="warning_500">#FFB74D</color>
+    <color name="warning_50">#4A2E00</color>
+    <color name="warning_700">#F57C00</color>
+
+    <color name="danger_500">#F2B8B5</color>
+    <color name="danger_50">#8C1D18</color>
+    <color name="danger_700">#B00020</color>
+
+    <color name="info_500">#64B5F6</color>
+    <color name="info_50">#0D3B5C</color>
+    <color name="info_700">#1976D2</color>
+
+    <!-- ✅ إصلاح: Inverse Surface -->
+    <color name="surface_inverse_dark">#F1F5F9</color>
+    <color name="on_surface_inverse_dark">#0F172A</color>
+
+    <!-- 🎭 State Layers -->
+    <color name="state_layer_hover">#14FFFFFF</color>
+    <color name="state_layer_focus">#1FFFFFFF</color>
+    <color name="state_layer_pressed">#29FFFFFF</color>
+    <color name="state_layer_gold_hover">#14E8C766</color>
+    <color name="state_layer_gold_pressed">#29E8C766</color>
+
+    <!-- ═══════════════════════════════════════════════════
+         🔄 ALIASES — المصدر الواحد للحقيقة
+         ═══════════════════════════════════════════════════ -->
+
+    <!-- ✅ الألوان الأساسية تُشير إلى gold_luxury -->
+    <color name="brand_primary">@color/gold_luxury</color>
+    <color name="brand_primary_dark">@color/gold_luxury_dark</color>
+    <color name="colorPrimary">@color/gold_luxury</color>
+    <color name="colorOnPrimary">@color/gold_luxury_dark_deep</color>
+    <color name="primary">@color/gold_luxury</color>
+    <color name="accent">@color/gold_luxury</color>
+    <color name="accent_light">@color/gold_luxury_light</color>
+    <color name="accent_dark">@color/gold_luxury_dark</color>
+    <color name="gold">@color/gold_luxury</color>
+    <color name="nav_item_selected">@color/gold_luxury</color>
+    <color name="accent_color">@color/gold_luxury</color>
+    <color name="accent_color_variant">@color/chocolate</color>
+
+    <!-- ✅ الأسطح -->
+    <color name="colorSurface">@color/gray_dark_warm</color>
+    <color name="colorOnSurface">@color/text_light_primary</color>
+    <color name="colorSurfaceVariant">@color/chocolate_soft</color>
+    <color name="colorOnSurfaceVariant">@color/text_light_secondary</color>
+    <color name="colorOutline">@color/border_dark_warm</color>
+    <color name="colorOutlineVariant">@color/border_dark_medium</color>
+
+    <color name="background_dark">@color/black_luxury</color>
+    <color name="background_card">@color/gray_dark_warm</color>
+    <color name="background_card_variant">@color/chocolate_soft</color>
+
+    <color name="bg_main">@color/black_luxury</color>
+    <color name="bg_card">@color/gray_dark_warm</color>
+    <color name="card_background">@color/gray_dark_warm</color>
+    <color name="card_stroke">@color/border_dark_warm</color>
+
+    <color name="toolbar_background">@color/gray_dark_warm</color>
+    <color name="nav_bar_background">@color/gray_dark_warm</color>
+    <color name="nav_item_unselected">@color/chocolate</color>
+
+    <!-- ✅ النصوص -->
+    <color name="primary_text">@color/text_light_primary</color>
+    <color name="primary_text_variant">#E0E0E0</color>
+    <color name="text_primary">@color/text_light_primary</color>
+    <color name="text_secondary">@color/text_light_secondary</color>
+    <color name="text_secondary_variant">@color/text_muted_warm</color>
+    <color name="text_muted">@color/text_light_secondary</color>
+    <color name="text_light">@color/pure_white</color>
+    <color name="on_surface">@color/text_light_primary</color>
+    <color name="on_surface_variant">@color/text_light_secondary</color>
+
+    <!-- ✅ الحالات -->
+    <color name="status_online">@color/success_500</color>
+    <color name="status_offline">@color/error_luxury</color>
+    <color name="status_updating">@color/warning_500</color>
+    <color name="status_online_green">@color/success_500</color>
+    <color name="status_offline_red">@color/error_luxury</color>
+
+    <!-- ✅ الأخطاء -->
     <color name="error_luxury">#F2B8B5</color>
+    <color name="error_luxury_light">#F9DEDC</color>
     <color name="error_container_luxury">#8C1D18</color>
+    <color name="error_container_deep">#601410</color>
     <color name="success_luxury">#81C784</color>
     <color name="warning_luxury">#FFB74D</color>
     <color name="info_luxury">#64B5F6</color>
 
-    <!-- الألوان القديمة (للتوافق) -->
-    <color name="lfile_colorPrimary">#92B4F4</color>
+    <!-- ═══════════════════════════════════════════════════
+         🎨 Legacy Aliases (توافق مع الكود القديم)
+         ═══════════════════════════════════════════════════ -->
+
     <color name="white">#FFFFFF</color>
     <color name="white1">#1E1E1E</color>
-    <color name="black">#FFFFFF</color>
+    <color name="black">#000000</color>              <!-- ✅ أسود حقيقي -->
     <color name="black1">#E0E0E0</color>
     <color name="gray">#A0A0A0</color>
     <color name="gray1">#2C2C2C</color>
     <color name="gray2">#505050</color>
     <color name="gray3">#1A1A1A</color>
+    <color name="graywhite">#1E1E1E</color>
+    <color name="grayslate">#9E9E9E</color>
+    <color name="deep_gray">#E0E0E0</color>
+    <color name="text_gray">#999999</color>
+
     <color name="red">#FF4444</color>
     <color name="red1">#FF6B6B</color>
     <color name="red2">#FF5252</color>
     <color name="red3">#33FF0000</color>
     <color name="red4">#88FF0000</color>
     <color name="red5">#AAFF0000</color>
-    <color name="gold">#E8C766</color>
-    <color name="yellow">#FFFF00</color>
+    <color name="red_qian">#FF8A80</color>
+
     <color name="green">#81C784</color>
     <color name="green1">#33008000</color>
     <color name="green2">#88008000</color>
     <color name="green3">#AA008000</color>
+
     <color name="blue">#6B9FFF</color>
     <color name="blue1">#4FC3F7</color>
     <color name="blue2">#4DD0E1</color>
@@ -75,36 +177,28 @@
     <color name="lightblue2">#6B9FD4</color>
     <color name="lightblue3">#2A3F5F</color>
     <color name="lightblue4">#1A2A3F</color>
+
     <color name="purple">#B388FF</color>
     <color name="pink">#FF80AB</color>
     <color name="orange">#FFB74D</color>
+    <color name="yellow">#FFFF00</color>
     <color name="lemonyellow">#3A3A2A</color>
-    <color name="graywhite">#1E1E1E</color>
-    <color name="grayslate">#9E9E9E</color>
+
     <color name="full_transparent">#00000000</color>
     <color name="half_transparent">#AAFFFFFF</color>
+    <color name="listitem_black">#FFFFFF</color>
+    <color name="listitem_gray">#D7CCC8</color>
 
-    <!-- ألوان الهوية -->
-    <color name="brand_primary">#E8C766</color>
-    <color name="brand_primary_dark">#9E8033</color>
+    <color name="lfile_colorPrimary">#92B4F4</color>
 
-    <color name="nav_bar_background">#161618</color>
-    <color name="nav_item_selected">#E8C766</color>
-    <color name="nav_item_unselected">#D7CCC8</color>
-
+    <!-- Action Sheet -->
     <color name="action_sheet_bg">#12141A</color>
     <color name="action_sheet_card_bg">#1C2029</color>
     <color name="action_sheet_text_primary">#FFFFFF</color>
     <color name="action_sheet_text_secondary">#D7CCC8</color>
     <color name="action_sheet_divider">#2E241B</color>
-    <color name="listitem_black">#FFFFFF</color>
-    <color name="listitem_gray">#D7CCC8</color>
 
-    <color name="deep_gray">#E0E0E0</color>
-    <color name="text_gray">#999999</color>
-    <color name="red_qian">#FF8A80</color>
-
-    <!-- القائمة الجانبية -->
+    <!-- Sliding Menu -->
     <color name="sliding_menu_back">#FF1C1C1E</color>
     <color name="sliding_menu_title_text_color">#FF999999</color>
     <color name="sliding_menu_item_text_color">#FFB1B1B1</color>
@@ -112,7 +206,7 @@
     <color name="sliding_menu_item_pressed">#FF39393B</color>
     <color name="sliding_menu_item">#00000000</color>
 
-    <!-- ZXing -->
+    <!-- ZXing (Barcode) -->
     <color name="contents_text">#FFFFFFFF</color>
     <color name="encode_view">#FF000000</color>
     <color name="help_button_view">#FF333333</color>
@@ -131,71 +225,40 @@
     <color name="sbc_snippet_text">#FFB4B4B4</color>
     <color name="share_text">#FFFFFFFF</color>
     <color name="status_text">#FFFFFFFF</color>
-    <color name="transparent">#00000000</color>
-    <color name="viewfinder_frame">#E8C766</color>
+    <color name="viewfinder_frame">@color/gold_luxury</color>
     <color name="viewfinder_laser">#FF4444</color>
     <color name="viewfinder_mask">#60000000</color>
-    <color name="primary">#E8C766</color>
-    <color name="on_surface_variant">#D7CCC8</color>
-    <color name="outline">#3F3325</color>
 
-    <!-- الداشبورد -->
-    <color name="primary_text">#FFFFFFFF</color>
-    <color name="primary_text_variant">#FFE0E0E0</color>
+    <!-- Shimmer -->
+    <color name="shimmer_color">@color/black_highlight</color>
+    <color name="shimmer_highlight">@color/gray_warm</color>
+    <color name="shimmer_base">@color/black_highlight</color>
 
-    <color name="text_secondary">#FFD7CCC8</color>
-    <color name="text_secondary_variant">#FFA1887F</color>
+    <!-- Karat -->
+    <color name="karat_text">#E0E0E0</color>
+    <color name="karat_text_empty">#6B6B6B</color>
 
-    <color name="background_dark">#FF0B0B0C</color>
-    <color name="background_card">#FF161618</color>
-    <color name="background_card_variant">#FF221F1C</color>
+    <!-- Fab -->
+    <color name="fab_background">@color/gold_luxury</color>
+    <color name="fab_icon_color">@color/gold_luxury_dark_deep</color>
+    <color name="progress_indicator_color">@color/gold_luxury</color>
 
-    <color name="accent_color">#E8C766</color>
-    <color name="accent_color_variant">#D7CCC8</color>
+    <!-- Luxury aliases -->
+    <color name="gold_luxury_soft_bg">@color/gold_luxury_soft</color>
+    <color name="cream_warm">@color/black_highlight</color>
+    <color name="cream_soft">@color/chocolate_soft</color>
+    <color name="cream_highlight">@color/gray_dark_warm</color>
+    <color name="border_warm">@color/border_dark_warm</color>
+    <color name="border_warm_dark">@color/border_dark_medium</color>
+    <color name="text_dark_primary">@color/text_light_primary</color>
+    <color name="text_dark_secondary">@color/text_light_secondary</color>
+    <color name="text_on_gold">@color/gold_luxury_dark_deep</color>
+    <color name="text_gold_accent">@color/gold_luxury</color>
+    <color name="border_gold">@color/gold_luxury_dark</color>
+    <color name="bg_gold_soft">@color/gold_luxury_soft</color>
+    <color name="bg_gold_highlight">@color/gold_luxury_dark</color>
 
-    <color name="shimmer_color">#FF1A1816</color>
-    <color name="shimmer_highlight">#FF2C2A28</color>
-
-    <color name="card_background">#FF161618</color>
-    <color name="card_stroke">#FF3F3325</color>
-
-    <color name="status_online">#FF81C784</color>
-    <color name="status_offline">#FFEF5350</color>
-    <color name="status_updating">#FFFFB74D</color>
-
-    <color name="karat_text">#FFE0E0E0</color>
-    <color name="karat_text_empty">#FF6B6B6B</color>
-
-    <!-- Material 3 Aliases -->
-    <color name="colorOnSurface">#FFF9FAFB</color>
-    <color name="colorSurface">#FF161618</color>
-    <color name="colorPrimary">#FFE8C766</color>
-    <color name="colorOnPrimary">#FF3E2723</color>
-    <color name="colorSurfaceVariant">#FF221F1C</color>
-    <color name="colorOnSurfaceVariant">#FFD7CCC8</color>
-    <color name="colorOutline">#FF3F3325</color>
-    <color name="colorOutlineVariant">#FF2E241B</color>
-
-    <color name="on_surface">@color/colorOnSurface</color>
-    <color name="on_surface_variant_alias">@color/colorOnSurfaceVariant</color>
-    <color name="primary_alias">@color/colorPrimary</color>
-    <color name="surface_alias">@color/colorSurface</color>
-    <color name="on_primary_alias">@color/colorOnPrimary</color>
-    <color name="surface_variant_alias">@color/colorSurfaceVariant</color>
-    <color name="outline_alias">@color/colorOutline</color>
-    <color name="outline_variant_alias">@color/colorOutlineVariant</color>
-
-    <color name="bg_main">#FF0B0B0C</color>
-    <color name="bg_card">#FF161618</color>
-    <color name="accent">#E8C766</color>
-    <color name="accent_light">#F5D77E</color>
-    <color name="accent_dark">#9E8033</color>
-    <color name="text_primary">#FFFFFFFF</color>
-    <color name="text_light">#FFFFFFFF</color>
-    <color name="text_muted">#FFD7CCC8</color>
-    
-    
-     <!-- Activity Status Colors - Dark Theme -->
+    <!-- Activity Status -->
     <color name="activity_success">#4ADE80</color>
     <color name="activity_success_bg">#14532D</color>
     <color name="activity_danger">#F87171</color>
@@ -205,5 +268,92 @@
     <color name="activity_neutral">#9CA3AF</color>
     <color name="activity_neutral_bg">#374151</color>
 
+    <!-- ═══════════════════════════════════════════════════
+         📊 Charts / Icons (توافق مع الوضع الفاتح)
+         ═══════════════════════════════════════════════════ -->
+    <color name="chart_blue">#64B5F6</color>
+    <color name="chart_green">@color/success_500</color>
+    <color name="chart_orange">@color/warning_500</color>
+    <color name="chart_red">#EF5350</color>
+    <color name="chart_purple">#B388FF</color>
+    <color name="chart_teal">#4DD0E1</color>
+    <color name="chart_pink">#FF80AB</color>
+    <color name="chart_indigo">#7986CB</color>
+
+    <color name="icon_dashboard">#7986CB</color>
+    <color name="icon_sales">#4DB6AC</color>
+    <color name="icon_inventory">#FF8A65</color>
+    <color name="icon_movement">#64B5F6</color>
+    <color name="icon_branches">#BA68C8</color>
+    <color name="icon_gates">#EF5350</color>
+    <color name="icon_audit">#81C784</color>
+    <color name="icon_reorder">#FFB74D</color>
+    <color name="icon_users">#9575CD</color>
+    <color name="icon_financial">#4DD0E1</color>
+    <color name="icon_advanced">@color/gold_luxury</color>
+
+    <!-- Reports -->
+    <color name="report_profit_green">#4CAF50</color>
+    <color name="report_loss_red">#EF5350</color>
+    <color name="report_gold_amber">@color/warning_500</color>
+    <color name="report_neutral_gray">@color/text_muted_warm</color>
+    <color name="report_primary">@color/text_light_primary</color>
+    <color name="report_primary_dark">@color/black_luxury</color>
+    <color name="report_accent">@color/gold_luxury</color>
+    <color name="report_background">@color/black_luxury</color>
+    <color name="report_surface">@color/gray_dark_warm</color>
+    <color name="report_text_primary">@color/text_light_primary</color>
+    <color name="report_text_secondary">@color/text_light_secondary</color>
+    <color name="report_success">@color/success_500</color>
+    <color name="report_warning">@color/warning_500</color>
+    <color name="report_error">@color/danger_500</color>
+    <color name="report_info">@color/info_500</color>
+
+    <!-- Gate Control -->
+    <color name="gate_pass_green">@color/success_500</color>
+    <color name="gate_deny_red">#EF5350</color>
+    <color name="gate_sim_green">@color/success_500</color>
+    <color name="gate_sim_red">#EF5350</color>
+    <color name="gate_console_bg">#000000</color>
+    <color name="gate_console_text">#00FF66</color>
+    <color name="gate_alarm_bg">#B71C1C</color>
+    <color name="gate_alarm_title_yellow">#FFFF00</color>
+
+    <!-- Status Labels (Business) -->
+    <color name="status_draft">@color/text_muted_warm</color>
+    <color name="status_pending">@color/warning_500</color>
+    <color name="status_in_transit">@color/info_500</color>
+    <color name="status_completed">@color/success_700</color>
+
+    <!-- Inventory Status -->
+    <color name="inventory_stop_red">#EF5350</color>
+    <color name="inventory_stop">#EF5350</color>
+    <color name="inventory_warning">#FFB74D</color>
+    <color name="inventory_safe">#81C784</color>
+    <color name="inventory_low">#FFB74D</color>
+    <color name="inventory_empty">#9E9E9E</color>
+    <color name="inventory_ok">#81C784</color>
+
+    <color name="online">#81C784</color>
+    <color name="offline">#EF5350</color>
+    <color name="connecting_yellow">#FFB74D</color>
+    <color name="online_green">#81C784</color>
+    <color name="offline_red">#EF5350</color>
+
+    <!-- String Array -->
+    <string-array name="colors" translatable="false">
+        <item>#E8C766</item>
+        <item>#D7CCC8</item>
+        <item>#81C784</item>
+        <item>#64B5F6</item>
+        <item>#FFB74D</item>
+        <item>#EF5350</item>
+        <item>#BA68C8</item>
+        <item>#4DD0E1</item>
+        <item>#FF80AB</item>
+        <item>#B388FF</item>
+        <item>#F5D77E</item>
+        <item>#BCAAA4</item>
+    </string-array>
 
 </resources>
