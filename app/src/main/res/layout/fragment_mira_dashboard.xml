@@ -183,16 +183,15 @@
                                 android:textAppearance="@style/TextAppearance.App.Label.Medium"
                                 android:textColor="?attr/colorOnPrimaryContainer" />
 
+                            <!-- ✨ الرقم الرئيسي — نمط رقمي -->
                             <TextView
                                 android:id="@+id/tvHeroBalance"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
                                 android:text="••••••••"
-                                android:textAppearance="@style/TextAppearance.App.Display.Medium"
-                                android:textColor="?attr/colorOnPrimaryContainer"
-                                android:textDirection="ltr"
-                                tools:text="$81,647.51" />
+                                android:textAppearance="@style/TextAppearance.App.Number.OnGold.Hero"
+                                tools:text="$61,648.96" />
 
                             <TextView
                                 android:id="@+id/tvHeroSubtitle"
@@ -212,6 +211,7 @@
                             android:orientation="horizontal"
                             android:weightSum="3">
 
+                            <!-- YER -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -224,9 +224,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                    android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:textDirection="ltr"
+                                    android:textAppearance="@style/TextAppearance.App.Number.OnGold.Medium"
                                     tools:text="12,450,000" />
 
                                 <TextView
@@ -245,6 +243,7 @@
                                 android:background="?attr/colorOutlineVariant"
                                 android:alpha="0.4" />
 
+                            <!-- SAR -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -257,9 +256,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                    android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:textDirection="ltr"
+                                    android:textAppearance="@style/TextAppearance.App.Number.OnGold.Medium"
                                     tools:text="306,150" />
 
                                 <TextView
@@ -278,6 +275,7 @@
                                 android:background="?attr/colorOutlineVariant"
                                 android:alpha="0.4" />
 
+                            <!-- USD -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -290,10 +288,8 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                    android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:textDirection="ltr"
-                                    tools:text="81,647.51" />
+                                    android:textAppearance="@style/TextAppearance.App.Number.OnGold.Medium"
+                                    tools:text="61,648.96" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
@@ -368,7 +364,7 @@
                     android:baselineAligned="false"
                     android:weightSum="3">
 
-                    <!-- Metric 1 -->
+                    <!-- Metric 1: عدد القطع -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="108dp"
@@ -408,13 +404,12 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Headline.Small"
-                                android:textColor="?attr/colorOnSurface"
+                                android:textAppearance="@style/TextAppearance.App.Number.Large"
                                 tools:text="7" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Metric 2 -->
+                    <!-- Metric 2: الوزن -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="108dp"
@@ -454,14 +449,13 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Headline.Small"
-                                android:textColor="?attr/colorPrimary"
-                                android:textDirection="ltr"
-                                tools:text="615.0 g" />
+                                android:textAppearance="@style/TextAppearance.App.Number.Large"
+                                android:textColor="@color/text_gold_accent"
+                                tools:text="442.0 g" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Metric 3 -->
+                    <!-- Metric 3: مبيعات اليوم -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="108dp"
@@ -501,9 +495,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Headline.Small"
-                                android:textColor="?attr/colorOnSurface"
-                                tools:text="1" />
+                                android:textAppearance="@style/TextAppearance.App.Number.Large"
+                                tools:text="5" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
@@ -589,7 +582,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="@dimen/space_2"
-                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                                android:textAppearance="@style/TextAppearance.App.Number.Small"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 tools:text="-0.00%" />
                         </LinearLayout>
@@ -614,9 +607,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Display.Medium"
-                                android:textColor="?attr/colorPrimary"
-                                android:textDirection="ltr"
+                                android:textAppearance="@style/TextAppearance.App.Number.Hero"
+                                android:textColor="@color/text_gold_accent"
                                 tools:text="$4,282.33" />
                         </LinearLayout>
 
@@ -633,9 +625,8 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                android:textAppearance="@style/TextAppearance.App.Number.Small"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textDirection="ltr"
                                 tools:text="18K: $103.26/g" />
 
                             <TextView
@@ -644,9 +635,8 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                android:textAppearance="@style/TextAppearance.App.Number.Small"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textDirection="ltr"
                                 tools:text="21K: $120.47/g" />
 
                             <TextView
@@ -655,9 +645,8 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                android:textColor="?attr/colorPrimary"
-                                android:textDirection="ltr"
+                                android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                android:textColor="@color/text_gold_accent"
                                 tools:text="24K: $137.68/g" />
                         </LinearLayout>
 
@@ -761,7 +750,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="@dimen/space_1"
                                     android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                    android:textAppearance="@style/TextAppearance.App.Number.Small"
                                     android:textColor="?attr/colorOnSurface"
                                     tools:text="3,798,900 YER" />
                             </LinearLayout>
@@ -792,7 +781,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="@dimen/space_1"
                                     android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                    android:textAppearance="@style/TextAppearance.App.Number.Small"
                                     android:textColor="?attr/colorOnSurface"
                                     tools:text="3,798,900 YER" />
                             </LinearLayout>
@@ -823,7 +812,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="@dimen/space_1"
                                     android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                    android:textAppearance="@style/TextAppearance.App.Number.Small"
                                     android:textColor="?attr/colorOnSurface"
                                     tools:text="3,798,900 YER" />
                             </LinearLayout>
