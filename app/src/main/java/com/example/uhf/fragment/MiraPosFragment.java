@@ -3,7 +3,6 @@ package com.example.uhf.fragment;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
-import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,7 +12,6 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
@@ -64,9 +62,8 @@ import org.json.JSONObject;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -74,58 +71,43 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * MiraPosFragment - الإصدار 4.0 (المطوّر الاحترافي)
+ * MiraPosFragment - الإصدار 5.0 (الحصين ضد التعليق)
  *
- * ✅ الإصلاحات المطبقة (32 مشكلة):
- *  1. Thread-safe collections (CopyOnWriteArrayList)
- *  2. scannedEpcs → CopyOnWriteArraySet
- *  3. pendingEpcs مع try-finally صحيح
- *  4. lastScannedTimes → ConcurrentHashMap
- *  5. حذف showSearchLoadingDialog/dismiss (dead code)
- *  6. حذف handleItemNotFound (dead code)
- *  7. showDiscountDialog → تعيد توجيه صحيح
- *  8. lastSaleResponse مع timestamp
- *  9. فحص isHealthy للـ miraExecutor
- * 10. RefundItem → final fields + Builder
- * 11. selectedRefundItem → AtomicReference
- * 12. SimpleDateFormat → thread-safe
- * 13. checkRefundEligibility مع null check
- * 14. refundDialog مع null check قبل الاستخدام
- * 15. restoreItemToCache → تجميع IDs
- * 16. notifyDashboardAndInventoryUpdate → إرسال اختياري
- * 17. setButtonsEnabled قبل loading dialog
- * 18. sessionManager null check
- * 19. refundBarcodeLauncher في onCreate
- * 20. showCartBottomSheet → R.layout
- * 21. إغلاق bottomSheet في onPause
- * 22. findNestedScrollView مع max depth
- * 23. setupKeyboardVisibilityListener → remove في onDestroyView
- * 24. liveScaleWeight → volatile
- * 25. updateCartItemsScaleWeight مع فحص isEmpty
- * 26. onRingScanned → فحص isRFIDScanActive
- * 27. parseItemResponse → toast واحد
- * 28. openBarcodeScanner → commit() آمن
- * 29. showReceipt → فحص data فعلي
- * 30. getKaratNumber مع trim
- * 31. onDestroyView → تنظيف شامل
- * 32. showToast → دائماً safeRun
+ * ✅ الإصلاحات v5.0:
+ *  1. Pre-compute للقيم المالية على UI Thread (منع تعليق SharedPreferences)
+ *  2. Timeout 30s على عملية البيع (لا انتظار للأبد)
+ *  3. Logging شامل لكل خطوة (تتبع دقيق)
+ *  4. AtomicBoolean لمنع التنفيذ المزدوج
+ *  5. Fallback Executor إذا فشل miraExecutor
+ *  6. checkoutWithLongTimeout (60 ثانية للـ read)
+ *  7. MiraPriceManager Singleton حقيقي (بدون Thread-Leak)
  */
 public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
+    private static final String POS_DEBUG = "POS_DEBUG";
     private static final String REFUND_DEBUG = "REFUND_DEBUG";
+    private static final String CHECKOUT_TRACE = "CHECKOUT_TRACE";
+    private static final String BUILD_PAYLOAD = "BUILD_PAYLOAD";
 
     // ✅ ثوابت
     private static final long SCAN_COOLDOWN_MS = 1500;
     private static final long REFUND_MAX_DAYS = 30;
     private static final int MAX_VIEW_DEPTH = 50;
-    private static final long LAST_SALE_VALIDITY_MS = 5 * 60 * 1000; // 5 دقائق
+    private static final long LAST_SALE_VALIDITY_MS = 5 * 60 * 1000;
+    private static final long CHECKOUT_TIMEOUT_MS = 30_000;
 
-    // ✅ متغيرات أساسية
+    // ✅ حالة أساسية
     private volatile boolean isSyncing = false;
     private volatile boolean isCheckoutDialogShowing = false;
+    private final AtomicBoolean isCheckoutInProgress = new AtomicBoolean(false);
+
     private SessionManager sessionManager;
     private SmartScaleManager scaleManager;
     private ScaleSimulationHelper simulationHelper;
@@ -137,6 +119,9 @@ public class MiraPosFragment extends MiraBaseFragment {
     private MiraApiClient apiClient;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    // ⭐ Executor احتياطي
+    private final ExecutorService fallbackExecutor = Executors.newFixedThreadPool(2);
+
     private MiraPriceManager priceManager;
     private MiraBranchesManager branchesManager;
     private PermissionManager permissionManager;
@@ -145,10 +130,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private volatile boolean isRFIDScanActive = false;
     private volatile boolean isRFIDModeActive = false;
 
-    // ✅ [إصلاح #3] pendingEpcs thread-safe
     private final Set<String> pendingEpcs = new CopyOnWriteArraySet<>();
-
-    // ✅ [إصلاح #4] ConcurrentHashMap
     private final Map<String, Long> lastScannedTimes = new ConcurrentHashMap<>();
 
     // ✅ Views
@@ -162,1337 +144,1367 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private boolean isArabic;
 
-    // ✅ [إصلاح #8] مع timestamp
     private volatile MiraApiClient.ApiResponse lastSaleResponse = null;
     private volatile long lastSaleResponseTime = 0;
 
-    // ✅ [إصلاح #24] volatile
     private volatile double liveScaleWeight = 0.0;
 
-    // ✅ [إصلاح #1] CopyOnWriteArrayList
     private final List<CartItem> cartList = new CopyOnWriteArrayList<>();
-
-    // ✅ [إصلاح #2] CopyOnWriteArraySet
     private final Set<String> scannedEpcs = new CopyOnWriteArraySet<>();
 
     private CartAdapter cartAdapter;
 
-    // ✅ [إصلاح #11] AtomicReference
-    private final java.util.concurrent.atomic.AtomicReference<RefundItem> selectedRefundItem =
-            new java.util.concurrent.atomic.AtomicReference<>(null);
+    private final AtomicReference<RefundItem> selectedRefundItem =
+            new AtomicReference<>(null);
 
-    // ✅ [إصلاح #21] مرجع للـ bottomSheet
     private BottomSheetDialog activeCartSheet;
 
-    
+    // ⭐ Timeout runnable
+    private Runnable checkoutTimeoutRunnable;
 
-    // ✅ [إصلاح #22] لتجنّب recursion عميق
-    private int viewTraverseDepth = 0;
+    // ==================== كلاسات مساعدة ====================
 
+    private static final class RefundItem {
+        final String epc;
+        final String serialNo;
+        final int itemId;
+        final long saleId;
+        final double originalPrice;
+        final String title;
 
-// ==================== كلاسات مساعدة ====================
-
-/**
- * ✅ [إصلاح #10] immutable RefundItem
- */
-private static final class RefundItem {
-    final String epc;
-    final String serialNo;
-    final int itemId;
-    final long saleId;
-    final double originalPrice;
-    final String title;
-
-    RefundItem(String epc, String serialNo, int itemId, long saleId,
-               double originalPrice, String title) {
-        this.epc = epc;
-        this.serialNo = serialNo;
-        this.itemId = itemId;
-        this.saleId = saleId;
-        this.originalPrice = originalPrice;
-        this.title = title;
-    }
-}
-
-/**
- * ✅ [إصلاح #10] immutable RefundEligibility
- */
-private static final class RefundEligibility {
-    final boolean isEligible;
-    final String reason;
-    final long saleId;
-    final int itemId;
-    final double originalPrice;
-    final String originalSaleDate;
-
-    private RefundEligibility(boolean isEligible, String reason, long saleId,
-                              int itemId, double originalPrice, String originalSaleDate) {
-        this.isEligible = isEligible;
-        this.reason = reason;
-        this.saleId = saleId;
-        this.itemId = itemId;
-        this.originalPrice = originalPrice;
-        this.originalSaleDate = originalSaleDate;
+        RefundItem(String epc, String serialNo, int itemId, long saleId,
+                   double originalPrice, String title) {
+            this.epc = epc;
+            this.serialNo = serialNo;
+            this.itemId = itemId;
+            this.saleId = saleId;
+            this.originalPrice = originalPrice;
+            this.title = title;
+        }
     }
 
-    static RefundEligibility eligible(long saleId, int itemId, double price, String date) {
-        return new RefundEligibility(true, null, saleId, itemId, price, date);
+    private static final class RefundEligibility {
+        final boolean isEligible;
+        final String reason;
+        final long saleId;
+        final int itemId;
+        final double originalPrice;
+        final String originalSaleDate;
+
+        private RefundEligibility(boolean isEligible, String reason, long saleId,
+                                  int itemId, double originalPrice, String originalSaleDate) {
+            this.isEligible = isEligible;
+            this.reason = reason;
+            this.saleId = saleId;
+            this.itemId = itemId;
+            this.originalPrice = originalPrice;
+            this.originalSaleDate = originalSaleDate;
+        }
+
+        static RefundEligibility eligible(long saleId, int itemId, double price, String date) {
+            return new RefundEligibility(true, null, saleId, itemId, price, date);
+        }
+
+        static RefundEligibility notEligible(String reason) {
+            return new RefundEligibility(false, reason, 0, 0, 0, "");
+        }
     }
 
-    static RefundEligibility notEligible(String reason) {
-        return new RefundEligibility(false, reason, 0, 0, 0, "");
-    }
-}
+    // ==================== دورة الحياة ====================
 
-// ==================== دورة الحياة ====================
-
-@Nullable
-@Override
-public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                         @Nullable Bundle savedInstanceState) {
-    
-    try {
-        return inflater.inflate(R.layout.fragment_mira_pos, container, false);
-    } catch (Exception e) {
-        Log.e(TAG, "onCreateView error: " + e.getMessage(), e);
-        return null;
-    }
-}
-@Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
-
-    try {
-        Context ctx = requireContext().getApplicationContext();
-
-        // ✅ تهيئة المديرين
-        branchesManager = MiraBranchesManager.getInstance(ctx);
-        priceManager = MiraPriceManager.getInstance(ctx);
-        permissionManager = PermissionManager.getInstance(ctx);
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        sessionManager = new SessionManager(ctx);
-        posManager = new POSManager(ctx);
-        pendingSalesManager = new PendingSalesManager(ctx);
-
-        // ✅ [إصلاح #9] فحص miraExecutor
-        miraExecutor = MiraExecutorService.getInstance();
-        if (miraExecutor == null || !miraExecutor.isHealthy()) {
-            Log.e(TAG, "MiraExecutorService unhealthy");
-            showToast(isArabic ? "⚠️ خطأ في تهيئة المحرك" : "⚠️ Engine init error");
-            return;
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        try {
+            return inflater.inflate(R.layout.fragment_mira_pos, container, false);
+        } catch (Exception e) {
+            Log.e(TAG, "onCreateView error: " + e.getMessage(), e);
+            return null;
         }
-
-        // ✅ تهيئة RFID
-        rfidManager = RFIDManager.getInstance(ctx);
-        if (rfidManager != null) {
-            rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
-                @Override
-                public void onTagRead(String epc, int rssi) {
-                    if (isRFIDScanActive && isRFIDModeActive) {
-                        onRingScanned(epc);
-                    }
-                }
-                @Override public void onScanStarted() {}
-                @Override public void onScanStopped() {}
-                @Override
-                public void onConnectionChanged(boolean connected) {
-                    safeRun(() -> {
-                        if (btnPosRFIDMode != null && isRFIDModeActive) {
-                            btnPosRFIDMode.setAlpha(connected ? 1.0f : 0.5f);
-                        }
-                    });
-                }
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "RFID Error: " + error);
-                }
-            });
-        }
-
-        apiClient = MiraApiClient.getInstance(ctx);
-
-        bindViews(view);
-        setupRecyclerView();
-        setupListeners();
-        applyPermissions();
-        initSmartScale();
-        updateCartSummary();
-        // ✅ تم حذف setupKeyboardVisibilityListener(view) — لم نعد بحاجة إليه
-
-    } catch (Exception e) {
-        Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
-    }
-}
-
-@Override
-public void onResume() {
-    super.onResume();
-    try {
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-        }
-        if (scaleManager != null) {
-            scaleManager.connect();
-        }
-        if (tvCartStatus != null && cartList.isEmpty()) {
-            tvCartStatus.setText(isArabic ?
-                    getString(R.string.pos_ready_scan) : "Ready to scan...");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "onResume error: " + e.getMessage());
-    }
-}
-
-@Override
-public void onPause() {
-    super.onPause();
-    try {
-        stopRFIDScan();
-        isCheckoutDialogShowing = false;
-
-        // ✅ [إصلاح #21] إغلاق bottomSheet
-        if (activeCartSheet != null && activeCartSheet.isShowing()) {
-            activeCartSheet.dismiss();
-            activeCartSheet = null;
-        }
-
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "onPause error: " + e.getMessage());
-    }
-}
-
-@Override
-public void onDestroyView() {
-    super.onDestroyView();
-    try {
-        stopRFIDScan();
-        isCheckoutDialogShowing = false;
-
-        if (rfidManager != null) rfidManager.setListener(null);
-        if (scaleManager != null) scaleManager.cleanup();
-        if (simulationHelper != null) simulationHelper.cleanup();
-
-        // ✅ تم حذف removeKeyboardListener() — لم نعد بحاجة إليه
-
-        // ✅ [إصلاح #21] إغلاق bottomSheet
-        if (activeCartSheet != null && activeCartSheet.isShowing()) {
-            activeCartSheet.dismiss();
-            activeCartSheet = null;
-        }
-
-        // ✅ [إصلاح #31] تنظيف شامل
-        if (rvCartItems != null) {
-            rvCartItems.setAdapter(null);
-            rvCartItems.setLayoutManager(null);
-        }
-        cartAdapter = null;
-
-        pendingEpcs.clear();
-        lastScannedTimes.clear();
-        selectedRefundItem.set(null);
-
-        // إلغاء كل callbacks
-        if (mainHandler != null) {
-            mainHandler.removeCallbacksAndMessages(null);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "onDestroyView error: " + e.getMessage());
-    }
-}
-@Override
-public void onDestroy() {
-    super.onDestroy();
-    try {
-        stopRFIDScan();
-        if (scaleManager != null) scaleManager.cleanup();
-        // لا نُطلق rfidManager — Singleton مشترك
-    } catch (Exception e) {
-        Log.e(TAG, "onDestroy error: " + e.getMessage());
-    }
-}
-
-
-// ==================== Views ====================
-
-private void bindViews(View view) {
-    tvScaleStatus = view.findViewById(R.id.tvPosScaleStatus);
-    tvItemCount = view.findViewById(R.id.tvPosItemCount);
-    tvTotalAmount = view.findViewById(R.id.tvPosTotalAmount);
-    tvCartStatus = view.findViewById(R.id.tvPosCartStatus);
-    tilManualEpc = view.findViewById(R.id.tilPosManualEpc);
-    etManualEpc = view.findViewById(R.id.etPosManualEpc);
-    btnAddManual = view.findViewById(R.id.btnPosAddManual);
-    btnCheckout = view.findViewById(R.id.btnPosCheckout);
-    btnClearCart = view.findViewById(R.id.btnPosClearCart);
-    btnOpenScanner = view.findViewById(R.id.btnOpenScanner);
-    btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
-    rvCartItems = view.findViewById(R.id.rvPosCartItems);
-    layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
-    btnPosRefund = view.findViewById(R.id.btnPosRefund);
-
-    if (tvScaleStatus != null) {
-        tvScaleStatus.setOnClickListener(v -> {
-            if (scaleManager != null) scaleManager.showSettingsDialog();
-        });
     }
 
-    // ✅ منع الحقل من أخذ التركيز تلقائياً عند فتح الشاشة
-    if (etManualEpc != null) {
-        etManualEpc.clearFocus();
-    }
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
-    applyLanguage();
-}
+        try {
+            Context ctx = requireContext().getApplicationContext();
 
-private void applyLanguage() {
-    try {
-        if (isArabic) {
-            if (tilManualEpc != null) tilManualEpc.setHint(getString(R.string.pos_manual_hint));
-            if (btnCheckout != null) btnCheckout.setText(R.string.pos_checkout);
-            if (btnClearCart != null) btnClearCart.setText(R.string.pos_clear);
-            if (btnOpenScanner != null) btnOpenScanner.setText(R.string.pos_scan_gs1);
-            if (btnPosRFIDMode != null && !isRFIDModeActive)
-                btnPosRFIDMode.setText(R.string.pos_scan_rfid);
-            if (btnAddManual != null) btnAddManual.setText(R.string.pos_add);
-        } else {
-            if (tilManualEpc != null) tilManualEpc.setHint("Enter EPC or Barcode...");
-            if (btnCheckout != null) btnCheckout.setText("Checkout");
-            if (btnClearCart != null) btnClearCart.setText("Clear");
-            if (btnOpenScanner != null) btnOpenScanner.setText("📷 Scan GS1");
-            if (btnPosRFIDMode != null && !isRFIDModeActive)
-                btnPosRFIDMode.setText("📡 Scan RFID");
-            if (btnAddManual != null) btnAddManual.setText("Add");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "applyLanguage error: " + e.getMessage());
-    }
-}
+            branchesManager = MiraBranchesManager.getInstance(ctx);
+            priceManager = MiraPriceManager.getInstance(ctx);
+            permissionManager = PermissionManager.getInstance(ctx);
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+            sessionManager = new SessionManager(ctx);
+            posManager = new POSManager(ctx);
+            pendingSalesManager = new PendingSalesManager(ctx);
 
-private void setupRecyclerView() {
-    try {
-        if (rvCartItems != null) {
-            rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
-            cartAdapter = new CartAdapter(cartList, this::removeItemFromCart,
-                    isArabic, priceManager);
-            rvCartItems.setAdapter(cartAdapter);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "setupRecyclerView error: " + e.getMessage());
-    }
-}
-
-private void setupListeners() {
-    try {
-        if (etManualEpc != null) {
-            etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
-                if (actionId == EditorInfo.IME_ACTION_DONE
-                        || actionId == EditorInfo.IME_ACTION_SEARCH
-                        || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
-                        && event.getAction() == KeyEvent.ACTION_DOWN)) {
-                    submitManualEpc();
-                    return true;
-                }
-                return false;
-            });
-        }
-
-        if (btnAddManual != null) btnAddManual.setOnClickListener(v -> submitManualEpc());
-        if (btnClearCart != null) {
-            btnClearCart.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                clearCart();
-            });
-        }
-        if (btnCheckout != null) {
-            btnCheckout.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                processCheckoutAndStockUpdate();
-            });
-        }
-        if (btnPosRefund != null) btnPosRefund.setOnClickListener(v -> showRefundDialog());
-        if (btnOpenScanner != null) {
-            btnOpenScanner.setOnClickListener(v -> {
-                try {
-                    UIHelper.hideKeyboard(getActivity());
-                    openBarcodeScanner();
-                } catch (Exception e) {
-                    Log.e(TAG, "Open scanner error: " + e.getMessage());
-                    showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
-                }
-            });
-        }
-        if (btnPosRFIDMode != null) {
-            btnPosRFIDMode.setOnClickListener(v -> {
-                try {
-                    UIHelper.hideKeyboard(getActivity());
-                    toggleRFIDMode();
-                } catch (Exception e) {
-                    Log.e(TAG, "RFID mode error: " + e.getMessage());
-                    showToast(isArabic ? "⚠️ خطأ في RFID" : "⚠️ RFID error");
-                }
-            });
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "setupListeners error: " + e.getMessage());
-    }
-}
-
-// ==================== البحث عن القطعة ====================
-
-private void processRingEpc(final String code, final String source) {
-    if (code == null || code.trim().isEmpty() || !isAdded()) return;
-    final String cleanCode = code.trim();
-
-    // ✅ [إصلاح #3] فحص pendingEpcs
-    if (!pendingEpcs.add(cleanCode)) {
-        return; // موجودة مسبقاً
-    }
-
-    playAlertSound(1);
-
-    safeRun(() -> {
-        if (tvCartStatus != null)
-            tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
-    });
-
-    try {
-        miraExecutor.getNetworkExecutor().execute(() -> {
-            try {
-                Context context = getContext();
-                if (context == null) return;
-
-                MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(context);
-                final int branchId = getActiveBranchId();
-
-                syncManager.findItem(cleanCode, branchId,
-                        new MiraItemSyncManager.ItemLookupCallback() {
-                    @Override
-                    public void onItemFound(JSONObject item, boolean fromServer) {
-                        safeRun(() -> {
-                            int itemBranchId = item.optInt("branch_id", -1);
-                            if (itemBranchId > 0 && itemBranchId != branchId) {
-                                showToast(isArabic ? "❌ قطعة في فرع آخر" :
-                                        "❌ Item in Another Branch");
-                                playAlertSound(2);
-                                updateCartSummary();
-                                return;
-                            }
-                            parseItemResponse(cleanCode, item);
-                        });
-                    }
-
-                    @Override
-                    public void onItemNotFound() {
-                        safeRun(() -> {
-                            showToast(isArabic ? "❌ القطعة غير موجودة" :
-                                    "❌ Item Not Found");
-                            playAlertSound(2);
-                            updateCartSummary();
-                        });
-                    }
-                });
-            } catch (Exception e) {
-                safeRun(() -> {
-                    showToast(isArabic ? "⚠️ خطأ في البحث" : "⚠️ Search error");
-                    updateCartSummary();
-                });
-            } finally {
-                // ✅ [إصلاح #3] إزالة موثوقة
-                pendingEpcs.remove(cleanCode);
+            miraExecutor = MiraExecutorService.getInstance();
+            if (miraExecutor == null || !miraExecutor.isHealthy()) {
+                Log.e(TAG, "MiraExecutorService unhealthy");
+                showToast(isArabic ? "⚠️ خطأ في تهيئة المحرك" : "⚠️ Engine init error");
+                return;
             }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "processRingEpc error: " + e.getMessage());
-        pendingEpcs.remove(cleanCode);
+
+            rfidManager = RFIDManager.getInstance(ctx);
+            if (rfidManager != null) {
+                rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
+                    @Override
+                    public void onTagRead(String epc, int rssi) {
+                        if (isRFIDScanActive && isRFIDModeActive) {
+                            onRingScanned(epc);
+                        }
+                    }
+                    @Override public void onScanStarted() {}
+                    @Override public void onScanStopped() {}
+                    @Override
+                    public void onConnectionChanged(boolean connected) {
+                        safeRun(() -> {
+                            if (btnPosRFIDMode != null && isRFIDModeActive) {
+                                btnPosRFIDMode.setAlpha(connected ? 1.0f : 0.5f);
+                            }
+                        });
+                    }
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "RFID Error: " + error);
+                    }
+                });
+            }
+
+            apiClient = MiraApiClient.getInstance(ctx);
+
+            bindViews(view);
+            setupRecyclerView();
+            setupListeners();
+            applyPermissions();
+            initSmartScale();
+            updateCartSummary();
+
+        } catch (Exception e) {
+            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+        }
     }
-}
-/**
- * ✅ parseItemResponse - الإصدار المُصحح النهائي
- * 
- * الحل الجذري:
- * - CartItem.price يجب أن يكون دائماً بالدولار (USD)
- * - CartAdapter.formatPriceDefault() يحوّل من USD → العملة المحلية
- * - لذلك نستخدم retail_price_usd مباشرةً
- * - إذا لم يوجد USD، نحوّل من retail_price_local / exchange_rate
- */
-private void parseItemResponse(String code, JSONObject data) {
-    try {
-        JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
-        if (item == null) {
-            showToast(isArabic ? "❌ القطعة غير موجودة" : "❌ Item Not Found");
-            playAlertSound(2);
-            updateCartSummary();
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+            }
+            if (scaleManager != null) {
+                scaleManager.connect();
+            }
+            if (tvCartStatus != null && cartList.isEmpty()) {
+                tvCartStatus.setText(isArabic ?
+                        getString(R.string.pos_ready_scan) : "Ready to scan...");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onResume error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        try {
+            stopRFIDScan();
+            isCheckoutDialogShowing = false;
+
+            if (activeCartSheet != null && activeCartSheet.isShowing()) {
+                activeCartSheet.dismiss();
+                activeCartSheet = null;
+            }
+
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onPause error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        try {
+            stopRFIDScan();
+            isCheckoutDialogShowing = false;
+            isCheckoutInProgress.set(false);
+
+            if (rfidManager != null) rfidManager.setListener(null);
+            if (scaleManager != null) scaleManager.cleanup();
+            if (simulationHelper != null) simulationHelper.cleanup();
+
+            if (activeCartSheet != null && activeCartSheet.isShowing()) {
+                activeCartSheet.dismiss();
+                activeCartSheet = null;
+            }
+
+            if (rvCartItems != null) {
+                rvCartItems.setAdapter(null);
+                rvCartItems.setLayoutManager(null);
+            }
+            cartAdapter = null;
+
+            pendingEpcs.clear();
+            lastScannedTimes.clear();
+            selectedRefundItem.set(null);
+
+            // ✅ إزالة timeout
+            if (checkoutTimeoutRunnable != null && mainHandler != null) {
+                mainHandler.removeCallbacks(checkoutTimeoutRunnable);
+                checkoutTimeoutRunnable = null;
+            }
+
+            if (mainHandler != null) {
+                mainHandler.removeCallbacksAndMessages(null);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onDestroyView error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        try {
+            stopRFIDScan();
+            if (scaleManager != null) scaleManager.cleanup();
+            // لا نُطلق fallbackExecutor — قد يكون مستخدماً من أمثلة أخرى
+            // لكن نُغلق إذا كانت العملية الأخيرة
+            if (fallbackExecutor != null && !fallbackExecutor.isShutdown()) {
+                fallbackExecutor.shutdown();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onDestroy error: " + e.getMessage());
+        }
+    }
+
+    // ==================== Views ====================
+
+    private void bindViews(View view) {
+        tvScaleStatus = view.findViewById(R.id.tvPosScaleStatus);
+        tvItemCount = view.findViewById(R.id.tvPosItemCount);
+        tvTotalAmount = view.findViewById(R.id.tvPosTotalAmount);
+        tvCartStatus = view.findViewById(R.id.tvPosCartStatus);
+        tilManualEpc = view.findViewById(R.id.tilPosManualEpc);
+        etManualEpc = view.findViewById(R.id.etPosManualEpc);
+        btnAddManual = view.findViewById(R.id.btnPosAddManual);
+        btnCheckout = view.findViewById(R.id.btnPosCheckout);
+        btnClearCart = view.findViewById(R.id.btnPosClearCart);
+        btnOpenScanner = view.findViewById(R.id.btnOpenScanner);
+        btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
+        rvCartItems = view.findViewById(R.id.rvPosCartItems);
+        layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
+        btnPosRefund = view.findViewById(R.id.btnPosRefund);
+
+        if (tvScaleStatus != null) {
+            tvScaleStatus.setOnClickListener(v -> {
+                if (scaleManager != null) scaleManager.showSettingsDialog();
+            });
+        }
+
+        if (etManualEpc != null) {
+            etManualEpc.clearFocus();
+        }
+
+        applyLanguage();
+    }
+
+    private void applyLanguage() {
+        try {
+            if (isArabic) {
+                if (tilManualEpc != null) tilManualEpc.setHint(getString(R.string.pos_manual_hint));
+                if (btnCheckout != null) btnCheckout.setText(R.string.pos_checkout);
+                if (btnClearCart != null) btnClearCart.setText(R.string.pos_clear);
+                if (btnOpenScanner != null) btnOpenScanner.setText(R.string.pos_scan_gs1);
+                if (btnPosRFIDMode != null && !isRFIDModeActive)
+                    btnPosRFIDMode.setText(R.string.pos_scan_rfid);
+                if (btnAddManual != null) btnAddManual.setText(R.string.pos_add);
+            } else {
+                if (tilManualEpc != null) tilManualEpc.setHint("Enter EPC or Barcode...");
+                if (btnCheckout != null) btnCheckout.setText("Checkout");
+                if (btnClearCart != null) btnClearCart.setText("Clear");
+                if (btnOpenScanner != null) btnOpenScanner.setText("📷 Scan GS1");
+                if (btnPosRFIDMode != null && !isRFIDModeActive)
+                    btnPosRFIDMode.setText("📡 Scan RFID");
+                if (btnAddManual != null) btnAddManual.setText("Add");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyLanguage error: " + e.getMessage());
+        }
+    }
+
+    private void setupRecyclerView() {
+        try {
+            if (rvCartItems != null) {
+                rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
+                cartAdapter = new CartAdapter(cartList, this::removeItemFromCart,
+                        isArabic, priceManager);
+                rvCartItems.setAdapter(cartAdapter);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "setupRecyclerView error: " + e.getMessage());
+        }
+    }
+
+    private void setupListeners() {
+        try {
+            if (etManualEpc != null) {
+                etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
+                    if (actionId == EditorInfo.IME_ACTION_DONE
+                            || actionId == EditorInfo.IME_ACTION_SEARCH
+                            || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                            && event.getAction() == KeyEvent.ACTION_DOWN)) {
+                        submitManualEpc();
+                        return true;
+                    }
+                    return false;
+                });
+            }
+
+            if (btnAddManual != null) btnAddManual.setOnClickListener(v -> submitManualEpc());
+            if (btnClearCart != null) {
+                btnClearCart.setOnClickListener(v -> {
+                    UIHelper.hideKeyboard(getActivity());
+                    clearCart();
+                });
+            }
+            if (btnCheckout != null) {
+                btnCheckout.setOnClickListener(v -> {
+                    UIHelper.hideKeyboard(getActivity());
+                    processCheckoutAndStockUpdate();
+                });
+            }
+            if (btnPosRefund != null) btnPosRefund.setOnClickListener(v -> showRefundDialog());
+            if (btnOpenScanner != null) {
+                btnOpenScanner.setOnClickListener(v -> {
+                    try {
+                        UIHelper.hideKeyboard(getActivity());
+                        openBarcodeScanner();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Open scanner error: " + e.getMessage());
+                        showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+                    }
+                });
+            }
+            if (btnPosRFIDMode != null) {
+                btnPosRFIDMode.setOnClickListener(v -> {
+                    try {
+                        UIHelper.hideKeyboard(getActivity());
+                        toggleRFIDMode();
+                    } catch (Exception e) {
+                        Log.e(TAG, "RFID mode error: " + e.getMessage());
+                        showToast(isArabic ? "⚠️ خطأ في RFID" : "⚠️ RFID error");
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "setupListeners error: " + e.getMessage());
+        }
+    }
+
+    // ==================== البحث عن القطعة ====================
+
+    private void processRingEpc(final String code, final String source) {
+        if (code == null || code.trim().isEmpty() || !isAdded()) return;
+        final String cleanCode = code.trim();
+
+        if (!pendingEpcs.add(cleanCode)) {
             return;
         }
 
-        String vaultStatus = item.optString("status",
-                item.optString("vault_status", "")).toLowerCase();
-
-        if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
-            showToast(isArabic ? "❌ القطعة مباعة مسبقاً" : "❌ Item already sold");
-            playAlertSound(2);
-            updateCartSummary();
-            return;
-        }
-
-        boolean isAvailable = !vaultStatus.equals("sold")
-                && !vaultStatus.equals("reserved");
-
-        String title = item.optString("title",
-                item.optString("item_title", isArabic ? "قطعة" : "Item"));
-        String karat = item.optString("karat", item.optString("gold_karat", "21K"));
-        double weight = item.optDouble("weight",
-                item.optDouble("gross_weight",
-                        item.optDouble("gross_weight_grams", 0)));
-
-        // ✅✅✅ [الحل النهائي] استخراج السعر - الأولوية للدولار
-        double priceLocal   = item.optDouble("retail_price_local", 0);
-        double priceMain    = item.optDouble("retail_price", 0);
-        double priceUSD     = item.optDouble("retail_price_usd", 0);
-        double priceGeneric = item.optDouble("price", 0);
-
-        Log.e(TAG, "💰 PRICE FIELDS for: " + title);
-        Log.e(TAG, "   - retail_price_local = " + priceLocal);
-        Log.e(TAG, "   - retail_price (main) = " + priceMain);
-        Log.e(TAG, "   - retail_price_usd = " + priceUSD);
-        Log.e(TAG, "   - price (generic) = " + priceGeneric);
-
-        // ✅ CartItem.price يجب أن يكون دائماً بالدولار
-        // لأن CartAdapter يحوّل من USD → العملة المحلية عند العرض
-        double price = 0;
-        String priceSource = "none";
-
-        // 1. الأولوية لـ retail_price_usd (بالدولار مباشرة)
-        if (priceUSD > 0 && priceUSD < 100_000_000) {
-            price = priceUSD;
-            priceSource = "retail_price_usd";
-        }
-        // 2. إذا لم يوجد USD، حوّل من Local إلى USD
-        else if (priceLocal > 0 && priceLocal < 100_000_000) {
-            double exchangeRate = (priceManager != null)
-                    ? priceManager.getExchangeRate("YER")
-                    : 530.0;
-            if (exchangeRate <= 0) exchangeRate = 530.0;
-            price = priceLocal / exchangeRate;
-            priceSource = "retail_price_local/" + exchangeRate;
-        }
-        // 3. fallback: retail_price
-        else if (priceMain > 0 && priceMain < 100_000_000) {
-            price = priceMain;
-            priceSource = "retail_price";
-        }
-        // 4. fallback: price generic
-        else if (priceGeneric > 0 && priceGeneric < 100_000_000) {
-            price = priceGeneric;
-            priceSource = "price";
-        }
-        // 5. كل القيم ضخمة → غير صالحة (أكواد EPC)
-        else {
-            Log.e(TAG, "🚨 ALL PRICE FIELDS INVALID OR SUSPICIOUS!");
-            price = 0;
-            priceSource = "invalid";
-        }
-
-        Log.e(TAG, "   ✅ SELECTED PRICE (USD) = " + price + " (from: " + priceSource + ")");
-
-        // ✅ حساب ديناميكي فقط إذا كان السعر 0
-        if (price <= 0 && weight > 0 && priceManager != null) {
-            Log.w(TAG, "⚠️ Price is 0, calculating dynamically for " + title);
-            price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
-            Log.e(TAG, "   → Calculated price = " + price);
-        }
-
-        // ✅ بناء CartItem
-        CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
-                price, isAvailable, vaultStatus.toUpperCase());
-
-        // ✅ استخراج مرن
-        cartItem.serialNo = extractString(item,
-                "serial", "serial_number", "serialNo", "sn");
-        cartItem.gtin = extractString(item,
-                "gtin", "gtin13", "barcode", "code");
-        cartItem.location = extractString(item,
-                "location", "current_location", "zone");
-
-        cartItem.itemId = item.optInt("id",
-                item.optInt("item_id",
-                        item.optInt("product_id", 0)));
-
-        // ✅ حفظ TID
-        String tid = extractString(item,
-                "tid", "tag_tid", "rfid_tid");
-        if (!tid.isEmpty() && cartItem.serialNo.isEmpty()) {
-            cartItem.serialNo = tid;
-        }
-
-        // ✅ حفظ EPC الأصلي
-        String rfidEpc = extractString(item,
-                "rfid_epc", "epc_final");
-        if (!rfidEpc.isEmpty()) {
-            cartItem.epc = rfidEpc;
-        }
-
-        Log.e(TAG, "📍 Parsed cart item: " +
-                "epc=" + cartItem.epc +
-                ", serial=" + cartItem.serialNo +
-                ", gtin=" + cartItem.gtin +
-                ", tid=" + tid +
-                ", item_id=" + cartItem.itemId +
-                ", price(USD)=" + cartItem.price);
-
-        boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo,
-                cartItem.gtin);
+        playAlertSound(1);
 
         safeRun(() -> {
-            if (alreadyInCart) {
-                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" :
-                        "⚠️ Item already in cart!");
+            if (tvCartStatus != null)
+                tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
+        });
+
+        try {
+            miraExecutor.getNetworkExecutor().execute(() -> {
+                try {
+                    Context context = getContext();
+                    if (context == null) return;
+
+                    MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(context);
+                    final int branchId = getActiveBranchId();
+
+                    syncManager.findItem(cleanCode, branchId,
+                            new MiraItemSyncManager.ItemLookupCallback() {
+                        @Override
+                        public void onItemFound(JSONObject item, boolean fromServer) {
+                            safeRun(() -> {
+                                int itemBranchId = item.optInt("branch_id", -1);
+                                if (itemBranchId > 0 && itemBranchId != branchId) {
+                                    showToast(isArabic ? "❌ قطعة في فرع آخر" :
+                                            "❌ Item in Another Branch");
+                                    playAlertSound(2);
+                                    updateCartSummary();
+                                    return;
+                                }
+                                parseItemResponse(cleanCode, item);
+                            });
+                        }
+
+                        @Override
+                        public void onItemNotFound() {
+                            safeRun(() -> {
+                                showToast(isArabic ? "❌ القطعة غير موجودة" :
+                                        "❌ Item Not Found");
+                                playAlertSound(2);
+                                updateCartSummary();
+                            });
+                        }
+                    });
+                } catch (Exception e) {
+                    safeRun(() -> {
+                        showToast(isArabic ? "⚠️ خطأ في البحث" : "⚠️ Search error");
+                        updateCartSummary();
+                    });
+                } finally {
+                    pendingEpcs.remove(cleanCode);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "processRingEpc error: " + e.getMessage());
+            pendingEpcs.remove(cleanCode);
+        }
+    }
+
+    private void parseItemResponse(String code, JSONObject data) {
+        try {
+            JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
+            if (item == null) {
+                showToast(isArabic ? "❌ القطعة غير موجودة" : "❌ Item Not Found");
                 playAlertSound(2);
                 updateCartSummary();
                 return;
             }
 
-            if (!isAvailable) {
-                showToast(isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable");
+            String vaultStatus = item.optString("status",
+                    item.optString("vault_status", "")).toLowerCase();
+
+            if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
+                showToast(isArabic ? "❌ القطعة مباعة مسبقاً" : "❌ Item already sold");
+                playAlertSound(2);
                 updateCartSummary();
                 return;
             }
 
-            scannedEpcs.add(code);
-            if (cartItem.serialNo != null && !cartItem.serialNo.isEmpty()) {
-                scannedEpcs.add(cartItem.serialNo);
+            boolean isAvailable = !vaultStatus.equals("sold")
+                    && !vaultStatus.equals("reserved");
+
+            String title = item.optString("title",
+                    item.optString("item_title", isArabic ? "قطعة" : "Item"));
+            String karat = item.optString("karat", item.optString("gold_karat", "21K"));
+            double weight = item.optDouble("weight",
+                    item.optDouble("gross_weight",
+                            item.optDouble("gross_weight_grams", 0)));
+
+            double priceLocal   = item.optDouble("retail_price_local", 0);
+            double priceMain    = item.optDouble("retail_price", 0);
+            double priceUSD     = item.optDouble("retail_price_usd", 0);
+            double priceGeneric = item.optDouble("price", 0);
+
+            double price = 0;
+            String priceSource = "none";
+
+            if (priceUSD > 0 && priceUSD < 100_000_000) {
+                price = priceUSD;
+                priceSource = "retail_price_usd";
+            } else if (priceLocal > 0 && priceLocal < 100_000_000) {
+                double exchangeRate = (priceManager != null)
+                        ? priceManager.getExchangeRate("YER")
+                        : 530.0;
+                if (exchangeRate <= 0) exchangeRate = 530.0;
+                price = priceLocal / exchangeRate;
+                priceSource = "retail_price_local/" + exchangeRate;
+            } else if (priceMain > 0 && priceMain < 100_000_000) {
+                price = priceMain;
+                priceSource = "retail_price";
+            } else if (priceGeneric > 0 && priceGeneric < 100_000_000) {
+                price = priceGeneric;
+                priceSource = "price";
+            } else {
+                price = 0;
+                priceSource = "invalid";
             }
-            if (cartItem.gtin != null && !cartItem.gtin.isEmpty()) {
-                scannedEpcs.add(cartItem.gtin);
+
+            if (price <= 0 && weight > 0 && priceManager != null) {
+                price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
             }
 
-            cartList.add(0, cartItem);
-            if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
-            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-            updateCartSummary();
+            CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight,
+                    price, isAvailable, vaultStatus.toUpperCase());
 
-            playAlertSound(1);
-            showToast(isArabic ? "✅ تمت الإضافة: " + title : "✅ Added: " + title);
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "Parse error: " + e.getMessage(), e);
-        showToast(isArabic ? "❌ خطأ في معالجة القطعة" : "❌ Error processing item");
-        updateCartSummary();
-    }
-}
+            cartItem.serialNo = extractString(item,
+                    "serial", "serial_number", "serialNo", "sn");
+            cartItem.gtin = extractString(item,
+                    "gtin", "gtin13", "barcode", "code");
+            cartItem.location = extractString(item,
+                    "location", "current_location", "zone");
+            cartItem.itemId = item.optInt("id",
+                    item.optInt("item_id",
+                            item.optInt("product_id", 0)));
 
-/**
- * ✅ استخراج String من JSON بأسماء متعددة
- */
-private String extractString(JSONObject obj, String... keys) {
-    if (obj == null || keys == null) return "";
-    for (String key : keys) {
-        try {
-            String value = obj.optString(key, "");
-            if (value != null && !value.isEmpty() && !"null".equals(value)) {
-                return value;
+            String tid = extractString(item, "tid", "tag_tid", "rfid_tid");
+            if (!tid.isEmpty() && cartItem.serialNo.isEmpty()) {
+                cartItem.serialNo = tid;
             }
-        } catch (Exception ignored) {}
-    }
-    return "";
-}
 
-private boolean isItemAlreadyInCart(String epc, String serialNo, String gtin) {
-    for (CartItem item : cartList) {
-        if (item.epc != null && epc != null && item.epc.equalsIgnoreCase(epc)) return true;
-        if (item.serialNo != null && serialNo != null && !serialNo.isEmpty()
-                && item.serialNo.equalsIgnoreCase(serialNo)) return true;
-        if (item.gtin != null && gtin != null && !gtin.isEmpty()
-                && item.gtin.equalsIgnoreCase(gtin)) return true;
-    }
-    return false;
-}
-// ==================== Cart ====================
-
-private void updateCartSummary() {
-    try {
-        int count = cartList.size();
-        double sum = 0;
-        boolean bad = false;
-        for (CartItem i : cartList) {
-            sum += i.price;
-            if (!i.isAvailable) bad = true;
-        }
-        final int fc = count;
-        final double fs = sum;
-        final boolean fb = bad;
-
-        safeRun(() -> {
-            if (layoutCartEmptyState != null)
-                layoutCartEmptyState.setVisibility(fc == 0 ? View.VISIBLE : View.GONE);
-            if (tvItemCount != null) tvItemCount.setText(String.valueOf(fc));
-            if (tvTotalAmount != null)
-                tvTotalAmount.setText(priceManager.formatPriceDefault(fs));
-            if (tvCartStatus != null) {
-                if (fc == 0)
-                    tvCartStatus.setText(isArabic ?
-                            getString(R.string.pos_ready_scan) : "Ready to scan...");
-                else if (fb)
-                    tvCartStatus.setText(isArabic ?
-                            "⚠️ قطعة غير متاحة!" : "⚠️ Unavailable item!");
-                else
-                    tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
+            String rfidEpc = extractString(item, "rfid_epc", "epc_final");
+            if (!rfidEpc.isEmpty()) {
+                cartItem.epc = rfidEpc;
             }
-            if (btnCheckout != null) {
-                btnCheckout.setEnabled(fc > 0 && !fb && hasPosPermission());
-                btnCheckout.setAlpha(fc > 0 && !fb ? 1f : 0.5f);
-            }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "updateCartSummary error: " + e.getMessage());
-    }
-}
 
-private void removeItemFromCart(int pos) {
-    try {
-        if (pos >= 0 && pos < cartList.size()) {
-            CartItem item = cartList.get(pos);
-            scannedEpcs.remove(item.epc);
-            if (item.serialNo != null && !item.serialNo.isEmpty()) {
-                scannedEpcs.remove(item.serialNo);
-            }
-            if (item.gtin != null && !item.gtin.isEmpty()) {
-                scannedEpcs.remove(item.gtin);
-            }
-            cartList.remove(pos);
-            if (cartAdapter != null) cartAdapter.notifyItemRemoved(pos);
-            updateCartSummary();
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "removeItemFromCart error: " + e.getMessage());
-    }
-}
+            boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo,
+                    cartItem.gtin);
 
-private void clearCart() {
-    try {
-        int size = cartList.size();
-        if (size > 0) {
-            cartList.clear();
-            scannedEpcs.clear();
-            if (cartAdapter != null) cartAdapter.notifyItemRangeRemoved(0, size);
+            safeRun(() -> {
+                if (alreadyInCart) {
+                    showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" :
+                            "⚠️ Item already in cart!");
+                    playAlertSound(2);
+                    updateCartSummary();
+                    return;
+                }
+
+                if (!isAvailable) {
+                    showToast(isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable");
+                    updateCartSummary();
+                    return;
+                }
+
+                scannedEpcs.add(code);
+                if (cartItem.serialNo != null && !cartItem.serialNo.isEmpty()) {
+                    scannedEpcs.add(cartItem.serialNo);
+                }
+                if (cartItem.gtin != null && !cartItem.gtin.isEmpty()) {
+                    scannedEpcs.add(cartItem.gtin);
+                }
+
+                cartList.add(0, cartItem);
+                if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
+                if (rvCartItems != null) rvCartItems.scrollToPosition(0);
+                updateCartSummary();
+
+                playAlertSound(1);
+                showToast(isArabic ? "✅ تمت الإضافة: " + title : "✅ Added: " + title);
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Parse error: " + e.getMessage(), e);
+            showToast(isArabic ? "❌ خطأ في معالجة القطعة" : "❌ Error processing item");
             updateCartSummary();
         }
-    } catch (Exception e) {
-        Log.e(TAG, "clearCart error: " + e.getMessage());
     }
-}
 
-private double getCartTotal() {
-    double t = 0;
-    for (CartItem i : cartList) t += i.price;
-    return t;
-}
-
-// ==================== Checkout ====================
-
-private void processCheckoutAndStockUpdate() {
-    try {
-        if (!hasPosPermission()) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            return;
-        }
-        if (cartList.isEmpty()) {
-            showToast(isArabic ? "السلة فارغة" : "Cart is empty");
-            return;
-        }
-        if (isCheckoutDialogShowing) return;
-        if (!isAdded() || getActivity() == null) return;
-
-        UIHelper.hideKeyboard(getActivity());
-        isCheckoutDialogShowing = true;
-
-        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(
-                getCartTotal(), cartList.size());
-
-        dialog.setCheckoutListener(data -> {
-            isCheckoutDialogShowing = false;
-            executeCheckoutDirectly(data);
-        });
-
-        dialog.setOnDismissListener(() -> isCheckoutDialogShowing = false);
-
-        FragmentManager fm = getParentFragmentManager();
-        if (!fm.isStateSaved()) {
-            dialog.show(fm, "POSCheckoutDialog");
-        } else {
-            isCheckoutDialogShowing = false;
-        }
-    } catch (Exception e) {
-        isCheckoutDialogShowing = false;
-        Log.e(TAG, "processCheckout error: " + e.getMessage());
-        showToast(isArabic ? "خطأ: " + e.getMessage() : "Error: " + e.getMessage());
-    }
-}
-
-private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
-    try {
-        if (!isAdded() || data == null) return;
-
-        // ✅ [إصلاح #17] عطّل الأزرار أولاً
-        setButtonsEnabled(false);
-
-        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
-
-        miraExecutor.getNetworkExecutor().execute(() -> {
+    private String extractString(JSONObject obj, String... keys) {
+        if (obj == null || keys == null) return "";
+        for (String key : keys) {
             try {
-                Context ctx = getContext();
-                if (ctx == null) return;
+                String value = obj.optString(key, "");
+                if (value != null && !value.isEmpty() && !"null".equals(value)) {
+                    return value;
+                }
+            } catch (Exception ignored) {}
+        }
+        return "";
+    }
 
-                MiraApiClient client = MiraApiClient.getInstance(ctx);
+    private boolean isItemAlreadyInCart(String epc, String serialNo, String gtin) {
+        for (CartItem item : cartList) {
+            if (item.epc != null && epc != null && item.epc.equalsIgnoreCase(epc)) return true;
+            if (item.serialNo != null && serialNo != null && !serialNo.isEmpty()
+                    && item.serialNo.equalsIgnoreCase(serialNo)) return true;
+            if (item.gtin != null && gtin != null && !gtin.isEmpty()
+                    && item.gtin.equalsIgnoreCase(gtin)) return true;
+        }
+        return false;
+    }
 
-                JSONObject payload = buildCheckoutPayload(client, data);
+    // ==================== Cart ====================
 
-                Log.d("POS_DEBUG", "🚨 SENDING CHECKOUT: " + payload.toString());
+    private void updateCartSummary() {
+        try {
+            int count = cartList.size();
+            double sum = 0;
+            boolean bad = false;
+            for (CartItem i : cartList) {
+                sum += i.price;
+                if (!i.isAvailable) bad = true;
+            }
+            final int fc = count;
+            final double fs = sum;
+            final boolean fb = bad;
 
-                MiraApiClient.ApiResponse response = client.checkout(payload);
+            safeRun(() -> {
+                if (layoutCartEmptyState != null)
+                    layoutCartEmptyState.setVisibility(fc == 0 ? View.VISIBLE : View.GONE);
+                if (tvItemCount != null) tvItemCount.setText(String.valueOf(fc));
+                if (tvTotalAmount != null)
+                    tvTotalAmount.setText(priceManager.formatPriceDefault(fs));
+                if (tvCartStatus != null) {
+                    if (fc == 0)
+                        tvCartStatus.setText(isArabic ?
+                                getString(R.string.pos_ready_scan) : "Ready to scan...");
+                    else if (fb)
+                        tvCartStatus.setText(isArabic ?
+                                "⚠️ قطعة غير متاحة!" : "⚠️ Unavailable item!");
+                    else
+                        tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
+                }
+                if (btnCheckout != null) {
+                    btnCheckout.setEnabled(fc > 0 && !fb && hasPosPermission());
+                    btnCheckout.setAlpha(fc > 0 && !fb ? 1f : 0.5f);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "updateCartSummary error: " + e.getMessage());
+        }
+    }
 
-                final MiraApiClient.ApiResponse finalResponse = response;
+    private void removeItemFromCart(int pos) {
+        try {
+            if (pos >= 0 && pos < cartList.size()) {
+                CartItem item = cartList.get(pos);
+                scannedEpcs.remove(item.epc);
+                if (item.serialNo != null && !item.serialNo.isEmpty()) {
+                    scannedEpcs.remove(item.serialNo);
+                }
+                if (item.gtin != null && !item.gtin.isEmpty()) {
+                    scannedEpcs.remove(item.gtin);
+                }
+                cartList.remove(pos);
+                if (cartAdapter != null) cartAdapter.notifyItemRemoved(pos);
+                updateCartSummary();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "removeItemFromCart error: " + e.getMessage());
+        }
+    }
 
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    setButtonsEnabled(true);
+    private void clearCart() {
+        try {
+            int size = cartList.size();
+            if (size > 0) {
+                cartList.clear();
+                scannedEpcs.clear();
+                if (cartAdapter != null) cartAdapter.notifyItemRangeRemoved(0, size);
+                updateCartSummary();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "clearCart error: " + e.getMessage());
+        }
+    }
 
-                    if (finalResponse != null && finalResponse.isSuccess) {
-                        playAlertSound(1);
-                        lastSaleResponse = finalResponse;
-                        lastSaleResponseTime = System.currentTimeMillis();
-                        clearCart();
-                        showReceipt(finalResponse);
-                        notifyDashboardAndInventoryUpdate("sale");
-                        showToast(isArabic ? "✅ تم البيع بنجاح" : "✅ Sale Successful");
+    private double getCartTotal() {
+        double t = 0;
+        for (CartItem i : cartList) t += i.price;
+        return t;
+    }
 
-                    } else if (finalResponse != null && finalResponse.isNetworkError) {
-                        playAlertSound(1);
-                        lastSaleResponse = finalResponse;
-                        lastSaleResponseTime = System.currentTimeMillis();
-                        clearCart();
-                        showToast(isArabic ? "✅ تم البيع (أوفلاين)" : "✅ Sale (Offline)");
-                        notifyDashboardAndInventoryUpdate("sale_offline");
+    // ==================== Checkout ====================
 
-                    } else {
-                        String errorMsg = finalResponse != null && finalResponse.error != null
-                                ? finalResponse.error : "Unknown error";
-                        showRetryDialog(
-                                isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
-                                errorMsg,
-                                () -> executeCheckoutDirectly(data));
-                    }
-                });
+    private void processCheckoutAndStockUpdate() {
+        try {
+            if (!hasPosPermission()) {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                return;
+            }
+            if (cartList.isEmpty()) {
+                showToast(isArabic ? "السلة فارغة" : "Cart is empty");
+                return;
+            }
+            if (isCheckoutDialogShowing) return;
+            if (!isAdded() || getActivity() == null) return;
+
+            UIHelper.hideKeyboard(getActivity());
+            isCheckoutDialogShowing = true;
+
+            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(
+                    getCartTotal(), cartList.size());
+
+            dialog.setCheckoutListener(data -> {
+                isCheckoutDialogShowing = false;
+                executeCheckoutDirectly(data);
+            });
+
+            dialog.setOnDismissListener(() -> isCheckoutDialogShowing = false);
+
+            FragmentManager fm = getParentFragmentManager();
+            if (!fm.isStateSaved()) {
+                dialog.show(fm, "POSCheckoutDialog");
+            } else {
+                isCheckoutDialogShowing = false;
+            }
+        } catch (Exception e) {
+            isCheckoutDialogShowing = false;
+            Log.e(TAG, "processCheckout error: " + e.getMessage());
+            showToast(isArabic ? "خطأ: " + e.getMessage() : "Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ executeCheckoutDirectly v5.0
+     * - Pre-compute على UI Thread
+     * - Timeout 30s
+     * - Logging شامل
+     */
+    private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
+        Log.e(CHECKOUT_TRACE, "1️⃣ Entered executeCheckoutDirectly");
+
+        try {
+            if (!isAdded() || data == null) {
+                Log.e(CHECKOUT_TRACE, "❌ data null or not added");
+                return;
+            }
+            Log.e(CHECKOUT_TRACE, "2️⃣ data valid");
+
+            // ═══════════════════════════════════════════════════════
+            // ✅ Pre-compute على UI Thread
+            // ═══════════════════════════════════════════════════════
+            final String currencyCode;
+            final double exchangeRate;
+            final double subtotalLocal;
+            final double discountLocal;
+            final double finalLocal;
+
+            try {
+                long t0 = System.currentTimeMillis();
+
+                currencyCode = priceManager != null
+                        ? priceManager.getDefaultCurrency() : "YER";
+                Log.e(CHECKOUT_TRACE, "3️⃣ currencyCode=" + currencyCode);
+
+                exchangeRate = priceManager != null
+                        ? priceManager.getExchangeRate(currencyCode) : 530.0;
+                Log.e(CHECKOUT_TRACE, "4️⃣ exchangeRate=" + exchangeRate);
+
+                subtotalLocal = data.originalTotal * exchangeRate;
+                discountLocal = data.discountAmount * exchangeRate;
+                finalLocal = data.finalAmount * exchangeRate;
+
+                long elapsed = System.currentTimeMillis() - t0;
+                Log.e(CHECKOUT_TRACE, "5️⃣ Pre-compute took: " + elapsed + "ms");
 
             } catch (Exception e) {
-                Log.e(TAG, "executeCheckoutDirectly error: " + e.getMessage(), e);
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    setButtonsEnabled(true);
-                    showRetryDialog(
-                            isArabic ? "❌ خطأ" : "❌ Error",
-                            e.getMessage(),
-                            () -> executeCheckoutDirectly(data));
-                });
+                Log.e(CHECKOUT_TRACE, "❌ Pre-compute error: " + e.getMessage(), e);
+                currencyCode = "YER";
+                exchangeRate = 530.0;
+                subtotalLocal = data.originalTotal * 530.0;
+                discountLocal = data.discountAmount * 530.0;
+                finalLocal = data.finalAmount * 530.0;
             }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "executeCheckoutDirectly error: " + e.getMessage());
-    }
-}
 
-/**
- * ✅ بناء الـ payload في دالة منفصلة
- */
-/**
- * ✅ بناء الـ payload بشكل كامل واحترافي
- * يُرسل كل البيانات المطلوبة للسيرفر
- */
-private JSONObject buildCheckoutPayload(MiraApiClient client,
-                                         POSCheckoutDialog.POSCheckoutData data)
-        throws Exception {
+            setButtonsEnabled(false);
+            Log.e(CHECKOUT_TRACE, "6️⃣ buttons disabled");
 
-    JSONObject payload = new JSONObject();
-    payload.put("action", "COMPLETE_POS_SALE");
-    payload.put("gate_id", client.getGateId());
-    payload.put("branch_id", getActiveBranchId());
-    payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
-    payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
+            final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+            Log.e(CHECKOUT_TRACE, "7️⃣ dialog shown");
 
-    // ✅ بيانات العميل
-    String customerName = (data.customerName != null && !data.customerName.trim().isEmpty())
-            ? data.customerName.trim()
-            : (isArabic ? "عميل نقدي" : "Cash Customer");
+            // ═══════════════════════════════════════════════════════
+            // ✅ Timeout Safety
+            // ═══════════════════════════════════════════════════════
+            final AtomicBoolean finished = new AtomicBoolean(false);
 
-    String customerPhone = (data.customerPhone != null && !data.customerPhone.trim().isEmpty()
-            && !"—".equals(data.customerPhone.trim())
-            && !"-".equals(data.customerPhone.trim()))
-            ? data.customerPhone.trim()
-            : "";
-
-    payload.put("customer_name", customerName);
-    payload.put("customer_phone", customerPhone);
-
-    JSONObject customer = new JSONObject();
-    customer.put("name", customerName);
-    customer.put("phone", customerPhone);
-    payload.put("customer", customer);
-
-    // ✅ بيانات القطع (باستخدام CartItem.toJson())
-    JSONArray itemsArr = new JSONArray();
-    for (CartItem item : cartList) {
-        if (item == null) continue;
-
-        JSONObject obj = item.toJson();
-
-        // ✅ إذا لم يوجد serialNo، استخدم EPC أو TID
-        if (obj.optString("serial_no", "").isEmpty()) {
-            String fallback = !item.tid.isEmpty() ? item.tid
-                    : !item.rfidEpc.isEmpty() ? item.rfidEpc
-                    : item.epc;
-            obj.put("serial_no", fallback);
-        }
-
-        itemsArr.put(obj);
-    }
-    payload.put("items", itemsArr);
-    payload.put("item_count", cartList.size());
-
-    // ✅ بيانات الدفع
-    String currencyCode = priceManager.getDefaultCurrency();
-    double exchangeRate = priceManager.getExchangeRate(currencyCode);
-
-    double subtotalUsd = data.originalTotal;
-    double discountUsd = data.discountAmount;
-    double finalUsd = data.finalAmount;
-
-    double subtotalLocal = priceManager.convertFromUSD(subtotalUsd, currencyCode);
-    double discountLocal = priceManager.convertFromUSD(discountUsd, currencyCode);
-    double finalLocal = priceManager.convertFromUSD(finalUsd, currencyCode);
-
-    if (exchangeRate <= 0) {
-        exchangeRate = 530.0;
-        subtotalLocal = subtotalUsd * exchangeRate;
-        discountLocal = discountUsd * exchangeRate;
-        finalLocal = finalUsd * exchangeRate;
-    }
-
-    // ✅ على الجذر
-    payload.put("subtotal_usd", subtotalUsd);
-    payload.put("discount_usd", discountUsd);
-    payload.put("total_usd", finalUsd);
-    payload.put("total_amount_usd", finalUsd);
-    payload.put("subtotal", subtotalLocal);
-    payload.put("discount", discountLocal);
-    payload.put("total", finalLocal);
-    payload.put("total_amount", finalLocal);
-
-    // ✅ على payment
-    JSONObject payment = new JSONObject();
-    payment.put("subtotal_usd", subtotalUsd);
-    payment.put("discount_amount_usd", discountUsd);
-    payment.put("final_amount_usd", finalUsd);
-    payment.put("subtotal", subtotalLocal);
-    payment.put("discount_amount", discountLocal);
-    payment.put("final_amount", finalLocal);
-    payment.put("exchange_rate", exchangeRate);
-    payment.put("currency_code", currencyCode);
-    payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
-    payload.put("payment", payment);
-
-    // ✅ ملاحظة افتراضية (بدل notes)
-payload.put("notes", isArabic ? "بيع POS" : "POS Sale");
-
-    Log.d("POS_DEBUG", "🚨 CHECKOUT PAYLOAD:\n" + payload.toString(2));
-
-    return payload;
-}
-
-private void showReceipt(MiraApiClient.ApiResponse response) {
-    try {
-        if (!isAdded() || getActivity() == null) return;
-
-        String receiptJson = "{}";
-        if (response != null) {
-            if (response.data != null) {
-                receiptJson = response.data.toString();
-            } else if (response.getBody() != null && !response.getBody().isEmpty()) {
-                receiptJson = response.getBody();
-            }
-        }
-
-        MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(receiptJson);
-        FragmentManager fm = getParentFragmentManager();
-        if (!fm.isStateSaved()) {
-            receiptFragment.show(fm, "MiraReceiptFragment");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "showReceipt error: " + e.getMessage());
-    }
-}
-
-private void showRetryDialog(String title, String message, Runnable retryAction) {
-    try {
-        Context ctx = getContext();
-        if (ctx == null || !isAdded()) return;
-
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
-        builder.setTitle(title).setMessage(message).setCancelable(false);
-        if (retryAction != null) {
-            builder.setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry",
-                    (dialog, which) -> {
-                        dialog.dismiss();
-                        retryAction.run();
+            checkoutTimeoutRunnable = () -> {
+                if (!finished.get()) {
+                    Log.e(CHECKOUT_TRACE, "⏰ TIMEOUT after 30s");
+                    safeRun(() -> {
+                        dismissDialog(loadingDialog);
+                        setButtonsEnabled(true);
+                        showRetryDialog(
+                                isArabic ? "⏰ انتهت المهلة" : "⏰ Timeout",
+                                isArabic ? "لم يستجب السيرفر. حاول مرة أخرى."
+                                        : "Server not responding. Try again.",
+                                () -> executeCheckoutDirectly(data));
                     });
+                }
+            };
+            mainHandler.postDelayed(checkoutTimeoutRunnable, CHECKOUT_TIMEOUT_MS);
+
+            // ═══════════════════════════════════════════════════════
+            // ✅ Background Execution
+            // ═══════════════════════════════════════════════════════
+            miraExecutor.getNetworkExecutor().execute(() -> {
+                Log.e(CHECKOUT_TRACE, "8️⃣ THREAD STARTED");
+
+                try {
+                    Context ctx = getContext();
+                    if (ctx == null) {
+                        Log.e(CHECKOUT_TRACE, "❌ ctx null");
+                        finished.set(true);
+                        if (checkoutTimeoutRunnable != null) {
+                            mainHandler.removeCallbacks(checkoutTimeoutRunnable);
+                        }
+                        return;
+                    }
+                    Log.e(CHECKOUT_TRACE, "9️⃣ ctx obtained");
+
+                    MiraApiClient client = MiraApiClient.getInstance(ctx);
+                    Log.e(CHECKOUT_TRACE, "🔟 client obtained");
+
+                    // ✅ بناء Payload
+                    Log.e(CHECKOUT_TRACE, "1️⃣1️⃣ BEFORE buildCheckoutPayload");
+                    long tBuild = System.currentTimeMillis();
+
+                    JSONObject payload = buildCheckoutPayload(client, data,
+                            currencyCode, exchangeRate,
+                            subtotalLocal, discountLocal, finalLocal);
+
+                    long buildTime = System.currentTimeMillis() - tBuild;
+                    Log.e(CHECKOUT_TRACE, "1️⃣2️⃣ AFTER buildCheckoutPayload (" 
+                            + buildTime + "ms) - size=" + payload.toString().length());
+
+                    // ✅ تنفيذ Checkout
+                    Log.e(CHECKOUT_TRACE, "1️⃣3️⃣ BEFORE checkout");
+                    long tCheckout = System.currentTimeMillis();
+
+                    MiraApiClient.ApiResponse response =
+                            client.checkoutWithLongTimeout(payload);
+
+                    long checkoutTime = System.currentTimeMillis() - tCheckout;
+                    Log.e(CHECKOUT_TRACE, "1️⃣4️⃣ AFTER checkout in " + checkoutTime 
+                            + "ms, code=" + (response != null ? response.code : "null"));
+
+                    // ✅ إلغاء Timeout
+                    finished.set(true);
+                    if (checkoutTimeoutRunnable != null) {
+                        mainHandler.removeCallbacks(checkoutTimeoutRunnable);
+                    }
+
+                    final MiraApiClient.ApiResponse finalResponse = response;
+
+                    // ✅ معالجة النتيجة
+                    safeRun(() -> {
+                        dismissDialog(loadingDialog);
+                        setButtonsEnabled(true);
+
+                        if (finalResponse != null && finalResponse.isSuccess) {
+                            Log.e(CHECKOUT_TRACE, "✅ SUCCESS");
+                            playAlertSound(1);
+                            lastSaleResponse = finalResponse;
+                            lastSaleResponseTime = System.currentTimeMillis();
+                            clearCart();
+                            showReceipt(finalResponse);
+                            notifyDashboardAndInventoryUpdate("sale");
+                            showToast(isArabic ? "✅ تم البيع بنجاح" : "✅ Sale Successful");
+
+                        } else if (finalResponse != null && finalResponse.isNetworkError) {
+                            Log.e(CHECKOUT_TRACE, "✅ OFFLINE");
+                            playAlertSound(1);
+                            lastSaleResponse = finalResponse;
+                            lastSaleResponseTime = System.currentTimeMillis();
+                            clearCart();
+                            showToast(isArabic ? "✅ تم البيع (أوفلاين)" : "✅ Sale (Offline)");
+                            notifyDashboardAndInventoryUpdate("sale_offline");
+
+                        } else {
+                            String errorMsg = finalResponse != null && finalResponse.error != null
+                                    ? finalResponse.error : "Unknown error";
+                            Log.e(CHECKOUT_TRACE, "❌ FAILED: " + errorMsg);
+                            showRetryDialog(
+                                    isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
+                                    errorMsg,
+                                    () -> executeCheckoutDirectly(data));
+                        }
+                    });
+
+                } catch (Exception e) {
+                    Log.e(CHECKOUT_TRACE, "❌❌❌ EXCEPTION: " + e.getMessage(), e);
+                    finished.set(true);
+                    if (checkoutTimeoutRunnable != null) {
+                        mainHandler.removeCallbacks(checkoutTimeoutRunnable);
+                    }
+
+                    safeRun(() -> {
+                        dismissDialog(loadingDialog);
+                        setButtonsEnabled(true);
+                        showRetryDialog(
+                                isArabic ? "❌ خطأ" : "❌ Error",
+                                e.getMessage(),
+                                () -> executeCheckoutDirectly(data));
+                    });
+                }
+            });
+
+            Log.e(CHECKOUT_TRACE, "1️⃣5️⃣ executor.execute() returned");
+
+        } catch (Exception e) {
+            Log.e(CHECKOUT_TRACE, "❌ OUTER: " + e.getMessage(), e);
         }
-        builder.setNegativeButton(isArabic ? "إغلاق" : "Close",
-                (dialog, which) -> dialog.dismiss());
-        builder.show();
-    } catch (Exception e) {
-        Log.e(TAG, "showRetryDialog error: " + e.getMessage());
     }
-}
 
+    /**
+     * ✅ buildCheckoutPayload v2.0
+     * - لا يستدعي priceManager (القيم محسوبة مسبقاً)
+     */
+    private JSONObject buildCheckoutPayload(MiraApiClient client,
+                                             POSCheckoutDialog.POSCheckoutData data,
+                                             String currencyCode,
+                                             double exchangeRate,
+                                             double subtotalLocal,
+                                             double discountLocal,
+                                             double finalLocal)
+            throws Exception {
 
-// ==================== Refund ====================
+        Log.e(BUILD_PAYLOAD, "A. Start");
 
-private void showRefundDialog() {
-    if (!isAdded() || getContext() == null) return;
+        JSONObject payload = new JSONObject();
+        payload.put("action", "COMPLETE_POS_SALE");
+        payload.put("gate_id", client.getGateId());
+        payload.put("branch_id", getActiveBranchId());
+        payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
+        payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
 
-    try {
-        selectedRefundItem.set(null);
+        Log.e(BUILD_PAYLOAD, "B. Basic fields done");
 
-        refundDialog = new RefundDialog(requireContext(),
-                new RefundDialog.RefundCallback() {
-            @Override
-            public void onRefundConfirm(String code, String reason) {
-                processRefund(code, reason);
+        String customerName = (data.customerName != null && !data.customerName.trim().isEmpty())
+                ? data.customerName.trim()
+                : (isArabic ? "عميل نقدي" : "Cash Customer");
+
+        String customerPhone = (data.customerPhone != null && !data.customerPhone.trim().isEmpty()
+                && !"—".equals(data.customerPhone.trim())
+                && !"-".equals(data.customerPhone.trim()))
+                ? data.customerPhone.trim()
+                : "";
+
+        payload.put("customer_name", customerName);
+        payload.put("customer_phone", customerPhone);
+
+        JSONObject customer = new JSONObject();
+        customer.put("name", customerName);
+        customer.put("phone", customerPhone);
+        payload.put("customer", customer);
+
+        Log.e(BUILD_PAYLOAD, "C. Customer done: " + customerName);
+
+        // ✅ القطع
+        JSONArray itemsArr = new JSONArray();
+        for (CartItem item : cartList) {
+            if (item == null) continue;
+
+            JSONObject obj = item.toJson();
+
+            if (obj.optString("serial_no", "").isEmpty()) {
+                String fallback = !item.tid.isEmpty() ? item.tid
+                        : !item.rfidEpc.isEmpty() ? item.rfidEpc
+                        : item.epc;
+                obj.put("serial_no", fallback);
             }
 
-            @Override
-            public void onBarcodeScan() {
-                try {
-                    ScanOptions options = new ScanOptions();
-                    options.setPrompt(isArabic ? "📷 وجه الكاميرا نحو باركود القطعة" :
-                            "📷 Aim camera at item barcode");
-                    options.setBeepEnabled(false);
-                    options.setOrientationLocked(true);
-                    refundBarcodeLauncher.launch(options);
-                } catch (Exception e) {
-                    Log.e(TAG, "onBarcodeScan error: " + e.getMessage());
+            itemsArr.put(obj);
+        }
+        payload.put("items", itemsArr);
+        payload.put("item_count", cartList.size());
+
+        Log.e(BUILD_PAYLOAD, "D. Items done: " + cartList.size());
+
+        // ✅ القيم المالية — Pre-computed
+        double subtotalUsd = data.originalTotal;
+        double discountUsd = data.discountAmount;
+        double finalUsd = data.finalAmount;
+
+        payload.put("subtotal_usd", subtotalUsd);
+        payload.put("discount_usd", discountUsd);
+        payload.put("total_usd", finalUsd);
+        payload.put("total_amount_usd", finalUsd);
+        payload.put("subtotal", subtotalLocal);
+        payload.put("discount", discountLocal);
+        payload.put("total", finalLocal);
+        payload.put("total_amount", finalLocal);
+
+        Log.e(BUILD_PAYLOAD, "E. Amounts done");
+
+        // ✅ payment
+        JSONObject payment = new JSONObject();
+        payment.put("subtotal_usd", subtotalUsd);
+        payment.put("discount_amount_usd", discountUsd);
+        payment.put("final_amount_usd", finalUsd);
+        payment.put("subtotal", subtotalLocal);
+        payment.put("discount_amount", discountLocal);
+        payment.put("final_amount", finalLocal);
+        payment.put("exchange_rate", exchangeRate);
+        payment.put("currency_code", currencyCode);
+        payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
+        payload.put("payment", payment);
+
+        payload.put("notes", isArabic ? "بيع POS" : "POS Sale");
+
+        Log.e(BUILD_PAYLOAD, "Z. Complete - size=" + payload.toString().length());
+
+        return payload;
+    }
+
+    private void showReceipt(MiraApiClient.ApiResponse response) {
+        try {
+            if (!isAdded() || getActivity() == null) return;
+
+            String receiptJson = "{}";
+            if (response != null) {
+                if (response.data != null) {
+                    receiptJson = response.data.toString();
+                } else if (response.getBody() != null && !response.getBody().isEmpty()) {
+                    receiptJson = response.getBody();
                 }
             }
 
-            @Override
-            public void onCodeChanged(String code) {
-                searchItemForRefund(code);
+            MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(receiptJson);
+            FragmentManager fm = getParentFragmentManager();
+            if (!fm.isStateSaved()) {
+                receiptFragment.show(fm, "MiraReceiptFragment");
             }
-        });
-        refundDialog.show();
-    } catch (Exception e) {
-        Log.e(TAG, "showRefundDialog error: " + e.getMessage());
-    }
-}
-
-private void searchItemForRefund(String code) {
-    if (code == null || code.trim().isEmpty()) return;
-
-    final String cleanCode = code.trim();
-    Log.d(REFUND_DEBUG, "🔍 Searching for refund: " + cleanCode);
-
-    selectedRefundItem.set(null);
-
-    try {
-        miraExecutor.getNetworkExecutor().execute(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("code", cleanCode);
-                payload.put("search_type", "auto");
-                payload.put("branch_id", getActiveBranchId());
-                payload.put("context", "refund_check");
-                payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
-                payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
-                payload.put("username", sessionManager != null ?
-                        sessionManager.getUsername() : "");
-
-                MiraApiClient client = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = client.searchItem(payload);
-
-                safeRun(() -> handleRefundSearchResponse(response, cleanCode));
-            } catch (Exception e) {
-                Log.e(TAG, "searchItemForRefund error: " + e.getMessage(), e);
-                safeRun(() -> showRefundItemErrorInDialog(
-                        isArabic ? "⚠️ خطأ في البحث" : "⚠️ Search error"));
-            }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "searchItemForRefund error: " + e.getMessage());
-    }
-}
-
-private void handleRefundSearchResponse(MiraApiClient.ApiResponse response, String code) {
-    if (!isAdded()) return;
-
-    if (response != null && response.isSuccess && response.data != null) {
-        JSONObject itemData = response.data.optJSONObject("item");
-        if (itemData == null) itemData = response.data;
-
-        RefundEligibility eligibility = checkRefundEligibility(itemData);
-
-        if (eligibility.isEligible) {
-            selectedRefundItem.set(new RefundItem(
-                    itemData.optString("epc", code),
-                    itemData.optString("serial", itemData.optString("serial_number", "")),
-                    eligibility.itemId,
-                    eligibility.saleId,
-                    eligibility.originalPrice,
-                    itemData.optString("title", itemData.optString("item_title", ""))
-            ));
-
-            showRefundItemInfoInDialog(itemData, eligibility);
-        } else {
-            showRefundItemErrorInDialog(eligibility.reason);
+        } catch (Exception e) {
+            Log.e(TAG, "showReceipt error: " + e.getMessage());
         }
-    } else {
-        String errorMsg = response != null && response.error != null
-                ? response.error : "Item not found";
-        showRefundItemErrorInDialog(errorMsg);
-    }
-}
-
-/**
- * ✅ [إصلاح #12, #13] thread-safe + null check
- */
-private RefundEligibility checkRefundEligibility(JSONObject itemData) {
-    if (itemData == null) {
-        return RefundEligibility.notEligible(isArabic ?
-                "⚠️ لا توجد بيانات" : "⚠️ No data");
     }
 
-    try {
-        // 1. حالة القطعة
-        String status = itemData.optString("status",
-                itemData.optString("vault_status", "")).toLowerCase();
-
-        if (!"sold".equals(status)) {
-            return RefundEligibility.notEligible(isArabic
-                    ? "⚠️ القطعة غير مباعة (حالتها: " + status + ")"
-                    : "⚠️ Item not sold (status: " + status + ")");
-        }
-
-        // 2. نوع العملية
-        String lastAction = itemData.optString("last_action", "").toLowerCase();
-        if (!lastAction.isEmpty() && !"sale".equals(lastAction)
-                && !"pos_sale".equals(lastAction)) {
-            return RefundEligibility.notEligible(isArabic
-                    ? "⚠️ آخر عملية ليست بيعاً (آخر عملية: " + lastAction + ")"
-                    : "⚠️ Last action is not a sale (" + lastAction + ")");
-        }
-
-        // 3. تاريخ البيع
-        String saleDateStr = itemData.optString("sale_date",
-                itemData.optString("sold_at", ""));
-        if (!saleDateStr.isEmpty()) {
-            Long daysDiff = parseDaysDifference(saleDateStr);
-            if (daysDiff != null && daysDiff > REFUND_MAX_DAYS) {
-                return RefundEligibility.notEligible(isArabic
-                        ? "⚠️ انتهت فترة الإرجاع (" + daysDiff + " يوم)"
-                        : "⚠️ Refund period expired (" + daysDiff + " days)");
-            }
-        }
-
-        // 4. عدم الإرجاع المسبق
-        boolean alreadyRefunded = itemData.optBoolean("is_refunded", false);
-        if (alreadyRefunded) {
-            return RefundEligibility.notEligible(isArabic
-                    ? "⚠️ تم إرجاع هذه القطعة مسبقاً"
-                    : "⚠️ Item already refunded");
-        }
-
-        // ✅ صالح
-        return RefundEligibility.eligible(
-                itemData.optLong("sale_id", 0),
-                itemData.optInt("id", itemData.optInt("item_id", 0)),
-                itemData.optDouble("retail_price_usd",
-                        itemData.optDouble("retail_price", 0)),
-                saleDateStr);
-
-    } catch (Exception e) {
-        Log.e(TAG, "checkRefundEligibility error: " + e.getMessage());
-        return RefundEligibility.notEligible(isArabic
-                ? "⚠️ خطأ في التحقق" : "⚠️ Validation error");
-    }
-}
-
-/**
- * ✅ [إصلاح #12] thread-safe date parsing
- */
-private Long parseDaysDifference(String dateStr) {
-    if (dateStr == null || dateStr.isEmpty()) return null;
-
-    String[] patterns = {
-            "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm:ss",
-            "yyyy-MM-dd"
-    };
-
-    for (String pattern : patterns) {
+    private void showRetryDialog(String title, String message, Runnable retryAction) {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.US);
-            Date d = sdf.parse(dateStr);
-            if (d != null) {
-                return (System.currentTimeMillis() - d.getTime())
-                        / (1000L * 60 * 60 * 24);
+            Context ctx = getContext();
+            if (ctx == null || !isAdded()) return;
+
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
+            builder.setTitle(title).setMessage(message).setCancelable(false);
+            if (retryAction != null) {
+                builder.setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry",
+                        (dialog, which) -> {
+                            dialog.dismiss();
+                            retryAction.run();
+                        });
             }
-        } catch (ParseException ignored) {}
+            builder.setNegativeButton(isArabic ? "إغلاق" : "Close",
+                    (dialog, which) -> dialog.dismiss());
+            builder.show();
+        } catch (Exception e) {
+            Log.e(TAG, "showRetryDialog error: " + e.getMessage());
+        }
     }
-    return null;
-}
 
-private void showRefundItemInfoInDialog(JSONObject itemData,
-                                         RefundEligibility eligibility) {
-    try {
-        RefundDialog dialog = refundDialog;
-        if (dialog == null || !dialog.isShowing()) return;
+    // ==================== Refund ====================
 
-        String title = itemData.optString("title",
-                itemData.optString("item_title", isArabic ? "قطعة ذهبية" : "Gold Item"));
-        String epc = itemData.optString("epc", "");
-        String serialNo = itemData.optString("serial",
-                itemData.optString("serial_number", ""));
-        String karat = itemData.optString("karat", "21K");
-        double weight = itemData.optDouble("weight", 0);
+    private void showRefundDialog() {
+        if (!isAdded() || getContext() == null) return;
 
-        double originalPrice = eligibility.originalPrice > 0
-                ? eligibility.originalPrice
-                : itemData.optDouble("retail_price_usd", 0);
+        try {
+            selectedRefundItem.set(null);
 
-        String priceStr = priceManager != null
-                ? priceManager.formatPriceDefault(originalPrice)
-                : String.format(Locale.US, "$%.2f", originalPrice);
+            refundDialog = new RefundDialog(requireContext(),
+                    new RefundDialog.RefundCallback() {
+                @Override
+                public void onRefundConfirm(String code, String reason) {
+                    processRefund(code, reason);
+                }
 
-        String details = String.format(Locale.US,
-                "EPC: %s\nSerial: %s\nKarat: %s | Weight: %.2fg\nPrice: %s",
-                epc.isEmpty() ? "—" : epc,
-                serialNo.isEmpty() ? "—" : serialNo,
-                karat, weight, priceStr);
+                @Override
+                public void onBarcodeScan() {
+                    try {
+                        ScanOptions options = new ScanOptions();
+                        options.setPrompt(isArabic ? "📷 وجه الكاميرا نحو باركود القطعة" :
+                                "📷 Aim camera at item barcode");
+                        options.setBeepEnabled(false);
+                        options.setOrientationLocked(true);
+                        refundBarcodeLauncher.launch(options);
+                    } catch (Exception e) {
+                        Log.e(TAG, "onBarcodeScan error: " + e.getMessage());
+                    }
+                }
 
-        dialog.showRefundItemInfo(title, details);
-    } catch (Exception e) {
-        Log.e(TAG, "showRefundItemInfoInDialog error: " + e.getMessage());
+                @Override
+                public void onCodeChanged(String code) {
+                    searchItemForRefund(code);
+                }
+            });
+            refundDialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "showRefundDialog error: " + e.getMessage());
+        }
     }
-}
 
-private void showRefundItemErrorInDialog(String message) {
-    try {
-        RefundDialog dialog = refundDialog;
-        if (dialog == null) return;
-        dialog.showRefundItemError(message);
-    } catch (Exception e) {
-        Log.e(TAG, "showRefundItemErrorInDialog error: " + e.getMessage());
+    private void searchItemForRefund(String code) {
+        if (code == null || code.trim().isEmpty()) return;
+
+        final String cleanCode = code.trim();
+        Log.d(REFUND_DEBUG, "🔍 Searching for refund: " + cleanCode);
+
+        selectedRefundItem.set(null);
+
+        try {
+            miraExecutor.getNetworkExecutor().execute(() -> {
+                try {
+                    JSONObject payload = new JSONObject();
+                    payload.put("code", cleanCode);
+                    payload.put("search_type", "auto");
+                    payload.put("branch_id", getActiveBranchId());
+                    payload.put("context", "refund_check");
+                    payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
+                    payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
+                    payload.put("username", sessionManager != null ?
+                            sessionManager.getUsername() : "");
+
+                    MiraApiClient client = MiraApiClient.getInstance(requireContext());
+                    MiraApiClient.ApiResponse response = client.searchItem(payload);
+
+                    safeRun(() -> handleRefundSearchResponse(response, cleanCode));
+                } catch (Exception e) {
+                    Log.e(TAG, "searchItemForRefund error: " + e.getMessage(), e);
+                    safeRun(() -> showRefundItemErrorInDialog(
+                            isArabic ? "⚠️ خطأ في البحث" : "⚠️ Search error"));
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "searchItemForRefund error: " + e.getMessage());
+        }
     }
-}
 
-private void processRefund(String code, String reason) {
-    final AlertDialog loadingDialog = showProfessionalLoadingDialog();
-    final RefundItem itemToRefund = selectedRefundItem.get();
+    private void handleRefundSearchResponse(MiraApiClient.ApiResponse response, String code) {
+        if (!isAdded()) return;
 
-    try {
-        miraExecutor.getNetworkExecutor().execute(() -> {
+        if (response != null && response.isSuccess && response.data != null) {
+            JSONObject itemData = response.data.optJSONObject("item");
+            if (itemData == null) itemData = response.data;
+
+            RefundEligibility eligibility = checkRefundEligibility(itemData);
+
+            if (eligibility.isEligible) {
+                selectedRefundItem.set(new RefundItem(
+                        itemData.optString("epc", code),
+                        itemData.optString("serial", itemData.optString("serial_number", "")),
+                        eligibility.itemId,
+                        eligibility.saleId,
+                        eligibility.originalPrice,
+                        itemData.optString("title", itemData.optString("item_title", ""))
+                ));
+
+                showRefundItemInfoInDialog(itemData, eligibility);
+            } else {
+                showRefundItemErrorInDialog(eligibility.reason);
+            }
+        } else {
+            String errorMsg = response != null && response.error != null
+                    ? response.error : "Item not found";
+            showRefundItemErrorInDialog(errorMsg);
+        }
+    }
+
+    private RefundEligibility checkRefundEligibility(JSONObject itemData) {
+        if (itemData == null) {
+            return RefundEligibility.notEligible(isArabic ?
+                    "⚠️ لا توجد بيانات" : "⚠️ No data");
+        }
+
+        try {
+            String status = itemData.optString("status",
+                    itemData.optString("vault_status", "")).toLowerCase();
+
+            if (!"sold".equals(status)) {
+                return RefundEligibility.notEligible(isArabic
+                        ? "⚠️ القطعة غير مباعة (حالتها: " + status + ")"
+                        : "⚠️ Item not sold (status: " + status + ")");
+            }
+
+            String lastAction = itemData.optString("last_action", "").toLowerCase();
+            if (!lastAction.isEmpty() && !"sale".equals(lastAction)
+                    && !"pos_sale".equals(lastAction)) {
+                return RefundEligibility.notEligible(isArabic
+                        ? "⚠️ آخر عملية ليست بيعاً (آخر عملية: " + lastAction + ")"
+                        : "⚠️ Last action is not a sale (" + lastAction + ")");
+            }
+
+            String saleDateStr = itemData.optString("sale_date",
+                    itemData.optString("sold_at", ""));
+            if (!saleDateStr.isEmpty()) {
+                Long daysDiff = parseDaysDifference(saleDateStr);
+                if (daysDiff != null && daysDiff > REFUND_MAX_DAYS) {
+                    return RefundEligibility.notEligible(isArabic
+                            ? "⚠️ انتهت فترة الإرجاع (" + daysDiff + " يوم)"
+                            : "⚠️ Refund period expired (" + daysDiff + " days)");
+                }
+            }
+
+            boolean alreadyRefunded = itemData.optBoolean("is_refunded", false);
+            if (alreadyRefunded) {
+                return RefundEligibility.notEligible(isArabic
+                        ? "⚠️ تم إرجاع هذه القطعة مسبقاً"
+                        : "⚠️ Item already refunded");
+            }
+
+            return RefundEligibility.eligible(
+                    itemData.optLong("sale_id", 0),
+                    itemData.optInt("id", itemData.optInt("item_id", 0)),
+                    itemData.optDouble("retail_price_usd",
+                            itemData.optDouble("retail_price", 0)),
+                    saleDateStr);
+
+        } catch (Exception e) {
+            Log.e(TAG, "checkRefundEligibility error: " + e.getMessage());
+            return RefundEligibility.notEligible(isArabic
+                    ? "⚠️ خطأ في التحقق" : "⚠️ Validation error");
+        }
+    }
+
+    private Long parseDaysDifference(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) return null;
+
+        String[] patterns = {
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd"
+        };
+
+        for (String pattern : patterns) {
             try {
-                JSONObject payload = new JSONObject();
-                payload.put("code", code != null ? code.trim() : "");
-                payload.put("epc", itemToRefund != null && itemToRefund.epc != null
-                        ? itemToRefund.epc : code);
-                payload.put("serial_no", itemToRefund != null
-                        && itemToRefund.serialNo != null
-                        ? itemToRefund.serialNo : "");
-                payload.put("item_id", itemToRefund != null ? itemToRefund.itemId : 0);
-                payload.put("sale_id", itemToRefund != null ? itemToRefund.saleId : 0);
-                payload.put("original_price_usd",
-                        itemToRefund != null ? itemToRefund.originalPrice : 0);
+                SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.US);
+                Date d = sdf.parse(dateStr);
+                if (d != null) {
+                    return (System.currentTimeMillis() - d.getTime())
+                            / (1000L * 60 * 60 * 24);
+                }
+            } catch (ParseException ignored) {}
+        }
+        return null;
+    }
 
-                payload.put("reason", reason != null ? reason : "customer_request");
-                payload.put("refund_type", "full");
-                payload.put("branch_id", getActiveBranchId());
-                payload.put("user_id", sessionManager != null ?
-                        sessionManager.getUserId() : 0);
-                payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
-                payload.put("username", sessionManager != null ?
-                        sessionManager.getUsername() : "");
-                payload.put("timestamp", System.currentTimeMillis());
+    private void showRefundItemInfoInDialog(JSONObject itemData,
+                                             RefundEligibility eligibility) {
+        try {
+            RefundDialog dialog = refundDialog;
+            if (dialog == null || !dialog.isShowing()) return;
 
-                MiraApiClient client = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = client.processRefund(payload);
+            String title = itemData.optString("title",
+                    itemData.optString("item_title", isArabic ? "قطعة ذهبية" : "Gold Item"));
+            String epc = itemData.optString("epc", "");
+            String serialNo = itemData.optString("serial",
+                    itemData.optString("serial_number", ""));
+            String karat = itemData.optString("karat", "21K");
+            double weight = itemData.optDouble("weight", 0);
 
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    if (refundDialog != null && refundDialog.isShowing()) {
-                        refundDialog.dismiss();
-                    }
+            double originalPrice = eligibility.originalPrice > 0
+                    ? eligibility.originalPrice
+                    : itemData.optDouble("retail_price_usd", 0);
 
-                    if (response != null && response.isSuccess) {
-                        restoreItemToCache(code, itemToRefund);
+            String priceStr = priceManager != null
+                    ? priceManager.formatPriceDefault(originalPrice)
+                    : String.format(Locale.US, "$%.2f", originalPrice);
 
-                        showSuccessMessage(
-                                isArabic ? "✅ تم الإرجاع" : "✅ Refund Successful",
-                                isArabic ? "تم إرجاع القطعة بنجاح إلى المخزون" :
-                                        "Item successfully returned to inventory",
-                                true);
+            String details = String.format(Locale.US,
+                    "EPC: %s\nSerial: %s\nKarat: %s | Weight: %.2fg\nPrice: %s",
+                    epc.isEmpty() ? "—" : epc,
+                    serialNo.isEmpty() ? "—" : serialNo,
+                    karat, weight, priceStr);
 
-                        notifyDashboardAndInventoryUpdate("refund");
-                        selectedRefundItem.set(null);
-                    } else {
-                        String err = response != null && response.error != null
-                                ? response.error : "Unknown error";
-                        showSuccessMessage(
-                                isArabic ? "❌ فشل الإرجاع" : "❌ Refund Failed",
-                                err, false);
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "processRefund error: " + e.getMessage(), e);
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    showSuccessMessage(isArabic ? "❌ خطأ" : "❌ Error",
-                            e.getMessage(), false);
-                });
+            dialog.showRefundItemInfo(title, details);
+        } catch (Exception e) {
+            Log.e(TAG, "showRefundItemInfoInDialog error: " + e.getMessage());
+        }
+    }
+
+    private void showRefundItemErrorInDialog(String message) {
+        try {
+            RefundDialog dialog = refundDialog;
+            if (dialog == null) return;
+            dialog.showRefundItemError(message);
+        } catch (Exception e) {
+            Log.e(TAG, "showRefundItemErrorInDialog error: " + e.getMessage());
+        }
+    }
+
+    private void processRefund(String code, String reason) {
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+        final RefundItem itemToRefund = selectedRefundItem.get();
+
+        try {
+            miraExecutor.getNetworkExecutor().execute(() -> {
+                try {
+                    JSONObject payload = new JSONObject();
+                    payload.put("code", code != null ? code.trim() : "");
+                    payload.put("epc", itemToRefund != null && itemToRefund.epc != null
+                            ? itemToRefund.epc : code);
+                    payload.put("serial_no", itemToRefund != null
+                            && itemToRefund.serialNo != null
+                            ? itemToRefund.serialNo : "");
+                    payload.put("item_id", itemToRefund != null ? itemToRefund.itemId : 0);
+                    payload.put("sale_id", itemToRefund != null ? itemToRefund.saleId : 0);
+                    payload.put("original_price_usd",
+                            itemToRefund != null ? itemToRefund.originalPrice : 0);
+
+                    payload.put("reason", reason != null ? reason : "customer_request");
+                    payload.put("refund_type", "full");
+                    payload.put("branch_id", getActiveBranchId());
+                    payload.put("user_id", sessionManager != null ?
+                            sessionManager.getUserId() : 0);
+                    payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
+                    payload.put("username", sessionManager != null ?
+                            sessionManager.getUsername() : "");
+                    payload.put("timestamp", System.currentTimeMillis());
+
+                    MiraApiClient client = MiraApiClient.getInstance(requireContext());
+                    MiraApiClient.ApiResponse response = client.processRefund(payload);
+
+                    safeRun(() -> {
+                        dismissDialog(loadingDialog);
+                        if (refundDialog != null && refundDialog.isShowing()) {
+                            refundDialog.dismiss();
+                        }
+
+                        if (response != null && response.isSuccess) {
+                            restoreItemToCache(code, itemToRefund);
+
+                            showSuccessMessage(
+                                    isArabic ? "✅ تم الإرجاع" : "✅ Refund Successful",
+                                    isArabic ? "تم إرجاع القطعة بنجاح إلى المخزون" :
+                                            "Item successfully returned to inventory",
+                                    true);
+
+                            notifyDashboardAndInventoryUpdate("refund");
+                            selectedRefundItem.set(null);
+                        } else {
+                            String err = response != null && response.error != null
+                                    ? response.error : "Unknown error";
+                            showSuccessMessage(
+                                    isArabic ? "❌ فشل الإرجاع" : "❌ Refund Failed",
+                                    err, false);
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "processRefund error: " + e.getMessage(), e);
+                    safeRun(() -> {
+                        dismissDialog(loadingDialog);
+                        showSuccessMessage(isArabic ? "❌ خطأ" : "❌ Error",
+                                e.getMessage(), false);
+                    });
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "processRefund error: " + e.getMessage());
+        }
+    }
+
+    private void restoreItemToCache(String code, RefundItem item) {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) return;
+
+            MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
+
+            Set<String> ids = new HashSet<>();
+            if (item != null) {
+                if (item.epc != null && !item.epc.isEmpty()) ids.add(item.epc);
+                if (item.serialNo != null && !item.serialNo.isEmpty()) ids.add(item.serialNo);
             }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "processRefund error: " + e.getMessage());
-    }
-}
+            if (code != null && !code.isEmpty()) ids.add(code);
 
-/**
- * ✅ [إصلاح #15] تجميع IDs قبل الاستدعاء
- */
-private void restoreItemToCache(String code, RefundItem item) {
-    try {
-        Context ctx = getContext();
-        if (ctx == null) return;
-
-        MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
-
-        // ✅ تجميع IDs بدون تكرار
-        Set<String> ids = new java.util.HashSet<>();
-        if (item != null) {
-            if (item.epc != null && !item.epc.isEmpty()) ids.add(item.epc);
-            if (item.serialNo != null && !item.serialNo.isEmpty()) ids.add(item.serialNo);
+            for (String id : ids) {
+                cache.markItemAsAvailable(id);
+                Log.d(TAG, "✅ Item restored to cache: " + id);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "restoreItemToCache error: " + e.getMessage());
         }
-        if (code != null && !code.isEmpty()) ids.add(code);
-
-        for (String id : ids) {
-            cache.markItemAsAvailable(id);
-            Log.d(TAG, "✅ Item restored to cache: " + id);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "restoreItemToCache error: " + e.getMessage());
     }
-}
 
     // ==================== Notifications ====================
 
@@ -1503,9 +1515,6 @@ private void restoreItemToCache(String code, RefundItem item) {
             Context ctx = getContext();
             int branchId = getActiveBranchId();
             long timestamp = System.currentTimeMillis();
-
-            // ✅ [إصلاح #16] استخدم sendBroadcast مع Intent واحد لكل مستمع
-            // لكن يمكن تجميعها في Intent واحد إذا كان المستمعون يستخدمون action واحد
 
             sendBroadcastSafely(ctx, "com.example.uhf.REFRESH_SALES", source,
                     branchId, timestamp);
@@ -1642,8 +1651,6 @@ private void restoreItemToCache(String code, RefundItem item) {
                 return;
             }
 
-            // ✅ [إصلاح #20] يمكن استخدام R.layout إذا كان موجوداً
-            // هنا نستخدم البناء البرمجي كما هو (مع تحسينات)
             activeCartSheet = new BottomSheetDialog(requireContext());
 
             LinearLayout root = new LinearLayout(requireContext());
@@ -1698,9 +1705,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ [إصلاح #7] تستدعي checkout مباشرة (الاسم تاريخي)
-     */
     public void showDiscountDialog() {
         try {
             if (!isAdded() || cartList.isEmpty()) {
@@ -1715,7 +1719,6 @@ private void restoreItemToCache(String code, RefundItem item) {
 
     public void showLastReceiptDialog() {
         try {
-            // ✅ [إصلاح #8] فحص الصلاحية الزمنية
             if (lastSaleResponse == null ||
                     (System.currentTimeMillis() - lastSaleResponseTime) > LAST_SALE_VALIDITY_MS) {
                 showToast(isArabic ? "لا يوجد إيصال حديث" : "No recent receipt");
@@ -1743,8 +1746,6 @@ private void restoreItemToCache(String code, RefundItem item) {
 
     // ==================== ActivityResultLauncher ====================
 
-    // ✅ [إصلاح #19] معرّف كحقل — يجب أن يُستدعى registerForActivityResult
-    // في onAttach أو onCreate (وهو كذلك — لأن الحقل يُهيَّأ عند إنشاء Fragment)
     private final ActivityResultLauncher<ScanOptions> refundBarcodeLauncher =
             registerForActivityResult(new ScanContract(), result -> {
         try {
@@ -1759,14 +1760,8 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     });
 
-  
-    // ═══════════════════════════════════════════════════════════
-    // ✅ دوال مساعدة (كانت ناقصة في الملف)
-    // ═══════════════════════════════════════════════════════════
+    // ==================== دوال مساعدة ====================
 
-    /**
-     * ✅ عرض Toast آمن من أي خيط
-     */
     private void showToast(String msg) {
         if (msg == null || msg.isEmpty()) return;
         safeRun(() -> {
@@ -1780,9 +1775,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         });
     }
 
-    /**
-     * ✅ تنفيذ على الـ UI thread بأمان
-     */
     private void safeRun(Runnable r) {
         try {
             if (isAdded() && getActivity() != null) {
@@ -1801,9 +1793,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ تشغيل صوت التنبيه
-     */
     private void playAlertSound(int id) {
         try {
             if (getActivity() instanceof UHFMainActivity) {
@@ -1814,9 +1803,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ الحصول على رقم الفرع النشط
-     */
     private int getActiveBranchId() {
         try {
             return branchesManager != null ? branchesManager.getActiveBranchId() : 1;
@@ -1825,9 +1811,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ فحص صلاحية POS
-     */
     private boolean hasPosPermission() {
         try {
             return permissionManager != null && (
@@ -1841,9 +1824,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ تحويل رمز العيار إلى رقم
-     */
     private int getKaratNumber(String karat) {
         if (karat == null) return 21;
         String clean = karat.trim().toUpperCase(Locale.US).replace("K", "");
@@ -1854,9 +1834,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         return 21;
     }
 
-    /**
-     * ✅ إيقاف مسح RFID
-     */
     private void stopRFIDScan() {
         try {
             if (rfidManager == null) return;
@@ -1867,9 +1844,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ بدء مسح RFID
-     */
     private void startRFIDScan() {
         try {
             if (rfidManager == null) return;
@@ -1881,9 +1855,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ تبديل وضع RFID
-     */
     private void toggleRFIDMode() {
         try {
             if (!isAdded() || rfidManager == null) return;
@@ -1910,9 +1881,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ استقبال شريحة RFID
-     */
     public void onRingScanned(String epc) {
         try {
             if (epc == null || epc.trim().isEmpty()) return;
@@ -1934,9 +1902,6 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ استقبال باركود
-     */
     public void onBarcodeScanned(String data) {
         try {
             if (data == null || data.trim().isEmpty()) return;
@@ -1957,92 +1922,78 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-    /**
-     * ✅ إرسال EPC يدوياً
-     */
-   private void submitManualEpc() {
-    try {
-        if (!hasPosPermission()) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            return;
-        }
-
-        UIHelper.hideKeyboard(getActivity());
-
-        String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
-
-        if (!epc.isEmpty()) {
-            if (scannedEpcs.contains(epc)) {
-                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
-                playAlertSound(2);
+    private void submitManualEpc() {
+        try {
+            if (!hasPosPermission()) {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
                 return;
             }
-            processRingEpc(epc, "manual");
-            if (etManualEpc != null) etManualEpc.setText("");
 
-            // ✅ إخفاء الكيبورد وإزالة التركيز بعد الإضافة
-            if (getActivity() != null && etManualEpc != null) {
-                UIHelper.hideKeyboard(getActivity());
-                etManualEpc.clearFocus();
-            }
-        } else {
-            showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "submitManualEpc error: " + e.getMessage());
-    }
-}
+            UIHelper.hideKeyboard(getActivity());
 
-    /**
-     * ✅ فتح ماسح الباركود
-     */
-    private void openBarcodeScanner() {
-    try {
-        if (!isAdded() || getContext() == null) return;
-        FragmentManager fm = getParentFragmentManager();
-        if (fm == null || fm.isStateSaved()) return;
+            String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
 
-        MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
-        sf.setOnBarcodeScannedListener((data, format) -> {
-            try {
-                // ✅ ملاحظة: لا نستدعي popBackStack هنا لأن الماسح أغلق نفسه بالفعل
-                
-                // تفريغ الحقل
-                if (etManualEpc != null) etManualEpc.setText(data);
-
-                // معالجة الكود
-                if (isAdded() && data != null && !data.isEmpty()) {
-                    processRingEpc(data, "barcode");
-                    if (etManualEpc != null) etManualEpc.setText("");
+            if (!epc.isEmpty()) {
+                if (scannedEpcs.contains(epc)) {
+                    showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
+                    playAlertSound(2);
+                    return;
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Barcode callback error: " + e.getMessage());
-            }
-        });
+                processRingEpc(epc, "manual");
+                if (etManualEpc != null) etManualEpc.setText("");
 
-        int containerId = android.R.id.content;
-        try {
-            View view = getView();
-            if (view != null && view.getParent() instanceof View) {
-                containerId = ((View) view.getParent()).getId();
+                if (getActivity() != null && etManualEpc != null) {
+                    UIHelper.hideKeyboard(getActivity());
+                    etManualEpc.clearFocus();
+                }
+            } else {
+                showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
             }
-        } catch (Exception ignored) {}
-
-        if (!fm.isStateSaved()) {
-            fm.beginTransaction()
-                    .replace(containerId, sf)
-                    .addToBackStack("barcode_scanner")
-                    .commit();
+        } catch (Exception e) {
+            Log.e(TAG, "submitManualEpc error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
-        showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
     }
-}
 
-    /**
-     * ✅ تهيئة الميزان الذكي
-     */
+    private void openBarcodeScanner() {
+        try {
+            if (!isAdded() || getContext() == null) return;
+            FragmentManager fm = getParentFragmentManager();
+            if (fm == null || fm.isStateSaved()) return;
+
+            MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
+            sf.setOnBarcodeScannedListener((data, format) -> {
+                try {
+                    if (etManualEpc != null) etManualEpc.setText(data);
+
+                    if (isAdded() && data != null && !data.isEmpty()) {
+                        processRingEpc(data, "barcode");
+                        if (etManualEpc != null) etManualEpc.setText("");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Barcode callback error: " + e.getMessage());
+                }
+            });
+
+            int containerId = android.R.id.content;
+            try {
+                View view = getView();
+                if (view != null && view.getParent() instanceof View) {
+                    containerId = ((View) view.getParent()).getId();
+                }
+            } catch (Exception ignored) {}
+
+            if (!fm.isStateSaved()) {
+                fm.beginTransaction()
+                        .replace(containerId, sf)
+                        .addToBackStack("barcode_scanner")
+                        .commit();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "openBarcodeScanner error: " + e.getMessage());
+            showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+        }
+    }
+
     private void initSmartScale() {
         try {
             scaleManager = new SmartScaleManager(requireContext(),
@@ -2108,38 +2059,24 @@ private void restoreItemToCache(String code, RefundItem item) {
         }
     }
 
-/**
- * ✅ [إصلاح] تحديث وزن القطعة الأولى في السلة
- * - لا يعيد حساب السعر (نحتفظ بالسعر من السيرفر)
- * - فقط يحدّث الوزن المعروض
- */
-private void updateCartItemsScaleWeight(double currentScaleWeight) {
-    if (cartList.isEmpty() || currentScaleWeight <= 0) return;
+    private void updateCartItemsScaleWeight(double currentScaleWeight) {
+        if (cartList.isEmpty() || currentScaleWeight <= 0) return;
 
-    try {
-        CartItem topItem = cartList.get(0);
-        if (topItem.scaleWeight != currentScaleWeight) {
-            topItem.scaleWeight = currentScaleWeight;
+        try {
+            CartItem topItem = cartList.get(0);
+            if (topItem.scaleWeight != currentScaleWeight) {
+                topItem.scaleWeight = currentScaleWeight;
 
-            // ✅ لا تعد حساب السعر — احتفظ بالسعر من السيرفر
-            // (كان: topItem.price = priceManager.calculateGoldPrice(...))
-
-            if (cartAdapter != null) {
-                cartAdapter.notifyItemChanged(0);
+                if (cartAdapter != null) {
+                    cartAdapter.notifyItemChanged(0);
+                }
+                updateCartSummary();
             }
-            updateCartSummary();
-
-            Log.d(TAG, "⚖️ Updated scale weight: " + currentScaleWeight
-                    + "g (price kept: " + topItem.price + " USD)");
+        } catch (Exception e) {
+            Log.e(TAG, "updateCartItemsScaleWeight error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "updateCartItemsScaleWeight error: " + e.getMessage());
     }
-}
 
-    /**
-     * ✅ عرض رسالة نجاح/فشل مع بطاقة
-     */
     private void showSuccessMessage(String title, String message, boolean isSuccess) {
         try {
             Context ctx = getContext();
@@ -2188,4 +2125,4 @@ private void updateCartItemsScaleWeight(double currentScaleWeight) {
             Log.e(TAG, "showSuccessMessage error: " + e.getMessage());
         }
     }
-    } // ✅ نهاية الكلاس MiraPosFragment  
+                }
