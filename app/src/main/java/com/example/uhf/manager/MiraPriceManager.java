@@ -4,20 +4,36 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import com.example.uhf.api.MiraApiClient;
+
 import org.json.JSONObject;
 
 import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * MiraPriceManager v2.0 — الحصين ضد Thread-Leak
+ *
+ * ✅ الإصلاحات v2.0:
+ *  1. hasLoadedFromServer flag — يمنع تحميل مكرر
+ *  2. loadFromServer مع Daemon Thread
+ *  3. logging للأداء
+ *  4. Null-safety في كل مكان
+ */
 public class MiraPriceManager {
 
     private static final String TAG = "MiraPriceManager";
     private static final String PREFS_NAME = "MIRA_GOLD_SETTINGS";
-    private static MiraPriceManager instance;
+
+    private static volatile MiraPriceManager instance;
     private static Context appContext;
 
-    private SharedPreferences prefs;
+    // ✅ [إصلاح v2.0] منع تحميل مكرر
+    private static volatile boolean hasLoadedFromServer = false;
+    private static volatile boolean isLoading = false;
+
+    private final SharedPreferences prefs;
     private final DecimalFormat decimalFormat = new DecimalFormat("#,##0.00");
 
     public static final String CURRENCY_USD = "USD";
@@ -33,10 +49,17 @@ public class MiraPriceManager {
     public static final int KARAT_14 = 14;
     public static final int KARAT_12 = 12;
 
+    // ==================== Singleton ====================
+
     private MiraPriceManager(Context context) {
         appContext = context.getApplicationContext();
         prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        loadFromServer();
+
+        // ✅ [إصلاح v2.0] حمّل من السيرفر مرة واحدة فقط
+        if (!hasLoadedFromServer && !isLoading) {
+            hasLoadedFromServer = true;
+            loadFromServer();
+        }
     }
 
     public static synchronized MiraPriceManager getInstance(Context context) {
@@ -46,8 +69,115 @@ public class MiraPriceManager {
         return instance;
     }
 
+    /**
+     * ✅ إعادة تحميل يدوية (من Settings مثلاً)
+     */
     public void refreshNow() {
+        // ✅ لا نُعيد التحميل إذا كان جارياً
+        if (isLoading) {
+            Log.d(TAG, "refreshNow: already loading, skip");
+            return;
+        }
         loadFromServer();
+    }
+
+    /**
+     * ✅ [إصلاح v2.0] آمن — لا يُكرَّر
+     */
+    private void loadFromServer() {
+        if (isLoading) {
+            Log.d(TAG, "loadFromServer: already in progress");
+            return;
+        }
+
+        isLoading = true;
+
+        Thread loaderThread = new Thread(() -> {
+            long startTime = System.currentTimeMillis();
+
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(appContext);
+
+                // ✅ timeout safety داخلي — لا ينتظر أكثر من 15 ثانية
+                MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
+
+                long elapsed = System.currentTimeMillis() - startTime;
+                Log.d(TAG, "📥 loadFromServer took " + elapsed + "ms, success=" 
+                        + (response != null && response.isSuccess));
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject data = response.data.optJSONObject("data");
+                    if (data == null) data = response.data;
+
+                    JSONObject goldData = data.optJSONObject("gold");
+                    JSONObject currencyData = data.optJSONObject("currency");
+
+                    SharedPreferences.Editor editor = prefs.edit();
+
+                    if (goldData != null) {
+                        String[] goldKeys = {
+                                "gold_price_24k", "gold_price_22k", "gold_price_21k",
+                                "gold_price_18k", "gold_price_14k",
+                                "margin_24k", "margin_22k", "margin_21k",
+                                "margin_18k", "margin_14k", "margin_12k",
+                                "making_24k", "making_22k", "making_21k",
+                                "making_18k", "making_14k", "making_12k"
+                        };
+                        for (String key : goldKeys) {
+                            if (goldData.has(key)) {
+                                editor.putString(key, goldData.optString(key, "0"));
+                            }
+                        }
+                    }
+
+                    if (currencyData != null) {
+                        String[] currencyKeys = {
+                                "global_default_currency", "chart_currency",
+                                "exchange_official_YER", "exchange_official_EGP",
+                                "exchange_official_SAR", "exchange_official_AED",
+                                "exchange_market_YER", "exchange_market_EGP",
+                                "exchange_market_SAR", "exchange_market_AED",
+                                "use_market_rate"
+                        };
+                        for (String key : currencyKeys) {
+                            if (currencyData.has(key)) {
+                                editor.putString(key, currencyData.optString(key, ""));
+                            }
+                        }
+
+                        if (currencyData.has("use_market_rate")) {
+                            boolean useMarket = currencyData.optBoolean("use_market_rate", false);
+                            editor.putBoolean("use_market_rate", useMarket);
+                        }
+                    }
+
+                    editor.apply();
+                    notifyPriceUpdated();
+
+                    Log.d(TAG, "✅ loadFromServer: prices updated");
+                } else {
+                    Log.w(TAG, "⚠️ loadFromServer: no valid response");
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ loadFromServer error: " + e.getMessage(), e);
+            } finally {
+                isLoading = false;
+            }
+        }, "MiraPriceLoader");
+
+        // ✅ [إصلاح v2.0] Daemon — لا يمنع إغلاق التطبيق
+        loaderThread.setDaemon(true);
+        loaderThread.start();
+    }
+
+    private void notifyPriceUpdated() {
+        try {
+            android.content.Intent intent = new android.content.Intent("MIRA_PRICES_UPDATED");
+            appContext.sendBroadcast(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "notifyPriceUpdated error: " + e.getMessage());
+        }
     }
 
     // ============================================
@@ -72,10 +202,10 @@ public class MiraPriceManager {
     public double getFinalPricePerGram(int karat) {
         double basePrice = getGoldPricePerGram(karat);
         if (basePrice <= 0) return 0;
-        
+
         double margin = getMargin(karat);
         double making = getMakingCharge(karat);
-        
+
         double subtotal = basePrice + making;
         double profitAmount = subtotal * (margin / 100.0);
         return subtotal + profitAmount;
@@ -85,23 +215,23 @@ public class MiraPriceManager {
         double basePrice = getGoldPricePerGram(karat);
         double makingCharge = getMakingCharge(karat);
         double margin = getMargin(karat);
-        
+
         if (basePrice <= 0) {
             return new PricingDetails(0, 0, 0, 0, 0);
         }
-        
+
         double baseGoldCost = weightGrams * basePrice;
         double totalMakingCost = weightGrams * makingCharge;
         double subtotal = baseGoldCost + totalMakingCost;
         double profitAmount = subtotal * (margin / 100.0);
         double finalPrice = subtotal + profitAmount;
-        
+
         return new PricingDetails(
-            baseGoldCost,
-            totalMakingCost,
-            profitAmount,
-            finalPrice,
-            basePrice
+                baseGoldCost,
+                totalMakingCost,
+                profitAmount,
+                finalPrice,
+                basePrice
         );
     }
 
@@ -111,8 +241,8 @@ public class MiraPriceManager {
         public final double profitAmount;
         public final double finalPrice;
         public final double gramPrice;
-        
-        public PricingDetails(double baseGoldCost, double totalMakingCost, 
+
+        public PricingDetails(double baseGoldCost, double totalMakingCost,
                               double profitAmount, double finalPrice, double gramPrice) {
             this.baseGoldCost = baseGoldCost;
             this.totalMakingCost = totalMakingCost;
@@ -173,22 +303,24 @@ public class MiraPriceManager {
     }
 
     public double getExchangeRate(String currency) {
-        if (currency.equals(CURRENCY_USD)) return 1.0;
+        if (CURRENCY_USD.equals(currency)) return 1.0;
 
         try {
             boolean useMarketRate = prefs.getBoolean("use_market_rate", false);
             String source = useMarketRate ? "market" : "official";
             String key = "exchange_" + source + "_" + currency;
             String directValue = prefs.getString(key, "");
-            if (!directValue.isEmpty()) {
-                double rate = Double.parseDouble(directValue);
-                if (rate > 0) return rate;
+            if (directValue != null && !directValue.isEmpty()) {
+                try {
+                    double rate = Double.parseDouble(directValue);
+                    if (rate > 0) return rate;
+                } catch (NumberFormatException ignored) {}
             }
 
             String currencySettingsJson = prefs.getString("currency_settings", "");
-            if (!currencySettingsJson.isEmpty()) {
+            if (currencySettingsJson != null && !currencySettingsJson.isEmpty()) {
                 JSONObject currencySettings = new JSONObject(currencySettingsJson);
-                
+
                 if (currencySettings.has("use_market_rate")) {
                     Object obj = currencySettings.get("use_market_rate");
                     if (obj instanceof Boolean) {
@@ -198,7 +330,7 @@ public class MiraPriceManager {
                         useMarketRate = str.equals("true") || str.equals("1");
                     }
                 }
-                
+
                 source = useMarketRate ? "market" : "official";
                 key = "exchange_" + source + "_" + currency;
                 double rate = currencySettings.optDouble(key, 0);
@@ -233,10 +365,10 @@ public class MiraPriceManager {
 
     public String formatPrice(double priceUSD, String currency) {
         if (priceUSD <= 0) return "—";
-        
+
         double convertedPrice = convertFromUSD(priceUSD, currency);
         String symbol = getCurrencySymbol(currency);
-        if (currency.equals(CURRENCY_YER) || currency.equals(CURRENCY_EGP)) {
+        if (CURRENCY_YER.equals(currency) || CURRENCY_EGP.equals(currency)) {
             DecimalFormat largeFormat = new DecimalFormat("#,##0");
             return largeFormat.format(convertedPrice) + " " + symbol;
         }
@@ -272,13 +404,13 @@ public class MiraPriceManager {
     public String getGoldItemPriceSummary(int karat, double weightGrams) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
         if (priceUSD <= 0) return "—";
-        
+
         String defaultCurrency = getDefaultCurrency();
         double priceInCurrency = convertFromUSD(priceUSD, defaultCurrency);
         return String.format("%s %s ($%s)",
-            decimalFormat.format(priceInCurrency),
-            getCurrencySymbol(defaultCurrency),
-            decimalFormat.format(priceUSD));
+                decimalFormat.format(priceInCurrency),
+                getCurrencySymbol(defaultCurrency),
+                decimalFormat.format(priceUSD));
     }
 
     public Map<String, Double> getAllGoldPrices() {
@@ -301,39 +433,43 @@ public class MiraPriceManager {
     }
 
     public void saveGoldSettings(JSONObject goldSettings) {
+        if (goldSettings == null) return;
+
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("gold_settings", goldSettings.toString());
-        
+
         String[] goldKeys = {
-            "gold_price_24k", "gold_price_22k", "gold_price_21k",
-            "gold_price_18k", "gold_price_14k",
-            "margin_24k", "margin_22k", "margin_21k",
-            "margin_18k", "margin_14k", "margin_12k",
-            "making_24k", "making_22k", "making_21k",
-            "making_18k", "making_14k", "making_12k"
+                "gold_price_24k", "gold_price_22k", "gold_price_21k",
+                "gold_price_18k", "gold_price_14k",
+                "margin_24k", "margin_22k", "margin_21k",
+                "margin_18k", "margin_14k", "margin_12k",
+                "making_24k", "making_22k", "making_21k",
+                "making_18k", "making_14k", "making_12k"
         };
-        
+
         for (String key : goldKeys) {
             if (goldSettings.has(key)) {
                 editor.putString(key, goldSettings.optString(key, "0"));
             }
         }
-        
+
         editor.apply();
     }
 
     public void saveCurrencySettings(JSONObject currencySettings) {
+        if (currencySettings == null) return;
+
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("currency_settings", currencySettings.toString());
-        
+
         boolean useMarketRate = currencySettings.optBoolean("use_market_rate", false);
         editor.putBoolean("use_market_rate", useMarketRate);
-        
+
         String[] currencies = {CURRENCY_YER, CURRENCY_EGP, CURRENCY_SAR, CURRENCY_AED};
         for (String currency : currencies) {
             String officialKey = "exchange_official_" + currency;
             String marketKey = "exchange_market_" + currency;
-            
+
             if (currencySettings.has(officialKey)) {
                 editor.putString(officialKey, currencySettings.optString(officialKey, "0"));
             }
@@ -341,7 +477,7 @@ public class MiraPriceManager {
                 editor.putString(marketKey, currencySettings.optString(marketKey, "0"));
             }
         }
-        
+
         editor.apply();
     }
 
@@ -372,24 +508,26 @@ public class MiraPriceManager {
     private double getDoubleFromPrefs(String key, double defaultValue) {
         try {
             String goldSettingsJson = prefs.getString("gold_settings", "");
-            if (!goldSettingsJson.isEmpty()) {
+            if (goldSettingsJson != null && !goldSettingsJson.isEmpty()) {
                 JSONObject goldSettings = new JSONObject(goldSettingsJson);
                 if (goldSettings.has(key)) {
                     return goldSettings.optDouble(key, defaultValue);
                 }
             }
-            
+
             String currencySettingsJson = prefs.getString("currency_settings", "");
-            if (!currencySettingsJson.isEmpty()) {
+            if (currencySettingsJson != null && !currencySettingsJson.isEmpty()) {
                 JSONObject currencySettings = new JSONObject(currencySettingsJson);
                 if (currencySettings.has(key)) {
                     return currencySettings.optDouble(key, defaultValue);
                 }
             }
-            
+
             String value = prefs.getString(key, "");
-            if (!value.isEmpty()) {
-                return Double.parseDouble(value);
+            if (value != null && !value.isEmpty()) {
+                try {
+                    return Double.parseDouble(value);
+                } catch (NumberFormatException ignored) {}
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing " + key + ": " + e.getMessage());
@@ -397,73 +535,15 @@ public class MiraPriceManager {
         return defaultValue;
     }
 
-    private void loadFromServer() {
-        new Thread(() -> {
-            try {
-                com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(appContext);
-                com.example.uhf.api.MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
-                
-                if (response.isSuccess && response.data != null) {
-                    JSONObject data = response.data.optJSONObject("data");
-                    if (data == null) data = response.data;
-                    
-                    JSONObject goldData = data.optJSONObject("gold");
-                    JSONObject currencyData = data.optJSONObject("currency");
-                    
-                    SharedPreferences.Editor editor = prefs.edit();
-                    
-                    if (goldData != null) {
-                        String[] goldKeys = {
-                            "gold_price_24k", "gold_price_22k", "gold_price_21k",
-                            "gold_price_18k", "gold_price_14k",
-                            "margin_24k", "margin_22k", "margin_21k",
-                            "margin_18k", "margin_14k", "margin_12k",
-                            "making_24k", "making_22k", "making_21k",
-                            "making_18k", "making_14k", "making_12k"
-                        };
-                        for (String key : goldKeys) {
-                            if (goldData.has(key)) {
-                                editor.putString(key, goldData.optString(key, "0"));
-                            }
-                        }
-                    }
-                    
-                    if (currencyData != null) {
-                        String[] currencyKeys = {
-                            "global_default_currency", "chart_currency",
-                            "exchange_official_YER", "exchange_official_EGP",
-                            "exchange_official_SAR", "exchange_official_AED",
-                            "exchange_market_YER", "exchange_market_EGP",
-                            "exchange_market_SAR", "exchange_market_AED",
-                            "use_market_rate"
-                        };
-                        for (String key : currencyKeys) {
-                            if (currencyData.has(key)) {
-                                editor.putString(key, currencyData.optString(key, ""));
-                            }
-                        }
-                        
-                        if (currencyData.has("use_market_rate")) {
-                            boolean useMarket = currencyData.optBoolean("use_market_rate", false);
-                            editor.putBoolean("use_market_rate", useMarket);
-                        }
-                    }
-                    
-                    editor.apply();
-                    notifyPriceUpdated();
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading prices from server: " + e.getMessage());
-            }
-        }).start();
-    }
-
-    private void notifyPriceUpdated() {
-        android.content.Intent intent = new android.content.Intent("MIRA_PRICES_UPDATED");
-        appContext.sendBroadcast(intent);
-    }
-
     public boolean hasValidPrices() {
         return getGoldPricePerGram(KARAT_24) > 0;
+    }
+
+    /**
+     * ✅ [إصلاح v2.0] إعادة تعيين حالة التحميل (للاستخدام بعد logout)
+     */
+    public static void resetLoadState() {
+        hasLoadedFromServer = false;
+        isLoading = false;
     }
 }
