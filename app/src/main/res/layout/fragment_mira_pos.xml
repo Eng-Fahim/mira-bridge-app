@@ -96,7 +96,7 @@
         app:strokeColor="?attr/colorSecondary" />
 
     <!-- ═══════════════════════════════════════════════════════
-         NESTED SCROLL
+         NESTED SCROLL (Cart & Summary Only)
          ═══════════════════════════════════════════════════════ -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/posScrollView"
@@ -128,51 +128,6 @@
                     android:text="@string/pos_ready_scan"
                     android:textAppearance="@style/TextAppearance.App.Label.Medium"
                     android:textColor="?attr/colorOnSurfaceVariant" />
-            </LinearLayout>
-
-            <!-- MANUAL INPUT -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="?attr/colorSurface"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="@dimen/space_3"
-                android:paddingVertical="@dimen/space_3">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/tilPosManualEpc"
-                    style="@style/AppTextInputStyle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/space_2"
-                    android:layout_weight="1"
-                    android:hint="@string/pos_manual_hint"
-                    app:boxBackgroundColor="?attr/colorSurfaceVariant"
-                    app:endIconMode="clear_text"
-                    app:errorEnabled="true">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etPosManualEpc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:imeOptions="actionDone"
-                        android:inputType="text"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textAppearance="@style/TextAppearance.App.Body.Medium"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textDirection="ltr" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPosAddManual"
-                    style="@style/AppButtonStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="@dimen/button_height_sm"
-                    android:minWidth="76dp"
-                    android:paddingHorizontal="@dimen/space_4"
-                    android:text="@string/pos_add" />
             </LinearLayout>
 
             <!-- CART -->
@@ -319,4 +274,53 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
+
+    <!-- ═══════════════════════════════════════════════════════
+         STICKY MANUAL INPUT BAR (تم نقله للأسفل)
+         ═══════════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        android:elevation="@dimen/elevation_2"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_3"
+        android:paddingVertical="@dimen/space_2">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilPosManualEpc"
+            style="@style/AppTextInputStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/space_2"
+            android:layout_weight="1"
+            android:hint="@string/pos_manual_hint"
+            app:boxBackgroundColor="?attr/colorSurfaceVariant"
+            app:endIconMode="clear_text"
+            app:errorEnabled="true">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etPosManualEpc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionDone"
+                android:inputType="text"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                android:textColor="?attr/colorOnSurface"
+                android:textDirection="ltr" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPosAddManual"
+            style="@style/AppButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/button_height_sm"
+            android:minWidth="76dp"
+            android:paddingHorizontal="@dimen/space_4"
+            android:text="@string/pos_add" />
+    </LinearLayout>
+
 </LinearLayout>
