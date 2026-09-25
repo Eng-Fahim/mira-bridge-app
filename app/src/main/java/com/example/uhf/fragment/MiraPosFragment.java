@@ -904,34 +904,45 @@ private void processCheckoutAndStockUpdate() {
     }
     DiagTracer.mark("POS.processCheckout END");
 }
-
 private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
+    DiagTracer.mark("POS.executeCheckout START");
     try {
-        if (!isAdded() || data == null) return;
+        if (!isAdded() || data == null) {
+            DiagTracer.mark("POS.executeCheckout invalid args");
+            return;
+        }
 
-        // ✅ عطّل الأزرار أولاً
         setButtonsEnabled(false);
+        DiagTracer.mark("POS.executeCheckout buttons disabled");
 
         final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+        DiagTracer.mark("POS.executeCheckout loading shown");
 
         miraExecutor.getNetworkExecutor().execute(() -> {
+            DiagTracer.mark("POS.network thread START");
             try {
                 Context ctx = getContext();
-                if (ctx == null) return;
+                if (ctx == null) {
+                    DiagTracer.mark("POS.network thread ctx=null");
+                    return;
+                }
 
                 MiraApiClient client = MiraApiClient.getInstance(ctx);
+                DiagTracer.mark("POS.client obtained");
 
                 JSONObject payload = buildCheckoutPayload(client, data);
-
-                Log.d("POS_DEBUG", "🚨 SENDING CHECKOUT: " + payload.toString());
+                DiagTracer.mark("POS.payload built");
 
                 MiraApiClient.ApiResponse response = client.checkout(payload);
+                DiagTracer.mark("POS.server response received");
 
                 final MiraApiClient.ApiResponse finalResponse = response;
 
                 safeRun(() -> {
+                    DiagTracer.mark("POS.on UI thread with response");
                     dismissDialog(loadingDialog);
                     setButtonsEnabled(true);
+                    
 
                     if (finalResponse != null && finalResponse.isSuccess) {
                         playAlertSound(1);
