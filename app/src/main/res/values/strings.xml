@@ -2278,4 +2278,28 @@
 <string name="logout">تسجيل الخروج</string>
 <string name="security_icon">أيقونة الأمان</string>
 <string name="pos_remove_item">إزالة القطعة من السلة</string>
+
+<!-- ═══════════════════════════════════════════════════════════
+     🎯 Gate Operation Mode — v2.0 (جديد)
+     ═══════════════════════════════════════════════════════════ -->
+
+<!-- عنوان البطاقة -->
+<string name="gate_operation_mode">🎯 وضع التشغيل</string>
+<string name="gate_mode_semi_auto">شبه تلقائي</string>
+
+<!-- خيارات الأوضاع (مع وصف مختصر) -->
+<string name="gate_mode_manual_full">✋ يدوي — تحكم كامل</string>
+<string name="gate_mode_semi_auto_full">🔄 شبه تلقائي — موصى به</string>
+<string name="gate_mode_full_auto_full">⚡ تلقائي كامل — للبوابات</string>
+
+<!-- إعدادات إضافية -->
+<string name="gate_setting_keep_screen_on">إبقاء الشاشة نشطة</string>
+<string name="gate_setting_continuous_scan">مسح مستمر تلقائي</string>
+<string name="gate_setting_sound">تنبيهات صوتية</string>
+<string name="gate_setting_vibration">اهتزاز</string>
+
+<!-- أوصاف الأوضاع (للاستخدام في التلميحات) -->
+<string name="gate_mode_manual_desc">تتحكم يدوياً بكل عملية مسح</string>
+<string name="gate_mode_semi_auto_desc">المسح يعمل تلقائياً، مع تنبيهات صوتية</string>
+<string name="gate_mode_full_auto_desc">البوابة تعمل بدون تدخل بشري (يحتاج بوابة خارجية)</string>
 </resources>
