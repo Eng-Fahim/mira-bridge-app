@@ -164,11 +164,23 @@
         </provider>
 
         <!-- ==================== خدمة المراقبة الخلفية ==================== -->
-        <service
-            android:name=".service.MiraGateMonitorService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync|connectedDevice" />
-
+<service
+    android:name=".service.MiraGateMonitorService"
+    android:exported="false"
+    android:foregroundServiceType="dataSync|connectedDevice"
+    android:stopWithTask="false" />
+    
+<!-- ==================== مستقبل أحداث البوابات ==================== -->
+<receiver
+    android:name=".receiver.GateEventReceiver"
+    android:exported="false"
+    android:enabled="true">
+    <intent-filter>
+        <action android:name="com.example.uhf.GATE_EVENT" />
+        <action android:name="com.example.uhf.GATE_ALERT" />
+        <action android:name="com.example.uhf.GATE_SYNC" />
+    </intent-filter>
+</receiver>
         <!-- ==================== مستقبل زر الزناد Chainway ==================== -->
         <receiver
             android:name="com.example.uhf.MiraRfid.TriggerKeyReceiver"
