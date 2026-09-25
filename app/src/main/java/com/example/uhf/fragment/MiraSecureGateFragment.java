@@ -1274,22 +1274,126 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
-        if (isDestroyed || !isAdded()) return;
+    if (isDestroyed || !isAdded()) return;
 
-        if (allowed && "ALERTS".equals(logFilter)) return;
-        if (!allowed && "PASS".equals(logFilter)) return;
+    if (allowed && "ALERTS".equals(logFilter)) return;
+    if (!allowed && "PASS".equals(logFilter)) return;
 
-        if (allowed) {
-            logConsole(getLocalizedText("✅ خروج شرعي: ", "✅ Legal exit: ") + itemTitle);
-            updateLiveTicker("✅ " + itemTitle, false);
-            SoundGenerator.playSound(miraGatesSettings.getSoundPass());
-        } else {
-            logConsole(getLocalizedText("🚨 خروج غير شرعي: ", "🚨 Illegal exit: ") + itemTitle);
-            updateLiveTicker("🚨 " + itemTitle, true);
-            triggerAlarm(itemTitle, serial);
-        }
+    if (allowed) {
+        logConsole(getLocalizedText("✅ خروج شرعي: ", "✅ Legal exit: ") + itemTitle);
+        updateLiveTicker("✅ " + itemTitle, false);
+        SoundGenerator.playSound(miraGatesSettings.getSoundPass());
+
+        // ✅ [جديد] تحديث العدّاد المحلي فوراً
+        incrementPassCountLocally();
+
+        // ✅ [جديد] إرسال الحدث للسيرفر
+        reportExitEventToServer(serial, itemTitle, true);
+
+    } else {
+        logConsole(getLocalizedText("🚨 خروج غير شرعي: ", "🚨 Illegal exit: ") + itemTitle);
+        updateLiveTicker("🚨 " + itemTitle, true);
+        triggerAlarm(itemTitle, serial);
+
+        // ✅ [جديد] تحديث العدّاد المحلي فوراً
+        incrementDenyCountLocally();
+
+        // ✅ [جديد] إرسال الحدث للسيرفر
+        reportExitEventToServer(serial, itemTitle, false);
     }
+}
 
+// ═══════════════════════════════════════════════════════════
+// ✅ العدّادات المحلية
+// ═══════════════════════════════════════════════════════════
+private volatile int localPassCount = 0;
+private volatile int localDenyCount = 0;
+
+private void incrementPassCountLocally() {
+    localPassCount++;
+    final int newValue = localPassCount;
+    mainHandler.post(() -> {
+        if (isAdded() && !isDestroyed && tvPassCount != null) {
+            try {
+                int current = Integer.parseInt(tvPassCount.getText().toString());
+                tvPassCount.setText(String.valueOf(current + 1));
+            } catch (Exception e) {
+                tvPassCount.setText(String.valueOf(newValue));
+            }
+            updateRiskMeter(localPassCount, localDenyCount);
+        }
+    });
+}
+
+private void incrementDenyCountLocally() {
+    localDenyCount++;
+    final int newValue = localDenyCount;
+    mainHandler.post(() -> {
+        if (isAdded() && !isDestroyed && tvDenyCount != null) {
+            try {
+                int current = Integer.parseInt(tvDenyCount.getText().toString());
+                tvDenyCount.setText(String.valueOf(current + 1));
+            } catch (Exception e) {
+                tvDenyCount.setText(String.valueOf(newValue));
+            }
+            updateRiskMeter(localPassCount, localDenyCount);
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+// ✅ إرسال الحدث للسيرفر
+// ═══════════════════════════════════════════════════════════
+private void reportExitEventToServer(String epc, String itemTitle, boolean allowed) {
+    executeOnGateExecutor(() -> {
+        try {
+            Context context = getContext();
+            if (context == null || isDestroyed) return;
+
+            MiraApiClient client = MiraApiClient.getInstance(context);
+            JSONObject payload = new JSONObject();
+            payload.put("epc", epc);
+            payload.put("item_title", itemTitle);
+            payload.put("allowed", allowed);
+            payload.put("gate_id", getCurrentGateId());
+            payload.put("branch_id", getCurrentBranchId());
+            payload.put("timestamp", System.currentTimeMillis());
+            payload.put("event_type", allowed ? "PASS" : "DENY");
+
+            // ✅ أرسل للسيرفر لتحديث قاعدة البيانات
+            MiraApiClient.ApiResponse response = 
+                    client.postWithAuth("/gate-exit-event", payload);
+
+            if (response != null && response.isSuccess) {
+                Log.d(TAG, "✅ Exit event reported: " + epc + " allowed=" + allowed);
+            } else {
+                // ✅ فشل — احفظ محلياً للمزامنة لاحقاً
+                if (offlineCache != null) {
+                    offlineCache.saveOfflineEvent(epc, allowed, itemTitle, getCurrentGateId());
+                    Log.d(TAG, "📥 Exit event saved offline (sync later)");
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "reportExitEventToServer error: " + e.getMessage());
+            // ✅ احفظ محلياً عند الخطأ
+            try {
+                if (offlineCache != null) {
+                    offlineCache.saveOfflineEvent(epc, allowed, itemTitle, getCurrentGateId());
+                }
+            } catch (Exception ignored) {}
+        }
+    });
+}
+
+private String getCurrentGateId() {
+    // ✅ يمكن تخصيصه حسب البوابة الحالية
+    // افتراضياً: أول بوابة في القائمة
+    if (!monitorList.isEmpty()) {
+        return monitorList.get(0).gateId;
+    }
+    return "default_gate";
+}
     private void triggerAlarm(String itemTitle, String serial) {
         mainHandler.post(() -> {
             if (isDestroyed || !isAdded()) return;
