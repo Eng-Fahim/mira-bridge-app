@@ -37,6 +37,8 @@ import com.google.android.material.textfield.TextInputLayout;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 
+
+import com.example.uhf.utils.DiagTracer;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
@@ -840,42 +842,67 @@ private double getCartTotal() {
 // ==================== Checkout ====================
 
 private void processCheckoutAndStockUpdate() {
+    DiagTracer.mark("POS.processCheckout START");
     try {
+        DiagTracer.mark("POS.cartList",
+                "size=" + cartList.size() + ", total=" + getCartTotal());
+
         if (!hasPosPermission()) {
+            DiagTracer.mark("POS.no permission");
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
         if (cartList.isEmpty()) {
+            DiagTracer.mark("POS.cart empty");
             showToast(isArabic ? "السلة فارغة" : "Cart is empty");
             return;
         }
-        if (isCheckoutDialogShowing) return;
-        if (!isAdded() || getActivity() == null) return;
+        if (isCheckoutDialogShowing) {
+            DiagTracer.mark("POS.already showing");
+            return;
+        }
+        if (!isAdded() || getActivity() == null) {
+            DiagTracer.mark("POS.fragment detached");
+            return;
+        }
 
         UIHelper.hideKeyboard(getActivity());
         isCheckoutDialogShowing = true;
 
+        DiagTracer.mark("POS.before newInstance");
         POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(
                 getCartTotal(), cartList.size());
+        DiagTracer.mark("POS.after newInstance");
 
         dialog.setCheckoutListener(data -> {
+            DiagTracer.mark("POS.listener called");
             isCheckoutDialogShowing = false;
             executeCheckoutDirectly(data);
         });
 
-        dialog.setOnDismissListener(() -> isCheckoutDialogShowing = false);
+        dialog.setOnDismissListener(() -> {
+            DiagTracer.mark("POS.onDismiss called");
+            isCheckoutDialogShowing = false;
+        });
 
         FragmentManager fm = getParentFragmentManager();
+        DiagTracer.mark("POS.fm.isStateSaved="
+                + (fm != null ? fm.isStateSaved() : "null"));
+
         if (!fm.isStateSaved()) {
+            DiagTracer.mark("POS.before dialog.show()");
             dialog.show(fm, "POSCheckoutDialog");
+            DiagTracer.mark("POS.after dialog.show()");
         } else {
+            DiagTracer.mark("POS.state saved → not showing");
             isCheckoutDialogShowing = false;
         }
     } catch (Exception e) {
+        DiagTracer.markException("processCheckout", e);
         isCheckoutDialogShowing = false;
-        Log.e(TAG, "processCheckout error: " + e.getMessage());
         showToast(isArabic ? "خطأ: " + e.getMessage() : "Error: " + e.getMessage());
     }
+    DiagTracer.mark("POS.processCheckout END");
 }
 
 private void executeCheckoutDirectly(POSCheckoutDialog.POSCheckoutData data) {
