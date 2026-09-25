@@ -18,102 +18,98 @@ import androidx.core.app.NotificationCompat;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
-import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.OfflineGateCache;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
- * ✅ MiraGateMonitorService v2.0
+ * MiraGateMonitorService v2.0
+ * ═══════════════════════════════════════════════════════════════
+ * خدمة مراقبة البوابات في الخلفية.
  *
- * الخدمة الاحترافية لمراقبة البوابات في الخلفية.
- *
- * الميزات:
- * 1. مراقبة فعلية للبوابات كل 30 ثانية
- * 2. إشعار عند تغيير حالة أي بوابة
- * 3. مزامنة الأحداث المعلقة تلقائياً
- * 4. Exponential Backoff عند فشل الشبكة
- * 5. إشعارات منفصلة لكل نوع حدث
- * 6. تسجيل مستمر في سجل موحد
+ * التحسينات الجديدة:
+ *  1. 3 قنوات إشعار (Monitor / Alert / Sync)
+ *  2. تنظيف دوري للقائمة المسموحة (كل ساعة)
+ *  3. إشعار ديناميكي يُحدَّث بعدد القطع المسموحة
+ *  4. استقبال أحداث البيع/الإرجاع لتحديث الإشعار
+ *  5. إحصائيات داخلية (SALE/REFUND counters)
+ *  6. Fail-safe شامل
  */
 public class MiraGateMonitorService extends Service {
 
     private static final String TAG = "MiraGateMonitor";
 
-    // ==================== الإشعارات ====================
-    private static final String CHANNEL_SERVICE = "mira_gate_service";
-    private static final String CHANNEL_ALERTS = "mira_gate_alerts";
-    private static final String CHANNEL_EVENTS = "mira_gate_events";
+    // ═══════════════════════════════════════════════════════════
+    // Notification Channels
+    // ═══════════════════════════════════════════════════════════
+    private static final String CHANNEL_MONITOR = "mira_gate_monitor_channel";
+    private static final String CHANNEL_ALERT   = "mira_gate_alert_channel";
+    private static final String CHANNEL_SYNC    = "mira_gate_sync_channel";
 
-    private static final int NOTIFICATION_ID_SERVICE = 1001;
-    private static final int NOTIFICATION_ID_ALERT_BASE = 2000;
+    private static final int NOTIFICATION_ID_MONITOR = 1001;
+    private static final int NOTIFICATION_ID_ALERT   = 1002;
+    private static final int NOTIFICATION_ID_SYNC    = 1003;
 
-    // ==================== الإعدادات ====================
-    private static final long INITIAL_POLL_INTERVAL_MS = 30_000;    // 30 ثانية
-    private static final long MAX_POLL_INTERVAL_MS = 5 * 60_000;     // 5 دقائق
-    private static final long MIN_POLL_INTERVAL_MS = 15_000;         // 15 ثانية
-    private static final long SYNC_INTERVAL_MS = 60_000;             // 60 ثانية
+    // ═══════════════════════════════════════════════════════════
+    // Extras — يقرأها الـ Receiver
+    // ═══════════════════════════════════════════════════════════
+    public static final String EXTRA_FORCE_SYNC = "force_sync";
+    public static final String EXTRA_EVENT_TYPE = "event_type";
+    public static final String EXTRA_ALLOWED    = "allowed";
 
-    // ==================== الحالة ====================
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private ScheduledExecutorService scheduler;
-    private ScheduledFuture<?> pollFuture;
-    private ScheduledFuture<?> syncFuture;
+    // ═══════════════════════════════════════════════════════════
+    // Timings
+    // ═══════════════════════════════════════════════════════════
+    private static final long CLEANUP_INTERVAL_MS = 60 * 60 * 1000L; // كل ساعة
+    private static final long NOTIFICATION_UPDATE_MIN_INTERVAL_MS = 5000L;
 
-    private MiraApiClient apiClient;
-    private MiraBranchesManager branchesManager;
-    private OfflineGateCache offlineCache;
+    // ═══════════════════════════════════════════════════════════
+    // State
+    // ═══════════════════════════════════════════════════════════
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private long lastNotificationUpdate = 0L;
+    private volatile boolean isRunning = false;
 
-    private final AtomicBoolean isRunning = new AtomicBoolean(false);
-    private volatile long currentPollInterval = INITIAL_POLL_INTERVAL_MS;
-    private volatile int consecutiveFailures = 0;
-    private volatile int lastKnownGateCount = -1;
-    private volatile boolean lastKnownOnlineStatus = true;
+    // إحصائيات الجلسة
+    private volatile int sessionSalesCount = 0;
+    private volatile int sessionRefundsCount = 0;
+    private volatile int sessionAlertsCount = 0;
 
-    // ==================== دورة الحياة ====================
+    // ═══════════════════════════════════════════════════════════
+    // Lifecycle
+    // ═══════════════════════════════════════════════════════════
 
     @Override
     public void onCreate() {
         super.onCreate();
-
-        Log.d(TAG, "🚀 onCreate");
-
         try {
-            Context ctx = getApplicationContext();
-            apiClient = MiraApiClient.getInstance(ctx);
-            branchesManager = MiraBranchesManager.getInstance(ctx);
-            offlineCache = OfflineGateCache.getInstance(ctx);
+            createAllNotificationChannels();
+            isRunning = true;
+            Log.i(TAG, "Service created");
         } catch (Exception e) {
-            Log.e(TAG, "onCreate init error: " + e.getMessage(), e);
+            Log.e(TAG, "onCreate error: " + e.getMessage(), e);
         }
-
-        createNotificationChannels();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "🚀 onStartCommand");
+        try {
+            // 1. Foreground notification
+            startForeground(NOTIFICATION_ID_MONITOR, buildMonitorNotification());
 
-        // ✅ تحقق من عدم التشغيل المزدوج
-        if (isRunning.get()) {
-            Log.d(TAG, "Service already running, ignoring duplicate start");
-            return START_STICKY;
+            // 2. معالجة Intent الوارد
+            if (intent != null) {
+                handleIncomingIntent(intent);
+            }
+
+            // 3. جدولة التنظيف الدوري (مرة واحدة فقط)
+            if (!hasScheduledCleanup) {
+                hasScheduledCleanup = true;
+                scheduleCleanup();
+            }
+
+            Log.d(TAG, "Service started");
+        } catch (Exception e) {
+            Log.e(TAG, "onStartCommand error: " + e.getMessage(), e);
         }
-
-        // ✅ ابدأ الخدمة في المقدمة
-        startForeground(NOTIFICATION_ID_SERVICE, buildServiceNotification());
-
-        // ✅ شغّل المراقبة
-        startMonitoring();
-
         return START_STICKY;
     }
 
@@ -125,355 +121,285 @@ public class MiraGateMonitorService extends Service {
 
     @Override
     public void onDestroy() {
-        Log.d(TAG, "🛑 onDestroy");
-
-        stopMonitoring();
-
+        try {
+            isRunning = false;
+            handler.removeCallbacksAndMessages(null);
+            Log.d(TAG, "Service destroyed");
+        } catch (Exception e) {
+            Log.e(TAG, "onDestroy error: " + e.getMessage());
+        }
         super.onDestroy();
     }
 
-    // ==================== المراقبة ====================
+    // ═══════════════════════════════════════════════════════════
+    // Intent Handling
+    // ═══════════════════════════════════════════════════════════
 
-    private void startMonitoring() {
-        if (!isRunning.compareAndSet(false, true)) {
-            Log.w(TAG, "startMonitoring called but already running");
-            return;
-        }
-
+    private void handleIncomingIntent(Intent intent) {
         try {
-            scheduler = Executors.newScheduledThreadPool(2, r -> {
-                Thread t = new Thread(r, "GateMonitor-Worker");
-                t.setDaemon(true);
-                t.setPriority(Thread.NORM_PRIORITY - 1);
-                return t;
-            });
+            String eventType = intent.getStringExtra(EXTRA_EVENT_TYPE);
+            boolean forceSync = intent.getBooleanExtra(EXTRA_FORCE_SYNC, false);
+            boolean allowed = intent.getBooleanExtra(EXTRA_ALLOWED, false);
 
-            // ✅ 1) Poll البوابات — كل 30 ثانية
-            pollFuture = scheduler.scheduleWithFixedDelay(
-                    this::pollGatesTask,
-                    0,
-                    INITIAL_POLL_INTERVAL_MS,
-                    TimeUnit.MILLISECONDS
-            );
+            Log.d(TAG, "📥 Intent: type=" + eventType
+                    + ", forceSync=" + forceSync
+                    + ", allowed=" + allowed);
 
-            // ✅ 2) مزامنة الأحداث المعلقة — كل 60 ثانية
-            syncFuture = scheduler.scheduleWithFixedDelay(
-                    this::syncPendingEventsTask,
-                    15_000,         // ابدأ بعد 15 ثانية
-                    SYNC_INTERVAL_MS,
-                    TimeUnit.MILLISECONDS
-            );
-
-            Log.d(TAG, "✅ Monitoring started");
-
-        } catch (Exception e) {
-            Log.e(TAG, "startMonitoring error: " + e.getMessage(), e);
-            isRunning.set(false);
-        }
-    }
-
-    private void stopMonitoring() {
-        if (!isRunning.compareAndSet(true, false)) {
-            return;
-        }
-
-        try {
-            if (pollFuture != null) {
-                pollFuture.cancel(true);
-                pollFuture = null;
-            }
-            if (syncFuture != null) {
-                syncFuture.cancel(true);
-                syncFuture = null;
-            }
-            if (scheduler != null) {
-                scheduler.shutdownNow();
-                scheduler = null;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "stopMonitoring error: " + e.getMessage(), e);
-        }
-
-        Log.d(TAG, "🛑 Monitoring stopped");
-    }
-
-    // ==================== Poll البوابات ====================
-
-    private void pollGatesTask() {
-        if (!isRunning.get()) return;
-
-        try {
-            if (apiClient == null) {
-                Log.w(TAG, "apiClient is null, skipping poll");
-                return;
-            }
-
-            int branchId = branchesManager != null
-                    ? branchesManager.getActiveBranchId() : 0;
-
-            MiraApiClient.ApiResponse response = apiClient.getGatesByBranch(branchId);
-
-            if (response != null && response.isSuccess && response.data != null) {
-                // ✅ نجاح — أعد ضبط الـ backoff
-                consecutiveFailures = 0;
-                currentPollInterval = INITIAL_POLL_INTERVAL_MS;
-
-                if (!lastKnownOnlineStatus) {
-                    lastKnownOnlineStatus = true;
-                    Log.d(TAG, "✅ Connection restored");
-                }
-
-                processGatesResponse(response.data);
-
-            } else {
-                // ❌ فشل
-                handlePollFailure(response != null ? response.error : "Unknown error");
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "pollGatesTask error: " + e.getMessage(), e);
-            handlePollFailure(e.getMessage());
-        }
-    }
-
-    private void processGatesResponse(JSONObject data) {
-        try {
-            JSONArray gatesArray = extractGatesArray(data);
-            if (gatesArray == null) return;
-
-            int currentCount = gatesArray.length();
-
-            // ✅ 1) تغيير عدد البوابات
-            if (lastKnownGateCount != -1 && lastKnownGateCount != currentCount) {
-                String msg = "🔔 عدد البوابات تغير: " + lastKnownGateCount
-                        + " → " + currentCount;
-                Log.d(TAG, msg);
-                showEventNotification("تغيير في البوابات", msg);
-            }
-            lastKnownGateCount = currentCount;
-
-            // ✅ 2) فحص حالة كل بوابة
-            for (int i = 0; i < gatesArray.length(); i++) {
-                JSONObject gate = gatesArray.optJSONObject(i);
-                if (gate == null) continue;
-
-                String gateName = gate.optString("gate_name", "بوابة");
-                String status = gate.optString("status", "offline");
-                int denyCount = gate.optInt("deny_count", 0);
-                String lastEvent = gate.optString("last_event", "");
-
-                // ✅ 3) حالة الخرق
-                if ("alert".equals(status) || "breach".equals(status)) {
-                    showAlertNotification(
-                            "🚨 خرق أمني في " + gateName,
-                            lastEvent.isEmpty() ? "حدث اختراق" : lastEvent
-                    );
+            // 1. تحديث الإحصائيات
+            if (eventType != null) {
+                switch (eventType) {
+                    case "SALE_COMPLETED":
+                        sessionSalesCount++;
+                        break;
+                    case "REFUND_COMPLETED":
+                        sessionRefundsCount++;
+                        break;
+                    case "GATE_ALERT":
+                        sessionAlertsCount++;
+                        showAlertNotification(eventType);
+                        break;
+                    case "GATE_EVENT":
+                        if (forceSync) scheduleSyncNotification();
+                        break;
+                    case "GATE_SYNC":
+                        scheduleSyncNotification();
+                        break;
                 }
             }
 
+            // 2. تحديث الإشعار الدائم (بمعدل محدود)
+            updateMonitorNotificationThrottled();
+
         } catch (Exception e) {
-            Log.e(TAG, "processGatesResponse error: " + e.getMessage(), e);
+            Log.e(TAG, "handleIncomingIntent error: " + e.getMessage(), e);
         }
     }
 
-    private JSONArray extractGatesArray(JSONObject data) {
-        JSONArray arr = data.optJSONArray("gates");
-        if (arr != null) return arr;
+    // ═══════════════════════════════════════════════════════════
+    // Cleanup (تنظيف دوري)
+    // ═══════════════════════════════════════════════════════════
 
-        JSONObject d = data.optJSONObject("data");
-        if (d != null) {
-            arr = d.optJSONArray("gates");
-            if (arr != null) return arr;
-        }
+    private volatile boolean hasScheduledCleanup = false;
 
-        return data.optJSONArray("items");
-    }
+    private void scheduleCleanup() {
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!isRunning) return;
 
-    private void handlePollFailure(String error) {
-        consecutiveFailures++;
+                try {
+                    OfflineGateCache cache = OfflineGateCache.getInstance(
+                            getApplicationContext());
+                    int removed = cache.cleanupExpiredAllowed();
+                    int remaining = cache.getAllowedListSize();
 
-        if (lastKnownOnlineStatus) {
-            lastKnownOnlineStatus = false;
-            Log.w(TAG, "⚠️ Connection lost: " + error);
-        }
+                    Log.i(TAG, "🧹 Cleanup: removed=" + removed
+                            + ", remaining=" + remaining);
 
-        // ✅ Exponential Backoff
-        long newInterval = Math.min(
-                INITIAL_POLL_INTERVAL_MS * (1L << Math.min(consecutiveFailures, 5)),
-                MAX_POLL_INTERVAL_MS
-        );
+                    // تحديث الإشعار بالعدد الجديد
+                    updateMonitorNotification();
 
-        if (newInterval != currentPollInterval) {
-            currentPollInterval = newInterval;
-            Log.d(TAG, "📉 Poll interval increased to " + (currentPollInterval / 1000) + "s");
-        }
-    }
+                } catch (Exception e) {
+                    Log.e(TAG, "scheduleCleanup error: " + e.getMessage());
+                }
 
-    // ==================== مزامنة الأحداث ====================
-
-    private void syncPendingEventsTask() {
-        if (!isRunning.get()) return;
-
-        try {
-            if (offlineCache == null || apiClient == null) return;
-
-            JSONArray pendingEvents = offlineCache.getOfflineEvents();
-            if (pendingEvents == null || pendingEvents.length() == 0) return;
-
-            Log.d(TAG, "🔄 Syncing " + pendingEvents.length() + " pending events");
-
-            MiraApiClient.ApiResponse response = apiClient.syncOfflineTransactions(pendingEvents);
-
-            if (response != null && response.isSuccess) {
-                offlineCache.clearOfflineEvents();
-                offlineCache.saveLastSyncTime(System.currentTimeMillis());
-
-                Log.d(TAG, "✅ Synced " + pendingEvents.length() + " events");
+                // جدولة الدورة التالية
+                if (isRunning) {
+                    handler.postDelayed(this, CLEANUP_INTERVAL_MS);
+                }
             }
-
-        } catch (Exception e) {
-            Log.e(TAG, "syncPendingEventsTask error: " + e.getMessage(), e);
-        }
+        }, CLEANUP_INTERVAL_MS);
     }
 
-    // ==================== الإشعارات ====================
+    // ═══════════════════════════════════════════════════════════
+    // Notifications
+    // ═══════════════════════════════════════════════════════════
 
-    private void createNotificationChannels() {
+    private void createAllNotificationChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
 
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager == null) return;
 
-        // ✅ 1) Service channel (منخفض الأهمية)
-        NotificationChannel serviceChannel = new NotificationChannel(
-                CHANNEL_SERVICE,
-                "مراقبة البوابات",
+        // 1. Monitor (LOW — دائم)
+        NotificationChannel monitor = new NotificationChannel(
+                CHANNEL_MONITOR,
+                "MIRA Gate Monitor",
                 NotificationManager.IMPORTANCE_LOW
         );
-        serviceChannel.setDescription("خدمة مراقبة البوابات الأمنية في الخلفية");
-        serviceChannel.setShowBadge(false);
-        manager.createNotificationChannel(serviceChannel);
+        monitor.setDescription("مراقبة البوابات الأمنية في الخلفية");
+        monitor.setShowBadge(false);
+        manager.createNotificationChannel(monitor);
 
-        // ✅ 2) Alerts channel (عالي جداً)
-        NotificationChannel alertsChannel = new NotificationChannel(
-                CHANNEL_ALERTS,
-                "🚨 إنذارات أمنية",
+        // 2. Alert (HIGH — إنذار)
+        NotificationChannel alert = new NotificationChannel(
+                CHANNEL_ALERT,
+                "MIRA Gate Alerts",
                 NotificationManager.IMPORTANCE_HIGH
         );
-        alertsChannel.setDescription("إنذارات فورية عند اكتشاف خرق أمني");
-        alertsChannel.enableVibration(true);
-        alertsChannel.setVibrationPattern(new long[]{0, 1000, 500, 1000});
-        alertsChannel.enableLights(true);
-        alertsChannel.setLightColor(0xFFFF0000);
-        alertsChannel.setShowBadge(true);
-        manager.createNotificationChannel(alertsChannel);
+        alert.setDescription("إنذارات أمنية من البوابات");
+        alert.setShowBadge(true);
+        alert.enableVibration(true);
+        manager.createNotificationChannel(alert);
 
-        // ✅ 3) Events channel (متوسط)
-        NotificationChannel eventsChannel = new NotificationChannel(
-                CHANNEL_EVENTS,
-                "📋 أحداث البوابات",
+        // 3. Sync (DEFAULT — مزامنة)
+        NotificationChannel sync = new NotificationChannel(
+                CHANNEL_SYNC,
+                "MIRA Gate Sync",
                 NotificationManager.IMPORTANCE_DEFAULT
         );
-        eventsChannel.setDescription("أحداث عادية في نظام البوابات");
-        eventsChannel.setShowBadge(true);
-        manager.createNotificationChannel(eventsChannel);
+        sync.setDescription("إشعارات مزامنة بيانات البوابات");
+        sync.setShowBadge(true);
+        manager.createNotificationChannel(sync);
     }
 
-    private Notification buildServiceNotification() {
+    private Notification buildMonitorNotification() {
+        int allowedCount = 0;
+        int pendingEvents = 0;
+        try {
+            OfflineGateCache cache = OfflineGateCache.getInstance(this);
+            allowedCount = cache.getAllowedListSize();
+            pendingEvents = cache.getPendingEventsCount();
+        } catch (Exception e) {
+            Log.w(TAG, "buildMonitorNotification stats error: " + e.getMessage());
+        }
+
+        String contentText = "🛡️ مراقبة نشطة"
+                + " • مسموح: " + allowedCount
+                + " • معلّق: " + pendingEvents;
+
+        if (sessionSalesCount > 0 || sessionRefundsCount > 0) {
+            contentText += " • بيع: " + sessionSalesCount
+                    + " • إرجاع: " + sessionRefundsCount;
+        }
+
         Intent notificationIntent = new Intent(this, UHFMainActivity.class);
-        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
+        int piFlags = PendingIntent.FLAG_IMMUTABLE
+                | PendingIntent.FLAG_UPDATE_CURRENT;
         PendingIntent pendingIntent = PendingIntent.getActivity(
-                this, 0, notificationIntent,
-                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-        );
+                this, 0, notificationIntent, piFlags);
 
-        String statusText = lastKnownOnlineStatus
-                ? "المراقبة الأمنية تعمل في الخلفية"
-                : "⚠️ غير متصل - إعادة المحاولة...";
-
-        return new NotificationCompat.Builder(this, CHANNEL_SERVICE)
+        return new NotificationCompat.Builder(this, CHANNEL_MONITOR)
                 .setContentTitle("🛡️ MIRA Gate Monitor")
-                .setContentText(statusText)
+                .setContentText(contentText)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
                 .setSmallIcon(R.drawable.ic_luxury_mira_logo)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOnlyAlertOnce(true)
                 .build();
     }
 
-    private void showAlertNotification(String title, String message) {
+    private void updateMonitorNotification() {
         try {
-            Intent intent = new Intent(this, UHFMainActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            intent.putExtra("navigate_to", "SecureGate");
-
-            PendingIntent pendingIntent = PendingIntent.getActivity(
-                    this,
-                    (int) System.currentTimeMillis(),
-                    intent,
-                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-            );
-
-            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ALERTS)
-                    .setContentTitle(title)
-                    .setContentText(message)
-                    .setSmallIcon(R.drawable.ic_luxury_mira_logo)
-                    .setContentIntent(pendingIntent)
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setCategory(NotificationCompat.CATEGORY_ALARM)
-                    .setAutoCancel(true)
-                    .setVibrate(new long[]{0, 1000, 500, 1000})
-                    .build();
-
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                int notificationId = NOTIFICATION_ID_ALERT_BASE
-                        + (int) (System.currentTimeMillis() % 1000);
-                manager.notify(notificationId, notification);
+            NotificationManager nm = (NotificationManager)
+                    getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.notify(NOTIFICATION_ID_MONITOR, buildMonitorNotification());
             }
-
-            Log.d(TAG, "🚨 Alert notification: " + title);
-
         } catch (Exception e) {
-            Log.e(TAG, "showAlertNotification error: " + e.getMessage(), e);
+            Log.w(TAG, "updateMonitorNotification error: " + e.getMessage());
         }
     }
 
-    private void showEventNotification(String title, String message) {
+    private void updateMonitorNotificationThrottled() {
+        long now = System.currentTimeMillis();
+        if (now - lastNotificationUpdate < NOTIFICATION_UPDATE_MIN_INTERVAL_MS) {
+            return;
+        }
+        lastNotificationUpdate = now;
+        updateMonitorNotification();
+    }
+
+    private void showAlertNotification(String eventType) {
         try {
-            Intent intent = new Intent(this, UHFMainActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            intent.putExtra("navigate_to", "SecureGate");
+            Intent alertIntent = new Intent(this, UHFMainActivity.class);
+            alertIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            alertIntent.putExtra("open_gate_alerts", true);
 
+            int piFlags = PendingIntent.FLAG_IMMUTABLE
+                    | PendingIntent.FLAG_UPDATE_CURRENT;
             PendingIntent pendingIntent = PendingIntent.getActivity(
-                    this,
-                    (int) System.currentTimeMillis(),
-                    intent,
-                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-            );
+                    this, 100, alertIntent, piFlags);
 
-            Notification notification = new NotificationCompat.Builder(this, CHANNEL_EVENTS)
-                    .setContentTitle(title)
-                    .setContentText(message)
+            Notification notification = new NotificationCompat.Builder(
+                    this, CHANNEL_ALERT)
+                    .setContentTitle("🚨 إنذار أمني")
+                    .setContentText("محاولة خروج غير مصرّح بها")
                     .setSmallIcon(R.drawable.ic_luxury_mira_logo)
                     .setContentIntent(pendingIntent)
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                    .setCategory(NotificationCompat.CATEGORY_EVENT)
                     .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_ALARM)
                     .build();
 
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                int notificationId = 3000 + (int) (System.currentTimeMillis() % 1000);
-                manager.notify(notificationId, notification);
+            NotificationManager nm = (NotificationManager)
+                    getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.notify(NOTIFICATION_ID_ALERT, notification);
             }
-
-            Log.d(TAG, "📋 Event notification: " + title);
-
         } catch (Exception e) {
-            Log.e(TAG, "showEventNotification error: " + e.getMessage(), e);
+            Log.e(TAG, "showAlertNotification error: " + e.getMessage());
+        }
+    }
+
+    private void scheduleSyncNotification() {
+        try {
+            Notification notification = new NotificationCompat.Builder(
+                    this, CHANNEL_SYNC)
+                    .setContentTitle("🔄 مزامنة البوابات")
+                    .setContentText("جارٍ مزامنة البيانات...")
+                    .setSmallIcon(R.drawable.ic_luxury_mira_logo)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .build();
+
+            NotificationManager nm = (NotificationManager)
+                    getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.notify(NOTIFICATION_ID_SYNC, notification);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "scheduleSyncNotification error: " + e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Public static helpers
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * يُشغّل الخدمة بشكل آمن من أي مكان.
+     */
+    public static void startSafely(Context context) {
+        if (context == null) return;
+        try {
+            Intent intent = new Intent(context, MiraGateMonitorService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent);
+            } else {
+                context.startService(intent);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "startSafely error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * يُوقف الخدمة بشكل آمن.
+     */
+    public static void stopSafely(Context context) {
+        if (context == null) return;
+        try {
+            context.stopService(new Intent(context, MiraGateMonitorService.class));
+        } catch (Exception e) {
+            Log.e(TAG, "stopSafely error: " + e.getMessage());
         }
     }
 }
