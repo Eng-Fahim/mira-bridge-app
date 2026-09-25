@@ -79,7 +79,7 @@ public class POSCheckoutDialog extends DialogFragment {
     private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount, tvFinalTotal, tvAccountNumber;
     private EditText etCustomerName, etCustomerPhone, etCustomerEmail, etCustomerAddress, etCustomerNotes, etDiscount;
     private TextInputLayout tilCustomerName, tilCustomerPhone;
-    private Spinner spPaymentMethod;
+    private com.google.android.material.textfield.MaterialAutoCompleteTextView spPaymentMethod;
     private Button btnConfirmCheckout, btnCancelCheckout;
 
     // ═══════════════════════════════════════════════════════════
@@ -334,48 +334,26 @@ public class POSCheckoutDialog extends DialogFragment {
     // setupSpinner
     // ═══════════════════════════════════════════════════════════
     private void setupSpinner() {
-        DiagTracer.mark("D.setupSpinner inside START");
+    if (spPaymentMethod == null || getContext() == null) return;
 
-        if (spPaymentMethod == null) {
-            DiagTracer.mark("D.setupSpinner spPaymentMethod=null → ABORT");
-            return;
-        }
-        if (getContext() == null) {
-            DiagTracer.mark("D.setupSpinner ctx=null → ABORT");
-            return;
-        }
+    String[] methods = isArabic
+            ? new String[]{"💵 نقداً", "💳 بطاقة", "🏦 تحويل بنكي", "⏳ آجل"}
+            : new String[]{"CASH", "CARD", "BANK_TRANSFER", "CREDIT"};
 
-        String[] methods = isArabic
-                ? new String[]{"💵 نقداً", "💳 بطاقة", "🏦 تحويل بنكي", "⏳ آجل"}
-                : new String[]{"CASH", "CARD", "BANK_TRANSFER", "CREDIT"};
+    ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
+            android.R.layout.simple_dropdown_item_1line, methods);
+    spPaymentMethod.setAdapter(adapter);
 
-        DiagTracer.mark("D.setupSpinner building adapter");
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
-                android.R.layout.simple_spinner_item, methods);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    // ✅ MaterialAutoCompleteTextView يستخدم setOnItemClickListener
+    spPaymentMethod.setOnItemClickListener((parent, view, position, id) -> {
+        updateAccountNumber(position);
+    });
 
-        DiagTracer.mark("D.setupSpinner setAdapter");
-        spPaymentMethod.setAdapter(adapter);
-        DiagTracer.mark("D.setupSpinner adapter set");
+    // ✅ نص افتراضي
+    spPaymentMethod.setText(methods[0], false);
 
-        spPaymentMethod.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                DiagTracer.mark("D.spinner onItemSelected pos=" + position);
-                updateAccountNumber(position);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                DiagTracer.mark("D.spinner onNothingSelected");
-            }
-        });
-
-        DiagTracer.mark("D.setupSpinner updateAccountNumber(0)");
-        updateAccountNumber(0);
-
-        DiagTracer.mark("D.setupSpinner inside END");
-    }
+    updateAccountNumber(0);
+}
 
     // ═══════════════════════════════════════════════════════════
     // updateAccountNumber
