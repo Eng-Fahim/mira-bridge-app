@@ -35,6 +35,8 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 
+
+import com.example.uhf.utils.DiagTracer;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 
@@ -275,6 +277,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+    DiagTracer.init(this);
         applySavedTheme();
         super.onCreate(savedInstanceState);
         try {
