@@ -126,16 +126,22 @@ public class POSCheckoutDialog extends DialogFragment {
         return dialog;
     }
 
-    @Override
-    public void onStart() {
-        super.onStart();
+   @Override
+public void onStart() {
+    super.onStart();
+    try {
         if (getDialog() != null && getDialog().getWindow() != null) {
+            // ✅ استخدم MATCH_PARENT بدل WRAP_CONTENT
             getDialog().getWindow().setLayout(
                     (int) (getResources().getDisplayMetrics().widthPixels * 0.92),
-                    WindowManager.LayoutParams.WRAP_CONTENT
+                    WindowManager.LayoutParams.MATCH_PARENT
             );
+            getDialog().getWindow().setDimAmount(0.5f);
         }
+    } catch (Exception e) {
+        Log.e("POSCheckout", "onStart error: " + e.getMessage(), e);
     }
+}
 
     @Nullable
     @Override
@@ -145,14 +151,43 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    Log.e("POSCheckout", "🅰️ onViewCreated START");
+    
+    try {
+        long t0 = System.currentTimeMillis();
+        
         bindViews(view);
+        Log.e("POSCheckout", "🅱️ bindViews done (" 
+                + (System.currentTimeMillis() - t0) + "ms)");
+        
+        long t1 = System.currentTimeMillis();
         applyLanguage();
+        Log.e("POSCheckout", "🅲 applyLanguage done (" 
+                + (System.currentTimeMillis() - t1) + "ms)");
+        
+        long t2 = System.currentTimeMillis();
         setupSpinner();
+        Log.e("POSCheckout", "🅳 setupSpinner done (" 
+                + (System.currentTimeMillis() - t2) + "ms)");
+        
+        long t3 = System.currentTimeMillis();
         setupData();
+        Log.e("POSCheckout", "🅴 setupData done (" 
+                + (System.currentTimeMillis() - t3) + "ms)");
+        
+        long t4 = System.currentTimeMillis();
         setupListeners();
+        Log.e("POSCheckout", "🅵 setupListeners done (" 
+                + (System.currentTimeMillis() - t4) + "ms)");
+        
+        Log.e("POSCheckout", "🅶 onViewCreated COMPLETE (" 
+                + (System.currentTimeMillis() - t0) + "ms total)");
+        
+    } catch (Exception e) {
+        Log.e("POSCheckout", "❌ onViewCreated error: " + e.getMessage(), e);
     }
+}
 
     private void bindViews(View view) {
         tvDialogTitle = view.findViewById(R.id.tvDialogTitle);
