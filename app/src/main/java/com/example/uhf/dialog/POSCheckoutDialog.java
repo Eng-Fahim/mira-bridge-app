@@ -13,11 +13,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -29,15 +27,16 @@ import com.example.uhf.R;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.utils.DiagTracer;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.Locale;
 
 /**
- * POSCheckoutDialog v2.1 — Diagnostic Edition
- * ═══════════════════════════════════════════════════════════════
- * - كل مرحلة موثّقة بـ DiagTracer.mark()
- * - التوستات تظهر على الشاشة لكشف نقطة التعليق
+ * POSCheckoutDialog v2.2 — Fixed Edition
+ * - ✅ MaterialAutoCompleteTextView (بدل Spinner)
+ * - ✅ لا استخدام لـ getSelectedItemPosition()
+ * - ✅ يعمل مع XML الحالي
  */
 public class POSCheckoutDialog extends DialogFragment {
 
@@ -66,7 +65,6 @@ public class POSCheckoutDialog extends DialogFragment {
 
     private static final String ARG_TOTAL_AMOUNT = "total_amount";
     private static final String ARG_ITEM_COUNT = "item_count";
-    private static final String DLOG = "POSCheckout";
 
     private double totalAmount = 0.0;
     private int itemCount = 0;
@@ -79,7 +77,7 @@ public class POSCheckoutDialog extends DialogFragment {
     private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount, tvFinalTotal, tvAccountNumber;
     private EditText etCustomerName, etCustomerPhone, etCustomerEmail, etCustomerAddress, etCustomerNotes, etDiscount;
     private TextInputLayout tilCustomerName, tilCustomerPhone;
-    private com.google.android.material.textfield.MaterialAutoCompleteTextView spPaymentMethod;
+    private MaterialAutoCompleteTextView spPaymentMethod;
     private Button btnConfirmCheckout, btnCancelCheckout;
 
     // ═══════════════════════════════════════════════════════════
@@ -114,7 +112,6 @@ public class POSCheckoutDialog extends DialogFragment {
         if (dismissListener != null) {
             try {
                 dismissListener.onDialogDismissed();
-                DiagTracer.mark("D.onDismiss listener called");
             } catch (Exception e) {
                 DiagTracer.markException("onDismiss listener", e);
             }
@@ -150,19 +147,13 @@ public class POSCheckoutDialog extends DialogFragment {
         }
 
         if (getContext() != null) {
-            DiagTracer.mark("D.onCreate ctx ok — before orgProfile");
             try {
                 orgProfile = MiraOrgProfileManager.getInstance(getContext());
-                DiagTracer.mark("D.onCreate after orgProfile=" + (orgProfile != null));
-            } catch (Exception e) {
-                DiagTracer.markException("orgProfile", e);
-            }
-
-            try {
                 priceManager = MiraPriceManager.getInstance(getContext());
-                DiagTracer.mark("D.onCreate after priceManager=" + (priceManager != null));
+                DiagTracer.mark("D.onCreate managers=" 
+                        + (orgProfile != null) + "/" + (priceManager != null));
             } catch (Exception e) {
-                DiagTracer.markException("priceManager", e);
+                DiagTracer.markException("managers", e);
             }
         } else {
             DiagTracer.mark("D.onCreate ctx=null");
@@ -171,9 +162,6 @@ public class POSCheckoutDialog extends DialogFragment {
         DiagTracer.mark("D.onCreate END");
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // onCreateDialog
-    // ═══════════════════════════════════════════════════════════
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
@@ -182,15 +170,11 @@ public class POSCheckoutDialog extends DialogFragment {
         if (dialog.getWindow() != null) {
             dialog.getWindow().requestFeature(Window.FEATURE_NO_TITLE);
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            DiagTracer.mark("D.onCreateDialog window configured");
         }
         DiagTracer.mark("D.onCreateDialog END");
         return dialog;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // onStart
-    // ═══════════════════════════════════════════════════════════
     @Override
     public void onStart() {
         DiagTracer.mark("D.onStart START");
@@ -202,9 +186,6 @@ public class POSCheckoutDialog extends DialogFragment {
                         WindowManager.LayoutParams.WRAP_CONTENT
                 );
                 getDialog().getWindow().setDimAmount(0.5f);
-                DiagTracer.mark("D.onStart window set WRAP_CONTENT");
-            } else {
-                DiagTracer.mark("D.onStart window=null");
             }
         } catch (Exception e) {
             DiagTracer.markException("onStart window", e);
@@ -212,9 +193,6 @@ public class POSCheckoutDialog extends DialogFragment {
         DiagTracer.mark("D.onStart END");
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // onCreateView
-    // ═══════════════════════════════════════════════════════════
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -231,9 +209,6 @@ public class POSCheckoutDialog extends DialogFragment {
         return v;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // onViewCreated
-    // ═══════════════════════════════════════════════════════════
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         DiagTracer.mark("D.onViewCreated START");
@@ -242,11 +217,7 @@ public class POSCheckoutDialog extends DialogFragment {
         try {
             DiagTracer.mark("D.bindViews before");
             bindViews(view);
-            DiagTracer.mark("D.bindViews after",
-                    "tvItemCount=" + (tvItemCount != null)
-                            + ", tvSubtotal=" + (tvSubtotal != null)
-                            + ", tvFinalTotal=" + (tvFinalTotal != null)
-                            + ", btnConfirm=" + (btnConfirmCheckout != null));
+            DiagTracer.mark("D.bindViews after");
 
             DiagTracer.mark("D.applyLanguage before");
             applyLanguage();
@@ -271,9 +242,6 @@ public class POSCheckoutDialog extends DialogFragment {
         DiagTracer.mark("D.onViewCreated END");
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // bindViews
-    // ═══════════════════════════════════════════════════════════
     private void bindViews(View view) {
         tvDialogTitle = view.findViewById(R.id.tvDialogTitle);
         tvItemCount = view.findViewById(R.id.tvItemCount);
@@ -297,9 +265,6 @@ public class POSCheckoutDialog extends DialogFragment {
         btnConfirmCheckout = view.findViewById(R.id.btnConfirmCheckout);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // applyLanguage
-    // ═══════════════════════════════════════════════════════════
     private void applyLanguage() {
         if (tvDialogTitle != null) {
             tvDialogTitle.setText(isArabic ? "إتمام عملية البيع" : "Complete Sale");
@@ -330,34 +295,25 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // setupSpinner
-    // ═══════════════════════════════════════════════════════════
     private void setupSpinner() {
-    if (spPaymentMethod == null || getContext() == null) return;
+        if (spPaymentMethod == null || getContext() == null) return;
 
-    String[] methods = isArabic
-            ? new String[]{"💵 نقداً", "💳 بطاقة", "🏦 تحويل بنكي", "⏳ آجل"}
-            : new String[]{"CASH", "CARD", "BANK_TRANSFER", "CREDIT"};
+        String[] methods = isArabic
+                ? new String[]{"💵 نقداً", "💳 بطاقة", "🏦 تحويل بنكي", "⏳ آجل"}
+                : new String[]{"CASH", "CARD", "BANK_TRANSFER", "CREDIT"};
 
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
-            android.R.layout.simple_dropdown_item_1line, methods);
-    spPaymentMethod.setAdapter(adapter);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
+                android.R.layout.simple_dropdown_item_1line, methods);
+        spPaymentMethod.setAdapter(adapter);
 
-    // ✅ MaterialAutoCompleteTextView يستخدم setOnItemClickListener
-    spPaymentMethod.setOnItemClickListener((parent, view, position, id) -> {
-        updateAccountNumber(position);
-    });
+        spPaymentMethod.setOnItemClickListener((parent, view, position, id) -> {
+            updateAccountNumber(position);
+        });
 
-    // ✅ نص افتراضي
-    spPaymentMethod.setText(methods[0], false);
+        spPaymentMethod.setText(methods[0], false);
+        updateAccountNumber(0);
+    }
 
-    updateAccountNumber(0);
-}
-
-    // ═══════════════════════════════════════════════════════════
-    // updateAccountNumber
-    // ═══════════════════════════════════════════════════════════
     private void updateAccountNumber(int position) {
         if (tvAccountNumber == null) return;
 
@@ -383,43 +339,32 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // getCurrentAccountCode
-    // ═══════════════════════════════════════════════════════════
-    private String getCurrentAccountCode() {
-        if (spPaymentMethod == null || spPaymentMethod.getSelectedItemPosition() < 0) {
-            return "110101";
+    /**
+     * ✅ استخراج payment method من النص الظاهر (MaterialAutoCompleteTextView)
+     */
+    private String getCurrentPaymentMethod() {
+        if (spPaymentMethod == null || spPaymentMethod.getText() == null) {
+            return "CASH";
         }
+        String text = spPaymentMethod.getText().toString();
+        if (text.contains("CARD") || text.contains("بطاقة")) return "CARD";
+        if (text.contains("BANK") || text.contains("تحويل")) return "BANK_TRANSFER";
+        if (text.contains("CREDIT") || text.contains("آجل")) return "CREDIT";
+        return "CASH";
+    }
 
-        int position = spPaymentMethod.getSelectedItemPosition();
-        switch (position) {
-            case 0: return "110101";
-            case 1: return "110201";
-            case 2: return "110202";
-            case 3: return "110301";
+    private String getCurrentAccountCode() {
+        String method = getCurrentPaymentMethod();
+        switch (method) {
+            case "CARD": return "110201";
+            case "BANK_TRANSFER": return "110202";
+            case "CREDIT": return "110301";
             default: return "110101";
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // getEnglishPaymentMethod
-    // ═══════════════════════════════════════════════════════════
-    private String getEnglishPaymentMethod(int position) {
-        switch (position) {
-            case 0: return "CASH";
-            case 1: return "CARD";
-            case 2: return "BANK_TRANSFER";
-            case 3: return "CREDIT";
-            default: return "CASH";
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // setupData
-    // ═══════════════════════════════════════════════════════════
     private void setupData() {
-        DiagTracer.mark("D.setupData inside START",
-                "itemCount=" + itemCount + ", totalAmount=" + totalAmount);
+        DiagTracer.mark("D.setupData inside START");
 
         if (tvItemCount != null) {
             String text = isArabic
@@ -427,8 +372,6 @@ public class POSCheckoutDialog extends DialogFragment {
                     : String.format(Locale.getDefault(), "%d items", itemCount);
             tvItemCount.setText(text);
             DiagTracer.mark("D.setupData tvItemCount set", text);
-        } else {
-            DiagTracer.mark("D.setupData tvItemCount=null");
         }
 
         DiagTracer.mark("D.setupData calling updateFinalAmount");
@@ -436,9 +379,6 @@ public class POSCheckoutDialog extends DialogFragment {
         DiagTracer.mark("D.setupData inside END");
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // validateInputs
-    // ═══════════════════════════════════════════════════════════
     private boolean validateInputs() {
         boolean isValid = true;
 
@@ -473,9 +413,6 @@ public class POSCheckoutDialog extends DialogFragment {
         return isValid;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // setupListeners
-    // ═══════════════════════════════════════════════════════════
     private void setupListeners() {
         if (etDiscount != null) {
             etDiscount.addTextChangedListener(new TextWatcher() {
@@ -483,7 +420,6 @@ public class POSCheckoutDialog extends DialogFragment {
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    // ⚠️ لا نُضيف DiagTracer هنا (يُستدعى كثيراً)
                     updateFinalAmount();
                 }
                 @Override
@@ -503,7 +439,6 @@ public class POSCheckoutDialog extends DialogFragment {
                 DiagTracer.mark("D.btnConfirm clicked");
 
                 if (!validateInputs()) {
-                    DiagTracer.mark("D.btnConfirm validation failed");
                     return;
                 }
 
@@ -520,9 +455,8 @@ public class POSCheckoutDialog extends DialogFragment {
                 if (etCustomerNotes != null)
                     data.customerNotes = etCustomerNotes.getText().toString().trim();
 
-                int paymentPosition = spPaymentMethod != null
-                        ? spPaymentMethod.getSelectedItemPosition() : 0;
-                data.paymentMethod = getEnglishPaymentMethod(paymentPosition);
+                // ✅ استخراج من النص (ليس من position)
+                data.paymentMethod = getCurrentPaymentMethod();
                 data.accountCode = getCurrentAccountCode();
 
                 if (priceManager != null) {
@@ -541,24 +475,15 @@ public class POSCheckoutDialog extends DialogFragment {
                 data.discountAmount = totalAmount * (data.discount / 100.0);
                 data.finalAmount = totalAmount - data.discountAmount;
 
-                DiagTracer.mark("D.btnConfirm dismiss",
-                        "final=" + data.finalAmount);
-
                 dismissAllowingStateLoss();
 
                 if (listener != null) {
-                    DiagTracer.mark("D.btnConfirm calling listener");
                     listener.onCheckout(data);
-                } else {
-                    DiagTracer.mark("D.btnConfirm listener=null!");
                 }
             });
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // updateFinalAmount
-    // ═══════════════════════════════════════════════════════════
     private void updateFinalAmount() {
         DiagTracer.mark("D.updateFinalAmount START");
 
@@ -580,27 +505,18 @@ public class POSCheckoutDialog extends DialogFragment {
         double discountAmount = totalAmount * (discountPercent / 100.0);
         double finalAmount = totalAmount - discountAmount;
 
-        DiagTracer.mark("D.updateFinalAmount calc",
-                "total=" + totalAmount + ", disc=" + discountAmount 
-                        + ", final=" + finalAmount);
-
         try {
             if (tvSubtotal != null) {
-                DiagTracer.mark("D.updateFinalAmount before formatPriceDefault(subtotal)");
                 String s = priceManager.formatPriceDefault(totalAmount);
                 tvSubtotal.setText(s);
-                DiagTracer.mark("D.updateFinalAmount tvSubtotal set", s);
             }
             if (tvDiscountAmount != null) {
                 String s = priceManager.formatPriceDefault(discountAmount);
                 tvDiscountAmount.setText(s);
-                DiagTracer.mark("D.updateFinalAmount tvDiscountAmount set", s);
             }
             if (tvFinalTotal != null) {
-                DiagTracer.mark("D.updateFinalAmount before formatPriceDefault(final)");
                 String s = priceManager.formatPriceDefault(finalAmount);
                 tvFinalTotal.setText(s);
-                DiagTracer.mark("D.updateFinalAmount tvFinalTotal set", s);
             }
         } catch (Exception e) {
             DiagTracer.markException("updateFinalAmount format", e);
