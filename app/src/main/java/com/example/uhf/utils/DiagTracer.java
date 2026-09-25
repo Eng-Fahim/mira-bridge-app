@@ -26,7 +26,7 @@ import java.util.List;
 public final class DiagTracer {
 
     private static final String TAG = "DiagTracer";
-    private static final boolean ENABLED = true;   // ✅ فعّله للتشخيص
+    private static final boolean ENABLED = false;   // ✅ فعّله للتشخيص
 
     private static Context appContext;
     private static final long START_TIME = SystemClock.uptimeMillis();
