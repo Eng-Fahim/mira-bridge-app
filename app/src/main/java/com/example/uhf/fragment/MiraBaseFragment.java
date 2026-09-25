@@ -1,4 +1,4 @@
-lpackage com.example.uhf.fragment;
+package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.DialogInterface;
