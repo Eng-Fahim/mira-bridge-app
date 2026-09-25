@@ -5,7 +5,6 @@ import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.util.Log;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -127,17 +126,19 @@ public class POSCheckoutDialog extends DialogFragment {
         return dialog;
     }
 
-   @Override
+    @Override
 public void onStart() {
     super.onStart();
     try {
         if (getDialog() != null && getDialog().getWindow() != null) {
-            // ✅ استخدم MATCH_PARENT بدل WRAP_CONTENT
-            getDialog().getWindow().setLayout(
+            Window window = getDialog().getWindow();
+            window.setLayout(
                     (int) (getResources().getDisplayMetrics().widthPixels * 0.92),
-                    WindowManager.LayoutParams.MATCH_PARENT
+                    WindowManager.LayoutParams.WRAP_CONTENT   // ← من MATCH_PARENT
             );
-            getDialog().getWindow().setDimAmount(0.5f);
+            window.setDimAmount(0.5f);
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            Log.e("POSCheckout", "✅ Window set: WRAP_CONTENT");
         }
     } catch (Exception e) {
         Log.e("POSCheckout", "onStart error: " + e.getMessage(), e);
@@ -152,43 +153,14 @@ public void onStart() {
     }
 
     @Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    Log.e("POSCheckout", "🅰️ onViewCreated START");
-    
-    try {
-        long t0 = System.currentTimeMillis();
-        
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         bindViews(view);
-        Log.e("POSCheckout", "🅱️ bindViews done (" 
-                + (System.currentTimeMillis() - t0) + "ms)");
-        
-        long t1 = System.currentTimeMillis();
         applyLanguage();
-        Log.e("POSCheckout", "🅲 applyLanguage done (" 
-                + (System.currentTimeMillis() - t1) + "ms)");
-        
-        long t2 = System.currentTimeMillis();
         setupSpinner();
-        Log.e("POSCheckout", "🅳 setupSpinner done (" 
-                + (System.currentTimeMillis() - t2) + "ms)");
-        
-        long t3 = System.currentTimeMillis();
         setupData();
-        Log.e("POSCheckout", "🅴 setupData done (" 
-                + (System.currentTimeMillis() - t3) + "ms)");
-        
-        long t4 = System.currentTimeMillis();
         setupListeners();
-        Log.e("POSCheckout", "🅵 setupListeners done (" 
-                + (System.currentTimeMillis() - t4) + "ms)");
-        
-        Log.e("POSCheckout", "🅶 onViewCreated COMPLETE (" 
-                + (System.currentTimeMillis() - t0) + "ms total)");
-        
-    } catch (Exception e) {
-        Log.e("POSCheckout", "❌ onViewCreated error: " + e.getMessage(), e);
     }
-}
 
     private void bindViews(View view) {
         tvDialogTitle = view.findViewById(R.id.tvDialogTitle);
@@ -319,13 +291,26 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     }
 
     private void setupData() {
-        if (tvItemCount != null) {
-            tvItemCount.setText(isArabic
-                    ? String.format(Locale.getDefault(), "%d قطعة", itemCount)
-                    : String.format(Locale.getDefault(), "%d items", itemCount));
-        }
-        updateFinalAmount();
+    Log.e("POSCheckout", "═══════════════════════════════════");
+    Log.e("POSCheckout", "📊 setupData:");
+    Log.e("POSCheckout", "   itemCount = " + itemCount);
+    Log.e("POSCheckout", "   totalAmount = " + totalAmount);
+    Log.e("POSCheckout", "   priceManager = " + (priceManager != null));
+    Log.e("POSCheckout", "   tvItemCount = " + (tvItemCount != null));
+    Log.e("POSCheckout", "   tvSubtotal = " + (tvSubtotal != null));
+    Log.e("POSCheckout", "   tvFinalTotal = " + (tvFinalTotal != null));
+    
+    if (tvItemCount != null) {
+        String text = isArabic
+                ? String.format(Locale.getDefault(), "%d قطعة", itemCount)
+                : String.format(Locale.getDefault(), "%d items", itemCount);
+        tvItemCount.setText(text);
+        Log.e("POSCheckout", "   ✅ tvItemCount = \"" + text + "\"");
     }
+    
+    updateFinalAmount();
+    Log.e("POSCheckout", "═══════════════════════════════════");
+}
 
     private boolean validateInputs() {
         boolean isValid = true;
@@ -406,25 +391,40 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     }
 
     private void updateFinalAmount() {
-        double discountPercent = 0.0;
-        if (etDiscount != null) {
-            String val = etDiscount.getText().toString().trim();
-            if (!val.isEmpty()) {
-                try { discountPercent = Double.parseDouble(val); } catch (Exception ignored) {}
-            }
-        }
-
-        double discountAmount = totalAmount * (discountPercent / 100.0);
-        double finalAmount = totalAmount - discountAmount;
-
-        if (tvSubtotal != null) {
-            tvSubtotal.setText(priceManager.formatPriceDefault(totalAmount));
-        }
-        if (tvDiscountAmount != null) {
-            tvDiscountAmount.setText(priceManager.formatPriceDefault(discountAmount));
-        }
-        if (tvFinalTotal != null) {
-            tvFinalTotal.setText(priceManager.formatPriceDefault(finalAmount));
+    Log.e("POSCheckout", "💵 updateFinalAmount:");
+    Log.e("POSCheckout", "   totalAmount = " + totalAmount);
+    Log.e("POSCheckout", "   priceManager = " + (priceManager != null));
+    
+    if (priceManager == null) {
+        Log.e("POSCheckout", "   ❌ priceManager is NULL — ABORT!");
+        return;
+    }
+    
+    double discountPercent = 0.0;
+    if (etDiscount != null) {
+        String val = etDiscount.getText().toString().trim();
+        if (!val.isEmpty()) {
+            try { discountPercent = Double.parseDouble(val); } catch (Exception ignored) {}
         }
     }
+
+    double discountAmount = totalAmount * (discountPercent / 100.0);
+    double finalAmount = totalAmount - discountAmount;
+
+    try {
+        String subtotalStr = priceManager.formatPriceDefault(totalAmount);
+        String discountStr = priceManager.formatPriceDefault(discountAmount);
+        String finalStr = priceManager.formatPriceDefault(finalAmount);
+        
+        Log.e("POSCheckout", "   subtotalStr = " + subtotalStr);
+        Log.e("POSCheckout", "   discountStr = " + discountStr);
+        Log.e("POSCheckout", "   finalStr = " + finalStr);
+        
+        if (tvSubtotal != null) tvSubtotal.setText(subtotalStr);
+        if (tvDiscountAmount != null) tvDiscountAmount.setText(discountStr);
+        if (tvFinalTotal != null) tvFinalTotal.setText(finalStr);
+    } catch (Exception e) {
+        Log.e("POSCheckout", "   ❌ formatPriceDefault error: " + e.getMessage(), e);
+    }
+}
 }
