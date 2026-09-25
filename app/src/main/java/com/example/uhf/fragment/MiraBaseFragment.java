@@ -1,4 +1,4 @@
-package com.example.uhf.fragment;
+lpackage com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.DialogInterface;
@@ -56,7 +56,7 @@ public abstract class MiraBaseFragment extends Fragment {
             Log.e(TAG, "dialogHelper init error: " + e.getMessage());
         }
         
-        setupAutoHideKeyboard(view);
+        //setupAutoHideKeyboard(view);
     }
 
     // ==================== اتجاه اللغة ====================
