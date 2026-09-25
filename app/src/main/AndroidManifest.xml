@@ -170,16 +170,25 @@
     android:foregroundServiceType="dataSync|connectedDevice"
     android:stopWithTask="false" />
     
-<!-- ==================== مستقبل أحداث البوابات ==================== -->
+    <!-- ==================== مستقبل أحداث البوابات ==================== -->
 <receiver
     android:name=".receiver.GateEventReceiver"
     android:exported="false"
     android:enabled="true">
+
+    <!-- أحداث البوابة (من MiraSecureGateFragment) -->
     <intent-filter>
         <action android:name="com.example.uhf.GATE_EVENT" />
         <action android:name="com.example.uhf.GATE_ALERT" />
         <action android:name="com.example.uhf.GATE_SYNC" />
     </intent-filter>
+
+    <!-- أحداث البيع/الإرجاع (من GateSaleBridge) -->
+    <intent-filter>
+        <action android:name="com.mira.gate.SALE_COMPLETED" />
+        <action android:name="com.mira.gate.REFUND_COMPLETED" />
+    </intent-filter>
+
 </receiver>
         <!-- ==================== مستقبل زر الزناد Chainway ==================== -->
         <receiver
