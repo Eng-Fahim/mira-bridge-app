@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.DiffUtil;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -31,7 +32,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
@@ -55,25 +55,51 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * MiraSecureGateFragment v2.0 — الأداء المُحسَّن
+ *
+ * ✅ التحسينات v2.0:
+ *  1. gateExecutor = 8 threads (بدل 4)
+ *  2. Scheduler واحد (بدل 2)
+ *  3. Exponential Backoff للـ Polling
+ *  4. Adaptive Ping
+ *  5. DiffUtil للـ RecyclerView
+ *  6. Debounce لـ loadAllGatesStatus
+ *  7. Batch Logging (300ms)
+ *  8. حماية كاملة من RejectedExecution
+ *  9. Cleanup شامل في onDestroyView
+ *  10. مراقبة اتصال ذكية
+ */
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MiraSecureGateFragment extends Fragment {
 
     private static final String TAG = "MiraSecureGate";
     private static final long SCAN_COOL_DOWN_MS = 2500;
     private static final int API_TIMEOUT_SECONDS = 5;
-    private static final int MONITOR_INTERVAL_SECONDS = 5;
-    private static final int PING_INTERVAL_SECONDS = 10;
-    private volatile boolean isCameraOpen = false;
+    private static final long LOG_BATCH_INTERVAL_MS = 300;
+    private static final long STATUS_DEBOUNCE_MS = 2000;
+    private static final long ALLOWED_CACHE_REFRESH_MS = 5 * 60_000;
 
+    // ⭐ Backoff settings
+    private static final long POLL_INITIAL_MS = 5_000;
+    private static final long POLL_MAX_MS = 60_000;
+    private static final long PING_INITIAL_MS = 10_000;
+    private static final long PING_MAX_MS = 60_000;
+
+    private volatile boolean isCameraOpen = false;
     private OfflineGateCache offlineCache;
     private volatile boolean isOnline = true;
 
@@ -81,19 +107,35 @@ public class MiraSecureGateFragment extends Fragment {
     private MiraGatesSettings miraGatesSettings;
     private PermissionManager permissionManager;
     private MiraBranchesManager branchesManager;
-    
+
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ExecutorService gateExecutor;
-    private ScheduledExecutorService monitorScheduler;
-    private ScheduledExecutorService pingScheduler;
-    
-    // إدارة الفروع
+    private ScheduledExecutorService scheduler;
+
+    // ⭐ Scheduled Futures
+    private ScheduledFuture<?> pollFuture;
+    private ScheduledFuture<?> pingFuture;
+
+    // ⭐ Backoff counters
+    private volatile long currentPollInterval = POLL_INITIAL_MS;
+    private volatile long currentPingInterval = PING_INITIAL_MS;
+    private volatile int consecutivePollFailures = 0;
+    private volatile int consecutivePingFailures = 0;
+
+    // ⭐ Debounce
+    private final AtomicBoolean statusLoadInProgress = new AtomicBoolean(false);
+    private volatile long lastAllowedCacheRefresh = 0;
+
+    // ⭐ Batch logging
+    private final StringBuilder logBuffer = new StringBuilder();
+    private final AtomicBoolean logFlushScheduled = new AtomicBoolean(false);
+
     private int currentBranchId = 0;
     private boolean isGlobalAdmin = false;
     private Spinner spBranchSelector;
     private TextView tvCurrentBranch;
-    private List<BranchInfo> branchesList = new ArrayList<>();
-    
+    private final List<BranchInfo> branchesList = new ArrayList<>();
+
     private RecyclerView rvGatesMonitor;
     private GateMonitorAdapter monitorAdapter;
     private final List<GateMonitorItem> monitorList = new ArrayList<>();
@@ -109,10 +151,10 @@ public class MiraSecureGateFragment extends Fragment {
     private Button btnSimulateAllowed, btnSimulateDenied;
     private Button btnScanBarcode, btnEmergencyLockdown, btnClearConsole;
     private Button btnFilterAll, btnFilterAlerts, btnFilterPass;
-    
+
     private String soldEpc = "", soldTitle = "";
     private String unsoldEpc = "", unsoldTitle = "";
-    
+
     private volatile boolean isDestroyed = false;
     private volatile boolean isScanning = false;
     private volatile boolean isLockdown = false;
@@ -123,102 +165,31 @@ public class MiraSecureGateFragment extends Fragment {
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
     private boolean isArabic = true;
 
-    private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
-    new ScanContract(),
-    result -> {
-        if (gateExecutor == null || gateExecutor.isShutdown()) return;
-        
-        gateExecutor.execute(() -> {
-            try {
-                Thread.sleep(300);
-            } catch (InterruptedException ignored) {}
+    // ==================== Activity Result Launcher ====================
 
-            mainHandler.post(() -> {
-                isCameraOpen = false;
-                
-                if (result.getContents() != null && !isDestroyed && isAdded()) {
-                    final String scannedCode = result.getContents().trim();
-                    
-                    // ✅ نقل processInputEpc إلى background
-                    gateExecutor.execute(() -> {
-                        processInputEpcBackground(scannedCode, "CAMERA");
-                    });
-                }
-                
-                if (!isLockdown && !isDestroyed && isAdded()) {
-                    autoStartScanning();
-                }
+    private final ActivityResultLauncher<ScanOptions> barcodeLauncher =
+            registerForActivityResult(new ScanContract(), result -> {
+                if (isDestroyed || !isAdded()) return;
+
+                mainHandler.post(() -> {
+                    isCameraOpen = false;
+                    if (result != null && result.getContents() != null && !isDestroyed && isAdded()) {
+                        final String scannedCode = result.getContents().trim();
+                        executeOnGateExecutor(() -> processInputEpcBackground(scannedCode, "CAMERA"));
+                    }
+
+                    if (!isLockdown && !isDestroyed && isAdded()) {
+                        autoStartScanning();
+                    }
+                });
             });
-        });
-    }
-);
-
-/**
- * ✅ نسخة background من processInputEpc
- */
-private void processInputEpcBackground(String epc, String sourceType) {
-    if (isDestroyed || epc == null || epc.trim().isEmpty()) return;
-    
-    final String cleanedEpc = epc.trim().toUpperCase();
-    
-    long now = System.currentTimeMillis();
-    Long last = scanDebounceMap.putIfAbsent(cleanedEpc, now);
-    if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
-    scanDebounceMap.put(cleanedEpc, now);
-    
-    logConsole(getLocalizedText("📡 [", "📡 [") + sourceType 
-        + getLocalizedText("] فحص: ", "] Scan: ") + cleanedEpc);
-    
-    // ✅ قراءة Disk I/O على background الآن
-    if (offlineCache != null && offlineCache.isAllowedLocally(cleanedEpc)) {
-        mainHandler.post(() -> {
-            if (isAdded() && !isDestroyed) {
-                handleGateDecision(true, 
-                    getLocalizedText("قطعة مصرح بها (محلي)", "Authorized item (local)"), 
-                    cleanedEpc);
-            }
-        });
-        return;
-    }
-    
-    if (!isOnline) {
-        logConsole(getLocalizedText("⚠️ بدون إنترنت - رفض أمني فوري", 
-            "⚠️ Offline - immediate security denial"));
-        mainHandler.post(() -> {
-            if (isAdded() && !isDestroyed) {
-                handleGateDecision(false, getLocalizedText("بدون إنترنت", "Offline"), cleanedEpc);
-                if (offlineCache != null) {
-                    offlineCache.saveOfflineEvent(cleanedEpc, false, 
-                        getLocalizedText("بدون إنترنت", "Offline"), "local");
-                }
-            }
-        });
-        return;
-    }
-    
-    queryMiraGateServer(cleanedEpc);
-}
-
-/**
- * ✅ النسخة القديمة — نُبقيها للتوافق مع RFID callback
- */
-private void processInputEpc(String epc, String sourceType) {
-    // ✅ أعد التوجيه إلى background مباشرة
-    if (gateExecutor != null && !gateExecutor.isShutdown()) {
-        final String finalEpc = epc;
-        final String finalSource = sourceType;
-        gateExecutor.execute(() -> processInputEpcBackground(finalEpc, finalSource));
-    } else {
-        processInputEpcBackground(epc, sourceType);
-    }
-}
 
     // ==================== Helper Methods ====================
-    
+
     private String getLocalizedText(String arabic, String english) {
         return isArabic ? arabic : english;
     }
-    
+
     private int getColorFromTheme(int attrRes, int fallbackColor) {
         try {
             TypedValue typedValue = new TypedValue();
@@ -231,26 +202,46 @@ private void processInputEpc(String epc, String sourceType) {
         }
         return fallbackColor;
     }
-    
+
     private int getSuccessColor() {
         return getColorFromTheme(com.google.android.material.R.attr.colorPrimary, Color.parseColor("#10B981"));
     }
-    
+
     private int getDangerColor() {
         return getColorFromTheme(com.google.android.material.R.attr.colorError, Color.parseColor("#EF4444"));
     }
-    
+
     private int getWarningColor() {
         return getColorFromTheme(com.google.android.material.R.attr.colorSecondary, Color.parseColor("#F59E0B"));
     }
-    
+
     private int getTextColor() {
         return getColorFromTheme(com.google.android.material.R.attr.colorOnSurface, Color.WHITE);
     }
-    
+
     private int getSecondaryTextColor() {
         return getColorFromTheme(com.google.android.material.R.attr.colorOnSurfaceVariant, Color.GRAY);
     }
+
+    /**
+     * ⭐ تنفيذ آمن على gateExecutor
+     */
+    private void executeOnGateExecutor(Runnable task) {
+        try {
+            ExecutorService exec = gateExecutor;
+            if (exec != null && !exec.isShutdown() && !exec.isTerminated()) {
+                exec.execute(task);
+            } else {
+                Log.w(TAG, "gateExecutor is shut down, skipping task");
+            }
+        } catch (RejectedExecutionException e) {
+            Log.w(TAG, "Task rejected: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "executeOnGateExecutor error: " + e.getMessage(), e);
+        }
+    }
+
+    // ==================== Lifecycle ====================
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -260,20 +251,19 @@ private void processInputEpc(String epc, String sourceType) {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
+
         Context context = getContext();
         isArabic = context != null && Locale.getDefault().getLanguage().equals("ar");
-        
+
         initializeComponents();
         initViews(view);
         setupListeners();
-        
+
         startMonitoring();
-        startPingMonitor();
         loadTestEpcs();
         autoStartScanning();
         startBackgroundService();
-        
+
         updateSystemStatus(true);
         logConsole(getLocalizedText("🚀 تم تفعيل مركز القيادة الأمنية", "🚀 SECURITY COMMAND CENTER ACTIVATED"));
     }
@@ -281,7 +271,7 @@ private void processInputEpc(String epc, String sourceType) {
     private void initializeComponents() {
         Context context = getContext();
         if (context == null) return;
-        
+
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
         }
@@ -290,53 +280,60 @@ private void processInputEpc(String epc, String sourceType) {
         permissionManager = PermissionManager.getInstance(context);
         branchesManager = MiraBranchesManager.getInstance(context);
         vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
-        gateExecutor = Executors.newFixedThreadPool(4);
+
+        // ⭐ 8 threads بدل 4
+        gateExecutor = Executors.newFixedThreadPool(8, r -> {
+            Thread t = new Thread(r, "MiraGate-Worker");
+            t.setDaemon(true);
+            t.setPriority(Thread.NORM_PRIORITY - 1);
+            return t;
+        });
+
         isDestroyed = false;
-        
         loadCurrentBranchInfo();
     }
 
     private void initViews(View view) {
-    rvGatesMonitor = view.findViewById(R.id.rvGatesMonitor);
-    tvPassCount = view.findViewById(R.id.tvPassCount);
-    tvDenyCount = view.findViewById(R.id.tvDenyCount);
-    tvTotalCount = view.findViewById(R.id.tvTotalCount);
-    tvDebugConsole = view.findViewById(R.id.tvDebugConsole);
-    scrollDebugLog = view.findViewById(R.id.scrollDebugLog);
-    overlayAlarm = view.findViewById(R.id.overlayAlarm);
-    tvOverlayTitle = view.findViewById(R.id.tvOverlayTitle);
-    tvOverlayDetails = view.findViewById(R.id.tvOverlayDetails);
-    tvPingLatency = view.findViewById(R.id.tvPingLatency);
-    tvSystemStatus = view.findViewById(R.id.tvSystemStatus);
-    tvLiveTickerText = view.findViewById(R.id.tvLiveTickerText);
-    pbRiskMeter = view.findViewById(R.id.pbRiskMeter);
-    tvRiskPercentage = view.findViewById(R.id.tvRiskPercentage);
-    btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
-    btnToggleScan = view.findViewById(R.id.btnToggleScan);
-    btnSimulateAllowed = view.findViewById(R.id.btnSimulateAllowed);
-    btnSimulateDenied = view.findViewById(R.id.btnSimulateDenied);
-    btnScanBarcode = view.findViewById(R.id.btnScanBarcode);
-    btnEmergencyLockdown = view.findViewById(R.id.btnEmergencyLockdown);
-    btnClearConsole = view.findViewById(R.id.btnClearConsole);
-    btnFilterAll = view.findViewById(R.id.btnFilterAll);
-    btnFilterAlerts = view.findViewById(R.id.btnFilterAlerts);
-    btnFilterPass = view.findViewById(R.id.btnFilterPass);
-    
-    spBranchSelector = view.findViewById(R.id.spBranchSelector);
-    tvCurrentBranch = view.findViewById(R.id.tvCurrentBranch);
-    
-    if (rvGatesMonitor != null) {
-        // ✅ استخدام GridLayoutManager لعرض البوابات في شبكة (عمودين)
-        rvGatesMonitor.setLayoutManager(new GridLayoutManager(getContext(), 2));
-        monitorAdapter = new GateMonitorAdapter(monitorList);
-        rvGatesMonitor.setAdapter(monitorAdapter);
+        rvGatesMonitor = view.findViewById(R.id.rvGatesMonitor);
+        tvPassCount = view.findViewById(R.id.tvPassCount);
+        tvDenyCount = view.findViewById(R.id.tvDenyCount);
+        tvTotalCount = view.findViewById(R.id.tvTotalCount);
+        tvDebugConsole = view.findViewById(R.id.tvDebugConsole);
+        scrollDebugLog = view.findViewById(R.id.scrollDebugLog);
+        overlayAlarm = view.findViewById(R.id.overlayAlarm);
+        tvOverlayTitle = view.findViewById(R.id.tvOverlayTitle);
+        tvOverlayDetails = view.findViewById(R.id.tvOverlayDetails);
+        tvPingLatency = view.findViewById(R.id.tvPingLatency);
+        tvSystemStatus = view.findViewById(R.id.tvSystemStatus);
+        tvLiveTickerText = view.findViewById(R.id.tvLiveTickerText);
+        pbRiskMeter = view.findViewById(R.id.pbRiskMeter);
+        tvRiskPercentage = view.findViewById(R.id.tvRiskPercentage);
+        btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
+        btnToggleScan = view.findViewById(R.id.btnToggleScan);
+        btnSimulateAllowed = view.findViewById(R.id.btnSimulateAllowed);
+        btnSimulateDenied = view.findViewById(R.id.btnSimulateDenied);
+        btnScanBarcode = view.findViewById(R.id.btnScanBarcode);
+        btnEmergencyLockdown = view.findViewById(R.id.btnEmergencyLockdown);
+        btnClearConsole = view.findViewById(R.id.btnClearConsole);
+        btnFilterAll = view.findViewById(R.id.btnFilterAll);
+        btnFilterAlerts = view.findViewById(R.id.btnFilterAlerts);
+        btnFilterPass = view.findViewById(R.id.btnFilterPass);
+
+        spBranchSelector = view.findViewById(R.id.spBranchSelector);
+        tvCurrentBranch = view.findViewById(R.id.tvCurrentBranch);
+
+        if (rvGatesMonitor != null) {
+            rvGatesMonitor.setLayoutManager(new GridLayoutManager(getContext(), 2));
+            // ⭐ DiffUtil
+            monitorAdapter = new GateMonitorAdapter();
+            rvGatesMonitor.setAdapter(monitorAdapter);
+        }
     }
-}
 
     private void setupListeners() {
         if (btnStopAlarm != null) btnStopAlarm.setOnClickListener(v -> stopAlarm());
         if (btnToggleScan != null) btnToggleScan.setOnClickListener(v -> toggleScanning());
-        
+
         if (btnSimulateAllowed != null) {
             btnSimulateAllowed.setOnClickListener(v -> {
                 if (!soldEpc.isEmpty()) queryMiraGateServer(soldEpc);
@@ -358,7 +355,7 @@ private void processInputEpc(String epc, String sourceType) {
                         options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
                         options.setBeepEnabled(false);
                         options.setOrientationLocked(true);
-                        
+
                         try {
                             barcodeLauncher.launch(options);
                         } catch (Exception e) {
@@ -372,24 +369,24 @@ private void processInputEpc(String epc, String sourceType) {
         }
 
         if (btnEmergencyLockdown != null) btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
-        
+
         if (btnClearConsole != null) {
             btnClearConsole.setOnClickListener(v -> {
                 if (tvDebugConsole != null) tvDebugConsole.setText("");
             });
         }
-        
-        if (btnFilterAll != null) btnFilterAll.setOnClickListener(v -> { 
-            logFilter = "ALL"; 
-            logConsole(getLocalizedText("🔍 فلتر: الكل", "🔍 Filter: All")); 
+
+        if (btnFilterAll != null) btnFilterAll.setOnClickListener(v -> {
+            logFilter = "ALL";
+            logConsole(getLocalizedText("🔍 فلتر: الكل", "🔍 Filter: All"));
         });
-        if (btnFilterAlerts != null) btnFilterAlerts.setOnClickListener(v -> { 
-            logFilter = "ALERTS"; 
-            logConsole(getLocalizedText("🔍 فلتر: الإنذارات", "🔍 Filter: Alerts")); 
+        if (btnFilterAlerts != null) btnFilterAlerts.setOnClickListener(v -> {
+            logFilter = "ALERTS";
+            logConsole(getLocalizedText("🔍 فلتر: الإنذارات", "🔍 Filter: Alerts"));
         });
-        if (btnFilterPass != null) btnFilterPass.setOnClickListener(v -> { 
-            logFilter = "PASS"; 
-            logConsole(getLocalizedText("🔍 فلتر: المقبول", "🔍 Filter: Pass")); 
+        if (btnFilterPass != null) btnFilterPass.setOnClickListener(v -> {
+            logFilter = "PASS";
+            logConsole(getLocalizedText("🔍 فلتر: المقبول", "🔍 Filter: Pass"));
         });
     }
 
@@ -399,24 +396,24 @@ private void processInputEpc(String epc, String sourceType) {
         }
     }
 
-    // ==================== إدارة الفروع ====================
-    
+    // ==================== Branch Management ====================
+
     private void loadCurrentBranchInfo() {
         try {
             Context context = getContext();
             if (context == null) return;
-            
+
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            isGlobalAdmin = permissionManager != null && 
-                (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
-            
+            isGlobalAdmin = permissionManager != null &&
+                    (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
+
             mainHandler.post(() -> {
+                if (isDestroyed || !isAdded()) return;
+
                 if (isGlobalAdmin) {
                     loadBranchesForSelector();
                 } else {
-                    if (spBranchSelector != null) {
-                        spBranchSelector.setVisibility(View.GONE);
-                    }
+                    if (spBranchSelector != null) spBranchSelector.setVisibility(View.GONE);
                     if (tvCurrentBranch != null) {
                         tvCurrentBranch.setText(branchesManager != null ? branchesManager.getActiveBranchName() : "");
                         tvCurrentBranch.setVisibility(View.VISIBLE);
@@ -429,42 +426,36 @@ private void processInputEpc(String epc, String sourceType) {
     }
 
     private void loadBranchesForSelector() {
-        if (gateExecutor == null || getContext() == null) return;
-        
-        gateExecutor.execute(() -> {
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
-                if (context == null) return;
-                
+                if (context == null || isDestroyed) return;
+
                 List<?> allBranches = branchesManager != null ? branchesManager.getAllBranches() : new ArrayList<>();
-                
+
                 branchesList.clear();
                 if (allBranches != null) {
                     for (Object branchObj : allBranches) {
                         BranchInfo info = convertToBranchInfo(branchObj);
-                        if (info != null) {
-                            branchesList.add(info);
-                        }
+                        if (info != null) branchesList.add(info);
                     }
                 }
-                
+
                 if (!branchesList.isEmpty()) {
                     mainHandler.post(() -> {
-                        if (spBranchSelector != null && isAdded()) {
+                        if (spBranchSelector != null && isAdded() && !isDestroyed) {
                             List<String> branchNames = new ArrayList<>();
                             branchNames.add(getLocalizedText("🌐 كل الفروع", "🌐 All Branches"));
-                            for (BranchInfo branch : branchesList) {
-                                branchNames.add(branch.branchName);
-                            }
-                            
+                            for (BranchInfo branch : branchesList) branchNames.add(branch.branchName);
+
                             ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                                context,
-                                android.R.layout.simple_spinner_item,
-                                branchNames
+                                    context,
+                                    android.R.layout.simple_spinner_item,
+                                    branchNames
                             );
                             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                             spBranchSelector.setAdapter(adapter);
-                            
+
                             if (currentBranchId > 0) {
                                 for (int i = 0; i < branchesList.size(); i++) {
                                     if (branchesList.get(i).branchId == currentBranchId) {
@@ -473,33 +464,30 @@ private void processInputEpc(String epc, String sourceType) {
                                     }
                                 }
                             }
-                            
+
                             spBranchSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                                 @Override
                                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                                    if (position == 0) {
-                                        currentBranchId = 0;
-                                    } else if (position - 1 < branchesList.size()) {
+                                    if (position == 0) currentBranchId = 0;
+                                    else if (position - 1 < branchesList.size()) {
                                         currentBranchId = branchesList.get(position - 1).branchId;
                                     }
-                                    
+
                                     loadAllGatesStatus();
-                                    
-                                    String branchName = position == 0 ? 
-                                        getLocalizedText("كل الفروع", "All Branches") : 
-                                        branchesList.get(position - 1).branchName;
-                                    
+
+                                    String branchName = position == 0 ?
+                                            getLocalizedText("كل الفروع", "All Branches") :
+                                            branchesList.get(position - 1).branchName;
+
                                     logConsole(getLocalizedText("🔄 تم تغيير الفرع إلى: ", "🔄 Branch changed to: ") + branchName);
                                 }
-                                
+
                                 @Override
                                 public void onNothingSelected(AdapterView<?> parent) {}
                             });
-                            
+
                             spBranchSelector.setVisibility(View.VISIBLE);
-                            if (tvCurrentBranch != null) {
-                                tvCurrentBranch.setVisibility(View.GONE);
-                            }
+                            if (tvCurrentBranch != null) tvCurrentBranch.setVisibility(View.GONE);
                         }
                     });
                 }
@@ -511,13 +499,13 @@ private void processInputEpc(String epc, String sourceType) {
 
     private BranchInfo convertToBranchInfo(Object obj) {
         if (obj == null) return null;
-        
+
         BranchInfo info = new BranchInfo();
         Class<?> clazz = obj.getClass();
 
         info.branchId = extractIntProperty(clazz, obj, new String[]{"getId", "getBranchId", "id", "branchId"});
         info.branchName = extractStringProperty(clazz, obj, new String[]{"getName", "getBranchName", "name", "branchName"});
-        
+
         if (info.branchName == null || info.branchName.isEmpty()) {
             info.branchName = (isArabic ? "فرع " : "Branch ") + info.branchId;
         }
@@ -567,23 +555,20 @@ private void processInputEpc(String epc, String sourceType) {
 
     private String getCurrentBranchName() {
         try {
-            if (currentBranchId == 0) {
-                return getLocalizedText("كل الفروع", "All Branches");
-            }
-            
+            if (currentBranchId == 0) return getLocalizedText("كل الفروع", "All Branches");
+
             for (BranchInfo branch : branchesList) {
-                if (branch.branchId == currentBranchId) {
-                    return branch.branchName;
-                }
+                if (branch.branchId == currentBranchId) return branch.branchName;
             }
-            
+
             return branchesManager != null ? branchesManager.getActiveBranchName() : String.valueOf(currentBranchId);
         } catch (Exception e) {
             return String.valueOf(currentBranchId);
         }
     }
 
-    // ==================== خدمة الخلفية ====================
+    // ==================== Background Service ====================
+
     private void startBackgroundService() {
         try {
             Context context = getContext();
@@ -598,8 +583,10 @@ private void processInputEpc(String epc, String sourceType) {
     }
 
     // ==================== Lockdown ====================
+
     private void toggleLockdown() {
         isLockdown = !isLockdown;
+
         if (isLockdown) {
             lockAllGates();
             updateSystemStatus(false);
@@ -620,8 +607,7 @@ private void processInputEpc(String epc, String sourceType) {
     }
 
     private void lockAllGates() {
-        if (gateExecutor == null) return;
-        gateExecutor.execute(() -> {
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
                 if (context == null) return;
@@ -637,8 +623,7 @@ private void processInputEpc(String epc, String sourceType) {
     }
 
     private void unlockAllGates() {
-        if (gateExecutor == null) return;
-        gateExecutor.execute(() -> {
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
                 if (context == null) return;
@@ -653,132 +638,250 @@ private void processInputEpc(String epc, String sourceType) {
         });
     }
 
-/**
- * ✅ تأثير النبض البصري للإنذار
- */
-private void startPulseAnimation(View view) {
-    Animation anim = new AlphaAnimation(0.3f, 1.0f);
-    anim.setDuration(400);
-    anim.setRepeatMode(Animation.REVERSE);
-    anim.setRepeatCount(Animation.INFINITE);
-    view.startAnimation(anim);
-}
+    private void startPulseAnimation(View view) {
+        if (view == null) return;
+        Animation anim = new AlphaAnimation(0.3f, 1.0f);
+        anim.setDuration(400);
+        anim.setRepeatMode(Animation.REVERSE);
+        anim.setRepeatCount(Animation.INFINITE);
+        view.startAnimation(anim);
+    }
 
-/**
- * ✅ التحكم في بوابة واحدة (قفل/فتح/إعادة تعيين)
- */
-private void toggleGateState(String gateId, String currentStatus) {
-    if (gateExecutor == null || gateId == null || gateId.isEmpty()) return;
-    
-    gateExecutor.execute(() -> {
+    private void toggleGateState(String gateId, String currentStatus) {
+        if (gateId == null || gateId.isEmpty()) return;
+
+        executeOnGateExecutor(() -> {
+            try {
+                Context context = getContext();
+                if (context == null) return;
+
+                MiraApiClient client = MiraApiClient.getInstance(context);
+                JSONObject payload = new JSONObject();
+                payload.put("gate_id", gateId);
+
+                String command;
+                if ("offline".equals(currentStatus) || currentStatus == null) {
+                    command = "RECONNECT";
+                } else if ("alert".equals(currentStatus) || "breach".equals(currentStatus)) {
+                    command = "RESET_ALARM";
+                } else {
+                    command = "TOGGLE_LOCK";
+                }
+
+                payload.put("command", command);
+                payload.put("branch_id", getCurrentBranchId());
+
+                MiraApiClient.ApiResponse response = client.postWithAuth("/gate-command", payload);
+
+                mainHandler.post(() -> {
+                    if (isDestroyed || !isAdded()) return;
+                    if (response != null && response.isSuccess) {
+                        logConsole(getLocalizedText("✅ تم إرسال أمر للبوابة: ", "✅ Command sent to gate: ") + gateId);
+                        loadAllGatesStatus();
+                    } else {
+                        logConsole(getLocalizedText("❌ فشل إرسال الأمر للبوابة: ", "❌ Failed to send command to gate: ") + gateId);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "toggleGateState: " + e.getMessage());
+                mainHandler.post(() -> {
+                    if (isAdded() && !isDestroyed) {
+                        logConsole(getLocalizedText("❌ خطأ في التحكم بالبوابة: ", "❌ Gate control error: ") + e.getMessage());
+                    }
+                });
+            }
+        });
+    }
+
+    // ==================== Adaptive Monitoring ====================
+
+    private void startMonitoring() {
         try {
-            Context context = getContext();
-            if (context == null) return;
-            
-            MiraApiClient client = MiraApiClient.getInstance(context);
-            JSONObject payload = new JSONObject();
-            payload.put("gate_id", gateId);
-            
-            // تحديد الأمر المناسب حسب الحالة
-            String command;
-            if ("offline".equals(currentStatus) || currentStatus == null) {
-                command = "RECONNECT";
-            } else if ("alert".equals(currentStatus) || "breach".equals(currentStatus)) {
-                command = "RESET_ALARM";
-            } else {
-                command = "TOGGLE_LOCK";
-            }
-            
-            payload.put("command", command);
-            payload.put("branch_id", getCurrentBranchId());
-            
-            MiraApiClient.ApiResponse response = client.postWithAuth("/gate-command", payload);
-            
-            if (response != null && response.isSuccess) {
-                mainHandler.post(() -> {
-                    logConsole(getLocalizedText("✅ تم إرسال أمر للبوابة: ", "✅ Command sent to gate: ") + gateId);
-                    // تحديث فوري لحالة البوابات
-                    loadAllGatesStatus();
-                });
-            } else {
-                mainHandler.post(() -> {
-                    logConsole(getLocalizedText("❌ فشل إرسال الأمر للبوابة: ", "❌ Failed to send command to gate: ") + gateId);
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "toggleGateState: " + e.getMessage());
-            mainHandler.post(() -> {
-                logConsole(getLocalizedText("❌ خطأ في التحكم بالبوابة: ", "❌ Gate control error: ") + e.getMessage());
+            scheduler = Executors.newScheduledThreadPool(2, r -> {
+                Thread t = new Thread(r, "MiraGateScheduler");
+                t.setDaemon(true);
+                t.setPriority(Thread.NORM_PRIORITY - 1);
+                return t;
             });
-        }
-    });
-}
 
-    // ==================== Ping Monitor ====================
-    private void startPingMonitor() {
-        pingScheduler = Executors.newSingleThreadScheduledExecutor();
-        pingScheduler.scheduleAtFixedRate(() -> {
-            if (!isDestroyed && isAdded()) checkPing();
-        }, 0, PING_INTERVAL_SECONDS, TimeUnit.SECONDS);
+            // ⭐ Poll scheduler
+            scheduleNextPoll();
+
+            // ⭐ Ping scheduler
+            scheduleNextPing();
+
+            // ✅ تحميل فوري
+            loadAllGatesStatus();
+            refreshAllowedCacheIfNeeded(true);
+
+        } catch (Exception e) {
+            Log.e(TAG, "startMonitoring error: " + e.getMessage(), e);
+        }
+    }
+
+    private void scheduleNextPoll() {
+        if (isDestroyed || scheduler == null || scheduler.isShutdown()) return;
+
+        try {
+            pollFuture = scheduler.schedule(() -> {
+                if (isDestroyed) return;
+                try {
+                    loadAllGatesStatus();
+                    checkConnection();
+                } catch (Exception e) {
+                    Log.e(TAG, "Poll task error: " + e.getMessage(), e);
+                }
+                scheduleNextPoll(); // ⭐ إعادة الجدولة
+            }, currentPollInterval, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException e) {
+            Log.w(TAG, "scheduleNextPoll rejected: " + e.getMessage());
+        }
+    }
+
+    private void scheduleNextPing() {
+        if (isDestroyed || scheduler == null || scheduler.isShutdown()) return;
+
+        try {
+            pingFuture = scheduler.schedule(() -> {
+                if (isDestroyed) return;
+                try {
+                    checkPing();
+                } catch (Exception e) {
+                    Log.e(TAG, "Ping task error: " + e.getMessage(), e);
+                }
+                scheduleNextPing(); // ⭐ إعادة الجدولة
+            }, currentPingInterval, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException e) {
+            Log.w(TAG, "scheduleNextPing rejected: " + e.getMessage());
+        }
+    }
+
+    // ==================== Connection Status ====================
+
+    private void checkConnection() {
+        if (isDestroyed || !isAdded()) return;
+
+        Context context = getContext();
+        if (context == null) return;
+
+        MiraApiClient client = MiraApiClient.getInstance(context);
+
+        client.pingApiAsync(isOnlineNow -> {
+            if (isDestroyed || !isAdded()) return;
+
+            boolean wasOnline = isOnline;
+            isOnline = isOnlineNow;
+
+            // ✅ نجاح → إعادة تعيين
+            if (isOnlineNow) {
+                consecutivePollFailures = 0;
+                currentPollInterval = POLL_INITIAL_MS;
+            } else {
+                consecutivePollFailures++;
+                // ⭐ Exponential Backoff
+                long newInterval = Math.min(
+                        POLL_INITIAL_MS * (1L << Math.min(consecutivePollFailures, 4)),
+                        POLL_MAX_MS
+                );
+                if (newInterval != currentPollInterval) {
+                    currentPollInterval = newInterval;
+                    Log.d(TAG, "📉 Poll interval increased to " + (currentPollInterval / 1000) + "s");
+                }
+            }
+
+            if (isOnline != wasOnline && isAdded() && !isDestroyed) {
+                if (isOnline) {
+                    logConsole(getLocalizedText("🟢 عاد الاتصال - جاري المزامنة...",
+                            "🟢 Connection restored - syncing..."));
+                    executeOnGateExecutor(() -> {
+                        refreshAllowedCacheIfNeeded(true);
+                        syncOfflineEvents();
+                    });
+                } else {
+                    logConsole(getLocalizedText("🔴 انقطع الاتصال - الوضع المحلي",
+                            "🔴 Connection lost - local mode"));
+                }
+
+                if (offlineCache != null) offlineCache.saveConnectionState(isOnline);
+            }
+        });
     }
 
     private void checkPing() {
-    if (isDestroyed || !isAdded()) return;
-    
-    Context context = getContext();
-    if (context == null) return;
-    
-    MiraApiClient client = MiraApiClient.getInstance(context);
-    long start = System.currentTimeMillis();
-    
-    // ✅ استخدم الدالة async الجديدة
-    client.pingApiAsync(ok -> {
-        long latency = System.currentTimeMillis() - start;
-        
-        if (tvPingLatency != null && isAdded() && !isDestroyed) {
+        if (isDestroyed || !isAdded()) return;
+
+        Context context = getContext();
+        if (context == null) return;
+
+        MiraApiClient client = MiraApiClient.getInstance(context);
+        long start = System.currentTimeMillis();
+
+        client.pingApiAsync(ok -> {
+            if (isDestroyed || !isAdded()) return;
+
+            long latency = System.currentTimeMillis() - start;
+
             if (ok) {
-                tvPingLatency.setText(getLocalizedText("📡 Ping: ", "📡 Ping: ") 
-                    + latency + " ms | ✅ " + getLocalizedText("متصل", "Connected"));
-                tvPingLatency.setTextColor(getSuccessColor());
+                consecutivePingFailures = 0;
+                currentPingInterval = PING_INITIAL_MS;
             } else {
-                tvPingLatency.setText(getLocalizedText("📡 Ping: -- | ⚠️ غير متصل", 
-                    "📡 Ping: -- | ⚠️ Disconnected"));
-                tvPingLatency.setTextColor(getWarningColor());
+                consecutivePingFailures++;
+                long newInterval = Math.min(
+                        PING_INITIAL_MS * (1L << Math.min(consecutivePingFailures, 3)),
+                        PING_MAX_MS
+                );
+                if (newInterval != currentPingInterval) {
+                    currentPingInterval = newInterval;
+                    Log.d(TAG, "📉 Ping interval increased to " + (currentPingInterval / 1000) + "s");
+                }
             }
-        }
-    });
-}
+
+            if (tvPingLatency != null && isAdded() && !isDestroyed) {
+                if (ok) {
+                    tvPingLatency.setText(getLocalizedText("📡 Ping: ", "📡 Ping: ")
+                            + latency + " ms | ✅ " + getLocalizedText("متصل", "Connected"));
+                    tvPingLatency.setTextColor(getSuccessColor());
+                } else {
+                    tvPingLatency.setText(getLocalizedText("📡 Ping: -- | ⚠️ غير متصل",
+                            "📡 Ping: -- | ⚠️ Disconnected"));
+                    tvPingLatency.setTextColor(getWarningColor());
+                }
+            }
+        });
+    }
 
     private void updateSystemStatus(boolean armed) {
-        if (tvSystemStatus != null) {
-            if (isLockdown) {
-                tvSystemStatus.setText(getLocalizedText("🔴 إغلاق طارئ", "🔴 LOCKDOWN"));
-                tvSystemStatus.setTextColor(getDangerColor());
-            } else if (armed) {
-                tvSystemStatus.setText(getLocalizedText("🟢 النظام مسلح", "🟢 SYSTEM ARMED"));
-                tvSystemStatus.setTextColor(getSuccessColor());
-            } else {
-                tvSystemStatus.setText(getLocalizedText("🟡 وضع الاستعداد", "🟡 STANDBY"));
-                tvSystemStatus.setTextColor(getWarningColor());
-            }
+        if (tvSystemStatus == null) return;
+
+        if (isLockdown) {
+            tvSystemStatus.setText(getLocalizedText("🔴 إغلاق طارئ", "🔴 LOCKDOWN"));
+            tvSystemStatus.setTextColor(getDangerColor());
+        } else if (armed) {
+            tvSystemStatus.setText(getLocalizedText("🟢 النظام مسلح", "🟢 SYSTEM ARMED"));
+            tvSystemStatus.setTextColor(getSuccessColor());
+        } else {
+            tvSystemStatus.setText(getLocalizedText("🟡 وضع الاستعداد", "🟡 STANDBY"));
+            tvSystemStatus.setTextColor(getWarningColor());
         }
     }
 
     private void updateLiveTicker(String message, boolean isAlert) {
-        if (tvLiveTickerText != null) {
-            tvLiveTickerText.setText(message);
-            tvLiveTickerText.setTextColor(isAlert ? getDangerColor() : getSuccessColor());
-            if (isAlert) {
-                Animation anim = new AlphaAnimation(0.3f, 1.0f);
-                anim.setDuration(300);
-                anim.setRepeatMode(Animation.REVERSE);
-                anim.setRepeatCount(5);
-                tvLiveTickerText.startAnimation(anim);
-            }
+        if (tvLiveTickerText == null) return;
+
+        tvLiveTickerText.setText(message);
+        tvLiveTickerText.setTextColor(isAlert ? getDangerColor() : getSuccessColor());
+
+        if (isAlert) {
+            Animation anim = new AlphaAnimation(0.3f, 1.0f);
+            anim.setDuration(300);
+            anim.setRepeatMode(Animation.REVERSE);
+            anim.setRepeatCount(5);
+            tvLiveTickerText.startAnimation(anim);
         }
     }
 
     // ==================== RFID Scanning ====================
+
     private void autoStartScanning() {
         mainHandler.postDelayed(() -> {
             if (!isDestroyed && isAdded() && !isLockdown && !isCameraOpen) {
@@ -788,25 +891,28 @@ private void toggleGateState(String gateId, String currentStatus) {
     }
 
     private void toggleScanning() {
-        if (isScanning) stopScanning(); else startScanning();
+        if (isScanning) stopScanning();
+        else startScanning();
     }
 
     private void startScanning() {
         if (isDestroyed || mContext == null || mContext.mReader == null || isCameraOpen) return;
 
         RfidHardwareHelper.getInstance().startAsync(
-            mContext.mReader,
-            miraGatesSettings.getRfidPower(),
-            info -> {
-                if (!isDestroyed && info != null && info.getEPC() != null) {
-                    processInputEpc(info.getEPC(), "RFID");
+                mContext.mReader,
+                miraGatesSettings.getRfidPower(),
+                info -> {
+                    if (!isDestroyed && info != null && info.getEPC() != null) {
+                        processInputEpc(info.getEPC(), "RFID");
+                    }
+                },
+                () -> {
+                    isScanning = true;
+                    if (btnToggleScan != null) {
+                        btnToggleScan.setText(getLocalizedText("🔴 إيقاف المسح", "🔴 Stop Scan"));
+                    }
+                    logConsole(getLocalizedText("🛡️ قارئ RFID يعمل", "🛡️ RFID reader active"));
                 }
-            },
-            () -> {
-                isScanning = true;
-                if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🔴 إيقاف المسح", "🔴 Stop Scan"));
-                logConsole(getLocalizedText("🛡️ قارئ RFID يعمل", "🛡️ RFID reader active"));
-            }
         );
     }
 
@@ -814,58 +920,60 @@ private void toggleGateState(String gateId, String currentStatus) {
         if (mContext != null) {
             RfidHardwareHelper.getInstance().stopAsync(mContext.mReader, () -> {
                 isScanning = false;
-                if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
+                if (btnToggleScan != null) {
+                    btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
+                }
             });
         }
     }
 
     private void stopScanningSync() {
         if (mContext != null && mContext.mReader != null) {
-            try { 
-                mContext.mReader.stopInventory(); 
-                mContext.mReader.setInventoryCallback(null); 
+            try {
+                mContext.mReader.stopInventory();
+                mContext.mReader.setInventoryCallback(null);
             } catch (Exception e) {
                 Log.e(TAG, "stopScanningSync: " + e.getMessage());
             }
         }
         isScanning = false;
         mainHandler.post(() -> {
-            if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
+            if (btnToggleScan != null) {
+                btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
+            }
         });
     }
 
-    // ==================== المراقبة والتحديثات ====================
-    private void startMonitoring() {
-        monitorScheduler = Executors.newSingleThreadScheduledExecutor();
-        monitorScheduler.scheduleAtFixedRate(() -> {
-            if (!isDestroyed && isAdded()) {
-                loadAllGatesStatus();
-                checkConnection();
-            }
-        }, 0, MONITOR_INTERVAL_SECONDS, TimeUnit.SECONDS);
-        
-        loadAllGatesStatus();
-        updateLocalAllowedCache();
-    }
+    // ==================== Gate Status ====================
 
     private void loadAllGatesStatus() {
-        if (gateExecutor == null || getContext() == null) return;
-        gateExecutor.execute(() -> {
+        // ⭐ Debounce
+        if (!statusLoadInProgress.compareAndSet(false, true)) {
+            Log.d(TAG, "Status load already in progress, skipping");
+            return;
+        }
+
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
-                if (context == null) return;
+                if (context == null || isDestroyed) {
+                    statusLoadInProgress.set(false);
+                    return;
+                }
+
                 MiraApiClient client = MiraApiClient.getInstance(context);
-                
                 MiraApiClient.ApiResponse response = client.getGatesByBranch(
-                    currentBranchId > 0 ? currentBranchId : 0
+                        currentBranchId > 0 ? currentBranchId : 0
                 );
-                
+
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray arr = extractGatesArray(response.data);
                     if (arr != null) {
                         List<GateMonitorItem> items = new ArrayList<>();
                         for (int i = 0; i < arr.length(); i++) {
                             JSONObject g = arr.optJSONObject(i);
+                            if (g == null) continue;
+
                             GateMonitorItem item = new GateMonitorItem();
                             item.gateId = g.optString("gate_id", "");
                             item.gateName = g.optString("gate_name", getLocalizedText("بوابة", "Gate"));
@@ -878,11 +986,20 @@ private void toggleGateState(String gateId, String currentStatus) {
                             item.branchName = g.optString("branch_name", "");
                             items.add(item);
                         }
-                        mainHandler.post(() -> updateMonitorList(items));
+
+                        mainHandler.post(() -> {
+                            statusLoadInProgress.set(false);
+                            if (isAdded() && !isDestroyed) updateMonitorList(items);
+                        });
+                        return;
                     }
                 }
+
+                mainHandler.post(() -> statusLoadInProgress.set(false));
+
             } catch (Exception e) {
                 Log.e(TAG, "loadAllGatesStatus: " + e.getMessage());
+                statusLoadInProgress.set(false);
             }
         });
     }
@@ -894,22 +1011,52 @@ private void toggleGateState(String gateId, String currentStatus) {
         return d != null ? d.optJSONArray("gates") : null;
     }
 
-    private void updateMonitorList(List<GateMonitorItem> items) {
+    private void updateMonitorList(List<GateMonitorItem> newItems) {
+        if (monitorAdapter == null) return;
+
+        // ⭐ DiffUtil
+        List<GateMonitorItem> oldItems = new ArrayList<>(monitorList);
+
+        DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override
+            public int getOldListSize() { return oldItems.size(); }
+
+            @Override
+            public int getNewListSize() { return newItems.size(); }
+
+            @Override
+            public boolean areItemsTheSame(int oldPos, int newPos) {
+                return Objects.equals(oldItems.get(oldPos).gateId, newItems.get(newPos).gateId);
+            }
+
+            @Override
+            public boolean areContentsTheSame(int oldPos, int newPos) {
+                GateMonitorItem o = oldItems.get(oldPos);
+                GateMonitorItem n = newItems.get(newPos);
+                return Objects.equals(o.status, n.status)
+                        && o.passCount == n.passCount
+                        && o.denyCount == n.denyCount
+                        && Objects.equals(o.lastEvent, n.lastEvent)
+                        && Objects.equals(o.branchName, n.branchName);
+            }
+        });
+
         monitorList.clear();
-        monitorList.addAll(items);
-        if (monitorAdapter != null) monitorAdapter.notifyDataSetChanged();
-        
+        monitorList.addAll(newItems);
+        diffResult.dispatchUpdatesTo(monitorAdapter);
+
+        // ⭐ الإحصائيات
         int pass = 0, deny = 0;
-        for (GateMonitorItem item : items) { 
-            pass += item.passCount; 
-            deny += item.denyCount; 
+        for (GateMonitorItem item : newItems) {
+            pass += item.passCount;
+            deny += item.denyCount;
         }
         if (tvPassCount != null) tvPassCount.setText(String.valueOf(pass));
         if (tvDenyCount != null) tvDenyCount.setText(String.valueOf(deny));
-        if (tvTotalCount != null) tvTotalCount.setText(String.valueOf(items.size()));
-        
+        if (tvTotalCount != null) tvTotalCount.setText(String.valueOf(newItems.size()));
+
         updateRiskMeter(pass, deny);
-        
+
         if (tvCurrentBranch != null) {
             String branchLabel;
             if (currentBranchId == 0) {
@@ -933,17 +1080,20 @@ private void toggleGateState(String gateId, String currentStatus) {
     }
 
     private void loadTestEpcs() {
-        if (gateExecutor == null || getContext() == null) return;
-        gateExecutor.execute(() -> {
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
-                if (context == null) return;
+                if (context == null || isDestroyed) return;
                 MiraApiClient client = MiraApiClient.getInstance(context);
                 MiraApiClient.ApiResponse response = client.getTestEpcs();
                 if (response != null && response.isSuccess && response.data != null) {
                     soldEpc = response.data.optString("sold_epc", "");
                     unsoldEpc = response.data.optString("unsold_epc", "");
-                    mainHandler.post(() -> logConsole(getLocalizedText("✅ EPCs للمحاكاة جاهزة", "✅ Simulation EPCs ready")));
+                    mainHandler.post(() -> {
+                        if (isAdded() && !isDestroyed) {
+                            logConsole(getLocalizedText("✅ EPCs للمحاكاة جاهزة", "✅ Simulation EPCs ready"));
+                        }
+                    });
                 }
             } catch (Exception e) {
                 Log.e(TAG, "loadTestEpcs: " + e.getMessage());
@@ -951,24 +1101,27 @@ private void toggleGateState(String gateId, String currentStatus) {
         });
     }
 
-
     private void syncOfflineEvents() {
-        if (gateExecutor == null || offlineCache == null) return;
-        
-        gateExecutor.execute(() -> {
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
-                if (context == null) return;
+                if (context == null || isDestroyed || offlineCache == null) return;
+
                 JSONArray pendingEvents = offlineCache.getOfflineEvents();
-                if (pendingEvents.length() == 0) return;
-                
+                if (pendingEvents == null || pendingEvents.length() == 0) return;
+
                 MiraApiClient client = MiraApiClient.getInstance(context);
                 MiraApiClient.ApiResponse response = client.syncOfflineTransactions(pendingEvents);
-                
+
                 if (response != null && response.isSuccess) {
                     offlineCache.clearOfflineEvents();
                     offlineCache.saveLastSyncTime(System.currentTimeMillis());
-                    mainHandler.post(() -> logConsole(getLocalizedText("✅ تمت مزامنة ", "✅ Synced ") + pendingEvents.length() + getLocalizedText(" حدث", " events")));
+                    mainHandler.post(() -> {
+                        if (isAdded() && !isDestroyed) {
+                            logConsole(getLocalizedText("✅ تمت مزامنة ", "✅ Synced ")
+                                    + pendingEvents.length() + getLocalizedText(" حدث", " events"));
+                        }
+                    });
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Sync offline: " + e.getMessage());
@@ -976,16 +1129,24 @@ private void toggleGateState(String gateId, String currentStatus) {
         });
     }
 
-    private void updateLocalAllowedCache() {
-        if (gateExecutor == null || getContext() == null) return;
-        
-        gateExecutor.execute(() -> {
+    /**
+     * ⭐ مزامنة ذكية — مرة واحدة كل 5 دقائق
+     */
+    private void refreshAllowedCacheIfNeeded(boolean force) {
+        long now = System.currentTimeMillis();
+        if (!force && (now - lastAllowedCacheRefresh) < ALLOWED_CACHE_REFRESH_MS) {
+            return;
+        }
+        lastAllowedCacheRefresh = now;
+
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
-                if (context == null) return;
+                if (context == null || isDestroyed) return;
+
                 MiraApiClient client = MiraApiClient.getInstance(context);
                 MiraApiClient.ApiResponse response = client.getWithAuth("/allowed-list");
-                
+
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray arr = response.data.optJSONArray("allowed_epcs");
                     if (arr != null) {
@@ -994,102 +1155,130 @@ private void toggleGateState(String gateId, String currentStatus) {
                             String epc = arr.optString(i, "");
                             if (!epc.isEmpty()) allowed.add(epc);
                         }
-                        
+
                         localAllowedEpcCache.clear();
                         localAllowedEpcCache.addAll(allowed);
-                        
-                        if (offlineCache != null) {
-                            offlineCache.saveAllowedEpcs(allowed);
-                        }
-                        
-                        mainHandler.post(() -> logConsole(getLocalizedText("✅ القائمة المسموحة: ", "✅ Allowed list: ") + allowed.size()));
+
+                        if (offlineCache != null) offlineCache.saveAllowedEpcs(allowed);
+
+                        mainHandler.post(() -> {
+                            if (isAdded() && !isDestroyed) {
+                                logConsole(getLocalizedText("✅ القائمة المسموحة: ", "✅ Allowed list: ") + allowed.size());
+                            }
+                        });
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "updateLocalAllowedCache: " + e.getMessage());
+                Log.e(TAG, "refreshAllowedCache error: " + e.getMessage());
             }
         });
     }
 
-    private void checkConnection() {
-    if (isDestroyed || !isAdded()) return;
-    
-    Context context = getContext();
-    if (context == null) return;
-    
-    MiraApiClient client = MiraApiClient.getInstance(context);
-    
-    // ✅ استخدم async
-    client.pingApiAsync(isOnlineNow -> {
-        boolean wasOnline = isOnline;
-        isOnline = isOnlineNow;
-        
-        if (isOnline != wasOnline && isAdded() && !isDestroyed) {
-            if (isOnline) {
-                logConsole(getLocalizedText("🟢 عاد الاتصال - جاري المزامنة...", 
-                    "🟢 Connection restored - syncing..."));
-                // ✅ لا تستدعي على Main Thread مباشرة - استخدم background
-                if (gateExecutor != null && !gateExecutor.isShutdown()) {
-                    gateExecutor.execute(() -> {
-                        updateLocalAllowedCache();
-                        syncOfflineEvents();
-                    });
+    // ==================== EPC Processing ====================
+
+    private void processInputEpcBackground(String epc, String sourceType) {
+        if (isDestroyed || epc == null || epc.trim().isEmpty()) return;
+
+        final String cleanedEpc = epc.trim().toUpperCase();
+
+        long now = System.currentTimeMillis();
+        Long last = scanDebounceMap.putIfAbsent(cleanedEpc, now);
+        if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
+        scanDebounceMap.put(cleanedEpc, now);
+
+        logConsole("[".concat(sourceType).concat("] ") + cleanedEpc);
+
+        if (offlineCache != null && offlineCache.isAllowedLocally(cleanedEpc)) {
+            mainHandler.post(() -> {
+                if (isAdded() && !isDestroyed) {
+                    handleGateDecision(true, getLocalizedText("قطعة مصرح بها (محلي)", "Authorized (local)"), cleanedEpc);
                 }
-            } else {
-                logConsole(getLocalizedText("🔴 انقطع الاتصال - الوضع المحلي", 
-                    "🔴 Connection lost - local mode"));
-            }
-            
-            if (offlineCache != null) {
-                offlineCache.saveConnectionState(isOnline);
-            }
+            });
+            return;
         }
-    });
-}
+
+        if (!isOnline) {
+            logConsole(getLocalizedText("⚠️ بدون إنترنت - رفض أمني", "⚠️ Offline - security denial"));
+            mainHandler.post(() -> {
+                if (isAdded() && !isDestroyed) {
+                    handleGateDecision(false, getLocalizedText("بدون إنترنت", "Offline"), cleanedEpc);
+                    if (offlineCache != null) {
+                        offlineCache.saveOfflineEvent(cleanedEpc, false,
+                                getLocalizedText("بدون إنترنت", "Offline"), "local");
+                    }
+                }
+            });
+            return;
+        }
+
+        queryMiraGateServer(cleanedEpc);
+    }
+
+    private void processInputEpc(String epc, String sourceType) {
+        if (gateExecutor != null && !gateExecutor.isShutdown()) {
+            final String finalEpc = epc;
+            final String finalSource = sourceType;
+            executeOnGateExecutor(() -> processInputEpcBackground(finalEpc, finalSource));
+        } else {
+            processInputEpcBackground(epc, sourceType);
+        }
+    }
 
     private void queryMiraGateServer(String epc) {
-        if (gateExecutor == null) return;
-        gateExecutor.execute(() -> {
+        executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
-                if (context == null) return;
+                if (context == null || isDestroyed) return;
+
                 MiraApiClient client = MiraApiClient.getInstance(context);
                 JSONObject params = new JSONObject();
                 params.put("context", "gate");
                 params.put("branch_id", getCurrentBranchId());
-                
-                Future<MiraApiClient.ApiResponse> future = gateExecutor.submit(() -> client.authorize(epc, "gate", params));
+
+                Future<MiraApiClient.ApiResponse> future = gateExecutor.submit(
+                        () -> client.authorize(epc, "gate", params)
+                );
                 MiraApiClient.ApiResponse response = future.get(API_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                
+
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject decision = response.data.optJSONObject("decision");
                     JSONObject item = response.data.optJSONObject("item");
                     boolean allowed = decision != null && decision.optBoolean("allowed", false);
-                    String itemTitle = item != null ? item.optString("title", getLocalizedText("قطعة", "Item")) : getLocalizedText("قطعة", "Item");
+                    String itemTitle = item != null ? item.optString("title",
+                            getLocalizedText("قطعة", "Item")) : getLocalizedText("قطعة", "Item");
                     String serial = item != null ? item.optString("serial", epc) : epc;
                     String message = decision != null ? decision.optString("message", "") : "";
-                    
+
                     if (allowed) localAllowedEpcCache.add(epc);
-                    
+
                     mainHandler.post(() -> {
+                        if (isDestroyed || !isAdded()) return;
                         handleGateDecision(allowed, itemTitle, serial);
                         if (!message.isEmpty()) logConsole((allowed ? "✅ " : "🚨 ") + message);
                     });
                 }
             } catch (TimeoutException e) {
-                mainHandler.post(() -> handleGateDecision(false, getLocalizedText("انقطاع اتصال", "Connection timeout"), epc));
+                mainHandler.post(() -> {
+                    if (isAdded() && !isDestroyed) {
+                        handleGateDecision(false, getLocalizedText("انقطاع اتصال", "Timeout"), epc);
+                    }
+                });
             } catch (Exception e) {
-                mainHandler.post(() -> handleGateDecision(false, getLocalizedText("غير مصرح", "Unauthorized"), epc));
+                mainHandler.post(() -> {
+                    if (isAdded() && !isDestroyed) {
+                        handleGateDecision(false, getLocalizedText("غير مصرح", "Unauthorized"), epc);
+                    }
+                });
             }
         });
     }
 
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
-        
+
         if (allowed && "ALERTS".equals(logFilter)) return;
         if (!allowed && "PASS".equals(logFilter)) return;
-        
+
         if (allowed) {
             logConsole(getLocalizedText("✅ خروج شرعي: ", "✅ Legal exit: ") + itemTitle);
             updateLiveTicker("✅ " + itemTitle, false);
@@ -1101,190 +1290,240 @@ private void toggleGateState(String gateId, String currentStatus) {
         }
     }
 
-    // ==================== الإنذار والملاحظات ====================
     private void triggerAlarm(String itemTitle, String serial) {
         mainHandler.post(() -> {
+            if (isDestroyed || !isAdded()) return;
+
             if (overlayAlarm != null) {
-                tvOverlayTitle.setText(getLocalizedText("🚨 إنذار: خروج غير مصرح", "🚨 ALERT: UNAUTHORIZED BREACH"));
-                tvOverlayDetails.setText(itemTitle + "\n[" + serial + "]");
+                if (tvOverlayTitle != null) {
+                    tvOverlayTitle.setText(getLocalizedText("🚨 إنذار: خروج غير مصرح", "🚨 ALERT: UNAUTHORIZED BREACH"));
+                }
+                if (tvOverlayDetails != null) {
+                    tvOverlayDetails.setText(itemTitle + "\n[" + serial + "]");
+                }
                 overlayAlarm.setVisibility(View.VISIBLE);
                 overlayAlarm.setBackgroundColor(getDangerColor());
+
                 Animation anim = new AlphaAnimation(0.4f, 1.0f);
                 anim.setDuration(300);
                 anim.setRepeatMode(Animation.REVERSE);
                 anim.setRepeatCount(Animation.INFINITE);
                 overlayAlarm.startAnimation(anim);
             }
+
             if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
             SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
         });
     }
 
     private void stopAlarm() {
-        if (overlayAlarm != null) { 
-            overlayAlarm.clearAnimation(); 
-            overlayAlarm.setVisibility(View.GONE); 
+        if (overlayAlarm != null) {
+            overlayAlarm.clearAnimation();
+            overlayAlarm.setVisibility(View.GONE);
         }
         if (vibrator != null) vibrator.cancel();
     }
 
-    // ==================== السجل الخطي ====================
+    // ==================== Batch Logging ====================
+
     private void logConsole(String message) {
-        mainHandler.post(() -> {
-            if (isDestroyed || !isAdded()) return;
-            String line = "[" + timeFormat.format(new Date()) + "] " + message + "\n";
-            if (tvDebugConsole != null) {
-                tvDebugConsole.append(line);
-                if (scrollDebugLog != null) scrollDebugLog.fullScroll(View.FOCUS_DOWN);
-            }
-            Log.d(TAG, message);
-        });
+        if (message == null || isDestroyed) return;
+
+        synchronized (logBuffer) {
+            logBuffer.append("[")
+                    .append(timeFormat.format(new Date()))
+                    .append("] ")
+                    .append(message)
+                    .append("\n");
+        }
+
+        if (logFlushScheduled.compareAndSet(false, true)) {
+            mainHandler.postDelayed(this::flushLogBuffer, LOG_BATCH_INTERVAL_MS);
+        }
+
+        Log.d(TAG, message);
+    }
+
+    private void flushLogBuffer() {
+        logFlushScheduled.set(false);
+
+        if (isDestroyed || !isAdded() || tvDebugConsole == null) {
+            synchronized (logBuffer) { logBuffer.setLength(0); }
+            return;
+        }
+
+        String toAppend;
+        synchronized (logBuffer) {
+            toAppend = logBuffer.toString();
+            logBuffer.setLength(0);
+        }
+
+        if (toAppend.isEmpty()) return;
+
+        try {
+            tvDebugConsole.append(toAppend);
+            if (scrollDebugLog != null) scrollDebugLog.fullScroll(View.FOCUS_DOWN);
+        } catch (Exception e) {
+            Log.e(TAG, "flushLogBuffer error: " + e.getMessage());
+        }
     }
 
     // ==================== Adapters ====================
+
     private static class GateMonitorItem {
         String gateId, gateName, location, status, lastEvent;
         String branchName;
         int passCount, denyCount;
         int branchId;
     }
-    
+
     private static class BranchInfo {
         int branchId;
         String branchName;
     }
 
     private class GateMonitorAdapter extends RecyclerView.Adapter<GateMonitorAdapter.VH> {
-    private final List<GateMonitorItem> items;
-    GateMonitorAdapter(List<GateMonitorItem> items) { this.items = items; }
-    
-    @NonNull @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_gate_monitor_card, parent, false);
-        return new VH(view);
-    }
-    
-    @Override
-    public void onBindViewHolder(@NonNull VH h, int position) {
-        GateMonitorItem item = items.get(position);
-        
-        // اسم البوابة
-        h.tvGateName.setText(item.gateName);
-        h.tvGateName.setTextColor(getTextColor());
-        
-        // اسم الفرع (يظهر فقط عند عرض كل الفروع)
-        if (h.tvBranchName != null) {
-            if (currentBranchId == 0 && item.branchName != null && !item.branchName.isEmpty()) {
-                h.tvBranchName.setText("🏢 " + item.branchName);
-                h.tvBranchName.setVisibility(View.VISIBLE);
-            } else {
-                h.tvBranchName.setVisibility(View.GONE);
+
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_gate_monitor_card, parent, false);
+            return new VH(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int position) {
+            if (position < 0 || position >= monitorList.size()) return;
+
+            GateMonitorItem item = monitorList.get(position);
+
+            if (h.tvGateName != null) {
+                h.tvGateName.setText(item.gateName);
+                h.tvGateName.setTextColor(getTextColor());
+            }
+
+            if (h.tvBranchName != null) {
+                if (currentBranchId == 0 && item.branchName != null && !item.branchName.isEmpty()) {
+                    h.tvBranchName.setText("🏢 " + item.branchName);
+                    h.tvBranchName.setVisibility(View.VISIBLE);
+                } else {
+                    h.tvBranchName.setVisibility(View.GONE);
+                }
+            }
+
+            if (h.tvGateLocation != null) {
+                h.tvGateLocation.setText("📍 " + (item.location != null && !item.location.isEmpty() ?
+                        item.location : getLocalizedText("غير محدد", "Not specified")));
+            }
+
+            if (h.tvPassCount != null) h.tvPassCount.setText(String.valueOf(item.passCount));
+            if (h.tvDenyCount != null) h.tvDenyCount.setText(String.valueOf(item.denyCount));
+
+            if (h.tvGateLastEvent != null) {
+                h.tvGateLastEvent.setText(item.lastEvent != null && !item.lastEvent.isEmpty() ?
+                        item.lastEvent : getLocalizedText("لا أحداث", "No events"));
+                h.tvGateLastEvent.setTextColor(getSecondaryTextColor());
+            }
+
+            switch (item.status != null ? item.status.toLowerCase() : "offline") {
+                case "alert":
+                case "breach":
+                    if (h.cardGate != null) {
+                        h.cardGate.setCardBackgroundColor(Color.parseColor("#33EF4444"));
+                        h.cardGate.setStrokeColor(getDangerColor());
+                    }
+                    if (h.tvGateStatus != null) {
+                        h.tvGateStatus.setText(getLocalizedText("🚨 إنذار", "🚨 BREACH"));
+                        h.tvGateStatus.setTextColor(getDangerColor());
+                    }
+                    if (h.vStatusDot != null) {
+                        h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+                    }
+                    if (h.btnToggleSingleGate != null) {
+                        h.btnToggleSingleGate.setText(getLocalizedText("🔓 إعادة تعيين", "🔓 Reset"));
+                        h.btnToggleSingleGate.setBackgroundColor(getDangerColor());
+                    }
+                    startPulseAnimation(h.itemView);
+                    break;
+
+                case "online":
+                case "armed":
+                case "active":
+                    if (h.cardGate != null) {
+                        h.cardGate.setCardBackgroundColor(getColorFromTheme(
+                                com.google.android.material.R.attr.colorSurface, Color.parseColor("#1E1E1E")));
+                        h.cardGate.setStrokeColor(getSuccessColor());
+                    }
+                    if (h.tvGateStatus != null) {
+                        h.tvGateStatus.setText(getLocalizedText("🟢 مسلحة", "🟢 ARMED"));
+                        h.tvGateStatus.setTextColor(getSuccessColor());
+                    }
+                    if (h.vStatusDot != null) {
+                        h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
+                    }
+                    if (h.btnToggleSingleGate != null) {
+                        h.btnToggleSingleGate.setText(getLocalizedText("🔒 إغلاق", "🔒 Lock"));
+                        h.btnToggleSingleGate.setBackgroundColor(getSecondaryTextColor());
+                    }
+                    h.itemView.clearAnimation();
+                    break;
+
+                default:
+                    if (h.cardGate != null) {
+                        h.cardGate.setCardBackgroundColor(getColorFromTheme(
+                                com.google.android.material.R.attr.colorSurfaceVariant, Color.parseColor("#2A2A2A")));
+                        h.cardGate.setStrokeColor(getSecondaryTextColor());
+                    }
+                    if (h.tvGateStatus != null) {
+                        h.tvGateStatus.setText(getLocalizedText("⚪ غير متصلة", "⚪ OFFLINE"));
+                        h.tvGateStatus.setTextColor(getSecondaryTextColor());
+                    }
+                    if (h.vStatusDot != null) {
+                        h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_gray);
+                    }
+                    if (h.btnToggleSingleGate != null) {
+                        h.btnToggleSingleGate.setText(getLocalizedText("🔄 إعادة اتصال", "🔄 Reconnect"));
+                        h.btnToggleSingleGate.setBackgroundColor(getWarningColor());
+                    }
+                    h.itemView.clearAnimation();
+                    break;
+            }
+
+            if (h.btnToggleSingleGate != null) {
+                h.btnToggleSingleGate.setOnClickListener(v -> toggleGateState(item.gateId, item.status));
             }
         }
-        
-        // الموقع
-        if (h.tvGateLocation != null) {
-            h.tvGateLocation.setText("📍 " + (item.location != null && !item.location.isEmpty() ? 
-                item.location : getLocalizedText("غير محدد", "Not specified")));
-        }
-        
-        // الإحصائيات
-        if (h.tvPassCount != null) h.tvPassCount.setText(String.valueOf(item.passCount));
-        if (h.tvDenyCount != null) h.tvDenyCount.setText(String.valueOf(item.denyCount));
-        
-        // آخر حدث
-        h.tvGateLastEvent.setText(item.lastEvent != null && !item.lastEvent.isEmpty() ? 
-            item.lastEvent : getLocalizedText("لا أحداث", "No events"));
-        h.tvGateLastEvent.setTextColor(getSecondaryTextColor());
-        
-        // تحديد حالة البوابة
-        switch (item.status != null ? item.status.toLowerCase() : "offline") {
-            case "alert":
-            case "breach":
-                h.cardGate.setCardBackgroundColor(Color.parseColor("#33EF4444"));
-                h.cardGate.setStrokeColor(getDangerColor());
-                h.tvGateStatus.setText(getLocalizedText("🚨 إنذار", "🚨 BREACH"));
-                h.tvGateStatus.setTextColor(getDangerColor());
-                if (h.vStatusDot != null) {
-                    h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
-                }
-                if (h.btnToggleSingleGate != null) {
-                    h.btnToggleSingleGate.setText(getLocalizedText("🔓 إعادة تعيين", "🔓 Reset"));
-                    h.btnToggleSingleGate.setBackgroundColor(getDangerColor());
-                }
-                // تأثير نبض للإنذار
-                startPulseAnimation(h.itemView);
-                break;
-                
-            case "online":
-            case "armed":
-            case "active":
-                h.cardGate.setCardBackgroundColor(getColorFromTheme(
-                    com.google.android.material.R.attr.colorSurface, Color.parseColor("#1E1E1E")));
-                h.cardGate.setStrokeColor(getSuccessColor());
-                h.tvGateStatus.setText(getLocalizedText("🟢 مسلحة", "🟢 ARMED"));
-                h.tvGateStatus.setTextColor(getSuccessColor());
-                if (h.vStatusDot != null) {
-                    h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
-                }
-                if (h.btnToggleSingleGate != null) {
-                    h.btnToggleSingleGate.setText(getLocalizedText("🔒 إغلاق", "🔒 Lock"));
-                    h.btnToggleSingleGate.setBackgroundColor(getSecondaryTextColor());
-                }
-                h.itemView.clearAnimation();
-                break;
-                
-            default: // offline
-                h.cardGate.setCardBackgroundColor(getColorFromTheme(
-                    com.google.android.material.R.attr.colorSurfaceVariant, Color.parseColor("#2A2A2A")));
-                h.cardGate.setStrokeColor(getSecondaryTextColor());
-                h.tvGateStatus.setText(getLocalizedText("⚪ غير متصلة", "⚪ OFFLINE"));
-                h.tvGateStatus.setTextColor(getSecondaryTextColor());
-                if (h.vStatusDot != null) {
-                    h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_gray);
-                }
-                if (h.btnToggleSingleGate != null) {
-                    h.btnToggleSingleGate.setText(getLocalizedText("🔄 إعادة اتصال", "🔄 Reconnect"));
-                    h.btnToggleSingleGate.setBackgroundColor(getWarningColor());
-                }
-                h.itemView.clearAnimation();
-                break;
-        }
-        
-        // زر التحكم السريع بالبوابة
-        if (h.btnToggleSingleGate != null) {
-            h.btnToggleSingleGate.setOnClickListener(v -> {
-                toggleGateState(item.gateId, item.status);
-            });
-        }
-    }
-    
-    @Override 
-    public int getItemCount() { return items.size(); }
-    
-    class VH extends RecyclerView.ViewHolder {
-        com.google.android.material.card.MaterialCardView cardGate;
-        TextView tvGateName, tvGateStatus, tvGateLocation, tvPassCount, tvDenyCount, tvGateLastEvent, tvBranchName;
-        View vStatusDot;
-        Button btnToggleSingleGate;
-        
-        VH(@NonNull View itemView) {
-            super(itemView);
-            cardGate = itemView.findViewById(R.id.cardGate);
-            tvGateName = itemView.findViewById(R.id.tvGateName);
-            tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
-            tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
-            tvPassCount = itemView.findViewById(R.id.tvPassCount);
-            tvDenyCount = itemView.findViewById(R.id.tvDenyCount);
-            tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
-            tvBranchName = itemView.findViewById(R.id.tvBranchName);
-            vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
-            btnToggleSingleGate = itemView.findViewById(R.id.btnToggleSingleGate);
-        }
-    }
-}
 
-    // ==================== دورة الحياة ====================
+        @Override
+        public int getItemCount() {
+            return monitorList.size();
+        }
+
+        class VH extends RecyclerView.ViewHolder {
+            com.google.android.material.card.MaterialCardView cardGate;
+            TextView tvGateName, tvGateStatus, tvGateLocation, tvPassCount, tvDenyCount, tvGateLastEvent, tvBranchName;
+            View vStatusDot;
+            Button btnToggleSingleGate;
+
+            VH(@NonNull View itemView) {
+                super(itemView);
+                cardGate = itemView.findViewById(R.id.cardGate);
+                tvGateName = itemView.findViewById(R.id.tvGateName);
+                tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+                tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
+                tvPassCount = itemView.findViewById(R.id.tvPassCount);
+                tvDenyCount = itemView.findViewById(R.id.tvDenyCount);
+                tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+                tvBranchName = itemView.findViewById(R.id.tvBranchName);
+                vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
+                btnToggleSingleGate = itemView.findViewById(R.id.btnToggleSingleGate);
+            }
+        }
+    }
+
+    // ==================== Lifecycle ====================
+
     @Override
     public void onPause() {
         super.onPause();
@@ -1304,12 +1543,24 @@ private void toggleGateState(String gateId, String currentStatus) {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+
         isDestroyed = true;
         stopScanningSync();
         stopAlarm();
-        if (monitorScheduler != null) monitorScheduler.shutdownNow();
-        if (pingScheduler != null) pingScheduler.shutdownNow();
-        if (gateExecutor != null) gateExecutor.shutdownNow();
+
+        // ⭐ Cleanup شامل
+        try {
+            if (pollFuture != null) { pollFuture.cancel(true); pollFuture = null; }
+            if (pingFuture != null) { pingFuture.cancel(true); pingFuture = null; }
+            if (scheduler != null) { scheduler.shutdownNow(); scheduler = null; }
+            if (gateExecutor != null) { gateExecutor.shutdownNow(); gateExecutor = null; }
+        } catch (Exception e) {
+            Log.e(TAG, "Cleanup error: " + e.getMessage(), e);
+        }
+
+        scanDebounceMap.clear();
+        localAllowedEpcCache.clear();
+
         mainHandler.removeCallbacksAndMessages(null);
     }
 }
