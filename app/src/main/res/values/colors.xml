@@ -738,6 +738,74 @@
 <color name="scan_progress_track">#E8DFC8</color>
 <color name="scan_progress_start">#B89456</color>
 <color name="scan_progress_end">#E5C158</color>
+   
+   <!-- ═══════════════════════════════════════════════════════
+     MIRA POS — ألوان الوضع الفاتح
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- الهوية الذهبية -->
+<color name="pos_gold_primary">#E8C766</color>
+<color name="pos_gold_deep">#B8860B</color>
+<color name="pos_gold_soft">#F5E6B8</color>
+<color name="pos_gold_shimmer">#FFE9A8</color>
+<color name="pos_gold_transparent_20">#33E8C766</color>
+<color name="pos_gold_transparent_10">#1AE8C766</color>
+<color name="pos_gold_transparent_40">#66E8C766</color>
+
+<!-- الخلفيات -->
+<color name="pos_surface">#FFFFFF</color>
+<color name="pos_surface_variant">#FAF6EC</color>
+<color name="pos_header_bg">#FFFFFF</color>
+<color name="pos_header_stroke">#1AE8C766</color>
+
+<!-- النصوص -->
+<color name="pos_header_title">#1A1A1A</color>
+<color name="pos_header_subtitle">#8B7355</color>
+<color name="pos_hero_title">#E8C766</color>
+<color name="pos_hero_subtitle">#B8860B</color>
+<color name="pos_text_primary">#1A1A1A</color>
+<color name="pos_text_secondary">#6B6B6B</color>
+<color name="pos_text_hint">#9E9E9E</color>
+<color name="pos_text_on_gold">#1A1A1A</color>
+
+<!-- الحالات -->
+<color name="pos_status_online">#22C55E</color>
+<color name="pos_status_online_bg">#1A22C55E</color>
+<color name="pos_status_offline">#EF4444</color>
+<color name="pos_status_offline_bg">#1AEF4444</color>
+<color name="pos_status_searching">#9CA3AF</color>
+<color name="pos_status_searching_bg">#1A9CA3AF</color>
+<color name="pos_status_simulation">#F59E0B</color>
+<color name="pos_status_simulation_bg">#1AF59E0B</color>
+<color name="pos_status_active">#22C55E</color>
+<color name="pos_status_active_bg">#1A22C55E</color>
+
+<!-- الحدود والفواصل -->
+<color name="pos_divider">#1A000000</color>
+<color name="pos_divider_gold">#4DE8C766</color>
+<color name="pos_stroke_light">#E0E0E0</color>
+
+<!-- CTA / Buttons -->
+<color name="pos_cta_enabled">#E8C766</color>
+<color name="pos_cta_disabled">#E0E0E0</color>
+<color name="pos_cta_text_enabled">#1A1A1A</color>
+<color name="pos_cta_text_disabled">#9E9E9E</color>
+<color name="pos_danger">#EF4444</color>
+<color name="pos_danger_bg">#1AEF4444</color>
+
+<!-- Hero Glow -->
+<color name="pos_hero_glow_start">#33E8C766</color>
+<color name="pos_hero_glow_end">#00E8C766</color>
+<color name="pos_hero_ring">#66E8C766</color>
+<color name="pos_hero_wave">#99E8C766</color>
+<color name="pos_hero_sparkle">#FFE9A8</color>
+
+<!-- Summary -->
+<color name="pos_summary_bg_idle">#FAF6EC</color>
+<color name="pos_summary_bg_active">#E8C766</color>
+<color name="pos_summary_text_idle">#6B6B6B</color>
+<color name="pos_summary_text_active">#1A1A1A</color>
+   
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
