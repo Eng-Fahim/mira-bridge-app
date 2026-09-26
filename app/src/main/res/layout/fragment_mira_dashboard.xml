@@ -8,9 +8,7 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
 
-    <!-- ═══════════════════════════════════════════════════════
-         SHIMMER LOADING
-         ═══════════════════════════════════════════════════════ -->
+    <!-- SHIMMER LOADING -->
     <LinearLayout
         android:id="@+id/shimmerLayout"
         android:layout_width="0dp"
@@ -47,9 +45,7 @@
             android:background="@drawable/shimmer_background" />
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════════════════
-         LOADING OVERLAY
-         ═══════════════════════════════════════════════════════ -->
+    <!-- LOADING OVERLAY -->
     <LinearLayout
         android:id="@+id/loadingOverlay"
         android:layout_width="match_parent"
@@ -79,9 +75,7 @@
             android:layout_marginTop="@dimen/space_4" />
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════════════════
-         MAIN CONTENT
-         ═══════════════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"
@@ -110,9 +104,9 @@
                 android:paddingTop="@dimen/space_4"
                 android:paddingBottom="@dimen/space_6">
 
-                <!-- ═══════════════════════════════════════════════════════
-                     1. HERO BALANCE CARD — V3 (Iconic Edition)
-                     ═══════════════════════════════════════════════════════ -->
+                <!-- ═══════════════════════════════════════════════════
+                     1. HERO BALANCE CARD — Adaptive (Light + Dark)
+                     ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
                     android:layout_width="match_parent"
@@ -121,25 +115,24 @@
                     app:cardBackgroundColor="@android:color/transparent"
                     app:cardCornerRadius="@dimen/card_radius"
                     app:cardElevation="@dimen/elevation_3"
-                    app:strokeColor="#4DF5D97A"
+                    app:strokeColor="@color/hero_stroke"
                     app:strokeWidth="1dp">
 
                     <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content">
 
-                        <!-- Layer 1: Dark Gold Gradient -->
+                        <!-- Layer 1: Adaptive Gradient -->
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_hero_gold_gradient" />
 
-                        <!-- Layer 2: Gold Glow (subtle) -->
+                        <!-- Layer 2: Adaptive Glow -->
                         <View
                             android:layout_width="200dp"
                             android:layout_height="200dp"
                             android:layout_gravity="top|end"
-                            android:alpha="0.18"
                             android:background="@drawable/bg_hero_glow" />
 
                         <!-- Layer 3: Diamond Pattern -->
@@ -148,7 +141,7 @@
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_diamond_pattern" />
 
-                        <!-- Layer 4: MIRA Watermark -->
+                        <!-- Layer 4: Watermark -->
                         <ImageView
                             android:layout_width="180dp"
                             android:layout_height="180dp"
@@ -158,7 +151,7 @@
                             android:alpha="0.06"
                             android:importantForAccessibility="no"
                             android:src="@drawable/ic_diamond"
-                            app:tint="#F5D97A" />
+                            app:tint="@color/hero_title_text" />
 
                         <!-- Layer 5: Content -->
                         <LinearLayout
@@ -169,14 +162,14 @@
                             android:paddingTop="@dimen/space_4"
                             android:paddingBottom="@dimen/space_4">
 
-                            <!-- ═══ Top Row: Badge + Title + Eye + Trend ═══ -->
+                            <!-- Top Row -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:gravity="center_vertical"
                                 android:orientation="horizontal">
 
-                                <!-- MIRA ID Badge (لا تغيير — Logo) -->
+                                <!-- MIRA ID Badge -->
                                 <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
@@ -192,7 +185,7 @@
                                         android:layout_height="10dp"
                                         android:importantForAccessibility="no"
                                         android:src="@drawable/ic_diamond"
-                                        app:tint="#F5D97A" />
+                                        app:tint="@color/hero_title_text" />
 
                                     <TextView
                                         android:layout_width="wrap_content"
@@ -201,19 +194,19 @@
                                         android:fontFamily="sans-serif-medium"
                                         android:letterSpacing="0.1"
                                         android:text="MIRA ID™"
-                                        android:textColor="#F5D97A"
+                                        android:textColor="@color/hero_title_text"
                                         android:textSize="9sp"
                                         android:textStyle="bold" />
                                 </LinearLayout>
 
-                                <!-- Title — ✅ لون الهوية بدل hex -->
+                                <!-- Title -->
                                 <TextView
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
                                     android:layout_weight="1"
                                     android:text="@string/total_inventory_value"
                                     android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                    android:textColor="@color/gold_luxury_light"
+                                    android:textColor="@color/hero_title_text"
                                     tools:text="💰 قيمة المخزون" />
 
                                 <!-- Eye Button -->
@@ -226,7 +219,7 @@
                                     android:contentDescription="@string/toggle_visibility"
                                     android:padding="4dp"
                                     android:src="@drawable/ic_eye_off"
-                                    app:tint="#F5D97A" />
+                                    app:tint="@color/hero_title_text" />
 
                                 <!-- Trend -->
                                 <TextView
@@ -237,13 +230,13 @@
                                     android:paddingHorizontal="@dimen/space_2"
                                     android:paddingVertical="4dp"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                    android:textColor="@color/gold_luxury_light"
+                                    android:textColor="@color/hero_title_text"
                                     android:visibility="gone"
                                     tools:text="📈 +2.4%"
                                     tools:visibility="visible" />
                             </LinearLayout>
 
-                            <!-- ═══ Hero Value Section ═══ -->
+                            <!-- Hero Value Section -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -257,12 +250,9 @@
                                     android:alpha="0.75"
                                     android:text="@string/current_inventory_value"
                                     android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                                    android:textColor="#B89456"
+                                    android:textColor="@color/hero_label_text"
                                     tools:text="القيمة الحالية" />
 
-                                <!-- ⭐⭐⭐ الرقم الرئيسي — الترقية الأهم -->
-                                <!-- قبل: 8 خصائص hardcoded بدون tnum -->
-                                <!-- بعد: نمط واحد + tnum تلقائي + ظل + LTR -->
                                 <TextView
                                     android:id="@+id/tvHeroBalance"
                                     android:layout_width="match_parent"
@@ -270,18 +260,18 @@
                                     android:layout_marginTop="@dimen/space_1"
                                     android:text="••••••••"
                                     android:textAppearance="@style/TextAppearance.App.Number.OnGold.Hero"
-                                    android:textColor="#FFFFFF"
+                                    android:textColor="@color/hero_value_text"
                                     tools:text="$52,798.66" />
 
-                                <!-- ✅ Gold Underline -->
+                                <!-- Gold Underline -->
                                 <View
                                     android:layout_width="140dp"
                                     android:layout_height="2dp"
                                     android:layout_marginTop="@dimen/space_2"
-                                    android:background="@drawable/bg_gold_underline" />
+                                    android:background="@color/hero_underline" />
                             </LinearLayout>
 
-                            <!-- ═══ Chips: Weight + Count ═══ -->
+                            <!-- Chips: Weight + Count -->
                             <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -302,10 +292,9 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="⚖"
-                                        android:textColor="@color/gold_luxury_light"
+                                        android:textColor="@color/hero_title_text"
                                         android:textSize="12sp" />
 
-                                    <!-- ✅ الوزن — Number.OnGold.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroSubtitle"
                                         android:layout_width="wrap_content"
@@ -313,11 +302,11 @@
                                         android:layout_marginStart="6dp"
                                         android:text="0.0 g"
                                         android:textAppearance="@style/TextAppearance.App.Number.OnGold.Small"
-                                        android:textColor="#FFFFFF"
+                                        android:textColor="@color/hero_value_text"
                                         tools:text="374.0 g" />
                                 </LinearLayout>
 
-                                <!-- Chip: Item Count — نص مختلط (لا يستخدم Number) -->
+                                <!-- Chip: Item Count -->
                                 <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
@@ -332,10 +321,9 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="◈"
-                                        android:textColor="@color/gold_luxury_light"
+                                        android:textColor="@color/hero_title_text"
                                         android:textSize="12sp" />
 
-                                    <!-- ⚠️ نص مختلط (رقم + كلمة عربية) → Label.Medium وليس Number -->
                                     <TextView
                                         android:id="@+id/tvHeroItemCount"
                                         android:layout_width="wrap_content"
@@ -343,12 +331,12 @@
                                         android:layout_marginStart="6dp"
                                         android:text="0 قطعة"
                                         android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                                        android:textColor="#FFFFFF"
+                                        android:textColor="@color/hero_value_text"
                                         tools:text="6 قطعة" />
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- Sparkline Placeholder -->
+                            <!-- Sparkline -->
                             <com.example.uhf.widget.MiraSparklineView
                                 android:id="@+id/heroSparkline"
                                 android:layout_width="match_parent"
@@ -363,15 +351,15 @@
                                 android:layout_height="1dp"
                                 android:layout_marginTop="@dimen/space_4"
                                 android:layout_marginBottom="@dimen/space_4"
-                                android:background="#33F5D97A" />
+                                android:background="@color/hero_divider" />
 
-                            <!-- ═══ Currencies List ═══ -->
+                            <!-- Currencies List -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:orientation="vertical">
 
-                                <!-- Row 1: USD -->
+                                <!-- USD -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
@@ -392,7 +380,7 @@
                                         android:fontFamily="sans-serif-medium"
                                         android:letterSpacing="0.05"
                                         android:text="USD"
-                                        android:textColor="@color/gold_luxury_light"
+                                        android:textColor="@color/hero_title_text"
                                         android:textSize="11sp"
                                         android:textStyle="bold" />
 
@@ -401,18 +389,17 @@
                                         android:layout_height="1dp"
                                         android:layout_weight="1" />
 
-                                    <!-- ✅ Number.OnGold.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroValueUSD"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="••••••"
                                         android:textAppearance="@style/TextAppearance.App.Number.OnGold.Small"
-                                        android:textColor="#FFFFFF"
+                                        android:textColor="@color/hero_value_text"
                                         tools:text="52,798.66" />
                                 </LinearLayout>
 
-                                <!-- Row 2: SAR -->
+                                <!-- SAR -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
@@ -432,7 +419,7 @@
                                         android:layout_marginStart="@dimen/space_2"
                                         android:letterSpacing="0.05"
                                         android:text="SAR"
-                                        android:textColor="#B89456"
+                                        android:textColor="@color/hero_secondary_text"
                                         android:textSize="11sp" />
 
                                     <View
@@ -440,18 +427,17 @@
                                         android:layout_height="1dp"
                                         android:layout_weight="1" />
 
-                                    <!-- ✅ Number.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroValueSAR"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="••••••"
                                         android:textAppearance="@style/TextAppearance.App.Number.Small"
-                                        android:textColor="#B89456"
+                                        android:textColor="@color/hero_secondary_text"
                                         tools:text="197,994.98" />
                                 </LinearLayout>
 
-                                <!-- Row 3: YER -->
+                                <!-- YER -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
@@ -471,7 +457,7 @@
                                         android:layout_marginStart="@dimen/space_2"
                                         android:letterSpacing="0.05"
                                         android:text="YER"
-                                        android:textColor="#B89456"
+                                        android:textColor="@color/hero_secondary_text"
                                         android:textSize="11sp" />
 
                                     <View
@@ -479,19 +465,18 @@
                                         android:layout_height="1dp"
                                         android:layout_weight="1" />
 
-                                    <!-- ✅ Number.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroValueYER"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="••••••"
                                         android:textAppearance="@style/TextAppearance.App.Number.Small"
-                                        android:textColor="#B89456"
+                                        android:textColor="@color/hero_secondary_text"
                                         tools:text="27,983,290" />
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- ═══ Footer ═══ -->
+                            <!-- Footer -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -506,7 +491,7 @@
                                     android:fontFamily="sans-serif"
                                     android:letterSpacing="0.15"
                                     android:text="MIRA JEWELRY ENTERPRISE™"
-                                    android:textColor="#B89456"
+                                    android:textColor="@color/hero_secondary_text"
                                     android:textSize="7sp"
                                     android:textStyle="bold" />
                             </LinearLayout>
@@ -514,9 +499,9 @@
                     </FrameLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ═══════════════════════════════════════════════════════
+                <!-- ═══════════════════════════════════════════════════
                      2. ALERTS STRIP
-                     ═══════════════════════════════════════════════════════ -->
+                     ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/alertsStrip"
                     android:layout_width="match_parent"
@@ -556,9 +541,9 @@
                         android:textColor="?attr/colorPrimary" />
                 </LinearLayout>
 
-                <!-- ═══════════════════════════════════════════════════════
-                     3. INVENTORY METRICS
-                     ═══════════════════════════════════════════════════════ -->
+                <!-- ═══════════════════════════════════════════════════
+                     3. INVENTORY METRICS — Warm Surface
+                     ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/inventoryMetrics"
                     android:layout_width="match_parent"
@@ -568,16 +553,16 @@
                     android:baselineAligned="false"
                     android:weightSum="3">
 
-                    <!-- Metric 1: عدد القطع -->
+                    <!-- Metric 1 -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="108dp"
                         android:layout_marginEnd="@dimen/space_1"
                         android:layout_weight="1"
-                        app:cardBackgroundColor="?attr/colorSurface"
+                        app:cardBackgroundColor="@color/card_surface_warm"
                         app:cardCornerRadius="@dimen/radius_xl"
                         app:cardElevation="@dimen/elevation_1"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="@dimen/stroke_normal">
 
                         <LinearLayout
@@ -613,16 +598,16 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Metric 2: الوزن -->
+                    <!-- Metric 2 -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="108dp"
                         android:layout_marginHorizontal="@dimen/space_1"
                         android:layout_weight="1"
-                        app:cardBackgroundColor="?attr/colorSurface"
+                        app:cardBackgroundColor="@color/card_surface_warm"
                         app:cardCornerRadius="@dimen/radius_xl"
                         app:cardElevation="@dimen/elevation_1"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="@dimen/stroke_normal">
 
                         <LinearLayout
@@ -659,16 +644,16 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Metric 3: مبيعات اليوم -->
+                    <!-- Metric 3 -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="108dp"
                         android:layout_marginStart="@dimen/space_1"
                         android:layout_weight="1"
-                        app:cardBackgroundColor="?attr/colorSurface"
+                        app:cardBackgroundColor="@color/card_surface_warm"
                         app:cardCornerRadius="@dimen/radius_xl"
                         app:cardElevation="@dimen/elevation_1"
-                        app:strokeColor="?attr/colorOutlineVariant"
+                        app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="@dimen/stroke_normal">
 
                         <LinearLayout
@@ -705,18 +690,18 @@
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <!-- ═══════════════════════════════════════════════════════
-                     4. GOLD PRICES
-                     ═══════════════════════════════════════════════════════ -->
+                <!-- ═══════════════════════════════════════════════════
+                     4. GOLD PRICES — Warm Surface
+                     ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGoldPrices"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/space_4"
-                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardBackgroundColor="@color/card_surface_warm"
                     app:cardCornerRadius="@dimen/card_radius"
                     app:cardElevation="@dimen/elevation_1"
-                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:strokeColor="@color/card_stroke_warm"
                     app:strokeWidth="@dimen/stroke_normal">
 
                     <LinearLayout
@@ -806,7 +791,6 @@
                                 android:textAppearance="@style/TextAppearance.App.Label.Medium"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
 
-                            <!-- ✅ Hero → Large (34sp كان كبيراً جداً هنا) -->
                             <TextView
                                 android:id="@+id/tvOuncePrice"
                                 android:layout_width="wrap_content"
@@ -881,18 +865,18 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ═══════════════════════════════════════════════════════
-                     5. SALES SUMMARY
-                     ═══════════════════════════════════════════════════════ -->
+                <!-- ═══════════════════════════════════════════════════
+                     5. SALES SUMMARY — Warm Surface
+                     ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/salesSummaryCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/space_4"
-                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardBackgroundColor="@color/card_surface_warm"
                     app:cardCornerRadius="@dimen/radius_xl"
                     app:cardElevation="@dimen/elevation_1"
-                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:strokeColor="@color/card_stroke_warm"
                     app:strokeWidth="@dimen/stroke_normal">
 
                     <LinearLayout
@@ -1025,9 +1009,9 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ═══════════════════════════════════════════════════════
+                <!-- ═══════════════════════════════════════════════════
                      6. RECENT ACTIVITY
-                     ═══════════════════════════════════════════════════════ -->
+                     ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/recentActivityHeader"
                     android:layout_width="match_parent"
