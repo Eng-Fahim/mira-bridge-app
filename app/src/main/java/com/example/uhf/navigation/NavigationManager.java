@@ -30,7 +30,7 @@ import java.util.List;
  * ✅ يدعم BackPressInterceptor (للجرد النشط)
  *
  * ✅ جديد في هذه النسخة:
- * - إضافة TAG_SNAPSHOTS (شاشة لقطات المخزون)
+ * - TAG_GATES (شاشة البوابات من التنقل السفلي)
  */
 public class NavigationManager {
 
@@ -44,6 +44,7 @@ public class NavigationManager {
     public static final String TAG_IDENTITY_STUDIO   = "IdentityStudio";
     public static final String TAG_RADAR             = "Radar";
     public static final String TAG_SECURE_GATE       = "SecureGate";
+    public static final String TAG_GATES             = "Gates";   // ✅ جديد
     public static final String TAG_REPORTS           = "Reports";
     public static final String TAG_ACCOUNTING        = "Accounting";
     public static final String TAG_ADMIN_HUB         = "AdminHub";
@@ -59,14 +60,12 @@ public class NavigationManager {
     public static final String TAG_BRANCHES          = "Branches";
     public static final String TAG_RFID_BINDINGS     = "RfidBindings";
     public static final String TAG_SOUND_SETTINGS    = "SoundSettings";
-
-    // ✅ جديد: شاشة لقطات المخزون
     public static final String TAG_SNAPSHOTS         = "Snapshots";
 
     // ==================== قائمة التبويبات الرئيسية ====================
     private static final String[] ROOT_TAGS = {
             TAG_DASHBOARD, TAG_INVENTORY, TAG_POS,
-            TAG_TRANSFERS, TAG_RADAR, TAG_SECURE_GATE,
+            TAG_GATES, TAG_RADAR, TAG_SECURE_GATE,       // ✅ TAG_GATES بدل TAG_TRANSFERS
             TAG_REPORTS, TAG_ACCOUNTING, TAG_ADMIN_HUB
     };
 
@@ -173,7 +172,7 @@ public class NavigationManager {
             tx.commit();
 
             currentFragmentTag = tag;
-            currentFragment = target;   // ✅ جديد
+            currentFragment = target;
 
             log("✅ Navigated to: " + tag + " (backStack=" + addToBackStack + ")");
 
@@ -207,7 +206,7 @@ public class NavigationManager {
             tx.commit();
 
             currentFragmentTag = tag;
-            currentFragment = fragment;   // ✅ جديد
+            currentFragment = fragment;
 
             log("✅ Direct load: " + tag);
 
@@ -317,6 +316,7 @@ public class NavigationManager {
             case TAG_IDENTITY_STUDIO:   return new MiraIdentityStudioFragment();
             case TAG_RADAR:             return new MiraUHFRadarLocationFragment();
             case TAG_SECURE_GATE:       return new MiraSecureGateFragment();
+            case TAG_GATES:             return new MiraSecureGateFragment();  // ✅ جديد
             case TAG_REPORTS:           return new MiraReportsProFragment();
             case TAG_ACCOUNTING:        return new MiraAccountingFragment();
             case TAG_ADMIN_HUB:         return new MiraAdminHubFragment();
@@ -332,7 +332,6 @@ public class NavigationManager {
             case TAG_BRANCHES:          return new MiraBranchesManagementFragment();
             case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
             case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
-            // ✅ جديد: شاشة اللقطات
             case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
             default:
                 log("Unknown tag: " + tag + ", falling back to Dashboard");
