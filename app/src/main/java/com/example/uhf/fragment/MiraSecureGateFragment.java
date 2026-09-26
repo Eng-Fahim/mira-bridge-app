@@ -173,6 +173,8 @@ public class MiraSecureGateFragment extends Fragment {
     private RadioButton rbManual, rbSemiAuto, rbFullAuto;
     private MaterialSwitch swKeepScreenOn, swContinuousScan, swSoundAlerts, swVibration;
     private TextView tvCurrentModeBadge;
+    
+    private MaterialSwitch swSimulateExitOnSale;
 
     // ✅ v2.1: Local counters
     private volatile int localPassCount = 0;
@@ -384,6 +386,8 @@ public class MiraSecureGateFragment extends Fragment {
         swSoundAlerts = view.findViewById(R.id.swSoundAlerts);
         swVibration = view.findViewById(R.id.swVibration);
         tvCurrentModeBadge = view.findViewById(R.id.tvCurrentModeBadge);
+        
+        swSimulateExitOnSale = view.findViewById(R.id.swSimulateExitOnSale);
 
         if (rvGatesMonitor != null) {
             rvGatesMonitor.setLayoutManager(new GridLayoutManager(getContext(), 2));
@@ -508,6 +512,15 @@ public class MiraSecureGateFragment extends Fragment {
                 miraGatesSettings.setVibrationEnabled(checked);
             });
         }
+        
+        if (swSimulateExitOnSale != null) {
+    swSimulateExitOnSale.setOnCheckedChangeListener((btn, checked) -> {
+        miraGatesSettings.setSimulateExitOnSale(checked);
+        logConsole(getLocalizedText(
+                "🎬 محاكاة الخروج: " + (checked ? "مفعّلة" : "معطّلة"),
+                "🎬 Simulate exit: " + (checked ? "ON" : "OFF")));
+    });
+}
     }
 
     // ==================== Operation Mode ====================
@@ -543,6 +556,9 @@ public class MiraSecureGateFragment extends Fragment {
                 swSoundAlerts.setChecked(true);
             if (swVibration != null) 
                 swVibration.setChecked(miraGatesSettings.isVibrationEnabled());
+                
+                if (swSimulateExitOnSale != null) 
+    swSimulateExitOnSale.setChecked(miraGatesSettings.isSimulateExitOnSale());
 
             // ✅ تطبيق السلوك
             applyOperationMode(currentOperationMode);
