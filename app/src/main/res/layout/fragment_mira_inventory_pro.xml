@@ -30,7 +30,7 @@
         android:background="?attr/colorSurface"
         app:elevation="@dimen/elevation_0">
 
-        <!-- ✨ STATUS STRIP — متكيف مع الوضعين -->
+        <!-- ✨ STATUS STRIP -->
         <LinearLayout
             android:id="@+id/statusBar"
             android:layout_width="match_parent"
@@ -129,11 +129,12 @@
          MAIN CONTENT
          ═══════════════════════════════════════════════════════ -->
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/nestedScroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:overScrollMode="never"
-        android:paddingBottom="150dp"
+        android:paddingBottom="160dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
@@ -142,330 +143,293 @@
             android:orientation="vertical">
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ LAST SCAN CARD — متكيف (Hero-like)
+                 🌅 WELCOME STATE — الحالة الافتراضية (بدون بيانات)
                  ═══════════════════════════════════════════════════════ -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/lastScanCard"
+            <LinearLayout
+                android:id="@+id/welcomeState"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_3"
-                app:cardBackgroundColor="@android:color/transparent"
-                app:cardCornerRadius="@dimen/card_radius"
-                app:cardElevation="@dimen/elevation_2"
-                app:strokeColor="@color/scan_hero_stroke"
-                app:strokeWidth="1dp">
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/space_6"
+                android:paddingTop="@dimen/space_12"
+                android:paddingBottom="@dimen/space_8"
+                android:visibility="visible">
 
-                <LinearLayout
+                <!-- 🎨 الشعار الذهبي الدائري -->
+                <FrameLayout
+                    android:layout_width="140dp"
+                    android:layout_height="140dp"
+                    android:background="@drawable/bg_empty_welcome">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="💎"
+                        android:textSize="64sp" />
+
+                    <!-- حلقة خارجية متحركة -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_empty_state_gold_circle" />
+                </FrameLayout>
+
+                <!-- ✨ العنوان الرئيسي -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_6"
+                    android:text="🎯 جاهز للجرد"
+                    android:textAppearance="@style/TextAppearance.App.Title.Large"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+
+                <!-- 📝 وصف -->
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_scan_last_gradient"
+                    android:layout_marginTop="@dimen/space_3"
                     android:gravity="center"
-                    android:minHeight="140dp"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_3">
+                    android:text="اختر وضع الجرد من الأعلى،\nثم اضغط زر البدء في الأسفل"
+                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="14sp"
+                    android:lineSpacingMultiplier="1.5" />
 
-                    <!-- Chip "آخر مسح" -->
-                    <LinearLayout
+                <!-- 🎯 الأوضاع المتاحة -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_6"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_scan_chip"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
+                        android:background="@drawable/bg_welcome_pill"
                         android:paddingHorizontal="@dimen/space_3"
-                        android:paddingVertical="@dimen/space_1">
-
-                        <TextView
-                            android:id="@+id/tvLastScanLabel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="✨ آخر مسح"
-                            android:textAppearance="@style/TextAppearance.App.Label.Small"
-                            android:textColor="@color/scan_hero_chip_text"
-                            android:textStyle="bold" />
-                    </LinearLayout>
+                        android:paddingVertical="@dimen/space_1"
+                        android:text="⚡ شامل"
+                        android:textAppearance="@style/TextAppearance.App.Label.Small"
+                        android:textColor="@color/scan_hero_chip_text"
+                        android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/tvLastScanTitle"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="2"
-                        android:text="لا توجد مسوحات"
-                        android:textAppearance="@style/TextAppearance.App.Title.Large"
-                        android:textColor="@color/scan_hero_title" />
-
-                    <TextView
-                        android:id="@+id/tvLastScanEpc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_1"
-                        android:alpha="0.65"
-                        android:ellipsize="middle"
-                        android:fontFamily="monospace"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text=""
-                        android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                        android:textColor="@color/scan_hero_secondary"
-                        android:textDirection="ltr"
-                        android:visibility="gone"
-                        tools:text="E280 1160 6000 0204 1B2C"
-                        tools:visibility="visible" />
-
-                    <!-- Row: Karat • Weight • RSSI -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:baselineAligned="false"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/tvLastScanKarat"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="—"
-                            android:textAppearance="@style/TextAppearance.App.Label.Large"
-                            android:textColor="@color/scan_hero_value" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginHorizontal="@dimen/space_2"
-                            android:alpha="0.5"
-                            android:text="•"
-                            android:textColor="@color/scan_hero_secondary" />
-
-                        <TextView
-                            android:id="@+id/tvLastScanWeight"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0.00g"
-                            android:textAppearance="@style/TextAppearance.App.Label.Large"
-                            android:textColor="@color/scan_hero_value"
-                            android:textDirection="ltr" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginHorizontal="@dimen/space_2"
-                            android:alpha="0.5"
-                            android:text="•"
-                            android:textColor="@color/scan_hero_secondary" />
-
-                        <TextView
-                            android:id="@+id/tvLastScanRssi"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="monospace"
-                            android:text="📶 -50"
-                            android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                            android:textColor="@color/scan_hero_secondary" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvLastScanStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:background="@drawable/bg_status_chip"
-                        android:paddingHorizontal="@dimen/space_4"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:background="@drawable/bg_welcome_pill"
+                        android:paddingHorizontal="@dimen/space_3"
                         android:paddingVertical="@dimen/space_1"
-                        android:text="✅ مطابق"
-                        android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                        android:textColor="@color/scan_hero_chip_text" />
+                        android:text="📂 فئوي"
+                        android:textAppearance="@style/TextAppearance.App.Label.Small"
+                        android:textColor="@color/scan_hero_chip_text"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:background="@drawable/bg_welcome_pill"
+                        android:paddingHorizontal="@dimen/space_3"
+                        android:paddingVertical="@dimen/space_1"
+                        android:text="👁 أعمى"
+                        android:textAppearance="@style/TextAppearance.App.Label.Small"
+                        android:textColor="@color/scan_hero_chip_text"
+                        android:textStyle="bold" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+
+                <!-- ⬇️ مؤشر للأسفل -->
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="@dimen/space_8"
+                    android:background="@drawable/bg_welcome_arrow">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="⬇"
+                        android:textSize="20sp"
+                        android:textColor="@color/scan_hero_chip_text" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:text="اضغط للبدء"
+                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                    android:textColor="@color/scan_hero_secondary"
+                    android:alpha="0.7" />
+            </LinearLayout>
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ PROGRESS CARD — Warm Surface
+                 🎯 ACTIVE STATE — الكروت (تظهر عند المسح)
                  ═══════════════════════════════════════════════════════ -->
-            <com.google.android.material.card.MaterialCardView
+            <LinearLayout
+                android:id="@+id/activeContentGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_3"
-                app:cardBackgroundColor="@color/scan_card_bg"
-                app:cardCornerRadius="@dimen/card_radius"
-                app:cardElevation="@dimen/elevation_0"
-                app:strokeColor="@color/scan_card_stroke"
-                app:strokeWidth="1dp">
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
 
-                <LinearLayout
+                <!-- ═══════════════════════════════════════════════════════
+                     1. LAST SCAN CARD
+                     ═══════════════════════════════════════════════════════ -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/lastScanCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_4">
+                    android:layout_marginHorizontal="@dimen/space_3"
+                    android:layout_marginTop="@dimen/space_3"
+                    app:cardBackgroundColor="@android:color/transparent"
+                    app:cardCornerRadius="@dimen/card_radius"
+                    app:cardElevation="@dimen/elevation_2"
+                    app:strokeColor="@color/scan_hero_stroke"
+                    app:strokeWidth="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:background="@drawable/bg_scan_last_gradient"
+                        android:gravity="center"
+                        android:minHeight="140dp"
+                        android:orientation="vertical"
+                        android:padding="@dimen/space_3">
 
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="📊 التقدم"
-                            android:textAppearance="@style/TextAppearance.App.Label.Large"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-
-                        <TextView
-                            android:id="@+id/tvProgressPercent"
+                        <!-- Chip "آخر مسح" -->
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif-medium"
-                            android:text="0%"
-                            android:textColor="@color/scan_hero_title"
+                            android:background="@drawable/bg_scan_chip"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="@dimen/space_3"
+                            android:paddingVertical="@dimen/space_1">
+
+                            <TextView
+                                android:id="@+id/tvLastScanLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="✨ آخر مسح"
+                                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                android:textColor="@color/scan_hero_chip_text"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvLastScanTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_3"
+                            android:ellipsize="end"
+                            android:gravity="center"
+                            android:maxLines="2"
+                            android:text="لا توجد مسوحات"
+                            android:textAppearance="@style/TextAppearance.App.Title.Large"
+                            android:textColor="@color/scan_hero_title" />
+
+                        <TextView
+                            android:id="@+id/tvLastScanEpc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_1"
+                            android:alpha="0.65"
+                            android:ellipsize="middle"
+                            android:fontFamily="monospace"
+                            android:gravity="center"
+                            android:maxLines="1"
+                            android:text=""
+                            android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                            android:textColor="@color/scan_hero_secondary"
                             android:textDirection="ltr"
-                            android:textSize="22sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <ProgressBar
-                        android:id="@+id/progressScanned"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="10dp"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:max="100"
-                        android:progress="0"
-                        android:progressDrawable="@drawable/scan_progress_gold" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:baselineAligned="false"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:weightSum="6">
+                            android:visibility="gone"
+                            tools:text="E280 1160 6000 0204 1B2C"
+                            tools:visibility="visible" />
 
                         <LinearLayout
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="3"
-                            android:gravity="start|center_vertical"
+                            android:layout_marginTop="@dimen/space_3"
+                            android:baselineAligned="false"
+                            android:gravity="center"
                             android:orientation="horizontal">
 
                             <TextView
-                                android:id="@+id/tvScannedCount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="sans-serif-medium"
-                                android:includeFontPadding="false"
-                                android:text="0"
-                                android:textColor="@color/scan_hero_title"
-                                android:textDirection="ltr"
-                                android:textSize="34sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginHorizontal="@dimen/space_1"
-                                android:text="/"
-                                android:textAppearance="@style/TextAppearance.App.Title.Large"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-
-                            <TextView
-                                android:id="@+id/tvExpectedCount"
+                                android:id="@+id/tvLastScanKarat"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="—"
-                                android:textAppearance="@style/TextAppearance.App.Title.Large"
-                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                android:textColor="@color/scan_hero_value" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginHorizontal="@dimen/space_2"
+                                android:alpha="0.5"
+                                android:text="•"
+                                android:textColor="@color/scan_hero_secondary" />
+
+                            <TextView
+                                android:id="@+id/tvLastScanWeight"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0.00g"
+                                android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                android:textColor="@color/scan_hero_value"
                                 android:textDirection="ltr" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginHorizontal="@dimen/space_2"
+                                android:alpha="0.5"
+                                android:text="•"
+                                android:textColor="@color/scan_hero_secondary" />
+
+                            <TextView
+                                android:id="@+id/tvLastScanRssi"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="monospace"
+                                android:text="📶 -50"
+                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                                android:textColor="@color/scan_hero_secondary" />
                         </LinearLayout>
 
-                        <LinearLayout
-                            android:layout_width="0dp"
+                        <TextView
+                            android:id="@+id/tvLastScanStatus"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1.5"
-                            android:gravity="center"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tvAccuracy"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="sans-serif-medium"
-                                android:text="—"
-                                android:textColor="@color/success_500"
-                                android:textDirection="ltr"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="الدقة"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="40dp"
-                            android:layout_gravity="center_vertical"
-                            android:background="?attr/colorOutlineVariant"
-                            android:alpha="0.3" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1.5"
-                            android:gravity="end"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tvVariance"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="sans-serif-medium"
-                                android:text="—"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textDirection="ltr"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="الفرق"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-                        </LinearLayout>
+                            android:layout_marginTop="@dimen/space_3"
+                            android:background="@drawable/bg_status_chip"
+                            android:paddingHorizontal="@dimen/space_4"
+                            android:paddingVertical="@dimen/space_1"
+                            android:text="✅ مطابق"
+                            android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                            android:textColor="@color/scan_hero_chip_text" />
                     </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                </com.google.android.material.card.MaterialCardView>
 
-            <!-- ═══════════════════════════════════════════════════════
-                 ✨ GOLD METRICS ROW — Weight + Value
-                 ═══════════════════════════════════════════════════════ -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_3"
-                android:baselineAligned="false"
-                android:orientation="horizontal"
-                android:weightSum="2">
-
-                <!-- Weight — Warm Surface -->
+                <!-- ═══════════════════════════════════════════════════════
+                     2. PROGRESS CARD
+                     ═══════════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
+                    android:id="@+id/progressCard"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/space_1"
-                    android:layout_weight="1"
+                    android:layout_marginHorizontal="@dimen/space_3"
+                    android:layout_marginTop="@dimen/space_3"
                     app:cardBackgroundColor="@color/scan_card_bg"
-                    app:cardCornerRadius="@dimen/radius_xl"
+                    app:cardCornerRadius="@dimen/card_radius"
                     app:cardElevation="@dimen/elevation_0"
                     app:strokeColor="@color/scan_card_stroke"
                     app:strokeWidth="1dp">
@@ -473,241 +437,408 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
                         android:orientation="vertical"
                         android:padding="@dimen/space_4">
 
-                        <TextView
-                            android:id="@+id/tvTotalWeight"
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif-medium"
-                            android:text="0.00 g"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textDirection="ltr"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
+                            android:orientation="horizontal">
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="📊 التقدم"
+                                android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+
+                            <TextView
+                                android:id="@+id/tvProgressPercent"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-medium"
+                                android:text="0%"
+                                android:textColor="@color/scan_hero_title"
+                                android:textDirection="ltr"
+                                android:textSize="22sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <ProgressBar
+                            android:id="@+id/progressScanned"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="10dp"
+                            android:layout_marginTop="@dimen/space_3"
+                            android:max="100"
+                            android:progress="0"
+                            android:progressDrawable="@drawable/scan_progress_gold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_1"
-                            android:text="⚖️ الوزن"
-                            android:textAppearance="@style/TextAppearance.App.Label.Small"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
+                            android:layout_marginTop="@dimen/space_4"
+                            android:baselineAligned="false"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:weightSum="6">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="3"
+                                android:gravity="start|center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:id="@+id/tvScannedCount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:includeFontPadding="false"
+                                    android:text="0"
+                                    android:textColor="@color/scan_hero_title"
+                                    android:textDirection="ltr"
+                                    android:textSize="34sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginHorizontal="@dimen/space_1"
+                                    android:text="/"
+                                    android:textAppearance="@style/TextAppearance.App.Title.Large"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                <TextView
+                                    android:id="@+id/tvExpectedCount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="—"
+                                    android:textAppearance="@style/TextAppearance.App.Title.Large"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textDirection="ltr" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.5"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvAccuracy"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:text="—"
+                                    android:textColor="@color/success_500"
+                                    android:textDirection="ltr"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="الدقة"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="40dp"
+                                android:layout_gravity="center_vertical"
+                                android:background="?attr/colorOutlineVariant"
+                                android:alpha="0.3" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.5"
+                                android:gravity="end"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvVariance"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:text="—"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textDirection="ltr"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="الفرق"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+                            </LinearLayout>
+                        </LinearLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Value — Golden Adaptive -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_1"
-                    android:layout_weight="1"
-                    app:cardBackgroundColor="@color/scan_value_bg"
-                    app:cardCornerRadius="@dimen/radius_xl"
-                    app:cardElevation="@dimen/elevation_3">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:padding="@dimen/space_4">
-
-                        <TextView
-                            android:id="@+id/tvTotalValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif-medium"
-                            android:text="$0.00"
-                            android:textColor="@color/scan_value_text"
-                            android:textDirection="ltr"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_1"
-                            android:text="💎 القيمة"
-                            android:textAppearance="@style/TextAppearance.App.Label.Small"
-                            android:textColor="@color/scan_value_label" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-            </LinearLayout>
-
-            <!-- ═══════════════════════════════════════════════════════
-                 ✨ ALERTS ROW — Warm Alert
-                 ═══════════════════════════════════════════════════════ -->
-            <LinearLayout
-                android:id="@+id/alertsRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_3"
-                android:background="@drawable/bg_scan_alert"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="@dimen/space_4"
-                android:paddingVertical="@dimen/space_3"
-                android:visibility="gone"
-                tools:visibility="visible">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="⚠️"
-                    android:textSize="18sp" />
-
-                <TextView
-                    android:id="@+id/tvAlertsText"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_2"
-                    android:layout_weight="1"
-                    android:text=""
-                    android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                    android:textColor="@color/scan_alert_text" />
-            </LinearLayout>
-
-            <!-- Fancy Divider -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginHorizontal="@dimen/space_8"
-                android:layout_marginTop="@dimen/space_4"
-                android:background="@drawable/bg_gold_divider_gradient" />
-
-            <!-- ═══════════════════════════════════════════════════════
-                 ✨ ACTION BUTTONS
-                 ═══════════════════════════════════════════════════════ -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnOpenItemsList"
-                style="@style/AppButtonStyle"
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/button_height"
-                android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_4"
-                android:text="📋 عرض قائمة الممسوحات"
-                app:icon="@android:drawable/ic_menu_sort_by_size"
-                app:iconGravity="textStart"
-                app:iconSize="@dimen/icon_md" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_2"
-                android:background="@color/scan_card_bg"
-                android:orientation="horizontal"
-                android:padding="4dp"
-                android:weightSum="3">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnTakeSnapshot"
-                    style="@style/AppButtonStyle.IconTonal"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:contentDescription="حفظ لقطة"
-                    app:icon="@android:drawable/ic_menu_camera"
-                    app:iconSize="@dimen/icon_md" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnClearSession"
-                    style="@style/AppButtonStyle.IconTonal"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginHorizontal="@dimen/space_1"
-                    android:layout_weight="1"
-                    android:contentDescription="بدء جرد جديد"
-                    app:icon="@android:drawable/ic_menu_revert"
-                    app:iconSize="@dimen/icon_md" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewSnapshots"
-                    style="@style/AppButtonStyle.IconTonal"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:contentDescription="عرض اللقطات"
-                    app:icon="@android:drawable/ic_menu_gallery"
-                    app:iconSize="@dimen/icon_md" />
-            </LinearLayout>
-
-            <!-- SEARCH & FILTER (hidden for Java) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <EditText
-                    android:id="@+id/etSearchItems"
+                <!-- ═══════════════════════════════════════════════════════
+                     3. GOLD METRICS ROW — Weight + Value
+                     ═══════════════════════════════════════════════════════ -->
+                <LinearLayout
+                    android:id="@+id/metricsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/space_3"
+                    android:layout_marginTop="@dimen/space_3"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal"
+                    android:weightSum="2">
 
-                <ImageView
-                    android:id="@+id/btnClearSearch"
-                    android:layout_width="@dimen/icon_md"
-                    android:layout_height="@dimen/icon_md"
-                    android:importantForAccessibility="no" />
+                    <!-- Weight -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_1"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/scan_card_bg"
+                        app:cardCornerRadius="@dimen/radius_xl"
+                        app:cardElevation="@dimen/elevation_0"
+                        app:strokeColor="@color/scan_card_stroke"
+                        app:strokeWidth="1dp">
 
-                <ImageView
-                    android:id="@+id/btnLiveFilter"
-                    android:layout_width="@dimen/icon_md"
-                    android:layout_height="@dimen/icon_md"
-                    android:importantForAccessibility="no" />
-            </LinearLayout>
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="@dimen/space_4">
 
-            <!-- ✨ EMPTY STATE -->
-            <LinearLayout
-                android:id="@+id/tvEmptyState"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:paddingVertical="@dimen/space_12"
-                android:visibility="gone"
-                tools:visibility="visible">
+                            <TextView
+                                android:id="@+id/tvTotalWeight"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-medium"
+                                android:text="0.00 g"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textDirection="ltr"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
 
-                <FrameLayout
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:background="@drawable/bg_empty_state_gold_circle">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_1"
+                                android:text="⚖️ الوزن"
+                                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Value -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_1"
+                        android:layout_weight="1"
+                        app:cardBackgroundColor="@color/scan_value_bg"
+                        app:cardCornerRadius="@dimen/radius_xl"
+                        app:cardElevation="@dimen/elevation_3">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="@dimen/space_4">
+
+                            <TextView
+                                android:id="@+id/tvTotalValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-medium"
+                                android:text="$0.00"
+                                android:textColor="@color/scan_value_text"
+                                android:textDirection="ltr"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_1"
+                                android:text="💎 القيمة"
+                                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                android:textColor="@color/scan_value_label" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
+
+                <!-- ═══════════════════════════════════════════════════════
+                     4. ALERTS ROW
+                     ═══════════════════════════════════════════════════════ -->
+                <LinearLayout
+                    android:id="@+id/alertsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/space_3"
+                    android:layout_marginTop="@dimen/space_3"
+                    android:background="@drawable/bg_scan_alert"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="@dimen/space_4"
+                    android:paddingVertical="@dimen/space_3"
+                    android:visibility="gone"
+                    tools:visibility="visible">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:text="📡"
-                        android:textSize="48sp" />
-                </FrameLayout>
+                        android:text="⚠️"
+                        android:textSize="18sp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
+                    <TextView
+                        android:id="@+id/tvAlertsText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:layout_weight="1"
+                        android:text=""
+                        android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                        android:textColor="@color/scan_alert_text" />
+                </LinearLayout>
+
+                <!-- Fancy Divider -->
+                <View
+                    android:id="@+id/fancyDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginHorizontal="@dimen/space_8"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:background="@drawable/bg_gold_divider_gradient" />
+
+                <!-- ═══════════════════════════════════════════════════════
+                     5. ACTION BUTTONS
+                     ═══════════════════════════════════════════════════════ -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOpenItemsList"
+                    style="@style/AppButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_marginHorizontal="@dimen/space_3"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:text="📋 عرض قائمة الممسوحات"
+                    app:icon="@android:drawable/ic_menu_sort_by_size"
+                    app:iconGravity="textStart"
+                    app:iconSize="@dimen/icon_md" />
+
+                <LinearLayout
+                    android:id="@+id/iconActionsRow"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_5"
-                    android:text="لا توجد مسوحات بعد"
-                    android:textAppearance="@style/TextAppearance.App.Title.Large"
-                    android:textColor="?attr/colorOnSurface" />
+                    android:layout_marginHorizontal="@dimen/space_3"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:background="@color/scan_card_bg"
+                    android:orientation="horizontal"
+                    android:padding="4dp"
+                    android:weightSum="3">
 
-                <TextView
-                    android:layout_width="wrap_content"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnTakeSnapshot"
+                        style="@style/AppButtonStyle.IconTonal"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:contentDescription="حفظ لقطة"
+                        app:icon="@android:drawable/ic_menu_camera"
+                        app:iconSize="@dimen/icon_md" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearSession"
+                        style="@style/AppButtonStyle.IconTonal"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_marginHorizontal="@dimen/space_1"
+                        android:layout_weight="1"
+                        android:contentDescription="بدء جرد جديد"
+                        app:icon="@android:drawable/ic_menu_revert"
+                        app:iconSize="@dimen/icon_md" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnViewSnapshots"
+                        style="@style/AppButtonStyle.IconTonal"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:contentDescription="عرض اللقطات"
+                        app:icon="@android:drawable/ic_menu_gallery"
+                        app:iconSize="@dimen/icon_md" />
+                </LinearLayout>
+
+                <!-- SEARCH & FILTER (hidden for Java) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <EditText
+                        android:id="@+id/etSearchItems"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <ImageView
+                        android:id="@+id/btnClearSearch"
+                        android:layout_width="@dimen/icon_md"
+                        android:layout_height="@dimen/icon_md"
+                        android:importantForAccessibility="no" />
+
+                    <ImageView
+                        android:id="@+id/btnLiveFilter"
+                        android:layout_width="@dimen/icon_md"
+                        android:layout_height="@dimen/icon_md"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+
+                <!-- ✨ EMPTY STATE (داخل Active — للفلترة الفارغة) -->
+                <LinearLayout
+                    android:id="@+id/tvEmptyState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="@dimen/space_8"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔍"
+                        android:textSize="48sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_3"
+                        android:text="لا توجد نتائج مطابقة"
+                        android:textAppearance="@style/TextAppearance.App.Title.Small"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <!-- RECYCLERVIEW -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvInventoryItems"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_2"
-                    android:text="ابدأ بمسح أول قطعة للحصول على النتائج"
-                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-            </LinearLayout>
+                    android:visibility="gone"
+                    tools:visibility="visible" />
 
-            <!-- RECYCLERVIEW -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvInventoryItems"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:visibility="gone" />
+            </LinearLayout>
+            <!-- ✅ نهاية activeContentGroup -->
 
             <!-- HIDDEN CONTAINERS (Java compatibility) -->
             <LinearLayout
@@ -740,7 +871,7 @@
     </androidx.core.widget.NestedScrollView>
 
     <!-- ═══════════════════════════════════════════════════════
-         ✨ FLOATING DOCK — Warm Surface
+         ✨ FLOATING DOCK
          ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
