@@ -9,9 +9,7 @@
     android:background="?attr/colorSurface"
     android:layoutDirection="rtl">
 
-    <!-- ═══════════════════════════════════════════════════════
-         Flash Overlay
-         ═══════════════════════════════════════════════════════ -->
+    <!-- Flash Overlay -->
     <View
         android:id="@+id/flashOverlay"
         android:layout_width="match_parent"
@@ -32,12 +30,12 @@
         android:background="?attr/colorSurface"
         app:elevation="@dimen/elevation_0">
 
-        <!-- ✨ STATUS STRIP — تدرج ذهبي فاخر -->
+        <!-- ✨ STATUS STRIP — متكيف مع الوضعين -->
         <LinearLayout
             android:id="@+id/statusBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_status_bar_gold_gradient"
+            android:background="@drawable/bg_scan_status_gradient"
             android:elevation="@dimen/elevation_2"
             android:gravity="center_vertical"
             android:orientation="horizontal"
@@ -57,7 +55,7 @@
                 android:layout_marginStart="@dimen/space_2"
                 android:text="جاهز"
                 android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/status_bar_text"
+                android:textColor="@color/scan_status_text"
                 android:textStyle="bold" />
 
             <View
@@ -72,7 +70,7 @@
                 android:fontFamily="monospace"
                 android:text="📶 -45"
                 android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/status_bar_text"
+                android:textColor="@color/scan_status_text"
                 android:textDirection="ltr"
                 android:textStyle="bold" />
 
@@ -84,7 +82,7 @@
                 android:fontFamily="monospace"
                 android:text="00:00:00"
                 android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/status_bar_text"
+                android:textColor="@color/scan_status_text"
                 android:textDirection="ltr"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -144,7 +142,7 @@
             android:orientation="vertical">
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ LAST SCAN CARD
+                 ✨ LAST SCAN CARD — متكيف (Hero-like)
                  ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/lastScanCard"
@@ -152,15 +150,16 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/space_3"
                 android:layout_marginTop="@dimen/space_3"
-                app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                app:cardBackgroundColor="@android:color/transparent"
                 app:cardCornerRadius="@dimen/card_radius"
                 app:cardElevation="@dimen/elevation_2"
-                app:strokeColor="@color/border_gold"
+                app:strokeColor="@color/scan_hero_stroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="@drawable/bg_scan_last_gradient"
                     android:gravity="center"
                     android:minHeight="140dp"
                     android:orientation="vertical"
@@ -170,7 +169,7 @@
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_chip_gold_soft"
+                        android:background="@drawable/bg_scan_chip"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingHorizontal="@dimen/space_3"
@@ -182,7 +181,7 @@
                             android:layout_height="wrap_content"
                             android:text="✨ آخر مسح"
                             android:textAppearance="@style/TextAppearance.App.Label.Small"
-                            android:textColor="@color/text_on_gold"
+                            android:textColor="@color/scan_hero_chip_text"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -196,7 +195,7 @@
                         android:maxLines="2"
                         android:text="لا توجد مسوحات"
                         android:textAppearance="@style/TextAppearance.App.Title.Large"
-                        android:textColor="?attr/colorOnPrimaryContainer" />
+                        android:textColor="@color/scan_hero_title" />
 
                     <TextView
                         android:id="@+id/tvLastScanEpc"
@@ -210,7 +209,7 @@
                         android:maxLines="1"
                         android:text=""
                         android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                        android:textColor="?attr/colorOnPrimaryContainer"
+                        android:textColor="@color/scan_hero_secondary"
                         android:textDirection="ltr"
                         android:visibility="gone"
                         tools:text="E280 1160 6000 0204 1B2C"
@@ -231,7 +230,7 @@
                             android:layout_height="wrap_content"
                             android:text="—"
                             android:textAppearance="@style/TextAppearance.App.Label.Large"
-                            android:textColor="?attr/colorOnPrimaryContainer" />
+                            android:textColor="@color/scan_hero_value" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -239,7 +238,7 @@
                             android:layout_marginHorizontal="@dimen/space_2"
                             android:alpha="0.5"
                             android:text="•"
-                            android:textColor="?attr/colorOnPrimaryContainer" />
+                            android:textColor="@color/scan_hero_secondary" />
 
                         <TextView
                             android:id="@+id/tvLastScanWeight"
@@ -247,7 +246,7 @@
                             android:layout_height="wrap_content"
                             android:text="0.00g"
                             android:textAppearance="@style/TextAppearance.App.Label.Large"
-                            android:textColor="?attr/colorOnPrimaryContainer"
+                            android:textColor="@color/scan_hero_value"
                             android:textDirection="ltr" />
 
                         <TextView
@@ -256,7 +255,7 @@
                             android:layout_marginHorizontal="@dimen/space_2"
                             android:alpha="0.5"
                             android:text="•"
-                            android:textColor="?attr/colorOnPrimaryContainer" />
+                            android:textColor="@color/scan_hero_secondary" />
 
                         <TextView
                             android:id="@+id/tvLastScanRssi"
@@ -265,7 +264,7 @@
                             android:fontFamily="monospace"
                             android:text="📶 -50"
                             android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                            android:textColor="?attr/colorOnPrimaryContainer" />
+                            android:textColor="@color/scan_hero_secondary" />
                     </LinearLayout>
 
                     <TextView
@@ -278,19 +277,23 @@
                         android:paddingVertical="@dimen/space_1"
                         android:text="✅ مطابق"
                         android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                        android:textColor="@color/text_gold_accent" />
+                        android:textColor="@color/scan_hero_chip_text" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ PROGRESS BAR CARD — Bento Layout
+                 ✨ PROGRESS CARD — Warm Surface
                  ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
-                style="@style/AppCardViewStyle.Outlined"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_3">
+                android:layout_marginTop="@dimen/space_3"
+                app:cardBackgroundColor="@color/scan_card_bg"
+                app:cardCornerRadius="@dimen/card_radius"
+                app:cardElevation="@dimen/elevation_0"
+                app:strokeColor="@color/scan_card_stroke"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -317,13 +320,12 @@
                             android:layout_height="wrap_content"
                             android:fontFamily="sans-serif-medium"
                             android:text="0%"
-                            android:textColor="@color/text_gold_accent"
+                            android:textColor="@color/scan_hero_title"
                             android:textDirection="ltr"
                             android:textSize="22sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
-                    <!-- Progress Bar متدرج -->
                     <ProgressBar
                         android:id="@+id/progressScanned"
                         style="?android:attr/progressBarStyleHorizontal"
@@ -332,9 +334,8 @@
                         android:layout_marginTop="@dimen/space_3"
                         android:max="100"
                         android:progress="0"
-                        android:progressDrawable="@drawable/progress_gold_gradient" />
+                        android:progressDrawable="@drawable/scan_progress_gold" />
 
-                    <!-- Bento Layout: العدد • الدقة | الفرق -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -344,7 +345,6 @@
                         android:orientation="horizontal"
                         android:weightSum="6">
 
-                        <!-- العدد (الأكبر) -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -359,7 +359,7 @@
                                 android:fontFamily="sans-serif-medium"
                                 android:includeFontPadding="false"
                                 android:text="0"
-                                android:textColor="@color/text_gold_accent"
+                                android:textColor="@color/scan_hero_title"
                                 android:textDirection="ltr"
                                 android:textSize="34sp"
                                 android:textStyle="bold" />
@@ -382,7 +382,6 @@
                                 android:textDirection="ltr" />
                         </LinearLayout>
 
-                        <!-- الدقة -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -410,7 +409,6 @@
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
-                        <!-- فاصل عمودي رقيق -->
                         <View
                             android:layout_width="1dp"
                             android:layout_height="40dp"
@@ -418,7 +416,6 @@
                             android:background="?attr/colorOutlineVariant"
                             android:alpha="0.3" />
 
-                        <!-- الفرق -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -450,7 +447,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ GOLD METRICS ROW — الوزن + القيمة
+                 ✨ GOLD METRICS ROW — Weight + Value
                  ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -461,16 +458,16 @@
                 android:orientation="horizontal"
                 android:weightSum="2">
 
-                <!-- الوزن (ثانوي — Surface + حد ذهبي) -->
+                <!-- Weight — Warm Surface -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="@dimen/space_1"
                     android:layout_weight="1"
-                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardBackgroundColor="@color/scan_card_bg"
                     app:cardCornerRadius="@dimen/radius_xl"
                     app:cardElevation="@dimen/elevation_0"
-                    app:strokeColor="@color/border_gold"
+                    app:strokeColor="@color/scan_card_stroke"
                     app:strokeWidth="1dp">
 
                     <LinearLayout
@@ -501,13 +498,13 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- القيمة (ذهبية بارزة) -->
+                <!-- Value — Golden Adaptive -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/space_1"
                     android:layout_weight="1"
-                    app:cardBackgroundColor="@color/gold_500"
+                    app:cardBackgroundColor="@color/scan_value_bg"
                     app:cardCornerRadius="@dimen/radius_xl"
                     app:cardElevation="@dimen/elevation_3">
 
@@ -524,7 +521,7 @@
                             android:layout_height="wrap_content"
                             android:fontFamily="sans-serif-medium"
                             android:text="$0.00"
-                            android:textColor="@color/pure_white"
+                            android:textColor="@color/scan_value_text"
                             android:textDirection="ltr"
                             android:textSize="20sp"
                             android:textStyle="bold" />
@@ -533,16 +530,15 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_1"
-                            android:alpha="0.9"
                             android:text="💎 القيمة"
                             android:textAppearance="@style/TextAppearance.App.Label.Small"
-                            android:textColor="@color/pure_white" />
+                            android:textColor="@color/scan_value_label" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ ALERTS ROW
+                 ✨ ALERTS ROW — Warm Alert
                  ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/alertsRow"
@@ -550,7 +546,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/space_3"
                 android:layout_marginTop="@dimen/space_3"
-                android:background="@drawable/bg_alert_strip"
+                android:background="@drawable/bg_scan_alert"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="@dimen/space_4"
@@ -572,10 +568,10 @@
                     android:layout_weight="1"
                     android:text=""
                     android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                    android:textColor="?attr/colorOnSurface" />
+                    android:textColor="@color/scan_alert_text" />
             </LinearLayout>
 
-            <!-- ✨ Fancy Divider -->
+            <!-- Fancy Divider -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
@@ -598,13 +594,12 @@
                 app:iconGravity="textStart"
                 app:iconSize="@dimen/icon_md" />
 
-            <!-- شريط أدوات موحّد (Snapshot • Clear • Gallery) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/space_3"
                 android:layout_marginTop="@dimen/space_2"
-                android:background="?attr/colorSurfaceVariant"
+                android:background="@color/scan_card_bg"
                 android:orientation="horizontal"
                 android:padding="4dp"
                 android:weightSum="3">
@@ -641,7 +636,7 @@
                     app:iconSize="@dimen/icon_md" />
             </LinearLayout>
 
-            <!-- SEARCH & FILTER (مخفي — للتوافق مع Java) -->
+            <!-- SEARCH & FILTER (hidden for Java) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
@@ -714,7 +709,7 @@
                 android:layout_height="0dp"
                 android:visibility="gone" />
 
-            <!-- HIDDEN CONTAINERS (للتوافق مع Java) -->
+            <!-- HIDDEN CONTAINERS (Java compatibility) -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="0dp"
@@ -745,7 +740,7 @@
     </androidx.core.widget.NestedScrollView>
 
     <!-- ═══════════════════════════════════════════════════════
-         ✨ FLOATING DOCK
+         ✨ FLOATING DOCK — Warm Surface
          ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
@@ -753,10 +748,10 @@
         android:layout_gravity="bottom"
         android:layout_marginHorizontal="@dimen/space_3"
         android:layout_marginBottom="@dimen/space_3"
-        app:cardBackgroundColor="?attr/colorSurface"
+        app:cardBackgroundColor="@color/scan_card_bg"
         app:cardCornerRadius="@dimen/radius_2xl"
         app:cardElevation="@dimen/elevation_12"
-        app:strokeColor="@color/border_gold"
+        app:strokeColor="@color/scan_card_stroke"
         app:strokeWidth="1.5dp">
 
         <LinearLayout
@@ -766,7 +761,6 @@
             android:orientation="horizontal"
             android:padding="@dimen/space_2">
 
-            <!-- زر البدء الرئيسي -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnMainToggleScan"
                 style="@style/AppButtonStyle"
@@ -778,7 +772,6 @@
                 app:iconGravity="textStart"
                 app:iconSize="@dimen/icon_md" />
 
-            <!-- زر الطاقة -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPowerControlCompact"
                 style="@style/AppButtonStyle.IconTonal"
@@ -794,7 +787,6 @@
                 app:iconPadding="0dp"
                 app:iconSize="22dp" />
 
-            <!-- زر الأرشيف -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnArchiveReportsCompact"
                 style="@style/AppButtonStyle.IconTonal"
@@ -810,7 +802,6 @@
                 app:iconPadding="0dp"
                 app:iconSize="22dp" />
 
-            <!-- زر الاعتماد -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCommitSession"
                 style="@style/AppButtonStyle.Success"
