@@ -22,6 +22,13 @@
         app:actionLayout="@layout/action_item_notification_badge"
         app:showAsAction="always" />
 
+    <!-- 🛡️ أجهزة ومستشعرات المنظومة (نُقل من Secondary Toolbar) -->
+<item
+    android:id="@+id/action_device_status"
+    android:icon="@drawable/ic_device_connected"
+    android:title="@string/menu_device_status"
+    app:showAsAction="always" />
+
     <!-- 📌 القائمة المنسدلة (Overflow Menu) -->
 
     <!-- إعدادات الواجهة والتخصيص -->
