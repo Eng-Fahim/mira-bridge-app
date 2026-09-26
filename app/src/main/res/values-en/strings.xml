@@ -1858,4 +1858,153 @@
 <string name="unlock_with_biometric">Unlock with Fingerprint</string>
 <string name="logout">Logout</string>
 <string name="security_icon">Security icon</string>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     📋 INVENTORY SCREEN
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- Welcome State -->
+<string name="inventory_welcome_title">Ready to Inventory</string>
+<string name="inventory_welcome_subtitle">Precise jewelry inventory with RFID\nChoose a mode and start now</string>
+<string name="inventory_welcome_hint">Select inventory mode from above,\nthen press the start button below</string>
+<string name="inventory_welcome_tap">Tap to start</string>
+<string name="inventory_welcome_system_name">Smart Inventory System</string>
+<string name="inventory_welcome_system_subtitle">MIRA RFID INVENTORY</string>
+
+<!-- Segmented Modes -->
+<string name="mode_full">⚡ Full</string>
+<string name="mode_category">📂 Category</string>
+<string name="mode_blind">👁 Blind</string>
+<string name="mode_full_short">Full</string>
+<string name="mode_category_short">Category</string>
+<string name="mode_blind_short">Blind</string>
+
+<!-- Last Scan Card -->
+<string name="last_scan_label">✨ Last Scan</string>
+<string name="last_scan_empty">No scans yet</string>
+<string name="last_scan_price_label">💰 Price</string>
+<string name="last_scan_weight_label">⚖️ Weight</string>
+<string name="last_scan_karat_label">🏷️ Karat</string>
+<string name="last_scan_rssi_label">📶 RSSI</string>
+<string name="last_scan_status_match">✅ In Catalog</string>
+<string name="last_scan_status_duplicate">🔁 Duplicate</string>
+<string name="last_scan_status_unexpected">🆕 Unexpected</string>
+<string name="last_scan_status_unknown">⚠️ Unknown</string>
+
+<!-- Progress Card -->
+<string name="progress_title">📊 Progress</string>
+<string name="progress_accuracy">Accuracy</string>
+<string name="progress_variance">Variance</string>
+
+<!-- Metrics -->
+<string name="metric_weight">⚖️ Weight</string>
+<string name="metric_value">💎 Value</string>
+
+<!-- Action Buttons -->
+<string name="btn_open_items_list">📋 View Scanned Items</string>
+<string name="btn_take_snapshot">Save Snapshot</string>
+<string name="btn_clear_session">New Inventory</string>
+<string name="btn_view_snapshots">View History</string>
+
+<!-- Main Toggle Button -->
+<string name="btn_start_inventory">▶️ Start Inventory</string>
+<string name="btn_stop_inventory">⏹️ Stop</string>
+<string name="btn_start_inventory_long">▶️ Start RFID Inventory</string>
+<string name="btn_stop_inventory_long">⏹️ Stop Scan</string>
+
+<!-- Commit Button -->
+<string name="btn_commit">Commit</string>
+<string name="btn_committed">✅ Committed</string>
+
+<!-- Report Button -->
+<string name="btn_report">📋 Report</string>
+
+<!-- Archive Button -->
+<string name="btn_archive">📂 Archive</string>
+
+<!-- Status Bar -->
+<string name="status_ready">Ready</string>
+<string name="status_scanning">📡 Scanning...</string>
+<string name="status_stopped">📡 Scan stopped</string>
+<string name="status_connected">📡 Connected</string>
+<string name="status_disconnected">📡 Disconnected</string>
+<string name="status_blind_mode">⚡ Blind mode - No expectations</string>
+
+<!-- Empty State -->
+<string name="empty_state_title">🔍 No matching results</string>
+
+<!-- Power Button (default) -->
+<string name="btn_power_default">⚡ dBm</string>
+
+<!-- =============================== -->
+<!-- Items List Dialog -->
+<!-- =============================== -->
+<string name="items_list_title">📋 Scans</string>
+<string name="items_list_empty">No scans yet</string>
+<string name="items_list_of">of</string>
+<string name="dialog_close">Close</string>
+<string name="dialog_cancel">Cancel</string>
+<string name="dialog_ok">OK</string>
+<string name="dialog_back">Back</string>
+
+<!-- Toast Messages -->
+<string name="toast_loading_data">🔄 Loading data...</string>
+<string name="toast_scan_stopped">🛑 Scan stopped</string>
+<string name="toast_scan_completed">🎉 All expected items scanned!</string>
+<string name="toast_session_restored">✅ Restored %1$d items</string>
+<string name="toast_session_restored_failed">❌ Restore failed</string>
+<string name="toast_session_reset">✅ Reset successfully</string>
+<string name="toast_session_reset_error">❌ Reset error</string>
+<string name="toast_snapshot_saved">✅ Snapshot saved</string>
+<string name="toast_snapshot_save_failed">❌ Save failed</string>
+<string name="toast_auto_snapshot_saved">📸 Auto-snapshot saved</string>
+<string name="toast_no_scans_to_save">⚠️ No scans to save</string>
+<string name="toast_new_session_started">✨ Started fresh session</string>
+<string name="toast_access_denied">⛔ Access denied</string>
+<string name="toast_power_applied">✅ Power set to %1$d dBm</string>
+<string name="toast_power_failed">⚠️ Power control failed — check reader</string>
+<string name="toast_power_error">⚠️ Power control error</string>
+<string name="toast_synced_transactions">✅ Synced %1$d transactions</string>
+
+<!-- Dialogs -->
+<string name="dialog_restore_title">🔄 Restore Previous Session</string>
+<string name="dialog_restore_btn_restore">✅ Restore</string>
+<string name="dialog_restore_btn_new">Start New</string>
+<string name="dialog_restore_btn_later">Later</string>
+<string name="dialog_restore_dont_ask">Don\'t ask again for this session</string>
+
+<string name="dialog_reset_title">⚠️ Confirm</string>
+<string name="dialog_reset_message">Are you sure you want to reset the session?\nAll uncommitted data will be lost.</string>
+<string name="dialog_reset_btn">Reset</string>
+
+<string name="dialog_exit_title">⚠️ Important Warning</string>
+<string name="dialog_exit_message">Inventory is still running!\n\nIf you change the screen, the inventory will stop and unsaved data will be lost.\n\nDo you want to stop and continue?</string>
+<string name="dialog_exit_btn_confirm">Stop and Continue</string>
+<string name="dialog_exit_btn_stay">Stay in Inventory</string>
+
+<string name="dialog_category_title">🎯 Select Category</string>
+<string name="dialog_category_running_title">⚠️ Inventory Running</string>
+<string name="dialog_category_running_message">To change category, stop the current inventory.\nContinue?</string>
+<string name="dialog_blind_running_message">Stop current inventory and start blind inventory?</string>
+<string name="dialog_btn_stop_continue">Stop &amp; Continue</string>
+<string name="dialog_btn_continue">Continue</string>
+
+<string name="dialog_snapshot_title">📸 Save Snapshot</string>
+<string name="dialog_snapshot_message">Will save %1$d items</string>
+<string name="dialog_snapshot_hint">Snapshot name (optional)</string>
+<string name="dialog_snapshot_btn_save">Save</string>
+
+<!-- Categories -->
+<string name="cat_all">All</string>
+<string name="cat_24k">24K</string>
+<string name="cat_22k">22K</string>
+<string name="cat_21k">21K</string>
+<string name="cat_18k">18K</string>
+<string name="cat_14k">14K</string>
+<string name="cat_bullion">Bullion</string>
+<string name="cat_ounce">Ounce</string>
+<string name="cat_silver">Silver</string>
+<string name="cat_diamond">Diamond</string>
+<string name="cat_other">Other</string>
 </resources>
