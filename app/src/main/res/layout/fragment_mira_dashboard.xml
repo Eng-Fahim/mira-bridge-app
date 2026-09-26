@@ -111,7 +111,7 @@
                 android:paddingBottom="@dimen/space_6">
 
                 <!-- ═══════════════════════════════════════════════════════
-                     1. HERO BALANCE CARD — V2 (Dark Gold Hero)
+                     1. HERO BALANCE CARD — V3 (Iconic Edition)
                      ═══════════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
@@ -142,7 +142,25 @@
                             android:alpha="0.18"
                             android:background="@drawable/bg_hero_glow" />
 
-                        <!-- Layer 3: Content -->
+                        <!-- Layer 3: Diamond Pattern -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_diamond_pattern" />
+
+                        <!-- Layer 4: MIRA Watermark (شفاف جداً) -->
+                        <ImageView
+                            android:layout_width="180dp"
+                            android:layout_height="180dp"
+                            android:layout_gravity="center|end"
+                            android:layout_marginTop="40dp"
+                            android:layout_marginEnd="-30dp"
+                            android:alpha="0.06"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_diamond"
+                            app:tint="#F5D97A" />
+
+                        <!-- Layer 5: Content -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -151,13 +169,44 @@
                             android:paddingTop="@dimen/space_4"
                             android:paddingBottom="@dimen/space_4">
 
-                            <!-- Header: Title + Eye + Trend -->
+                            <!-- ═══ Top Row: Badge + Title + Eye + Trend ═══ -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:gravity="center_vertical"
                                 android:orientation="horizontal">
 
+                                <!-- MIRA ID Badge -->
+                                <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginEnd="@dimen/space_2"
+                                    android:background="@drawable/bg_mira_badge"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:paddingHorizontal="8dp"
+                                    android:paddingVertical="3dp">
+
+                                    <ImageView
+                                        android:layout_width="10dp"
+                                        android:layout_height="10dp"
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_diamond"
+                                        app:tint="#F5D97A" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="4dp"
+                                        android:fontFamily="sans-serif-medium"
+                                        android:letterSpacing="0.1"
+                                        android:text="MIRA ID™"
+                                        android:textColor="#F5D97A"
+                                        android:textSize="9sp"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <!-- Title -->
                                 <TextView
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
@@ -165,8 +214,9 @@
                                     android:text="@string/total_inventory_value"
                                     android:textAppearance="@style/TextAppearance.App.Label.Large"
                                     android:textColor="#F5D97A"
-                                    tools:text="💰 إجمالي قيمة المخزون" />
+                                    tools:text="💰 قيمة المخزون" />
 
+                                <!-- Eye Button -->
                                 <ImageButton
                                     android:id="@+id/btnToggleHeroVisibility"
                                     android:layout_width="32dp"
@@ -178,6 +228,7 @@
                                     android:src="@drawable/ic_eye_off"
                                     app:tint="#F5D97A" />
 
+                                <!-- Trend -->
                                 <TextView
                                     android:id="@+id/tvHeroTrend"
                                     android:layout_width="wrap_content"
@@ -192,7 +243,7 @@
                                     tools:visibility="visible" />
                             </LinearLayout>
 
-                            <!-- Hero Value Section -->
+                            <!-- ═══ Hero Value Section ═══ -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -223,13 +274,20 @@
                                     android:textSize="36sp"
                                     android:textStyle="bold"
                                     tools:text="$52,798.66" />
+
+                                <!-- ✅ Gold Underline -->
+                                <View
+                                    android:layout_width="140dp"
+                                    android:layout_height="2dp"
+                                    android:layout_marginTop="@dimen/space_2"
+                                    android:background="@drawable/bg_gold_underline" />
                             </LinearLayout>
 
-                            <!-- Chips: Weight + Count -->
+                            <!-- ═══ Chips: Weight + Count ═══ -->
                             <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_3"
+                                android:layout_marginTop="@dimen/space_4"
                                 android:orientation="horizontal">
 
                                 <!-- Chip: Weight -->
@@ -295,21 +353,30 @@
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- Divider -->
+                            <!-- ═══ Sparkline Placeholder (مستقبلي) ═══ -->
+                            <com.example.uhf.widget.MiraSparklineView
+                                android:id="@+id/heroSparkline"
+                                android:layout_width="match_parent"
+                                android:layout_height="40dp"
+                                android:layout_marginTop="@dimen/space_3"
+                                android:visibility="gone"
+                                tools:visibility="visible" />
+
+                            <!-- ═══ Divider ═══ -->
                             <View
                                 android:layout_width="match_parent"
                                 android:layout_height="1dp"
-                                android:layout_marginTop="@dimen/space_5"
+                                android:layout_marginTop="@dimen/space_4"
                                 android:layout_marginBottom="@dimen/space_4"
                                 android:background="#33F5D97A" />
 
-                            <!-- Currencies List (Vertical) -->
+                            <!-- ═══ Currencies List ═══ -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:orientation="vertical">
 
-                                <!-- Row 1: USD (Primary) -->
+                                <!-- Row 1: USD -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
@@ -328,11 +395,11 @@
                                         android:layout_height="wrap_content"
                                         android:layout_marginStart="@dimen/space_2"
                                         android:fontFamily="sans-serif-medium"
+                                        android:letterSpacing="0.05"
                                         android:text="USD"
                                         android:textColor="#F5D97A"
                                         android:textSize="11sp"
-                                        android:textStyle="bold"
-                                        android:letterSpacing="0.05" />
+                                        android:textStyle="bold" />
 
                                     <View
                                         android:layout_width="0dp"
@@ -370,10 +437,10 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:layout_marginStart="@dimen/space_2"
+                                        android:letterSpacing="0.05"
                                         android:text="SAR"
                                         android:textColor="#B89456"
-                                        android:textSize="11sp"
-                                        android:letterSpacing="0.05" />
+                                        android:textSize="11sp" />
 
                                     <View
                                         android:layout_width="0dp"
@@ -409,10 +476,10 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:layout_marginStart="@dimen/space_2"
+                                        android:letterSpacing="0.05"
                                         android:text="YER"
                                         android:textColor="#B89456"
-                                        android:textSize="11sp"
-                                        android:letterSpacing="0.05" />
+                                        android:textSize="11sp" />
 
                                     <View
                                         android:layout_width="0dp"
@@ -431,12 +498,25 @@
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- Sparkline placeholder -->
-                            <View
-                                android:id="@+id/heroSparkline"
+                            <!-- ═══ Footer: MIRA ID™ Signature (bottom) ═══ -->
+                            <LinearLayout
                                 android:layout_width="match_parent"
-                                android:layout_height="0dp"
-                                android:visibility="gone" />
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_3"
+                                android:gravity="end|center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:alpha="0.4"
+                                    android:fontFamily="sans-serif"
+                                    android:letterSpacing="0.15"
+                                    android:text="MIRA JEWELRY ENTERPRISE™"
+                                    android:textColor="#B89456"
+                                    android:textSize="7sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
                         </LinearLayout>
                     </FrameLayout>
                 </com.google.android.material.card.MaterialCardView>
