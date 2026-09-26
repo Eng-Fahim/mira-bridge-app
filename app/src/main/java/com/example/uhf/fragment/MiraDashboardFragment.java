@@ -105,6 +105,8 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
     private View liveStatusDot;
     private TextView tvLiveStatusText;
+    
+    private TextView tvHeroItemCount;   // ✅ متغير جديد
 
     // ✅ Recent Activity
     //private RecyclerView rvRecentActivity;
@@ -311,6 +313,9 @@ if (isAdded() && llRecentActivity != null && activityCache != null) {
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
+            
+            
+            
 
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
@@ -332,6 +337,7 @@ if (isAdded() && llRecentActivity != null && activityCache != null) {
             tvHeroValueYER = v.findViewById(R.id.tvHeroValueYER);
             tvHeroValueSAR = v.findViewById(R.id.tvHeroValueSAR);
             tvHeroValueUSD = v.findViewById(R.id.tvHeroValueUSD);
+            tvHeroItemCount = v.findViewById(R.id.tvHeroItemCount);   // ✅ جديد
 
             alertsStrip = v.findViewById(R.id.alertsStrip);
             tvAlertIcon = v.findViewById(R.id.tvAlertIcon);
@@ -455,11 +461,20 @@ applySalesVisibility();
                 tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
             }
 
-            // Subtitle يظهر دائماً
-            if (tvHeroSubtitle != null) {
-                tvHeroSubtitle.setText(String.format(
-                        "👑 %d قطعة • %.1fg", itemCount, totalWeight));
-            }
+            // ═══════════════════════════════════════════════════════
+// ✅ Chip 1: الوزن (tvHeroSubtitle)
+// ═══════════════════════════════════════════════════════
+if (tvHeroSubtitle != null) {
+    tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
+}
+
+// ═══════════════════════════════════════════════════════
+// ✅ Chip 2: عدد القطع (tvHeroItemCount)
+// ═══════════════════════════════════════════════════════
+if (tvHeroItemCount != null) {
+    tvHeroItemCount.setText(String.format(
+            Locale.getDefault(), "%d قطعة", itemCount));
+}
 
             // ═══════════════════════════════════════════════════════
             // ✅ عرض القيمة بـ 3 عملات
