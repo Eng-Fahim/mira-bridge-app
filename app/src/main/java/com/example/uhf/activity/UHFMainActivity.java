@@ -458,32 +458,48 @@ private void setupKeyboardBehavior() {
         if (rootView == null) return;
 
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-            // ✅ 
-            androidx.core.graphics.Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
-            boolean isKeyboardVisible = imeInsets.bottom > 0;
-
-            String currentTag = navigationManager != null
-                    ? navigationManager.getCurrentFragmentTag()
-                    : NavigationManager.TAG_DASHBOARD;
-            
-            updateBottomNavVisibility(currentTag);
-
-            View fragmentContainer = findViewById(R.id.fragment_container);
-            if (fragmentContainer != null) {
-                fragmentContainer.setPadding(
-                        fragmentContainer.getPaddingLeft(),
-                        fragmentContainer.getPaddingTop(),
-                        fragmentContainer.getPaddingRight(),
-                        isKeyboardVisible ? 8 : 90);
+            try {
+                androidx.core.graphics.Insets imeInsets = 
+                        insets.getInsets(WindowInsetsCompat.Type.ime());
+                boolean isKeyboardVisible = imeInsets.bottom > 0;
+                
+                View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+                if (bottomNavContainer != null) {
+                    // ✅ الكيبورد له أولوية قصوى
+                    if (isKeyboardVisible) {
+                        bottomNavContainer.animate()
+                                .alpha(0f)
+                                .setDuration(200)
+                                .withEndAction(() -> bottomNavContainer.setVisibility(View.GONE))
+                                .start();
+                    } else {
+                        // ✅ أظهر إذا كنا في شاشة رئيسية
+                        String currentTag = navigationManager != null
+                                ? navigationManager.getCurrentFragmentTag()
+                                : NavigationManager.TAG_DASHBOARD;
+                        updateBottomNavVisibility(currentTag);
+                    }
+                }
+                
+                // ✅ ضبط padding
+                View fragmentContainer = findViewById(R.id.fragment_container);
+                if (fragmentContainer != null) {
+                    fragmentContainer.setPadding(
+                            fragmentContainer.getPaddingLeft(),
+                            fragmentContainer.getPaddingTop(),
+                            fragmentContainer.getPaddingRight(),
+                            isKeyboardVisible ? 8 : 90);
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "setupKeyboardBehavior.inner error", t);
             }
             return insets;
         });
 
-    } catch (Exception e) {
-        Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage(), e);
+    } catch (Throwable e) {
+        Log.e(TAG, "setupKeyboardBehavior error", e);
     }
 }
-
     // ==================== التولبار الثانوي ====================
 
     private void setupSecondaryToolbar() {
@@ -1001,25 +1017,38 @@ public void onResume() {
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        try {
-            isArabic = newConfig.locale.getLanguage().equals("ar");
+    super.onConfigurationChanged(newConfig);
+    try {
+        isArabic = newConfig.locale.getLanguage().equals("ar");
+        
+        if (getWindow() != null && getWindow().getDecorView() != null) {
             getWindow().getDecorView().setLayoutDirection(
                     isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-
-            updateBottomNavLanguage();
-            updateToolbarTitle();
-
-            supportInvalidateOptionsMenu();
-            View bottomNav = findViewById(R.id.bottomNavigationView);
-            if (bottomNav != null) {
-                bottomNav.refreshDrawableState();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Configuration change error: " + e.getMessage());
         }
-    }
 
+        // ✅ تحقق من الحالة قبل التحديث
+        if (isFinishing() || isDestroyed()) return;
+        
+        mainHandler.postDelayed(() -> {
+            try {
+                if (isFinishing() || isDestroyed()) return;
+                updateBottomNavLanguage();
+                updateToolbarTitle();
+                supportInvalidateOptionsMenu();
+                
+                View bottomNav = findViewById(R.id.bottomNavigationView);
+                if (bottomNav != null) {
+                    bottomNav.refreshDrawableState();
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "onConfigurationChanged.delayed error", t);
+            }
+        }, 100);
+        
+    } catch (Throwable e) {
+        Log.e(TAG, "Configuration change error", e);
+    }
+}
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
@@ -1493,35 +1522,39 @@ public void onResume() {
 return super.onOptionsItemSelected(item);
     }
 
-    private void toggleLanguage() {
+private void toggleLanguage() {
     try {
-        // ✅ احفظ الحالة الحالية
+        // ✅ احفظ الحالة
         String currentTag = navigationManager != null
                 ? navigationManager.getCurrentFragmentTag()
                 : NavigationManager.TAG_DASHBOARD;
-        
         saveFragmentTagToPrefs(currentTag);
-        Log.d(TAG, "🌐 Changing language. Current fragment: " + currentTag);
         
-        // ✅ طبّق اللغة الجديدة
+        Log.d(TAG, "🌐 Toggling language. Fragment: " + currentTag);
+        
+        // ✅ طبّق اللغة
         String newLang = isArabic ? "en" : "ar";
         MiraLanguageHelper.applyLanguage(this, newLang);
         
-        // ✅ إعادة إنشاء Activity بطريقة آمنة (تحفظ الـ Stack)
+        // ✅ استخدم Intent بدل recreate (أأمن)
         Intent intent = new Intent(this, UHFMainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP 
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP 
+                | Intent.FLAG_ACTIVITY_NO_ANIMATION);
         startActivity(intent);
+        
+        // ✅ إنهاء الـ Activity الحالية
         finish();
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         
-        Log.d(TAG, "✅ Language changed to: " + newLang + " (fragment: " + currentTag + ")");
+        // ✅ لا overridePendingTransition
+        overridePendingTransition(0, 0);
         
-    } catch (Exception e) {
-        Log.e(TAG, "toggleLanguage error: " + e.getMessage(), e);
-        Toast.makeText(this, "Error changing language", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "✅ Language changed. Restarting activity.");
+        
+    } catch (Throwable e) {
+        Log.e(TAG, "toggleLanguage error", e);
     }
 }
-
     private void confirmLogout() {
         new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
@@ -2584,25 +2617,27 @@ return super.onOptionsItemSelected(item);
     
 
 /**
- * ✅ إخفاء/إظهار القائمة مؤقتاً (بدون تغيير الشاشة)
+ * ✅ إخفاء/إظهار القائمة مؤقتاً
  */
 public void setBottomNavVisibleTemporarily(boolean visible) {
     try {
+        if (isFinishing() || isDestroyed()) return;
+        
         View bottomNavContainer = findViewById(R.id.bottomNavContainer);
         if (bottomNavContainer == null) return;
         
-        bottomNavTemporarilyHidden = !visible;  // ✅ صحيح
+        bottomNavTemporarilyHidden = !visible;
         
         String currentTag = navigationManager != null
                 ? navigationManager.getCurrentFragmentTag()
                 : NavigationManager.TAG_DASHBOARD;
         
-        boolean isMainScreen = currentTag.equals(NavigationManager.TAG_DASHBOARD)
-                || currentTag.equals(NavigationManager.TAG_INVENTORY)
-                || currentTag.equals(NavigationManager.TAG_POS)
-                || currentTag.equals(NavigationManager.TAG_GATES);
+        boolean isMainScreen = NavigationManager.TAG_DASHBOARD.equals(currentTag)
+                || NavigationManager.TAG_INVENTORY.equals(currentTag)
+                || NavigationManager.TAG_POS.equals(currentTag)
+                || NavigationManager.TAG_GATES.equals(currentTag);
         
-        boolean shouldShow = isMainScreen && visible && !isKeyboardVisible();
+        boolean shouldShow = isMainScreen && visible;
         
         if (shouldShow) {
             bottomNavContainer.setVisibility(View.VISIBLE);
@@ -2611,98 +2646,105 @@ public void setBottomNavVisibleTemporarily(boolean visible) {
             bottomNavContainer.animate()
                     .alpha(0f)
                     .setDuration(200)
-                    .withEndAction(() -> bottomNavContainer.setVisibility(View.GONE))
+                    .withEndAction(() -> {
+                        if (!isFinishing() && !isDestroyed()) {
+                            bottomNavContainer.setVisibility(View.GONE);
+                        }
+                    })
                     .start();
         }
-    } catch (Exception e) {
+    } catch (Throwable e) {
         Log.e(TAG, "setBottomNavVisibleTemporarily error", e);
     }
 }
-    /**
- * ✅ إظهار/إخفاء القائمة السفلية حسب الشاشة
- * 
- * - الرئيسية، الجرد، البيع، البوابات → إظهار
- * - باقي الشاشات (إدخال بيانات) → إخفاء
- */
 /**
  * ✅ إظهار/إخفاء القائمة السفلية حسب الشاشة
- * 
- * قواعد:
- * - الشاشات الرئيسية (Dashboard/Inventory/POS/Gates/SalesHistory/Transfers) → إظهار
- * - باقي الشاشات (إدخال بيانات) → إخفاء
- * - عند الكيبورد → إخفاء
- * - عند setBottomNavVisibleTemporarily(false) → إخفاء
+ * النسخة الآمنة
  */
 private void updateBottomNavVisibility(String tag) {
     try {
+        // ✅ تحقق من الحالة
+        if (isFinishing() || isDestroyed() || tag == null) return;
+        
         View bottomNavContainer = findViewById(R.id.bottomNavContainer);
         if (bottomNavContainer == null) return;
         
-        // ✅ الشاشات الرئيسية
-        boolean isMainScreen = tag.equals(NavigationManager.TAG_DASHBOARD)
-                || tag.equals(NavigationManager.TAG_INVENTORY)
-                || tag.equals(NavigationManager.TAG_POS)
-                || tag.equals(NavigationManager.TAG_GATES)
-                || tag.equals("SalesHistory")
-                || tag.equals("Transfers");
+        // ✅ تحقق أن الـ View جاهز
+        if (!bottomNavContainer.isLaidOut() 
+                && bottomNavContainer.getWidth() == 0 
+                && bottomNavContainer.getHeight() == 0) {
+            // ✅ الـ View لم يُرسّخ بعد — استخدم setVisibility مباشرة
+            boolean isMainScreen = isMainScreenTag(tag);
+            boolean shouldShow = isMainScreen && !bottomNavTemporarilyHidden;
+            bottomNavContainer.setVisibility(shouldShow ? View.VISIBLE : View.GONE);
+            bottomNavContainer.setAlpha(shouldShow ? 1f : 0f);
+            return;
+        }
         
-        // ✅ احترم الكيبورد
-        boolean isKeyboardVisible = isKeyboardVisible();
+        boolean isMainScreen = isMainScreenTag(tag);
+        boolean shouldShow = isMainScreen && !bottomNavTemporarilyHidden;
         
-        // ✅ احترم الإخفاء المؤقت
-        boolean shouldShow = isMainScreen 
-                && !isKeyboardVisible 
-                && !bottomNavTemporarilyHidden;
-        
-        // ✅ أنيميشن سلس
+        // ✅ أنيميشن آمن
         if (shouldShow) {
             if (bottomNavContainer.getVisibility() != View.VISIBLE) {
                 bottomNavContainer.setVisibility(View.VISIBLE);
                 bottomNavContainer.setAlpha(0f);
-                bottomNavContainer.animate()
-                        .alpha(1f)
-                        .setDuration(250)
-                        .start();
-            } else {
-                bottomNavContainer.animate()
-                        .alpha(1f)
-                        .setDuration(250)
-                        .start();
             }
+            bottomNavContainer.animate().cancel();
+            bottomNavContainer.animate()
+                    .alpha(1f)
+                    .setDuration(250)
+                    .start();
         } else {
+            bottomNavContainer.animate().cancel();
             bottomNavContainer.animate()
                     .alpha(0f)
                     .setDuration(250)
-                    .withEndAction(() -> bottomNavContainer.setVisibility(View.GONE))
+                    .withEndAction(() -> {
+                        try {
+                            if (!isFinishing() && !isDestroyed()) {
+                                bottomNavContainer.setVisibility(View.GONE);
+                            }
+                        } catch (Throwable ignored) {}
+                    })
                     .start();
         }
         
-        Log.d(TAG, "📍 Bottom Nav: " + (shouldShow ? "VISIBLE" : "HIDDEN")
-                + " (tag=" + tag 
-                + ", keyboard=" + isKeyboardVisible 
-                + ", temporarilyHidden=" + bottomNavTemporarilyHidden + ")");
-        
-    } catch (Exception e) {
-        Log.e(TAG, "updateBottomNavVisibility error: " + e.getMessage(), e);
+    } catch (Throwable e) {
+        Log.e(TAG, "updateBottomNavVisibility error", e);
     }
 }
 
 /**
- * ✅ فحص إذا كان الكيبورد ظاهراً
- * نستخدم WindowInsetsCompat لضمان التوافق
+ * ✅ فحص إذا كان الـ tag ينتمي لشاشة رئيسية
+ */
+private boolean isMainScreenTag(String tag) {
+    if (tag == null) return false;
+    return NavigationManager.TAG_DASHBOARD.equals(tag)
+            || NavigationManager.TAG_INVENTORY.equals(tag)
+            || NavigationManager.TAG_POS.equals(tag)
+            || NavigationManager.TAG_GATES.equals(tag)
+            || "SalesHistory".equals(tag)
+            || "Transfers".equals(tag);
+}
+/**
+ * ✅ فحص إذا كان الكيبورد ظاهراً — نسخة آمنة
  */
 private boolean isKeyboardVisible() {
     try {
         View rootView = findViewById(android.R.id.content);
         if (rootView == null) return false;
         
+        // ✅ استخدم ViewCompat (يعمل على كل الإصدارات)
         WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(rootView);
         if (windowInsets == null) return false;
         
-        androidx.core.graphics.Insets imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+        androidx.core.graphics.Insets imeInsets = 
+                windowInsets.getInsets(WindowInsetsCompat.Type.ime());
         return imeInsets.bottom > 0;
-    } catch (Exception e) {
+    } catch (Throwable e) {
+        // ⚠️ استخدم Throwable وليس Exception — للأمان الكامل
         return false;
     }
 }
-                                }
+}
