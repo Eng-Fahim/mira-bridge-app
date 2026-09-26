@@ -179,4 +179,59 @@ public void clearSession() {
     public int getTotalReads() { return totalReads.get(); }
     public int getUniqueCount() { return uniqueCount.get(); }
     public int getDuplicateCount() { return duplicateCount.get(); }
+
+
+    /**
+ * ✅ إضافة EPC للجلسة الحالية (للاسترجاع)
+ * 
+ * تستخدم نفس منطق onTagScanned لكن بدون زيادة totalReads
+ * (لأنها استرجاع، ليس مسحاً جديداً)
+ * 
+ * @param rawEpc EPC الخام
+ * @param rssi   شدة الإشارة
+ */
+public void addEpc(String rawEpc, int rssi) {
+    try {
+        String epc = InventoryItem.normalizeEpc(rawEpc);
+        if (epc.isEmpty()) return;
+
+        // ⚠️ لا نزيد totalReads هنا — هذا استرجاع وليس مسحاً جديداً
+        // ولا نزيد uniqueCount أيضاً لأنها موجودة مسبقاً
+
+        scannedByEpcMap.compute(epc, (k, existingItem) -> {
+            if (existingItem == null) {
+                // ✅ عنصر جديد في الـ Engine
+                uniqueCount.incrementAndGet();
+                
+                InventoryItem catalogMatch = catalogByEpc.get(epc);
+                InventoryItem newItem;
+                
+                if (catalogMatch != null) {
+                    newItem = new InventoryItem(
+                            catalogMatch.getEpc(),
+                            catalogMatch.getGtin(),
+                            catalogMatch.getSerial(),
+                            catalogMatch.getTitle(),
+                            catalogMatch.getKarat());
+                    newItem.setWeight(catalogMatch.getWeight());
+                    newItem.setPrice(catalogMatch.getPrice());
+                } else {
+                    newItem = new InventoryItem(epc, "", "", "Uncatalogued Asset");
+                }
+                
+                newItem.recordScan(rssi);
+                return newItem;
+            } else {
+                // موجود مسبقاً — لا نزيد أي عداد
+                existingItem.recordScan(rssi);
+                return existingItem;
+            }
+        });
+
+        Log.d(TAG, "✅ addEpc: " + epc + " (unique=" + uniqueCount.get() + ")");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "addEpc error: " + rawEpc, e);
+    }
+}
 }
