@@ -1908,8 +1908,7 @@
 <string name="btn_view_snapshots">View History</string>
 
 <!-- Main Toggle Button -->
-<string name="btn_start_inventory">▶️ Start Inventory</string>
-<string name="btn_stop_inventory">⏹️ Stop</string>
+
 <string name="btn_start_inventory_long">▶️ Start RFID Inventory</string>
 <string name="btn_stop_inventory_long">⏹️ Stop Scan</string>
 
