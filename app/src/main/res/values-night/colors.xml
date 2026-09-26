@@ -359,6 +359,46 @@
 <color name="hero_secondary_text">@color/gold_300</color>
 <color name="hero_underline">@color/gold_500</color>
 <color name="hero_divider">@color/gold_700</color>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     🌙 SCAN SCREEN — Dark Mode
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- Last Scan Card -->
+<color name="scan_hero_bg_start">#3D2E0A</color>
+<color name="scan_hero_bg_end">#0A0A0A</color>
+<color name="scan_hero_stroke">#4DF5D97A</color>
+<color name="scan_hero_title">#F5D97A</color>
+<color name="scan_hero_value">#FFFFFF</color>
+<color name="scan_hero_label">#B89456</color>
+<color name="scan_hero_secondary">#B89456</color>
+<color name="scan_hero_chip_bg">#33F5D97A</color>
+<color name="scan_hero_chip_text">#F5D97A</color>
+
+<!-- Status Bar -->
+<color name="scan_status_bg_start">#3D2E0A</color>
+<color name="scan_status_bg_end">#1F1706</color>
+<color name="scan_status_text">#F5D97A</color>
+
+<!-- Warm Surfaces -->
+<color name="scan_card_bg">#1E1C1A</color>
+<color name="scan_card_stroke">#3F3325</color>
+
+<!-- Value Card -->
+<color name="scan_value_bg">#B89456</color>
+<color name="scan_value_text">#FFFFFF</color>
+<color name="scan_value_label">#F5E4B0</color>
+
+<!-- Alerts Row -->
+<color name="scan_alert_bg">#3D2F00</color>
+<color name="scan_alert_text">#F5D97A</color>
+<color name="scan_alert_icon">#FFB74D</color>
+
+<!-- Progress Bar -->
+<color name="scan_progress_track">#3F3325</color>
+<color name="scan_progress_start">#B89456</color>
+<color name="scan_progress_end">#F5D97A</color>
     <!-- String Array -->
     <string-array name="colors" translatable="false">
         <item>#E8C766</item>
