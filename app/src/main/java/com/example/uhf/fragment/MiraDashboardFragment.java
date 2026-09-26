@@ -73,7 +73,6 @@ public class MiraDashboardFragment extends Fragment {
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final long SWIPE_REFRESH_TIMEOUT_MS = 15 * 1000;
-
     // ═══════════════════════════════════════════════════════
     // State
     // ═══════════════════════════════════════════════════════
