@@ -2,41 +2,34 @@ package com.example.uhf.manager;
 
 import android.content.Context;
 import android.content.Intent;
-import android.os.Bundle;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.model.CartItem;
+
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * GateSaleBridge v1.0
+ * GateSaleBridge v1.1
  * ═══════════════════════════════════════════════════════════════
  * جسر يربط عمليات البيع/الإرجاع بنظام البوابات الأمنية (Secure Gate).
  *
- * المسؤوليات:
- *  1. حفظ EPCs القطع المباعة في القائمة المسموحة (OfflineGateCache)
- *  2. إرسال Broadcast لتطبيق البوابات (MiraGateMonitorService)
- *  3. تسجيل عملية البيع لأغراض التقارير
- *
- * المبادئ:
- *  - Best-effort: فشل الجسر لا يؤثر أبداً على عملية البيع
- *  - Thread-safe: يُستدعى من أي خيط
- *  - Non-blocking: كل العمليات سريعة (cache + broadcast)
- *
- * @author MIRA Enterprise
- * @version 1.0
+ * v1.1:
+ *  - إضافة "محاكاة الخروج" (وضع اختباري)
+ *  - استخراج منطق المحاكاة إلى دالة مستقلة
  */
 public final class GateSaleBridge {
 
     private static final String TAG = "GateSaleBridge";
 
     // ═══════════════════════════════════════════════════════════
-    // Actions — يقرأها GateEventReceiver / MiraGateMonitorService
+    // Actions
     // ═══════════════════════════════════════════════════════════
     public static final String ACTION_SALE_COMPLETED =
             "com.mira.gate.SALE_COMPLETED";
@@ -62,17 +55,6 @@ public final class GateSaleBridge {
     // 1. بعد البيع الناجح
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * يُستدعى بعد نجاح البيع (أونلاين أو أوفلاين).
-     *
-     * @param ctx        سياق التطبيق
-     * @param items      قائمة القطع المباعة (CartItems)
-     * @param saleId     معرف البيع من السيرفر (0 للأوفلاين)
-     * @param totalUsd   الإجمالي بالدولار
-     * @param branchId   الفرع النشط
-     * @param userId     معرف المستخدم
-     * @param isOffline  هل البيع أوفلاين؟
-     */
     public static void onSaleCompleted(@NonNull Context ctx,
                                        @Nullable List<CartItem> items,
                                        long saleId,
@@ -86,7 +68,7 @@ public final class GateSaleBridge {
         }
 
         try {
-            // استخراج EPCs الصالحة (تجاهل الفارغة)
+            // استخراج EPCs الصالحة
             List<String> epcs = extractValidEpcs(items);
             if (epcs.isEmpty()) {
                 Log.w(TAG, "onSaleCompleted: no valid EPCs — skip broadcast");
@@ -98,12 +80,15 @@ public final class GateSaleBridge {
                     + ", branch=" + branchId
                     + ", offline=" + isOffline);
 
-            // 1. حفظ في القائمة المسموحة
+            // 1. حفظ في القائمة المسموحة (محلياً)
             addToAllowedListSafe(ctx, epcs, saleId, branchId, isOffline);
 
-            // 2. إرسال Broadcast للبوابات
+            // 2. إرسال Broadcast للبوابات (محلياً)
             sendSaleBroadcast(ctx, epcs, saleId, totalUsd, items.size(),
                     branchId, userId, isOffline);
+
+            // 3. ✅ [جديد] محاكاة الخروج (وضع اختباري)
+            simulateExitIfEnabled(ctx, epcs, saleId, branchId);
 
         } catch (Exception e) {
             // ⚠️ لا نُفشل البيع أبداً بسبب الجسر
@@ -115,10 +100,6 @@ public final class GateSaleBridge {
     // 2. بعد الإرجاع الناجح
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * يُستدعى بعد نجاح الإرجاع.
-     * يزيل EPCs من القائمة المسموحة (لأنها عادت للمخزون).
-     */
     public static void onRefundCompleted(@NonNull Context ctx,
                                          @Nullable String epc,
                                          @Nullable String serialNo,
@@ -148,6 +129,77 @@ public final class GateSaleBridge {
         } catch (Exception e) {
             Log.e(TAG, "onRefundCompleted error (non-fatal): " + e.getMessage(), e);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. 🎬 محاكاة الخروج (وضع اختباري)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * إذا كان "محاكاة الخروج" مفعّلاً في MiraGatesSettings،
+     * يُرسل لكل EPC حدث خروج فوري للسيرفر.
+     *
+     * الغرض: اختبار النظام بدون قارئ RFID.
+     * ⚠️ لا يستخدم في الإنتاج.
+     */
+    private static void simulateExitIfEnabled(Context ctx,
+                                              List<String> epcs,
+                                              long saleId,
+                                              int branchId) {
+        try {
+            MiraGatesSettings settings = MiraGatesSettings.getInstance(ctx);
+            if (settings == null || !settings.isSimulateExitOnSale()) {
+                return; // ✅ معطّل — لا شيء يحدث
+            }
+
+            Log.i(TAG, "🎬 SIMULATE EXIT enabled — sending /gate-exit-event for "
+                    + epcs.size() + " EPCs");
+
+            for (String epc : epcs) {
+                sendSimulatedExitEvent(ctx, epc, saleId, branchId);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "simulateExitIfEnabled error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * يُرسل حدث خروج محاكي للسيرفر — في Thread منفصل.
+     */
+    private static void sendSimulatedExitEvent(Context ctx, String epc,
+                                                long saleId, int branchId) {
+        if (epc == null || epc.isEmpty()) return;
+
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(ctx);
+                if (client == null) {
+                    Log.w(TAG, "MiraApiClient is null");
+                    return;
+                }
+
+                JSONObject payload = new JSONObject();
+                payload.put("epc", epc);
+                payload.put("item_title", "محاكاة خروج (بيع " + saleId + ")");
+                payload.put("allowed", true);
+                payload.put("gate_id", "simulation_gate");
+                payload.put("branch_id", branchId);
+                payload.put("timestamp", System.currentTimeMillis());
+                payload.put("event_type", "PASS");
+
+                MiraApiClient.ApiResponse response =
+                        client.postWithAuth("/gate-exit-event", payload);
+
+                if (response != null && response.isSuccess) {
+                    Log.d(TAG, "✅ Simulated exit sent: " + epc);
+                } else {
+                    Log.w(TAG, "⚠️ Simulated exit failed: " + epc
+                            + " (code=" + (response != null ? response.code : -1) + ")");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "sendSimulatedExitEvent error: " + e.getMessage());
+            }
+        }, "MiraSimulateExit").start();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -236,10 +288,6 @@ public final class GateSaleBridge {
     // Helpers — Extract EPCs
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * يستخرج EPCs صالحة من قائمة CartItem.
-     * الأولوية: rfidEpc → epc → serialNo (fallback)
-     */
     private static List<String> extractValidEpcs(List<CartItem> items) {
         List<String> result = new ArrayList<>(items.size());
         for (CartItem item : items) {
