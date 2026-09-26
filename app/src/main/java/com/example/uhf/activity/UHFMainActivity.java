@@ -2683,4 +2683,21 @@ private void updateBottomNavVisibility(String tag) {
         Log.e(TAG, "updateBottomNavVisibility error: " + e.getMessage());
     }
 }
-                                }
+
+/**
+ * ✅ فحص إذا كان الكيبورد ظاهراً
+ * نستخدم androidx.core.graphics.Insets (وليس android.graphics.Insets)
+ */
+private boolean isKeyboardVisible() {
+    try {
+        View rootView = findViewById(android.R.id.content);
+        if (rootView == null || rootView.getRootWindowInsets() == null) return false;
+        
+        androidx.core.graphics.Insets imeInsets = rootView.getRootWindowInsets()
+                .getInsets(WindowInsetsCompat.Type.ime());
+        return imeInsets.bottom > 0;
+    } catch (Exception e) {
+        return false;
+    }
+}
+                       }
