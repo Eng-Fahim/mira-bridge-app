@@ -51,6 +51,8 @@ public class MiraGatesSettings {
     private static final String KEY_OPERATION_MODE = "operation_mode";
     private static final String KEY_KEEP_SCREEN_ON = "keep_screen_on";
     private static final String KEY_CONTINUOUS_SCAN = "continuous_scan";
+    
+    private static final String KEY_SIMULATE_EXIT_ON_SALE = "simulate_exit_on_sale";
 
     // ═══════════════════════════════════════════════════════════
     // 🎯 Operation Mode Enum (v2.0)
@@ -160,6 +162,29 @@ public class MiraGatesSettings {
     public boolean isContinuousScanEnabled() {
         return prefs.getBoolean(KEY_CONTINUOUS_SCAN, true);
     }
+    
+    // ═══════════════════════════════════════════════════════════
+// 🎬 محاكاة الخروج عند البيع (وضع اختباري)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * عند تفعيله:
+ * - بمجرد البيع، يُنفَّذ record_exit_event تلقائياً
+ * - gate_logs + gate_status يُحدَّثان
+ * - items.vault_status = 'exited'
+ * - allowed_epcs.status = 'exited'
+ * 
+ * ⚠️ افتراضياً: معطّل (للاستخدام في الإنتاج)
+ * للاختبار فقط!
+ */
+public boolean isSimulateExitOnSale() {
+    return prefs.getBoolean(KEY_SIMULATE_EXIT_ON_SALE, false);
+}
+
+public void setSimulateExitOnSale(boolean value) {
+    prefs.edit().putBoolean(KEY_SIMULATE_EXIT_ON_SALE, value).apply();
+    Log.i(TAG, "🎬 Simulate exit on sale: " + value);
+}
 
     public void setContinuousScanEnabled(boolean value) {
         prefs.edit().putBoolean(KEY_CONTINUOUS_SCAN, value).apply();
