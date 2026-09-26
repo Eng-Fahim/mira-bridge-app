@@ -399,6 +399,11 @@
 <color name="scan_progress_track">#3F3325</color>
 <color name="scan_progress_start">#B89456</color>
 <color name="scan_progress_end">#F5D97A</color>
+
+🌙 CARDS — Dark Mode
+         ═══════════════════════════════════════════════════════ -->
+    <color name="card_surface_warm">#1E1C1A</color>
+    <color name="card_stroke_warm">#3F3325</color>
     <!-- String Array -->
     <string-array name="colors" translatable="false">
         <item>#E8C766</item>
