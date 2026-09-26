@@ -628,6 +628,38 @@
     <color name="text_warning">#F59E0B</color>
     <color name="text_info">#0284C7</color>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     🆕 PART 7 — INVENTORY POLISH v3.1
+     ألوان خاصة بشاشة الجرد
+     ═══════════════════════════════════════════════════════════════ -->
+
+<!-- 📊 Status Bar -->
+<color name="status_bar_text">@color/gold_900</color>       <!-- نص داكن على ذهبي فاتح -->
+<color name="status_bar_text_on_dark">@color/pure_white</color> <!-- احتياطي لو الخلفية غامقة -->
+
+<!-- 🧭 Segmented Control (زر شامل/فئوي/أعمى) -->
+<color name="segmented_text_active">@color/gold_900</color>       <!-- نص داكن على ذهبي -->
+<color name="segmented_text_inactive">@color/gold_700</color>
+<color name="segmented_bg_active">@color/gold_500</color>
+<color name="segmented_bg_inactive">@android:color/transparent</color>
+<color name="segmented_stroke">@color/gold_300</color>            <!-- الإطار -->
+
+<!-- 📈 Progress Bar -->
+<color name="progress_start">@color/gold_700</color>              <!-- #8B6914 -->
+<color name="progress_center">@color/gold_500</color>             <!-- #C59B27 -->
+<color name="progress_end">@color/gold_300</color>                <!-- #E5C158 -->
+
+<!-- ⚠️ Alerts Strip -->
+<color name="alert_bg">@color/gold_50</color>                     <!-- #FFFBF0 -->
+<color name="alert_bg_dark">#3D2E00</color>                       <!-- ذهبي داكن للـ dark mode -->
+<color name="alert_text">@color/gold_700</color>
+<color name="alert_icon">@color/warning_500</color>
+
+<!-- 🎯 Metrics (بطاقة الوزن الثانوية) -->
+<color name="metric_secondary_bg">@color/pure_white</color>
+<color name="metric_secondary_stroke">@color/gold_200</color>
+
+    
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
