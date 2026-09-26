@@ -9,7 +9,9 @@ import com.example.uhf.api.MiraApiClient;
 import org.json.JSONObject;
 
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -21,6 +23,7 @@ import java.util.Map;
  *  3. logging للأداء
  *  4. Null-safety في كل مكان
  */
+ 
 public class MiraPriceManager {
 
     private static final String TAG = "MiraPriceManager";
@@ -29,12 +32,14 @@ public class MiraPriceManager {
     private static volatile MiraPriceManager instance;
     private static Context appContext;
 
-    // ✅ [إصلاح v2.0] منع تحميل مكرر
     private static volatile boolean hasLoadedFromServer = false;
     private static volatile boolean isLoading = false;
 
     private final SharedPreferences prefs;
-    private final DecimalFormat decimalFormat = new DecimalFormat("#,##0.00");
+
+    // ✅ Formatters — تُهيَّأ مرة واحدة مع Locale.US
+    private final DecimalFormat decimalFormat;
+    private final DecimalFormat largeFormat;
 
     public static final String CURRENCY_USD = "USD";
     public static final String CURRENCY_YER = "YER";
@@ -55,7 +60,12 @@ public class MiraPriceManager {
         appContext = context.getApplicationContext();
         prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-        // ✅ [إصلاح v2.0] حمّل من السيرفر مرة واحدة فقط
+        // ✅ تهيئة الـ Formatters مع Locale.US — إجبار الأرقام اللاتينية
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
+        decimalFormat = new DecimalFormat("#,##0.00", symbols);
+        largeFormat = new DecimalFormat("#,##0", symbols);
+
+        // ✅ حمّل من السيرفر مرة واحدة فقط
         if (!hasLoadedFromServer && !isLoading) {
             hasLoadedFromServer = true;
             loadFromServer();
@@ -68,6 +78,7 @@ public class MiraPriceManager {
         }
         return instance;
     }
+
 
     /**
      * ✅ إعادة تحميل يدوية (من Settings مثلاً)
@@ -364,16 +375,17 @@ public class MiraPriceManager {
     }
 
     public String formatPrice(double priceUSD, String currency) {
-        if (priceUSD <= 0) return "—";
+    if (priceUSD <= 0) return "—";
 
-        double convertedPrice = convertFromUSD(priceUSD, currency);
-        String symbol = getCurrencySymbol(currency);
-        if (CURRENCY_YER.equals(currency) || CURRENCY_EGP.equals(currency)) {
-            DecimalFormat largeFormat = new DecimalFormat("#,##0");
-            return largeFormat.format(convertedPrice) + " " + symbol;
-        }
-        return symbol + " " + decimalFormat.format(convertedPrice);
+    double convertedPrice = convertFromUSD(priceUSD, currency);
+    String symbol = getCurrencySymbol(currency);
+    
+    // ✅ largeFormat أصبح member بدل إنشائه محلياً
+    if (CURRENCY_YER.equals(currency) || CURRENCY_EGP.equals(currency)) {
+        return largeFormat.format(convertedPrice) + " " + symbol;
     }
+    return symbol + " " + decimalFormat.format(convertedPrice);
+}
 
     public String formatPriceDefault(double priceUSD) {
         return formatPrice(priceUSD, getDefaultCurrency());
@@ -407,10 +419,10 @@ public class MiraPriceManager {
 
         String defaultCurrency = getDefaultCurrency();
         double priceInCurrency = convertFromUSD(priceUSD, defaultCurrency);
-        return String.format("%s %s ($%s)",
-                decimalFormat.format(priceInCurrency),
-                getCurrencySymbol(defaultCurrency),
-                decimalFormat.format(priceUSD));
+        return String.format(Locale.US, "%s %s ($%s)",
+        decimalFormat.format(priceInCurrency),
+        getCurrencySymbol(defaultCurrency),
+        decimalFormat.format(priceUSD));
     }
 
     public Map<String, Double> getAllGoldPrices() {
