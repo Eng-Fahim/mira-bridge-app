@@ -176,6 +176,14 @@ private static final int MIN_ITEMS_TO_PROMPT = 3; // 3 قطع على الأقل
     private TextView tvLastScanRssi;
     private TextView tvLastScanStatus;
     
+    // ✅ NEW — Enhanced Last Scan Card refs
+    private TextView tvLastScanPrice;
+    private TextView tvLastScanReadCount;
+    private TextView tvLastScanSerial;
+    private TextView tvLastScanTime;
+    private View chipReadCount;
+    private View rowSerialTime;
+    
     
 
     private MaterialButton btnOpenItemsList;
@@ -616,6 +624,14 @@ public View onCreateView(@NonNull LayoutInflater inflater,
         btnOpenItemsList = view.findViewById(R.id.btnOpenItemsList);
         btnPowerControlCompact = view.findViewById(R.id.btnPowerControlCompact);
         btnArchiveReportsCompact = view.findViewById(R.id.btnArchiveReportsCompact);
+        
+        // ✅ Enhanced Last Scan Card refs
+        tvLastScanPrice = view.findViewById(R.id.tvLastScanPrice);
+        tvLastScanReadCount = view.findViewById(R.id.tvLastScanReadCount);
+        tvLastScanSerial = view.findViewById(R.id.tvLastScanSerial);
+        tvLastScanTime = view.findViewById(R.id.tvLastScanTime);
+        chipReadCount = view.findViewById(R.id.chipReadCount);
+        rowSerialTime = view.findViewById(R.id.rowSerialTime);
 
         // Setup RecyclerView
         setupRecyclerView();
@@ -1828,66 +1844,182 @@ private void animateMainButton() {
     }
 
     private void updateLastScanCard(ScannedItemDisplay item, boolean isDuplicate) {
-        if (item == null || tvLastScanTitle == null) return;
+    if (item == null || tvLastScanTitle == null) return;
 
-        try {
-            tvLastScanTitle.setText(item.title != null ? item.title : "—");
-            if (tvLastScanEpc != null) {
-                tvLastScanEpc.setText(item.epc != null ? item.epc : "—");
+    try {
+        // ═══ Title ═══
+        tvLastScanTitle.setText(item.title != null ? item.title : "—");
+
+        // ═══ EPC (مختصر) ═══
+        if (tvLastScanEpc != null) {
+            String epc = item.epc != null ? item.epc : "";
+            if (!epc.isEmpty()) {
+                tvLastScanEpc.setText(formatEpcShort(epc));
+                tvLastScanEpc.setVisibility(View.VISIBLE);
+            } else {
+                tvLastScanEpc.setVisibility(View.GONE);
             }
-            if (tvLastScanKarat != null) {
-                tvLastScanKarat.setText(item.karat != null ? item.karat : "—");
+        }
+
+        // ═══ 💰 السعر (جديد) ═══
+        if (tvLastScanPrice != null) {
+            if (item.price > 0) {
+                tvLastScanPrice.setText(String.format(Locale.US, "$%.0f", item.price));
+            } else {
+                tvLastScanPrice.setText("—");
             }
-            if (tvLastScanWeight != null) {
-                tvLastScanWeight.setText(String.format(Locale.US, "%.2fg", item.weight));
+        }
+
+        // ═══ ⚖️ الوزن ═══
+        if (tvLastScanWeight != null) {
+            if (item.weight > 0) {
+                tvLastScanWeight.setText(String.format(Locale.US, "%.1fg", item.weight));
+            } else {
+                tvLastScanWeight.setText("—");
             }
-            if (tvLastScanRssi != null) {
-                tvLastScanRssi.setText(String.format(Locale.US, "📶 %d", item.rssi));
+        }
+
+        // ═══ 🏷️ العيار ═══
+        if (tvLastScanKarat != null) {
+            tvLastScanKarat.setText(
+                    item.karat != null && !item.karat.isEmpty() ? item.karat : "—");
+        }
+
+        // ═══ 📶 RSSI ═══
+        if (tvLastScanRssi != null) {
+            tvLastScanRssi.setText(String.format(Locale.US, "%d", item.rssi));
+        }
+
+        // ═══ 🔄 عدد القراءات ═══
+        if (chipReadCount != null && tvLastScanReadCount != null) {
+            if (item.count > 1) {
+                tvLastScanReadCount.setText(String.format(Locale.US, "× %d", item.count));
+                chipReadCount.setVisibility(View.VISIBLE);
+            } else {
+                chipReadCount.setVisibility(View.GONE);
+            }
+        }
+
+        // ═══ Serial + Time Row ═══
+        if (rowSerialTime != null) {
+            boolean hasSerial = false;
+            boolean hasTime = false;
+
+            // Serial (من GTIN أو Serial)
+            if (tvLastScanSerial != null) {
+                String serial = getSerialDisplay(item);
+                if (serial != null && !serial.isEmpty()) {
+                    tvLastScanSerial.setText(serial);
+                    hasSerial = true;
+                }
             }
 
-            boolean isKnown = catalogEpcs.contains(item.epc);
-boolean hasCatalog = !catalogEpcs.isEmpty();
-if (tvLastScanStatus != null) {
-    String statusText;
-    int statusColor;
-    
-    if (isDuplicate) {
-        // 1) مكرر
-        statusText = isArabic ? "🔁 مكرر" : "🔁 Duplicate";
-        statusColor = 0xFF3B82F6;  // أزرق
-    } else if (isKnown) {
-        // 2) مطابق للمخزون
-        statusText = isArabic ? "✅ مطابق للمخزون" : "✅ In Catalog";
-        statusColor = 0xFF16A34A;  // أخضر
-    } else if (hasCatalog) {
-        // 3) غير متوقع (الكتالوج موجود لكن القطعة غير فيه)
-        statusText = isArabic ? "🆕 غير متوقع" : "🆕 Unexpected";
-        statusColor = 0xFFF59E0B;  // برتقالي
-    } else {
-        // 4) غير معروف (لا يوجد كتالوج — جرد أعمى)
-        statusText = isArabic ? "⚠️ غير معروف" : "⚠️ Unknown";
-        statusColor = 0xFFDC2626;  // أحمر
+            // Time
+            if (tvLastScanTime != null && item.time != null && !item.time.isEmpty()) {
+                tvLastScanTime.setText("⏰ " + extractTimeShort(item.time));
+                hasTime = true;
+            }
+
+            rowSerialTime.setVisibility(
+                    (hasSerial || hasTime) ? View.VISIBLE : View.GONE);
+        }
+
+        // ═══ الحالة (مطابق/مكرر/غير متوقع) ═══
+        boolean isKnown = catalogEpcs.contains(item.epc);
+        boolean hasCatalog = !catalogEpcs.isEmpty();
+
+        if (tvLastScanStatus != null) {
+            String statusText;
+            int statusColor;
+
+            if (isDuplicate) {
+                statusText = isArabic ? "🔁 مكرر" : "🔁 Duplicate";
+                statusColor = 0xFF3B82F6;
+            } else if (isKnown) {
+                statusText = isArabic ? "✅ مطابق للمخزون" : "✅ In Catalog";
+                statusColor = 0xFF16A34A;
+            } else if (hasCatalog) {
+                statusText = isArabic ? "🆕 غير متوقع" : "🆕 Unexpected";
+                statusColor = 0xFFF59E0B;
+            } else {
+                statusText = isArabic ? "⚠️ غير معروف" : "⚠️ Unknown";
+                statusColor = 0xFFDC2626;
+            }
+
+            tvLastScanStatus.setText(statusText);
+            tvLastScanStatus.setTextColor(statusColor);
+        }
+
+        // ═══ Animation ═══
+        if (lastScanCard != null) {
+            android.animation.ObjectAnimator scaleX =
+                    android.animation.ObjectAnimator.ofFloat(
+                            lastScanCard, "scaleX", 0.98f, 1f);
+            android.animation.ObjectAnimator scaleY =
+                    android.animation.ObjectAnimator.ofFloat(
+                            lastScanCard, "scaleY", 0.98f, 1f);
+            scaleX.setDuration(200);
+            scaleY.setDuration(200);
+            scaleX.start();
+            scaleY.start();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "updateLastScanCard error", e);
     }
-    
-    tvLastScanStatus.setText(statusText);
-    tvLastScanStatus.setTextColor(statusColor);
 }
 
-            if (lastScanCard != null) {
-                android.animation.ObjectAnimator scaleX =
-                        android.animation.ObjectAnimator.ofFloat(lastScanCard, "scaleX", 0.98f, 1f);
-                android.animation.ObjectAnimator scaleY =
-                        android.animation.ObjectAnimator.ofFloat(lastScanCard, "scaleY", 0.98f, 1f);
-                scaleX.setDuration(200);
-                scaleY.setDuration(200);
-                scaleX.start();
-                scaleY.start();
+/**
+ * ✅ تنسيق EPC — عرض أول 4 وأخر 4 مجموعات
+ */
+private String formatEpcShort(String epc) {
+    if (epc == null || epc.isEmpty()) return "";
+    if (epc.length() <= 16) return epc;
+    return epc.substring(0, 8) + "…" + epc.substring(epc.length() - 6);
+}
+
+/**
+ * ✅ استخراج Serial Display (من Serial أو GTIN)
+ */
+private String getSerialDisplay(ScannedItemDisplay item) {
+    try {
+        if (item == null) return null;
+        
+        // جرب Serial من catalogItem
+        InventoryItem catalogItem = catalogManager != null
+                ? catalogManager.getItemByEpc(item.epc) : null;
+        
+        if (catalogItem != null) {
+            String serial = catalogItem.getSerial();
+            if (serial != null && !serial.isEmpty()) {
+                return "SN: " + serial;
             }
-        } catch (Exception e) {
-            Log.e(TAG, "updateLastScanCard error", e);
+            String gtin = catalogItem.getGtin();
+            if (gtin != null && !gtin.isEmpty()) {
+                return "GTIN: " + gtin;
+            }
         }
+        return null;
+    } catch (Exception e) {
+        return null;
     }
-    
+}
+
+/**
+ * ✅ استخراج وقت مختصر (14:32)
+ */
+private String extractTimeShort(String timeStr) {
+    if (timeStr == null || timeStr.isEmpty()) return "";
+    try {
+        // "14:32:05" → "14:32"
+        String[] parts = timeStr.split(":");
+        if (parts.length >= 2) {
+            return parts[0] + ":" + parts[1];
+        }
+        return timeStr;
+    } catch (Exception e) {
+        return timeStr;
+    }
+}
     
 /**
  * ✅ تحديث حالة جميع الأزرار بناءً على الحالة الحالية
