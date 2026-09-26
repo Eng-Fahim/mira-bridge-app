@@ -280,6 +280,28 @@
                         android:text="@string/gate_setting_vibration"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp" />
+                        
+                        <!-- ═══════════════════════════════════════════════════════════
+     🎬 محاكاة الخروج عند البيع (وضع اختباري) — جديد
+     ═══════════════════════════════════════════════════════════ -->
+<com.google.android.material.materialswitch.MaterialSwitch
+    android:id="@+id/swSimulateExitOnSale"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:text="@string/gate_setting_simulate_exit"
+    android:textColor="?attr/colorOnSurface"
+    android:textSize="12sp" />
+
+<TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="2dp"
+    android:layout_marginBottom="4dp"
+    android:text="@string/gate_setting_simulate_exit_desc"
+    android:textColor="?attr/colorOnSurfaceVariant"
+    android:textSize="10sp"
+    android:paddingStart="8dp" />
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
