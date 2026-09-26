@@ -84,19 +84,19 @@
 
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/secondaryToolbar"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:background="?attr/colorSurface"
-            android:elevation="3dp"
-            android:layoutDirection="locale"
-            app:contentInsetEnd="0dp"
-            app:contentInsetEndWithActions="0dp"
-            app:contentInsetStart="0dp"
-            app:contentInsetStartWithNavigation="0dp"
-            app:paddingEnd="0dp"
-            app:paddingStart="0dp" />
+        <!-- ✅ مُخفى — الأزرار نُقلت إلى Toolbar الرئيسي -->
+<com.google.android.material.appbar.MaterialToolbar
+    android:id="@+id/secondaryToolbar"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:visibility="gone"
+    android:layoutDirection="locale"
+    app:contentInsetEnd="0dp"
+    app:contentInsetEndWithActions="0dp"
+    app:contentInsetStart="0dp"
+    app:contentInsetStartWithNavigation="0dp"
+    app:paddingEnd="0dp"
+    app:paddingStart="0dp" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
