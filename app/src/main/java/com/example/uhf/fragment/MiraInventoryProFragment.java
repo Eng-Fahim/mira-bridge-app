@@ -1804,26 +1804,31 @@ if (tvLastScanStatus != null) {
 private void updateButtonsState() {
     if (!isAdded() || isFragmentDestroyed) return;
     
-    int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+    // ✅ اعتمد على كلا المصدرين
+    int engineCount = (inventoryEngine != null) 
+            ? inventoryEngine.getUniqueCount() : 0;
+    int listCount = (scannedItemsDisplayList != null) 
+            ? scannedItemsDisplayList.size() : 0;
+    int scanned = Math.max(engineCount, listCount);
+    
     boolean hasItems = scanned > 0;
     boolean canEdit = canEditInventory();
     boolean canView = canViewInventory();
     
-    // ✅ زر البدء/الإيقاف — دائماً مفعّل إذا كان canEdit
+    // ✅ زر البدء/الإيقاف
     if (btnMainToggleScan != null) {
         btnMainToggleScan.setEnabled(canEdit);
         btnMainToggleScan.setAlpha(canEdit ? 1.0f : 0.5f);
     }
     
-    // ✅ زر الاعتماد — يحتاج عناصر + ليس مسحاً + صلاحية
+    // ✅ زر الاعتماد — يحتاج عناصر + ليس مسحاً
     if (btnCommitSession != null) {
         boolean canCommit = hasItems && !isScanning && canEdit;
         btnCommitSession.setEnabled(canCommit);
         btnCommitSession.setAlpha(canCommit ? 1.0f : 0.5f);
-        // ✅ لا تغيّر النص هنا — احتفظ بـ "اعتماد" أو "✅ معتمد" من commit
     }
     
-    // ✅ زر التقرير — يحتاج عناصر + ليس مسحاً
+    // ✅ زر التقرير
     if (btnGenerateReport != null) {
         boolean canReport = hasItems && !isScanning;
         btnGenerateReport.setEnabled(canReport);
@@ -1846,7 +1851,7 @@ private void updateButtonsState() {
         btnPowerControlCompact.setAlpha((!isScanning && canEdit) ? 1.0f : 0.5f);
     }
     
-    // ✅ زر الأرشيف — يحتاج canView فقط (لا يحتاج عناصر)
+    // ✅ زر الأرشيف
     if (btnArchiveReports != null) {
         boolean canArchive = !isScanning && canView;
         btnArchiveReports.setEnabled(canArchive);
@@ -1865,7 +1870,7 @@ private void updateButtonsState() {
         btnTakeSnapshot.setAlpha(canSnapshot ? 1.0f : 0.5f);
     }
     
-    // ✅ زر عرض اللقطات (سيُضاف لاحقاً)
+    // ✅ زر عرض اللقطات
     if (btnViewSnapshots != null) {
         btnViewSnapshots.setEnabled(!isScanning);
         btnViewSnapshots.setAlpha(isScanning ? 0.5f : 1.0f);
