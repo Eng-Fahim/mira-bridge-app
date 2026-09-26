@@ -2,101 +2,88 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/posRootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
     android:orientation="vertical">
 
     <!-- ═══════════════════════════════════════════════════════
-         HEADER BAR
-         ═══════════════════════════════════════════════════════ -->
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="0dp"
-        app:cardElevation="@dimen/elevation_1"
-        app:strokeWidth="0dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="@dimen/screen_padding_h"
-            android:paddingVertical="@dimen/space_3">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/pos_title"
-                android:textAppearance="@style/TextAppearance.App.Title.Medium"
-                android:textColor="?attr/colorOnSurface" />
-
-            <TextView
-                android:id="@+id/tvPosScaleStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_status_badge"
-                android:paddingHorizontal="@dimen/space_3"
-                android:paddingVertical="@dimen/space_1"
-                android:text="@string/pos_scale_searching"
-                android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                android:textColor="?attr/colorPrimary" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- ═══════════════════════════════════════════════════════
-         SCAN ACTIONS BAR
+         1. HEADER BAR — يبقى (مع تحسين بصري)
          ═══════════════════════════════════════════════════════ -->
     <LinearLayout
+        android:id="@+id/posHeaderCard"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
-        android:gravity="center"
+        android:layout_height="@dimen/pos_header_height"
+        android:background="@drawable/bg_pos_header"
+        android:elevation="@dimen/elevation_1"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="@dimen/space_3"
-        android:paddingTop="@dimen/space_2"
-        android:paddingBottom="@dimen/space_1">
+        android:paddingHorizontal="@dimen/screen_padding_h">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnOpenScanner"
-            style="@style/AppButtonStyle"
-            android:layout_width="0dp"
-            android:layout_height="@dimen/button_height"
-            android:layout_marginEnd="@dimen/space_1"
-            android:layout_weight="1"
-            android:text="@string/pos_scan_gs1"
-            app:iconPadding="@dimen/space_2" />
+        <!-- Icon -->
+        <ImageView
+            android:layout_width="@dimen/pos_header_icon"
+            android:layout_height="@dimen/pos_header_icon"
+            android:contentDescription="@string/pos_header_icon_desc"
+            android:src="@drawable/ic_pos_cart_gold"
+            app:tint="@color/pos_gold_primary" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnPosRFIDMode"
-            style="@style/AppButtonStyle"
+        <!-- Title + Subtitle -->
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="@dimen/button_height"
-            android:layout_marginStart="@dimen/space_1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_3"
             android:layout_weight="1"
-            android:text="@string/pos_scan_rfid"
-            app:iconPadding="@dimen/space_2" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvPosHeaderTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/pos_title"
+                android:textAppearance="@style/TextAppearance.App.Title.Medium"
+                android:textColor="@color/pos_header_title"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPosHeaderSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/pos_subtitle"
+                android:textColor="@color/pos_header_subtitle"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Scale Status Badge (tvPosScaleStatus — نفس الـ ID القديم) -->
+        <TextView
+            android:id="@+id/tvPosScaleStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/pos_status_badge_h"
+            android:background="@drawable/bg_pos_status_badge"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="@dimen/pos_status_badge_pad_h"
+            android:text="@string/pos_scale_searching"
+            android:textColor="@color/pos_status_searching"
+            android:textSize="11sp"
+            tools:text="⚖️ جاري البحث..." />
+
+        <!-- Overflow Menu -->
+        <ImageButton
+            android:id="@+id/btnPosOverflow"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="@dimen/space_2"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/pos_overflow_desc"
+            android:padding="@dimen/space_1"
+            android:src="@drawable/ic_pos_overflow"
+            app:tint="@color/pos_text_primary" />
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════════════════
-         REFUND BUTTON
-         ═══════════════════════════════════════════════════════ -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnPosRefund"
-        style="@style/AppButtonStyle.Outlined"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/button_height_sm"
-        android:layout_marginHorizontal="@dimen/space_3"
-        android:layout_marginTop="@dimen/space_1"
-        android:text="🔄 مرتجع مبيعات"
-        android:textColor="?attr/colorSecondary"
-        app:strokeColor="?attr/colorSecondary" />
-
-    <!-- ═══════════════════════════════════════════════════════
-         NESTED SCROLL (Cart & Summary Only)
+         2. NESTED SCROLL — Hero / Cart / Summary
          ═══════════════════════════════════════════════════════ -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/posScrollView"
@@ -111,216 +98,519 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="@dimen/space_4">
 
-            <!-- STATUS STRIP -->
+            <!-- ══════════════════════════════════════════════
+                 2.A HERO STATE — يظهر في Empty State فقط
+                 ══════════════════════════════════════════════ -->
             <LinearLayout
+                android:id="@+id/posHeroContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="?attr/colorSurfaceVariant"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/screen_padding_h"
+                android:paddingTop="@dimen/pos_hero_top_margin"
+                android:paddingBottom="@dimen/space_5">
+
+                <!-- Glow Circle + Icon + Sparkles -->
+                <FrameLayout
+                    android:id="@+id/posHeroCircleWrapper"
+                    android:layout_width="@dimen/pos_hero_circle"
+                    android:layout_height="@dimen/pos_hero_circle">
+
+                    <!-- Layer 1: Glow -->
+                    <View
+                        android:id="@+id/posHeroGlow"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_pos_hero_glow" />
+
+                    <!-- Layer 2: Ring -->
+                    <View
+                        android:id="@+id/posHeroRing"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_pos_hero_ring" />
+
+                    <!-- Layer 3: Main Icon (dinamically changes) -->
+                    <ImageView
+                        android:id="@+id/ivPosHeroIcon"
+                        android:layout_width="@dimen/pos_hero_icon"
+                        android:layout_height="@dimen/pos_hero_icon"
+                        android:layout_gravity="center"
+                        android:contentDescription="@string/pos_empty_cart_desc"
+                        android:src="@drawable/ic_pos_cart_gold"
+                        app:tint="@color/pos_gold_primary" />
+
+                    <!-- Layer 4: Sparkle Top-Right -->
+                    <ImageView
+                        android:id="@+id/ivPosHeroSparkleTop"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="top|end"
+                        android:layout_marginTop="22dp"
+                        android:layout_marginEnd="22dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_pos_sparkle" />
+
+                    <!-- Layer 5: Sparkle Bottom-Left -->
+                    <ImageView
+                        android:id="@+id/ivPosHeroSparkleBottom"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_gravity="bottom|start"
+                        android:layout_marginBottom="26dp"
+                        android:layout_marginStart="26dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_pos_sparkle" />
+                </FrameLayout>
+
+                <!-- Title AR -->
+                <TextView
+                    android:id="@+id/tvPosHeroTitleAr"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:letterSpacing="0.01"
+                    android:text="@string/pos_hero_title_ar"
+                    android:textColor="@color/pos_hero_title"
+                    android:textSize="@dimen/pos_hero_title_size"
+                    android:textStyle="bold" />
+
+                <!-- Subtitle EN -->
+                <TextView
+                    android:id="@+id/tvPosHeroTitleEn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:letterSpacing="0.3"
+                    android:text="@string/pos_hero_title_en"
+                    android:textColor="@color/pos_hero_subtitle"
+                    android:textSize="@dimen/pos_hero_subtitle_size"
+                    android:textStyle="bold" />
+
+                <!-- Gold Divider -->
+                <View
+                    android:id="@+id/posHeroDivider"
+                    android:layout_width="@dimen/pos_hero_divider_w"
+                    android:layout_height="@dimen/pos_hero_divider_h"
+                    android:layout_marginTop="@dimen/space_3"
+                    android:background="@color/pos_divider_gold" />
+
+                <!-- Message -->
+                <TextView
+                    android:id="@+id/tvPosHeroMessage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_3"
+                    android:gravity="center"
+                    android:text="@string/pos_hero_idle_msg"
+                    android:textColor="@color/pos_text_primary"
+                    android:textSize="@dimen/pos_hero_msg_size" />
+
+                <!-- Hint -->
+                <TextView
+                    android:id="@+id/tvPosHeroHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_1"
+                    android:gravity="center"
+                    android:text="@string/pos_hero_idle_hint"
+                    android:textColor="@color/pos_text_secondary"
+                    android:textSize="@dimen/pos_hero_hint_size" />
+
+                <!-- RFID Counter (يظهر فقط في RFID mode) -->
+                <TextView
+                    android:id="@+id/tvPosRfidCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:background="@drawable/bg_pos_status_badge"
+                    android:paddingHorizontal="@dimen/pos_status_badge_pad_h"
+                    android:paddingVertical="4dp"
+                    android:textColor="@color/pos_status_active"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="تم مسح 3 قطع"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <!-- ══════════════════════════════════════════════
+                 2.B SCAN BUTTONS (3) — دائماً ظاهرة
+                 ══════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/posScanButtonsRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:gravity="center"
-                android:paddingVertical="@dimen/space_2">
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/screen_padding_h">
+
+                <!-- GS1 Button -->
+                <FrameLayout
+                    android:id="@+id/btnPosScanGs1"
+                    android:layout_width="@dimen/pos_scan_btn_size"
+                    android:layout_height="@dimen/pos_scan_btn_size"
+                    android:layout_marginEnd="@dimen/space_2"
+                    android:background="@drawable/bg_pos_scan_button_primary"
+                    android:clickable="true"
+                    android:contentDescription="@string/pos_btn_gs1_desc"
+                    android:focusable="true">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/ivPosGs1Icon"
+                            android:layout_width="@dimen/pos_scan_btn_icon"
+                            android:layout_height="@dimen/pos_scan_btn_icon"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_pos_gs1"
+                            app:tint="@color/pos_text_on_gold" />
+
+                        <TextView
+                            android:id="@+id/tvPosGs1Label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/pos_gap_sm"
+                            android:text="@string/pos_btn_gs1"
+                            android:textColor="@color/pos_text_on_gold"
+                            android:textSize="@dimen/pos_scan_btn_label"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- RFID Button -->
+                <FrameLayout
+                    android:id="@+id/btnPosScanRfid"
+                    android:layout_width="@dimen/pos_scan_btn_size"
+                    android:layout_height="@dimen/pos_scan_btn_size"
+                    android:layout_marginHorizontal="@dimen/space_2"
+                    android:background="@drawable/bg_pos_scan_button_outlined"
+                    android:clickable="true"
+                    android:contentDescription="@string/pos_btn_rfid_desc"
+                    android:focusable="true">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/ivPosRfidIcon"
+                            android:layout_width="@dimen/pos_scan_btn_icon"
+                            android:layout_height="@dimen/pos_scan_btn_icon"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_pos_rfid"
+                            app:tint="@color/pos_gold_primary" />
+
+                        <TextView
+                            android:id="@+id/tvPosRfidLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/pos_gap_sm"
+                            android:text="@string/pos_btn_rfid"
+                            android:textColor="@color/pos_gold_primary"
+                            android:textSize="@dimen/pos_scan_btn_label"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- Manual Button -->
+                <FrameLayout
+                    android:id="@+id/btnPosScanManual"
+                    android:layout_width="@dimen/pos_scan_btn_size"
+                    android:layout_height="@dimen/pos_scan_btn_size"
+                    android:layout_marginStart="@dimen/space_2"
+                    android:background="@drawable/bg_pos_scan_button_outlined"
+                    android:clickable="true"
+                    android:contentDescription="@string/pos_btn_manual_desc"
+                    android:focusable="true">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/ivPosManualIcon"
+                            android:layout_width="@dimen/pos_scan_btn_icon"
+                            android:layout_height="@dimen/pos_scan_btn_icon"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_pos_manual"
+                            app:tint="@color/pos_gold_primary" />
+
+                        <TextView
+                            android:id="@+id/tvPosManualLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/pos_gap_sm"
+                            android:text="@string/pos_btn_manual"
+                            android:textColor="@color/pos_gold_primary"
+                            android:textSize="@dimen/pos_scan_btn_label"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </FrameLayout>
+            </LinearLayout>
+
+            <!-- ══════════════════════════════════════════════
+                 2.C MANUAL INPUT (Inline — مخفي افتراضياً)
+                 ══════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/posManualInputContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/screen_padding_h"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilPosManualEpc"
+                    style="@style/AppTextInputStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/space_2"
+                    android:layout_weight="1"
+                    android:hint="@string/pos_manual_hint"
+                    app:boxBackgroundColor="@color/pos_surface_variant"
+                    app:endIconMode="clear_text"
+                    app:errorEnabled="true">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPosManualEpc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:imeOptions="actionDone"
+                        android:inputType="text"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                        android:textColor="@color/pos_text_primary"
+                        android:textDirection="ltr" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPosAddManual"
+                    style="@style/AppButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="@dimen/button_height_sm"
+                    android:minWidth="76dp"
+                    android:paddingHorizontal="@dimen/space_4"
+                    android:text="@string/pos_add" />
+            </LinearLayout>
+
+            <!-- ══════════════════════════════════════════════
+                 2.D CART STATUS STRIP
+                 ══════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/posCartStatusStrip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/screen_padding_h"
+                android:paddingVertical="@dimen/space_1">
 
                 <TextView
                     android:id="@+id/tvPosCartStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/pos_ready_scan"
+                    android:text="@string/pos_cart_empty"
                     android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
+                    android:textColor="@color/pos_text_secondary" />
             </LinearLayout>
 
-            <!-- CART -->
-            <FrameLayout
+            <!-- ══════════════════════════════════════════════
+                 2.E CART LIST (يظهر عند وجود قطع)
+                 ══════════════════════════════════════════════ -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvPosCartItems"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="200dp">
+                android:layout_marginTop="@dimen/space_1"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false"
+                android:paddingHorizontal="@dimen/screen_padding_h"
+                android:paddingBottom="@dimen/space_2"
+                android:visibility="gone"
+                tools:listitem="@layout/item_pos_cart_row"
+                tools:visibility="visible" />
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvPosCartItems"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:clipToPadding="false"
-                    android:nestedScrollingEnabled="false"
-                    android:paddingHorizontal="@dimen/space_3"
-                    android:paddingTop="@dimen/space_2"
-                    android:paddingBottom="@dimen/space_2"
-                    tools:listitem="@layout/item_pos_cart_row" />
+            <!-- Empty Cart State (يظهر فقط عندما تكون السلة فارغة) -->
+            <LinearLayout
+                android:id="@+id/layoutCartEmptyState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="@dimen/space_4"
+                android:visibility="gone"
+                tools:visibility="gone">
 
-                <LinearLayout
-                    android:id="@+id/layoutCartEmptyState"
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_6"
-                    android:visibility="visible">
+                    android:text="🛒"
+                    android:textSize="32sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🛒"
-                        android:textSize="54sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:text="@string/pos_ready_scan"
+                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                    android:textColor="@color/pos_text_secondary" />
+            </LinearLayout>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:text="@string/pos_ready_scan"
-                        android:textAppearance="@style/TextAppearance.App.Body.Medium"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-            </FrameLayout>
-
-            <!-- SUMMARY FOOTER -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- ══════════════════════════════════════════════
+                 2.F SUMMARY STRIP
+                 ══════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/posSummaryStrip"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/space_3"
-                android:layout_marginTop="@dimen/space_2"
-                android:layout_marginBottom="@dimen/space_4"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="@dimen/radius_xl"
-                app:cardElevation="@dimen/elevation_3"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="@dimen/stroke_normal">
+                android:layout_marginHorizontal="@dimen/screen_padding_h"
+                android:layout_marginTop="@dimen/space_3"
+                android:background="@drawable/bg_pos_summary_strip"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/space_4"
+                android:paddingVertical="@dimen/space_3">
 
+                <!-- Item Count -->
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_3">
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                    <!-- Item Count + Total -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="@dimen/space_3"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:text="@string/pos_item_count"
+                        android:textAppearance="@style/TextAppearance.App.Label.Small"
+                        android:textColor="@color/pos_summary_text_idle" />
 
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/pos_item_count"
-                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-
-                            <TextView
-                                android:id="@+id/tvPosItemCount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0"
-                                android:textAppearance="@style/TextAppearance.App.Headline.Small"
-                                android:textColor="?attr/colorOnSurface" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="end"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/pos_total_amount"
-                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-
-                            <TextView
-                                android:id="@+id/tvPosTotalAmount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/pos_default_amount"
-                                android:textAppearance="@style/TextAppearance.App.Display.Medium"
-                                android:textColor="?attr/colorPrimary"
-                                android:textDirection="ltr" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <!-- Clear + Checkout -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:id="@+id/tvPosItemCount"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnPosClearCart"
-                            style="@style/AppButtonStyle.Outlined"
-                            android:layout_width="100dp"
-                            android:layout_height="@dimen/button_height"
-                            android:layout_marginEnd="@dimen/space_2"
-                            android:text="@string/pos_clear"
-                            android:textColor="?attr/colorError"
-                            app:strokeColor="?attr/colorError" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnPosCheckout"
-                            style="@style/AppButtonStyle"
-                            android:layout_width="0dp"
-                            android:layout_height="@dimen/button_height"
-                            android:layout_weight="1"
-                            android:text="@string/pos_checkout" />
-                    </LinearLayout>
+                        android:text="0"
+                        android:textColor="@color/pos_text_primary"
+                        android:textSize="@dimen/pos_summary_count_size"
+                        android:textStyle="bold" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="36dp"
+                    android:layout_marginHorizontal="@dimen/space_3"
+                    android:background="@color/pos_divider" />
+
+                <!-- Total Amount -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/pos_total_amount"
+                        android:textAppearance="@style/TextAppearance.App.Label.Small"
+                        android:textColor="@color/pos_summary_text_idle" />
+
+                    <TextView
+                        android:id="@+id/tvPosTotalAmount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/pos_default_amount"
+                        android:textColor="@color/pos_gold_primary"
+                        android:textDirection="ltr"
+                        android:textSize="@dimen/pos_summary_amount_size"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ══════════════════════════════════════════════
+                 2.G CTA ROW (Clear + Checkout)
+                 ══════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/posCtaRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/screen_padding_h"
+                android:layout_marginTop="@dimen/space_3"
+                android:orientation="horizontal">
+
+                <!-- Clear Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPosClearCart"
+                    style="@style/AppButtonStyle.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="@dimen/pos_cta_h"
+                    android:layout_marginEnd="@dimen/space_2"
+                    android:minWidth="96dp"
+                    android:text="@string/pos_clear"
+                    android:textColor="@color/pos_danger"
+                    app:icon="@drawable/ic_pos_overflow"
+                    app:iconGravity="textStart"
+                    app:iconTint="@color/pos_danger"
+                    app:strokeColor="@color/pos_danger" />
+
+                <!-- Checkout Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPosCheckout"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/pos_cta_h"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_pos_cta_button"
+                    android:enabled="false"
+                    android:text="@string/pos_checkout"
+                    android:textColor="@color/pos_cta_text_enabled"
+                    android:textSize="@dimen/pos_cta_text_size"
+                    android:textStyle="bold"
+                    app:backgroundTint="@null" />
+            </LinearLayout>
+
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
     <!-- ═══════════════════════════════════════════════════════
-         STICKY MANUAL INPUT BAR (تم نقله للأسفل)
+         3. LEGACY BUTTONS (مخفية — للتوافق مع الكود القديم)
          ═══════════════════════════════════════════════════════ -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
-        android:elevation="@dimen/elevation_2"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="@dimen/space_3"
-        android:paddingVertical="@dimen/space_2">
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOpenScanner"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        tools:ignore="MissingConstraints" />
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/tilPosManualEpc"
-            style="@style/AppTextInputStyle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="@dimen/space_2"
-            android:layout_weight="1"
-            android:hint="@string/pos_manual_hint"
-            app:boxBackgroundColor="?attr/colorSurfaceVariant"
-            app:endIconMode="clear_text"
-            app:errorEnabled="true">
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPosRFIDMode"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        tools:ignore="MissingConstraints" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etPosManualEpc"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:imeOptions="actionDone"
-                android:inputType="text"
-                android:maxLines="1"
-                android:singleLine="true"
-                android:textAppearance="@style/TextAppearance.App.Body.Medium"
-                android:textColor="?attr/colorOnSurface"
-                android:textDirection="ltr" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnPosAddManual"
-            style="@style/AppButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/button_height_sm"
-            android:minWidth="76dp"
-            android:paddingHorizontal="@dimen/space_4"
-            android:text="@string/pos_add" />
-    </LinearLayout>
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPosRefund"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        tools:ignore="MissingConstraints" />
 
 </LinearLayout>
