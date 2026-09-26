@@ -400,6 +400,76 @@
 <color name="scan_progress_start">#B89456</color>
 <color name="scan_progress_end">#F5D97A</color>
 
+<!-- ═══════════════════════════════════════════════════════
+     MIRA POS — ألوان الوضع الداكن
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- الهوية الذهبية -->
+<color name="pos_gold_primary">#D4AF37</color>
+<color name="pos_gold_deep">#8B6914</color>
+<color name="pos_gold_soft">#3D3216</color>
+<color name="pos_gold_shimmer">#F0D896</color>
+<color name="pos_gold_transparent_20">#33D4AF37</color>
+<color name="pos_gold_transparent_10">#1AD4AF37</color>
+<color name="pos_gold_transparent_40">#66D4AF37</color>
+
+<!-- الخلفيات -->
+<color name="pos_surface">#121212</color>
+<color name="pos_surface_variant">#1F1B14</color>
+<color name="pos_header_bg">#1A1A1A</color>
+<color name="pos_header_stroke">#1AD4AF37</color>
+
+<!-- النصوص -->
+<color name="pos_header_title">#F5F5F5</color>
+<color name="pos_header_subtitle">#C9B896</color>
+<color name="pos_hero_title">#D4AF37</color>
+<color name="pos_hero_subtitle">#8B6914</color>
+<color name="pos_text_primary">#F5F5F5</color>
+<color name="pos_text_secondary">#B0B0B0</color>
+<color name="pos_text_hint">#7A7A7A</color>
+<color name="pos_text_on_gold">#0A0A0A</color>
+
+<!-- الحالات -->
+<color name="pos_status_online">#4ADE80</color>
+<color name="pos_status_online_bg">#1A4ADE80</color>
+<color name="pos_status_offline">#F87171</color>
+<color name="pos_status_offline_bg">#1AF87171</color>
+<color name="pos_status_searching">#6B7280</color>
+<color name="pos_status_searching_bg">#1A6B7280</color>
+<color name="pos_status_simulation">#FBBF24</color>
+<color name="pos_status_simulation_bg">#1AFBBF24</color>
+<color name="pos_status_active">#4ADE80</color>
+<color name="pos_status_active_bg">#1A4ADE80</color>
+
+<!-- الحدود والفواصل -->
+<color name="pos_divider">#1AFFFFFF</color>
+<color name="pos_divider_gold">#4DD4AF37</color>
+<color name="pos_stroke_light">#2A2A2A</color>
+
+<!-- CTA / Buttons -->
+<color name="pos_cta_enabled">#D4AF37</color>
+<color name="pos_cta_disabled">#2A2A2A</color>
+<color name="pos_cta_text_enabled">#0A0A0A</color>
+<color name="pos_cta_text_disabled">#6B7280</color>
+<color name="pos_danger">#F87171</color>
+<color name="pos_danger_bg">#1AF87171</color>
+
+<!-- Hero Glow -->
+<color name="pos_hero_glow_start">#33D4AF37</color>
+<color name="pos_hero_glow_end">#00D4AF37</color>
+<color name="pos_hero_ring">#66D4AF37</color>
+<color name="pos_hero_wave">#99D4AF37</color>
+<color name="pos_hero_sparkle">#F0D896</color>
+
+<!-- Summary -->
+<color name="pos_summary_bg_idle">#1F1B14</color>
+<color name="pos_summary_bg_active">#D4AF37</color>
+<color name="pos_summary_text_idle">#B0B0B0</color>
+<color name="pos_summary_text_active">#0A0A0A</color>
+
+
+
+
 🌙 CARDS — Dark Mode
          ═══════════════════════════════════════════════════════ -->
     <color name="card_surface_warm">#1E1C1A</color>
