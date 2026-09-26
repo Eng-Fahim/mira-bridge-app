@@ -1986,10 +1986,8 @@
 <string name="inventory_synced_success">تمت مزامنة الجرد بنجاح</string>
 
 
-    <string name="status_connected">متصل</string>
-    
     <string name="status_connecting">جارِ الاتصال...</string>
-    <string name="status_disconnected">غير متصل</string>
+   
     
     <string name="action_quick_search">البحث السريع</string>
     <string name="action_sync_data">مزامنة البيانات</string>
