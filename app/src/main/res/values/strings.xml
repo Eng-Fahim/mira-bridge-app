@@ -2528,7 +2528,7 @@
 
 <!-- Archive Button -->
 <string name="btn_archive">📂 الأرشيف</string>
-
+<string name="pos_remove_item">حذف القطعة</string>
 <!-- Status Bar -->
 <string name="status_ready">جاهز</string>
 <string name="status_scanning">📡 جاري الجرد...</string>
