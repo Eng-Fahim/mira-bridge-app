@@ -2410,8 +2410,7 @@
 <string name="btn_view_snapshots">عرض السجل</string>
 
 <!-- Main Toggle Button -->
-<string name="btn_start_inventory">▶️ بدء الجرد</string>
-<string name="btn_stop_inventory">⏹️ إيقاف الجرد</string>
+
 <string name="btn_start_inventory_long">▶️ بدء جرد RFID</string>
 <string name="btn_stop_inventory_long">⏹️ إيقاف الجرد</string>
 
