@@ -339,6 +339,14 @@
     <color name="connecting_yellow">#FFB74D</color>
     <color name="online_green">#81C784</color>
     <color name="offline_red">#EF5350</color>
+    
+     <!-- ═══════════════════════════════════════════════════════
+         🌙 HERO CARD GRADIENT — Dark Mode
+         نفس القيم الحالية للـ gradient
+         ═══════════════════════════════════════════════════════ -->
+    <color name="hero_gradient_start">#3D2E0A</color>      <!-- ذهبي داكن -->
+    <color name="hero_gradient_center">#1F1706</color>     <!-- بني غامق -->
+    <color name="hero_gradient_end">#0A0A0A</color>        <!-- أسود شبه كامل -->
 
     <!-- String Array -->
     <string-array name="colors" translatable="false">
