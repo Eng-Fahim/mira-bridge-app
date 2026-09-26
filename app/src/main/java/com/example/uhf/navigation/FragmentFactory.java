@@ -30,6 +30,7 @@ public class FragmentFactory {
             case "RFIDWrite": return new MiraUHFReadWriteFragment();
             case "ReaderSetup": return new MiraReaderSetupFragment();
             case "GateSettings": return new MiraGateSettingsFragment();
+            case "Gates": return new MiraSecureGateFragment();
             case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
             case "Branches": return new MiraBranchesManagementFragment();
             case "RfidBindings": return new MiraRfidBindingsFragment();
