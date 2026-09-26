@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+
+    <!-- تدرج ذهبي من المركز للأطراف -->
+    <gradient
+        android:type="radial"
+        android:gradientRadius="50%"
+        android:startColor="#40E5C158"
+        android:centerColor="#20C59B27"
+        android:endColor="#00B89456" />
+
+    <!-- إطار ذهبي رقيق -->
+    <stroke
+        android:width="1.5dp"
+        android:color="#60E5C158" />
+
+</shape>
