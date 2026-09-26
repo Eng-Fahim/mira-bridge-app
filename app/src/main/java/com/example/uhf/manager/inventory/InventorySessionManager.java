@@ -262,4 +262,114 @@ public class InventorySessionManager {
             return "";
         }
     }
+    // ==================== Smart Restore Checks (v2.1) ====================
+
+/**
+ * ✅ فحص ذكي: هل الجلسة المحفوظة تستحق أن نعرضها للمستخدم؟
+ * 
+ * تُستخدم لمنع الإزعاج — نعرض رسالة الاسترجاع فقط إذا:
+ * - الجلسة صالحة (غير منتهية الصلاحية)
+ * - عدد القطع >= minItems
+ * - عمر الجلسة >= minAgeMs
+ * 
+ * @param minItems  الحد الأدنى لعدد القطع (مثلاً 3)
+ * @param minAgeMs  الحد الأدنى لعمر الجلسة بالمللي ثانية (مثلاً 2 دقيقة)
+ * @return true إذا كانت الجلسة "ذات قيمة" وتستحق العرض
+ */
+public boolean hasMeaningfulSession(int minItems, long minAgeMs) {
+    try {
+        if (context == null) return false;
+
+        SharedPreferences prefs = context.getSharedPreferences(
+                PREFS_INVENTORY, Context.MODE_PRIVATE);
+
+        String sessionDataStr = prefs.getString(KEY_SESSION_DATA, null);
+        long sessionTime = prefs.getLong(KEY_SESSION_TIME, 0);
+
+        if (sessionDataStr == null || sessionTime <= 0) {
+            Log.d(TAG, "hasMeaningfulSession: no saved session");
+            return false;
+        }
+
+        // 1) التحقق من الصلاحية
+        long ageMs = System.currentTimeMillis() - sessionTime;
+        if (ageMs > SESSION_EXPIRY_MS) {
+            Log.d(TAG, "hasMeaningfulSession: expired (age=" 
+                    + (ageMs / 1000) + "s)");
+            return false;
+        }
+
+        // 2) التحقق من العمر الأدنى
+        if (ageMs < minAgeMs) {
+            Log.d(TAG, "hasMeaningfulSession: too fresh (age=" 
+                    + (ageMs / 1000) + "s, need " + (minAgeMs / 1000) + "s)");
+            return false;
+        }
+
+        // 3) التحقق من عدد القطع
+        JSONObject sessionData = new JSONObject(sessionDataStr);
+        JSONArray items = sessionData.optJSONArray("items");
+        int count = items != null ? items.length() : 0;
+
+        if (count < minItems) {
+            Log.d(TAG, "hasMeaningfulSession: too few items (" 
+                    + count + ", need " + minItems + ")");
+            return false;
+        }
+
+        Log.d(TAG, "hasMeaningfulSession: ✅ VALID (items=" + count 
+                + ", age=" + (ageMs / 1000) + "s)");
+        return true;
+
+    } catch (Exception e) {
+        Log.e(TAG, "hasMeaningfulSession error: " + e.getMessage());
+        return false;
+    }
+}
+
+/**
+ * ✅ الحصول على عدد القطع في الجلسة المحفوظة (بدون عرضها)
+ * 
+ * @return عدد القطع أو 0 إذا لا توجد جلسة
+ */
+public int getSessionItemCount() {
+    try {
+        if (context == null) return 0;
+
+        SharedPreferences prefs = context.getSharedPreferences(
+                PREFS_INVENTORY, Context.MODE_PRIVATE);
+
+        String sessionDataStr = prefs.getString(KEY_SESSION_DATA, null);
+        if (sessionDataStr == null) return 0;
+
+        JSONObject sessionData = new JSONObject(sessionDataStr);
+        JSONArray items = sessionData.optJSONArray("items");
+        return items != null ? items.length() : 0;
+
+    } catch (Exception e) {
+        return 0;
+    }
+}
+
+/**
+ * ✅ الحصول على عمر الجلسة المحفوظة بالمللي ثانية
+ * 
+ * @return العمر بالمللي ثانية أو -1 إذا لا توجد جلسة
+ */
+public long getSessionAgeMs() {
+    try {
+        if (context == null) return -1;
+
+        SharedPreferences prefs = context.getSharedPreferences(
+                PREFS_INVENTORY, Context.MODE_PRIVATE);
+
+        long sessionTime = prefs.getLong(KEY_SESSION_TIME, 0);
+        if (sessionTime <= 0) return -1;
+
+        return System.currentTimeMillis() - sessionTime;
+
+    } catch (Exception e) {
+        return -1;
+    }
+}
 }
