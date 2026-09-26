@@ -2302,4 +2302,7 @@
 <string name="gate_mode_manual_desc">تتحكم يدوياً بكل عملية مسح</string>
 <string name="gate_mode_semi_auto_desc">المسح يعمل تلقائياً، مع تنبيهات صوتية</string>
 <string name="gate_mode_full_auto_desc">البوابة تعمل بدون تدخل بشري (يحتاج بوابة خارجية)</string>
+
+ <string name="gate_setting_simulate_exit">🎬 محاكاة الخروج عند البيع</string>
+<string name="gate_setting_simulate_exit_desc">⚠️ للاختبار فقط — عند التفعيل، ستُسجَّل القطع المُباعة كخروج فوري</string>
 </resources>
