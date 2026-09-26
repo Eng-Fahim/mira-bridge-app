@@ -348,6 +348,17 @@
     <color name="hero_gradient_center">#1F1706</color>     <!-- بني غامق -->
     <color name="hero_gradient_end">#0A0A0A</color>        <!-- أسود شبه كامل -->
 
+    <!-- ═══════════════════════════════════════════════════════════════
+     🌙 HERO CARD COLORS — Dark Mode
+     ═══════════════════════════════════════════════════════════════ -->
+
+<color name="hero_stroke">@color/gold_700</color>
+<color name="hero_title_text">@color/gold_100</color>
+<color name="hero_label_text">@color/gold_300</color>
+<color name="hero_value_text">@color/gold_100</color>
+<color name="hero_secondary_text">@color/gold_300</color>
+<color name="hero_underline">@color/gold_500</color>
+<color name="hero_divider">@color/gold_700</color>
     <!-- String Array -->
     <string-array name="colors" translatable="false">
         <item>#E8C766</item>
