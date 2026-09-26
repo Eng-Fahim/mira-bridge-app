@@ -698,6 +698,46 @@
      ═══════════════════════════════════════════════════════ -->
 <color name="card_surface_warm">#F8F5EF</color>
 <color name="card_stroke_warm">#E8DFC8</color>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════
+     🆕 PART 9 — SCAN SCREEN COLORS (Light Mode)
+     ألوان شاشة الجرد — النسخة الفاتحة
+     ═══════════════════════════════════════════════════════════════ -->
+
+<!-- 📊 Status Bar (شريط الحالة العلوي) -->
+<color name="scan_status_bg_start">#E5C158</color>
+<color name="scan_status_bg_end">#B89456</color>
+<color name="scan_status_text">#1A1200</color>
+
+<!-- 🎯 Last Scan Card (بطاقة آخر مسح) -->
+<color name="scan_hero_bg_start">#F5E4B0</color>
+<color name="scan_hero_bg_end">#E5C158</color>
+<color name="scan_hero_stroke">#4DB89456</color>
+<color name="scan_hero_title">#3D2E00</color>
+<color name="scan_hero_value">#1A1200</color>
+<color name="scan_hero_label">#6B5A28</color>
+<color name="scan_hero_secondary">#8B7639</color>
+<color name="scan_hero_chip_bg">#40B89456</color>
+<color name="scan_hero_chip_text">#3D2E00</color>
+
+<!-- 📇 Cards (البطاقات العادية) -->
+<color name="scan_card_bg">#F8F5EF</color>
+<color name="scan_card_stroke">#E8DFC8</color>
+
+<!-- 💎 Value Card (بطاقة القيمة الذهبية) -->
+<color name="scan_value_bg">#E5C158</color>
+<color name="scan_value_text">#1A1200</color>
+<color name="scan_value_label">#3D2E00</color>
+
+<!-- ⚠️ Alerts Row -->
+<color name="scan_alert_bg">#FFF8E1</color>
+<color name="scan_alert_text">#6B5A28</color>
+
+<!-- 📈 Progress Bar -->
+<color name="scan_progress_track">#E8DFC8</color>
+<color name="scan_progress_start">#B89456</color>
+<color name="scan_progress_end">#E5C158</color>
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
