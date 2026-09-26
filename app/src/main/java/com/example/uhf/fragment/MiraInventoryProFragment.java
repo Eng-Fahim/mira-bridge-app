@@ -111,6 +111,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final int KEYCODE_RFID_TRIGGER_3 = 293;
 
     private static final int ITEMS_LIST_PAGE_SIZE = 100;
+    
+    // ✅ [جديد] لمنع تكرار رسالة الاسترجاع
+private static final String PREFS_UI = "mira_inventory_ui_prefs";
+private static final String KEY_SKIP_RESTORE_PROMPT = "skip_restore_prompt";
+private static final long MIN_SESSION_AGE_TO_PROMPT_MS = 2 * 60 * 1000; // دقيقتان
+private static final int MIN_ITEMS_TO_PROMPT = 3; // 3 قطع على الأقل
 
     // ==================== Views ====================
     private TextView tvProgressPercent;
@@ -2770,75 +2776,201 @@ private void navigateToSnapshots() {
     }
 
     private void showRestoreSessionDialog(JSONArray items, int expectedCount,
-                                           String category, long timeAgoMillis) {
-        if (!isAdded() || isFragmentDestroyed) return;
+                                       String category, long timeAgoMillis) {
+    if (!isAdded() || isFragmentDestroyed) return;
 
-        String message = sessionManager.buildRestoreMessage(items, timeAgoMillis);
+    String message = sessionManager.buildRestoreMessage(items, timeAgoMillis);
 
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "🔄 استرجاع الجلسة" : "🔄 Restore Session")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "استرجاع" : "Restore",
-                        (d, w) -> applyRestoredSession(items, expectedCount, category))
-                .setNegativeButton(isArabic ? "بدء جديد" : "Start New",
-                        (d, w) -> {
-                            if (sessionManager != null) sessionManager.clearSession();
-                        })
-                .setCancelable(false)
-                .show();
+    // ✅ Checkbox "لا تسألني مجدداً"
+    final android.widget.CheckBox dontAskAgain = new android.widget.CheckBox(requireContext());
+    dontAskAgain.setText(isArabic 
+            ? "لا تسألني مجدداً عن هذه الجلسة" 
+            : "Don't ask again for this session");
+    dontAskAgain.setPadding(40, 20, 40, 20);
+    
+    android.widget.LinearLayout container = new android.widget.LinearLayout(requireContext());
+    container.setOrientation(android.widget.LinearLayout.VERTICAL);
+    container.setPadding(40, 20, 40, 20);
+    container.addView(dontAskAgain);
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🔄 استرجاع جلسة سابقة" : "🔄 Restore Previous Session")
+            .setMessage(message)
+            .setView(container)
+            .setPositiveButton(isArabic ? "✅ استرجاع" : "✅ Restore",
+                    (d, w) -> {
+                        if (dontAskAgain.isChecked()) {
+                            saveSkipRestorePrompt(true);
+                        }
+                        applyRestoredSession(items, expectedCount, category);
+                    })
+            .setNegativeButton(isArabic ? "بدء جديد" : "Start New",
+                    (d, w) -> {
+                        if (dontAskAgain.isChecked()) {
+                            saveSkipRestorePrompt(true);
+                        }
+                        if (sessionManager != null) sessionManager.clearSession();
+                        showToast(isArabic ? "✨ بدء جلسة جديدة" : "✨ Started fresh session");
+                    })
+            .setNeutralButton(isArabic ? "لاحقاً" : "Later", null)
+            .setCancelable(true)
+            .show();
+}
+
+/**
+ * ✅ حفظ اختيار "لا تسألني مجدداً"
+ */
+private void saveSkipRestorePrompt(boolean skip) {
+    try {
+        if (getContext() == null) return;
+        requireContext().getSharedPreferences(PREFS_UI, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_SKIP_RESTORE_PROMPT, skip).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "saveSkipRestorePrompt error", e);
     }
+}
+
+/**
+ * ✅ إعادة تفعيل الرسالة (عند بدء جرد جديد)
+ */
+private void resetSkipRestorePrompt() {
+    try {
+        if (getContext() == null) return;
+        requireContext().getSharedPreferences(PREFS_UI, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_SKIP_RESTORE_PROMPT, false).apply();
+    } catch (Exception ignored) {}
+}
 
     private void applyRestoredSession(JSONArray items, int expectedCount, String category) {
-        try {
-            synchronized (scannedItemsDisplayList) {
-                scannedItemsDisplayList.clear();
-
-                for (int i = 0; i < items.length(); i++) {
+    try {
+        if (items == null) return;
+        
+        Log.d(TAG, "🔄 Restoring " + items.length() + " items...");
+        
+        // 1) امسح القوائم الحالية
+        synchronized (scannedItemsDisplayList) {
+            scannedItemsDisplayList.clear();
+        }
+        
+        // 2) املأ القائمة الجديدة
+        double totalWeight = 0;
+        double totalValue = 0;
+        
+        synchronized (scannedItemsDisplayList) {
+            for (int i = 0; i < items.length(); i++) {
+                try {
                     JSONObject itemObj = items.getJSONObject(i);
+                    
                     ScannedItemDisplay item = new ScannedItemDisplay(
-                            itemObj.optString("epc"),
-                            itemObj.optString("title"),
-                            itemObj.optString("karat"),
-                            itemObj.optInt("count", 1),
-                            itemObj.optInt("rssi"),
-                            itemObj.optString("time"));
+                            itemObj.optString("epc", ""),
+                            itemObj.optString("title", ""),
+                            itemObj.optString("karat", "—"),
+                            Math.max(1, itemObj.optInt("count", 1)),
+                            itemObj.optInt("rssi", -50),
+                            itemObj.optString("time", ""));
+                    
                     item.weight = itemObj.optDouble("weight", 0);
                     item.price = itemObj.optDouble("price", 0);
+                    
+                    // ✅ تراكمي دقيق
+                    totalWeight += item.weight * item.count;
+                    totalValue += item.price * item.count;
+                    
                     scannedItemsDisplayList.add(item);
+                } catch (Exception e) {
+                    Log.w(TAG, "Item parse error at " + i, e);
                 }
             }
-
-            recalculateAggregates();
-            updateAdapterList();
-
-            this.expectedCount = expectedCount;
-            if (tvExpectedCount != null) {
-                tvExpectedCount.setText(String.valueOf(expectedCount));
-            }
-
-            selectedCategoryFilter = (category == null || category.isEmpty())
-                    ? null : category;
-            lastScannedForAnimation = items.length();
-
-            if (modernAdapter != null) modernAdapter.resetAnimationTracker();
-
-            updateUI();
-            updateTotalWeightAndValue();
-
-            if (tvEmptyState != null) {
-                tvEmptyState.setVisibility(scannedItemsDisplayList.isEmpty()
-                        ? View.VISIBLE : View.GONE);
-            }
-
-            showToast(isArabic
-                    ? "✅ تم استرجاع " + items.length() + " قطعة"
-                    : "✅ Restored " + items.length() + " items");
-
-        } catch (Exception e) {
-            Log.e(TAG, "applyRestoredSession error", e);
         }
+        
+        // 3) حدّث aggregates
+        aggregateTotalWeight = totalWeight;
+        aggregateTotalValue = totalValue;
+        
+        // 4) حدّث الـ Adapter
+        if (modernAdapter != null) {
+            updateAdapterList();
+            modernAdapter.resetAnimationTracker();
+        }
+        
+        // 5) حدّث العدادات
+        this.expectedCount = expectedCount;
+        if (tvExpectedCount != null) {
+            tvExpectedCount.setText(expectedCount > 0 
+                    ? String.valueOf(expectedCount) : "—");
+        }
+        
+        selectedCategoryFilter = (category == null || category.isEmpty())
+                ? null : category;
+        lastScannedForAnimation = 0; // ✅ ابدأ من 0 للحركة
+        
+        // 6) حدّث الواجهة كاملة
+        updateUI();
+        updateTotalWeightAndValue();
+        
+        // ✅ [جديد] تحديث فوري للقيم المعروضة
+        if (tvTotalWeight != null) {
+            tvTotalWeight.setText(String.format(Locale.US, "%.2f g", totalWeight));
+        }
+        if (tvTotalValue != null) {
+            tvTotalValue.setText(String.format(Locale.US, "$%,.2f", totalValue));
+        }
+        if (tvScannedCount != null) {
+            tvScannedCount.setText(String.valueOf(scannedItemsDisplayList.size()));
+        }
+        if (tvItemCount != null) {
+            tvItemCount.setText(String.valueOf(scannedItemsDisplayList.size()));
+        }
+        
+        // 7) أخفِ Empty State
+        if (tvEmptyState != null) {
+            tvEmptyState.setVisibility(
+                    scannedItemsDisplayList.isEmpty() ? View.VISIBLE : View.GONE);
+        }
+        
+        // 8) امسح آخر تقرير من السيرفر (لأنه تقرير جديد)
+        lastServerReport = null;
+        
+        // 9) أعِد تعيين زر التقرير
+        if (btnGenerateReport != null) {
+            btnGenerateReport.setEnabled(true);
+            btnGenerateReport.setAlpha(1.0f);
+        }
+        
+        // 10) أعِد تعيين زر الاعتماد
+        if (btnCommitSession != null) {
+            btnCommitSession.setText(isArabic ? "اعتماد" : "Commit");
+            btnCommitSession.setEnabled(true);
+            btnCommitSession.setAlpha(1.0f);
+        }
+        
+        // 11) scroll إلى الأعلى
+        if (rvInventoryItems != null) {
+            rvInventoryItems.scrollToPosition(0);
+        }
+        
+        // 12) تحديث أزرار الحالة
         updateButtonsState();
+        
+        // 13) Toast
+        showToast(isArabic
+                ? "✅ تم استرجاع " + scannedItemsDisplayList.size() + " قطعة"
+                : "✅ Restored " + scannedItemsDisplayList.size() + " items");
+        
+        // 14) صوت نجاح
+        if (soundManager != null) {
+            soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+        }
+        
+        Log.d(TAG, "✅ Session restored: " 
+                + scannedItemsDisplayList.size() + " items, "
+                + String.format(Locale.US, "%.2f g, $%.2f", totalWeight, totalValue));
+        
+    } catch (Exception e) {
+        Log.e(TAG, "applyRestoredSession error", e);
+        showToast(isArabic ? "❌ فشل استرجاع الجلسة" : "❌ Restore failed");
     }
+}
 
     private void confirmResetSession() {
     if (!isAdded() || isFragmentDestroyed) return;
@@ -3261,8 +3393,7 @@ private String getCurrentUserName() {
     // ================================================================
     //  Lifecycle Cleanup
     // ================================================================
-
-    @Override
+@Override
 public void onResume() {
     super.onResume();
     try {
@@ -3270,21 +3401,55 @@ public void onResume() {
             ((UHFMainActivity) getActivity()).setActiveInventoryFragment(this);
         }
 
-        // ✅ استرجاع الجلسة فقط مرة واحدة عند أول ظهور، وليس في كل مرة
-        if (!hasTriedRestoringSession 
-                && scannedItemsDisplayList.isEmpty() 
-                && !isScanning
-                && inventoryEngine != null
-                && inventoryEngine.getUniqueCount() == 0) {
+        // ✅ استرجاع الجلسة فقط بشروط صارمة
+        if (shouldPromptForRestore()) {
             hasTriedRestoringSession = true;
-            mainHandler.postDelayed(this::checkAndRestoreSession, 600);
+            mainHandler.postDelayed(this::checkAndRestoreSession, 800);
         }
         
-        // ✅ تحديث حالة الأزرار عند العودة للشاشة
         updateButtonsState();
         
     } catch (Exception e) {
         Log.e(TAG, "onResume error", e);
+    }
+}
+
+/**
+ * ✅ شروط صارمة لعرض رسالة الاسترجاع
+ */
+private boolean shouldPromptForRestore() {
+    try {
+        // 1) لم نحاول من قبل في هذه الجلسة
+        if (hasTriedRestoringSession) return false;
+        
+        // 2) لا يوجد جرد حالياً
+        if (isScanning) return false;
+        
+        // 3) القائمة الحالية فارغة
+        if (!scannedItemsDisplayList.isEmpty()) return false;
+        
+        // 4) المحرك فارغ
+        if (inventoryEngine == null || inventoryEngine.getUniqueCount() > 0) return false;
+        
+        // 5) المستخدم لم يطلب عدم السؤال
+        if (getContext() == null) return false;
+        android.content.SharedPreferences prefs = requireContext()
+                .getSharedPreferences(PREFS_UI, Context.MODE_PRIVATE);
+        if (prefs.getBoolean(KEY_SKIP_RESTORE_PROMPT, false)) {
+            Log.d(TAG, "⏭️ User chose to skip restore prompt");
+            return false;
+        }
+        
+        // 6) الجلسة المحفوظة كبيرة كفاية + قديمة كفاية
+        if (sessionManager != null && sessionManager.hasMeaningfulSession(
+                MIN_ITEMS_TO_PROMPT, MIN_SESSION_AGE_TO_PROMPT_MS)) {
+            return true;
+        }
+        
+        return false;
+    } catch (Exception e) {
+        Log.e(TAG, "shouldPromptForRestore error", e);
+        return false;
     }
 }
     @Override
