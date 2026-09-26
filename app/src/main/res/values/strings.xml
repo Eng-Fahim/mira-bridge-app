@@ -1820,7 +1820,114 @@
 <string name="pos_default_amount">0 YER</string>
 <string name="pos_clear">تفريغ</string>
 <string name="pos_checkout">إتمام البيع وتحديث المخزون</string>
-    
+<!-- Header -->
+<string name="pos_subtitle">نقطة البيع</string>
+<string name="pos_header_icon_desc">أيقونة نظام البيع</string>
+
+<!-- Scale Status -->
+<string name="pos_scale_connected">⚖️ الميزان متصل</string>
+<string name="pos_scale_offline">⚖️ الميزان: غير متصل</string>
+<string name="pos_scale_simulation">⚖️ الميزان: محاكاة</string>
+<string name="pos_scale_tap_hint">اضغط لفتح إعدادات الميزان</string>
+
+<!-- Hero — Idle / Ready -->
+<string name="pos_hero_title_ar">نظام البيع السريع</string>
+<string name="pos_hero_title_en">MIRA POS SYSTEM</string>
+<string name="pos_hero_idle_msg">امسح قطعة لبدء عملية البيع</string>
+<string name="pos_hero_idle_hint">GS1 • RFID • أو الإدخال اليدوي</string>
+
+<!-- Hero — GS1 Scanning -->
+<string name="pos_hero_gs1_title">جاري مسح الباركود</string>
+<string name="pos_hero_gs1_subtitle">GS1 SCANNER ACTIVE</string>
+<string name="pos_hero_gs1_hint">وجّه الكاميرا نحو باركود القطعة</string>
+<string name="pos_hero_gs1_timeout">لم يُكتشف باركود بعد؟</string>
+
+<!-- Hero — RFID Listening -->
+<string name="pos_hero_rfid_title">استماع RFID</string>
+<string name="pos_hero_rfid_subtitle">RFID READER ACTIVE</string>
+<string name="pos_hero_rfid_hint">قرّب القطعة من القارئ</string>
+<string name="pos_hero_rfid_count">تم مسح %1$d قطعة</string>
+
+<!-- Hero — Manual Entry -->
+<string name="pos_hero_manual_title">الإدخال اليدوي</string>
+<string name="pos_hero_manual_subtitle">MANUAL ENTRY MODE</string>
+<string name="pos_hero_manual_hint">EPC / باركود…</string>
+
+<!-- Hero — Item Added -->
+<string name="pos_hero_added_title">✅ تمت الإضافة</string>
+<string name="pos_hero_added_subtitle">ITEM ADDED</string>
+
+<!-- Hero — Error -->
+<string name="pos_hero_error_title">⚠️ لم يتم التعرف</string>
+<string name="pos_hero_error_subtitle">TRY AGAIN</string>
+
+<!-- Scan Buttons -->
+<string name="pos_btn_gs1">GS1</string>
+<string name="pos_btn_gs1_active">نشط</string>
+<string name="pos_btn_rfid">RFID</string>
+<string name="pos_btn_rfid_active">نشط</string>
+<string name="pos_btn_manual">يدوي</string>
+<string name="pos_btn_manual_active">نشط</string>
+<string name="pos_btn_gs1_desc">مسح باركود GS1 بالكاميرا</string>
+<string name="pos_btn_rfid_desc">مسح RFID بالقارئ</string>
+<string name="pos_btn_manual_desc">الإدخال اليدوي للكود</string>
+
+<!-- Summary Strip -->
+<string name="pos_cart_empty">🛒 السلة فارغة — ابدأ المسح</string>
+<string name="pos_cart_ready">✓ جاهز للبيع</string>
+<string name="pos_cart_unavailable">⚠️ قطعة غير متاحة!</string>
+<string name="pos_cart_preparing">🔄 جاري تجهيز البيع…</string>
+
+<!-- CTA Buttons -->
+<string name="pos_clear_desc">إفراغ السلة بالكامل</string>
+<string name="pos_retry">🔄 إعادة المحاولة</string>
+<string name="pos_cancel">إلغاء</string>
+<string name="pos_close">إغلاق</string>
+<string name="pos_ok">حسناً</string>
+
+<!-- Manual Input Bar -->
+<string name="pos_manual_hint_short">EPC / باركود</string>
+
+<!-- Overflow Menu -->
+<string name="pos_menu_refund">🔄 مرتجع مبيعات</string>
+<string name="pos_menu_last_receipt">📋 آخر فاتورة</string>
+<string name="pos_menu_scale_settings">⚖️ إعدادات الميزان</string>
+<string name="pos_menu_cart_view">🛒 عرض السلة</string>
+<string name="pos_overflow_desc">خيارات إضافية</string>
+
+<!-- Messages / Toasts -->
+<string name="pos_msg_searching">🔍 جاري البحث…</string>
+<string name="pos_msg_not_found">❌ القطعة غير موجودة</string>
+<string name="pos_msg_already_sold">❌ القطعة مباعة مسبقاً</string>
+<string name="pos_msg_unavailable">❌ قطعة غير متاحة</string>
+<string name="pos_msg_other_branch">❌ قطعة في فرع آخر</string>
+<string name="pos_msg_already_in_cart">⚠️ هذه القطعة مضافة مسبقاً!</string>
+<string name="pos_msg_added">✅ تمت الإضافة: %1$s</string>
+<string name="pos_msg_cart_empty_toast">🛒 السلة فارغة</string>
+<string name="pos_msg_sale_success">✅ تم البيع بنجاح</string>
+<string name="pos_msg_sale_offline">✅ تم البيع (أوفلاين)</string>
+<string name="pos_msg_sale_failed">❌ فشل البيع</string>
+<string name="pos_msg_no_permission">⛔ غير مصرح</string>
+<string name="pos_msg_engine_error">⚠️ خطأ في تهيئة المحرك</string>
+<string name="pos_msg_scale_connected">✅ تم الاتصال: %1$s</string>
+<string name="pos_msg_processing">جاري إتمام العملية…</string>
+
+<!-- Success / Error Dialogs -->
+<string name="pos_dialog_refund_success_title">✅ تم الإرجاع</string>
+<string name="pos_dialog_refund_success_msg">تم إرجاع القطعة بنجاح إلى المخزون</string>
+<string name="pos_dialog_refund_failed_title">❌ فشل الإرجاع</string>
+<string name="pos_dialog_refund_failed_msg">تعذر إتمام عملية الإرجاع</string>
+<string name="pos_dialog_error_title">❌ خطأ</string>
+<string name="pos_dialog_retry_title">❌ فشل البيع</string>
+
+<!-- Refund Dialog -->
+<string name="pos_refund_title">🔄 مرتجع مبيعات</string>
+<string name="pos_refund_search_hint">أدخل كود القطعة أو امسحها…</string>
+<string name="pos_refund_confirm">تأكيد الإرجاع</string>
+<string name="pos_refund_scan_prompt">📷 وجّه الكاميرا نحو باركود القطعة</string>
+
+<!-- Empty Cart Icon Desc -->
+<string name="pos_empty_cart_desc">سلة التسوق فارغة</string>
     <!-- ============Inventory الجرد ======////-->
       <string name="inventory_alert_sold">🚨 تحذير: قطعة مباعة وموجودة بالرف!</string>
 <string name="inventory_branch_default">الفرع الرئيسي - صنعاء</string>
