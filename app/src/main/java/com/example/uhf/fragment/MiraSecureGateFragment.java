@@ -97,7 +97,8 @@ public class MiraSecureGateFragment extends Fragment {
     private static final long SCAN_COOL_DOWN_MS = 2500;
     private static final int API_TIMEOUT_SECONDS = 5;
     private static final long LOG_BATCH_INTERVAL_MS = 300;
-    private static final long ALLOWED_CACHE_REFRESH_MS = 5 * 60_000;
+    // ✅ مزامنة سريعة (10 ثواني) — للكشف الفوري عن EPCs الجديدة
+    private static final long ALLOWED_CACHE_REFRESH_MS = 10_000;
 
     // Backoff settings
     private static final long POLL_INITIAL_MS = 5_000;
