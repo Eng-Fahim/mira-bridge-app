@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- ═══════════════════════════════════════
+         💎 الماسة الوسطى (Iconic Diamond)
+         ═══════════════════════════════════════ -->
+    <path
+        android:fillColor="#E5C158"
+        android:pathData="M60,30 L75,45 L60,80 L45,45 Z" />
+
+    <path
+        android:fillColor="#F5D97A"
+        android:pathData="M60,30 L75,45 L60,45 Z" />
+
+    <path
+        android:fillColor="#B89456"
+        android:pathData="M60,80 L75,45 L60,45 Z" />
+
+    <!-- ═══════════════════════════════════════
+         📡 موجات RFID (Concentric Waves)
+         ═══════════════════════════════════════ -->
+
+    <!-- Wave 1 (الداخلية) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M40,42 Q30,55 40,68"
+        android:strokeWidth="2.5"
+        android:strokeColor="#C59B27"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M80,42 Q90,55 80,68"
+        android:strokeWidth="2.5"
+        android:strokeColor="#C59B27"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Wave 2 (الوسطى) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M33,36 Q20,55 33,74"
+        android:strokeWidth="2"
+        android:strokeColor="#8B6914"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeAlpha="0.7" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M87,36 Q100,55 87,74"
+        android:strokeWidth="2"
+        android:strokeColor="#8B6914"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeAlpha="0.7" />
+
+    <!-- Wave 3 (الخارجية) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M26,30 Q10,55 26,80"
+        android:strokeWidth="1.5"
+        android:strokeColor="#B89456"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeAlpha="0.4" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M94,30 Q110,55 94,80"
+        android:strokeWidth="1.5"
+        android:strokeColor="#B89456"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeAlpha="0.4" />
+
+    <!-- ═══════════════════════════════════════
+         ✨ بريق (Sparkles)
+         ═══════════════════════════════════════ -->
+
+    <!-- بريق أعلى اليسار -->
+    <path
+        android:fillColor="#F5D97A"
+        android:pathData="M42,32 L43.5,34.5 L46,36 L43.5,37.5 L42,40 L40.5,37.5 L38,36 L40.5,34.5 Z" />
+
+    <!-- بريق أعلى اليمين -->
+    <path
+        android:fillColor="#F5D97A"
+        android:pathData="M78,32 L79.5,34.5 L82,36 L79.5,37.5 L78,40 L76.5,37.5 L74,36 L76.5,34.5 Z" />
+
+    <!-- ═══════════════════════════════════════
+         📦 قاعدة الرف (Inventory Base)
+         ═══════════════════════════════════════ -->
+
+    <!-- خط أفقي (رف) -->
+    <path
+        android:fillColor="#B89456"
+        android:pathData="M35,88 L85,88 L85,90 L35,90 Z" />
+
+    <!-- صندوق صغير يسار -->
+    <path
+        android:fillColor="#E5C158"
+        android:pathData="M42,90 L52,90 L52,98 L42,98 Z" />
+
+    <!-- صندوق صغير وسط -->
+    <path
+        android:fillColor="#C59B27"
+        android:pathData="M56,90 L66,90 L66,98 L56,98 Z" />
+
+    <!-- صندوق صغير يمين -->
+    <path
+        android:fillColor="#E5C158"
+        android:pathData="M70,90 L80,90 L80,98 L70,98 Z" />
+
+</vector>
