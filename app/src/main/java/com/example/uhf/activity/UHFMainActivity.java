@@ -433,24 +433,24 @@ navigationManager.loadFragmentDirectly(targetFragment, savedTag);
     }
 
     private void setupWindowInsets() {
-        View bottomNavView = findViewById(R.id.bottomNavigationView);
-        if (bottomNavView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(bottomNavView, (v, insets) -> {
-                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(0, 0, 0, systemBars.bottom);
-                return insets;
-            });
-        }
-
-        View toolbarView = findViewById(R.id.toolbar);
-        if (toolbarView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
-                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(0, systemBars.top, 0, 0);
-                return insets;
-            });
-        }
+    View bottomNavView = findViewById(R.id.bottomNavigationView);
+    if (bottomNavView != null) {
+        ViewCompat.setOnApplyWindowInsetsListener(bottomNavView, (v, insets) -> {
+            androidx.core.graphics.Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(0, 0, 0, systemBars.bottom);
+            return insets;
+        });
     }
+
+    View toolbarView = findViewById(R.id.toolbar);
+    if (toolbarView != null) {
+        ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
+            androidx.core.graphics.Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(0, systemBars.top, 0, 0);
+            return insets;
+        });
+    }
+}
 
 private void setupKeyboardBehavior() {
     try {
@@ -458,9 +458,8 @@ private void setupKeyboardBehavior() {
         if (rootView == null) return;
 
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-            // ✅ استخدم androidx.core.graphics.Insets صراحةً
-            androidx.core.graphics.Insets imeInsets = 
-                    insets.getInsets(WindowInsetsCompat.Type.ime());
+            // ✅ 
+            androidx.core.graphics.Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
             boolean isKeyboardVisible = imeInsets.bottom > 0;
 
             String currentTag = navigationManager != null
@@ -2704,4 +2703,4 @@ private boolean isKeyboardVisible() {
         return false;
     }
 }
-}
+                                }
