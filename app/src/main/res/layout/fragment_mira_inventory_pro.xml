@@ -142,135 +142,197 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- ═══════════════════════════════════════════════════════
-                 🌅 WELCOME STATE — الحالة الافتراضية (بدون بيانات)
-                 ═══════════════════════════════════════════════════════ -->
-            <LinearLayout
-                android:id="@+id/welcomeState"
-                android:layout_width="match_parent"
+           <!-- ═══════════════════════════════════════════════════════
+     🌅 WELCOME STATE — شاشة ترحيب احترافية
+     ═══════════════════════════════════════════════════════ -->
+<LinearLayout
+    android:id="@+id/welcomeState"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingHorizontal="@dimen/space_6"
+    android:paddingTop="@dimen/space_8"
+    android:paddingBottom="@dimen/space_8"
+    android:visibility="visible">
+
+    <!-- 🎨 الشعار الذهبي مع الهالة -->
+    <FrameLayout
+        android:layout_width="180dp"
+        android:layout_height="180dp"
+        android:background="@drawable/bg_welcome_glow">
+
+        <!-- الشعار الرئيسي -->
+        <ImageView
+            android:id="@+id/ivWelcomeLogo"
+            android:layout_width="130dp"
+            android:layout_height="130dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_inventory_welcome" />
+
+    </FrameLayout>
+
+    <!-- ═══ العنوان الرئيسي ═══ -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_6"
+        android:text="نظام الجرد الذكي"
+        android:textAppearance="@style/TextAppearance.App.Title.Large"
+        android:textColor="@color/gold_luxury"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.02" />
+
+    <!-- ═══ العنوان الفرعي ═══ -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_1"
+        android:text="MIRA RFID INVENTORY"
+        android:textAppearance="@style/TextAppearance.App.Label.Medium"
+        android:textColor="@color/gold_luxury_dark"
+        android:textSize="11sp"
+        android:letterSpacing="0.3"
+        android:textStyle="bold" />
+
+    <!-- ═══ خط فاصل ذهبي ═══ -->
+    <View
+        android:layout_width="60dp"
+        android:layout_height="2dp"
+        android:layout_marginTop="@dimen/space_4"
+        android:background="@drawable/bg_gold_divider_gradient" />
+
+    <!-- ═══ الرسالة التوضيحية ═══ -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_4"
+        android:gravity="center"
+        android:text="جرد دقيق للمجوهرات بتقنية RFID\nاختر الوضع وابدأ فوراً"
+        android:textAppearance="@style/TextAppearance.App.Body.Medium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp"
+        android:lineSpacingMultiplier="1.6" />
+
+    <!-- ═══ أوضاع الجرد الثلاثة ═══ -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_6"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <!-- شامل -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_welcome_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="@dimen/space_3"
+            android:paddingVertical="@dimen/space_1">
+
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:paddingHorizontal="@dimen/space_6"
-                android:paddingTop="@dimen/space_12"
-                android:paddingBottom="@dimen/space_8"
-                android:visibility="visible">
+                android:text="⚡"
+                android:textSize="12sp" />
 
-                <!-- 🎨 الشعار الذهبي الدائري -->
-                <FrameLayout
-                    android:layout_width="140dp"
-                    android:layout_height="140dp"
-                    android:background="@drawable/bg_empty_welcome">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="شامل"
+                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                android:textColor="@color/scan_hero_chip_text"
+                android:textStyle="bold" />
+        </LinearLayout>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:text="💎"
-                        android:textSize="64sp" />
+        <!-- فئوي -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_2"
+            android:background="@drawable/bg_welcome_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="@dimen/space_3"
+            android:paddingVertical="@dimen/space_1">
 
-                    <!-- حلقة خارجية متحركة -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@drawable/bg_empty_state_gold_circle" />
-                </FrameLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📂"
+                android:textSize="12sp" />
 
-                <!-- ✨ العنوان الرئيسي -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_6"
-                    android:text="🎯 جاهز للجرد"
-                    android:textAppearance="@style/TextAppearance.App.Title.Large"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="فئوي"
+                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                android:textColor="@color/scan_hero_chip_text"
+                android:textStyle="bold" />
+        </LinearLayout>
 
-                <!-- 📝 وصف -->
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_3"
-                    android:gravity="center"
-                    android:text="اختر وضع الجرد من الأعلى،\nثم اضغط زر البدء في الأسفل"
-                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="14sp"
-                    android:lineSpacingMultiplier="1.5" />
+        <!-- أعمى -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_2"
+            android:background="@drawable/bg_welcome_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="@dimen/space_3"
+            android:paddingVertical="@dimen/space_1">
 
-                <!-- 🎯 الأوضاع المتاحة -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_6"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="👁"
+                android:textSize="12sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_welcome_pill"
-                        android:paddingHorizontal="@dimen/space_3"
-                        android:paddingVertical="@dimen/space_1"
-                        android:text="⚡ شامل"
-                        android:textAppearance="@style/TextAppearance.App.Label.Small"
-                        android:textColor="@color/scan_hero_chip_text"
-                        android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="أعمى"
+                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                android:textColor="@color/scan_hero_chip_text"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_2"
-                        android:background="@drawable/bg_welcome_pill"
-                        android:paddingHorizontal="@dimen/space_3"
-                        android:paddingVertical="@dimen/space_1"
-                        android:text="📂 فئوي"
-                        android:textAppearance="@style/TextAppearance.App.Label.Small"
-                        android:textColor="@color/scan_hero_chip_text"
-                        android:textStyle="bold" />
+    <!-- ═══ مؤشر السهم (يشير للأسفل) ═══ -->
+    <FrameLayout
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="@dimen/space_8"
+        android:background="@drawable/bg_welcome_arrow">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_2"
-                        android:background="@drawable/bg_welcome_pill"
-                        android:paddingHorizontal="@dimen/space_3"
-                        android:paddingVertical="@dimen/space_1"
-                        android:text="👁 أعمى"
-                        android:textAppearance="@style/TextAppearance.App.Label.Small"
-                        android:textColor="@color/scan_hero_chip_text"
-                        android:textStyle="bold" />
-                </LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="⬇"
+            android:textSize="20sp"
+            android:textColor="@color/scan_hero_chip_text" />
+    </FrameLayout>
 
-                <!-- ⬇️ مؤشر للأسفل -->
-                <FrameLayout
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="@dimen/space_8"
-                    android:background="@drawable/bg_welcome_arrow">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:text="⬇"
-                        android:textSize="20sp"
-                        android:textColor="@color/scan_hero_chip_text" />
-                </FrameLayout>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_2"
-                    android:text="اضغط للبدء"
-                    android:textAppearance="@style/TextAppearance.App.Label.Small"
-                    android:textColor="@color/scan_hero_secondary"
-                    android:alpha="0.7" />
-            </LinearLayout>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_2"
+        android:text="اضغط للبدء"
+        android:textAppearance="@style/TextAppearance.App.Label.Small"
+        android:textColor="@color/scan_hero_secondary"
+        android:alpha="0.7" />
+</LinearLayout>
 
             <!-- ═══════════════════════════════════════════════════════
-                 🎯 ACTIVE STATE — الكروت (تظهر عند المسح)
+                 🎯 ACTIVE STATE
                  ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/activeContentGroup"
@@ -281,7 +343,7 @@
                 tools:visibility="visible">
 
                 <!-- ═══════════════════════════════════════════════════════
-                     1. LAST SCAN CARD
+                     1. LAST SCAN CARD — Enhanced
                      ═══════════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/lastScanCard"
@@ -300,30 +362,74 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_scan_last_gradient"
                         android:gravity="center"
-                        android:minHeight="140dp"
+                        android:minHeight="160dp"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_3">
+                        android:padding="@dimen/space_4">
 
-                        <!-- Chip "آخر مسح" -->
+                        <!-- Top Row: Label + Read Count -->
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/bg_scan_chip"
                             android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="@dimen/space_3"
-                            android:paddingVertical="@dimen/space_1">
+                            android:orientation="horizontal">
 
-                            <TextView
-                                android:id="@+id/tvLastScanLabel"
+                            <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="✨ آخر مسح"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="@color/scan_hero_chip_text"
-                                android:textStyle="bold" />
+                                android:background="@drawable/bg_scan_chip"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="@dimen/space_3"
+                                android:paddingVertical="@dimen/space_1">
+
+                                <TextView
+                                    android:id="@+id/tvLastScanLabel"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="✨ آخر مسح"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="@color/scan_hero_chip_text"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="1dp"
+                                android:layout_weight="1" />
+
+                            <LinearLayout
+                                android:id="@+id/chipReadCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/bg_scan_chip"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="@dimen/space_2"
+                                android:paddingVertical="@dimen/space_1"
+                                android:visibility="gone"
+                                tools:visibility="visible">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="🔄"
+                                    android:textSize="10sp" />
+
+                                <TextView
+                                    android:id="@+id/tvLastScanReadCount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="4dp"
+                                    android:text="× 3"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="@color/scan_hero_chip_text"
+                                    android:textDirection="ltr"
+                                    android:textStyle="bold"
+                                    tools:text="× 3" />
+                            </LinearLayout>
                         </LinearLayout>
 
+                        <!-- Title -->
                         <TextView
                             android:id="@+id/tvLastScanTitle"
                             android:layout_width="match_parent"
@@ -336,75 +442,211 @@
                             android:textAppearance="@style/TextAppearance.App.Title.Large"
                             android:textColor="@color/scan_hero_title" />
 
+                        <!-- EPC (short) -->
                         <TextView
                             android:id="@+id/tvLastScanEpc"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_1"
-                            android:alpha="0.65"
+                            android:alpha="0.6"
                             android:ellipsize="middle"
                             android:fontFamily="monospace"
                             android:gravity="center"
                             android:maxLines="1"
                             android:text=""
-                            android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
                             android:textColor="@color/scan_hero_secondary"
                             android:textDirection="ltr"
+                            android:textSize="10sp"
                             android:visibility="gone"
-                            tools:text="E280 1160 6000 0204 1B2C"
+                            tools:text="E280 1160 6000…1B2C"
                             tools:visibility="visible" />
 
+                        <!-- Divider -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginTop="@dimen/space_3"
+                            android:layout_marginBottom="@dimen/space_3"
+                            android:alpha="0.3"
+                            android:background="@color/scan_hero_stroke" />
+
+                        <!-- 4 Metrics: Price | Weight | Karat | RSSI -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_3"
                             android:baselineAligned="false"
+                            android:orientation="horizontal"
+                            android:weightSum="4">
+
+                            <!-- 💰 Price -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvLastScanPrice"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:includeFontPadding="false"
+                                    android:text="$0"
+                                    android:textColor="@color/scan_hero_value"
+                                    android:textDirection="ltr"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="$450" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="💰 قيمة"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="@color/scan_hero_secondary"
+                                    android:textSize="9sp" />
+                            </LinearLayout>
+
+                            <!-- ⚖️ Weight -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvLastScanWeight"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:includeFontPadding="false"
+                                    android:text="0g"
+                                    android:textColor="@color/scan_hero_value"
+                                    android:textDirection="ltr"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="12.5g" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="⚖️ وزن"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="@color/scan_hero_secondary"
+                                    android:textSize="9sp" />
+                            </LinearLayout>
+
+                            <!-- 🏷️ Karat -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvLastScanKarat"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:includeFontPadding="false"
+                                    android:text="—"
+                                    android:textColor="@color/scan_hero_value"
+                                    android:textDirection="ltr"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="21K" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="🏷️ عيار"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="@color/scan_hero_secondary"
+                                    android:textSize="9sp" />
+                            </LinearLayout>
+
+                            <!-- 📶 RSSI -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvLastScanRssi"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="monospace"
+                                    android:includeFontPadding="false"
+                                    android:text="-50"
+                                    android:textColor="@color/scan_hero_value"
+                                    android:textDirection="ltr"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="-45" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="📶 إشارة"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="@color/scan_hero_secondary"
+                                    android:textSize="9sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- Serial + Time Row -->
+                        <LinearLayout
+                            android:id="@+id/rowSerialTime"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_3"
                             android:gravity="center"
-                            android:orientation="horizontal">
+                            android:orientation="horizontal"
+                            android:visibility="gone"
+                            tools:visibility="visible">
 
                             <TextView
-                                android:id="@+id/tvLastScanKarat"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="—"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                android:textColor="@color/scan_hero_value" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginHorizontal="@dimen/space_2"
-                                android:alpha="0.5"
-                                android:text="•"
-                                android:textColor="@color/scan_hero_secondary" />
-
-                            <TextView
-                                android:id="@+id/tvLastScanWeight"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0.00g"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                android:textColor="@color/scan_hero_value"
-                                android:textDirection="ltr" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginHorizontal="@dimen/space_2"
-                                android:alpha="0.5"
-                                android:text="•"
-                                android:textColor="@color/scan_hero_secondary" />
-
-                            <TextView
-                                android:id="@+id/tvLastScanRssi"
+                                android:id="@+id/tvLastScanSerial"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:fontFamily="monospace"
-                                android:text="📶 -50"
-                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                                android:text=""
+                                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                android:textColor="@color/scan_hero_secondary"
+                                android:textDirection="ltr"
+                                tools:text="SN: 0847" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginHorizontal="@dimen/space_2"
+                                android:alpha="0.5"
+                                android:text="•"
                                 android:textColor="@color/scan_hero_secondary" />
+
+                            <TextView
+                                android:id="@+id/tvLastScanTime"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="monospace"
+                                android:text=""
+                                android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                android:textColor="@color/scan_hero_secondary"
+                                android:textDirection="ltr"
+                                tools:text="⏰ 14:32:05" />
                         </LinearLayout>
 
+                        <!-- Status Chip -->
                         <TextView
                             android:id="@+id/tvLastScanStatus"
                             android:layout_width="wrap_content"
@@ -552,8 +794,8 @@
                                 android:layout_width="1dp"
                                 android:layout_height="40dp"
                                 android:layout_gravity="center_vertical"
-                                android:background="?attr/colorOutlineVariant"
-                                android:alpha="0.3" />
+                                android:alpha="0.3"
+                                android:background="?attr/colorOutlineVariant" />
 
                             <LinearLayout
                                 android:layout_width="0dp"
@@ -586,7 +828,7 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════════
-                     3. GOLD METRICS ROW — Weight + Value
+                     3. GOLD METRICS ROW
                      ═══════════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/metricsRow"
@@ -598,7 +840,6 @@
                     android:orientation="horizontal"
                     android:weightSum="2">
 
-                    <!-- Weight -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -638,7 +879,6 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Value -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -677,9 +917,7 @@
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <!-- ═══════════════════════════════════════════════════════
-                     4. ALERTS ROW
-                     ═══════════════════════════════════════════════════════ -->
+                <!-- ALERTS ROW -->
                 <LinearLayout
                     android:id="@+id/alertsRow"
                     android:layout_width="match_parent"
@@ -720,9 +958,7 @@
                     android:layout_marginTop="@dimen/space_4"
                     android:background="@drawable/bg_gold_divider_gradient" />
 
-                <!-- ═══════════════════════════════════════════════════════
-                     5. ACTION BUTTONS
-                     ═══════════════════════════════════════════════════════ -->
+                <!-- ACTION BUTTONS -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnOpenItemsList"
                     style="@style/AppButtonStyle"
@@ -778,7 +1014,7 @@
                         app:iconSize="@dimen/icon_md" />
                 </LinearLayout>
 
-                <!-- SEARCH & FILTER (hidden for Java) -->
+                <!-- HIDDEN SEARCH -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
@@ -803,7 +1039,7 @@
                         android:importantForAccessibility="no" />
                 </LinearLayout>
 
-                <!-- ✨ EMPTY STATE (داخل Active — للفلترة الفارغة) -->
+                <!-- EMPTY STATE (Filter) -->
                 <LinearLayout
                     android:id="@+id/tvEmptyState"
                     android:layout_width="match_parent"
@@ -840,7 +1076,7 @@
             </LinearLayout>
             <!-- ✅ نهاية activeContentGroup -->
 
-            <!-- HIDDEN CONTAINERS (Java compatibility) -->
+            <!-- HIDDEN CONTAINERS -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="0dp"
@@ -910,8 +1146,8 @@
                 android:layout_height="48dp"
                 android:layout_marginStart="@dimen/space_2"
                 android:contentDescription="Power"
-                android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:insetTop="0dp"
                 android:padding="0dp"
                 app:icon="@android:drawable/ic_lock_power_off"
                 app:iconGravity="textStart"
@@ -925,8 +1161,8 @@
                 android:layout_height="48dp"
                 android:layout_marginStart="@dimen/space_2"
                 android:contentDescription="Archive"
-                android:insetTop="0dp"
                 android:insetBottom="0dp"
+                android:insetTop="0dp"
                 android:padding="0dp"
                 app:icon="@android:drawable/ic_menu_agenda"
                 app:iconGravity="textStart"
