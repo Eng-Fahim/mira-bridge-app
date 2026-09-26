@@ -2686,13 +2686,62 @@ private void navigateToSnapshots() {
         showToast(isArabic ? "⚠️ فشل فتح المعاينة" : "⚠️ Preview failed");
     }
 }
-
 /**
- * ✅ بناء HTML احترافي للتقرير
+ * ✅ بناء HTML احترافي — مع دعم كامل للغات (AR/EN)
+ * يستخدم موارد strings.xml تلقائياً
  */
 private String buildReportHtml() {
     StringBuilder sb = new StringBuilder();
 
+    // ═══════════════════════════════════════════════════════
+    // ✅ 1) جلب النصوص من strings.xml (تلقائياً حسب لغة الجهاز)
+    // ═══════════════════════════════════════════════════════
+    if (!isAdded() || getContext() == null) return "";
+
+    final String T_TITLE         = getString(R.string.report_title);
+    final String T_SUBTITLE      = getString(R.string.report_subtitle);
+    final String T_BRAND         = getString(R.string.report_brand);
+    final String T_SESSION       = getString(R.string.report_session_id);
+    final String T_OPERATOR      = getString(R.string.report_operator);
+    final String T_DATE          = getString(R.string.report_date);
+    final String T_TIME          = getString(R.string.report_time);
+    final String T_BRANCH        = getString(R.string.report_branch);
+    final String T_MODE          = getString(R.string.report_mode);
+    final String T_MODE_FULL     = getString(R.string.report_mode_full);
+    final String T_MODE_BLIND    = getString(R.string.report_mode_blind);
+
+    final String T_SCANNED       = getString(R.string.report_stat_scanned);
+    final String T_EXPECTED      = getString(R.string.report_stat_expected);
+    final String T_ACCURACY      = getString(R.string.report_stat_accuracy);
+    final String T_VARIANCE      = getString(R.string.report_stat_variance);
+
+    final String T_TOTAL_WEIGHT  = getString(R.string.report_total_weight);
+    final String T_TOTAL_VALUE   = getString(R.string.report_total_value);
+    final String T_TOTAL_READS   = getString(R.string.report_total_reads);
+    final String T_MISSING       = getString(R.string.report_missing);
+
+    final String T_ITEMS_DETAILS = getString(R.string.report_items_details);
+    final String T_COL_NUM       = getString(R.string.report_col_num);
+    final String T_COL_NAME      = getString(R.string.report_col_name);
+    final String T_COL_EPC       = getString(R.string.report_col_epc);
+    final String T_COL_KARAT     = getString(R.string.report_col_karat);
+    final String T_COL_WEIGHT    = getString(R.string.report_col_weight);
+    final String T_COL_VALUE     = getString(R.string.report_col_value);
+    final String T_COL_COUNT     = getString(R.string.report_col_count);
+
+    final String T_FOOTER_NOTE   = getString(R.string.report_footer_note);
+    final String T_SIGN_OPERATOR = getString(R.string.report_sign_operator);
+    final String T_SIGN_MANAGER  = getString(R.string.report_sign_manager);
+    final String T_SIGN_OFFICIAL = getString(R.string.report_sign_official);
+    final String T_SYSTEM_USER   = getString(R.string.report_system_user);
+
+    // ✅ اتجاه الصفحة حسب اللغة
+    final String T_DIR = isArabic ? "rtl" : "ltr";
+    final String T_ALIGN = isArabic ? "right" : "left";
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ 2) حساب البيانات
+    // ═══════════════════════════════════════════════════════
     int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
     int totalReads = inventoryEngine != null ? inventoryEngine.getTotalReads() : 0;
     int missing = Math.max(0, expectedCount - scanned);
@@ -2706,127 +2755,324 @@ private String buildReportHtml() {
             ? inventoryEngine.getClientSessionId() : "SESS-LOCAL";
     String branchName = branchesManager != null
             ? branchesManager.getActiveBranchDisplayName() : "—";
-    String dateTime = getCurrentDateTimeString();
+    String userName = getCurrentUserName();
+    if (userName == null || userName.isEmpty()) {
+        userName = T_SYSTEM_USER;
+    }
 
+    String dateOnly;
+    String timeOnly;
+    try {
+        java.text.SimpleDateFormat dateFmt =
+                new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        java.text.SimpleDateFormat timeFmt =
+                new java.text.SimpleDateFormat("HH:mm:ss", Locale.US);
+        java.util.Date now = new java.util.Date();
+        dateOnly = dateFmt.format(now);
+        timeOnly = timeFmt.format(now);
+    } catch (Exception e) {
+        dateOnly = "—";
+        timeOnly = "—";
+    }
+
+    String reportNumber = "RPT-" + (System.currentTimeMillis() % 1000000);
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ 3) بناء HTML
+    // ═══════════════════════════════════════════════════════
     sb.append("<!DOCTYPE html>\n")
-      .append("<html dir=\"").append(isArabic ? "rtl" : "ltr").append("\">\n")
+      .append("<html dir=\"").append(T_DIR).append("\" lang=\"").append(isArabic ? "ar" : "en").append("\">\n")
       .append("<head>\n")
       .append("<meta charset=\"UTF-8\">\n")
       .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n")
-      .append("<title>").append(isArabic ? "تقرير الجرد" : "Inventory Report").append("</title>\n")
+      .append("<title>").append(T_TITLE).append("</title>\n")
       .append("<style>\n")
+
+      // ═══ Reset ═══
       .append("* { margin: 0; padding: 0; box-sizing: border-box; }\n")
-      .append("body { font-family: 'Cairo', Arial, sans-serif; padding: 20px; ")
-      .append("       color: #1A1200; background: #FFFFFF; direction: ")
-      .append(isArabic ? "rtl" : "ltr").append("; }\n")
-      .append(".header { text-align: center; border-bottom: 3px double #B89456; ")
-      .append("          padding-bottom: 15px; margin-bottom: 25px; }\n")
-      .append(".header h1 { color: #B89456; font-size: 26px; margin-bottom: 8px; }\n")
-      .append(".header .subtitle { color: #6B5A28; font-size: 14px; }\n")
-      .append(".info { display: grid; grid-template-columns: 1fr 1fr; ")
-      .append("        gap: 10px; margin-bottom: 25px; padding: 15px; ")
-      .append("        background: #FAF7F0; border-radius: 10px; ")
-      .append("        border: 1px solid #E8DFC8; }\n")
-      .append(".info-item { font-size: 13px; }\n")
-      .append(".info-item strong { color: #6B5A28; display: inline-block; ")
-      .append("                  min-width: 100px; }\n")
-      .append(".stats { display: grid; grid-template-columns: repeat(4, 1fr); ")
-      .append("         gap: 10px; margin-bottom: 25px; }\n")
-      .append(".stat { text-align: center; padding: 15px 10px; ")
-      .append("        background: linear-gradient(135deg, #F5E4B0, #E5C158); ")
-      .append("        border-radius: 12px; }\n")
-      .append(".stat .value { font-size: 24px; font-weight: bold; color: #1A1200; }\n")
-      .append(".stat .label { font-size: 11px; color: #6B5A28; margin-top: 5px; }\n")
-      .append("table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }\n")
-      .append("th { background: #E5C158; color: #1A1200; padding: 10px; ")
-      .append("     font-size: 12px; text-align: right; border: 1px solid #B89456; }\n")
-      .append("td { padding: 8px 10px; font-size: 12px; border: 1px solid #E8DFC8; }\n")
-      .append("tr:nth-child(even) { background: #FAF7F0; }\n")
-      .append(".footer { text-align: center; padding-top: 15px; ")
-      .append("          border-top: 1px solid #E8DFC8; margin-top: 25px; ")
-      .append("          color: #8B7639; font-size: 11px; }\n")
-      .append("@media print { body { padding: 0; } ")
-      .append("              .info { background: #FFFFFF; } ")
-      .append("              .stat { background: #F5E4B0 !important; ")
-      .append("                     -webkit-print-color-adjust: exact; } }\n")
+      .append("@page { size: A4; margin: 15mm 10mm; }\n")
+      .append("body { font-family: 'Cairo', 'Segoe UI', Arial, sans-serif; ")
+      .append("       color: #1A1200; background: #FFFFFF; padding: 0; ")
+      .append("       direction: ").append(T_DIR).append("; ")
+      .append("       font-size: 12px; line-height: 1.5; }\n")
+
+      // ═══ Container ═══
+      .append(".report-container { ")
+      .append("  border: 2px solid #B89456; border-radius: 8px; ")
+      .append("  padding: 0; overflow: hidden; }\n")
+
+      // ═══ Header ═══
+      .append(".header { ")
+      .append("  background: linear-gradient(135deg, #F5E4B0, #E5C158); ")
+      .append("  padding: 20px 25px; border-bottom: 3px double #8B6914; ")
+      .append("  display: flex; justify-content: space-between; ")
+      .append("  align-items: center; }\n")
+      .append(".header-left { text-align: ").append(T_ALIGN).append("; }\n")
+      .append(".header-left .logo { ")
+      .append("  font-size: 28px; font-weight: 900; color: #3D2E00; ")
+      .append("  letter-spacing: 2px; line-height: 1.1; direction: ltr; }\n")
+      .append(".header-left .logo-en { ")
+      .append("  font-size: 11px; font-weight: bold; color: #6B5A28; ")
+      .append("  letter-spacing: 4px; margin-top: 3px; direction: ltr; ")
+      .append("  text-align: ").append(T_ALIGN).append("; }\n")
+      .append(".header-left .branch { ")
+      .append("  font-size: 10px; color: #6B5A28; margin-top: 8px; ")
+      .append("  padding-top: 6px; border-top: 1px solid #8B6914; }\n")
+      .append(".header-right { text-align: ").append(isArabic ? "left" : "right").append("; }\n")
+      .append(".header-right .title { ")
+      .append("  font-size: 18px; font-weight: 900; color: #3D2E00; }\n")
+      .append(".header-right .subtitle { ")
+      .append("  font-size: 11px; color: #6B5A28; margin-top: 3px; }\n")
+      .append(".header-right .report-num { ")
+      .append("  display: inline-block; background: #3D2E00; color: #F5D97A; ")
+      .append("  padding: 4px 12px; border-radius: 12px; font-size: 10px; ")
+      .append("  font-weight: bold; margin-top: 8px; letter-spacing: 1px; ")
+      .append("  font-family: monospace; direction: ltr; }\n")
+
+      // ═══ Meta ═══
+      .append(".meta { ")
+      .append("  display: grid; grid-template-columns: 1fr 1fr; ")
+      .append("  gap: 0; padding: 15px 25px; background: #FAF7F0; ")
+      .append("  border-bottom: 1px solid #E8DFC8; }\n")
+      .append(".meta-item { padding: 6px 0; font-size: 11px; }\n")
+      .append(".meta-item .label { color: #6B5A28; font-weight: bold; ")
+      .append("  display: inline-block; min-width: 90px; }\n")
+      .append(".meta-item .value { color: #1A1200; font-weight: 600; }\n")
+      .append(".ltr-inline { direction: ltr; unicode-bidi: embed; ")
+      .append("  display: inline-block; font-family: monospace; }\n")
+
+      // ═══ Stats ═══
+      .append(".stats { ")
+      .append("  display: grid; grid-template-columns: repeat(4, 1fr); ")
+      .append("  gap: 0; border-bottom: 1px solid #E8DFC8; }\n")
+      .append(".stat { text-align: center; padding: 18px 10px; ")
+      .append("  background: #FFFDF5; border-")
+      .append(isArabic ? "right" : "left").append(": 1px solid #E8DFC8; }\n")
+      .append(".stat:first-child { border-")
+      .append(isArabic ? "right" : "left").append(": none; }\n")
+      .append(".stat .value { font-size: 24px; font-weight: 900; ")
+      .append("  color: #3D2E00; line-height: 1; }\n")
+      .append(".stat .value.gold { color: #B89456; }\n")
+      .append(".stat .value.green { color: #16A34A; }\n")
+      .append(".stat .value.red { color: #DC2626; }\n")
+      .append(".stat .label { font-size: 10px; color: #6B5A28; ")
+      .append("  margin-top: 6px; font-weight: bold; letter-spacing: 0.5px; }\n")
+
+      // ═══ Summary ═══
+      .append(".summary { ")
+      .append("  display: grid; grid-template-columns: repeat(4, 1fr); ")
+      .append("  gap: 0; padding: 12px 25px; background: #FAF7F0; ")
+      .append("  border-bottom: 2px solid #B89456; }\n")
+      .append(".summary-item { text-align: center; font-size: 11px; }\n")
+      .append(".summary-item .label { color: #6B5A28; font-size: 9px; ")
+      .append("  font-weight: bold; display: block; margin-bottom: 4px; ")
+      .append("  letter-spacing: 0.5px; }\n")
+      .append(".summary-item .value { color: #1A1200; font-weight: 900; ")
+      .append("  font-size: 13px; direction: ltr; display: inline-block; }\n")
+
+      // ═══ Table ═══
+      .append(".table-section { padding: 20px 25px; }\n")
+      .append(".table-title { ")
+      .append("  font-size: 14px; font-weight: 900; color: #3D2E00; ")
+      .append("  margin-bottom: 10px; padding-bottom: 8px; ")
+      .append("  border-bottom: 2px solid #B89456; text-align: ")
+      .append(T_ALIGN).append("; }\n")
+      .append("table { width: 100%; border-collapse: collapse; font-size: 10px; }\n")
+      .append("th { ")
+      .append("  background: linear-gradient(135deg, #E5C158, #B89456); ")
+      .append("  color: #FFFFFF; padding: 10px 6px; font-weight: bold; ")
+      .append("  text-align: center; border: 1px solid #8B6914; ")
+      .append("  font-size: 10px; letter-spacing: 0.5px; }\n")
+      .append("td { padding: 8px 6px; border: 1px solid #E8DFC8; ")
+      .append("  text-align: center; font-size: 10px; }\n")
+      .append("tr:nth-child(even) td { background: #FDFCF8; }\n")
+      .append("td.epc { font-family: 'Courier New', monospace; font-size: 8px; ")
+      .append("  direction: ltr; text-align: left; letter-spacing: 0.3px; }\n")
+      .append("td.name { text-align: ").append(T_ALIGN).append("; font-weight: 600; }\n")
+      .append("td.value { font-weight: 900; color: #B89456; direction: ltr; }\n")
+      .append("td.count { font-weight: 900; color: #3D2E00; }\n")
+
+      // ═══ Footer ═══
+      .append(".footer { ")
+      .append("  background: linear-gradient(135deg, #F5E4B0, #E5C158); ")
+      .append("  padding: 15px 25px; text-align: center; ")
+      .append("  border-top: 3px double #8B6914; font-size: 10px; ")
+      .append("  color: #3D2E00; line-height: 1.7; }\n")
+      .append(".footer .brand { font-weight: 900; letter-spacing: 2px; ")
+      .append("  color: #3D2E00; direction: ltr; display: inline-block; }\n")
+      .append(".footer .signature { ")
+      .append("  display: flex; justify-content: space-around; ")
+      .append("  margin-top: 15px; padding-top: 12px; ")
+      .append("  border-top: 1px dashed #8B6914; }\n")
+      .append(".footer .signature-item { text-align: center; }\n")
+      .append(".footer .signature-item .line { ")
+      .append("  width: 100px; height: 1px; background: #3D2E00; ")
+      .append("  margin: 20px auto 5px; }\n")
+      .append(".footer .signature-item .label { ")
+      .append("  font-size: 9px; font-weight: bold; color: #6B5A28; }\n")
+
+      // ═══ Print ═══
+      .append("@media print { ")
+      .append("  body { padding: 0; } ")
+      .append("  .report-container { border: 2px solid #B89456; } ")
+      .append("  .stat, th { -webkit-print-color-adjust: exact; ")
+      .append("    print-color-adjust: exact; } ")
+      .append("}\n")
+
       .append("</style>\n</head>\n<body>\n");
 
-    sb.append("<div class=\"header\">\n")
-      .append("<h1>💎 ").append(isArabic ? "تقرير جرد المخزون" : "Inventory Report").append("</h1>\n")
-      .append("<div class=\"subtitle\">MIRA JEWELRY ENTERPRISE™</div>\n</div>\n");
+    // ═══ CONTAINER ═══
+    sb.append("<div class=\"report-container\">\n");
 
-    sb.append("<div class=\"info\">\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "رقم الجلسة:" : "Session:").append("</strong> ")
-      .append(sessionId).append("</div>\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "التاريخ:" : "Date:").append("</strong> ")
-      .append(dateTime).append("</div>\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "الفرع:" : "Branch:").append("</strong> ")
-      .append(branchName).append("</div>\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "الوضع:" : "Mode:").append("</strong> ")
+    // ───── HEADER ─────
+    sb.append("  <div class=\"header\">\n")
+      .append("    <div class=\"header-left\">\n")
+      .append("      <div class=\"logo\">MIRA</div>\n")
+      .append("      <div class=\"logo-en\">JEWELRY ENTERPRISE™</div>\n")
+      .append("      <div class=\"branch\">📍 ").append(escapeHtml(branchName)).append("</div>\n")
+      .append("    </div>\n")
+      .append("    <div class=\"header-right\">\n")
+      .append("      <div class=\"title\">").append(T_TITLE).append("</div>\n")
+      .append("      <div class=\"subtitle\">").append(T_SUBTITLE).append("</div>\n")
+      .append("      <div class=\"report-num\">").append(reportNumber).append("</div>\n")
+      .append("    </div>\n")
+      .append("  </div>\n");
+
+    // ───── META ─────
+    sb.append("  <div class=\"meta\">\n")
+      .append("    <div class=\"meta-item\"><span class=\"label\">")
+      .append(T_SESSION).append(":</span> <span class=\"value ltr-inline\">")
+      .append(escapeHtml(sessionId)).append("</span></div>\n")
+
+      .append("    <div class=\"meta-item\"><span class=\"label\">")
+      .append(T_OPERATOR).append(":</span> <span class=\"value\">")
+      .append(escapeHtml(userName)).append("</span></div>\n")
+
+      .append("    <div class=\"meta-item\"><span class=\"label\">")
+      .append(T_DATE).append(":</span> <span class=\"value ltr-inline\">")
+      .append(dateOnly).append("</span></div>\n")
+
+      .append("    <div class=\"meta-item\"><span class=\"label\">")
+      .append(T_TIME).append(":</span> <span class=\"value ltr-inline\">")
+      .append(timeOnly).append("</span></div>\n")
+
+      .append("    <div class=\"meta-item\"><span class=\"label\">")
+      .append(T_BRANCH).append(":</span> <span class=\"value\">")
+      .append(escapeHtml(branchName)).append("</span></div>\n")
+
+      .append("    <div class=\"meta-item\"><span class=\"label\">")
+      .append(T_MODE).append(":</span> <span class=\"value\">")
       .append(selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty()
-              ? selectedCategoryFilter
-              : (expectedCount == 0 ? (isArabic ? "أعمى" : "Blind") : (isArabic ? "كامل" : "Full")))
-      .append("</div>\n</div>\n");
+              ? escapeHtml(selectedCategoryFilter)
+              : (expectedCount == 0 ? T_MODE_BLIND : T_MODE_FULL))
+      .append("</span></div>\n")
+      .append("  </div>\n");
 
-    sb.append("<div class=\"stats\">\n")
-      .append("<div class=\"stat\"><div class=\"value\">").append(scanned).append("</div>")
-      .append("<div class=\"label\">").append(isArabic ? "الممسوحة" : "Scanned").append("</div></div>\n")
-      .append("<div class=\"stat\"><div class=\"value\">").append(expectedCount).append("</div>")
-      .append("<div class=\"label\">").append(isArabic ? "المتوقعة" : "Expected").append("</div></div>\n")
-      .append("<div class=\"stat\"><div class=\"value\">").append(accuracy).append("%</div>")
-      .append("<div class=\"label\">").append(isArabic ? "الدقة" : "Accuracy").append("</div></div>\n")
-      .append("<div class=\"stat\"><div class=\"value\">")
+    // ───── STATS ─────
+    sb.append("  <div class=\"stats\">\n")
+      .append("    <div class=\"stat\"><div class=\"value\">").append(scanned).append("</div>")
+      .append("<div class=\"label\">").append(T_SCANNED).append("</div></div>\n")
+
+      .append("    <div class=\"stat\"><div class=\"value\">").append(expectedCount).append("</div>")
+      .append("<div class=\"label\">").append(T_EXPECTED).append("</div></div>\n")
+
+      .append("    <div class=\"stat\"><div class=\"value gold\">").append(accuracy).append("%</div>")
+      .append("<div class=\"label\">").append(T_ACCURACY).append("</div></div>\n")
+
+      .append("    <div class=\"stat\"><div class=\"value ")
+      .append(variance == 0 ? "green" : (variance > 0 ? "gold" : "red")).append("\">")
       .append(variance == 0 ? "0" : (variance > 0 ? "+" : "") + variance)
       .append("</div>")
-      .append("<div class=\"label\">").append(isArabic ? "الفرق" : "Variance").append("</div></div>\n")
-      .append("</div>\n");
+      .append("<div class=\"label\">").append(T_VARIANCE).append("</div></div>\n")
+      .append("  </div>\n");
 
-    sb.append("<div class=\"info\">\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "الوزن الإجمالي:" : "Total Weight:").append("</strong> ")
-      .append(String.format(Locale.US, "%.2f g", aggregateTotalWeight)).append("</div>\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "القيمة الإجمالية:" : "Total Value:").append("</strong> ")
-      .append(String.format(Locale.US, "$%,.2f", aggregateTotalValue)).append("</div>\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "عدد القراءات:" : "Total Reads:").append("</strong> ")
-      .append(totalReads).append("</div>\n")
-      .append("<div class=\"info-item\"><strong>").append(isArabic ? "القطع المفقودة:" : "Missing:").append("</strong> ")
-      .append(missing).append("</div>\n</div>\n");
+    // ───── SUMMARY ─────
+    sb.append("  <div class=\"summary\">\n")
+      .append("    <div class=\"summary-item\"><span class=\"label\">")
+      .append(T_TOTAL_WEIGHT).append("</span>")
+      .append("<span class=\"value\">")
+      .append(String.format(Locale.US, "%.2f g", aggregateTotalWeight))
+      .append("</span></div>\n")
 
+      .append("    <div class=\"summary-item\"><span class=\"label\">")
+      .append(T_TOTAL_VALUE).append("</span>")
+      .append("<span class=\"value\" style=\"color: #B89456;\">")
+      .append(String.format(Locale.US, "$%,.2f", aggregateTotalValue))
+      .append("</span></div>\n")
+
+      .append("    <div class=\"summary-item\"><span class=\"label\">")
+      .append(T_TOTAL_READS).append("</span>")
+      .append("<span class=\"value\">").append(totalReads).append("</span></div>\n")
+
+      .append("    <div class=\"summary-item\"><span class=\"label\">")
+      .append(T_MISSING).append("</span>")
+      .append("<span class=\"value\" style=\"color: ")
+      .append(missing > 0 ? "#DC2626" : "#16A34A").append(";\">")
+      .append(missing).append("</span></div>\n")
+      .append("  </div>\n");
+
+    // ───── TABLE ─────
     if (!scannedItemsDisplayList.isEmpty()) {
-        sb.append("<h2 style=\"color: #6B5A28; margin: 20px 0 10px; font-size: 18px;\">📋 ")
-          .append(isArabic ? "تفاصيل القطع" : "Items Details")
-          .append(" (").append(scannedItemsDisplayList.size()).append(")</h2>\n")
-          .append("<table>\n<thead>\n<tr>\n")
-          .append("<th>#</th>\n")
-          .append("<th>").append(isArabic ? "الاسم" : "Title").append("</th>\n")
-          .append("<th>EPC</th>\n")
-          .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>\n")
-          .append("<th>").append(isArabic ? "الوزن (g)" : "Weight (g)").append("</th>\n")
-          .append("<th>").append(isArabic ? "القيمة" : "Value").append("</th>\n")
-          .append("<th>").append(isArabic ? "العدد" : "Count").append("</th>\n")
-          .append("</tr>\n</thead>\n<tbody>\n");
+        sb.append("  <div class=\"table-section\">\n")
+          .append("    <div class=\"table-title\">📋 ")
+          .append(T_ITEMS_DETAILS)
+          .append(" (").append(scannedItemsDisplayList.size()).append(")</div>\n")
+
+          .append("    <table>\n<thead>\n<tr>\n")
+          .append("      <th style=\"width: 4%;\">").append(T_COL_NUM).append("</th>\n")
+          .append("      <th style=\"width: 22%;\">").append(T_COL_NAME).append("</th>\n")
+          .append("      <th style=\"width: 30%;\">").append(T_COL_EPC).append("</th>\n")
+          .append("      <th style=\"width: 8%;\">").append(T_COL_KARAT).append("</th>\n")
+          .append("      <th style=\"width: 10%;\">").append(T_COL_WEIGHT).append("</th>\n")
+          .append("      <th style=\"width: 12%;\">").append(T_COL_VALUE).append("</th>\n")
+          .append("      <th style=\"width: 7%;\">").append(T_COL_COUNT).append("</th>\n")
+          .append("    </tr>\n</thead>\n<tbody>\n");
 
         int index = 1;
         for (ScannedItemDisplay item : scannedItemsDisplayList) {
             if (item == null) continue;
-            sb.append("<tr>\n")
-              .append("<td>").append(index++).append("</td>\n")
-              .append("<td>").append(escapeHtml(item.title)).append("</td>\n")
-              .append("<td style=\"font-family: monospace; font-size: 10px; direction: ltr; text-align: left;\">")
-              .append(escapeHtml(item.epc)).append("</td>\n")
-              .append("<td>").append(escapeHtml(item.karat)).append("</td>\n")
-              .append("<td>").append(String.format(Locale.US, "%.2f", item.weight)).append("</td>\n")
-              .append("<td>").append(String.format(Locale.US, "$%.2f", item.price)).append("</td>\n")
-              .append("<td>").append(item.count).append("</td>\n</tr>\n");
+            sb.append("      <tr>\n")
+              .append("        <td>").append(index++).append("</td>\n")
+              .append("        <td class=\"name\">").append(escapeHtml(item.title)).append("</td>\n")
+              .append("        <td class=\"epc\">").append(escapeHtml(item.epc)).append("</td>\n")
+              .append("        <td>").append(escapeHtml(item.karat)).append("</td>\n")
+              .append("        <td>").append(String.format(Locale.US, "%.2f", item.weight)).append("</td>\n")
+              .append("        <td class=\"value\">")
+              .append(String.format(Locale.US, "$%,.2f", item.price)).append("</td>\n")
+              .append("        <td class=\"count\">").append(item.count).append("</td>\n")
+              .append("      </tr>\n");
         }
-        sb.append("</tbody>\n</table>\n");
+        sb.append("    </tbody>\n</table>\n</div>\n");
     }
 
-    sb.append("<div class=\"footer\">\n")
-      .append("MIRA JEWELRY ENTERPRISE™ — ")
-      .append(isArabic ? "تقرير مُولَّد تلقائياً" : "Auto-generated report")
-      .append("<br>").append(dateTime).append("</div>\n");
+    // ───── FOOTER ─────
+    sb.append("  <div class=\"footer\">\n")
+      .append("    <div class=\"brand\">").append(T_BRAND).append("</div>\n")
+      .append("    <div style=\"margin-top: 5px;\">")
+      .append(T_FOOTER_NOTE)
+      .append(" • <span class=\"ltr-inline\">")
+      .append(dateOnly).append(" ").append(timeOnly)
+      .append("</span></div>\n")
 
+      .append("    <div class=\"signature\">\n")
+      .append("      <div class=\"signature-item\">")
+      .append("<div class=\"line\"></div>")
+      .append("<div class=\"label\">").append(T_SIGN_OPERATOR).append("</div></div>\n")
+
+      .append("      <div class=\"signature-item\">")
+      .append("<div class=\"line\"></div>")
+      .append("<div class=\"label\">").append(T_SIGN_MANAGER).append("</div></div>\n")
+
+      .append("      <div class=\"signature-item\">")
+      .append("<div class=\"line\"></div>")
+      .append("<div class=\"label\">").append(T_SIGN_OFFICIAL).append("</div></div>\n")
+      .append("    </div>\n")
+
+      .append("  </div>\n");
+
+    sb.append("</div>\n");
     sb.append("</body>\n</html>");
+
     return sb.toString();
 }
 
