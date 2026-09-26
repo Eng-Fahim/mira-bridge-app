@@ -458,17 +458,17 @@ private void setupKeyboardBehavior() {
         if (rootView == null) return;
 
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-            Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
+            // ✅ استخدم androidx.core.graphics.Insets صراحةً
+            androidx.core.graphics.Insets imeInsets = 
+                    insets.getInsets(WindowInsetsCompat.Type.ime());
             boolean isKeyboardVisible = imeInsets.bottom > 0;
 
-            // ✅ استخدم الدالة الموحّدة (مع أنيميشن)
-            String currentTag = navigationManager != null 
-                    ? navigationManager.getCurrentFragmentTag() 
+            String currentTag = navigationManager != null
+                    ? navigationManager.getCurrentFragmentTag()
                     : NavigationManager.TAG_DASHBOARD;
             
             updateBottomNavVisibility(currentTag);
 
-            // ✅ اضبط padding fragmentContainer حسب الكيبورد
             View fragmentContainer = findViewById(R.id.fragment_container);
             if (fragmentContainer != null) {
                 fragmentContainer.setPadding(
@@ -2592,7 +2592,7 @@ public void setBottomNavVisibleTemporarily(boolean visible) {
         View bottomNavContainer = findViewById(R.id.bottomNavContainer);
         if (bottomNavContainer == null) return;
         
-        bottomNavTemporarilyHidden = !visible;
+        bottomNavTemporarilyHidden = !visible;  // ✅ صحيح
         
         String currentTag = navigationManager != null
                 ? navigationManager.getCurrentFragmentTag()
@@ -2625,12 +2625,21 @@ public void setBottomNavVisibleTemporarily(boolean visible) {
  * - الرئيسية، الجرد، البيع، البوابات → إظهار
  * - باقي الشاشات (إدخال بيانات) → إخفاء
  */
+/**
+ * ✅ إظهار/إخفاء القائمة السفلية حسب الشاشة
+ * 
+ * قواعد:
+ * - الشاشات الرئيسية (Dashboard/Inventory/POS/Gates/SalesHistory/Transfers) → إظهار
+ * - باقي الشاشات (إدخال بيانات) → إخفاء
+ * - عند الكيبورد → إخفاء
+ * - عند setBottomNavVisibleTemporarily(false) → إخفاء
+ */
 private void updateBottomNavVisibility(String tag) {
     try {
         View bottomNavContainer = findViewById(R.id.bottomNavContainer);
         if (bottomNavContainer == null) return;
         
-        // ✅ قائمة الشاشات الرئيسية
+        // ✅ الشاشات الرئيسية
         boolean isMainScreen = tag.equals(NavigationManager.TAG_DASHBOARD)
                 || tag.equals(NavigationManager.TAG_INVENTORY)
                 || tag.equals(NavigationManager.TAG_POS)
@@ -2638,49 +2647,44 @@ private void updateBottomNavVisibility(String tag) {
                 || tag.equals("SalesHistory")
                 || tag.equals("Transfers");
         
-        boolean shouldShow = isMainScreen;
+        // ✅ احترم الكيبورد
+        boolean isKeyboardVisible = isKeyboardVisible();
         
-        // ✅ احترم حالة الكيبورد أيضاً
-        boolean isKeyboardVisible = false;
-        try {
-            View rootView = findViewById(android.R.id.content);
-            if (rootView != null && rootView.getRootWindowInsets() != null) {
-                Insets imeInsets = rootView.getRootWindowInsets()
-                        .getInsets(WindowInsetsCompat.Type.ime());
-                isKeyboardVisible = imeInsets.bottom > 0;
-            }
-        } catch (Exception ignored) {}
-        
-        // ✅ أخفِ القائمة إذا:
-        // - الشاشة ليست رئيسية
-        // - أو الكيبورد ظاهر
-        boolean finalVisibility = shouldShow && !isKeyboardVisible;
-        
-        View currentView = bottomNavContainer;
-        float targetAlpha = finalVisibility ? 1.0f : 0.0f;
+        // ✅ احترم الإخفاء المؤقت
+        boolean shouldShow = isMainScreen 
+                && !isKeyboardVisible 
+                && !bottomNavTemporarilyHidden;
         
         // ✅ أنيميشن سلس
-        currentView.animate()
-                .alpha(targetAlpha)
-                .setDuration(250)
-                .withEndAction(() -> {
-                    if (!finalVisibility) {
-                        currentView.setVisibility(View.GONE);
-                    }
-                })
-                .start();
-        
-        if (finalVisibility) {
-            currentView.setVisibility(View.VISIBLE);
-            currentView.setAlpha(0f);
-            currentView.animate().alpha(1.0f).setDuration(250).start();
+        if (shouldShow) {
+            if (bottomNavContainer.getVisibility() != View.VISIBLE) {
+                bottomNavContainer.setVisibility(View.VISIBLE);
+                bottomNavContainer.setAlpha(0f);
+                bottomNavContainer.animate()
+                        .alpha(1f)
+                        .setDuration(250)
+                        .start();
+            } else {
+                bottomNavContainer.animate()
+                        .alpha(1f)
+                        .setDuration(250)
+                        .start();
+            }
+        } else {
+            bottomNavContainer.animate()
+                    .alpha(0f)
+                    .setDuration(250)
+                    .withEndAction(() -> bottomNavContainer.setVisibility(View.GONE))
+                    .start();
         }
         
-        Log.d(TAG, "📍 Bottom Nav visibility: " + finalVisibility 
-                + " (tag=" + tag + ", keyboard=" + isKeyboardVisible + ")");
+        Log.d(TAG, "📍 Bottom Nav: " + (shouldShow ? "VISIBLE" : "HIDDEN")
+                + " (tag=" + tag 
+                + ", keyboard=" + isKeyboardVisible 
+                + ", temporarilyHidden=" + bottomNavTemporarilyHidden + ")");
         
     } catch (Exception e) {
-        Log.e(TAG, "updateBottomNavVisibility error: " + e.getMessage());
+        Log.e(TAG, "updateBottomNavVisibility error: " + e.getMessage(), e);
     }
 }
 
@@ -2700,4 +2704,4 @@ private boolean isKeyboardVisible() {
         return false;
     }
 }
-                       }
+}
