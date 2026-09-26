@@ -60,11 +60,22 @@ public class OfflineGateCache {
      * محفوظة للتوافقية فقط.
      */
     @Deprecated
-    public void saveAllowedEpcs(Set<String> allowedEpcs) {
-        if (allowedEpcs == null) allowedEpcs = new HashSet<>();
-        prefs.edit().putStringSet(KEY_ALLOWED_LEGACY, new HashSet<>(allowedEpcs)).apply();
-        Log.d(TAG, "✅ [legacy] Allowed EPCs cached: " + allowedEpcs.size());
-    }
+public void saveAllowedEpcs(Set<String> allowedEpcs) {
+    if (allowedEpcs == null || allowedEpcs.isEmpty()) return;
+    
+    // ✅ دمج بدل استبدال (للحفاظ على EPCs المُضافة محلياً)
+    Set<String> current = new HashSet<>(
+            prefs.getStringSet(KEY_ALLOWED_LEGACY, new HashSet<>()));
+    
+    int before = current.size();
+    current.addAll(allowedEpcs);
+    int after = current.size();
+    
+    prefs.edit().putStringSet(KEY_ALLOWED_LEGACY, current).apply();
+    
+    Log.d(TAG, "✅ [legacy] Allowed EPCs MERGED: " + before + " → " + after 
+            + " (added " + (after - before) + ")");
+}
 
     /**
      * يدمج بين القائمة القديمة (StringSet) والقائمة الجديدة (JSON entries).
