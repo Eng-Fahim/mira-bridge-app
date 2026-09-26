@@ -41,6 +41,7 @@
 <string name="nav_identity">التكويد</string>
 <string name="nav_reports">التقارير</string>
 <string name="nav_transfers">التحويلات</string>
+    <string name="nav_gates">🛡️ البوابات</string>
     
     <string name="nav_home">الرئيسية</string>
     <string name="nav_profile">Profile</string>
