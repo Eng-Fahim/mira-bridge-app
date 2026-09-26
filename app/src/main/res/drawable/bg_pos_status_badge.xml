@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/pos_status_active_bg" />
+            <corners android:radius="@dimen/pos_status_badge_radius" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/pos_status_active" />
+        </shape>
+    </item>
+
+    <item android:state_enabled="false">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/pos_status_offline_bg" />
+            <corners android:radius="@dimen/pos_status_badge_radius" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/pos_status_offline" />
+        </shape>
+    </item>
+
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/pos_status_searching_bg" />
+            <corners android:radius="@dimen/pos_status_badge_radius" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/pos_status_searching" />
+        </shape>
+    </item>
+</selector>
