@@ -184,6 +184,7 @@ private static final int MIN_ITEMS_TO_PROMPT = 3; // 3 قطع على الأقل
     private View chipReadCount;
     private View rowSerialTime;
     
+    private ImageView ivWelcomeLogo;
     
 
     private MaterialButton btnOpenItemsList;
@@ -368,7 +369,8 @@ public View onCreateView(@NonNull LayoutInflater inflater,
     } catch (Exception e) {
         Log.e(TAG, "CatalogManager error", e);
     }
-
+    
+    
     // ============================================================
     // 8) FilterManager
     // ============================================================
@@ -474,6 +476,9 @@ public View onCreateView(@NonNull LayoutInflater inflater,
     } catch (Exception e) {
         Log.e(TAG, "initViews error", e);
     }
+    
+    mainHandler.postDelayed(this::animateWelcomeLogo, 300);
+
 
     // ============================================================
     // 16) RFID Manager — اربطه بالـ ScanController
@@ -552,6 +557,7 @@ public View onCreateView(@NonNull LayoutInflater inflater,
         btnTakeSnapshot = view.findViewById(R.id.btnTakeSnapshot);
         btnViewSnapshots = view.findViewById(R.id.btnViewSnapshots);
         
+        ivWelcomeLogo = view.findViewById(R.id.ivWelcomeLogo);
         welcomeState = view.findViewById(R.id.welcomeState);
         activeContentGroup = view.findViewById(R.id.activeContentGroup);
         progressCard = view.findViewById(R.id.progressCard);
@@ -4064,5 +4070,43 @@ private boolean shouldPromptForRestore() {
         backgroundExecutor = null;
         ioExecutor = null;
     }
+    
+    /**
+ * ✅ أنيميشن دخول الشعار (توهج + دوران طفيف)
+ */
+private void animateWelcomeLogo() {
+    try {
+        if (ivWelcomeLogo == null) return;
+        
+        // ✅ 1) ظهور تدريجي
+        ivWelcomeLogo.setAlpha(0f);
+        ivWelcomeLogo.setScaleX(0.5f);
+        ivWelcomeLogo.setScaleY(0.5f);
+        
+        ivWelcomeLogo.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(600)
+                .setInterpolator(new android.view.animation.OvershootInterpolator(1.5f))
+                .start();
+        
+        // ✅ 2) نبض مستمر (توهج خفيف)
+        mainHandler.postDelayed(() -> {
+            if (isAdded() && !isFragmentDestroyed && ivWelcomeLogo != null) {
+                android.animation.ObjectAnimator pulse = 
+                        android.animation.ObjectAnimator.ofFloat(
+                                ivWelcomeLogo, "alpha", 1f, 0.7f, 1f);
+                pulse.setDuration(2000);
+                pulse.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                pulse.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+                pulse.start();
+            }
+        }, 700);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "animateWelcomeLogo error", e);
+    }
+}
 
 } // ✅ نهاية الكلاس MiraInventoryProFragment
