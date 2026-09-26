@@ -151,6 +151,11 @@
             android:label="MIRA Identity Studio"
             android:windowSoftInputMode="adjustResize|stateHidden"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density" />
+            
+        <activity
+    android:name=".activity.InventoryReportPreviewActivity"
+    android:exported="false"
+    android:theme="@style/Theme.Uhfuartdemo" />
 
         <!-- ==================== FileProvider ==================== -->
         <provider
