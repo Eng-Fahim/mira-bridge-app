@@ -1299,18 +1299,19 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void updateBottomNavLanguage() {
-        try {
-            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-            if (nav != null && nav.getMenu() != null) {
-                nav.getMenu().findItem(R.id.nav_home).setTitle(isArabic ? "الرئيسية" : "Home");
-                nav.getMenu().findItem(R.id.nav_inventory).setTitle(isArabic ? "الجرد" : "Inventory");
-                nav.getMenu().findItem(R.id.nav_sales).setTitle(isArabic ? "البيع" : "Sales");
-                nav.getMenu().findItem(R.id.nav_transfers).setTitle(isArabic ? "التحويلات" : "Transfers");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
+    try {
+        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+        if (nav != null && nav.getMenu() != null) {
+            nav.getMenu().findItem(R.id.nav_home).setTitle(isArabic ? "الرئيسية" : "Home");
+            nav.getMenu().findItem(R.id.nav_inventory).setTitle(isArabic ? "الجرد" : "Inventory");
+            nav.getMenu().findItem(R.id.nav_sales).setTitle(isArabic ? "البيع" : "Sales");
+            nav.getMenu().findItem(R.id.nav_transfers).setTitle(
+                    isArabic ? "🛡️ البوابات" : "🛡️ Gates");
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
     }
+}
 
     // ==================== القوائم ====================
 
@@ -1451,15 +1452,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         } else if (id == R.id.action_export_data) {
             loadFragment(new MiraReportsProFragment(), "Reports");
             return true;
-        } else if (id == R.id.action_device_version) {
-            showSystemVersionDialog();
-            return true;
-        } else if (id == R.id.action_logout) {
-            confirmLogout();
-            return true;
-        }
+        } else if (id == R.id.action_device_status) {
+    showHardwareOptionsDialog();
+    return true;
+} else if (id == R.id.action_device_version) {
+    showSystemVersionDialog();
+    return true;
+} else if (id == R.id.action_logout) {
+    confirmLogout();
+    return true;
+}
 
-        return super.onOptionsItemSelected(item);
+return super.onOptionsItemSelected(item);
     }
 
     private void toggleLanguage() {
