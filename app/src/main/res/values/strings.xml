@@ -2306,4 +2306,207 @@
 
  <string name="gate_setting_simulate_exit">🎬 محاكاة الخروج عند البيع</string>
 <string name="gate_setting_simulate_exit_desc">⚠️ للاختبار فقط — عند التفعيل، ستُسجَّل القطع المُباعة كخروج فوري</string>
+
+
+
+<!-- ═══════════════════════════════════════════════════════
+     📋 INVENTORY REPORT — تقرير الجرد
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- Report Header -->
+<string name="report_title">تقرير جرد المخزون</string>
+<string name="report_subtitle">نظام الجرد الإلكتروني RFID</string>
+<string name="report_brand">MIRA JEWELRY ENTERPRISE™</string>
+
+<!-- Meta Info -->
+<string name="report_session_id">رقم الجلسة</string>
+<string name="report_operator">المستخدم</string>
+<string name="report_date">التاريخ</string>
+<string name="report_time">الوقت</string>
+<string name="report_branch">الفرع</string>
+<string name="report_mode">وضع الجرد</string>
+
+<!-- Modes -->
+<string name="report_mode_full">كامل</string>
+<string name="report_mode_blind">أعمى</string>
+<string name="report_mode_category">فئوي</string>
+
+<!-- Stats -->
+<string name="report_stat_scanned">الممسوحة</string>
+<string name="report_stat_expected">المتوقعة</string>
+<string name="report_stat_accuracy">الدقة</string>
+<string name="report_stat_variance">الفرق</string>
+
+<!-- Summary -->
+<string name="report_total_weight">الوزن الإجمالي</string>
+<string name="report_total_value">القيمة الإجمالية</string>
+<string name="report_total_reads">عدد القراءات</string>
+<string name="report_missing">القطع المفقودة</string>
+
+<!-- Table -->
+<string name="report_items_details">تفاصيل القطع المُجرَّدة</string>
+<string name="report_col_num">#</string>
+<string name="report_col_name">اسم القطعة</string>
+<string name="report_col_epc">EPC</string>
+<string name="report_col_karat">العيار</string>
+<string name="report_col_weight">الوزن (g)</string>
+<string name="report_col_value">القيمة</string>
+<string name="report_col_count">العدد</string>
+
+<!-- Footer -->
+<string name="report_footer_note">تقرير جرد رسمي مُولَّد تلقائياً</string>
+<string name="report_sign_operator">المستخدم / المُجرِّد</string>
+<string name="report_sign_manager">المدير / المشرف</string>
+<string name="report_sign_official">التوقيع الرسمي</string>
+
+<!-- Fallback -->
+<string name="report_system_user">مستخدم النظام</string>
+
+<!-- ═══════════════════════════════════════════════════════
+     📋 INVENTORY SCREEN — شاشة الجرد
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- Welcome State -->
+<string name="inventory_welcome_title">جاهز للجرد</string>
+<string name="inventory_welcome_subtitle">جرد دقيق للمجوهرات بتقنية RFID\nاختر الوضع وابدأ فوراً</string>
+<string name="inventory_welcome_hint">اختر وضع الجرد من الأعلى،\nثم اضغط زر البدء في الأسفل</string>
+<string name="inventory_welcome_tap">اضغط للبدء</string>
+<string name="inventory_welcome_system_name">نظام الجرد الذكي</string>
+<string name="inventory_welcome_system_subtitle">MIRA RFID INVENTORY</string>
+
+<!-- Segmented Modes -->
+<string name="mode_full">⚡ شامل</string>
+<string name="mode_category">📂 فئوي</string>
+<string name="mode_blind">👁 أعمى</string>
+<string name="mode_full_short">شامل</string>
+<string name="mode_category_short">فئوي</string>
+<string name="mode_blind_short">أعمى</string>
+
+<!-- Last Scan Card -->
+<string name="last_scan_label">✨ آخر مسح</string>
+<string name="last_scan_empty">لا توجد مسوحات</string>
+<string name="last_scan_price_label">💰 قيمة</string>
+<string name="last_scan_weight_label">⚖️ وزن</string>
+<string name="last_scan_karat_label">🏷️ عيار</string>
+<string name="last_scan_rssi_label">📶 إشارة</string>
+<string name="last_scan_status_match">✅ مطابق للمخزون</string>
+<string name="last_scan_status_duplicate">🔁 مكرر</string>
+<string name="last_scan_status_unexpected">🆕 غير متوقع</string>
+<string name="last_scan_status_unknown">⚠️ غير معروف</string>
+
+<!-- Progress Card -->
+<string name="progress_title">📊 التقدم</string>
+<string name="progress_accuracy">الدقة</string>
+<string name="progress_variance">الفرق</string>
+
+<!-- Metrics -->
+<string name="metric_weight">⚖️ الوزن</string>
+<string name="metric_value">💎 القيمة</string>
+
+<!-- Action Buttons -->
+<string name="btn_open_items_list">📋 عرض قائمة الممسوحات</string>
+<string name="btn_take_snapshot">حفظ لقطة</string>
+<string name="btn_clear_session">جرد جديد</string>
+<string name="btn_view_snapshots">عرض السجل</string>
+
+<!-- Main Toggle Button -->
+<string name="btn_start_inventory">▶️ بدء الجرد</string>
+<string name="btn_stop_inventory">⏹️ إيقاف الجرد</string>
+<string name="btn_start_inventory_long">▶️ بدء جرد RFID</string>
+<string name="btn_stop_inventory_long">⏹️ إيقاف الجرد</string>
+
+<!-- Commit Button -->
+<string name="btn_commit">اعتماد</string>
+<string name="btn_committed">✅ معتمد</string>
+
+<!-- Report Button -->
+<string name="btn_report">📋 تقرير</string>
+
+<!-- Archive Button -->
+<string name="btn_archive">📂 الأرشيف</string>
+
+<!-- Status Bar -->
+<string name="status_ready">جاهز</string>
+<string name="status_scanning">📡 جاري الجرد...</string>
+<string name="status_stopped">📡 تم إيقاف الجرد</string>
+<string name="status_connected">📡 متصل</string>
+<string name="status_disconnected">📡 غير متصل</string>
+<string name="status_blind_mode">⚡ جرد أعمى - بدون توقعات</string>
+
+<!-- Empty State -->
+<string name="empty_state_title">🔍 لا توجد نتائج مطابقة</string>
+
+<!-- Power Button (default) -->
+<string name="btn_power_default">⚡ dBm</string>
+
+<!-- =============================== -->
+<!-- Items List Dialog -->
+<!-- =============================== -->
+<string name="items_list_title">📋 الممسوحات</string>
+<string name="items_list_empty">لا توجد مسوحات بعد</string>
+<string name="items_list_of">من</string>
+<string name="dialog_close">إغلاق</string>
+<string name="dialog_cancel">إلغاء</string>
+<string name="dialog_ok">موافق</string>
+<string name="dialog_back">رجوع</string>
+
+<!-- Toast Messages -->
+<string name="toast_loading_data">🔄 جاري تحميل البيانات...</string>
+<string name="toast_scan_stopped">🛑 تم إيقاف المسح</string>
+<string name="toast_scan_completed">🎉 اكتمل جرد جميع المواد المتوقعة!</string>
+<string name="toast_session_restored">✅ تم استرجاع %1$d قطعة</string>
+<string name="toast_session_restored_failed">❌ فشل استرجاع الجلسة</string>
+<string name="toast_session_reset">✅ تم إعادة التعيين</string>
+<string name="toast_session_reset_error">❌ خطأ في إعادة التعيين</string>
+<string name="toast_snapshot_saved">✅ تم حفظ اللقطة</string>
+<string name="toast_snapshot_save_failed">❌ فشل الحفظ</string>
+<string name="toast_auto_snapshot_saved">📸 تم حفظ لقطة تلقائية</string>
+<string name="toast_no_scans_to_save">⚠️ لا توجد مسوحات لحفظها</string>
+<string name="toast_new_session_started">✨ بدء جلسة جديدة</string>
+<string name="toast_access_denied">⛔ غير مصرح</string>
+<string name="toast_power_applied">✅ تم ضبط القدرة على %1$d dBm</string>
+<string name="toast_power_failed">⚠️ فشل ضبط القدرة — تحقق من الاتصال بالقارئ</string>
+<string name="toast_power_error">⚠️ خطأ في ضبط القدرة</string>
+<string name="toast_synced_transactions">✅ تمت مزامنة %1$d معاملة</string>
+
+<!-- Dialogs -->
+<string name="dialog_restore_title">🔄 استرجاع جلسة سابقة</string>
+<string name="dialog_restore_btn_restore">✅ استرجاع</string>
+<string name="dialog_restore_btn_new">بدء جديد</string>
+<string name="dialog_restore_btn_later">لاحقاً</string>
+<string name="dialog_restore_dont_ask">لا تسألني مجدداً عن هذه الجلسة</string>
+
+<string name="dialog_reset_title">⚠️ تأكيد</string>
+<string name="dialog_reset_message">هل أنت متأكد من إعادة تعيين الجلسة؟\nسيتم حذف كل البيانات غير المعتمدة.</string>
+<string name="dialog_reset_btn">إعادة تعيين</string>
+
+<string name="dialog_exit_title">⚠️ تحذير مهم</string>
+<string name="dialog_exit_message">الجرد ما زال قيد التشغيل!\n\nإذا قمت بتغيير الواجهة، سيتوقف الجرد وستفقد البيانات غير المحفوظة.\n\nهل تريد إيقاف الجرد والمتابعة؟</string>
+<string name="dialog_exit_btn_confirm">إيقاف والمتابعة</string>
+<string name="dialog_exit_btn_stay">البقاء في الجرد</string>
+
+<string name="dialog_category_title">🎯 اختر الفئة للجرد</string>
+<string name="dialog_category_running_title">⚠️ الجرد قيد التشغيل</string>
+<string name="dialog_category_running_message">لتغيير الفئة، يجب إيقاف الجرد الحالي.\nهل تريد المتابعة؟</string>
+<string name="dialog_blind_running_message">هل تريد إيقاف الجرد الحالي وبدء الجرد الأعمى؟</string>
+<string name="dialog_btn_stop_continue">إيقاف ومتابعة</string>
+<string name="dialog_btn_continue">متابعة</string>
+
+<string name="dialog_snapshot_title">📸 حفظ لقطة</string>
+<string name="dialog_snapshot_message">سيتم حفظ %1$d قطعة في لقطة جديدة</string>
+<string name="dialog_snapshot_hint">اسم اللقطة (اختياري)</string>
+<string name="dialog_snapshot_btn_save">حفظ</string>
+
+<!-- Categories -->
+<string name="cat_all">الكل</string>
+<string name="cat_24k">عيار 24</string>
+<string name="cat_22k">عيار 22</string>
+<string name="cat_21k">عيار 21</string>
+<string name="cat_18k">عيار 18</string>
+<string name="cat_14k">عيار 14</string>
+<string name="cat_bullion">سبائك</string>
+<string name="cat_ounce">أونصة</string>
+<string name="cat_silver">فضة</string>
+<string name="cat_diamond">ألماس</string>
+<string name="cat_other">أخرى</string>
 </resources>
