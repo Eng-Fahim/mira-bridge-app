@@ -148,7 +148,7 @@
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_diamond_pattern" />
 
-                        <!-- Layer 4: MIRA Watermark (شفاف جداً) -->
+                        <!-- Layer 4: MIRA Watermark -->
                         <ImageView
                             android:layout_width="180dp"
                             android:layout_height="180dp"
@@ -176,7 +176,7 @@
                                 android:gravity="center_vertical"
                                 android:orientation="horizontal">
 
-                                <!-- MIRA ID Badge -->
+                                <!-- MIRA ID Badge (لا تغيير — Logo) -->
                                 <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
@@ -206,14 +206,14 @@
                                         android:textStyle="bold" />
                                 </LinearLayout>
 
-                                <!-- Title -->
+                                <!-- Title — ✅ لون الهوية بدل hex -->
                                 <TextView
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
                                     android:layout_weight="1"
                                     android:text="@string/total_inventory_value"
                                     android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                    android:textColor="#F5D97A"
+                                    android:textColor="@color/gold_luxury_light"
                                     tools:text="💰 قيمة المخزون" />
 
                                 <!-- Eye Button -->
@@ -237,7 +237,7 @@
                                     android:paddingHorizontal="@dimen/space_2"
                                     android:paddingVertical="4dp"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                    android:textColor="#F5D97A"
+                                    android:textColor="@color/gold_luxury_light"
                                     android:visibility="gone"
                                     tools:text="📈 +2.4%"
                                     tools:visibility="visible" />
@@ -260,19 +260,17 @@
                                     android:textColor="#B89456"
                                     tools:text="القيمة الحالية" />
 
+                                <!-- ⭐⭐⭐ الرقم الرئيسي — الترقية الأهم -->
+                                <!-- قبل: 8 خصائص hardcoded بدون tnum -->
+                                <!-- بعد: نمط واحد + tnum تلقائي + ظل + LTR -->
                                 <TextView
                                     android:id="@+id/tvHeroBalance"
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="@dimen/space_1"
-                                    android:fontFamily="sans-serif-medium"
-                                    android:includeFontPadding="false"
-                                    android:letterSpacing="-0.02"
                                     android:text="••••••••"
+                                    android:textAppearance="@style/TextAppearance.App.Number.OnGold.Hero"
                                     android:textColor="#FFFFFF"
-                                    android:textDirection="ltr"
-                                    android:textSize="36sp"
-                                    android:textStyle="bold"
                                     tools:text="$52,798.66" />
 
                                 <!-- ✅ Gold Underline -->
@@ -304,24 +302,22 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="⚖"
-                                        android:textColor="#F5D97A"
+                                        android:textColor="@color/gold_luxury_light"
                                         android:textSize="12sp" />
 
+                                    <!-- ✅ الوزن — Number.OnGold.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroSubtitle"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:layout_marginStart="6dp"
-                                        android:fontFamily="sans-serif-medium"
                                         android:text="0.0 g"
+                                        android:textAppearance="@style/TextAppearance.App.Number.OnGold.Small"
                                         android:textColor="#FFFFFF"
-                                        android:textDirection="ltr"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold"
                                         tools:text="374.0 g" />
                                 </LinearLayout>
 
-                                <!-- Chip: Item Count -->
+                                <!-- Chip: Item Count — نص مختلط (لا يستخدم Number) -->
                                 <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
@@ -336,24 +332,23 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="◈"
-                                        android:textColor="#F5D97A"
+                                        android:textColor="@color/gold_luxury_light"
                                         android:textSize="12sp" />
 
+                                    <!-- ⚠️ نص مختلط (رقم + كلمة عربية) → Label.Medium وليس Number -->
                                     <TextView
                                         android:id="@+id/tvHeroItemCount"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:layout_marginStart="6dp"
-                                        android:fontFamily="sans-serif-medium"
                                         android:text="0 قطعة"
+                                        android:textAppearance="@style/TextAppearance.App.Label.Medium"
                                         android:textColor="#FFFFFF"
-                                        android:textSize="13sp"
-                                        android:textStyle="bold"
                                         tools:text="6 قطعة" />
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- ═══ Sparkline Placeholder (مستقبلي) ═══ -->
+                            <!-- Sparkline Placeholder -->
                             <com.example.uhf.widget.MiraSparklineView
                                 android:id="@+id/heroSparkline"
                                 android:layout_width="match_parent"
@@ -362,7 +357,7 @@
                                 android:visibility="gone"
                                 tools:visibility="visible" />
 
-                            <!-- ═══ Divider ═══ -->
+                            <!-- Divider -->
                             <View
                                 android:layout_width="match_parent"
                                 android:layout_height="1dp"
@@ -397,7 +392,7 @@
                                         android:fontFamily="sans-serif-medium"
                                         android:letterSpacing="0.05"
                                         android:text="USD"
-                                        android:textColor="#F5D97A"
+                                        android:textColor="@color/gold_luxury_light"
                                         android:textSize="11sp"
                                         android:textStyle="bold" />
 
@@ -406,16 +401,14 @@
                                         android:layout_height="1dp"
                                         android:layout_weight="1" />
 
+                                    <!-- ✅ Number.OnGold.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroValueUSD"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:fontFamily="sans-serif-medium"
                                         android:text="••••••"
+                                        android:textAppearance="@style/TextAppearance.App.Number.OnGold.Small"
                                         android:textColor="#FFFFFF"
-                                        android:textDirection="ltr"
-                                        android:textSize="16sp"
-                                        android:textStyle="bold"
                                         tools:text="52,798.66" />
                                 </LinearLayout>
 
@@ -447,14 +440,14 @@
                                         android:layout_height="1dp"
                                         android:layout_weight="1" />
 
+                                    <!-- ✅ Number.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroValueSAR"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="••••••"
+                                        android:textAppearance="@style/TextAppearance.App.Number.Small"
                                         android:textColor="#B89456"
-                                        android:textDirection="ltr"
-                                        android:textSize="14sp"
                                         tools:text="197,994.98" />
                                 </LinearLayout>
 
@@ -486,19 +479,19 @@
                                         android:layout_height="1dp"
                                         android:layout_weight="1" />
 
+                                    <!-- ✅ Number.Small -->
                                     <TextView
                                         android:id="@+id/tvHeroValueYER"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="••••••"
+                                        android:textAppearance="@style/TextAppearance.App.Number.Small"
                                         android:textColor="#B89456"
-                                        android:textDirection="ltr"
-                                        android:textSize="14sp"
                                         tools:text="27,983,290" />
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- ═══ Footer: MIRA ID™ Signature (bottom) ═══ -->
+                            <!-- ═══ Footer ═══ -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -813,12 +806,13 @@
                                 android:textAppearance="@style/TextAppearance.App.Label.Medium"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
 
+                            <!-- ✅ Hero → Large (34sp كان كبيراً جداً هنا) -->
                             <TextView
                                 android:id="@+id/tvOuncePrice"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Number.Hero"
+                                android:textAppearance="@style/TextAppearance.App.Number.Large"
                                 android:textColor="@color/text_gold_accent"
                                 tools:text="$4,282.33" />
                         </LinearLayout>
