@@ -1272,31 +1272,32 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private String getFragmentTagForNavItem(int itemId) {
-        if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
-        if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
-        if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
-        if (itemId == R.id.nav_transfers) return NavigationManager.TAG_TRANSFERS;
-        return "";
-    }
+    if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
+    if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
+    if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
+    if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;   // ✅ Gates
+    return "";
+}
 
     private void updateBottomNavSelectionByTag(String tag) {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            if (quickNav == null || tag == null) return;
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        if (quickNav == null || tag == null) return;
 
-            if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
-                quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
-                quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_POS)) {
-                quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_TRANSFERS)) {
-                quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
+        if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
+            quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
+            quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_POS)) {
+            quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_GATES)
+                || tag.equals(NavigationManager.TAG_SECURE_GATE)) {
+            quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
     }
+}
 
     private void updateBottomNavLanguage() {
     try {
