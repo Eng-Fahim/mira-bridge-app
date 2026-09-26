@@ -46,18 +46,19 @@
 
             <View
                 android:id="@+id/statusDot"
-                android:layout_width="8dp"
-                android:layout_height="8dp"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
                 android:background="@drawable/bg_status_dot_green" />
 
             <TextView
                 android:id="@+id/tvInventoryStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/space_1"
+                android:layout_marginStart="@dimen/space_2"
                 android:text="جاهز"
                 android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/pure_white" />
+                android:textColor="@color/status_bar_text"
+                android:textStyle="bold" />
 
             <View
                 android:layout_width="0dp"
@@ -71,8 +72,9 @@
                 android:fontFamily="monospace"
                 android:text="📶 -45"
                 android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/pure_white"
-                android:textDirection="ltr" />
+                android:textColor="@color/status_bar_text"
+                android:textDirection="ltr"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvElapsedTime"
@@ -82,11 +84,12 @@
                 android:fontFamily="monospace"
                 android:text="00:00:00"
                 android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/pure_white"
-                android:textDirection="ltr" />
+                android:textColor="@color/status_bar_text"
+                android:textDirection="ltr"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- ✨ SEGMENTED CONTROL — بظل داخلي -->
+        <!-- ✨ SEGMENTED CONTROL -->
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/segmentedModes"
             android:layout_width="match_parent"
@@ -141,7 +144,7 @@
             android:orientation="vertical">
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ LAST SCAN CARD — بحدود ذهبية رقيقة
+                 ✨ LAST SCAN CARD
                  ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/lastScanCard"
@@ -159,11 +162,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:minHeight="160dp"
+                    android:minHeight="140dp"
                     android:orientation="vertical"
-                    android:padding="@dimen/space_4">
+                    android:padding="@dimen/space_3">
 
-                    <!-- Chip "آخر مسح" — بخلفية ذهبية شفافة -->
+                    <!-- Chip "آخر مسح" -->
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -199,18 +202,21 @@
                         android:id="@+id/tvLastScanEpc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_2"
-                        android:alpha="0.75"
+                        android:layout_marginTop="@dimen/space_1"
+                        android:alpha="0.65"
                         android:ellipsize="middle"
                         android:fontFamily="monospace"
                         android:gravity="center"
                         android:maxLines="1"
-                        android:text="—"
+                        android:text=""
                         android:textAppearance="@style/TextAppearance.App.Label.Medium"
                         android:textColor="?attr/colorOnPrimaryContainer"
-                        android:textDirection="ltr" />
+                        android:textDirection="ltr"
+                        android:visibility="gone"
+                        tools:text="E280 1160 6000 0204 1B2C"
+                        tools:visibility="visible" />
 
-                    <!-- ترتيب RTL صحيح -->
+                    <!-- Row: Karat • Weight • RSSI -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -277,7 +283,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ PROGRESS BAR CARD — تدرج ذهبي + Bento Layout
+                 ✨ PROGRESS BAR CARD — Bento Layout
                  ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/AppCardViewStyle.Outlined"
@@ -309,39 +315,40 @@
                             android:id="@+id/tvProgressPercent"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
                             android:text="0%"
-                            android:textAppearance="@style/TextAppearance.App.Title.Medium"
                             android:textColor="@color/text_gold_accent"
                             android:textDirection="ltr"
+                            android:textSize="22sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
-                    <!-- ✨ Progress Bar متدرج -->
+                    <!-- Progress Bar متدرج -->
                     <ProgressBar
                         android:id="@+id/progressScanned"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="12dp"
+                        android:layout_height="10dp"
                         android:layout_marginTop="@dimen/space_3"
                         android:max="100"
                         android:progress="0"
-                        android:progressBackgroundTint="?attr/colorSurfaceVariant"
-                        android:progressTint="@color/gold_500" />
+                        android:progressDrawable="@drawable/progress_gold_gradient" />
 
-                    <!-- ✨ Bento Layout: العدد أكبر من الدقة والفرق -->
+                    <!-- Bento Layout: العدد • الدقة | الفرق -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_4"
                         android:baselineAligned="false"
+                        android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:weightSum="4">
+                        android:weightSum="6">
 
                         <!-- العدد (الأكبر) -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="2"
+                            android:layout_weight="3"
                             android:gravity="start|center_vertical"
                             android:orientation="horizontal">
 
@@ -349,11 +356,12 @@
                                 android:id="@+id/tvScannedCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-medium"
+                                android:includeFontPadding="false"
                                 android:text="0"
-                                android:textAppearance="@style/TextAppearance.App.Display.Large"
                                 android:textColor="@color/text_gold_accent"
                                 android:textDirection="ltr"
-                                android:textSize="32sp"
+                                android:textSize="34sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -378,7 +386,7 @@
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
+                            android:layout_weight="1.5"
                             android:gravity="center"
                             android:orientation="vertical">
 
@@ -386,26 +394,35 @@
                                 android:id="@+id/tvAccuracy"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-medium"
                                 android:text="—"
-                                android:textAppearance="@style/TextAppearance.App.Title.Medium"
                                 android:textColor="@color/success_500"
                                 android:textDirection="ltr"
-                                android:textSize="18sp"
+                                android:textSize="20sp"
                                 android:textStyle="bold" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
                                 android:text="الدقة"
                                 android:textAppearance="@style/TextAppearance.App.Label.Small"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
+                        <!-- فاصل عمودي رقيق -->
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="40dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="?attr/colorOutlineVariant"
+                            android:alpha="0.3" />
+
                         <!-- الفرق -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
+                            android:layout_weight="1.5"
                             android:gravity="end"
                             android:orientation="vertical">
 
@@ -413,16 +430,17 @@
                                 android:id="@+id/tvVariance"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-medium"
                                 android:text="—"
-                                android:textAppearance="@style/TextAppearance.App.Title.Medium"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textDirection="ltr"
-                                android:textSize="18sp"
+                                android:textSize="20sp"
                                 android:textStyle="bold" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
                                 android:text="الفرق"
                                 android:textAppearance="@style/TextAppearance.App.Label.Small"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
@@ -432,7 +450,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ GOLD METRICS ROW
+                 ✨ GOLD METRICS ROW — الوزن + القيمة
                  ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -443,15 +461,17 @@
                 android:orientation="horizontal"
                 android:weightSum="2">
 
-                <!-- الوزن (ثانوي) -->
+                <!-- الوزن (ثانوي — Surface + حد ذهبي) -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="@dimen/space_1"
                     android:layout_weight="1"
-                    app:cardBackgroundColor="?attr/colorTertiaryContainer"
+                    app:cardBackgroundColor="?attr/colorSurface"
                     app:cardCornerRadius="@dimen/radius_xl"
-                    app:cardElevation="@dimen/elevation_0">
+                    app:cardElevation="@dimen/elevation_0"
+                    app:strokeColor="@color/border_gold"
+                    app:strokeWidth="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -464,19 +484,20 @@
                             android:id="@+id/tvTotalWeight"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
                             android:text="0.00 g"
-                            android:textAppearance="@style/TextAppearance.App.Title.Large"
-                            android:textColor="?attr/colorOnTertiaryContainer"
-                            android:textDirection="ltr" />
+                            android:textColor="?attr/colorOnSurface"
+                            android:textDirection="ltr"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_1"
-                            android:alpha="0.8"
                             android:text="⚖️ الوزن"
                             android:textAppearance="@style/TextAppearance.App.Label.Small"
-                            android:textColor="?attr/colorOnTertiaryContainer" />
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -501,10 +522,11 @@
                             android:id="@+id/tvTotalValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
                             android:text="$0.00"
-                            android:textAppearance="@style/TextAppearance.App.Title.Large"
                             android:textColor="@color/pure_white"
                             android:textDirection="ltr"
+                            android:textSize="20sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -520,7 +542,7 @@
             </LinearLayout>
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ ALERTS ROW — تصميم فاخر
+                 ✨ ALERTS ROW
                  ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/alertsRow"
@@ -553,9 +575,7 @@
                     android:textColor="?attr/colorOnSurface" />
             </LinearLayout>
 
-            <!-- ═══════════════════════════════════════════════════════
-                 ✨ Fancy Divider
-                 ═══════════════════════════════════════════════════════ -->
+            <!-- ✨ Fancy Divider -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
@@ -564,7 +584,7 @@
                 android:background="@drawable/bg_gold_divider_gradient" />
 
             <!-- ═══════════════════════════════════════════════════════
-                 ✨ ACTION BUTTONS — رئيسي + 3 أيقونية
+                 ✨ ACTION BUTTONS
                  ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnOpenItemsList"
@@ -578,50 +598,47 @@
                 app:iconGravity="textStart"
                 app:iconSize="@dimen/icon_md" />
 
+            <!-- شريط أدوات موحّد (Snapshot • Clear • Gallery) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/space_3"
                 android:layout_marginTop="@dimen/space_2"
-                android:baselineAligned="false"
+                android:background="?attr/colorSurfaceVariant"
                 android:orientation="horizontal"
+                android:padding="4dp"
                 android:weightSum="3">
 
-                <!-- زر 1: حفظ لقطة -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnTakeSnapshot"
                     style="@style/AppButtonStyle.IconTonal"
                     android:layout_width="0dp"
-                    android:layout_height="@dimen/button_height"
-                    android:layout_marginEnd="@dimen/space_1"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
                     android:contentDescription="حفظ لقطة"
                     app:icon="@android:drawable/ic_menu_camera"
-                    app:iconSize="@dimen/icon_lg" />
+                    app:iconSize="@dimen/icon_md" />
 
-                <!-- زر 2: بدء جرد جديد -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnClearSession"
                     style="@style/AppButtonStyle.IconTonal"
                     android:layout_width="0dp"
-                    android:layout_height="@dimen/button_height"
+                    android:layout_height="48dp"
                     android:layout_marginHorizontal="@dimen/space_1"
                     android:layout_weight="1"
                     android:contentDescription="بدء جرد جديد"
                     app:icon="@android:drawable/ic_menu_revert"
-                    app:iconSize="@dimen/icon_lg" />
+                    app:iconSize="@dimen/icon_md" />
 
-                <!-- زر 3: عرض اللقطات -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnViewSnapshots"
                     style="@style/AppButtonStyle.IconTonal"
                     android:layout_width="0dp"
-                    android:layout_height="@dimen/button_height"
-                    android:layout_marginStart="@dimen/space_1"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
                     android:contentDescription="عرض اللقطات"
                     app:icon="@android:drawable/ic_menu_gallery"
-                    app:iconSize="@dimen/icon_lg" />
+                    app:iconSize="@dimen/icon_md" />
             </LinearLayout>
 
             <!-- SEARCH & FILTER (مخفي — للتوافق مع Java) -->
@@ -649,7 +666,7 @@
                     android:importantForAccessibility="no" />
             </LinearLayout>
 
-            <!-- ✨ EMPTY STATE — تصميم فاخر -->
+            <!-- ✨ EMPTY STATE -->
             <LinearLayout
                 android:id="@+id/tvEmptyState"
                 android:layout_width="match_parent"
@@ -660,7 +677,6 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <!-- دائرة ذهبية بحجم كبير -->
                 <FrameLayout
                     android:layout_width="120dp"
                     android:layout_height="120dp"
@@ -729,7 +745,7 @@
     </androidx.core.widget.NestedScrollView>
 
     <!-- ═══════════════════════════════════════════════════════
-         ✨ FLOATING DOCK — بإطار ذهبي مزدوج
+         ✨ FLOATING DOCK
          ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
@@ -766,23 +782,33 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPowerControlCompact"
                 style="@style/AppButtonStyle.IconTonal"
-                android:layout_width="@dimen/icon_xl"
-                android:layout_height="@dimen/icon_xl"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="@dimen/space_2"
                 android:contentDescription="Power"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp"
                 app:icon="@android:drawable/ic_lock_power_off"
-                app:iconSize="@dimen/icon_md" />
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="22dp" />
 
             <!-- زر الأرشيف -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnArchiveReportsCompact"
                 style="@style/AppButtonStyle.IconTonal"
-                android:layout_width="@dimen/icon_xl"
-                android:layout_height="@dimen/icon_xl"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="@dimen/space_2"
                 android:contentDescription="Archive"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp"
                 app:icon="@android:drawable/ic_menu_agenda"
-                app:iconSize="@dimen/icon_md" />
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="22dp" />
 
             <!-- زر الاعتماد -->
             <com.google.android.material.button.MaterialButton
