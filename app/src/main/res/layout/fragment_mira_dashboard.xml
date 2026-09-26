@@ -111,203 +111,334 @@
                 android:paddingBottom="@dimen/space_6">
 
                 <!-- ═══════════════════════════════════════════════════════
-                     1. HERO BALANCE CARD
+                     1. HERO BALANCE CARD — V2 (Dark Gold Hero)
                      ═══════════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/space_4"
-                    app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                    app:cardBackgroundColor="@android:color/transparent"
                     app:cardCornerRadius="@dimen/card_radius"
-                    app:cardElevation="@dimen/elevation_2"
-                    app:strokeWidth="0dp">
+                    app:cardElevation="@dimen/elevation_3"
+                    app:strokeColor="#4DF5D97A"
+                    app:strokeWidth="1dp">
 
-                    <LinearLayout
+                    <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="@dimen/space_5">
+                        android:layout_height="wrap_content">
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/total_inventory_value"
-                                android:textAppearance="@style/TextAppearance.App.Label.Large"
-                                android:textColor="?attr/colorOnPrimaryContainer"
-                                tools:text="💰 إجمالي قيمة المخزون" />
-
-                            <ImageButton
-                                android:id="@+id/btnToggleHeroVisibility"
-                                android:layout_width="@dimen/icon_lg"
-                                android:layout_height="@dimen/icon_lg"
-                                android:layout_marginEnd="@dimen/space_1"
-                                android:background="?attr/selectableItemBackgroundBorderless"
-                                android:contentDescription="@string/toggle_visibility"
-                                android:padding="@dimen/space_1"
-                                android:src="@drawable/ic_eye_off"
-                                app:tint="?attr/colorOnPrimaryContainer" />
-
-                            <TextView
-                                android:id="@+id/tvHeroTrend"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:background="@drawable/bg_chip_status"
-                                android:paddingHorizontal="@dimen/space_2"
-                                android:paddingVertical="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="?attr/colorPrimary"
-                                tools:text="📈 +2.4%" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:background="@drawable/bg_sparkline_placeholder"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:paddingVertical="@dimen/space_5">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/current_inventory_value"
-                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                                android:textColor="?attr/colorOnPrimaryContainer" />
-
-                            <!-- ✨ الرقم الرئيسي — نمط رقمي -->
-                            <TextView
-                                android:id="@+id/tvHeroBalance"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_1"
-                                android:text="••••••••"
-                                android:textAppearance="@style/TextAppearance.App.Number.OnGold.Hero"
-                                tools:text="$61,648.96" />
-
-                            <TextView
-                                android:id="@+id/tvHeroSubtitle"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_2"
-                                android:textAppearance="@style/TextAppearance.App.Label.Medium"
-                                android:textColor="?attr/colorOnPrimaryContainer"
-                                tools:text="👑 7 قطع • 615.0g" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:baselineAligned="false"
-                            android:orientation="horizontal"
-                            android:weightSum="3">
-
-                            <!-- YER -->
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:gravity="center"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:id="@+id/tvHeroValueYER"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Number.OnGold.Medium"
-                                    tools:text="12,450,000" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="@dimen/space_1"
-                                    android:text="🇾🇪 ريال يمني"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                    android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:alpha="0.75" />
-                            </LinearLayout>
-
-                            <View
-                                android:layout_width="1dp"
-                                android:layout_height="match_parent"
-                                android:background="?attr/colorOutlineVariant"
-                                android:alpha="0.4" />
-
-                            <!-- SAR -->
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:gravity="center"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:id="@+id/tvHeroValueSAR"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Number.OnGold.Medium"
-                                    tools:text="306,150" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="@dimen/space_1"
-                                    android:text="🇸🇦 ريال سعودي"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                    android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:alpha="0.75" />
-                            </LinearLayout>
-
-                            <View
-                                android:layout_width="1dp"
-                                android:layout_height="match_parent"
-                                android:background="?attr/colorOutlineVariant"
-                                android:alpha="0.4" />
-
-                            <!-- USD -->
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:gravity="center"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:id="@+id/tvHeroValueUSD"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="••••••"
-                                    android:textAppearance="@style/TextAppearance.App.Number.OnGold.Medium"
-                                    tools:text="61,648.96" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="@dimen/space_1"
-                                    android:text="🇺🇸 دولار أمريكي"
-                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                    android:textColor="?attr/colorOnPrimaryContainer"
-                                    android:alpha="0.75" />
-                            </LinearLayout>
-                        </LinearLayout>
-
+                        <!-- Layer 1: Dark Gold Gradient -->
                         <View
-                            android:id="@+id/heroSparkline"
                             android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:visibility="gone" />
-                    </LinearLayout>
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_hero_gold_gradient" />
+
+                        <!-- Layer 2: Gold Glow (subtle) -->
+                        <View
+                            android:layout_width="200dp"
+                            android:layout_height="200dp"
+                            android:layout_gravity="top|end"
+                            android:alpha="0.18"
+                            android:background="@drawable/bg_hero_glow" />
+
+                        <!-- Layer 3: Content -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="@dimen/space_5"
+                            android:paddingTop="@dimen/space_4"
+                            android:paddingBottom="@dimen/space_4">
+
+                            <!-- Header: Title + Eye + Trend -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="@string/total_inventory_value"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Large"
+                                    android:textColor="#F5D97A"
+                                    tools:text="💰 إجمالي قيمة المخزون" />
+
+                                <ImageButton
+                                    android:id="@+id/btnToggleHeroVisibility"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginEnd="@dimen/space_1"
+                                    android:background="?attr/selectableItemBackgroundBorderless"
+                                    android:contentDescription="@string/toggle_visibility"
+                                    android:padding="4dp"
+                                    android:src="@drawable/ic_eye_off"
+                                    app:tint="#F5D97A" />
+
+                                <TextView
+                                    android:id="@+id/tvHeroTrend"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:background="@drawable/bg_chip_status"
+                                    android:paddingHorizontal="@dimen/space_2"
+                                    android:paddingVertical="4dp"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="#F5D97A"
+                                    android:visibility="gone"
+                                    tools:text="📈 +2.4%"
+                                    tools:visibility="visible" />
+                            </LinearLayout>
+
+                            <!-- Hero Value Section -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_5"
+                                android:gravity="start"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:alpha="0.75"
+                                    android:text="@string/current_inventory_value"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                                    android:textColor="#B89456"
+                                    tools:text="القيمة الحالية" />
+
+                                <TextView
+                                    android:id="@+id/tvHeroBalance"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_1"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:includeFontPadding="false"
+                                    android:letterSpacing="-0.02"
+                                    android:text="••••••••"
+                                    android:textColor="#FFFFFF"
+                                    android:textDirection="ltr"
+                                    android:textSize="36sp"
+                                    android:textStyle="bold"
+                                    tools:text="$52,798.66" />
+                            </LinearLayout>
+
+                            <!-- Chips: Weight + Count -->
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_3"
+                                android:orientation="horizontal">
+
+                                <!-- Chip: Weight -->
+                                <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:background="@drawable/bg_hero_chip"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:paddingHorizontal="@dimen/space_3"
+                                    android:paddingVertical="6dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="⚖"
+                                        android:textColor="#F5D97A"
+                                        android:textSize="12sp" />
+
+                                    <TextView
+                                        android:id="@+id/tvHeroSubtitle"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="6dp"
+                                        android:fontFamily="sans-serif-medium"
+                                        android:text="0.0 g"
+                                        android:textColor="#FFFFFF"
+                                        android:textDirection="ltr"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold"
+                                        tools:text="374.0 g" />
+                                </LinearLayout>
+
+                                <!-- Chip: Item Count -->
+                                <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="@dimen/space_2"
+                                    android:background="@drawable/bg_hero_chip"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:paddingHorizontal="@dimen/space_3"
+                                    android:paddingVertical="6dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="◈"
+                                        android:textColor="#F5D97A"
+                                        android:textSize="12sp" />
+
+                                    <TextView
+                                        android:id="@+id/tvHeroItemCount"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="6dp"
+                                        android:fontFamily="sans-serif-medium"
+                                        android:text="0 قطعة"
+                                        android:textColor="#FFFFFF"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold"
+                                        tools:text="6 قطعة" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <!-- Divider -->
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:layout_marginTop="@dimen/space_5"
+                                android:layout_marginBottom="@dimen/space_4"
+                                android:background="#33F5D97A" />
+
+                            <!-- Currencies List (Vertical) -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical">
+
+                                <!-- Row 1: USD (Primary) -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:paddingVertical="5dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="🇺🇸"
+                                        android:textSize="14sp" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="@dimen/space_2"
+                                        android:fontFamily="sans-serif-medium"
+                                        android:text="USD"
+                                        android:textColor="#F5D97A"
+                                        android:textSize="11sp"
+                                        android:textStyle="bold"
+                                        android:letterSpacing="0.05" />
+
+                                    <View
+                                        android:layout_width="0dp"
+                                        android:layout_height="1dp"
+                                        android:layout_weight="1" />
+
+                                    <TextView
+                                        android:id="@+id/tvHeroValueUSD"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:fontFamily="sans-serif-medium"
+                                        android:text="••••••"
+                                        android:textColor="#FFFFFF"
+                                        android:textDirection="ltr"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold"
+                                        tools:text="52,798.66" />
+                                </LinearLayout>
+
+                                <!-- Row 2: SAR -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:paddingVertical="5dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="🇸🇦"
+                                        android:textSize="14sp" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="@dimen/space_2"
+                                        android:text="SAR"
+                                        android:textColor="#B89456"
+                                        android:textSize="11sp"
+                                        android:letterSpacing="0.05" />
+
+                                    <View
+                                        android:layout_width="0dp"
+                                        android:layout_height="1dp"
+                                        android:layout_weight="1" />
+
+                                    <TextView
+                                        android:id="@+id/tvHeroValueSAR"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="••••••"
+                                        android:textColor="#B89456"
+                                        android:textDirection="ltr"
+                                        android:textSize="14sp"
+                                        tools:text="197,994.98" />
+                                </LinearLayout>
+
+                                <!-- Row 3: YER -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:paddingVertical="5dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="🇾🇪"
+                                        android:textSize="14sp" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="@dimen/space_2"
+                                        android:text="YER"
+                                        android:textColor="#B89456"
+                                        android:textSize="11sp"
+                                        android:letterSpacing="0.05" />
+
+                                    <View
+                                        android:layout_width="0dp"
+                                        android:layout_height="1dp"
+                                        android:layout_weight="1" />
+
+                                    <TextView
+                                        android:id="@+id/tvHeroValueYER"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="••••••"
+                                        android:textColor="#B89456"
+                                        android:textDirection="ltr"
+                                        android:textSize="14sp"
+                                        tools:text="27,983,290" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <!-- Sparkline placeholder -->
+                            <View
+                                android:id="@+id/heroSparkline"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
+                                android:visibility="gone" />
+                        </LinearLayout>
+                    </FrameLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════════
