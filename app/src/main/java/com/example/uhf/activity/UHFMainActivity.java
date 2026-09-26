@@ -2689,15 +2689,17 @@ private void updateBottomNavVisibility(String tag) {
 
 /**
  * ✅ فحص إذا كان الكيبورد ظاهراً
- * نستخدم androidx.core.graphics.Insets (وليس android.graphics.Insets)
+ * نستخدم WindowInsetsCompat لضمان التوافق
  */
 private boolean isKeyboardVisible() {
     try {
         View rootView = findViewById(android.R.id.content);
-        if (rootView == null || rootView.getRootWindowInsets() == null) return false;
+        if (rootView == null) return false;
         
-        androidx.core.graphics.Insets imeInsets = rootView.getRootWindowInsets()
-                .getInsets(WindowInsetsCompat.Type.ime());
+        WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(rootView);
+        if (windowInsets == null) return false;
+        
+        androidx.core.graphics.Insets imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
         return imeInsets.bottom > 0;
     } catch (Exception e) {
         return false;
