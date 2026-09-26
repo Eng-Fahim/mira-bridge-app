@@ -498,15 +498,17 @@ public View onCreateView(@NonNull LayoutInflater inflater,
     // ============================================================
     // 19) ✅ تحديث أولي لحالة الأزرار بعد اكتمال التهيئة
     // ============================================================
-    mainHandler.postDelayed(() -> {
+        mainHandler.postDelayed(() -> {
         if (isAdded() && !isFragmentDestroyed) {
             updateButtonsState();
         }
     }, 150);
 
-    return view;
-}
+    // ✅✅✅ استرجاع صامت فوري (قبل أي شيء آخر)
+    mainHandler.postDelayed(this::silentRestoreSession, 100);
 
+    return view;
+    }
     // ==================== initViews ====================
 
     private void initViews(View view) {
@@ -2428,70 +2430,183 @@ private void navigateToSnapshots() {
     // ================================================================
 
     private void printCurrentReport() {
-    if (printManager == null) {
-        Log.e(TAG, "printCurrentReport: printManager is null");
-        showToast(isArabic ? "⚠️ مدير الطباعة غير جاهز" : "⚠️ Print manager not ready");
-        return;
-    }
+    if (!isAdded() || isFragmentDestroyed) return;
 
     try {
-        // ✅ إذا كان لدينا تقرير من السيرفر — استخدمه
-        if (lastServerReport != null && lastServerReport.length() > 0) {
-            Log.d(TAG, "📊 Printing from server report");
-            
-            int expected = extractInt(lastServerReport, "expected_count", expectedCount);
-            int found = extractInt(lastServerReport, "found_count",
-                    inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0);
-            int missing = extractInt(lastServerReport, "missing_count",
-                    Math.max(0, expected - found));
+        // ✅ ابنِ HTML احترافي
+        String html = buildReportHtml();
+        String title = isArabic ? "تقرير الجرد" : "Inventory Report";
 
-            InventoryReport serverReport = new InventoryReport(
-                    0,
-                    extractString(lastServerReport, "session_id",
-                            extractString(lastServerReport, "client_session_id",
-                                    inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SESS-LOCAL")),
-                    extractString(lastServerReport, "date",
-                            getCurrentDateTimeString()),
-                    expected,
-                    found,
-                    missing,
-                    extractString(lastServerReport, "status",
-                            isArabic ? "مكتمل" : "Completed")
-            );
+        // ✅ افتح Activity المعاينة
+        android.content.Intent intent = new android.content.Intent(
+                requireContext(),
+                com.example.uhf.activity.InventoryReportPreviewActivity.class);
+        intent.putExtra("report_html", html);
+        intent.putExtra("report_title", title);
+        startActivity(intent);
 
-            printManager.printArchivedReport(serverReport);
-            showToast(isArabic ? "🖨️ جاري تحضير الطباعة..." 
-                               : "🖨️ Preparing print...");
-            return;
-        }
-
-        // ✅ Fallback: التقرير المحلي
-        Log.d(TAG, "📊 Printing local report");
-        
-        int expected = expectedCount;
-        int found = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
-        int missing = Math.max(0, expected - found);
-
-        InventoryReport localReport = new InventoryReport(
-                0,
-                inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SESS-LOCAL",
-                getCurrentDateTimeString(),
-                expected,
-                found,
-                missing,
-                isArabic ? "جارية" : "In progress"
-        );
-
-        printManager.printArchivedReport(localReport);
-        showToast(isArabic ? "🖨️ جاري تحضير الطباعة..." 
-                           : "🖨️ Preparing print...");
+        Log.d(TAG, "✅ Report preview opened");
 
     } catch (Exception e) {
         Log.e(TAG, "printCurrentReport error", e);
-        showToast(isArabic ? "⚠️ فشل الطباعة" : "⚠️ Print failed");
+        showToast(isArabic ? "⚠️ فشل فتح المعاينة" : "⚠️ Preview failed");
     }
 }
 
+/**
+ * ✅ بناء HTML احترافي للتقرير
+ */
+private String buildReportHtml() {
+    StringBuilder sb = new StringBuilder();
+
+    int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+    int totalReads = inventoryEngine != null ? inventoryEngine.getTotalReads() : 0;
+    int missing = Math.max(0, expectedCount - scanned);
+    int variance = scanned - expectedCount;
+
+    int accuracy = expectedCount > 0
+            ? Math.min(100, (scanned * 100) / expectedCount)
+            : 100;
+
+    String sessionId = inventoryEngine != null
+            ? inventoryEngine.getClientSessionId() : "SESS-LOCAL";
+    String branchName = branchesManager != null
+            ? branchesManager.getActiveBranchDisplayName() : "—";
+    String dateTime = getCurrentDateTimeString();
+
+    sb.append("<!DOCTYPE html>\n")
+      .append("<html dir=\"").append(isArabic ? "rtl" : "ltr").append("\">\n")
+      .append("<head>\n")
+      .append("<meta charset=\"UTF-8\">\n")
+      .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n")
+      .append("<title>").append(isArabic ? "تقرير الجرد" : "Inventory Report").append("</title>\n")
+      .append("<style>\n")
+      .append("* { margin: 0; padding: 0; box-sizing: border-box; }\n")
+      .append("body { font-family: 'Cairo', Arial, sans-serif; padding: 20px; ")
+      .append("       color: #1A1200; background: #FFFFFF; direction: ")
+      .append(isArabic ? "rtl" : "ltr").append("; }\n")
+      .append(".header { text-align: center; border-bottom: 3px double #B89456; ")
+      .append("          padding-bottom: 15px; margin-bottom: 25px; }\n")
+      .append(".header h1 { color: #B89456; font-size: 26px; margin-bottom: 8px; }\n")
+      .append(".header .subtitle { color: #6B5A28; font-size: 14px; }\n")
+      .append(".info { display: grid; grid-template-columns: 1fr 1fr; ")
+      .append("        gap: 10px; margin-bottom: 25px; padding: 15px; ")
+      .append("        background: #FAF7F0; border-radius: 10px; ")
+      .append("        border: 1px solid #E8DFC8; }\n")
+      .append(".info-item { font-size: 13px; }\n")
+      .append(".info-item strong { color: #6B5A28; display: inline-block; ")
+      .append("                  min-width: 100px; }\n")
+      .append(".stats { display: grid; grid-template-columns: repeat(4, 1fr); ")
+      .append("         gap: 10px; margin-bottom: 25px; }\n")
+      .append(".stat { text-align: center; padding: 15px 10px; ")
+      .append("        background: linear-gradient(135deg, #F5E4B0, #E5C158); ")
+      .append("        border-radius: 12px; }\n")
+      .append(".stat .value { font-size: 24px; font-weight: bold; color: #1A1200; }\n")
+      .append(".stat .label { font-size: 11px; color: #6B5A28; margin-top: 5px; }\n")
+      .append("table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }\n")
+      .append("th { background: #E5C158; color: #1A1200; padding: 10px; ")
+      .append("     font-size: 12px; text-align: right; border: 1px solid #B89456; }\n")
+      .append("td { padding: 8px 10px; font-size: 12px; border: 1px solid #E8DFC8; }\n")
+      .append("tr:nth-child(even) { background: #FAF7F0; }\n")
+      .append(".footer { text-align: center; padding-top: 15px; ")
+      .append("          border-top: 1px solid #E8DFC8; margin-top: 25px; ")
+      .append("          color: #8B7639; font-size: 11px; }\n")
+      .append("@media print { body { padding: 0; } ")
+      .append("              .info { background: #FFFFFF; } ")
+      .append("              .stat { background: #F5E4B0 !important; ")
+      .append("                     -webkit-print-color-adjust: exact; } }\n")
+      .append("</style>\n</head>\n<body>\n");
+
+    sb.append("<div class=\"header\">\n")
+      .append("<h1>💎 ").append(isArabic ? "تقرير جرد المخزون" : "Inventory Report").append("</h1>\n")
+      .append("<div class=\"subtitle\">MIRA JEWELRY ENTERPRISE™</div>\n</div>\n");
+
+    sb.append("<div class=\"info\">\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "رقم الجلسة:" : "Session:").append("</strong> ")
+      .append(sessionId).append("</div>\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "التاريخ:" : "Date:").append("</strong> ")
+      .append(dateTime).append("</div>\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "الفرع:" : "Branch:").append("</strong> ")
+      .append(branchName).append("</div>\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "الوضع:" : "Mode:").append("</strong> ")
+      .append(selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty()
+              ? selectedCategoryFilter
+              : (expectedCount == 0 ? (isArabic ? "أعمى" : "Blind") : (isArabic ? "كامل" : "Full")))
+      .append("</div>\n</div>\n");
+
+    sb.append("<div class=\"stats\">\n")
+      .append("<div class=\"stat\"><div class=\"value\">").append(scanned).append("</div>")
+      .append("<div class=\"label\">").append(isArabic ? "الممسوحة" : "Scanned").append("</div></div>\n")
+      .append("<div class=\"stat\"><div class=\"value\">").append(expectedCount).append("</div>")
+      .append("<div class=\"label\">").append(isArabic ? "المتوقعة" : "Expected").append("</div></div>\n")
+      .append("<div class=\"stat\"><div class=\"value\">").append(accuracy).append("%</div>")
+      .append("<div class=\"label\">").append(isArabic ? "الدقة" : "Accuracy").append("</div></div>\n")
+      .append("<div class=\"stat\"><div class=\"value\">")
+      .append(variance == 0 ? "0" : (variance > 0 ? "+" : "") + variance)
+      .append("</div>")
+      .append("<div class=\"label\">").append(isArabic ? "الفرق" : "Variance").append("</div></div>\n")
+      .append("</div>\n");
+
+    sb.append("<div class=\"info\">\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "الوزن الإجمالي:" : "Total Weight:").append("</strong> ")
+      .append(String.format(Locale.US, "%.2f g", aggregateTotalWeight)).append("</div>\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "القيمة الإجمالية:" : "Total Value:").append("</strong> ")
+      .append(String.format(Locale.US, "$%,.2f", aggregateTotalValue)).append("</div>\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "عدد القراءات:" : "Total Reads:").append("</strong> ")
+      .append(totalReads).append("</div>\n")
+      .append("<div class=\"info-item\"><strong>").append(isArabic ? "القطع المفقودة:" : "Missing:").append("</strong> ")
+      .append(missing).append("</div>\n</div>\n");
+
+    if (!scannedItemsDisplayList.isEmpty()) {
+        sb.append("<h2 style=\"color: #6B5A28; margin: 20px 0 10px; font-size: 18px;\">📋 ")
+          .append(isArabic ? "تفاصيل القطع" : "Items Details")
+          .append(" (").append(scannedItemsDisplayList.size()).append(")</h2>\n")
+          .append("<table>\n<thead>\n<tr>\n")
+          .append("<th>#</th>\n")
+          .append("<th>").append(isArabic ? "الاسم" : "Title").append("</th>\n")
+          .append("<th>EPC</th>\n")
+          .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>\n")
+          .append("<th>").append(isArabic ? "الوزن (g)" : "Weight (g)").append("</th>\n")
+          .append("<th>").append(isArabic ? "القيمة" : "Value").append("</th>\n")
+          .append("<th>").append(isArabic ? "العدد" : "Count").append("</th>\n")
+          .append("</tr>\n</thead>\n<tbody>\n");
+
+        int index = 1;
+        for (ScannedItemDisplay item : scannedItemsDisplayList) {
+            if (item == null) continue;
+            sb.append("<tr>\n")
+              .append("<td>").append(index++).append("</td>\n")
+              .append("<td>").append(escapeHtml(item.title)).append("</td>\n")
+              .append("<td style=\"font-family: monospace; font-size: 10px; direction: ltr; text-align: left;\">")
+              .append(escapeHtml(item.epc)).append("</td>\n")
+              .append("<td>").append(escapeHtml(item.karat)).append("</td>\n")
+              .append("<td>").append(String.format(Locale.US, "%.2f", item.weight)).append("</td>\n")
+              .append("<td>").append(String.format(Locale.US, "$%.2f", item.price)).append("</td>\n")
+              .append("<td>").append(item.count).append("</td>\n</tr>\n");
+        }
+        sb.append("</tbody>\n</table>\n");
+    }
+
+    sb.append("<div class=\"footer\">\n")
+      .append("MIRA JEWELRY ENTERPRISE™ — ")
+      .append(isArabic ? "تقرير مُولَّد تلقائياً" : "Auto-generated report")
+      .append("<br>").append(dateTime).append("</div>\n");
+
+    sb.append("</body>\n</html>");
+    return sb.toString();
+}
+
+/**
+ * ✅ حماية HTML من XSS
+ */
+private String escapeHtml(String text) {
+    if (text == null) return "";
+    return text.replace("&", "&amp;")
+               .replace("<", "&lt;")
+               .replace(">", "&gt;")
+               .replace("\"", "&quot;")
+               .replace("'", "&#39;");
+}
     private void printSingleItemLabel(ScannedItemDisplay item) {
         if (printManager != null && item != null) {
             printManager.printSingleItemLabel(item);
@@ -3415,6 +3530,138 @@ public void onResume() {
 }
 
 /**
+ * ✅ استرجاع فوري للبيانات عند إعادة إنشاء الـ View
+ * (يعمل بدون dialog — صامت)
+ */
+private void silentRestoreSession() {
+    if (sessionManager == null || !isAdded() || isFragmentDestroyed) return;
+    
+    try {
+        if (!sessionManager.hasValidSession()) {
+            Log.d(TAG, "silentRestore: no valid session");
+            return;
+        }
+        
+        sessionManager.tryRestoreSession(new InventorySessionManager.SessionCallback() {
+            @Override
+            public void onSessionFound(JSONArray items, int expectedCount,
+                                        String category, long timeAgoMillis) {
+                if (!isAdded() || isFragmentDestroyed) return;
+                if (items == null || items.length() == 0) return;
+                
+                Log.d(TAG, "🔄 Silent restoring " + items.length() + " items...");
+                applyRestoredSessionSilent(items, expectedCount, category);
+            }
+            
+            @Override
+            public void onNoSession() {
+                Log.d(TAG, "silentRestore: no session");
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "silentRestoreSession error", e);
+    }
+}
+
+/**
+ * ✅ استرجاع صامت (بدون Toast، بدون Sound)
+ */
+private void applyRestoredSessionSilent(JSONArray items, int expectedCount, String category) {
+    try {
+        if (items == null) return;
+        
+        synchronized (scannedItemsDisplayList) {
+            scannedItemsDisplayList.clear();
+        }
+        
+        double totalWeight = 0;
+        double totalValue = 0;
+        
+        synchronized (scannedItemsDisplayList) {
+            for (int i = 0; i < items.length(); i++) {
+                try {
+                    JSONObject itemObj = items.getJSONObject(i);
+                    
+                    ScannedItemDisplay item = new ScannedItemDisplay(
+                            itemObj.optString("epc", ""),
+                            itemObj.optString("title", ""),
+                            itemObj.optString("karat", "—"),
+                            Math.max(1, itemObj.optInt("count", 1)),
+                            itemObj.optInt("rssi", -50),
+                            itemObj.optString("time", ""));
+                    
+                    item.weight = itemObj.optDouble("weight", 0);
+                    item.price = itemObj.optDouble("price", 0);
+                    
+                    totalWeight += item.weight * item.count;
+                    totalValue += item.price * item.count;
+                    
+                    scannedItemsDisplayList.add(item);
+                } catch (Exception e) {
+                    Log.w(TAG, "Silent restore parse error at " + i, e);
+                }
+            }
+        }
+        
+        aggregateTotalWeight = totalWeight;
+        aggregateTotalValue = totalValue;
+        
+        // ✅ استرجع للـ Engine أيضاً (مهم!)
+        if (inventoryEngine != null) {
+            for (ScannedItemDisplay item : scannedItemsDisplayList) {
+                if (item != null && item.epc != null) {
+                    try {
+                        inventoryEngine.addEpc(item.epc, item.rssi);
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+        
+        // ✅ حدّث Adapter
+        if (modernAdapter != null) {
+            updateAdapterList();
+            modernAdapter.resetAnimationTracker();
+        }
+        
+        // ✅ حدّث العدادات
+        this.expectedCount = expectedCount;
+        if (tvExpectedCount != null) {
+            tvExpectedCount.setText(expectedCount > 0 
+                    ? String.valueOf(expectedCount) : "—");
+        }
+        
+        selectedCategoryFilter = (category == null || category.isEmpty())
+                ? null : category;
+        lastScannedForAnimation = 0;
+        
+        // ✅ حدّث الواجهة كاملة
+        updateUI();
+        updateTotalWeightAndValue();
+        
+        if (tvScannedCount != null) {
+            tvScannedCount.setText(String.valueOf(scannedItemsDisplayList.size()));
+        }
+        if (tvItemCount != null) {
+            tvItemCount.setText(String.valueOf(scannedItemsDisplayList.size()));
+        }
+        
+        if (tvEmptyState != null) {
+            tvEmptyState.setVisibility(
+                    scannedItemsDisplayList.isEmpty() ? View.VISIBLE : View.GONE);
+        }
+        
+        // ✅ حدّث أزرار الحالة
+        updateButtonsState();
+        
+        Log.d(TAG, "✅ Silent restore complete: " 
+                + scannedItemsDisplayList.size() + " items");
+        
+    } catch (Exception e) {
+        Log.e(TAG, "applyRestoredSessionSilent error", e);
+    }
+}
+
+/**
  * ✅ شروط صارمة لعرض رسالة الاسترجاع
  */
 private boolean shouldPromptForRestore() {
@@ -3456,10 +3703,12 @@ private boolean shouldPromptForRestore() {
     public void onPause() {
         super.onPause();
         try {
-            if (isScanning || !scannedItemsDisplayList.isEmpty()) {
-                if (sessionManager != null) {
-                    sessionManager.saveSession(expectedCount, scanStartTime,
-                            selectedCategoryFilter, scannedItemsDisplayList);
+            if (!scannedItemsDisplayList.isEmpty()) {
+            if (sessionManager != null) {
+            sessionManager.saveSession(expectedCount, scanStartTime,
+                selectedCategoryFilter, scannedItemsDisplayList);
+                Log.d(TAG, "✅ Session saved on onDestroyView: " 
+                + scannedItemsDisplayList.size() + " items");
                 }
             }
 
@@ -3477,10 +3726,13 @@ private boolean shouldPromptForRestore() {
 
         // حفظ الجلسة
         try {
-            if (isScanning || !scannedItemsDisplayList.isEmpty()) {
-                if (sessionManager != null) {
-                    sessionManager.saveSession(expectedCount, scanStartTime,
-                            selectedCategoryFilter, scannedItemsDisplayList);
+            // ✅ احفظ الجلسة دائماً قبل تدمير الـ View
+            if (!scannedItemsDisplayList.isEmpty()) {
+            if (sessionManager != null) {
+            sessionManager.saveSession(expectedCount, scanStartTime,
+                selectedCategoryFilter, scannedItemsDisplayList);
+                Log.d(TAG, "✅ Session saved on onDestroyView: " 
+                + scannedItemsDisplayList.size() + " items");
                 }
             }
         } catch (Exception e) {
