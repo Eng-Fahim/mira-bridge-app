@@ -53,7 +53,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_2"
-                android:text="جاهز"
+                android:text="@string/status_ready"
                 android:textAppearance="@style/TextAppearance.App.Label.Small"
                 android:textColor="@color/scan_status_text"
                 android:textStyle="bold" />
@@ -105,7 +105,7 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="⚡ شامل" />
+                android:text="@string/mode_full" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnModeCategory"
@@ -113,7 +113,7 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="📂 فئوي" />
+                android:text="@string/mode_category" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnModeBlind"
@@ -121,7 +121,7 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="👁 أعمى" />
+                android:text="@string/mode_blind" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -142,194 +142,192 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-           <!-- ═══════════════════════════════════════════════════════
-     🌅 WELCOME STATE — شاشة ترحيب احترافية
-     ═══════════════════════════════════════════════════════ -->
-<LinearLayout
-    android:id="@+id/welcomeState"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:paddingHorizontal="@dimen/space_6"
-    android:paddingTop="@dimen/space_8"
-    android:paddingBottom="@dimen/space_8"
-    android:visibility="visible">
-
-    <!-- 🎨 الشعار الذهبي مع الهالة -->
-    <FrameLayout
-        android:layout_width="180dp"
-        android:layout_height="180dp"
-        android:background="@drawable/bg_welcome_glow">
-
-        <!-- الشعار الرئيسي -->
-        <ImageView
-            android:id="@+id/ivWelcomeLogo"
-            android:layout_width="130dp"
-            android:layout_height="130dp"
-            android:layout_gravity="center"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_inventory_welcome" />
-
-    </FrameLayout>
-
-    <!-- ═══ العنوان الرئيسي ═══ -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_6"
-        android:text="نظام الجرد الذكي"
-        android:textAppearance="@style/TextAppearance.App.Title.Large"
-        android:textColor="@color/gold_luxury"
-        android:textSize="26sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.02" />
-
-    <!-- ═══ العنوان الفرعي ═══ -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_1"
-        android:text="MIRA RFID INVENTORY"
-        android:textAppearance="@style/TextAppearance.App.Label.Medium"
-        android:textColor="@color/gold_luxury_dark"
-        android:textSize="11sp"
-        android:letterSpacing="0.3"
-        android:textStyle="bold" />
-
-    <!-- ═══ خط فاصل ذهبي ═══ -->
-    <View
-        android:layout_width="60dp"
-        android:layout_height="2dp"
-        android:layout_marginTop="@dimen/space_4"
-        android:background="@drawable/bg_gold_divider_gradient" />
-
-    <!-- ═══ الرسالة التوضيحية ═══ -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_4"
-        android:gravity="center"
-        android:text="جرد دقيق للمجوهرات بتقنية RFID\nاختر الوضع وابدأ فوراً"
-        android:textAppearance="@style/TextAppearance.App.Body.Medium"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="14sp"
-        android:lineSpacingMultiplier="1.6" />
-
-    <!-- ═══ أوضاع الجرد الثلاثة ═══ -->
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_6"
-        android:gravity="center"
-        android:orientation="horizontal">
-
-        <!-- شامل -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_welcome_pill"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="@dimen/space_3"
-            android:paddingVertical="@dimen/space_1">
-
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- ═══════════════════════════════════════════════════════
+                 🌅 WELCOME STATE
+                 ═══════════════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/welcomeState"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="⚡"
-                android:textSize="12sp" />
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/space_6"
+                android:paddingTop="@dimen/space_8"
+                android:paddingBottom="@dimen/space_8"
+                android:visibility="visible">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="شامل"
-                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/scan_hero_chip_text"
-                android:textStyle="bold" />
-        </LinearLayout>
+                <!-- 🎨 الشعار الذهبي مع الهالة -->
+                <FrameLayout
+                    android:layout_width="180dp"
+                    android:layout_height="180dp"
+                    android:background="@drawable/bg_welcome_glow">
 
-        <!-- فئوي -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_2"
-            android:background="@drawable/bg_welcome_pill"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="@dimen/space_3"
-            android:paddingVertical="@dimen/space_1">
+                    <ImageView
+                        android:id="@+id/ivWelcomeLogo"
+                        android:layout_width="130dp"
+                        android:layout_height="130dp"
+                        android:layout_gravity="center"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_inventory_welcome" />
+                </FrameLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📂"
-                android:textSize="12sp" />
+                <!-- ═══ العنوان الرئيسي ═══ -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_6"
+                    android:text="@string/inventory_welcome_system_name"
+                    android:textAppearance="@style/TextAppearance.App.Title.Large"
+                    android:textColor="@color/gold_luxury"
+                    android:textSize="26sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.02" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="فئوي"
-                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/scan_hero_chip_text"
-                android:textStyle="bold" />
-        </LinearLayout>
+                <!-- ═══ العنوان الفرعي ═══ -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_1"
+                    android:text="@string/inventory_welcome_system_subtitle"
+                    android:textAppearance="@style/TextAppearance.App.Label.Medium"
+                    android:textColor="@color/gold_luxury_dark"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.3"
+                    android:textStyle="bold" />
 
-        <!-- أعمى -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_2"
-            android:background="@drawable/bg_welcome_pill"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="@dimen/space_3"
-            android:paddingVertical="@dimen/space_1">
+                <!-- ═══ خط فاصل ذهبي ═══ -->
+                <View
+                    android:layout_width="60dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:background="@drawable/bg_gold_divider_gradient" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="👁"
-                android:textSize="12sp" />
+                <!-- ═══ الرسالة التوضيحية ═══ -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:gravity="center"
+                    android:text="@string/inventory_welcome_subtitle"
+                    android:textAppearance="@style/TextAppearance.App.Body.Medium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="14sp"
+                    android:lineSpacingMultiplier="1.6" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="أعمى"
-                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="@color/scan_hero_chip_text"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </LinearLayout>
+                <!-- ═══ أوضاع الجرد الثلاثة ═══ -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_6"
+                    android:gravity="center"
+                    android:orientation="horizontal">
 
-    <!-- ═══ مؤشر السهم (يشير للأسفل) ═══ -->
-    <FrameLayout
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:layout_marginTop="@dimen/space_8"
-        android:background="@drawable/bg_welcome_arrow">
+                    <!-- شامل -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_welcome_pill"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="@dimen/space_3"
+                        android:paddingVertical="@dimen/space_1">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="⬇"
-            android:textSize="20sp"
-            android:textColor="@color/scan_hero_chip_text" />
-    </FrameLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⚡"
+                            android:textSize="12sp" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_2"
-        android:text="اضغط للبدء"
-        android:textAppearance="@style/TextAppearance.App.Label.Small"
-        android:textColor="@color/scan_hero_secondary"
-        android:alpha="0.7" />
-</LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="@string/mode_full_short"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                            android:textColor="@color/scan_hero_chip_text"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <!-- فئوي -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:background="@drawable/bg_welcome_pill"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="@dimen/space_3"
+                        android:paddingVertical="@dimen/space_1">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📂"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="@string/mode_category_short"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                            android:textColor="@color/scan_hero_chip_text"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <!-- أعمى -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:background="@drawable/bg_welcome_pill"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="@dimen/space_3"
+                        android:paddingVertical="@dimen/space_1">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="👁"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="@string/mode_blind_short"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                            android:textColor="@color/scan_hero_chip_text"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- ═══ مؤشر السهم ═══ -->
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="@dimen/space_8"
+                    android:background="@drawable/bg_welcome_arrow">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="⬇"
+                        android:textSize="20sp"
+                        android:textColor="@color/scan_hero_chip_text" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:text="@string/inventory_welcome_tap"
+                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                    android:textColor="@color/scan_hero_secondary"
+                    android:alpha="0.7" />
+            </LinearLayout>
 
             <!-- ═══════════════════════════════════════════════════════
                  🎯 ACTIVE STATE
@@ -343,7 +341,7 @@
                 tools:visibility="visible">
 
                 <!-- ═══════════════════════════════════════════════════════
-                     1. LAST SCAN CARD — Enhanced
+                     1. LAST SCAN CARD
                      ═══════════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/lastScanCard"
@@ -386,7 +384,7 @@
                                     android:id="@+id/tvLastScanLabel"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="✨ آخر مسح"
+                                    android:text="@string/last_scan_label"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
                                     android:textColor="@color/scan_hero_chip_text"
                                     android:textStyle="bold" />
@@ -438,11 +436,11 @@
                             android:ellipsize="end"
                             android:gravity="center"
                             android:maxLines="2"
-                            android:text="لا توجد مسوحات"
+                            android:text="@string/last_scan_empty"
                             android:textAppearance="@style/TextAppearance.App.Title.Large"
                             android:textColor="@color/scan_hero_title" />
 
-                        <!-- EPC (short) -->
+                        <!-- EPC -->
                         <TextView
                             android:id="@+id/tvLastScanEpc"
                             android:layout_width="match_parent"
@@ -471,7 +469,7 @@
                             android:alpha="0.3"
                             android:background="@color/scan_hero_stroke" />
 
-                        <!-- 4 Metrics: Price | Weight | Karat | RSSI -->
+                        <!-- 4 Metrics -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -504,7 +502,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="💰 قيمة"
+                                    android:text="@string/last_scan_price_label"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
                                     android:textColor="@color/scan_hero_secondary"
                                     android:textSize="9sp" />
@@ -535,7 +533,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="⚖️ وزن"
+                                    android:text="@string/last_scan_weight_label"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
                                     android:textColor="@color/scan_hero_secondary"
                                     android:textSize="9sp" />
@@ -566,7 +564,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="🏷️ عيار"
+                                    android:text="@string/last_scan_karat_label"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
                                     android:textColor="@color/scan_hero_secondary"
                                     android:textSize="9sp" />
@@ -597,14 +595,14 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="📶 إشارة"
+                                    android:text="@string/last_scan_rssi_label"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
                                     android:textColor="@color/scan_hero_secondary"
                                     android:textSize="9sp" />
                             </LinearLayout>
                         </LinearLayout>
 
-                        <!-- Serial + Time Row -->
+                        <!-- Serial + Time -->
                         <LinearLayout
                             android:id="@+id/rowSerialTime"
                             android:layout_width="match_parent"
@@ -655,7 +653,7 @@
                             android:background="@drawable/bg_status_chip"
                             android:paddingHorizontal="@dimen/space_4"
                             android:paddingVertical="@dimen/space_1"
-                            android:text="✅ مطابق"
+                            android:text="@string/last_scan_status_match"
                             android:textAppearance="@style/TextAppearance.App.Label.Medium"
                             android:textColor="@color/scan_hero_chip_text" />
                     </LinearLayout>
@@ -691,7 +689,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="📊 التقدم"
+                                android:text="@string/progress_title"
                                 android:textAppearance="@style/TextAppearance.App.Label.Large"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -785,7 +783,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="الدقة"
+                                    android:text="@string/progress_accuracy"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
                                     android:textColor="?attr/colorOnSurfaceVariant" />
                             </LinearLayout>
@@ -819,7 +817,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="الفرق"
+                                    android:text="@string/progress_variance"
                                     android:textAppearance="@style/TextAppearance.App.Label.Small"
                                     android:textColor="?attr/colorOnSurfaceVariant" />
                             </LinearLayout>
@@ -873,7 +871,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:text="⚖️ الوزن"
+                                android:text="@string/metric_weight"
                                 android:textAppearance="@style/TextAppearance.App.Label.Small"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
@@ -910,7 +908,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:text="💎 القيمة"
+                                android:text="@string/metric_value"
                                 android:textAppearance="@style/TextAppearance.App.Label.Small"
                                 android:textColor="@color/scan_value_label" />
                         </LinearLayout>
@@ -966,11 +964,12 @@
                     android:layout_height="@dimen/button_height"
                     android:layout_marginHorizontal="@dimen/space_3"
                     android:layout_marginTop="@dimen/space_4"
-                    android:text="📋 عرض قائمة الممسوحات"
+                    android:text="@string/btn_open_items_list"
                     app:icon="@android:drawable/ic_menu_sort_by_size"
                     app:iconGravity="textStart"
                     app:iconSize="@dimen/icon_md" />
 
+                <!-- ✅ ACTIONS WITH LABELS -->
                 <LinearLayout
                     android:id="@+id/iconActionsRow"
                     android:layout_width="match_parent"
@@ -979,39 +978,104 @@
                     android:layout_marginTop="@dimen/space_2"
                     android:background="@color/scan_card_bg"
                     android:orientation="horizontal"
-                    android:padding="4dp"
+                    android:padding="6dp"
                     android:weightSum="3">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnTakeSnapshot"
-                        style="@style/AppButtonStyle.IconTonal"
+                    <!-- ═══ حفظ لقطة ═══ -->
+                    <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:contentDescription="حفظ لقطة"
-                        app:icon="@android:drawable/ic_menu_camera"
-                        app:iconSize="@dimen/icon_md" />
+                        android:gravity="center"
+                        android:orientation="vertical">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnClearSession"
-                        style="@style/AppButtonStyle.IconTonal"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginHorizontal="@dimen/space_1"
-                        android:layout_weight="1"
-                        android:contentDescription="بدء جرد جديد"
-                        app:icon="@android:drawable/ic_menu_revert"
-                        app:iconSize="@dimen/icon_md" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnTakeSnapshot"
+                            style="@style/AppButtonStyle.IconTonal"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:contentDescription="@string/btn_take_snapshot"
+                            android:insetBottom="0dp"
+                            android:insetTop="0dp"
+                            android:padding="0dp"
+                            app:icon="@android:drawable/ic_menu_camera"
+                            app:iconGravity="textStart"
+                            app:iconPadding="0dp"
+                            app:iconSize="24dp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnViewSnapshots"
-                        style="@style/AppButtonStyle.IconTonal"
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/btn_take_snapshot"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <!-- ═══ جرد جديد ═══ -->
+                    <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:contentDescription="عرض اللقطات"
-                        app:icon="@android:drawable/ic_menu_gallery"
-                        app:iconSize="@dimen/icon_md" />
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnClearSession"
+                            style="@style/AppButtonStyle.IconTonal"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:contentDescription="@string/btn_clear_session"
+                            android:insetBottom="0dp"
+                            android:insetTop="0dp"
+                            android:padding="0dp"
+                            app:icon="@android:drawable/ic_menu_revert"
+                            app:iconGravity="textStart"
+                            app:iconPadding="0dp"
+                            app:iconSize="24dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/btn_clear_session"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <!-- ═══ عرض السجل ═══ -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnViewSnapshots"
+                            style="@style/AppButtonStyle.IconTonal"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:contentDescription="@string/btn_view_snapshots"
+                            android:insetBottom="0dp"
+                            android:insetTop="0dp"
+                            android:padding="0dp"
+                            app:icon="@android:drawable/ic_menu_gallery"
+                            app:iconGravity="textStart"
+                            app:iconPadding="0dp"
+                            app:iconSize="24dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/btn_view_snapshots"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <!-- HIDDEN SEARCH -->
@@ -1059,7 +1123,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_3"
-                        android:text="لا توجد نتائج مطابقة"
+                        android:text="@string/empty_state_title"
                         android:textAppearance="@style/TextAppearance.App.Title.Small"
                         android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
@@ -1134,7 +1198,7 @@
                 android:layout_width="0dp"
                 android:layout_height="@dimen/button_height"
                 android:layout_weight="1"
-                android:text="▶️ بدء الجرد"
+                android:text="@string/btn_start_inventory"
                 app:icon="@android:drawable/ic_media_play"
                 app:iconGravity="textStart"
                 app:iconSize="@dimen/icon_md" />
@@ -1176,7 +1240,7 @@
                 android:layout_height="@dimen/button_height"
                 android:layout_marginStart="@dimen/space_2"
                 android:enabled="false"
-                android:text="اعتماد"
+                android:text="@string/btn_commit"
                 app:icon="@android:drawable/ic_menu_save"
                 app:iconSize="@dimen/icon_sm" />
         </LinearLayout>
