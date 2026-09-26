@@ -146,5 +146,54 @@
     <dimen name="app_padding_v">@dimen/screen_padding_v</dimen>
     <dimen name="app_card_radius">@dimen/card_radius</dimen>
     <dimen name="app_button_height">@dimen/button_height</dimen>
+    
+        <dimen name="app_button_height">@dimen/button_height</dimen>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         MIRA POS — أبعاد شاشة البيع
+         ═══════════════════════════════════════════════════════════ -->
+    <dimen name="pos_header_height">64dp</dimen>
+    <dimen name="pos_header_icon">26dp</dimen>
+    <dimen name="pos_status_badge_h">32dp</dimen>
+    <dimen name="pos_status_badge_pad_h">12dp</dimen>
+    <dimen name="pos_status_badge_radius">16dp</dimen>
+
+    <dimen name="pos_hero_circle">160dp</dimen>
+    <dimen name="pos_hero_ring_stroke">1.5dp</dimen>
+    <dimen name="pos_hero_icon">64dp</dimen>
+    <dimen name="pos_hero_top_margin">24dp</dimen>
+    <dimen name="pos_hero_title_size">22sp</dimen>
+    <dimen name="pos_hero_subtitle_size">11sp</dimen>
+    <dimen name="pos_hero_divider_w">48dp</dimen>
+    <dimen name="pos_hero_divider_h">2dp</dimen>
+    <dimen name="pos_hero_msg_size">15sp</dimen>
+    <dimen name="pos_hero_hint_size">12sp</dimen>
+
+    <dimen name="pos_scan_btn_size">92dp</dimen>
+    <dimen name="pos_scan_btn_icon">30dp</dimen>
+    <dimen name="pos_scan_btn_label">12sp</dimen>
+    <dimen name="pos_scan_btn_radius">18dp</dimen>
+
+    <dimen name="pos_summary_h">72dp</dimen>
+    <dimen name="pos_summary_radius">16dp</dimen>
+    <dimen name="pos_summary_count_size">26sp</dimen>
+    <dimen name="pos_summary_amount_size">26sp</dimen>
+
+    <dimen name="pos_cta_h">56dp</dimen>
+    <dimen name="pos_cta_radius">16dp</dimen>
+    <dimen name="pos_cta_text_size">16sp</dimen>
+
+    <dimen name="pos_manual_h">56dp</dimen>
+    <dimen name="pos_manual_radius">14dp</dimen>
+
+    <dimen name="pos_cart_item_h">76dp</dimen>
+    <dimen name="pos_cart_pad">12dp</dimen>
+
+    <dimen name="pos_overflow_icon">24dp</dimen>
+    <dimen name="pos_gap_sm">6dp</dimen>
+    <dimen name="pos_gap_md">12dp</dimen>
+    <dimen name="pos_gap_lg">20dp</dimen>
+
+    
 
 </resources>
