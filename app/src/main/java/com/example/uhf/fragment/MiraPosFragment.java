@@ -924,10 +924,47 @@ if (btnPosLastReceipt != null) {
                     }
                 }
 
-                // Summary strip state
-                if (posSummaryStrip != null) {
-                    posSummaryStrip.setSelected(count > 0);
-                }
+                // ═══════════════════════════════════════════════════════
+// ✅ Footer Sticky (Summary + CTA) — يظهر فقط عند وجود قطع
+// ═══════════════════════════════════════════════════════
+if (posFooterSticky != null) {
+    if (count > 0) {
+        // إظهار بحركة slide-up
+        if (posFooterSticky.getVisibility() != View.VISIBLE) {
+            posFooterSticky.setVisibility(View.VISIBLE);
+            posFooterSticky.setTranslationY(
+                    posFooterSticky.getHeight() > 0
+                            ? posFooterSticky.getHeight() : 300f);
+            posFooterSticky.animate()
+                    .translationY(0f)
+                    .setDuration(300)
+                    .setInterpolator(
+                            new android.view.animation.DecelerateInterpolator())
+                    .start();
+        }
+    } else {
+        // إخفاء بحركة slide-down
+        if (posFooterSticky.getVisibility() == View.VISIBLE) {
+            posFooterSticky.animate()
+                    .translationY(posFooterSticky.getHeight())
+                    .setDuration(250)
+                    .setInterpolator(
+                            new android.view.animation.AccelerateInterpolator())
+                    .withEndAction(() -> {
+                        if (posFooterSticky != null) {
+                            posFooterSticky.setVisibility(View.GONE);
+                            posFooterSticky.setTranslationY(0f);
+                        }
+                    })
+                    .start();
+        }
+    }
+}
+
+// Summary strip state (للون الذهبي)
+if (posSummaryStrip != null) {
+    posSummaryStrip.setSelected(count > 0);
+}
 
                 // CTA
                 if (btnCheckout != null) {
