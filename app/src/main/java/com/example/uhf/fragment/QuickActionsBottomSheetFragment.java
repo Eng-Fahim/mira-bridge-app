@@ -178,45 +178,37 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
     private void setupPrimaryCta(View view) {
     try {
-        // ✅ ابحث عن العنصر بطريقتين (احتياط)
         View cta = view.findViewById(R.id.cardIdentityStudio);
-        
         if (cta == null) {
-            Log.e(TAG, "❌ CTA NOT FOUND: cardIdentityStudio");
-            Toast.makeText(getContext(), 
-                    "❌ CTA not found in XML", 
-                    Toast.LENGTH_LONG).show();
+            Log.e(TAG, "❌ CTA not found: cardIdentityStudio");
             return;
         }
 
-        Log.d(TAG, "✅ CTA found: " + cta);
-        Toast.makeText(getContext(), 
-                "✅ CTA found", 
-                Toast.LENGTH_SHORT).show();
+        // ✅ منع الأبناء من التقاط اللمس
+        if (cta instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) cta;
+            vg.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+            vg.setClickable(true);
+            vg.setFocusable(true);
+        }
 
+        // فحص الصلاحيات
         boolean hasPermission = permissionManager.canAccessIdentityStudio();
         boolean quickAccessAllowed = quickAccessSettings == null
                 || quickAccessSettings.isActionEnabled("identity");
 
-        Log.d(TAG, "   hasPermission=" + hasPermission 
-                + ", quickAccess=" + quickAccessAllowed);
-
         if (!hasPermission || !quickAccessAllowed) {
             cta.setVisibility(View.GONE);
-            Toast.makeText(getContext(), 
-                    "⏭️ CTA hidden (perm=" + hasPermission + ")", 
-                    Toast.LENGTH_SHORT).show();
             return;
         }
 
         cta.setVisibility(View.VISIBLE);
 
-        // ✅ ربط click على الـ CTA وكل أطفاله
-        View.OnClickListener listener = v -> {
+        // ✅ الـ listener
+        cta.setOnClickListener(v -> {
             Log.d(TAG, "🔥🔥🔥 CTA CLICKED");
-            Toast.makeText(getContext(), "🔥 CTA Clicked!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "🔥 CTA works!", Toast.LENGTH_SHORT).show();
 
-            final Context ctx = getContext();
             final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
                     ? (UHFMainActivity) getActivity() : null;
 
@@ -224,43 +216,18 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             if (activity != null) {
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    try {
-                        activity.loadFragment(
-                                new MiraIdentityStudioFragment(), 
-                                "IdentityStudio");
-                    } catch (Exception e) {
-                        Log.e(TAG, "Navigate error: " + e.getMessage(), e);
-                    }
+                    activity.loadFragment(
+                            new MiraIdentityStudioFragment(), 
+                            "IdentityStudio");
                 });
             }
-        };
-
-        cta.setOnClickListener(listener);
-        
-        // ✅ اربط الـ listener على الأبناء أيضاً (احتياط)
-        if (cta instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) cta;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                View child = group.getChildAt(i);
-                child.setOnClickListener(listener);
-                if (child instanceof ViewGroup) {
-                    ViewGroup subGroup = (ViewGroup) child;
-                    for (int j = 0; j < subGroup.getChildCount(); j++) {
-                        subGroup.getChildAt(j).setOnClickListener(listener);
-                    }
-                }
-            }
-        }
+        });
 
         animatedViews.add(cta);
-
-        Log.d(TAG, "✅ CTA bound successfully");
+        Log.d(TAG, "✅ CTA bound");
 
     } catch (Exception e) {
         Log.e(TAG, "setupPrimaryCta error: " + e.getMessage(), e);
-        Toast.makeText(getContext(), 
-                "❌ setupPrimaryCta: " + e.getMessage(), 
-                Toast.LENGTH_LONG).show();
     }
 }
 
@@ -461,4 +428,4 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             mainHandler.removeCallbacksAndMessages(null);
         }
     }
-    }
+}
