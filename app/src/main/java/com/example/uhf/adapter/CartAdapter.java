@@ -43,30 +43,57 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder h, int pos) {
-        try {
-            CartItem item = items.get(pos);
-            if (h.tvTitle != null) h.tvTitle.setText(item.name);
-            if (h.tvEpc != null) h.tvEpc.setText("EPC: " + item.epc);
-            if (h.tvKaratWeight != null) {
-                h.tvKaratWeight.setText(String.format(Locale.US, "%s | %.2fg", item.karat,
-                        item.scaleWeight > 0 ? item.scaleWeight : item.weight));
-            }
-            if (h.tvPrice != null) h.tvPrice.setText(priceManager.formatPriceDefault(item.price));
-            if (h.tvStatus != null) {
-                h.tvStatus.setText(item.isAvailable ? 
-                    (isArabic ? "✅ متاحة" : "✅ Available") : 
-                    (isArabic ? "❌ غير متاحة" : "❌ Unavailable"));
-            }
-            if (h.btnRemove != null) {
-                h.btnRemove.setOnClickListener(v -> {
-                    int p = h.getAdapterPosition();
-                    if (p != RecyclerView.NO_POSITION) removeListener.onRemove(p);
-                });
-            }
-        } catch (Exception e) {
-            android.util.Log.e("CartAdapter", "Bind error: " + e.getMessage());
+    try {
+        CartItem item = items.get(pos);
+
+        // ✅ العنوان
+        if (h.tvTitle != null) h.tvTitle.setText(item.name);
+
+        // ✅ EPC — مع اختصار ذكي
+        if (h.tvEpc != null) {
+            String epc = item.epc != null ? item.epc : "—";
+            h.tvEpc.setText("EPC: " + epc);
         }
+
+        // ✅ العيار + الوزن
+        if (h.tvKaratWeight != null) {
+            double w = item.scaleWeight > 0 ? item.scaleWeight : item.weight;
+            h.tvKaratWeight.setText(String.format(Locale.US,
+                    "%s • %.2fg", item.karat, w));
+        }
+
+        // ✅ الحالة
+        if (h.tvStatus != null) {
+            h.tvStatus.setText(item.isAvailable
+                    ? (isArabic ? "✅ متاحة" : "✅ Available")
+                    : (isArabic ? "❌ غير متاحة" : "❌ Unavailable"));
+        }
+
+        // ✅ السعر (بارز)
+        if (h.tvPrice != null) {
+            try {
+                h.tvPrice.setText(priceManager != null
+                        ? priceManager.formatPriceDefault(item.price)
+                        : String.format(Locale.US, "$%.2f", item.price));
+            } catch (Exception e) {
+                h.tvPrice.setText(String.format(Locale.US, "$%.2f", item.price));
+            }
+        }
+
+        // ✅ زر الحذف
+        if (h.btnRemove != null) {
+            h.btnRemove.setOnClickListener(v -> {
+                int p = h.getAdapterPosition();
+                if (p != RecyclerView.NO_POSITION && removeListener != null) {
+                    removeListener.onRemove(p);
+                }
+            });
+        }
+
+    } catch (Exception e) {
+        Log.e("CartAdapter", "Bind error: " + e.getMessage(), e);
     }
+}
 
     @Override
     public int getItemCount() {
