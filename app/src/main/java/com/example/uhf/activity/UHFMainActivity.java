@@ -1151,30 +1151,57 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
     // ==================== التنقل ====================
 
     public void loadFragment(Fragment fragment, String tag) {
-        loadFragment(fragment, tag, true);
+    loadFragment(fragment, tag, true);
+}
+
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    if (isFinishing() || isDestroyed()) {
+        Log.w(TAG, "loadFragment skipped: activity finishing");
+        return;
+    }
+    if (fragment == null) {
+        Log.w(TAG, "loadFragment skipped: fragment null");
+        return;
     }
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed()) return;
-        if (navigationManager == null) return;
-
-        navigationManager.loadFragment(fragment, tag, addToBackStack);
-        this.currentFragment = fragment;
-
-        updateBottomNavSelectionByTag(tag);
-        updateSecondaryToolbar(tag);
+    // ✅ إذا كان الـ FM في حالة saved → أجّل التنفيذ حتى يصبح جاهزاً
+    if (getSupportFragmentManager().isStateSaved()) {
+        Log.d(TAG, "⏳ FM state saved — deferring loadFragment: " + tag);
+        mainHandler.post(() -> loadFragment(fragment, tag, addToBackStack));
+        return;
     }
 
-    public void loadFragmentDirectly(Fragment fragment, String tag) {
-        if (isFinishing() || isDestroyed()) return;
-        if (navigationManager == null) return;
-
-        navigationManager.loadFragmentDirectly(fragment, tag);
-        this.currentFragment = fragment;
-
-        updateBottomNavSelectionByTag(tag);
-        updateSecondaryToolbar(tag);
+    if (navigationManager == null) {
+        Log.w(TAG, "loadFragment skipped: navigationManager null");
+        return;
     }
+
+    navigationManager.loadFragment(fragment, tag, addToBackStack);
+    this.currentFragment = fragment;
+
+    updateBottomNavSelectionByTag(tag);
+    updateSecondaryToolbar(tag);
+
+    Log.d(TAG, "✅ loadFragment success: " + tag);
+}
+
+public void loadFragmentDirectly(Fragment fragment, String tag) {
+    if (isFinishing() || isDestroyed()) return;
+    if (fragment == null) return;
+
+    if (getSupportFragmentManager().isStateSaved()) {
+        mainHandler.post(() -> loadFragmentDirectly(fragment, tag));
+        return;
+    }
+
+    if (navigationManager == null) return;
+
+    navigationManager.loadFragmentDirectly(fragment, tag);
+    this.currentFragment = fragment;
+
+    updateBottomNavSelectionByTag(tag);
+    updateSecondaryToolbar(tag);
+}
 
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
