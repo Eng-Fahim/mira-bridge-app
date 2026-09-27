@@ -681,7 +681,7 @@ public class MiraPosFragment extends MiraBaseFragment {
                                     resetHeroAfterDelay();
                                     return;
                                 }
-                                parseItemResponse(cleanCode, item);
+                                parseItemResponse(cleanCode, item, source);
                             });
                         }
 
@@ -711,7 +711,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    private void parseItemResponse(String code, JSONObject data) {
+    private void parseItemResponse(String code, JSONObject data, String source) {
         try {
             JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
             if (item == null) {
@@ -1906,5 +1906,27 @@ public class MiraPosFragment extends MiraBaseFragment {
             Log.e(TAG, "refundBarcodeLauncher error: " + e.getMessage());
         }
     });
+    // ═══════════════════════════════════════════════════════
+    // Backward Compatibility — Legacy API (deprecated)
+    // ═══════════════════════════════════════════════════════
 
+    /**
+     * @deprecated السلة أصبحت معروضة دائماً في الواجهة الرئيسية
+     *             — الدالة محفوظة للتوافق مع UHFMainActivity
+     */
+    @Deprecated
+    public void showCartBottomSheet() {
+        Log.d(TAG, "showCartBottomSheet: no-op (cart is always visible)");
+        // لا شيء — السلة معروضة في الواجهة الرئيسية
+    }
+
+    /**
+     * @deprecated الخصم أصبح جزءاً من POSCheckoutDialog
+     *             — الدالة محفوظة للتوافق، وتفتح شاشة الدفع مباشرة
+     */
+    @Deprecated
+    public void showDiscountDialog() {
+        Log.d(TAG, "showDiscountDialog: redirecting to checkout dialog");
+        processCheckoutAndStockUpdate();
+    }
 } // end MiraPosFragment
