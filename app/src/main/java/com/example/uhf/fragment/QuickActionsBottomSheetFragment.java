@@ -1,10 +1,14 @@
 package com.example.uhf.fragment;
 
+import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
+import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,10 +30,13 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * ✅ QuickActionsBottomSheetFragment — v3.0 "Premium Edition"
+ * ✅ QuickActionsBottomSheetFragment — v4.0 "Premium Edition"
  *
- * تصميم: Primary CTA + Grid 4 أعمدة
- * حركة: Stagger Fade-in (40ms بين كل عنصر)
+ * التحديثات:
+ * - Stagger Fade-in Animation (40ms بين كل عنصر)
+ * - Delay قبل التنقل (250ms) لمنع تعارض Bottom Sheet مع الشاشة الجديدة
+ * - Haptic Feedback خفيف عند الضغط
+ * - بدون عنوان (Header-less design)
  */
 public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
@@ -42,6 +49,11 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     private static final long ITEM_FADE_DURATION_MS = 250L;
     private static final long INITIAL_DELAY_MS = 100L;
 
+    // ═══════════════════════════════════════════════════════
+    // Navigation Constants
+    // ═══════════════════════════════════════════════════════
+    private static final long NAVIGATION_DELAY_MS = 250L;
+
     private boolean isArabic;
     private PermissionManager permissionManager;
     private MiraQuickAccessSettings quickAccessSettings;
@@ -50,6 +62,11 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     // Animation state
     // ═══════════════════════════════════════════════════════
     private final List<View> animatedViews = new ArrayList<>();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    // ═══════════════════════════════════════════════════════
+    // Lifecycle
+    // ═══════════════════════════════════════════════════════
 
     @Nullable
     @Override
@@ -69,16 +86,16 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             permissionManager = PermissionManager.getInstance(context);
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
 
-            Log.d(TAG, "🚀 Initializing Quick Actions v3.0");
+            Log.d(TAG, "🚀 Initializing Quick Actions v4.0");
 
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             // PRIMARY CTA — استوديو التكويد
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             setupPrimaryCta(view);
 
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             // GRID — بقية الإجراءات
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardRfidWrite,
                     "rfid_write",
                     permissionManager.canEditInventory(),
@@ -129,21 +146,22 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                     permissionManager.canViewServerConfig(),
                     new MiraServerConfigFragment(), "ServerConfig");
 
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             // CLOSE BUTTON
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             View btnClose = view.findViewById(R.id.btnClose);
             if (btnClose != null) {
                 animatedViews.add(btnClose);
                 btnClose.setOnClickListener(v -> {
                     Log.d(TAG, "🔒 Close clicked");
+                    performHaptic();
                     dismiss();
                 });
             }
 
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             // STAGGER FADE-IN ANIMATION
-            // ═══════════════════════════════════════════════════════
+            // ═══════════════════════════════════════════════════
             runStaggerAnimation();
 
             Log.d(TAG, "✅ Quick Actions ready — "
@@ -178,6 +196,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             cta.setOnClickListener(v -> {
                 Log.d(TAG, "✅ CTA clicked: Identity Studio");
+                performHaptic();
                 dismiss();
                 navigateTo(new MiraIdentityStudioFragment(), "IdentityStudio");
             });
@@ -206,7 +225,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 return;
             }
 
-            // ✅ فحص الصلاحيات + إعدادات الوصول السريع
             boolean quickAccessAllowed = quickAccessSettings == null
                     || quickAccessSettings.isActionEnabled(actionKey);
             boolean isVisible = hasPermission && quickAccessAllowed;
@@ -220,9 +238,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             card.setVisibility(View.VISIBLE);
             animatedViews.add(card);
 
-            // ✅ عند الضغط → فتح الشاشة + إغلاق القائمة
             card.setOnClickListener(v -> {
                 Log.d(TAG, "✅ Clicked: " + actionKey);
+                performHaptic();
                 dismiss();
                 navigateTo(targetFragment, tag);
             });
@@ -235,24 +253,50 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // NAVIGATION
+    // NAVIGATION — with Delay + Haptic
     // ═══════════════════════════════════════════════════════
 
+    /**
+     * ✅ التنقل بعد تأخير 250ms
+     *     — حتى يكتمل انزلاق Bottom Sheet بدون تعارض
+     */
     private void navigateTo(Fragment targetFragment, String tag) {
         if (targetFragment == null) {
             Log.w(TAG, "Target fragment is null — cannot navigate");
             return;
         }
 
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).loadFragment(targetFragment, tag);
-        } else {
-            Log.w(TAG, "Activity is not UHFMainActivity");
-            if (getContext() != null) {
-                Toast.makeText(getContext(),
-                        isArabic ? "تعذر فتح الشاشة" : "Unable to open screen",
-                        Toast.LENGTH_SHORT).show();
+        mainHandler.postDelayed(() -> {
+            if (!isAdded()) {
+                Log.w(TAG, "Fragment not added — abort navigation");
+                return;
             }
+
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).loadFragment(targetFragment, tag);
+                Log.d(TAG, "🚀 Navigated to: " + tag);
+            } else {
+                Log.w(TAG, "Activity is not UHFMainActivity");
+                if (getContext() != null) {
+                    Toast.makeText(getContext(),
+                            isArabic ? "تعذر فتح الشاشة" : "Unable to open screen",
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+        }, NAVIGATION_DELAY_MS);
+    }
+
+    /**
+     * ✅ Haptic Feedback خفيف عند الضغط — إحساس فاخر
+     */
+    private void performHaptic() {
+        try {
+            View root = getView();
+            if (root != null) {
+                root.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Haptic feedback failed: " + e.getMessage());
         }
     }
 
@@ -260,23 +304,19 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     // STAGGER FADE-IN ANIMATION
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * ✅ حركة دخول راقية — كل عنصر يظهر بحركة fade + slide صغيرة
-     *     مع تأخير 40ms بين كل عنصر
-     */
     private void runStaggerAnimation() {
         try {
             if (animatedViews.isEmpty()) return;
 
             AnimatorSet masterSet = new AnimatorSet();
-            List<android.animation.Animator> animators = new ArrayList<>();
+            List<Animator> animators = new ArrayList<>();
 
             long delay = INITIAL_DELAY_MS;
 
             for (View v : animatedViews) {
                 if (v == null || v.getVisibility() != View.VISIBLE) continue;
 
-                // إعداد الحالة الأولية (مخفي + مُنزاح قليلاً لأسفل)
+                // الحالة الأولية: مخفي + مُنزاح قليلاً
                 v.setAlpha(0f);
                 v.setTranslationY(16f);
 
@@ -284,7 +324,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 alpha.setDuration(ITEM_FADE_DURATION_MS);
                 alpha.setStartDelay(delay);
 
-                ObjectAnimator translate = ObjectAnimator.ofFloat(v, "translationY", 16f, 0f);
+                ObjectAnimator translate =
+                        ObjectAnimator.ofFloat(v, "translationY", 16f, 0f);
                 translate.setDuration(ITEM_FADE_DURATION_MS);
                 translate.setStartDelay(delay);
 
@@ -298,8 +339,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             masterSet.setInterpolator(new DecelerateInterpolator());
             masterSet.start();
 
-            Log.d(TAG, "🎬 Stagger animation started — "
-                    + (delay + ITEM_FADE_DURATION_MS) + "ms total");
+            Log.d(TAG, "🎬 Stagger animation started — total "
+                    + (delay + ITEM_FADE_DURATION_MS) + "ms");
 
         } catch (Exception e) {
             Log.e(TAG, "runStaggerAnimation error: " + e.getMessage(), e);
@@ -329,10 +370,10 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                     : null;
 
             if (bottomSheet != null) {
-                // ✅ ارتفاع 80% من الشاشة — مناسب للتصميم الجديد
                 bottomSheet.getLayoutParams().height =
                         (int) (getResources().getDisplayMetrics().heightPixels * 0.80);
                 bottomSheet.requestLayout();
+                Log.d(TAG, "📏 Bottom sheet height set to 80%");
             }
         } catch (Exception e) {
             Log.e(TAG, "onStart error: " + e.getMessage());
@@ -343,5 +384,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     public void onDestroyView() {
         super.onDestroyView();
         animatedViews.clear();
+        if (mainHandler != null) {
+            mainHandler.removeCallbacksAndMessages(null);
+        }
     }
 }
