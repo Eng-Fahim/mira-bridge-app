@@ -1154,9 +1154,6 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
     loadFragment(fragment, tag, true);
 }
 
-public void loadFragment(Fragment fragment, String tag) {
-    loadFragment(fragment, tag, true);
-}
 
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
     Toast.makeText(this,
@@ -2682,4 +2679,4 @@ public void setBottomNavVisible(boolean visible) {
     }
 }
     
-                                }
+                        }
