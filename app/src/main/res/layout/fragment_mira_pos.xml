@@ -9,7 +9,7 @@
     android:orientation="vertical">
 
     <!-- ═══════════════════════════════════════════════════════
-         1. HEADER BAR — RTL مفروض
+         1. HEADER BAR — RTL + أزرار سريعة
          ═══════════════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/posHeaderCard"
@@ -37,36 +37,53 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/space_3"
             android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:text="@string/pos_title"
             android:textColor="@color/pos_header_title"
-            android:textSize="18sp"
+            android:textSize="16sp"
             android:textStyle="bold"
             tools:text="نظام البيع" />
 
-        <!-- Scale Status Badge -->
+        <!-- Refund Button -->
+        <ImageButton
+            android:id="@+id/btnPosRefund"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="@dimen/space_1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/pos_btn_refund_desc"
+            android:padding="6dp"
+            android:src="@drawable/ic_pos_refund"
+            app:tint="@color/pos_gold_primary" />
+
+        <!-- Last Receipt Button -->
+        <ImageButton
+            android:id="@+id/btnPosLastReceipt"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="@dimen/space_1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/pos_btn_receipt_desc"
+            android:padding="6dp"
+            android:src="@drawable/ic_pos_receipt"
+            app:tint="@color/pos_gold_primary" />
+
+        <!-- Scale Status Badge — قابل للضغط -->
         <TextView
             android:id="@+id/tvPosScaleStatus"
             android:layout_width="wrap_content"
             android:layout_height="@dimen/pos_status_badge_h"
+            android:layout_marginStart="@dimen/space_2"
             android:background="@drawable/bg_pos_status_badge"
+            android:clickable="true"
+            android:focusable="true"
             android:gravity="center_vertical"
             android:paddingHorizontal="@dimen/pos_status_badge_pad_h"
             android:text="@string/pos_scale_searching"
             android:textColor="@color/pos_status_searching"
             android:textSize="10sp"
             tools:text="⚖️ جاري البحث…" />
-
-        <!-- Overflow Menu — يسار -->
-        <ImageButton
-            android:id="@+id/btnPosOverflow"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="@dimen/space_2"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/pos_overflow_desc"
-            android:padding="@dimen/space_1"
-            android:src="@drawable/ic_pos_overflow"
-            app:tint="@color/pos_text_primary" />
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════════════════
@@ -325,7 +342,7 @@
             </LinearLayout>
 
             <!-- ══════════════════════════════════════════════
-                 2.C MANUAL INPUT (Inline)
+                 2.C MANUAL INPUT
                  ══════════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/posManualInputContainer"
@@ -372,9 +389,7 @@
                     android:text="@string/pos_add" />
             </LinearLayout>
 
-            <!-- ══════════════════════════════════════════════
-                 2.D CART STATUS STRIP (مخفي — Hero يغنيه)
-                 ══════════════════════════════════════════════ -->
+            <!-- Cart Status Strip (Legacy — مخفي) -->
             <LinearLayout
                 android:id="@+id/posCartStatusStrip"
                 android:layout_width="match_parent"
@@ -532,7 +547,7 @@
     </LinearLayout>
 
     <!-- ═══════════════════════════════════════════════════════
-         4. LEGACY BUTTONS (مخفية)
+         4. LEGACY BUTTONS (مخفية — للتوافق)
          ═══════════════════════════════════════════════════════ -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnOpenScanner"
@@ -543,13 +558,6 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnPosRFIDMode"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:visibility="gone"
-        tools:ignore="MissingConstraints" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnPosRefund"
         android:layout_width="1dp"
         android:layout_height="1dp"
         android:visibility="gone"
