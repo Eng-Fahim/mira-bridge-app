@@ -239,11 +239,26 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             animatedViews.add(card);
 
             card.setOnClickListener(v -> {
-                Log.d(TAG, "✅ Clicked: " + actionKey);
-                performHaptic();
-                dismiss();
-                navigateTo(targetFragment, tag);
-            });
+    final Context ctx = getContext();
+    final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
+            ? (UHFMainActivity) getActivity() : null;
+
+    Toast.makeText(ctx, "1️⃣ Clicked: " + actionKey, Toast.LENGTH_SHORT).show();
+    Toast.makeText(ctx, "2️⃣ Activity: " + (activity != null), Toast.LENGTH_SHORT).show();
+
+    dismiss();
+
+    if (activity != null) {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            Toast.makeText(ctx, "3️⃣ Calling loadFragment", Toast.LENGTH_SHORT).show();
+            activity.loadFragment(targetFragment, tag);
+        });
+    } else {
+        if (ctx != null) {
+            Toast.makeText(ctx, "❌ Activity NULL!", Toast.LENGTH_LONG).show();
+        }
+    }
+});
 
             Log.d(TAG, "✅ Registered: " + actionKey);
 
