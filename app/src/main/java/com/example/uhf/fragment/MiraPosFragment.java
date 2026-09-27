@@ -291,37 +291,50 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-            }
-            if (scaleManager != null) scaleManager.connect();
+public void onResume() {
+    super.onResume();
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
 
-            updateCartSummary();
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error: " + e.getMessage());
+            // ✅ إخفاء FAB في شاشة البيع
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setVisibility(View.GONE);
+                Log.d(TAG, "🙈 FAB hidden in POS");
+            }
         }
+        if (scaleManager != null) scaleManager.connect();
+        updateCartSummary();
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage());
     }
+}
 
     @Override
-    public void onPause() {
-        super.onPause();
-        try {
-            stopRFIDScan();
-            isCheckoutDialogShowing = false;
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onPause error: " + e.getMessage());
+public void onPause() {
+    super.onPause();
+    try {
+        stopRFIDScan();
+        isCheckoutDialogShowing = false;
+        if (heroController != null) {
+            heroController.setState(PosHeroController.State.IDLE);
         }
-    }
 
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+
+            // ✅ إعادة إظهار FAB
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setVisibility(View.VISIBLE);
+                Log.d(TAG, "👁️ FAB restored");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onPause error: " + e.getMessage());
+    }
+}
     @Override
     public void onDestroyView() {
         super.onDestroyView();
