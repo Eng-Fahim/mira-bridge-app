@@ -806,6 +806,24 @@
 <color name="pos_summary_text_idle">#6B6B6B</color>
 <color name="pos_summary_text_active">#1A1A1A</color>
    
+   
+   
+   <!-- ═══════════════════════════════════════════════════════
+     Quick Actions — Primary CTA
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- الخلفية (ذهبي فاتح ناعم) -->
+<color name="qa_primary_cta_bg">#FFF9E6</color>
+<color name="qa_primary_cta_stroke">#E8C766</color>
+
+<!-- الأيقونة والسهم -->
+<color name="qa_primary_cta_icon">#B8860B</color>
+
+<!-- النص الأساسي -->
+<color name="qa_primary_cta_text">#1A1A1A</color>
+
+<!-- النص الثانوي -->
+<color name="qa_primary_cta_subtext">#8B7355</color>
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
