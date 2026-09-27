@@ -113,7 +113,7 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Uhfuartdemo"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density"
-            android:windowSoftInputMode="adjustResize|stateUnspecified" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <!-- ==================== المستقبلات ==================== -->
         <receiver
