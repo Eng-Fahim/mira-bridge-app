@@ -1809,7 +1809,7 @@
 <string name="screenshot">لقطة شاشة</string>
 <!-- POS -->
 <string name="pos_title">🛒 نظام البيع - MIRA POS</string>
-<string name="pos_scale_searching">⚖️ الميزان: جاري البحث...</string>
+<string name="pos_scale_searching">⚖️ جاري البحث…</string>
 <string name="pos_scan_gs1">📷 مسح GS1</string>
 <string name="pos_scan_rfid">📡 مسح RFID</string>
 <string name="pos_ready_scan">جاهز لمسح القطع والخواتم...</string>
@@ -1889,8 +1889,13 @@
 <string name="pos_manual_hint_short">EPC / باركود</string>
 
 <!-- Overflow Menu -->
+
+<!-- POS Header Buttons -->
+<string name="pos_btn_refund_desc">مرتجع مبيعات</string>
+<string name="pos_btn_receipt_desc">آخر فاتورة</string>
 <string name="pos_menu_refund">🔄 مرتجع مبيعات</string>
 <string name="pos_menu_last_receipt">📋 آخر فاتورة</string>
+
 <string name="pos_menu_scale_settings">⚖️ إعدادات الميزان</string>
 <string name="pos_menu_cart_view">🛒 عرض السلة</string>
 <string name="pos_overflow_desc">خيارات إضافية</string>
