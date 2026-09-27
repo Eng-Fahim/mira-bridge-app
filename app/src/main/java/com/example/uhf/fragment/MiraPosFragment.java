@@ -402,32 +402,33 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void setupHeroController(View view) {
-        try {
-            heroController = new PosHeroController(
-                    view.findViewById(R.id.posHeroGlow),
-                    view.findViewById(R.id.posHeroRing),
-                    view.findViewById(R.id.ivPosHeroIcon),
-                    view.findViewById(R.id.ivPosHeroSparkleTop),
-                    view.findViewById(R.id.ivPosHeroSparkleBottom),
-                    view.findViewById(R.id.tvPosHeroTitleAr),
-                    view.findViewById(R.id.posHeroDivider),
-                    view.findViewById(R.id.tvPosHeroMessage),
-                    view.findViewById(R.id.tvPosHeroHint),
-                    view.findViewById(R.id.tvPosRfidCount),
-                    view.findViewById(R.id.btnPosScanGs1),
-                    view.findViewById(R.id.btnPosScanRfid),
-                    view.findViewById(R.id.btnPosScanManual),
-                    view.findViewById(R.id.ivPosGs1Icon),
-                    view.findViewById(R.id.ivPosRfidIcon),
-                    view.findViewById(R.id.ivPosManualIcon),
-                    view.findViewById(R.id.tvPosGs1Label),
-                    view.findViewById(R.id.tvPosRfidLabel),
-                    view.findViewById(R.id.tvPosManualLabel)
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "setupHeroController error: " + e.getMessage(), e);
-        }
+    try {
+        heroController = new PosHeroController(
+                view.findViewById(R.id.posHeroGlow),            // 1  View
+                view.findViewById(R.id.posHeroRing),            // 2  View
+                view.findViewById(R.id.ivPosHeroIcon),          // 3  ImageView
+                view.findViewById(R.id.ivPosHeroSparkleTop),    // 4  ImageView
+                view.findViewById(R.id.ivPosHeroSparkleBottom), // 5  ImageView
+                view.findViewById(R.id.tvPosHeroTitleAr),       // 6  TextView
+                view.findViewById(R.id.tvPosHeroTitleEn),       // 7  TextView
+                view.findViewById(R.id.posHeroDivider),         // 8  View
+                view.findViewById(R.id.tvPosHeroMessage),       // 9  TextView
+                view.findViewById(R.id.tvPosHeroHint),          // 10 TextView
+                view.findViewById(R.id.tvPosRfidCount),         // 11 TextView
+                view.findViewById(R.id.btnPosScanGs1),          // 12 View
+                view.findViewById(R.id.btnPosScanRfid),         // 13 View
+                view.findViewById(R.id.btnPosScanManual),       // 14 View
+                view.findViewById(R.id.ivPosGs1Icon),           // 15 ImageView
+                view.findViewById(R.id.ivPosRfidIcon),          // 16 ImageView
+                view.findViewById(R.id.ivPosManualIcon),        // 17 ImageView
+                view.findViewById(R.id.tvPosGs1Label),          // 18 TextView
+                view.findViewById(R.id.tvPosRfidLabel),         // 19 TextView
+                view.findViewById(R.id.tvPosManualLabel)        // 20 TextView
+        );
+    } catch (Exception e) {
+        Log.e(TAG, "setupHeroController error: " + e.getMessage(), e);
     }
+}
 
     private void setupCartListener() {
         if (cartManager == null) return;
