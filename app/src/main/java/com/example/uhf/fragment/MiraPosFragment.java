@@ -8,7 +8,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
-import android.view.MenuItem;
+
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
@@ -16,7 +16,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
+
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -132,6 +132,9 @@ public class MiraPosFragment extends MiraBaseFragment {
     private volatile long lastSaleResponseTime = 0;
 
     private final AtomicReference<RefundItem> selectedRefundItem = new AtomicReference<>(null);
+    
+    private ImageButton btnPosRefund;
+    private ImageButton btnPosLastReceipt;
 
     // ═══════════════════════════════════════════════════════
     // Views
@@ -142,7 +145,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private TextView btnAddManual;
     private TextView btnCheckout;
     private TextView btnClearCart;
-    private ImageButton btnPosOverflow;
+    
     private RecyclerView rvCartItems;
     private View layoutCartEmptyState;
     private View posHeroContainer;
@@ -377,7 +380,9 @@ public class MiraPosFragment extends MiraBaseFragment {
         btnAddManual = view.findViewById(R.id.btnPosAddManual);
         btnCheckout = view.findViewById(R.id.btnPosCheckout);
         btnClearCart = view.findViewById(R.id.btnPosClearCart);
-        btnPosOverflow = view.findViewById(R.id.btnPosOverflow);
+        btnPosRefund = view.findViewById(R.id.btnPosRefund);
+        btnPosLastReceipt = view.findViewById(R.id.btnPosLastReceipt);
+        
         rvCartItems = view.findViewById(R.id.rvPosCartItems);
         layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
         posHeroContainer = view.findViewById(R.id.posHeroContainer);
@@ -529,10 +534,21 @@ public class MiraPosFragment extends MiraBaseFragment {
                 });
             }
 
-            // Overflow menu
-            if (btnPosOverflow != null) {
-                btnPosOverflow.setOnClickListener(this::showOverflowMenu);
-            }
+           // Refund button (Header)
+if (btnPosRefund != null) {
+    btnPosRefund.setOnClickListener(v -> {
+        UIHelper.hideKeyboard(getActivity());
+        showRefundDialog();
+    });
+}
+
+// Last Receipt button (Header)
+if (btnPosLastReceipt != null) {
+    btnPosLastReceipt.setOnClickListener(v -> {
+        UIHelper.hideKeyboard(getActivity());
+        showLastReceiptDialog();
+    });
+}
         } catch (Exception e) {
             Log.e(TAG, "setupListeners error: " + e.getMessage());
         }
@@ -612,33 +628,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    // Overflow Menu
-    // ═══════════════════════════════════════════════════════
-
-    private void showOverflowMenu(View anchor) {
-        try {
-            PopupMenu popup = new PopupMenu(requireContext(), anchor);
-            popup.getMenu().add(0, 1, 0, getString(R.string.pos_menu_refund));
-            popup.getMenu().add(0, 2, 1, getString(R.string.pos_menu_last_receipt));
-            popup.getMenu().add(0, 3, 2, getString(R.string.pos_menu_scale_settings));
-
-            popup.setOnMenuItemClickListener(item -> {
-                switch (item.getItemId()) {
-                    case 1: showRefundDialog(); return true;
-                    case 2: showLastReceiptDialog(); return true;
-                    case 3:
-                        if (scaleManager != null) scaleManager.showSettingsDialog();
-                        return true;
-                }
-                return false;
-            });
-            popup.show();
-        } catch (Exception e) {
-            Log.e(TAG, "showOverflowMenu error: " + e.getMessage());
-        }
-    }
-
+   
     // ═══════════════════════════════════════════════════════
     // Process Item
     // ═══════════════════════════════════════════════════════
