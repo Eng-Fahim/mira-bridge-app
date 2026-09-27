@@ -295,9 +295,7 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
             if (scaleManager != null) scaleManager.connect();
 
-            if (tvCartStatus != null && cartManager != null && cartManager.isEmpty()) {
-                tvCartStatus.setText(getString(R.string.pos_ready_scan));
-            }
+            updateCartSummary();
         } catch (Exception e) {
             Log.e(TAG, "onResume error: " + e.getMessage());
         }
