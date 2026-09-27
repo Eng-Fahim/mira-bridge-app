@@ -2618,19 +2618,36 @@
 <string name="cat_diamond">ألماس</string>
 <string name="cat_other">أخرى</string>
 
+<!-- ═══════════════════════════════════════════════════════
+     Quick Actions Bottom Sheet — v2 (Grid + Primary CTA)
+     ═══════════════════════════════════════════════════════ -->
 
+<!-- Header -->
+<string name="qa_title">⚡ الوصول السريع</string>
+<string name="qa_subtitle">اختر ما تريد القيام به</string>
+<string name="qa_close">إغلاق</string>
+
+<!-- Primary CTA (استوديو التكويد) -->
+<string name="qa_identity_studio">استوديو التكويد</string>
+<string name="qa_identity_studio_desc">ابدأ بتكويد قطعة جديدة</string>
+
+<!-- Grid — الأسماء المختصرة (للشبكة) -->
+<string name="qa_rfid_write_short">RFID</string>
+<string name="qa_radar_short">رادار</string>
+<string name="qa_rfid_bindings_short">شرائح</string>
+<string name="qa_secure_gate_short">بوابات</string>
+<string name="qa_reports_short">تقارير</string>
+<string name="qa_accounting_short">مالية</string>
+<string name="qa_transfers_short">تحويلات</string>
+<string name="qa_sales_history_short">مبيعات</string>
+<string name="qa_admin_hub_short">إداري</string>
+<string name="qa_server_config_short">سيرفر</string>
 
 
 <!-- ═══════════════════════════════════════════════════════
      Quick Actions — Bottom Sheet
      ═══════════════════════════════════════════════════════ -->
 
-<string name="qa_title">إجراءات سريعة</string>
-<string name="qa_close">إغلاق</string>
-
-<!-- Group 1: Devices & Encoding -->
-<string name="qa_rfid_write">برمجة RFID</string>
-<string name="qa_identity_studio">استوديو التكويد</string>
 <string name="qa_radar">رادار التتبع</string>
 <string name="qa_rfid_bindings">إدارة الشرائح</string>
 
