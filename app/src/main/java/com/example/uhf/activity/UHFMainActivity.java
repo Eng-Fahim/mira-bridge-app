@@ -433,35 +433,48 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void setupKeyboardBehavior() {
-        try {
-            final View rootView = findViewById(android.R.id.content);
-            if (rootView == null) return;
+    try {
+        final View rootView = findViewById(android.R.id.content);
+        if (rootView == null) return;
 
-            ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-                Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
-                boolean isKeyboardVisible = imeInsets.bottom > 0;
+        final View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+        final View fragmentContainer = findViewById(R.id.fragment_container);
 
-                View bottomNavContainer = findViewById(R.id.bottomNavContainer);
-                if (bottomNavContainer != null) {
-                    bottomNavContainer.setVisibility(
-                            isKeyboardVisible ? View.GONE : View.VISIBLE);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+            Insets sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            boolean isKeyboardVisible = ime.bottom > sysBars.bottom;
+
+            if (bottomNavContainer != null) {
+                float targetY = isKeyboardVisible
+                        ? bottomNavContainer.getHeight() : 0f;
+                if (bottomNavContainer.getTranslationY() != targetY) {
+                    bottomNavContainer.animate()
+                            .translationY(targetY)
+                            .setDuration(250)
+                            .setInterpolator(
+                                new android.view.animation.DecelerateInterpolator())
+                            .start();
                 }
+            }
 
-                View fragmentContainer = findViewById(R.id.fragment_container);
-                if (fragmentContainer != null) {
+            if (fragmentContainer != null) {
+                int targetPadding = isKeyboardVisible ? 8 : 90;
+                if (fragmentContainer.getPaddingBottom() != targetPadding) {
                     fragmentContainer.setPadding(
                             fragmentContainer.getPaddingLeft(),
                             fragmentContainer.getPaddingTop(),
                             fragmentContainer.getPaddingRight(),
-                            isKeyboardVisible ? 8 : 90);
+                            targetPadding);
                 }
-                return insets;
-            });
+            }
 
-        } catch (Exception e) {
-            Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage(), e);
-        }
+            return insets;
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage());
     }
+}
 
     // ==================== التولبار الثانوي ====================
 
