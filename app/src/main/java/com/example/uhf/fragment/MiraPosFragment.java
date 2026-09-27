@@ -41,7 +41,7 @@ import com.example.uhf.dialog.POSCheckoutDialog;
 import com.example.uhf.dialog.RefundDialog;
 import com.example.uhf.manager.GateSaleBridge;
 import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.MiraExecutorService;
+import com.example.uhf.utils.MiraExecutorService;
 import com.example.uhf.manager.MiraItemSyncManager;
 import com.example.uhf.manager.MiraLocalItemCache;
 import com.example.uhf.manager.MiraPriceManager;
