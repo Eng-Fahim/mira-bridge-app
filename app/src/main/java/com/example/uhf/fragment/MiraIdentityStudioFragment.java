@@ -2347,14 +2347,29 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 public void onResume() {
     super.onResume();
 
-    if (!isAdded() || binding == null || getView() == null) return;
+    if (!isAdded() || getActivity() == null) return;
 
+    // ✅ إخفاء Bottom Nav أولاً (قبل أي فحص)
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+    }
+
+    // ✅ إذا الـ binding غير جاهز → أجّل بقية التنفيذ
+    if (binding == null || getView() == null) {
+        handler.postDelayed(() -> {
+            if (!isAdded() || binding == null) return;
+            performOnResumeSetup();
+        }, 100);
+        return;
+    }
+
+    performOnResumeSetup();
+}
+
+private void performOnResumeSetup() {
     try {
-        // ✅ إخفاء Bottom Nav أولاً
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-        }
+        if (!isAdded() || binding == null) return;
 
         if (priceManager != null) {
             priceManager.refreshNow();
@@ -2379,10 +2394,9 @@ public void onResume() {
             });
         }
     } catch (Exception e) {
-        Log.e(TAG, "onResume error: " + e.getMessage(), e);
+        Log.e(TAG, "performOnResumeSetup error: " + e.getMessage(), e);
     }
 }
-
 @Override
 public void onPause() {
     super.onPause();
