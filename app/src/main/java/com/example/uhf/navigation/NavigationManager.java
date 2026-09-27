@@ -124,98 +124,133 @@ public class NavigationManager {
     }
 
     public void loadFragment(@NonNull Fragment fragment,
-                             @NonNull String tag,
-                             boolean addToBackStack,
-                             boolean forceReload) {
+                         @NonNull String tag,
+                         boolean addToBackStack,
+                         boolean forceReload) {
 
-        if (fragmentManager.isStateSaved()) {
-            log("loadFragment skipped - state saved: " + tag);
+    // ✅ إذا كان الـ FM في حالة saved → أجّل التنفيذ
+    if (fragmentManager.isStateSaved()) {
+        log("⏳ FM state saved — deferring loadFragment: " + tag);
+
+        FragmentActivity activity = getActivity();
+        if (activity != null) {
+            activity.getSupportFragmentManager().executePendingTransactions();
+
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .post(() -> {
+                        if (fragmentManager.isStateSaved()) {
+                            log("❌ Still saved after defer — aborting: " + tag);
+                            return;
+                        }
+                        loadFragment(fragment, tag, addToBackStack, forceReload);
+                    });
+        } else {
+            log("❌ No activity — cannot defer: " + tag);
+        }
+        return;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // منطقك الأصلي من هنا — لا تغيير
+    // ═══════════════════════════════════════════════════════
+
+    // 1) نفس الـ Fragment
+    if (!forceReload && tag.equals(currentFragmentTag)) {
+        Fragment existing = fragmentManager.findFragmentByTag(tag);
+        if (existing != null && existing.isVisible()) {
+            log("Already on " + tag + ", skipping");
             return;
         }
+    }
 
-        // ✅ 1) إذا كان نفس الـ Fragment الحالي، لا تفعل شيئاً (إلا إذا forceReload)
-        if (!forceReload && tag.equals(currentFragmentTag)) {
-            Fragment existing = fragmentManager.findFragmentByTag(tag);
-            if (existing != null && existing.isVisible()) {
-                log("Already on " + tag + ", skipping");
-                return;
-            }
-        }
-
-        // ✅ 2) إذا كان root tag، امسح الـ Back Stack أولاً واحفظه كآخر root
-        if (isRootTag(tag)) {
-            lastRootTag = tag;
-            if (!addToBackStack) {
-                clearBackStackInternal();
-            }
-        }
-
-        // ✅ 3) إذا كان الـ Fragment موجوداً مسبقاً، أعد استخدامه
-        Fragment existing = fragmentManager.findFragmentByTag(tag);
-        Fragment target = (existing != null) ? existing : fragment;
-
-        // ✅ 4) تنفيذ الـ Transaction
-        try {
-            logState("BEFORE loadFragment: " + tag);
-
-            FragmentTransaction tx = fragmentManager.beginTransaction();
-            tx.setReorderingAllowed(true);
-            tx.setCustomAnimations(0, 0, 0, 0);
-
-            tx.replace(containerId, target, tag);
-            tx.setPrimaryNavigationFragment(target);
-
-            if (addToBackStack) {
-                tx.addToBackStack(tag);
-            }
-
-            tx.commit();
-
-            currentFragmentTag = tag;
-            currentFragment = target;
-
-            log("✅ Navigated to: " + tag + " (backStack=" + addToBackStack + ")");
-
-        } catch (IllegalStateException e) {
-            log("loadFragment commit failed (state saved): " + e.getMessage());
-        } catch (Exception e) {
-            log("loadFragment error: " + e.getMessage());
+    // 2) root tag → امسح الـ Back Stack
+    if (isRootTag(tag)) {
+        lastRootTag = tag;
+        if (!addToBackStack) {
+            clearBackStackInternal();
         }
     }
+
+    // 3) أعد استخدام Fragment موجود
+    Fragment existing = fragmentManager.findFragmentByTag(tag);
+    Fragment target = (existing != null) ? existing : fragment;
+
+    // 4) تنفيذ
+    try {
+        logState("BEFORE loadFragment: " + tag);
+
+        FragmentTransaction tx = fragmentManager.beginTransaction();
+        tx.setReorderingAllowed(true);
+        tx.setCustomAnimations(0, 0, 0, 0);
+        tx.replace(containerId, target, tag);
+        tx.setPrimaryNavigationFragment(target);
+
+        if (addToBackStack) {
+            tx.addToBackStack(tag);
+        }
+
+        tx.commit();
+
+        currentFragmentTag = tag;
+        currentFragment = target;
+
+        log("✅ Navigated to: " + tag + " (backStack=" + addToBackStack + ")");
+
+    } catch (IllegalStateException e) {
+        log("loadFragment commit failed: " + e.getMessage());
+    } catch (Exception e) {
+        log("loadFragment error: " + e.getMessage());
+    }
+}
 
     public void loadFragmentDirectly(@NonNull Fragment fragment, @NonNull String tag) {
-        if (fragmentManager.isStateSaved()) {
-            log("loadFragmentDirectly skipped - state saved: " + tag);
-            return;
+
+    // ✅ defer إذا الـ FM مشغول
+    if (fragmentManager.isStateSaved()) {
+        log("⏳ FM state saved — deferring loadFragmentDirectly: " + tag);
+
+        FragmentActivity activity = getActivity();
+        if (activity != null) {
+            activity.getSupportFragmentManager().executePendingTransactions();
+
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .post(() -> {
+                        if (fragmentManager.isStateSaved()) {
+                            log("❌ Still saved after defer — aborting");
+                            return;
+                        }
+                        loadFragmentDirectly(fragment, tag);
+                    });
         }
+        return;
+    }
 
         try {
-            logState("BEFORE loadFragmentDirectly: " + tag);
+        logState("BEFORE loadFragmentDirectly: " + tag);
+        clearBackStackInternal();
 
-            clearBackStackInternal();
-
-            if (isRootTag(tag)) {
-                lastRootTag = tag;
-            }
-
-            FragmentTransaction tx = fragmentManager.beginTransaction();
-            tx.setReorderingAllowed(true);
-            tx.setCustomAnimations(0, 0, 0, 0);
-            tx.replace(containerId, fragment, tag);
-            tx.setPrimaryNavigationFragment(fragment);
-            tx.commit();
-
-            currentFragmentTag = tag;
-            currentFragment = fragment;
-
-            log("✅ Direct load: " + tag);
-
-        } catch (IllegalStateException e) {
-            log("loadFragmentDirectly commit failed: " + e.getMessage());
-        } catch (Exception e) {
-            log("loadFragmentDirectly error: " + e.getMessage());
+        if (isRootTag(tag)) {
+            lastRootTag = tag;
         }
+
+        FragmentTransaction tx = fragmentManager.beginTransaction();
+        tx.setReorderingAllowed(true);
+        tx.setCustomAnimations(0, 0, 0, 0);
+        tx.replace(containerId, fragment, tag);
+        tx.setPrimaryNavigationFragment(fragment);
+        tx.commit();
+
+        currentFragmentTag = tag;
+        currentFragment = fragment;
+
+        log("✅ Direct load: " + tag);
+
+    } catch (IllegalStateException e) {
+        log("loadFragmentDirectly commit failed: " + e.getMessage());
+    } catch (Exception e) {
+        log("loadFragmentDirectly error: " + e.getMessage());
     }
+}
 
     // ==================== الرجوع ====================
 
