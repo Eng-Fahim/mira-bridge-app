@@ -157,6 +157,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public ArrayList<UHFTAGInfo> tagList = new ArrayList<>();
     public boolean loopFlag = false;
     private boolean isArabic = true;
+    
+    
+    private boolean lastKeyboardState = false;
 
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
@@ -288,6 +291,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             setContentView(R.layout.activity_main);
+
+// ✅ حل جذري لتعارض الـ Theme
+findViewById(android.R.id.content).setFitsSystemWindows(true);
+
+// ✅ إجبار نمط الكيبورد
+getWindow().setSoftInputMode(
+    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+    | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
+);
 
             setupWindowInsets();
             setupKeyboardBehavior();
@@ -424,7 +436,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    private void setupKeyboardBehavior() {
+
+private void setupKeyboardBehavior() {
     try {
         final View rootView = findViewById(android.R.id.content);
         if (rootView == null) return;
@@ -432,39 +445,94 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         final View bottomNavContainer = findViewById(R.id.bottomNavContainer);
         final View fragmentContainer = findViewById(R.id.fragment_container);
 
+        if (bottomNavContainer == null) return;
+
+        // ═══════════════════════════════════════════════════════
+        // Approach 1: ViewTreeObserver (يعمل على كل الأجهزة)
+        // ═══════════════════════════════════════════════════════
+        final int KEYBOARD_THRESHOLD_DP = 150;
+        final float density = getResources().getDisplayMetrics().density;
+        final int thresholdPx = (int) (KEYBOARD_THRESHOLD_DP * density);
+
+        final android.graphics.Rect visibleFrame = new android.graphics.Rect();
+
+        rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            try {
+                rootView.getWindowVisibleDisplayFrame(visibleFrame);
+
+                int screenHeight = rootView.getRootView().getHeight();
+                int keyboardHeight = screenHeight - visibleFrame.bottom;
+                boolean isKeyboardVisible = keyboardHeight > thresholdPx;
+
+                if (isKeyboardVisible == lastKeyboardState) return;
+                lastKeyboardState = isKeyboardVisible;
+
+                applyKeyboardVisibility(isKeyboardVisible,
+                        bottomNavContainer, fragmentContainer);
+
+            } catch (Exception e) {
+                Log.e(TAG, "VTO listener error: " + e.getMessage());
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // Approach 2: WindowInsets (Android 11+)
+        // ═══════════════════════════════════════════════════════
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
-            Insets sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            boolean isKeyboardVisible = ime.bottom > sysBars.bottom;
+            try {
+                Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+                Insets sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                boolean isKeyboardVisible = ime.bottom > sysBars.bottom;
 
-            if (bottomNavContainer != null) {
-                float targetY = isKeyboardVisible
-                        ? bottomNavContainer.getHeight() : 0f;
-                if (bottomNavContainer.getTranslationY() != targetY) {
-                    bottomNavContainer.animate()
-                            .translationY(targetY)
-                            .setDuration(250)
-                            .setInterpolator(
-                                new android.view.animation.DecelerateInterpolator())
-                            .start();
-                }
+                if (isKeyboardVisible == lastKeyboardState) return insets;
+
+                lastKeyboardState = isKeyboardVisible;
+                applyKeyboardVisibility(isKeyboardVisible,
+                        bottomNavContainer, fragmentContainer);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Insets listener error: " + e.getMessage());
             }
-
-            if (fragmentContainer != null) {
-                int targetPadding = isKeyboardVisible ? 8 : 90;
-                if (fragmentContainer.getPaddingBottom() != targetPadding) {
-                    fragmentContainer.setPadding(
-                            fragmentContainer.getPaddingLeft(),
-                            fragmentContainer.getPaddingTop(),
-                            fragmentContainer.getPaddingRight(),
-                            targetPadding);
-                }
-            }
-
             return insets;
         });
+
+        Log.d(TAG, "✅ setupKeyboardBehavior: Dual listeners attached");
+
     } catch (Exception e) {
-        Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage());
+        Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage(), e);
+    }
+}
+
+private void applyKeyboardVisibility(boolean isKeyboardVisible,
+                                     View bottomNavContainer,
+                                     View fragmentContainer) {
+    try {
+        if (bottomNavContainer != null) {
+            float targetY = isKeyboardVisible
+                    ? bottomNavContainer.getHeight() : 0f;
+
+            if (bottomNavContainer.getTranslationY() != targetY) {
+                bottomNavContainer.animate()
+                        .translationY(targetY)
+                        .setDuration(250)
+                        .setInterpolator(
+                                new android.view.animation.DecelerateInterpolator())
+                        .start();
+            }
+        }
+
+        if (fragmentContainer != null) {
+            int targetPadding = isKeyboardVisible ? 8 : 90;
+            if (fragmentContainer.getPaddingBottom() != targetPadding) {
+                fragmentContainer.setPadding(
+                        fragmentContainer.getPaddingLeft(),
+                        fragmentContainer.getPaddingTop(),
+                        fragmentContainer.getPaddingRight(),
+                        targetPadding);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "applyKeyboardVisibility error: " + e.getMessage());
     }
 }
 
