@@ -2614,4 +2614,43 @@ return super.onOptionsItemSelected(item);
             return 0;
         }
     }
+    
+    /**
+ * ✅ إخفاء/إظهار Bottom Nav + FAB
+ * يُستدعى من Fragments عند الحاجة (مثلاً شاشة التكويد)
+ */
+public void setBottomNavVisible(boolean visible) {
+    try {
+        View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+        if (bottomNavContainer == null) return;
+
+        if (visible) {
+            bottomNavContainer.setVisibility(View.VISIBLE);
+            bottomNavContainer.animate()
+                    .translationY(0f)
+                    .alpha(1f)
+                    .setDuration(250)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .start();
+        } else {
+            bottomNavContainer.animate()
+                    .translationY(bottomNavContainer.getHeight())
+                    .alpha(0f)
+                    .setDuration(250)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                    .withEndAction(() -> {
+                        if (bottomNavContainer != null) {
+                            bottomNavContainer.setVisibility(View.GONE);
+                        }
+                    })
+                    .start();
+        }
+
+        Log.d(TAG, "📱 BottomNav visibility set to: " + visible);
+
+    } catch (Exception e) {
+        Log.e(TAG, "setBottomNavVisible error: " + e.getMessage());
+    }
+}
+    
                                 }
