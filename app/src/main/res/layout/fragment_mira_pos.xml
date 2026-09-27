@@ -175,6 +175,16 @@
                     android:textColor="@color/pos_hero_title"
                     android:textSize="@dimen/pos_hero_title_size"
                     android:textStyle="bold" />
+                <TextView
+    android:id="@+id/tvPosHeroTitleEn"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="2dp"
+    android:letterSpacing="0.02"
+    android:text="POS Terminal"
+    android:textAllCaps="true"
+    android:textColor="@color/pos_text_secondary"
+    android:textSize="11sp" />
 
                 <View
                     android:id="@+id/posHeroDivider"
