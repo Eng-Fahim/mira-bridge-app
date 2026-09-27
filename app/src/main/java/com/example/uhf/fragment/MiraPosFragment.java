@@ -410,7 +410,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                     view.findViewById(R.id.ivPosHeroSparkleTop),
                     view.findViewById(R.id.ivPosHeroSparkleBottom),
                     view.findViewById(R.id.tvPosHeroTitleAr),
-                    view.findViewById(R.id.tvPosHeroTitleEn),
                     view.findViewById(R.id.posHeroDivider),
                     view.findViewById(R.id.tvPosHeroMessage),
                     view.findViewById(R.id.tvPosHeroHint),
