@@ -13,7 +13,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,13 +29,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * ✅ QuickActionsBottomSheetFragment — v4.0 "Premium Edition"
+ * ✅ QuickActionsBottomSheetFragment — v5.0 "Final Edition"
  *
- * التحديثات:
  * - Stagger Fade-in Animation (40ms بين كل عنصر)
- * - Delay قبل التنقل (250ms) لمنع تعارض Bottom Sheet مع الشاشة الجديدة
- * - Haptic Feedback خفيف عند الضغط
- * - بدون عنوان (Header-less design)
+ * - Haptic Feedback خفيف
+ * - Header-less design
+ * - CTA يعمل بشكل صحيح (setDescendantFocusability)
  */
 public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
@@ -48,11 +46,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     private static final long STAGGER_DELAY_MS = 40L;
     private static final long ITEM_FADE_DURATION_MS = 250L;
     private static final long INITIAL_DELAY_MS = 100L;
-
-    // ═══════════════════════════════════════════════════════
-    // Navigation Constants
-    // ═══════════════════════════════════════════════════════
-    private static final long NAVIGATION_DELAY_MS = 250L;
 
     private boolean isArabic;
     private PermissionManager permissionManager;
@@ -86,15 +79,13 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             permissionManager = PermissionManager.getInstance(context);
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
 
-            Log.d(TAG, "🚀 Initializing Quick Actions v4.0");
-
             // ═══════════════════════════════════════════════════
             // PRIMARY CTA — استوديو التكويد
             // ═══════════════════════════════════════════════════
             setupPrimaryCta(view);
 
             // ═══════════════════════════════════════════════════
-            // GRID — بقية الإجراءات
+            // GRID
             // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardRfidWrite,
                     "rfid_write",
@@ -153,7 +144,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             if (btnClose != null) {
                 animatedViews.add(btnClose);
                 btnClose.setOnClickListener(v -> {
-                    Log.d(TAG, "🔒 Close clicked");
                     performHaptic();
                     dismiss();
                 });
@@ -163,9 +153,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             // STAGGER FADE-IN ANIMATION
             // ═══════════════════════════════════════════════════
             runStaggerAnimation();
-
-            Log.d(TAG, "✅ Quick Actions ready — "
-                    + animatedViews.size() + " animated views");
 
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
@@ -177,59 +164,57 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     // ═══════════════════════════════════════════════════════
 
     private void setupPrimaryCta(View view) {
-    try {
-        View cta = view.findViewById(R.id.cardIdentityStudio);
-        if (cta == null) {
-            Log.e(TAG, "❌ CTA not found: cardIdentityStudio");
-            return;
-        }
-
-        // ✅ منع الأبناء من التقاط اللمس
-        if (cta instanceof ViewGroup) {
-            ViewGroup vg = (ViewGroup) cta;
-            vg.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
-            vg.setClickable(true);
-            vg.setFocusable(true);
-        }
-
-        // فحص الصلاحيات
-        boolean hasPermission = permissionManager.canAccessIdentityStudio();
-        boolean quickAccessAllowed = quickAccessSettings == null
-                || quickAccessSettings.isActionEnabled("identity");
-
-        if (!hasPermission || !quickAccessAllowed) {
-            cta.setVisibility(View.GONE);
-            return;
-        }
-
-        cta.setVisibility(View.VISIBLE);
-
-        // ✅ الـ listener
-        cta.setOnClickListener(v -> {
-            Log.d(TAG, "🔥🔥🔥 CTA CLICKED");
-            Toast.makeText(getContext(), "🔥 CTA works!", Toast.LENGTH_SHORT).show();
-
-            final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
-                    ? (UHFMainActivity) getActivity() : null;
-
-            dismiss();
-
-            if (activity != null) {
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    activity.loadFragment(
-                            new MiraIdentityStudioFragment(), 
-                            "IdentityStudio");
-                });
+        try {
+            View cta = view.findViewById(R.id.cardIdentityStudio);
+            if (cta == null) {
+                Log.e(TAG, "CTA not found: cardIdentityStudio");
+                return;
             }
-        });
 
-        animatedViews.add(cta);
-        Log.d(TAG, "✅ CTA bound");
+            // ✅ منع الأبناء من التقاط اللمس
+            if (cta instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) cta;
+                vg.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+                vg.setClickable(true);
+                vg.setFocusable(true);
+            }
 
-    } catch (Exception e) {
-        Log.e(TAG, "setupPrimaryCta error: " + e.getMessage(), e);
+            // فحص الصلاحيات
+            boolean hasPermission = permissionManager.canAccessIdentityStudio();
+            boolean quickAccessAllowed = quickAccessSettings == null
+                    || quickAccessSettings.isActionEnabled("identity");
+
+            if (!hasPermission || !quickAccessAllowed) {
+                cta.setVisibility(View.GONE);
+                return;
+            }
+
+            cta.setVisibility(View.VISIBLE);
+
+            // ✅ الـ listener
+            cta.setOnClickListener(v -> {
+                performHaptic();
+
+                final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
+                        ? (UHFMainActivity) getActivity() : null;
+
+                dismiss();
+
+                if (activity != null) {
+                    mainHandler.post(() -> {
+                        activity.loadFragment(
+                                new MiraIdentityStudioFragment(),
+                                "IdentityStudio");
+                    });
+                }
+            });
+
+            animatedViews.add(cta);
+
+        } catch (Exception e) {
+            Log.e(TAG, "setupPrimaryCta error: " + e.getMessage(), e);
+        }
     }
-}
 
     // ═══════════════════════════════════════════════════════
     // GRID ACTIONS
@@ -256,7 +241,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             if (!isVisible) {
                 card.setVisibility(View.GONE);
-                Log.d(TAG, "⏭️ Hidden: " + actionKey);
                 return;
             }
 
@@ -264,28 +248,19 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             animatedViews.add(card);
 
             card.setOnClickListener(v -> {
-    final Context ctx = getContext();
-    final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
-            ? (UHFMainActivity) getActivity() : null;
+                performHaptic();
 
-    Toast.makeText(ctx, "1️⃣ Clicked: " + actionKey, Toast.LENGTH_SHORT).show();
-    Toast.makeText(ctx, "2️⃣ Activity: " + (activity != null), Toast.LENGTH_SHORT).show();
+                final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
+                        ? (UHFMainActivity) getActivity() : null;
 
-    dismiss();
+                dismiss();
 
-    if (activity != null) {
-        new Handler(Looper.getMainLooper()).post(() -> {
-            Toast.makeText(ctx, "3️⃣ Calling loadFragment", Toast.LENGTH_SHORT).show();
-            activity.loadFragment(targetFragment, tag);
-        });
-    } else {
-        if (ctx != null) {
-            Toast.makeText(ctx, "❌ Activity NULL!", Toast.LENGTH_LONG).show();
-        }
-    }
-});
-
-            Log.d(TAG, "✅ Registered: " + actionKey);
+                if (activity != null) {
+                    mainHandler.post(() -> {
+                        activity.loadFragment(targetFragment, tag);
+                    });
+                }
+            });
 
         } catch (Exception e) {
             Log.e(TAG, "setupGridAction(" + actionKey + ") error: " + e.getMessage(), e);
@@ -293,42 +268,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // NAVIGATION — with Delay + Haptic
+    // Haptic Feedback
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * ✅ التنقل بعد تأخير 250ms
-     *     — حتى يكتمل انزلاق Bottom Sheet بدون تعارض
-     */
-    private void navigateTo(Fragment targetFragment, String tag) {
-        if (targetFragment == null) {
-            Log.w(TAG, "Target fragment is null — cannot navigate");
-            return;
-        }
-
-        mainHandler.postDelayed(() -> {
-            if (!isAdded()) {
-                Log.w(TAG, "Fragment not added — abort navigation");
-                return;
-            }
-
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).loadFragment(targetFragment, tag);
-                Log.d(TAG, "🚀 Navigated to: " + tag);
-            } else {
-                Log.w(TAG, "Activity is not UHFMainActivity");
-                if (getContext() != null) {
-                    Toast.makeText(getContext(),
-                            isArabic ? "تعذر فتح الشاشة" : "Unable to open screen",
-                            Toast.LENGTH_SHORT).show();
-                }
-            }
-        }, NAVIGATION_DELAY_MS);
-    }
-
-    /**
-     * ✅ Haptic Feedback خفيف عند الضغط — إحساس فاخر
-     */
     private void performHaptic() {
         try {
             View root = getView();
@@ -379,9 +321,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             masterSet.setInterpolator(new DecelerateInterpolator());
             masterSet.start();
 
-            Log.d(TAG, "🎬 Stagger animation started — total "
-                    + (delay + ITEM_FADE_DURATION_MS) + "ms");
-
         } catch (Exception e) {
             Log.e(TAG, "runStaggerAnimation error: " + e.getMessage(), e);
 
@@ -413,7 +352,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 bottomSheet.getLayoutParams().height =
                         (int) (getResources().getDisplayMetrics().heightPixels * 0.80);
                 bottomSheet.requestLayout();
-                Log.d(TAG, "📏 Bottom sheet height set to 80%");
             }
         } catch (Exception e) {
             Log.e(TAG, "onStart error: " + e.getMessage());
