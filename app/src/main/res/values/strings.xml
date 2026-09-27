@@ -2617,4 +2617,31 @@
 <string name="cat_silver">فضة</string>
 <string name="cat_diamond">ألماس</string>
 <string name="cat_other">أخرى</string>
+
+
+
+
+<!-- ═══════════════════════════════════════════════════════
+     Quick Actions — Bottom Sheet
+     ═══════════════════════════════════════════════════════ -->
+
+<string name="qa_title">إجراءات سريعة</string>
+<string name="qa_close">إغلاق</string>
+
+<!-- Group 1: Devices & Encoding -->
+<string name="qa_rfid_write">برمجة RFID</string>
+<string name="qa_identity_studio">استوديو التكويد</string>
+<string name="qa_radar">رادار التتبع</string>
+<string name="qa_rfid_bindings">إدارة الشرائح</string>
+
+<!-- Group 2: Operations & Finance -->
+<string name="qa_reports">التقارير</string>
+<string name="qa_accounting">المالية</string>
+<string name="qa_transfers">التحويلات</string>
+<string name="qa_sales_history">سجل المبيعات</string>
+
+<!-- Group 3: Admin & Gates -->
+<string name="qa_secure_gate">مراقبة البوابات</string>
+<string name="qa_admin_hub">الخيارات الإدارية</string>
+<string name="qa_server_config">إعدادات السيرفر</string>
 </resources>
