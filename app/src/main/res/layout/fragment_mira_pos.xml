@@ -446,15 +446,16 @@
          3. FOOTER STICKY (Summary + CTA)
          ═══════════════════════════════════════════════════════ -->
     <LinearLayout
-        android:id="@+id/posFooterSticky"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
-        android:elevation="@dimen/elevation_4"
-        android:orientation="vertical"
-        android:paddingTop="@dimen/space_3"
-        android:paddingBottom="@dimen/space_3">
-
+    android:id="@+id/posFooterSticky"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/colorSurface"
+    android:elevation="@dimen/elevation_4"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/space_3"
+    android:paddingBottom="@dimen/space_3"
+    android:visibility="gone"> 
+    
         <!-- Summary Strip -->
         <LinearLayout
             android:id="@+id/posSummaryStrip"
