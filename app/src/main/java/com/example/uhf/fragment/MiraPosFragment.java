@@ -907,11 +907,31 @@ if (btnPosLastReceipt != null) {
             if (tvItemCount != null) {
                 tvItemCount.setText(String.valueOf(count));
             }
-            if (tvTotalAmount != null) {
-                tvTotalAmount.setText(count > 0
-                        ? priceManager.formatPriceDefault(totalUsd)
-                        : getString(R.string.pos_default_amount));
+            // ✅ الجديدة — مع حماية شاملة
+if (tvTotalAmount != null) {
+    String totalText;
+    if (count > 0) {
+        if (priceManager != null) {
+            try {
+                totalText = priceManager.formatPriceDefault(totalUsd);
+                if (totalText == null || totalText.isEmpty()) {
+                    totalText = String.format(
+                            java.util.Locale.US, "$%.2f", totalUsd);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "formatPrice error: " + e.getMessage());
+                totalText = String.format(
+                        java.util.Locale.US, "$%.2f", totalUsd);
             }
+        } else {
+            totalText = String.format(
+                    java.util.Locale.US, "$%.2f", totalUsd);
+        }
+    } else {
+        totalText = getString(R.string.pos_default_amount);
+    }
+    tvTotalAmount.setText(totalText);
+}
 
                 // Status
                 if (tvCartStatus != null) {
