@@ -151,6 +151,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private View posHeroContainer;
     private View posManualInputContainer;
     private View posSummaryStrip;
+    private View posFooterSticky;   
 
     // Scan buttons
     private View btnPosScanGs1, btnPosScanRfid, btnPosScanManual;
@@ -392,6 +393,9 @@ public class MiraPosFragment extends MiraBaseFragment {
         btnPosScanGs1 = view.findViewById(R.id.btnPosScanGs1);
         btnPosScanRfid = view.findViewById(R.id.btnPosScanRfid);
         btnPosScanManual = view.findViewById(R.id.btnPosScanManual);
+        
+        posSummaryStrip = view.findViewById(R.id.posSummaryStrip);
+        posFooterSticky = view.findViewById(R.id.posFooterSticky); // ✅ أضف
 
         if (tvScaleStatus != null) {
             tvScaleStatus.setOnClickListener(v -> {
@@ -849,31 +853,65 @@ if (btnPosLastReceipt != null) {
     }
 
     private void updateCartSummaryFromManager(int count, double totalUsd,
-                                               boolean hasUnavailable) {
-        safeRun(() -> {
-            try {
-                // Hero visibility
-                if (posHeroContainer != null) {
-                    posHeroContainer.setVisibility(count == 0
-                            ? View.VISIBLE : View.GONE);
-                }
-                if (rvCartItems != null) {
-                    rvCartItems.setVisibility(count > 0
-                            ? View.VISIBLE : View.GONE);
-                }
-                if (layoutCartEmptyState != null) {
-                    layoutCartEmptyState.setVisibility(View.GONE);
-                }
+                                           boolean hasUnavailable) {
+    safeRun(() -> {
+        try {
+            // Hero visibility
+            if (posHeroContainer != null) {
+                posHeroContainer.setVisibility(count == 0
+                        ? View.VISIBLE : View.GONE);
+            }
+            if (rvCartItems != null) {
+                rvCartItems.setVisibility(count > 0
+                        ? View.VISIBLE : View.GONE);
+            }
 
-                // Count + Total
-                if (tvItemCount != null) {
-                    tvItemCount.setText(String.valueOf(count));
+            // ═══════════════════════════════════════════════════
+            // ✅ Footer Sticky (Summary + CTA) — يظهر فقط عند وجود قطع
+            // ═══════════════════════════════════════════════════
+            if (posFooterSticky != null) {
+                if (count > 0) {
+                    // إظهار بحركة slide-up
+                    if (posFooterSticky.getVisibility() != View.VISIBLE) {
+                        posFooterSticky.setVisibility(View.VISIBLE);
+                        posFooterSticky.setTranslationY(
+                                posFooterSticky.getHeight() > 0
+                                        ? posFooterSticky.getHeight() : 300f);
+                        posFooterSticky.animate()
+                                .translationY(0f)
+                                .setDuration(300)
+                                .setInterpolator(
+                                        new android.view.animation.DecelerateInterpolator())
+                                .start();
+                    }
+                } else {
+                    // إخفاء بحركة slide-down
+                    if (posFooterSticky.getVisibility() == View.VISIBLE) {
+                        posFooterSticky.animate()
+                                .translationY(posFooterSticky.getHeight())
+                                .setDuration(250)
+                                .setInterpolator(
+                                        new android.view.animation.AccelerateInterpolator())
+                                .withEndAction(() -> {
+                                    if (posFooterSticky != null) {
+                                        posFooterSticky.setVisibility(View.GONE);
+                                        posFooterSticky.setTranslationY(0f);
+                                    }
+                                })
+                                .start();
+                    }
                 }
-                if (tvTotalAmount != null) {
-                    tvTotalAmount.setText(count > 0
-                            ? priceManager.formatPriceDefault(totalUsd)
-                            : getString(R.string.pos_default_amount));
-                }
+            }
+
+            // Count + Total
+            if (tvItemCount != null) {
+                tvItemCount.setText(String.valueOf(count));
+            }
+            if (tvTotalAmount != null) {
+                tvTotalAmount.setText(count > 0
+                        ? priceManager.formatPriceDefault(totalUsd)
+                        : getString(R.string.pos_default_amount));
+            }
 
                 // Status
                 if (tvCartStatus != null) {
