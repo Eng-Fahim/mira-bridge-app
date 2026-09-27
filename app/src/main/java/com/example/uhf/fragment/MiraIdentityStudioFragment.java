@@ -2343,58 +2343,64 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== دورة الحياة ====================
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (!isAdded() || binding == null || getView() == null) return;
+@Override
+public void onResume() {
+    super.onResume();
 
-        try {
-            if (priceManager != null) {
-                priceManager.refreshNow();
-                calculateEstimatedGoldValue();
-            }
+    if (!isAdded() || binding == null || getView() == null) return;
 
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-            }
-
-            scheduleAutoSync();
-
-            // ✅ فحص دوري للمسودات القديمة + تنظيف الصور اليتيمة
-            if (miraExecutor != null && miraExecutor.isHealthy()) {
-                miraExecutor.getBackgroundExecutor().execute(() -> {
-                    try {
-                        if (formManager != null) {
-                            formManager.cleanupOldDrafts();
-                        }
-                        if (photoManager != null) {
-                            photoManager.cleanupOrphanFiles(
-                                    photoManager.getPhotoPaths());
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "onResume cleanup error: " + e.getMessage());
-                    }
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error: " + e.getMessage(), e);
-        }
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        View v = getView();
-        if (v != null && onResumeRunnable != null) {
-            v.removeCallbacks(onResumeRunnable);
-            onResumeRunnable = null;
-        }
-        stopRfidScanningMode();
-        saveCurrentDraftAsync();
+    try {
+        // ✅ إخفاء Bottom Nav أولاً
         if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
+            ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
+            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
         }
+
+        if (priceManager != null) {
+            priceManager.refreshNow();
+            calculateEstimatedGoldValue();
+        }
+
+        scheduleAutoSync();
+
+        if (miraExecutor != null && miraExecutor.isHealthy()) {
+            miraExecutor.getBackgroundExecutor().execute(() -> {
+                try {
+                    if (formManager != null) {
+                        formManager.cleanupOldDrafts();
+                    }
+                    if (photoManager != null) {
+                        photoManager.cleanupOrphanFiles(
+                                photoManager.getPhotoPaths());
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "onResume cleanup error: " + e.getMessage());
+                }
+            });
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage(), e);
     }
+}
+
+@Override
+public void onPause() {
+    super.onPause();
+
+    // ✅ إعادة إظهار Bottom Nav
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
+    }
+
+    View v = getView();
+    if (v != null && onResumeRunnable != null) {
+        v.removeCallbacks(onResumeRunnable);
+        onResumeRunnable = null;
+    }
+    stopRfidScanningMode();
+    saveCurrentDraftAsync();
+}
 
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
@@ -2464,4 +2470,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
         super.onDestroyView();
     }
-}
+                    }
