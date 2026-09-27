@@ -157,16 +157,13 @@
     <dimen name="pos_status_badge_pad_h">12dp</dimen>
     <dimen name="pos_status_badge_radius">16dp</dimen>
 
-    <dimen name="pos_hero_circle">160dp</dimen>
-    <dimen name="pos_hero_ring_stroke">1.5dp</dimen>
-    <dimen name="pos_hero_icon">64dp</dimen>
-    <dimen name="pos_hero_top_margin">24dp</dimen>
-    <dimen name="pos_hero_title_size">22sp</dimen>
-    <dimen name="pos_hero_subtitle_size">11sp</dimen>
-    <dimen name="pos_hero_divider_w">48dp</dimen>
-    <dimen name="pos_hero_divider_h">2dp</dimen>
-    <dimen name="pos_hero_msg_size">15sp</dimen>
-    <dimen name="pos_hero_hint_size">12sp</dimen>
+    <dimen name="pos_hero_circle">120dp</dimen>
+<dimen name="pos_hero_icon">48dp</dimen>
+<dimen name="pos_hero_top_margin">8dp</dimen>
+<dimen name="pos_hero_title_size">18sp</dimen>
+<dimen name="pos_hero_subtitle_size">10sp</dimen>
+<dimen name="pos_hero_msg_size">13sp</dimen>
+<dimen name="pos_hero_hint_size">11sp</dimen>
 
     <dimen name="pos_scan_btn_size">92dp</dimen>
     <dimen name="pos_scan_btn_icon">30dp</dimen>
