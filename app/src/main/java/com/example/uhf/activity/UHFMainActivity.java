@@ -1154,27 +1154,29 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
     loadFragment(fragment, tag, true);
 }
 
+public void loadFragment(Fragment fragment, String tag) {
+    loadFragment(fragment, tag, true);
+}
+
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    Toast.makeText(this,
+            "4️⃣ UHF.loadFragment: " + tag,
+            Toast.LENGTH_SHORT).show();
+
     if (isFinishing() || isDestroyed()) {
-        Log.w(TAG, "loadFragment skipped: activity finishing");
+        Toast.makeText(this, "❌ Activity finishing", Toast.LENGTH_SHORT).show();
+        return;
+    }
+    if (navigationManager == null) {
+        Toast.makeText(this, "❌ navMgr NULL", Toast.LENGTH_SHORT).show();
         return;
     }
     if (fragment == null) {
-        Log.w(TAG, "loadFragment skipped: fragment null");
+        Toast.makeText(this, "❌ fragment NULL", Toast.LENGTH_SHORT).show();
         return;
     }
 
-    // ✅ إذا كان الـ FM في حالة saved → أجّل التنفيذ حتى يصبح جاهزاً
-    if (getSupportFragmentManager().isStateSaved()) {
-        Log.d(TAG, "⏳ FM state saved — deferring loadFragment: " + tag);
-        mainHandler.post(() -> loadFragment(fragment, tag, addToBackStack));
-        return;
-    }
-
-    if (navigationManager == null) {
-        Log.w(TAG, "loadFragment skipped: navigationManager null");
-        return;
-    }
+    Toast.makeText(this, "5️⃣ Calling navMgr", Toast.LENGTH_SHORT).show();
 
     navigationManager.loadFragment(fragment, tag, addToBackStack);
     this.currentFragment = fragment;
@@ -1182,7 +1184,7 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
     updateBottomNavSelectionByTag(tag);
     updateSecondaryToolbar(tag);
 
-    Log.d(TAG, "✅ loadFragment success: " + tag);
+    Toast.makeText(this, "6️⃣ DONE", Toast.LENGTH_SHORT).show();
 }
 
 public void loadFragmentDirectly(Fragment fragment, String tag) {
