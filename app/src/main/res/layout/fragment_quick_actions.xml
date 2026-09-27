@@ -6,6 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?attr/colorSurface"
+    android:contentDescription="@string/qa_title"
     android:orientation="vertical"
     android:paddingTop="8dp"
     android:paddingBottom="16dp">
@@ -18,35 +19,9 @@
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginTop="4dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="20dp"
         android:background="?attr/colorOutlineVariant"
         android:alpha="0.6" />
-
-    <!-- ═══════════════════════════════════════════════════════
-         HEADER — Title + Subtitle
-         ═══════════════════════════════════════════════════════ -->
-    <TextView
-        android:id="@+id/tvQaTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:text="@string/qa_title"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        tools:text="⚡ الوصول السريع" />
-
-    <TextView
-        android:id="@+id/tvQaSubtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="20dp"
-        android:text="@string/qa_subtitle"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="13sp"
-        tools:text="اختر ما تريد القيام به" />
 
     <!-- ═══════════════════════════════════════════════════════
          PRIMARY CTA — استوديو التكويد (بارز)
@@ -128,7 +103,7 @@
         android:alpha="0.4" />
 
     <!-- ═══════════════════════════════════════════════════════
-         GRID — الأيقونات الصغيرة
+         GRID — الأيقونات
          ═══════════════════════════════════════════════════════ -->
     <GridLayout
         android:id="@+id/qaGrid"
