@@ -467,7 +467,18 @@
 <color name="pos_summary_text_idle">#B0B0B0</color>
 <color name="pos_summary_text_active">#0A0A0A</color>
 
+<!-- ═══════════════════════════════════════════════════════
+     Quick Actions — Primary CTA (Dark)
+     ═══════════════════════════════════════════════════════ -->
 
+<color name="qa_primary_cta_bg">#2A2416</color>
+<color name="qa_primary_cta_stroke">#8B6914</color>
+
+<color name="qa_primary_cta_icon">#D4AF37</color>
+
+<color name="qa_primary_cta_text">#F5F5F5</color>
+
+<color name="qa_primary_cta_subtext">#C9B896</color>
 
 
 🌙 CARDS — Dark Mode
