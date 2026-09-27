@@ -147,7 +147,6 @@
     <dimen name="app_card_radius">@dimen/card_radius</dimen>
     <dimen name="app_button_height">@dimen/button_height</dimen>
     
-        <dimen name="app_button_height">@dimen/button_height</dimen>
 
     <!-- ═══════════════════════════════════════════════════════════
          MIRA POS — أبعاد شاشة البيع
