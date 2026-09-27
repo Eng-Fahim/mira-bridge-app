@@ -415,20 +415,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private void setupWindowInsets() {
         View bottomNavView = findViewById(R.id.bottomNavigationView);
         if (bottomNavView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(bottomNavView, (v, insets) -> {
-                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(0, 0, 0, systemBars.bottom);
-                return insets;
-            });
+            
         }
 
         View toolbarView = findViewById(R.id.toolbar);
         if (toolbarView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
-                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(0, systemBars.top, 0, 0);
-                return insets;
-            });
+            
         }
     }
 
