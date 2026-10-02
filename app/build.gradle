@@ -10,12 +10,22 @@ android {
         applicationId "com.mira.jewelry.enterprise"
         minSdk 26
         targetSdk 34
-        versionCode 4
-        versionName "1.4.8"
+        versionCode 5              // ✅ زيادة الإصدار
+        versionName "1.5.0"        // ✅ الإصدار الجديد مع المحاسبة
         
         buildConfigField "boolean", "Test", "false"
         buildConfigField "boolean", "ENABLE_LOGGING", "false"
+        
+        // ✅ تحديث عنوان الـ API
         buildConfigField "String", "DEFAULT_SERVER_URL", '"https://sa.mirabarcode.com/wp-json"'
+        buildConfigField "String", "API_NAMESPACE", '"mira/v2"'
+        buildConfigField "String", "API_BASE_URL", '"https://sa.mirabarcode.com/wp-json/mira/v2/"'
+        
+        // ✅ إعدادات المحاسبة
+        buildConfigField "String", "DEFAULT_CURRENCY", '"YER"'
+        buildConfigField "String", "DEFAULT_USD_RATE", '"535.0"'
+        buildConfigField "String", "DEFAULT_SAR_RATE", '"142.5"'
+        buildConfigField "int", "DEFAULT_BRANCH_ID", "1"
         
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
@@ -30,7 +40,7 @@ android {
             abiFilters "arm64-v8a", "armeabi-v7a"
         }
         
-        // ✅ multidex للتطبيق الكبير (RFID + CameraX + MLKit + Room + ...)
+        // ✅ multidex للتطبيق الكبير (RFID + CameraX + MLKit + Room + Retrofit + ...)
         multiDexEnabled true
     }
 
@@ -92,6 +102,7 @@ android {
         checkReleaseBuilds false
         abortOnError false
         warningsAsErrors false
+        disable 'MissingTranslation', 'ExtraTranslation'
     }
     
     packagingOptions {
@@ -105,9 +116,12 @@ android {
                 '/META-INF/versions/**',
                 'META-INF/*.version',
                 'META-INF/proguard/*',
+                'META-INF/*.kotlin_module',     // ✅ جديد — Retrofit/Kotlin
                 '/*.properties',
                 'fabric/*',
-                'com/google/thirdparty/publicsuffix/*'
+                'com/google/thirdparty/publicsuffix/*',
+                'DebugProbesKt.bin',            // ✅ جديد — Coroutines
+                'kotlin-tooling-metadata.json'  // ✅ جديد
             ]
         }
         
@@ -120,7 +134,7 @@ android {
 }
 
 dependencies {
-    // ==================== AndroidX & UI ====================
+    // ==================== AndroidX Core & UI ====================
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
@@ -128,9 +142,15 @@ dependencies {
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.gridlayout:gridlayout:1.0.0'
     implementation 'androidx.preference:preference:1.2.1'
+    implementation 'androidx.vectordrawable:vectordrawable:1.2.0'  // ✅ جديد
     
     // ✅ multidex
     implementation 'androidx.multidex:multidex:2.0.1'
+    
+    // ✅ RecyclerView + CardView (للنظام المحاسبي)
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'  // ✅ جديد
     
     // ==================== Brotli decoder ====================
     implementation 'org.brotli:dec:0.1.2'
@@ -139,6 +159,13 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-process:2.7.0"
     implementation "androidx.lifecycle:lifecycle-common-java8:2.7.0"
     implementation "androidx.lifecycle:lifecycle-runtime:2.7.0"
+    // ✅ جديد — MVVM للنظام المحاسبي
+    implementation "androidx.lifecycle:lifecycle-viewmodel:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-livedata:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-savedstate:2.7.0"
+    
+    // ==================== Fragment ====================
+    implementation 'androidx.fragment:fragment:1.6.2'
     
     // ==================== Biometric ====================
     implementation 'androidx.biometric:biometric:1.1.0'
@@ -157,6 +184,14 @@ dependencies {
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     
+    // ==================== Networking — Retrofit + OkHttp (لنظام المحاسبة) ====================
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-scalars:2.9.0'  // ✅ جديد
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    
     // ==================== Charts ====================
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     
@@ -173,12 +208,20 @@ dependencies {
     
     // ==================== Coroutines ====================
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1'  // ✅ جديد
+    
+    // ==================== WorkManager (مزامنة دورية) ====================
+    implementation 'androidx.work:work-runtime:2.9.0'  // ✅ جديد
+    
+    // ==================== WorkManager (مزامنة دورية) ====================
+    implementation 'androidx.work:work-runtime:2.9.0'  // ✅ جديد
     
     // ==================== Desugaring ====================
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
     
     // ==================== Testing ====================
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.10.0'  // ✅ جديد
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation 'androidx.test.runner:1.6.2'
