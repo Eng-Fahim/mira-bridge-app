@@ -298,7 +298,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                         }
 
                         Log.e(TAG, "✅ Loading fragment: " + fragment.getClass().getSimpleName());
-                        activity.loadFragment(fragment, tag);
+                        activity.loadFragmentDirectly(fragment, tag);
 
                     } catch (Throwable e) {
                         Log.e(TAG, "❌ loadFragment error", e);
