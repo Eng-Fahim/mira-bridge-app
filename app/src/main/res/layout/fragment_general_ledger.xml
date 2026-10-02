@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5F6FA">
+
+    <!-- شريط البحث والفلترة -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#FFFFFF">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <!-- عنوان -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📖 دفتر الأستاذ العام"
+                android:textColor="#2C3E50"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"/>
+
+            <!-- اختيار الحساب -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="الحساب"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                app:startIconDrawable="@android:drawable/ic_menu_sort_by_size">
+
+                <AutoCompleteTextView
+                    android:id="@+id/spAccount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- التاريخ والفرع -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnFrom"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="من"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_marginEnd="4dp"
+                    android:textSize="12sp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="إلى"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_marginStart="4dp"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+
+            <!-- الأزرار -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnLoad"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="🔍 عرض"
+                    android:textColor="#FFFFFF"
+                    app:backgroundTint="#3498DB"
+                    android:layout_marginEnd="4dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnExport"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📥"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_marginStart="4dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- KPIs -->
+    <LinearLayout
+        android:id="@+id/kpiContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"/>
+
+    <!-- رأس الجدول -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#2C3E50">
+
+        <TextView
+            android:layout_width="70dp"
+            android:layout_height="wrap_content"
+            android:text="التاريخ"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="البيان"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="70dp"
+            android:layout_height="wrap_content"
+            android:text="مدين"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:gravity="end"/>
+
+        <TextView
+            android:layout_width="70dp"
+            android:layout_height="wrap_content"
+            android:text="دائن"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:gravity="end"/>
+
+        <TextView
+            android:layout_width="75dp"
+            android:layout_height="wrap_content"
+            android:text="الرصيد"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:gravity="end"/>
+    </LinearLayout>
+
+    <!-- RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLedger"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#FFFFFF"/>
+
+    <!-- Progress -->
+    <ProgressBar
+        android:id="@+id/pbLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone"/>
+
+    <!-- Empty -->
+    <LinearLayout
+        android:id="@+id/emptyState"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📖"
+            android:textSize="64sp"/>
+
+        <TextView
+            android:id="@+id/tvEmptyText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="اختر حساباً لعرض دفتر الأستاذ"
+            android:textColor="#7F8C8D"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp"/>
+    </LinearLayout>
+</LinearLayout>
