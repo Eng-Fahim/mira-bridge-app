@@ -9,8 +9,7 @@ import java.util.List;
 public class AccountDto implements Serializable {
 
     // ==================== Fields ====================
-    // ✅ public للتوافق مع MiraCreateJournalFragment
-    
+
     @SerializedName("id")
     public int id;
 
@@ -65,6 +64,12 @@ public class AccountDto implements Serializable {
     @SerializedName("children")
     public List<AccountDto> children;
 
+    /**
+     * ✅ accountName — اسم مختصر (يُملأ من API أو من MiraAccountTreeFragment)
+     */
+    @SerializedName("account_name")
+    public String accountName;
+
     // ==================== Constructor ====================
 
     public AccountDto() {
@@ -93,6 +98,7 @@ public class AccountDto implements Serializable {
     public boolean isBankAccount() { return isBankAccount; }
     public String getStatus() { return status; }
     public List<AccountDto> getChildren() { return children; }
+    public String getAccountName() { return accountName; }
 
     // ==================== Setters ====================
 
@@ -114,12 +120,12 @@ public class AccountDto implements Serializable {
     public void setBankAccount(boolean bankAccount) { isBankAccount = bankAccount; }
     public void setStatus(String status) { this.status = status; }
     public void setChildren(List<AccountDto> children) { this.children = children; }
+    public void setAccountName(String accountName) { this.accountName = accountName; }
 
     // ==================== Helpers ====================
 
     /**
-     * ✅ هل الحساب ورقة (بدون أبناء) — قابل للاستخدام في القيود
-     * هذا هو الحل لخطأ: cannot find symbol method isLeaf()
+     * ✅ هل الحساب ورقة (بدون أبناء)
      */
     public boolean isLeaf() {
         return children == null || children.isEmpty();
@@ -130,6 +136,38 @@ public class AccountDto implements Serializable {
      */
     public boolean hasChildren() {
         return children != null && !children.isEmpty();
+    }
+
+    /**
+     * ✅ هل الحساب ذهبي
+     */
+    public boolean isGold() {
+        if (accountCategory != null
+                && accountCategory.toLowerCase().contains("gold")) {
+            return true;
+        }
+        if (accountNameAr != null
+                && (accountNameAr.contains("ذهب") || accountNameAr.contains("الذهب"))) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * ✅ التسمية العربية لنوع الحساب
+     */
+    public String getTypeLabelAr() {
+        if (accountType == null) return "—";
+        switch (accountType.toLowerCase()) {
+            case "asset":     return "أصول";
+            case "liability": return "التزامات";
+            case "equity":    return "حقوق ملكية";
+            case "revenue":   return "إيرادات";
+            case "expense":   return "مصروفات";
+            case "cash":      return "نقدية";
+            case "bank":      return "بنكية";
+            default:          return accountType;
+        }
     }
 
     public String getDisplayName() {
