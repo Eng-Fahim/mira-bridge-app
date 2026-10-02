@@ -149,7 +149,11 @@ public class MiraApiClient {
         // ✅ إصلاح CRITICAL: تهيئة AccountingApiService
         // ملاحظة: تأكد من أن الـ Constructor يقبل (MiraApiClient, Context)
         // إذا كان يقبل (Context) فقط، عدّل السطر التالي:
-        this.accountingService = new AccountingApiService(context);
+        this.accountingService = new retrofit2.Retrofit.Builder()
+    .baseUrl("https://sa.mirabarcode.com/wp-json/mira/v2/")
+    .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+    .build()
+    .create(AccountingApiService.class);
 
         String savedBaseUrl = sessionManager.getServerUrl();
         if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
