@@ -628,202 +628,227 @@
     <color name="text_warning">#F59E0B</color>
     <color name="text_info">#0284C7</color>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     🆕 PART 7 — INVENTORY POLISH v3.1
-     ألوان خاصة بشاشة الجرد
-     ═══════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════
+         🆕 PART 7 — INVENTORY POLISH v3.1
+         ألوان خاصة بشاشة الجرد
+         ═══════════════════════════════════════════════════════════════ -->
 
-<!-- 📊 Status Bar -->
-<color name="status_bar_text">@color/gold_900</color>       <!-- نص داكن على ذهبي فاتح -->
-<color name="status_bar_text_on_dark">@color/pure_white</color> <!-- احتياطي لو الخلفية غامقة -->
+    <!-- 📊 Status Bar -->
+    <color name="status_bar_text">@color/gold_900</color>
+    <color name="status_bar_text_on_dark">@color/pure_white</color>
 
-<!-- 🧭 Segmented Control (زر شامل/فئوي/أعمى) -->
-<color name="segmented_text_active">@color/gold_900</color>       <!-- نص داكن على ذهبي -->
-<color name="segmented_text_inactive">@color/gold_700</color>
-<color name="segmented_bg_active">@color/gold_500</color>
-<color name="segmented_bg_inactive">@android:color/transparent</color>
-<color name="segmented_stroke">@color/gold_300</color>            <!-- الإطار -->
+    <!-- 🧭 Segmented Control (زر شامل/فئوي/أعمى) -->
+    <color name="segmented_text_active">@color/gold_900</color>
+    <color name="segmented_text_inactive">@color/gold_700</color>
+    <color name="segmented_bg_active">@color/gold_500</color>
+    <color name="segmented_bg_inactive">@android:color/transparent</color>
+    <color name="segmented_stroke">@color/gold_300</color>
 
-<!-- 📈 Progress Bar -->
-<color name="progress_start">@color/gold_700</color>              <!-- #8B6914 -->
-<color name="progress_center">@color/gold_500</color>             <!-- #C59B27 -->
-<color name="progress_end">@color/gold_300</color>                <!-- #E5C158 -->
+    <!-- 📈 Progress Bar -->
+    <color name="progress_start">@color/gold_700</color>
+    <color name="progress_center">@color/gold_500</color>
+    <color name="progress_end">@color/gold_300</color>
 
-<!-- ⚠️ Alerts Strip -->
-<color name="alert_bg">@color/gold_50</color>                     <!-- #FFFBF0 -->
-<color name="alert_bg_dark">#3D2E00</color>                       <!-- ذهبي داكن للـ dark mode -->
-<color name="alert_text">@color/gold_700</color>
-<color name="alert_icon">@color/warning_500</color>
+    <!-- ⚠️ Alerts Strip -->
+    <color name="alert_bg">@color/gold_50</color>
+    <color name="alert_bg_dark">#3D2E00</color>
+    <color name="alert_text">@color/gold_700</color>
+    <color name="alert_icon">@color/warning_500</color>
 
-<!-- 🎯 Metrics (بطاقة الوزن الثانوية) -->
-<color name="metric_secondary_bg">@color/pure_white</color>
-<color name="metric_secondary_stroke">@color/gold_200</color>
-
-    <!-- ═══════════════════════════════════════════════════════
-     ☀️ HERO CARD GRADIENT — Light Mode
-     ═══════════════════════════════════════════════════════ -->
-<color name="hero_gradient_start">#F5E4B0</color>      <!-- ذهبي فاتح -->
-<color name="hero_gradient_center">#EFD68A</color>     <!-- ذهبي متوسط -->
-<color name="hero_gradient_end">#E5C158</color>        <!-- ذهبي داكن قليلاً -->
-
-<!-- ═══════════════════════════════════════════════════════════════
-     🆕 PART 8 — HERO CARD COLORS
-     ألوان بطاقة الـ Hero في Dashboard
-     ═══════════════════════════════════════════════════════════════ -->
-
-<!-- حدود البطاقة -->
-<color name="hero_stroke">@color/gold_300</color>
-
-<!-- نصوص العنوان -->
-<color name="hero_title_text">@color/gold_900</color>
-
-<!-- نصوص التسميات (Labels) -->
-<color name="hero_label_text">@color/gold_700</color>
-
-<!-- نصوص القيم (Values) -->
-<color name="hero_value_text">@color/gold_900</color>
-
-<!-- النص الثانوي -->
-<color name="hero_secondary_text">@color/gold_700</color>
-
-<!-- الخط السفلي -->
-<color name="hero_underline">@color/gold_500</color>
-
-<!-- الفواصل -->
-<color name="hero_divider">@color/gold_300</color>
-
+    <!-- 🎯 Metrics (بطاقة الوزن الثانوية) -->
+    <color name="metric_secondary_bg">@color/pure_white</color>
+    <color name="metric_secondary_stroke">@color/gold_200</color>
 
     <!-- ═══════════════════════════════════════════════════════
-     ☀️ CARDS — Light Mode
-     ═══════════════════════════════════════════════════════ -->
-<color name="card_surface_warm">#F8F5EF</color>
-<color name="card_stroke_warm">#E8DFC8</color>
-
+         ☀️ HERO CARD GRADIENT — Light Mode
+         ═══════════════════════════════════════════════════════ -->
+    <color name="hero_gradient_start">#F5E4B0</color>
+    <color name="hero_gradient_center">#EFD68A</color>
+    <color name="hero_gradient_end">#E5C158</color>
 
     <!-- ═══════════════════════════════════════════════════════════════
-     🆕 PART 9 — SCAN SCREEN COLORS (Light Mode)
-     ألوان شاشة الجرد — النسخة الفاتحة
-     ═══════════════════════════════════════════════════════════════ -->
+         🆕 PART 8 — HERO CARD COLORS
+         ألوان بطاقة الـ Hero في Dashboard
+         ═══════════════════════════════════════════════════════════════ -->
 
-<!-- 📊 Status Bar (شريط الحالة العلوي) -->
-<color name="scan_status_bg_start">#E5C158</color>
-<color name="scan_status_bg_end">#B89456</color>
-<color name="scan_status_text">#1A1200</color>
+    <!-- حدود البطاقة -->
+    <color name="hero_stroke">@color/gold_300</color>
 
-<!-- 🎯 Last Scan Card (بطاقة آخر مسح) -->
-<color name="scan_hero_bg_start">#F5E4B0</color>
-<color name="scan_hero_bg_end">#E5C158</color>
-<color name="scan_hero_stroke">#4DB89456</color>
-<color name="scan_hero_title">#3D2E00</color>
-<color name="scan_hero_value">#1A1200</color>
-<color name="scan_hero_label">#6B5A28</color>
-<color name="scan_hero_secondary">#8B7639</color>
-<color name="scan_hero_chip_bg">#40B89456</color>
-<color name="scan_hero_chip_text">#3D2E00</color>
+    <!-- نصوص العنوان -->
+    <color name="hero_title_text">@color/gold_900</color>
 
-<!-- 📇 Cards (البطاقات العادية) -->
-<color name="scan_card_bg">#F8F5EF</color>
-<color name="scan_card_stroke">#E8DFC8</color>
+    <!-- نصوص التسميات (Labels) -->
+    <color name="hero_label_text">@color/gold_700</color>
 
-<!-- 💎 Value Card (بطاقة القيمة الذهبية) -->
-<color name="scan_value_bg">#E5C158</color>
-<color name="scan_value_text">#1A1200</color>
-<color name="scan_value_label">#3D2E00</color>
+    <!-- نصوص القيم (Values) -->
+    <color name="hero_value_text">@color/gold_900</color>
 
-<!-- ⚠️ Alerts Row -->
-<color name="scan_alert_bg">#FFF8E1</color>
-<color name="scan_alert_text">#6B5A28</color>
+    <!-- النص الثانوي -->
+    <color name="hero_secondary_text">@color/gold_700</color>
 
-<!-- 📈 Progress Bar -->
-<color name="scan_progress_track">#E8DFC8</color>
-<color name="scan_progress_start">#B89456</color>
-<color name="scan_progress_end">#E5C158</color>
-   
-   <!-- ═══════════════════════════════════════════════════════
-     MIRA POS — ألوان الوضع الفاتح
-     ═══════════════════════════════════════════════════════ -->
+    <!-- الخط السفلي -->
+    <color name="hero_underline">@color/gold_500</color>
 
-<!-- الهوية الذهبية -->
-<color name="pos_gold_primary">#E8C766</color>
-<color name="pos_gold_deep">#B8860B</color>
-<color name="pos_gold_soft">#F5E6B8</color>
-<color name="pos_gold_shimmer">#FFE9A8</color>
-<color name="pos_gold_transparent_20">#33E8C766</color>
-<color name="pos_gold_transparent_10">#1AE8C766</color>
-<color name="pos_gold_transparent_40">#66E8C766</color>
+    <!-- الفواصل -->
+    <color name="hero_divider">@color/gold_300</color>
 
-<!-- الخلفيات -->
-<color name="pos_surface">#FFFFFF</color>
-<color name="pos_surface_variant">#FAF6EC</color>
-<color name="pos_header_bg">#FFFFFF</color>
-<color name="pos_header_stroke">#1AE8C766</color>
+    <!-- ═══════════════════════════════════════════════════════
+         ☀️ CARDS — Light Mode
+         ═══════════════════════════════════════════════════════ -->
+    <color name="card_surface_warm">#F8F5EF</color>
+    <color name="card_stroke_warm">#E8DFC8</color>
 
-<!-- النصوص -->
-<color name="pos_header_title">#1A1A1A</color>
-<color name="pos_header_subtitle">#8B7355</color>
-<color name="pos_hero_title">#E8C766</color>
-<color name="pos_hero_subtitle">#B8860B</color>
-<color name="pos_text_primary">#1A1A1A</color>
-<color name="pos_text_secondary">#6B6B6B</color>
-<color name="pos_text_hint">#9E9E9E</color>
-<color name="pos_text_on_gold">#1A1A1A</color>
+    <!-- ═══════════════════════════════════════════════════════════════
+         🆕 PART 9 — SCAN SCREEN COLORS (Light Mode)
+         ألوان شاشة الجرد — النسخة الفاتحة
+         ═══════════════════════════════════════════════════════════════ -->
 
-<!-- الحالات -->
-<color name="pos_status_online">#22C55E</color>
-<color name="pos_status_online_bg">#1A22C55E</color>
-<color name="pos_status_offline">#EF4444</color>
-<color name="pos_status_offline_bg">#1AEF4444</color>
-<color name="pos_status_searching">#9CA3AF</color>
-<color name="pos_status_searching_bg">#1A9CA3AF</color>
-<color name="pos_status_simulation">#F59E0B</color>
-<color name="pos_status_simulation_bg">#1AF59E0B</color>
-<color name="pos_status_active">#22C55E</color>
-<color name="pos_status_active_bg">#1A22C55E</color>
+    <!-- 📊 Status Bar (شريط الحالة العلوي) -->
+    <color name="scan_status_bg_start">#E5C158</color>
+    <color name="scan_status_bg_end">#B89456</color>
+    <color name="scan_status_text">#1A1200</color>
 
-<!-- الحدود والفواصل -->
-<color name="pos_divider">#1A000000</color>
-<color name="pos_divider_gold">#4DE8C766</color>
-<color name="pos_stroke_light">#E0E0E0</color>
+    <!-- 🎯 Last Scan Card (بطاقة آخر مسح) -->
+    <color name="scan_hero_bg_start">#F5E4B0</color>
+    <color name="scan_hero_bg_end">#E5C158</color>
+    <color name="scan_hero_stroke">#4DB89456</color>
+    <color name="scan_hero_title">#3D2E00</color>
+    <color name="scan_hero_value">#1A1200</color>
+    <color name="scan_hero_label">#6B5A28</color>
+    <color name="scan_hero_secondary">#8B7639</color>
+    <color name="scan_hero_chip_bg">#40B89456</color>
+    <color name="scan_hero_chip_text">#3D2E00</color>
 
-<!-- CTA / Buttons -->
-<color name="pos_cta_enabled">#E8C766</color>
-<color name="pos_cta_disabled">#E0E0E0</color>
-<color name="pos_cta_text_enabled">#1A1A1A</color>
-<color name="pos_cta_text_disabled">#9E9E9E</color>
-<color name="pos_danger">#EF4444</color>
-<color name="pos_danger_bg">#1AEF4444</color>
+    <!-- 📇 Cards (البطاقات العادية) -->
+    <color name="scan_card_bg">#F8F5EF</color>
+    <color name="scan_card_stroke">#E8DFC8</color>
 
-<!-- Hero Glow -->
-<color name="pos_hero_glow_start">#33E8C766</color>
-<color name="pos_hero_glow_end">#00E8C766</color>
-<color name="pos_hero_ring">#66E8C766</color>
-<color name="pos_hero_wave">#99E8C766</color>
-<color name="pos_hero_sparkle">#FFE9A8</color>
+    <!-- 💎 Value Card (بطاقة القيمة الذهبية) -->
+    <color name="scan_value_bg">#E5C158</color>
+    <color name="scan_value_text">#1A1200</color>
+    <color name="scan_value_label">#3D2E00</color>
 
-<!-- Summary -->
-<color name="pos_summary_bg_idle">#FAF6EC</color>
-<color name="pos_summary_bg_active">#E8C766</color>
-<color name="pos_summary_text_idle">#6B6B6B</color>
-<color name="pos_summary_text_active">#1A1A1A</color>
-   
-   
-   
-   <!-- ═══════════════════════════════════════════════════════
-     Quick Actions — Primary CTA
-     ═══════════════════════════════════════════════════════ -->
+    <!-- ⚠️ Alerts Row -->
+    <color name="scan_alert_bg">#FFF8E1</color>
+    <color name="scan_alert_text">#6B5A28</color>
 
-<!-- الخلفية (ذهبي فاتح ناعم) -->
-<color name="qa_primary_cta_bg">#FFF9E6</color>
-<color name="qa_primary_cta_stroke">#E8C766</color>
+    <!-- 📈 Progress Bar -->
+    <color name="scan_progress_track">#E8DFC8</color>
+    <color name="scan_progress_start">#B89456</color>
+    <color name="scan_progress_end">#E5C158</color>
 
-<!-- الأيقونة والسهم -->
-<color name="qa_primary_cta_icon">#B8860B</color>
+    <!-- ═══════════════════════════════════════════════════════
+         MIRA POS — ألوان الوضع الفاتح
+         ═══════════════════════════════════════════════════════ -->
 
-<!-- النص الأساسي -->
-<color name="qa_primary_cta_text">#1A1A1A</color>
+    <!-- الهوية الذهبية -->
+    <color name="pos_gold_primary">#E8C766</color>
+    <color name="pos_gold_deep">#B8860B</color>
+    <color name="pos_gold_soft">#F5E6B8</color>
+    <color name="pos_gold_shimmer">#FFE9A8</color>
+    <color name="pos_gold_transparent_20">#33E8C766</color>
+    <color name="pos_gold_transparent_10">#1AE8C766</color>
+    <color name="pos_gold_transparent_40">#66E8C766</color>
 
-<!-- النص الثانوي -->
-<color name="qa_primary_cta_subtext">#8B7355</color>
+    <!-- الخلفيات -->
+    <color name="pos_surface">#FFFFFF</color>
+    <color name="pos_surface_variant">#FAF6EC</color>
+    <color name="pos_header_bg">#FFFFFF</color>
+    <color name="pos_header_stroke">#1AE8C766</color>
+
+    <!-- النصوص -->
+    <color name="pos_header_title">#1A1A1A</color>
+    <color name="pos_header_subtitle">#8B7355</color>
+    <color name="pos_hero_title">#E8C766</color>
+    <color name="pos_hero_subtitle">#B8860B</color>
+    <color name="pos_text_primary">#1A1A1A</color>
+    <color name="pos_text_secondary">#6B6B6B</color>
+    <color name="pos_text_hint">#9E9E9E</color>
+    <color name="pos_text_on_gold">#1A1A1A</color>
+
+    <!-- الحالات -->
+    <color name="pos_status_online">#22C55E</color>
+    <color name="pos_status_online_bg">#1A22C55E</color>
+    <color name="pos_status_offline">#EF4444</color>
+    <color name="pos_status_offline_bg">#1AEF4444</color>
+    <color name="pos_status_searching">#9CA3AF</color>
+    <color name="pos_status_searching_bg">#1A9CA3AF</color>
+    <color name="pos_status_simulation">#F59E0B</color>
+    <color name="pos_status_simulation_bg">#1AF59E0B</color>
+    <color name="pos_status_active">#22C55E</color>
+    <color name="pos_status_active_bg">#1A22C55E</color>
+
+    <!-- الحدود والفواصل -->
+    <color name="pos_divider">#1A000000</color>
+    <color name="pos_divider_gold">#4DE8C766</color>
+    <color name="pos_stroke_light">#E0E0E0</color>
+
+    <!-- CTA / Buttons -->
+    <color name="pos_cta_enabled">#E8C766</color>
+    <color name="pos_cta_disabled">#E0E0E0</color>
+    <color name="pos_cta_text_enabled">#1A1A1A</color>
+    <color name="pos_cta_text_disabled">#9E9E9E</color>
+    <color name="pos_danger">#EF4444</color>
+    <color name="pos_danger_bg">#1AEF4444</color>
+
+    <!-- Hero Glow -->
+    <color name="pos_hero_glow_start">#33E8C766</color>
+    <color name="pos_hero_glow_end">#00E8C766</color>
+    <color name="pos_hero_ring">#66E8C766</color>
+    <color name="pos_hero_wave">#99E8C766</color>
+    <color name="pos_hero_sparkle">#FFE9A8</color>
+
+    <!-- Summary -->
+    <color name="pos_summary_bg_idle">#FAF6EC</color>
+    <color name="pos_summary_bg_active">#E8C766</color>
+    <color name="pos_summary_text_idle">#6B6B6B</color>
+    <color name="pos_summary_text_active">#1A1A1A</color>
+
+    <!-- ═══════════════════════════════════════════════════════
+         Quick Actions — Primary CTA
+         ═══════════════════════════════════════════════════════ -->
+
+    <!-- الخلفية (ذهبي فاتح ناعم) -->
+    <color name="qa_primary_cta_bg">#FFF9E6</color>
+    <color name="qa_primary_cta_stroke">#E8C766</color>
+
+    <!-- الأيقونة والسهم -->
+    <color name="qa_primary_cta_icon">#B8860B</color>
+
+    <!-- النص الأساسي -->
+    <color name="qa_primary_cta_text">#1A1A1A</color>
+
+    <!-- النص الثانوي -->
+    <color name="qa_primary_cta_subtext">#8B7355</color>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         🆕 PART 10 — MIRA BRAND COLORS (Legacy / Compatibility)
+         ألوان هوية MIRA — للتوافق مع الشاشات القديمة
+         ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- 🎨 MIRA Brand — Primary -->
+    <color name="mira_primary">#2C3E50</color>
+    <color name="mira_primary_dark">#1A252F</color>
+    <color name="mira_accent">#F1C40F</color>
+
+    <!-- 🎨 MIRA Brand — Semantic -->
+    <color name="mira_success">#27AE60</color>
+    <color name="mira_danger">#E74C3C</color>
+    <color name="mira_warning">#F39C12</color>
+    <color name="mira_info">#3498DB</color>
+    <color name="mira_purple">#9B59B6</color>
+
+    <!-- 🥇 MIRA Brand — Gold -->
+    <color name="mira_gold">#D4AF37</color>
+    <color name="mira_gold_light">#F4E5B1</color>
+
+    <!-- 🌫️ MIRA Brand — Neutral -->
+    <color name="mira_background">#F5F6FA</color>
+    <color name="mira_surface">#FFFFFF</color>
+    <color name="mira_text_primary">#2C3E50</color>
+    <color name="mira_text_secondary">#7F8C8D</color>
+    <color name="mira_divider">#E0E0E0</color>
+
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
