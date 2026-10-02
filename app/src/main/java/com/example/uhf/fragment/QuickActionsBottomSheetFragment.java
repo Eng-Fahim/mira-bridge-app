@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import com.example.uhf.navigation.FragmentFactory;
+
 /**
  * ✅ QuickActionsBottomSheetFragment — v5.0 "Final Edition"
  *
@@ -221,51 +223,102 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     // ═══════════════════════════════════════════════════════
 
     private void setupGridAction(View root,
-                                 int cardId,
-                                 String actionKey,
-                                 boolean hasPermission,
-                                 Fragment targetFragment,
-                                 String tag) {
+                             int cardId,
+                             String actionKey,
+                             boolean hasPermission,
+                             Fragment targetFragment,
+                             String tag) {
 
-        try {
-            View card = root.findViewById(cardId);
+    try {
+        View card = root.findViewById(cardId);
 
-            if (card == null) {
-                Log.w(TAG, "Grid item not found: id=" + cardId + ", key=" + actionKey);
-                return;
-            }
+        if (card == null) {
+            Log.w(TAG, "Grid item not found: id=" + cardId + ", key=" + actionKey);
+            return;
+        }
 
-            boolean quickAccessAllowed = quickAccessSettings == null
-                    || quickAccessSettings.isActionEnabled(actionKey);
-            boolean isVisible = hasPermission && quickAccessAllowed;
+        boolean quickAccessAllowed = quickAccessSettings == null
+                || quickAccessSettings.isActionEnabled(actionKey);
+        boolean isVisible = hasPermission && quickAccessAllowed;
 
-            if (!isVisible) {
-                card.setVisibility(View.GONE);
-                return;
-            }
+        if (!isVisible) {
+            card.setVisibility(View.GONE);
+            return;
+        }
 
-            card.setVisibility(View.VISIBLE);
-            animatedViews.add(card);
+        card.setVisibility(View.VISIBLE);
+        animatedViews.add(card);
 
-            card.setOnClickListener(v -> {
+        card.setOnClickListener(v -> {
+            try {
                 performHaptic();
 
-                final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
-                        ? (UHFMainActivity) getActivity() : null;
+                // ✅ 1. احصل على Activity قبل dismiss
+                final UHFMainActivity activity =
+                    (getActivity() instanceof UHFMainActivity)
+                        ? (UHFMainActivity) getActivity()
+                        : null;
 
+                // ✅ 2. أظهر رسالة تشخيص
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    "▶ فتح: " + tag,
+                    android.widget.Toast.LENGTH_SHORT
+                ).show();
+
+                Log.e(TAG, "🔵 Clicked: " + tag + " | activity=" + (activity != null));
+
+                // ✅ 3. إذا activity = null → خطأ
+                if (activity == null) {
+                    Log.e(TAG, "❌ activity is NULL!");
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "❌ خطأ: Activity NULL",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show();
+                    return;
+                }
+
+                // ✅ 4. dismiss أولاً
                 dismiss();
 
-                if (activity != null) {
-                    mainHandler.post(() -> {
-                        activity.loadFragment(targetFragment, tag);
-                    });
-                }
-            });
+                // ✅ 5. ثم التنقل
+                mainHandler.postDelayed(() -> {
+                    try {
+                        Fragment fragment = FragmentFactory.createFragmentByTag(tag);
 
-        } catch (Exception e) {
-            Log.e(TAG, "setupGridAction(" + actionKey + ") error: " + e.getMessage(), e);
-        }
+                        if (fragment == null) {
+                            Log.e(TAG, "❌ FragmentFactory returned null for: " + tag);
+                            android.widget.Toast.makeText(
+                                activity,
+                                "❌ شاشة غير معروفة: " + tag,
+                                android.widget.Toast.LENGTH_LONG
+                            ).show();
+                            return;
+                        }
+
+                        Log.e(TAG, "✅ Loading fragment: " + fragment.getClass().getSimpleName());
+                        activity.loadFragment(fragment, tag);
+
+                    } catch (Throwable e) {
+                        Log.e(TAG, "❌ loadFragment error", e);
+                        android.widget.Toast.makeText(
+                            activity,
+                            "❌ خطأ: " + e.getMessage(),
+                            android.widget.Toast.LENGTH_LONG
+                        ).show();
+                    }
+                }, 250); // ← تأخير صغير لضمان إغلاق القائمة
+
+            } catch (Throwable e) {
+                Log.e(TAG, "❌ Click handler error", e);
+            }
+        });
+
+    } catch (Exception e) {
+        Log.e(TAG, "setupGridAction(" + actionKey + ") error: " + e.getMessage(), e);
     }
+}
 
     // ═══════════════════════════════════════════════════════
     // Haptic Feedback
