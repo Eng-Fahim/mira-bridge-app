@@ -10,7 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-import com.example.uhf.util.NumberFormatter;
+import com.example.uhf.utils.NumberFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
