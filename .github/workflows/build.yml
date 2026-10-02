@@ -25,7 +25,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # ✅ لا نستخدم setup-android — نستخدم preinstalled SDK مباشرة
       - name: ✅ Accept Android SDK licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
@@ -38,9 +37,13 @@ jobs:
             "build-tools;34.0.0" > /dev/null 2>&1 || true
 
       - name: 🔐 Restore keystore (optional)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/uhf-serial_release.jks
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/uhf-serial_release.jks
+            echo "✅ Keystore restored"
+          else
+            echo "⚠️ No keystore secret found — skipping"
+          fi
 
       - name: 🔧 Make gradlew executable
         run: chmod +x ./gradlew
