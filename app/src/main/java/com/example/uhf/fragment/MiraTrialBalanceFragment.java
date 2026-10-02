@@ -20,6 +20,8 @@ import com.example.uhf.api.dto.TrialBalanceDto;
 import com.example.uhf.utils.DateHelper;
 import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
+// يجب أن يكون هناك واحد من هذين
+import com.example.uhf.adapter.TrialBalanceAdapter;
 
 public class MiraTrialBalanceFragment extends Fragment {
 
