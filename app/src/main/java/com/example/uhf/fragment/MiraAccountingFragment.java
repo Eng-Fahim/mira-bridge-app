@@ -1,695 +1,339 @@
 package com.example.uhf.fragment;
 
-import android.app.Dialog;
-import android.content.Context;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
-import android.view.WindowManager;
-import android.widget.ArrayAdapter;
-import android.widget.EditText;
-import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-import com.example.uhf.activity.UHFMainActivity;
-import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.tools.SessionManager;
-import com.google.android.material.button.MaterialButton;
+import com.example.uhf.adapter.JournalEntryAdapter;
+import com.example.uhf.api.dto.*;
+import com.example.uhf.util.DateHelper;
+import com.example.uhf.util.NumberFormatter;
+import com.example.uhf.viewmodel.AccountingViewModel;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.textfield.TextInputEditText;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Arrays;
 
 public class MiraAccountingFragment extends Fragment {
-
-    private static final String TAG = "MiraAccountingFragment";
-
-    private MiraApiClient apiClient;
-    private MiraBranchesManager branchesManager;
-    private PermissionManager permissionManager;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
-    private static final ExecutorService executor = Executors.newFixedThreadPool(3);
-    private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
-
-    private RecyclerView rvAccountingData;
+    private static final String TAG = "MiraAccountingFragment";
+    
+    private AccountingViewModel viewModel;
+    
+    // Views
+    private TabLayout tabLayout;
+    private RecyclerView rvData;
     private ProgressBar pbLoading;
-    private TextView tvEmptyData;
-    private EditText etSearch;
-    private TextView tvTodayRevenue, tvTotalGoldVolume, tvBalanceStatus;
-    private TextView tvBranchName;
-    private TabLayout tabAccounting;
-    private MaterialButton btnCreateManualEntry;
-    private MaterialButton btnFinancialReports;
-    private ImageButton btnRefresh;
-
+    private LinearLayout emptyState;
+    private TextView tvEmptyText;
+    private TextInputEditText etSearch;
+    private LinearLayout kpiContainer;
+    private ExtendedFloatingActionButton fabCreateEntry;
+    
+    private JournalEntryAdapter journalAdapter;
+    
     private String currentTab = "journal";
-    private final List<AccountingEntry> entriesList = new ArrayList<>();
-    private final List<AccountingEntry> filteredList = new ArrayList<>();
-    private AccountingAdapter adapter;
-
-    private boolean isArabic = true;
-    private int currentBranchId = 0;
-
+    private int currentPage = 1;
+    
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, 
+                            @Nullable ViewGroup container, 
+                            @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
         
-        isDestroyed.set(false);
-        
-        apiClient = MiraApiClient.getInstance(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        permissionManager = PermissionManager.getInstance(requireContext());
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        
-        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-
         initViews(view);
+        setupViewModel();
+        setupTabs();
         setupRecyclerView();
         setupListeners();
-        applyPermissions();
-        updateBranchDisplay();
-        loadData(currentTab);
-
+        
+        // التحميل الأولي
+        loadCurrentTab();
+        
         return view;
     }
-
-    private void initViews(View view) {
-        rvAccountingData = view.findViewById(R.id.rvAccountingData);
-        pbLoading = view.findViewById(R.id.pbAccountingLoading);
-        tvEmptyData = view.findViewById(R.id.tvEmptyData);
-        etSearch = view.findViewById(R.id.etSearchAccounting);
-        btnRefresh = view.findViewById(R.id.btnRefreshAccounting);
-        tvTodayRevenue = view.findViewById(R.id.tvTodayRevenue);
-        tvTotalGoldVolume = view.findViewById(R.id.tvTotalGoldVolume);
-        tvBalanceStatus = view.findViewById(R.id.tvBalanceStatus);
-        tvBranchName = view.findViewById(R.id.tvBranchName);
-        btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
-        btnFinancialReports = view.findViewById(R.id.btnFinancialReports);
-        tabAccounting = view.findViewById(R.id.tabAccounting);
-        
-        if (tabAccounting != null) {
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "القيود" : "Journal"));
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "دليل الحسابات" : "Chart of Accounts"));
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "ميزان المراجعة" : "Trial Balance"));
-        }
+    
+    private void initViews(View v) {
+        tabLayout = v.findViewById(R.id.tabAccounting);
+        rvData = v.findViewById(R.id.rvAccountingData);
+        pbLoading = v.findViewById(R.id.pbLoading);
+        emptyState = v.findViewById(R.id.emptyState);
+        tvEmptyText = v.findViewById(R.id.tvEmptyText);
+        etSearch = v.findViewById(R.id.etSearch);
+        kpiContainer = v.findViewById(R.id.kpiContainer);
+        fabCreateEntry = v.findViewById(R.id.fabCreateEntry);
     }
-
-    private void updateBranchDisplay() {
-        if (tvBranchName != null && branchesManager != null) {
-            String branchName = branchesManager.getActiveBranchDisplayName();
-            tvBranchName.setText("🏢 " + branchName);
-        }
-    }
-
-    private void applyPermissions() {
-        if (btnCreateManualEntry != null) {
-            boolean canEdit = permissionManager.canEdit("accounting") || 
-                              permissionManager.isAdmin() || 
-                              permissionManager.isBranchManager();
-            btnCreateManualEntry.setVisibility(canEdit ? View.VISIBLE : View.GONE);
-        }
+    
+    private void setupViewModel() {
+        viewModel = new ViewModelProvider(this).get(AccountingViewModel.class);
         
-        if (btnFinancialReports != null) {
-            boolean canView = permissionManager.canView("accounting") || 
-                              permissionManager.canView("reports") || 
-                              permissionManager.isAdmin() || 
-                              permissionManager.isBranchManager();
-            btnFinancialReports.setVisibility(canView ? View.VISIBLE : View.GONE);
-        }
-    }
-
-    private void setupRecyclerView() {
-        if (rvAccountingData != null) {
-            rvAccountingData.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new AccountingAdapter(filteredList);
-            rvAccountingData.setAdapter(adapter);
-        }
-    }
-
-    private void setupListeners() {
-        if (tabAccounting != null) {
-            tabAccounting.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-                @Override
-                public void onTabSelected(TabLayout.Tab tab) {
-                    switch (tab.getPosition()) {
-                        case 0: currentTab = "journal"; break;
-                        case 1: currentTab = "chart"; break;
-                        case 2: currentTab = "trial"; break;
-                    }
-                    loadData(currentTab);
-                }
-                @Override public void onTabUnselected(TabLayout.Tab tab) {}
-                @Override public void onTabReselected(TabLayout.Tab tab) {}
-            });
-        }
-
-        if (btnRefresh != null) {
-            btnRefresh.setOnClickListener(v -> {
-                refreshCurrentBranch();
-                loadData(currentTab);
-            });
-        }
+        viewModel.getLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            pbLoading.setVisibility(isLoading != null && isLoading ? View.VISIBLE : View.GONE);
+        });
         
-        if (btnCreateManualEntry != null) {
-            btnCreateManualEntry.setOnClickListener(v -> {
-                boolean canEdit = permissionManager.canEdit("accounting") || 
-                                  permissionManager.isAdmin() || 
-                                  permissionManager.isBranchManager();
-                if (canEdit) {
-                    showCreateEntryDialog();
-                } else {
-                    showToast(isArabic ? "⛔ غير مصرح لك بإنشاء قيود" : "⛔ Access Denied");
-                }
-            });
-        }
-        
-        if (btnFinancialReports != null) {
-            btnFinancialReports.setOnClickListener(v -> {
-                if (permissionManager.canAccessFragment("FinancialReports")) {
-                    if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).loadFragment(
-                            new MiraFinancialReportsFragment(), "FinancialReports");
-                    }
-                } else {
-                    showToast(isArabic ? "⛔ غير مصرح لك بالوصول للتقارير المالية" : "⛔ Access Denied");
-                }
-            });
-        }
-
-        if (etSearch != null) {
-            etSearch.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    filterData(s.toString());
-                }
-                @Override public void afterTextChanged(Editable s) {}
-            });
-        }
-    }
-
-    private void refreshCurrentBranch() {
-        if (branchesManager != null) {
-            currentBranchId = branchesManager.getActiveBranchId();
-            updateBranchDisplay();
-        }
-    }
-
-    private void loadData(String tab) {
-        if (isDestroyed.get() || !isAdded() || getContext() == null) return;
-        
-        if (permissionManager == null || (!permissionManager.canView("accounting") && 
-            !permissionManager.isAdmin() && 
-            !permissionManager.isBranchManager() && 
-            !"AUDITOR".equals(new SessionManager(requireContext()).getRoleString()))) {
-            showEmptyState(true);
-            if (tvEmptyData != null) {
-                tvEmptyData.setText(isArabic ? "⛔ غير مصرح لك بالوصول" : "⛔ Access Denied");
-            }
-            if (pbLoading != null) pbLoading.setVisibility(View.GONE);
-            return;
-        }
-        
-        refreshCurrentBranch();
-        
-        if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
-        if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
-        
-        executeSafely(() -> {
-            try {
-                String branchIdStr = String.valueOf(currentBranchId);
-                MiraApiClient.ApiResponse response = null;
-                
-                switch (tab) {
-                    case "journal":
-                        response = apiClient.getJournalEntries(branchIdStr);
-                        break;
-                    case "chart":
-                        response = apiClient.getChartOfAccounts();
-                        break;
-                    case "trial":
-                        response = apiClient.getTrialBalance(branchIdStr);
-                        break;
-                }
-                
-                final MiraApiClient.ApiResponse finalResponse = response;
-                
-                mainHandler.post(() -> {
-                    if (isDestroyed.get() || !isAdded()) return;
-                    
-                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
-                    
-                    if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
-                        parseAndDisplay(finalResponse.data, tab);
-                    } else {
-                        showEmptyState(true);
-                    }
-                });
-            } catch (Exception e) {
-                logNonFatal("loadData.thread", e);
-                mainHandler.post(() -> {
-                    if (isDestroyed.get() || !isAdded()) return;
-                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
-                    showEmptyState(true);
-                });
+        viewModel.getError().observe(getViewLifecycleOwner(), error -> {
+            if (error != null && !error.isEmpty()) {
+                Toast.makeText(requireContext(), "❌ " + error, Toast.LENGTH_SHORT).show();
+                viewModel.clearError();
             }
         });
     }
-
-    private void executeSafely(Runnable task) {
-        if (executor != null && !executor.isShutdown() && !executor.isTerminated()) {
-            try {
-                executor.execute(task);
+    
+    private void setupTabs() {
+        if (tabLayout == null) return;
+        
+        tabLayout.addTab(tabLayout.newTab().setText("📋 القيود"));
+        tabLayout.addTab(tabLayout.newTab().setText("⚖️ الميزان"));
+        tabLayout.addTab(tabLayout.newTab().setText("📊 الحسابات"));
+        tabLayout.addTab(tabLayout.newTab().setText("📈 الدخل"));
+        tabLayout.addTab(tabLayout.newTab().setText("💰 الميزانية"));
+        tabLayout.addTab(tabLayout.newTab().setText("🥇 الذهب"));
+        
+        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                switch (tab.getPosition()) {
+                    case 0: currentTab = "journal"; break;
+                    case 1: currentTab = "trial"; break;
+                    case 2: currentTab = "accounts"; break;
+                    case 3: currentTab = "income"; break;
+                    case 4: currentTab = "balance"; break;
+                    case 5: currentTab = "gold"; break;
+                }
+                loadCurrentTab();
+            }
+            
+            @Override public void onTabUnselected(TabLayout.Tab tab) {}
+            @Override public void onTabReselected(TabLayout.Tab tab) {
+                loadCurrentTab();
+            }
+        });
+    }
+    
+    private void setupRecyclerView() {
+        journalAdapter = new JournalEntryAdapter(entry -> {
+            // TODO: فتح تفاصيل القيد
+            Toast.makeText(requireContext(), 
+                "قيد: " + entry.entryNumber, Toast.LENGTH_SHORT).show();
+        });
+        
+        if (rvData != null) {
+            rvData.setLayoutManager(new LinearLayoutManager(getContext()));
+            rvData.setAdapter(journalAdapter);
+        }
+    }
+    
+    private void setupListeners() {
+        if (fabCreateEntry != null) {
+            fabCreateEntry.setOnClickListener(v -> {
+                Toast.makeText(requireContext(), "إنشاء قيد جديد", Toast.LENGTH_SHORT).show();
+                // TODO: فتح نافذة إنشاء القيد
+            });
+        }
+    }
+    
+    private void loadCurrentTab() {
+        String from = DateHelper.startOfYearApi();
+        String to = DateHelper.todayApi();
+        
+        switch (currentTab) {
+            case "journal":
+                observeJournalEntries();
+                viewModel.loadJournalEntries(1, 50, null);
+                break;
+                
+            case "trial":
+                observeTrialBalance();
+                viewModel.loadTrialBalance(from, to, 0);
+                break;
+                
+            case "accounts":
+                observeAccounts();
+                viewModel.loadAccounts(null, null);
+                break;
+                
+            case "income":
+                observeIncomeStatement();
+                viewModel.loadIncomeStatement(from, to, 0);
+                break;
+                
+            case "balance":
+                observeBalanceSheet();
+                viewModel.loadBalanceSheet(DateHelper.todayApi());
+                break;
+                
+            case "gold":
+                observeGoldMovement();
+                viewModel.loadGoldMovement(from, to, 0);
+                break;
+        }
+    }
+    
+    private void observeJournalEntries() {
+        viewModel.getJournalEntries().observe(getViewLifecycleOwner(), entries -> {
+            if (entries == null || entries.length == 0) {
+                showEmpty("لا توجد قيود");
                 return;
-            } catch (RejectedExecutionException e) {
-                logNonFatal("executeSafely.rejected", e);
-            }
-        }
-        new Thread(task).start();
-    }
-
-    private void parseAndDisplay(JSONObject data, String tab) {
-        try {
-            entriesList.clear();
-            JSONArray items = data.optJSONArray("data");
-            
-            if (items == null) {
-                JSONObject dataObj = data.optJSONObject("data");
-                if (dataObj != null) {
-                    items = dataObj.optJSONArray("entries");
-                    if (items == null) {
-                        items = dataObj.optJSONArray("accounts");
-                    }
-                }
             }
             
-            if (items != null && items.length() > 0) {
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject obj = items.getJSONObject(i);
-                    AccountingEntry entry = new AccountingEntry();
-                    entry.id = i + 1;
-                    entry.branchId = obj.optInt("branch_id", 0);
-                    entry.branchName = obj.optString("branch_name", "");
-                    
-                    if ("journal".equals(tab)) {
-                        entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
-                        entry.description = obj.optString("description", "—");
-                        entry.debit = safeDouble(obj.optString("total_debit", "0"));
-                        entry.credit = safeDouble(obj.optString("total_credit", "0"));
-                        entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
-                        entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
-                        
-                    } else if ("chart".equals(tab)) {
-                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
-                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
-                        entry.debit = safeDouble(obj.optString("opening_balance", "0"));
-                        entry.credit = 0;
-                        entry.goldDebit = safeDouble(obj.optString("opening_gold_grams", "0"));
-                        
-                    } else if ("trial".equals(tab)) {
-                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
-                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
-                        
-                        entry.debit = safeDouble(
-                            obj.optString("total_debit", 
-                            obj.optString("debit_total", 
-                            obj.optString("sum_debit", "0")))
-                        );
-                        entry.credit = safeDouble(
-                            obj.optString("total_credit", 
-                            obj.optString("credit_total", 
-                            obj.optString("sum_credit", "0")))
-                        );
-                        
-                        entry.goldDebit = safeDouble(
-                            obj.optString("total_gold_debit", 
-                            obj.optString("gold_debit", 
-                            obj.optString("total_gold_debit_grams", 
-                            obj.optString("sum_gold_debit", "0"))))
-                        );
-                        entry.goldCredit = safeDouble(
-                            obj.optString("total_gold_credit", 
-                            obj.optString("gold_credit", 
-                            obj.optString("total_gold_credit_grams", 
-                            obj.optString("sum_gold_credit", "0"))))
-                        );
-                    }
-                    
-                    entriesList.add(entry);
-                }
-            }
-            
-            filterData(etSearch != null ? etSearch.getText().toString() : "");
-            updateSummary();
-            showEmptyState(entriesList.isEmpty());
-            
-        } catch (Exception e) {
-            logNonFatal("parseAndDisplay", e);
-            showEmptyState(true);
-        }
+            showData();
+            journalAdapter.setItems(Arrays.asList(entries));
+            renderJournalKPIs(entries);
+        });
     }
-
-    private double safeDouble(String value) {
-        try {
-            return Double.parseDouble(value);
-        } catch (Exception e) {
-            return 0.0;
-        }
-    }
-
-    private void updateSummary() {
+    
+    private void renderJournalKPIs(JournalEntryDto[] entries) {
+        if (kpiContainer == null) return;
+        kpiContainer.removeAllViews();
+        
         double totalDebit = 0;
         double totalCredit = 0;
-        double totalGoldDebit = 0;
-        double totalGoldCredit = 0;
+        int posted = 0;
+        int draft = 0;
         
-        for (AccountingEntry entry : entriesList) {
-            totalDebit += entry.debit;
-            totalCredit += entry.credit;
-            totalGoldDebit += entry.goldDebit;
-            totalGoldCredit += entry.goldCredit;
+        for (JournalEntryDto e : entries) {
+            totalDebit += e.totalDebit;
+            totalCredit += e.totalCredit;
+            if (e.isPosted()) posted++;
+            if (e.isDraft()) draft++;
         }
         
-        double netGold = totalGoldDebit - totalGoldCredit;
-        
-        if (tvTodayRevenue != null) {
-            tvTodayRevenue.setText(String.format(Locale.US, "%,.2f", totalDebit));
-        }
-        
-        if (tvTotalGoldVolume != null) {
-            if (netGold != 0) {
-                tvTotalGoldVolume.setText(String.format(Locale.US, "%+.3f g", netGold));
-                tvTotalGoldVolume.setTextColor(netGold > 0 ? 
-                    Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
-            } else {
-                tvTotalGoldVolume.setText("0.000 g");
-                tvTotalGoldVolume.setTextColor(Color.parseColor("#95A5A6"));
+        addKpiCard("📋 إجمالي القيود", String.valueOf(entries.length), "#3498DB");
+        addKpiCard("✅ معتمدة", String.valueOf(posted), "#27AE60");
+        addKpiCard("📝 مسودة", String.valueOf(draft), "#F39C12");
+        addKpiCard("💰 الإجمالي", NumberFormatter.moneyShort(totalDebit), "#9B59B6");
+    }
+    
+    private void observeTrialBalance() {
+        viewModel.getTrialBalance().observe(getViewLifecycleOwner(), tb -> {
+            if (tb == null || tb.rows == null || tb.rows.isEmpty()) {
+                showEmpty("لا توجد بيانات في هذه الفترة");
+                return;
             }
-        }
-    }
-
-    private void filterData(String query) {
-        filteredList.clear();
-        
-        for (AccountingEntry entry : entriesList) {
-            if (query == null || query.isEmpty() ||
-                (entry.code != null && entry.code.toLowerCase().contains(query.toLowerCase())) ||
-                (entry.description != null && entry.description.toLowerCase().contains(query.toLowerCase()))) {
-                filteredList.add(entry);
-            }
-        }
-        
-        if (adapter != null) {
-            adapter.notifyDataSetChanged();
-        }
-    }
-
-    private void showEmptyState(boolean show) {
-        if (isDestroyed.get() || !isAdded()) return;
-        
-        if (tvEmptyData != null) {
-            tvEmptyData.setVisibility(show ? View.VISIBLE : View.GONE);
-        }
-        if (rvAccountingData != null) {
-            rvAccountingData.setVisibility(show ? View.GONE : View.VISIBLE);
-        }
-    }
-
-    private void showCreateEntryDialog() {
-        if (getContext() == null || isDestroyed.get()) return;
-        
-        boolean canEdit = permissionManager.canEdit("accounting") || 
-                          permissionManager.isAdmin() || 
-                          permissionManager.isBranchManager();
-        if (!canEdit) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            return;
-        }
-        
-        Dialog dialog = new Dialog(getContext());
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_create_journal_entry);
-        
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
-        }
-        
-        EditText etRef = dialog.findViewById(R.id.etDialogRef);
-        EditText etDesc = dialog.findViewById(R.id.etDialogDesc);
-        EditText etGrossWeight = dialog.findViewById(R.id.etDialogGrossWeight);
-        Spinner spKarat = dialog.findViewById(R.id.spDialogKarat);
-        EditText etCashAmount = dialog.findViewById(R.id.etDialogCashAmount);
-        MaterialButton btnCancel = dialog.findViewById(R.id.btnDialogCancel);
-        MaterialButton btnSave = dialog.findViewById(R.id.btnDialogSave);
-        
-        String[] karats = {"24K", "22K", "21K", "18K", "14K"};
-        ArrayAdapter<String> karatAdapter = new ArrayAdapter<>(getContext(), 
-            android.R.layout.simple_spinner_dropdown_item, karats);
-        if (spKarat != null) spKarat.setAdapter(karatAdapter);
-        
-        if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
-        
-        if (btnSave != null) {
-            btnSave.setOnClickListener(v -> {
-                String ref = etRef != null ? etRef.getText().toString().trim() : "";
-                String desc = etDesc != null ? etDesc.getText().toString().trim() : "";
-                String grossStr = etGrossWeight != null ? etGrossWeight.getText().toString().trim() : "";
-                String cashStr = etCashAmount != null ? etCashAmount.getText().toString().trim() : "";
-                
-                if (ref.isEmpty() || desc.isEmpty()) {
-                    showToast(isArabic ? "يرجى تعبئة المرجع والبيان" : "Please fill reference and description");
-                    return;
-                }
-                
-                double grossWeight = 0;
-                double cashAmount = 0;
-                try {
-                    grossWeight = grossStr.isEmpty() ? 0 : Double.parseDouble(grossStr);
-                    cashAmount = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
-                } catch (NumberFormatException e) {
-                    showToast(isArabic ? "يرجى إدخال قيم عددية صحيحة" : "Invalid number format");
-                    return;
-                }
-
-                String karat = spKarat != null ? spKarat.getSelectedItem().toString() : "21K";
-                
-                createJournalEntry(ref, desc, grossWeight, karat, cashAmount);
-                dialog.dismiss();
-            });
-        }
-        
-        dialog.show();
-    }
-
-    private void createJournalEntry(String ref, String desc, double grossWeight, String karat, double cashAmount) {
-        executeSafely(() -> {
-            try {
-                refreshCurrentBranch();
-                
-                JSONObject payload = new JSONObject();
-                payload.put("reference", ref);
-                payload.put("description", desc);
-                payload.put("entry_date", new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()));
-                payload.put("source_type", "manual");
-                payload.put("branch_id", currentBranchId);
-                
-                double karatFactor = getKaratFactor(karat);
-                double net24K = grossWeight * karatFactor;
-                
-                JSONArray lines = new JSONArray();
-                
-                JSONObject debitLine = new JSONObject();
-                debitLine.put("account_id", 1);
-                debitLine.put("description", "شراء " + ref);
-                debitLine.put("debit", cashAmount);
-                debitLine.put("credit", 0);
-                debitLine.put("gold_debit", net24K);
-                debitLine.put("gold_credit", 0);
-                lines.put(debitLine);
-                
-                JSONObject creditLine = new JSONObject();
-                creditLine.put("account_id", 2);
-                creditLine.put("description", "دفع " + ref);
-                creditLine.put("debit", 0);
-                creditLine.put("credit", cashAmount);
-                creditLine.put("gold_debit", 0);
-                creditLine.put("gold_credit", 0);
-                lines.put(creditLine);
-                
-                payload.put("lines", lines);
-                payload.put("total_debit", cashAmount);
-                payload.put("total_credit", cashAmount);
-                payload.put("total_gold_debit", net24K);
-                payload.put("total_gold_credit", 0);
-                
-                MiraApiClient.ApiResponse response = apiClient.createJournalEntry(payload);
-                
-                mainHandler.post(() -> {
-                    if (isDestroyed.get() || !isAdded()) return;
-                    
-                    if (response != null && response.isSuccess) {
-                        showToast(isArabic ? "✅ تم إنشاء القيد" : "✅ Entry created");
-                        loadData(currentTab);
-                    } else {
-                        String error = response != null ? response.error : "Unknown";
-                        showToast((isArabic ? "❌ فشل: " : "❌ Failed: ") + error);
-                    }
-                });
-            } catch (Exception e) {
-                logNonFatal("createJournalEntry.thread", e);
-                mainHandler.post(() -> {
-                    if (isDestroyed.get() || !isAdded()) return;
-                    showToast(isArabic ? "❌ خطأ في الإنشاء" : "❌ Error");
-                });
-            }
+            
+            showData();
+            renderTrialBalanceKPIs(tb);
+            // TODO: عرض الجدول
         });
     }
-
-    private double getKaratFactor(String karat) {
-        switch (karat.toUpperCase()) {
-            case "24K": return 1.0;
-            case "22K": return 0.9166;
-            case "21K": return 0.875;
-            case "18K": return 0.750;
-            case "14K": return 0.5833;
-            default: return 0.875;
-        }
-    }
-
-    private void showToast(String message) {
-        try {
-            if (isAdded() && !isDestroyed.get() && getContext() != null) {
-                Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            logNonFatal("showToast", e);
-        }
-    }
-
-    private void logNonFatal(String location, Throwable throwable) {
-        Log.e(TAG, "Location: " + location + " | Error: " + throwable.getMessage(), throwable);
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (branchesManager != null) {
-            int newBranchId = branchesManager.getActiveBranchId();
-            if (newBranchId != currentBranchId) {
-                currentBranchId = newBranchId;
-                updateBranchDisplay();
-                loadData(currentTab);
-            }
-        }
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        isDestroyed.set(true);
-        mainHandler.removeCallbacksAndMessages(null);
-    }
-
-    private static class AccountingEntry {
-        int id;
-        String code;
-        String description;
-        double debit;
-        double credit;
-        double goldDebit;
-        double goldCredit;
-        int branchId;
-        String branchName;
-    }
-
-    private class AccountingAdapter extends RecyclerView.Adapter<AccountingAdapter.ViewHolder> {
+    
+    private void renderTrialBalanceKPIs(TrialBalanceDto tb) {
+        if (kpiContainer == null) return;
+        kpiContainer.removeAllViews();
         
-        private final List<AccountingEntry> items;
-        
-        AccountingAdapter(List<AccountingEntry> items) {
-            this.items = items;
-        }
-        
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_accounting_entry, parent, false);
-            return new ViewHolder(view);
-        }
-        
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            AccountingEntry entry = items.get(position);
-            holder.tvCode.setText(entry.code != null ? entry.code : "—");
-            holder.tvDescription.setText(entry.description != null ? entry.description : "—");
-            
-            double netGold = entry.goldDebit - entry.goldCredit;
-            
-            if (netGold > 0) {
-                holder.tvGold.setText(String.format(Locale.US, "+%.3f g", netGold));
-                holder.tvGold.setTextColor(Color.parseColor("#2ECC71"));
-            } else if (netGold < 0) {
-                holder.tvGold.setText(String.format(Locale.US, "%.3f g", netGold));
-                holder.tvGold.setTextColor(Color.parseColor("#E74C3C"));
-            } else {
-                holder.tvGold.setText("0.000 g");
-                holder.tvGold.setTextColor(Color.parseColor("#95A5A6"));
+        addKpiCard("📊 مدين", NumberFormatter.moneyShort(tb.totalDebit), "#3498DB");
+        addKpiCard("📊 دائن", NumberFormatter.moneyShort(tb.totalCredit), "#E74C3C");
+        addKpiCard("⚖️ الحالة", tb.balanced ? "✅ متوازن" : "❌ غير متوازن", 
+                  tb.balanced ? "#27AE60" : "#C0392B");
+        addKpiCard("📈 الحسابات", String.valueOf(tb.rows.size()), "#9B59B6");
+    }
+    
+    private void observeAccounts() {
+        viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
+            if (accounts == null || accounts.length == 0) {
+                showEmpty("لا توجد حسابات");
+                return;
             }
             
-            holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
-            holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
-        }
-        
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-        
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvCode, tvDescription, tvGold, tvDebit, tvCredit;
+            showData();
+            addKpiCard("📊 الحسابات", String.valueOf(accounts.length), "#3498DB");
+        });
+    }
+    
+    private void observeIncomeStatement() {
+        viewModel.getIncomeStatement().observe(getViewLifecycleOwner(), is -> {
+            if (is == null) return;
             
-            ViewHolder(View itemView) {
-                super(itemView);
-                tvCode = itemView.findViewById(R.id.tvRowCode);
-                tvDescription = itemView.findViewById(R.id.tvRowDescription);
-                tvGold = itemView.findViewById(R.id.tvRowGold);
-                tvDebit = itemView.findViewById(R.id.tvRowDebit);
-                tvCredit = itemView.findViewById(R.id.tvRowCredit);
-            }
+            showData();
+            if (kpiContainer == null) return;
+            kpiContainer.removeAllViews();
+            
+            addKpiCard("📈 الإيرادات", NumberFormatter.moneyShort(is.netRevenue), "#3498DB");
+            addKpiCard("💵 التكلفة", NumberFormatter.moneyShort(is.cogs), "#E74C3C");
+            addKpiCard("💰 الربح", NumberFormatter.moneyShort(is.netProfit), 
+                      is.netProfit >= 0 ? "#27AE60" : "#C0392B");
+            addKpiCard("📊 الهامش", NumberFormatter.percent(is.netProfitMargin), "#9B59B6");
+        });
+    }
+    
+    private void observeBalanceSheet() {
+        viewModel.getBalanceSheet().observe(getViewLifecycleOwner(), bs -> {
+            if (bs == null) return;
+            
+            showData();
+            if (kpiContainer == null) return;
+            kpiContainer.removeAllViews();
+            
+            addKpiCard("📊 الأصول", NumberFormatter.moneyShort(bs.totalAssets), "#3498DB");
+            addKpiCard("📉 الالتزامات", NumberFormatter.moneyShort(bs.totalLiabilities), "#E74C3C");
+            addKpiCard("💰 حقوق", NumberFormatter.moneyShort(bs.totalEquityWithIncome), "#9B59B6");
+            addKpiCard("⚖️ الحالة", bs.balanced ? "✅ متوازن" : "❌", 
+                      bs.balanced ? "#27AE60" : "#C0392B");
+        });
+    }
+    
+    private void observeGoldMovement() {
+        viewModel.getGoldMovement().observe(getViewLifecycleOwner(), gm -> {
+            if (gm == null || gm.totals == null) return;
+            
+            showData();
+            if (kpiContainer == null) return;
+            kpiContainer.removeAllViews();
+            
+            addKpiCard("📥 وارد", NumberFormatter.gold(gm.totals.goldIn), "#27AE60");
+            addKpiCard("📤 صادر", NumberFormatter.gold(gm.totals.goldOut), "#E74C3C");
+            addKpiCard("🥇 الرصيد", NumberFormatter.gold(gm.totals.closingGold), "#D4AF37");
+        });
+    }
+    
+    private void addKpiCard(String title, String value, String color) {
+        if (kpiContainer == null || getContext() == null) return;
+        
+        View card = LayoutInflater.from(getContext())
+            .inflate(R.layout.kpi_card, kpiContainer, false);
+        
+        TextView tvTitle = card.findViewById(R.id.tvKpiTitle);
+        TextView tvValue = card.findViewById(R.id.tvKpiValue);
+        View indicator = card.findViewById(R.id.kpiIndicator);
+        
+        tvTitle.setText(title);
+        tvValue.setText(value);
+        tvValue.setTextColor(android.graphics.Color.parseColor(color));
+        indicator.setBackgroundColor(android.graphics.Color.parseColor(color));
+        
+        kpiContainer.addView(card);
+    }
+    
+    private void showEmpty(String message) {
+        if (emptyState != null) {
+            emptyState.setVisibility(View.VISIBLE);
         }
+        if (rvData != null) {
+            rvData.setVisibility(View.GONE);
+        }
+        if (tvEmptyText != null) {
+            tvEmptyText.setText(message);
+        }
+    }
+    
+    private void showData() {
+        if (emptyState != null) emptyState.setVisibility(View.GONE);
+        if (rvData != null) rvData.setVisibility(View.VISIBLE);
     }
 }
