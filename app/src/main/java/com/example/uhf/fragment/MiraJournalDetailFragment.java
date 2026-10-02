@@ -59,26 +59,28 @@ public class MiraJournalDetailFragment extends Fragment {
         return view;
     }
 
-    private void initViews(View v) {
-        toolbar = v.findViewById(R.id.toolbar);
-        tvEntryNumber = v.findViewById(R.id.tvEntryNumber);
-        tvStatus = v.findViewById(R.id.tvStatus);
-        tvDate = v.findViewById(R.id.tvDate);
-        tvReference = v.findViewById(R.id.tvReference);
-        tvDescription = v.findViewById(R.id.tvDescription);
-        tvCurrency = v.findViewById(R.id.tvCurrency);
-        tvExchangeRate = v.findViewById(R.id.tvExchangeRate);
-        tvTotalDebit = v.findViewById(R.id.tvTotalDebit);
-        tvTotalCredit = v.findViewById(R.id.tvTotalCredit);
-        tvTotalGold = v.findViewById(R.id.tvTotalGold);
-        linesContainer = v.findViewById(R.id.linesContainer);
-        btnPost = v.findViewById(R.id.btnPost);
-        btnReverse = v.findViewById(R.id.btnReverse);
-        btnShare = v.findViewById(R.id.btnShare);
-        btnPrint = v.findViewById(R.id.btnPrint);
+    private void initViews(View rootView) {
+    toolbar = rootView.findViewById(R.id.toolbar);
+    tvEntryNumber = rootView.findViewById(R.id.tvEntryNumber);
+    tvStatus = rootView.findViewById(R.id.tvStatus);
+    tvDate = rootView.findViewById(R.id.tvDate);
+    tvReference = rootView.findViewById(R.id.tvReference);
+    tvDescription = rootView.findViewById(R.id.tvDescription);
+    tvCurrency = rootView.findViewById(R.id.tvCurrency);
+    tvExchangeRate = rootView.findViewById(R.id.tvExchangeRate);
+    tvTotalDebit = rootView.findViewById(R.id.tvTotalDebit);
+    tvTotalCredit = rootView.findViewById(R.id.tvTotalCredit);
+    tvTotalGold = rootView.findViewById(R.id.tvTotalGold);
+    linesContainer = rootView.findViewById(R.id.linesContainer);
+    btnPost = rootView.findViewById(R.id.btnPost);
+    btnReverse = rootView.findViewById(R.id.btnReverse);
+    btnShare = rootView.findViewById(R.id.btnShare);
+    btnPrint = rootView.findViewById(R.id.btnPrint);
 
-        toolbar.setNavigationOnClickListener(v ->
-            requireActivity().getSupportFragmentManager().popBackStack());
+    // ✅ الحل: استخدام اسم مختلف للمتغير في lambda
+    toolbar.setNavigationOnClickListener(view -> {
+        requireActivity().getSupportFragmentManager().popBackStack();
+    });
     }
 
     private void setupViewModel() {
