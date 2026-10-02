@@ -11,7 +11,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
 import com.example.uhf.manager.PermissionManager;
@@ -21,25 +20,29 @@ import com.google.android.material.tabs.TabLayout;
 /**
  * الشاشة الرئيسية للنظام المحاسبي
  * 
- * تحتوي على 7 تبويبات:
- * 1. 📋 القيود اليومية
- * 2. ⚖️ ميزان المراجعة
- * 3. 📊 دليل الحسابات
- * 4. 📈 قائمة الدخل
- * 5. 💰 الميزانية العمومية
- * 6. 🥇 حركة الذهب
- * 7. 📖 دفتر الأستاذ
+ * ✅ 7 تبويبات
+ * ✅ Container داخلي مستقل (tabContentContainer)
+ * ✅ لا يتعارض مع fragment_container في Activity
  * 
- * @version 2.0.0
+ * @version 2.1.0 (FINAL)
  */
 public class MiraAccountingFragment extends Fragment {
 
     private static final String TAG = "MiraAccountingFragment";
     private static final String KEY_CURRENT_TAB = "current_tab";
 
-    // View
+    // ✅ IDs الخاصة بالتبويبات
+    private static final int TAB_JOURNAL  = 0;
+    private static final int TAB_TRIAL    = 1;
+    private static final int TAB_ACCOUNTS = 2;
+    private static final int TAB_INCOME   = 3;
+    private static final int TAB_BALANCE  = 4;
+    private static final int TAB_GOLD     = 5;
+    private static final int TAB_LEDGER   = 6;
+
+    // Views
     private TabLayout tabLayout;
-    private FrameLayout fragmentContainer;
+    private FrameLayout tabContentContainer;  // ✅ الاسم الجديد
 
     // Session
     private PermissionManager permissionManager;
@@ -48,16 +51,6 @@ public class MiraAccountingFragment extends Fragment {
 
     // State
     private int currentTabIndex = 0;
-    private Fragment currentFragment;
-
-    // Tab definitions
-    private static final int TAB_JOURNAL = 0;
-    private static final int TAB_TRIAL = 1;
-    private static final int TAB_ACCOUNTS = 2;
-    private static final int TAB_INCOME = 3;
-    private static final int TAB_BALANCE = 4;
-    private static final int TAB_GOLD = 5;
-    private static final int TAB_LEDGER = 6;
 
     // ═══════════════════════════════════════════════════════════
     //  Lifecycle
@@ -68,12 +61,15 @@ public class MiraAccountingFragment extends Fragment {
         super.onCreate(savedInstanceState);
 
         if (getContext() != null) {
-            permissionManager = PermissionManager.getInstance(requireContext());
-            sessionManager = new SessionManager(requireContext());
+            try {
+                permissionManager = PermissionManager.getInstance(requireContext());
+                sessionManager = new SessionManager(requireContext());
+            } catch (Exception e) {
+                Log.e(TAG, "Session init error: " + e.getMessage());
+            }
             isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
         }
 
-        // استرجاع التبويب الحالي
         if (savedInstanceState != null) {
             currentTabIndex = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
         }
@@ -87,9 +83,18 @@ public class MiraAccountingFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_mira_accounting_v2, container, false);
 
         initViews(view);
+
+        if (tabLayout == null || tabContentContainer == null) {
+            Log.e(TAG, "❌ Critical views not found in layout!");
+            return view;
+        }
+
         checkPermissions();
         setupTabs();
-        loadTab(currentTabIndex);
+
+        if (savedInstanceState == null) {
+            loadTab(currentTabIndex);
+        }
 
         return view;
     }
@@ -100,39 +105,50 @@ public class MiraAccountingFragment extends Fragment {
         outState.putInt(KEY_CURRENT_TAB, currentTabIndex);
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        tabLayout = null;
+        tabContentContainer = null;
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Initialization
     // ═══════════════════════════════════════════════════════════
 
     private void initViews(View view) {
+        // ✅ الاسم الجديد: tabContentContainer (وليس fragmentContainer)
         tabLayout = view.findViewById(R.id.tabAccounting);
-        fragmentContainer = view.findViewById(R.id.fragmentContainer);
+        tabContentContainer = view.findViewById(R.id.tabContentContainer);
 
         if (tabLayout == null) {
-            Log.e(TAG, "tabLayout not found in layout!");
+            Log.e(TAG, "❌ tabAccounting NOT FOUND in fragment_mira_accounting_v2.xml!");
         }
-        if (fragmentContainer == null) {
-            Log.e(TAG, "fragmentContainer not found in layout!");
+        if (tabContentContainer == null) {
+            Log.e(TAG, "❌ tabContentContainer NOT FOUND in fragment_mira_accounting_v2.xml!");
         }
     }
 
-    /**
-     * فحص الصلاحيات
-     */
     private void checkPermissions() {
         if (permissionManager == null) return;
 
-        boolean hasAccess = permissionManager.canView("accounting")
-            || permissionManager.isAdmin()
-            || permissionManager.isBranchManager()
-            || "AUDITOR".equals(sessionManager != null ? sessionManager.getRoleString() : "");
+        try {
+            boolean hasAccess = permissionManager.canView("accounting")
+                || permissionManager.isAdmin()
+                || permissionManager.isBranchManager()
+                || (sessionManager != null && "AUDITOR".equals(sessionManager.getRoleString()));
 
-        if (!hasAccess) {
-            Toast.makeText(requireContext(),
-                isArabic ? "⛔ غير مصرح لك بالوصول للمحاسبة" : "⛔ Access Denied",
-                Toast.LENGTH_LONG).show();
-            // يمكن إغلاق الشاشة
-            requireActivity().onBackPressed();
+            if (!hasAccess) {
+                Toast.makeText(requireContext(),
+                    isArabic ? "⛔ غير مصرح لك بالوصول للمحاسبة" : "⛔ Access Denied",
+                    Toast.LENGTH_LONG).show();
+
+                if (getActivity() != null) {
+                    getActivity().onBackPressed();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "checkPermissions error: " + e.getMessage());
         }
     }
 
@@ -143,25 +159,21 @@ public class MiraAccountingFragment extends Fragment {
     private void setupTabs() {
         if (tabLayout == null) return;
 
-        // إزالة أي تبويبات سابقة
         tabLayout.removeAllTabs();
 
-        // إضافة التبويبات
-        addTab("📋 القيود", "📋 Journal");
-        addTab("⚖️ الميزان", "⚖️ Trial Balance");
-        addTab("📊 الحسابات", "📊 Accounts");
-        addTab("📈 الدخل", "📈 Income");
-        addTab("💰 الميزانية", "💰 Balance");
-        addTab("🥇 الذهب", "🥇 Gold");
-        addTab("📖 الأستاذ", "📖 Ledger");
+        addTab("📋 القيود",     "📋 Journal");
+        addTab("⚖️ الميزان",    "⚖️ Trial");
+        addTab("📊 الحسابات",   "📊 Accounts");
+        addTab("📈 الدخل",      "📈 Income");
+        addTab("💰 الميزانية",  "💰 Balance");
+        addTab("🥇 الذهب",      "🥇 Gold");
+        addTab("📖 الأستاذ",    "📖 Ledger");
 
-        // التبويب الحالي
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) {
             initialTab.select();
         }
 
-        // مستمع التغيير
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
@@ -172,22 +184,15 @@ public class MiraAccountingFragment extends Fragment {
                 }
             }
 
-            @Override
-            public void onTabUnselected(TabLayout.Tab tab) {
-                // لا شيء
-            }
+            @Override public void onTabUnselected(TabLayout.Tab tab) {}
 
             @Override
             public void onTabReselected(TabLayout.Tab tab) {
-                // إعادة التحميل عند الضغط مرة أخرى
                 loadTab(tab.getPosition());
             }
         });
     }
 
-    /**
-     * إضافة تبويب جديد مع دعم اللغة
-     */
     private void addTab(String arText, String enText) {
         if (tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.newTab();
@@ -199,70 +204,54 @@ public class MiraAccountingFragment extends Fragment {
     //  Tab Loading
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * تحميل الشاشة المناسبة للتبويب المحدد
-     */
     private void loadTab(int tabIndex) {
-        if (fragmentContainer == null) return;
-
-        Fragment targetFragment;
-
-        switch (tabIndex) {
-            case TAB_JOURNAL:
-                targetFragment = new MiraJournalFragment();
-                break;
-
-            case TAB_TRIAL:
-                targetFragment = new MiraTrialBalanceFragment();
-                break;
-
-            case TAB_ACCOUNTS:
-                targetFragment = new MiraAccountTreeFragment();
-                break;
-
-            case TAB_INCOME:
-                targetFragment = new MiraIncomeStatementFragment();
-                break;
-
-            case TAB_BALANCE:
-                targetFragment = new MiraBalanceSheetFragment();
-                break;
-
-            case TAB_GOLD:
-                targetFragment = new MiraGoldMovementFragment();
-                break;
-
-            case TAB_LEDGER:
-                targetFragment = new MiraGeneralLedgerFragment();
-                break;
-
-            default:
-                targetFragment = new MiraJournalFragment();
-                break;
+        if (tabContentContainer == null) {
+            Log.e(TAG, "❌ tabContentContainer is null!");
+            return;
         }
 
-        // استبدال الشاشة الحالية
-        if (targetFragment != null && isAdded() && !isDetached()) {
-            try {
-                FragmentTransaction transaction = getChildFragmentManager().beginTransaction();
+        if (!isAdded() || isDetached()) {
+            Log.w(TAG, "⚠️ Fragment not attached");
+            return;
+        }
 
-                // انتقال ناعم
-                transaction.setCustomAnimations(
-                    android.R.anim.fade_in,
-                    android.R.anim.fade_out
-                );
+        Fragment targetFragment = createFragmentForTab(tabIndex);
 
-                transaction.replace(R.id.fragmentContainer, targetFragment);
-                transaction.commit();
+        if (targetFragment == null) {
+            Log.e(TAG, "❌ Cannot create fragment for tab " + tabIndex);
+            return;
+        }
 
-                currentFragment = targetFragment;
+        try {
+            // ✅ المفتاح: tabContentContainer (وليس fragmentContainer)
+            getChildFragmentManager()
+                .beginTransaction()
+                .replace(R.id.tabContentContainer, targetFragment)
+                .commitAllowingStateLoss();
 
-                Log.d(TAG, "Loaded tab " + tabIndex + ": " + targetFragment.getClass().getSimpleName());
+            Log.d(TAG, "✅ Tab " + tabIndex + " loaded: " 
+                + targetFragment.getClass().getSimpleName());
 
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading fragment", e);
-                Toast.makeText(requireContext(), "❌ خطأ في تحميل الشاشة", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error loading tab " + tabIndex, e);
+        }
+    }
+
+    private Fragment createFragmentForTab(int tabIndex) {
+        try {
+            switch (tabIndex) {
+                case TAB_JOURNAL:  return new MiraJournalFragment();
+                case TAB_TRIAL:    return new MiraTrialBalanceFragment();
+                case TAB_ACCOUNTS: return new MiraAccountTreeFragment();
+                case TAB_INCOME:   return new MiraIncomeStatementFragment();
+                case TAB_BALANCE:  return new MiraBalanceSheetFragment();
+                case TAB_GOLD:     return new MiraGoldMovementFragment();
+                case TAB_LEDGER:   return new MiraGeneralLedgerFragment();
+                default:           return new MiraJournalFragment();
             }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Cannot create fragment for tab " + tabIndex, e);
+            return null;
         }
     }
 
@@ -270,9 +259,6 @@ public class MiraAccountingFragment extends Fragment {
     //  Public API
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * التنقل إلى تبويب محدد برمجياً
-     */
     public void navigateToTab(int tabIndex) {
         if (tabIndex < 0 || tabIndex > TAB_LEDGER) return;
         if (tabLayout == null) return;
@@ -283,73 +269,7 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-    /**
-     * التنقل إلى دفتر أستاذ حساب محدد
-     */
-    public void navigateToGeneralLedger(long accountId) {
-        Bundle args = new Bundle();
-        args.putLong("account_id", accountId);
-
-        MiraGeneralLedgerFragment glFragment = new MiraGeneralLedgerFragment();
-        glFragment.setArguments(args);
-
-        if (fragmentContainer != null && isAdded()) {
-            getChildFragmentManager().beginTransaction()
-                .replace(R.id.fragmentContainer, glFragment)
-                .addToBackStack(null)
-                .commit();
-        }
-    }
-
-    /**
-     * التنقل إلى تفاصيل قيد محدد
-     */
-    public void navigateToJournalDetail(long entryId) {
-        Bundle args = new Bundle();
-        args.putLong("entry_id", entryId);
-
-        MiraJournalDetailFragment detailFragment = new MiraJournalDetailFragment();
-        detailFragment.setArguments(args);
-
-        if (isAdded()) {
-            requireActivity().getSupportFragmentManager().beginTransaction()
-                .replace(android.R.id.content, detailFragment)
-                .addToBackStack(null)
-                .commit();
-        }
-    }
-
-    /**
-     * إعادة تحميل التبويب الحالي
-     */
     public void refreshCurrentTab() {
         loadTab(currentTabIndex);
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Lifecycle - إضافية
-    // ═══════════════════════════════════════════════════════════
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        // يمكن إعادة تحميل البيانات عند العودة
-        Log.d(TAG, "onResume - current tab: " + currentTabIndex);
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        Log.d(TAG, "onPause");
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        // تنظيف
-        tabLayout = null;
-        fragmentContainer = null;
-        currentFragment = null;
-    }
 }
-
