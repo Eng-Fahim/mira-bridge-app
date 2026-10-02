@@ -60,27 +60,27 @@ public class MiraJournalDetailFragment extends Fragment {
     }
 
     private void initViews(View rootView) {
-    toolbar = rootView.findViewById(R.id.toolbar);
-    tvEntryNumber = rootView.findViewById(R.id.tvEntryNumber);
-    tvStatus = rootView.findViewById(R.id.tvStatus);
-    tvDate = rootView.findViewById(R.id.tvDate);
-    tvReference = rootView.findViewById(R.id.tvReference);
-    tvDescription = rootView.findViewById(R.id.tvDescription);
-    tvCurrency = rootView.findViewById(R.id.tvCurrency);
-    tvExchangeRate = rootView.findViewById(R.id.tvExchangeRate);
-    tvTotalDebit = rootView.findViewById(R.id.tvTotalDebit);
-    tvTotalCredit = rootView.findViewById(R.id.tvTotalCredit);
-    tvTotalGold = rootView.findViewById(R.id.tvTotalGold);
-    linesContainer = rootView.findViewById(R.id.linesContainer);
-    btnPost = rootView.findViewById(R.id.btnPost);
-    btnReverse = rootView.findViewById(R.id.btnReverse);
-    btnShare = rootView.findViewById(R.id.btnShare);
-    btnPrint = rootView.findViewById(R.id.btnPrint);
+        toolbar = rootView.findViewById(R.id.toolbar);
+        tvEntryNumber = rootView.findViewById(R.id.tvEntryNumber);
+        tvStatus = rootView.findViewById(R.id.tvStatus);
+        tvDate = rootView.findViewById(R.id.tvDate);
+        tvReference = rootView.findViewById(R.id.tvReference);
+        tvDescription = rootView.findViewById(R.id.tvDescription);
+        tvCurrency = rootView.findViewById(R.id.tvCurrency);
+        tvExchangeRate = rootView.findViewById(R.id.tvExchangeRate);
+        tvTotalDebit = rootView.findViewById(R.id.tvTotalDebit);
+        tvTotalCredit = rootView.findViewById(R.id.tvTotalCredit);
+        tvTotalGold = rootView.findViewById(R.id.tvTotalGold);
+        linesContainer = rootView.findViewById(R.id.linesContainer);
+        btnPost = rootView.findViewById(R.id.btnPost);
+        btnReverse = rootView.findViewById(R.id.btnReverse);
+        btnShare = rootView.findViewById(R.id.btnShare);
+        btnPrint = rootView.findViewById(R.id.btnPrint);
 
-    // ✅ الحل: استخدام اسم مختلف للمتغير في lambda
-    toolbar.setNavigationOnClickListener(view -> {
-        requireActivity().getSupportFragmentManager().popBackStack();
-    });
+        // ✅ الحل: استخدام اسم مختلف للمتغير في lambda
+        toolbar.setNavigationOnClickListener(view -> {
+            requireActivity().getSupportFragmentManager().popBackStack();
+        });
     }
 
     private void setupViewModel() {
@@ -182,7 +182,6 @@ public class MiraJournalDetailFragment extends Fragment {
         });
 
         btnReverse.setOnClickListener(v -> {
-            // TODO: نافذة إدخال سبب العكس
             Toast.makeText(requireContext(), "🔧 العكس قيد التطوير", Toast.LENGTH_SHORT).show();
         });
 
