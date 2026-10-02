@@ -5,14 +5,15 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://www.jitpack.io' }
+        maven { url 'https://jitpack.io' }  // ⚠️ ضروري لـ MPAndroidChart
     }
 }
 
-rootProject.name = "uhf-uart-demo"
+rootProject.name = "MIRA Jewelry"
 include ':app'
