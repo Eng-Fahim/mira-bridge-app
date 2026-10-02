@@ -11,8 +11,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.api.dto.JournalEntryDto;
-import com.example.uhf.util.DateHelper;
-import com.example.uhf.util.NumberFormatter;
+import com.example.uhf.utils.DateHelper;
+import com.example.uhf.utils.NumberFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
