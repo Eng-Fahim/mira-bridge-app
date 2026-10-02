@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="6dp"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- شريط الحالة العمودي -->
+        <View
+            android:id="@+id/statusIndicator"
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="#F39C12"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <!-- الصف 1: الرقم + التاريخ + الحالة -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tvEntryNumber"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="JE-2026-00001"
+                    android:textColor="#2C3E50"
+                    android:textSize="14sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tvEntryDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10/02/2026"
+                    android:textColor="#7F8C8D"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"/>
+
+                <TextView
+                    android:id="@+id/tvEntryStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="معتمد"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"/>
+            </LinearLayout>
+
+            <!-- البيان -->
+            <TextView
+                android:id="@+id/tvEntryDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="بيع ذهب للعميل أحمد"
+                android:textColor="#34495E"
+                android:textSize="13sp"
+                android:layout_marginTop="6dp"
+                android:maxLines="2"
+                android:ellipsize="end"/>
+
+            <!-- الصف 3: المبلغ + الذهب -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <TextView
+                    android:id="@+id/tvEntryAmount"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="5,000,000.00 ر.ي"
+                    android:textColor="#27AE60"
+                    android:textSize="15sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tvEntryGold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+10.500 g"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
