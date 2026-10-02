@@ -8,59 +8,64 @@ import java.util.List;
 
 public class AccountDto implements Serializable {
 
+    // ==================== Fields ====================
+    // ✅ public للتوافق مع MiraCreateJournalFragment
+    
     @SerializedName("id")
-    private int id;
+    public int id;
 
     @SerializedName("account_code")
-    private String accountCode;
+    public String accountCode;
 
     @SerializedName("account_name_ar")
-    private String accountNameAr;
+    public String accountNameAr;
 
     @SerializedName("account_name_en")
-    private String accountNameEn;
+    public String accountNameEn;
 
     @SerializedName("account_type")
-    private String accountType;
+    public String accountType;
 
     @SerializedName("account_category")
-    private String accountCategory;
+    public String accountCategory;
 
     @SerializedName("nature")
-    private String nature;
+    public String nature;
 
     @SerializedName("parent_id")
-    private int parentId;
+    public int parentId;
 
     @SerializedName("level")
-    private int level;
+    public int level;
 
     @SerializedName("currency")
-    private String currency;
+    public String currency;
 
     @SerializedName("opening_balance")
-    private double openingBalance;
+    public double openingBalance;
 
     @SerializedName("current_balance")
-    private double currentBalance;
+    public double currentBalance;
 
     @SerializedName("gold_balance")
-    private double goldBalance;
+    public double goldBalance;
 
     @SerializedName("is_active")
-    private boolean isActive;
+    public boolean isActive;
 
     @SerializedName("is_cash_account")
-    private boolean isCashAccount;
+    public boolean isCashAccount;
 
     @SerializedName("is_bank_account")
-    private boolean isBankAccount;
+    public boolean isBankAccount;
 
     @SerializedName("status")
-    private String status;
+    public String status;
 
     @SerializedName("children")
-    private List<AccountDto> children;
+    public List<AccountDto> children;
+
+    // ==================== Constructor ====================
 
     public AccountDto() {
         this.currency = "YER";
@@ -112,13 +117,24 @@ public class AccountDto implements Serializable {
 
     // ==================== Helpers ====================
 
+    /**
+     * ✅ هل الحساب ورقة (بدون أبناء) — قابل للاستخدام في القيود
+     * هذا هو الحل لخطأ: cannot find symbol method isLeaf()
+     */
+    public boolean isLeaf() {
+        return children == null || children.isEmpty();
+    }
+
+    /**
+     * ✅ هل الحساب له أبناء
+     */
+    public boolean hasChildren() {
+        return children != null && !children.isEmpty();
+    }
+
     public String getDisplayName() {
         if (accountCode == null) return accountNameAr != null ? accountNameAr : "";
         return accountCode + " - " + (accountNameAr != null ? accountNameAr : "");
-    }
-
-    public boolean hasChildren() {
-        return children != null && !children.isEmpty();
     }
 
     public boolean isDebitNature() {
