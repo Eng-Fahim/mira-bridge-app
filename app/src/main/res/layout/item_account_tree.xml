@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:background="#FFFFFF"
+    android:background="?attr/colorSurface"
     android:paddingStart="8dp"
     android:paddingEnd="8dp"
     android:paddingTop="10dp"
@@ -17,7 +17,7 @@
         android:id="@+id/accountIndicator"
         android:layout_width="3dp"
         android:layout_height="match_parent"
-        android:background="#3498DB"
+        android:background="?attr/colorPrimary"
         android:layout_marginEnd="8dp"/>
 
     <!-- أيقونة -->
@@ -47,7 +47,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="1301"
-                android:textColor="#95A5A6"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="11sp"
                 android:textStyle="italic"
                 android:layout_marginEnd="6dp"/>
@@ -58,7 +58,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="مخزون الذهب"
-                android:textColor="#2C3E50"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="13sp"
                 android:maxLines="1"
                 android:ellipsize="end"/>
@@ -78,7 +78,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="أصول"
-            android:textColor="#3498DB"
+            android:textColor="?attr/colorPrimary"
             android:textSize="10sp"
             android:layout_marginTop="2dp"/>
     </LinearLayout>
@@ -89,7 +89,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="▼"
-        android:textColor="#95A5A6"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="10sp"
         android:layout_marginStart="8dp"
         android:visibility="gone"/>
