@@ -4,20 +4,22 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="#2C3E50"
+            android:background="?attr/colorPrimaryContainer"
             app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
+            app:navigationIconTint="?attr/colorOnPrimaryContainer"
             app:title="تفاصيل القيد"
-            app:titleTextColor="#FFFFFF"/>
+            app:titleTextColor="?attr/colorOnPrimaryContainer"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -31,12 +33,15 @@
             android:orientation="vertical"
             android:padding="12dp">
 
-            <!-- الرأس -->
+            <!-- ═══════ الرأس ═══════ -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -56,7 +61,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="JE-2026-00001"
-                            android:textColor="#2C3E50"
+                            android:textColor="?attr/colorOnSurface"
                             android:textSize="20sp"
                             android:textStyle="bold"/>
 
@@ -74,7 +79,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="10/02/2026"
-                        android:textColor="#7F8C8D"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:layout_marginTop="4dp"/>
 
                     <TextView
@@ -82,7 +87,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="بيع ذهب"
-                        android:textColor="#34495E"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="15sp"
                         android:layout_marginTop="12dp"/>
 
@@ -98,7 +103,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="المرجع: —"
-                            android:textColor="#7F8C8D"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="13sp"/>
 
                         <TextView
@@ -106,7 +111,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="YER"
-                            android:textColor="#3498DB"
+                            android:textColor="?attr/colorPrimary"
                             android:textSize="13sp"
                             android:textStyle="bold"/>
 
@@ -115,20 +120,23 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="سعر الصرف: 1.0"
-                            android:textColor="#7F8C8D"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="11sp"
                             android:layout_marginStart="8dp"/>
                     </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- ملخص -->
+            <!-- ═══════ ملخص ═══════ -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -147,7 +155,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="مدين"
-                            android:textColor="#7F8C8D"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp"/>
 
                         <TextView
@@ -155,7 +163,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0.00"
-                            android:textColor="#3498DB"
+                            android:textColor="?attr/colorPrimary"
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:layout_marginTop="4dp"/>
@@ -172,7 +180,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="دائن"
-                            android:textColor="#7F8C8D"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp"/>
 
                         <TextView
@@ -180,7 +188,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0.00"
-                            android:textColor="#E74C3C"
+                            android:textColor="?attr/colorError"
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:layout_marginTop="4dp"/>
@@ -197,7 +205,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="🥇 ذهب"
-                            android:textColor="#7F8C8D"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp"/>
 
                         <TextView
@@ -205,7 +213,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0.000 g"
-                            android:textColor="#D4AF37"
+                            android:textColor="@color/mira_gold"
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:layout_marginTop="4dp"/>
@@ -213,12 +221,12 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- السطور -->
+            <!-- ═══════ السطور ═══════ -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="📋 السطور"
-                android:textColor="#2C3E50"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginTop="16dp"
@@ -230,7 +238,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"/>
 
-            <!-- الأزرار -->
+            <!-- ═══════ الأزرار ═══════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -243,8 +251,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="✅ اعتماد"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#27AE60"
+                    android:textColor="@color/pure_white"
+                    app:backgroundTint="@color/success_500"
                     android:layout_marginEnd="4dp"
                     android:visibility="gone"/>
 
@@ -254,8 +262,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="🔄 عكس"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#E74C3C"
+                    android:textColor="@color/pure_white"
+                    app:backgroundTint="@color/danger_500"
                     android:layout_marginStart="4dp"
                     android:visibility="gone"/>
             </LinearLayout>
@@ -272,7 +280,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="📤 مشاركة"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/AppButtonStyle.Outlined"
                     android:layout_marginEnd="4dp"/>
 
                 <com.google.android.material.button.MaterialButton
@@ -281,7 +289,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="🖨️ طباعة"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/AppButtonStyle.Outlined"
                     android:layout_marginStart="4dp"/>
             </LinearLayout>
         </LinearLayout>
