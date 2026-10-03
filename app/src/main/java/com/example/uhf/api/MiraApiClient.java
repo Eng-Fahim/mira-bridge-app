@@ -682,6 +682,66 @@ this.accountingService = new retrofit2.Retrofit.Builder()
             return rawStream;
         }
     }
+    
+    // ═══════════════════════════════════════════════════════════
+//  ✅ طلبات mira/v2 (للإعداد المحاسبي)
+// ═══════════════════════════════════════════════════════════
+
+public ApiResponse getAccounting(String endpoint) {
+    return accountingRequest("GET", endpoint, null);
+}
+
+public ApiResponse postAccounting(String endpoint, JSONObject payload) {
+    return accountingRequest("POST", endpoint, payload);
+}
+
+private ApiResponse accountingRequest(String method, String endpoint, JSONObject payload) {
+    HttpURLConnection conn = null;
+    try {
+        String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
+        String fullUrl = "https://sa.mirabarcode.com/wp-json/mira/v2/" + cleanEndpoint;
+        URL url = new URL(fullUrl);
+        
+        HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+        CertificatePinningManager.applyPinning(httpsConn);
+        conn = httpsConn;
+        
+        conn.setRequestMethod(method);
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("Accept", "application/json");
+        
+        String apiKey = sessionManager.getApiKey();
+        String token = sessionManager.getAuthToken();
+        
+        if (apiKey != null && !apiKey.isEmpty()) {
+            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+        }
+        if (token != null && !token.isEmpty()) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        
+        conn.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
+        conn.setReadTimeout(DEFAULT_READ_TIMEOUT);
+        
+        if (payload != null) {
+            conn.setDoOutput(true);
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(input, 0, input.length);
+            }
+        }
+        
+        Log.e(TAG, "📡 accounting " + method + ": " + fullUrl);
+        
+        return buildResponse(conn);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "accountingRequest error: " + e.getMessage(), e);
+        return networkError(e.getMessage());
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
 
     // ==================== المصادقة ====================
     public ApiResponse login(String username, String password, String deviceId) {
