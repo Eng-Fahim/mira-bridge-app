@@ -18,6 +18,10 @@ import com.google.gson.GsonBuilder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.logging.HttpLoggingInterceptor;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -149,8 +153,50 @@ public class MiraApiClient {
         // ✅ إصلاح CRITICAL: تهيئة AccountingApiService
         // ملاحظة: تأكد من أن الـ Constructor يقبل (MiraApiClient, Context)
         // إذا كان يقبل (Context) فقط، عدّل السطر التالي:
-        this.accountingService = new retrofit2.Retrofit.Builder()
+        // ═══════════════════════════════════════════════════════════
+//  ✅ OkHttpClient مع Interceptor لإضافة Authorization
+// ═══════════════════════════════════════════════════════════
+okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
+    .connectTimeout(30, TimeUnit.SECONDS)
+    .readTimeout(30, TimeUnit.SECONDS)
+    .writeTimeout(30, TimeUnit.SECONDS)
+    .addInterceptor(chain -> {
+        okhttp3.Request original = chain.request();
+        
+        okhttp3.Request.Builder builder = original.newBuilder()
+            .header("Accept", "application/json")
+            .header("User-Agent", "MIRA-Android/2.0");
+        
+        // ✅ إضافة الـ Token
+        String token = getAuthToken();
+        if (token != null && !token.isEmpty()) {
+            builder.header("Authorization", "Bearer " + token);
+            Log.d(TAG, "✅ Adding Authorization header (" + token.length() + " chars)");
+        } else {
+            Log.w(TAG, "⚠️ No auth token available for: " + original.url());
+        }
+        
+        // ✅ إضافة API Key
+        String key = getEffectiveApiKey();
+        if (key != null && !key.isEmpty()) {
+            builder.header("X-MIRA-API-Key", key);
+        }
+        
+        okhttp3.Request request = builder.build();
+        Log.d(TAG, "📡 → " + request.method() + " " + request.url());
+        
+        return chain.proceed(request);
+    })
+    .addInterceptor(new okhttp3.logging.HttpLoggingInterceptor()
+        .setLevel(okhttp3.logging.HttpLoggingInterceptor.Level.BASIC))
+    .build();
+
+// ═══════════════════════════════════════════════════════════
+//  ✅ Retrofit مع OkHttpClient
+// ═══════════════════════════════════════════════════════════
+this.accountingService = new retrofit2.Retrofit.Builder()
     .baseUrl("https://sa.mirabarcode.com/wp-json/mira/v2/")
+    .client(accountingOkHttp)  // ← ⚠️ إضافة هذا السطر
     .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
     .build()
     .create(AccountingApiService.class);
@@ -2214,4 +2260,4 @@ public class MiraApiClient {
             return t;
         }
     }
-}
+                                }
