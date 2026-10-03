@@ -94,7 +94,7 @@ public class MiraAccountingSetupFragment extends Fragment {
         
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getWithAuth("setup/status");
+                MiraApiClient.ApiResponse response = apiClient.getAccounting("setup/status");
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
@@ -290,7 +290,7 @@ public class MiraAccountingSetupFragment extends Fragment {
                 JSONObject payload = new JSONObject();
                 payload.put("reason", "طلب المدير");
                 
-                MiraApiClient.ApiResponse response = apiClient.postWithAuth("setup/reset", payload);
+                MiraApiClient.ApiResponse response = apiClient.postAccounting("setup/reset", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
