@@ -53,19 +53,26 @@
     </group>
 
     <!-- إدارة النظام والفروع -->
-    <group android:id="@+id/group_management">
-        <item
-            android:id="@+id/action_branches"
-            android:icon="@drawable/ic_branch"
-            android:title="@string/menu_branches"
-            app:showAsAction="never" />
+<group android:id="@+id/group_management">
+    <item
+        android:id="@+id/action_branches"
+        android:icon="@drawable/ic_branch"
+        android:title="@string/menu_branches"
+        app:showAsAction="never" />
 
-        <item
-            android:id="@+id/action_export_data"
-            android:icon="@drawable/ic_export"
-            android:title="@string/menu_export_data"
-            app:showAsAction="never" />
-    </group>
+    <item
+        android:id="@+id/action_export_data"
+        android:icon="@drawable/ic_export"
+        android:title="@string/menu_export_data"
+        app:showAsAction="never" />
+
+    <!-- ✅ جديد: المحاسبة -->
+    <item
+        android:id="@+id/action_accounting"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="المحاسبة"
+        app:showAsAction="never" />
+</group>
 
     <!-- حول الجهاز والنظام -->
     <group android:id="@+id/group_info">
