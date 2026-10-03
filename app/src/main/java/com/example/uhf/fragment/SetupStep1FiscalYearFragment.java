@@ -134,7 +134,7 @@ public class SetupStep1FiscalYearFragment extends Fragment {
                 payload.put("calendar", "gregorian");
                 
                 MiraApiClient.ApiResponse response = 
-                    apiClient.postWithAuth("setup/step/1", payload);
+                    apiClient.postAccounting("setup/step/1", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     btnNext.setEnabled(true);
