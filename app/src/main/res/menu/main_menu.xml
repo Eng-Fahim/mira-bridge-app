@@ -65,7 +65,11 @@
         android:icon="@drawable/ic_export"
         android:title="@string/menu_export_data"
         app:showAsAction="never" />
-
+<item
+    android:id="@+id/action_accounting_setup"
+    android:title="إعداد المحاسبة"
+    android:icon="@android:drawable/ic_menu_preferences"
+    app:showAsAction="never"/>
     <!-- ✅ جديد: المحاسبة -->
     <item
         android:id="@+id/action_accounting"
