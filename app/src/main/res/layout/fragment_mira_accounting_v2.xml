@@ -4,29 +4,30 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
     <!-- شريط التبويبات -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabAccounting"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#2C3E50"
+        android:background="?attr/colorPrimaryContainer"
         app:tabMode="scrollable"
         app:tabGravity="start"
-        app:tabTextColor="#B0BEC5"
-        app:tabSelectedTextColor="#FFFFFF"
-        app:tabIndicatorColor="#F1C40F"
+        app:tabTextColor="?attr/colorOnPrimaryContainer"
+        app:tabSelectedTextColor="?attr/colorOnPrimaryContainer"
+        app:tabIndicatorColor="?attr/colorPrimary"
         app:tabIndicatorHeight="3dp"
         app:tabRippleColor="@android:color/transparent"
         app:tabPaddingStart="12dp"
         app:tabPaddingEnd="12dp"
         app:tabMinWidth="70dp"/>
 
-    <!-- ✅ الحاوية الداخلية — الاسم مختلف عن Activity -->
+    <!-- الحاوية الداخلية للتبويبات -->
     <FrameLayout
         android:id="@+id/tabContentContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:background="?attr/colorSurface"/>
 </LinearLayout>
