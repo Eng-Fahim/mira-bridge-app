@@ -3,8 +3,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
+    <!-- KPI Container -->
     <LinearLayout
         android:id="@+id/kpiContainer"
         android:layout_width="match_parent"
@@ -12,18 +13,19 @@
         android:orientation="horizontal"
         android:padding="8dp"/>
 
+    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="10dp"
-        android:background="#2C3E50">
+        android:background="?attr/colorPrimaryContainer">
 
         <TextView
             android:layout_width="70dp"
             android:layout_height="wrap_content"
             android:text="الكود"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="12sp"
             android:textStyle="bold"/>
 
@@ -32,7 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="الحساب"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="12sp"
             android:textStyle="bold"/>
 
@@ -40,7 +42,7 @@
             android:layout_width="80dp"
             android:layout_height="wrap_content"
             android:text="مدين"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="12sp"
             android:textStyle="bold"
             android:gravity="end"/>
@@ -49,7 +51,7 @@
             android:layout_width="80dp"
             android:layout_height="wrap_content"
             android:text="دائن"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="12sp"
             android:textStyle="bold"
             android:gravity="end"/>
@@ -58,18 +60,21 @@
             android:layout_width="80dp"
             android:layout_height="wrap_content"
             android:text="الرصيد"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="12sp"
             android:textStyle="bold"
             android:gravity="end"/>
     </LinearLayout>
 
+    <!-- RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRows"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:background="?attr/colorSurface"/>
 
+    <!-- Empty -->
     <TextView
         android:id="@+id/tvEmpty"
         android:layout_width="match_parent"
@@ -77,7 +82,7 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="📭 لا توجد بيانات"
-        android:textColor="#7F8C8D"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="16sp"
         android:visibility="gone"/>
 </LinearLayout>
