@@ -43,7 +43,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraAccountingSetupFragment;
-import com.example.uhf.fragment.MiraAccountingSetupFragment;
+
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
 
@@ -1557,9 +1557,6 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         } else if (id == R.id.action_accounting_setup) {
             loadFragment(new MiraAccountingSetupFragment(), "AccountingSetup");
             return true;
-        } else if (id == R.id.action_accounting_setup) {
-            loadFragment(new MiraAccountingSetupFragment(), "AccountingSetup");
-            return true;
         } else if (id == R.id.action_accounting) {
             openAccounting();
             return true;
@@ -2707,5 +2704,4 @@ public void setBottomNavVisible(boolean visible) {
         Log.e(TAG, "setBottomNavVisible error: " + e.getMessage());
     }
 }
-    
-                        }
+}
