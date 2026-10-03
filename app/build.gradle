@@ -25,8 +25,6 @@ android {
         buildConfigField "String", "DEFAULT_SAR_RATE", '"142.5"'
         buildConfigField "int", "DEFAULT_BRANCH_ID", "1"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
         vectorDrawables {
             useSupportLibrary true
         }
@@ -46,12 +44,6 @@ android {
 
     signingConfigs {
         if (hasKeystore) {
-            debug {
-                storeFile keystoreFile
-                storePassword System.getenv("KEYSTORE_PASSWORD") ?: "123456"
-                keyPassword System.getenv("KEY_PASSWORD") ?: "123456"
-                keyAlias System.getenv("KEY_ALIAS") ?: "uhf-serial-key"
-            }
             release {
                 storeFile keystoreFile
                 storePassword System.getenv("KEYSTORE_PASSWORD") ?: "123456"
@@ -78,17 +70,7 @@ android {
             debuggable false
         }
 
-        debug {
-            if (hasKeystore) {
-                signingConfig signingConfigs.debug
-            }
-            minifyEnabled false
-            shrinkResources false
-
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-
-            buildConfigField "boolean", "ENABLE_LOGGING", "true"
-        }
+        // ❌ تم حذف debug buildType لتسريع البناء
     }
 
     buildFeatures {
@@ -211,29 +193,21 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1'
 
-    // ✅ WorkManager — مرة واحدة فقط (تم حذف التكرار)
+    // ==================== WorkManager ====================
     implementation 'androidx.work:work-runtime:2.9.0'
 
     // ==================== Desugaring ====================
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
 
-    // ==================== Testing ====================
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.mockito:mockito-core:5.10.0'
-    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
-    androidTestImplementation 'androidx.test.runner:1.6.2'
-    androidTestImplementation 'androidx.test.rules:1.6.1'
+    // ❌ تم حذف testImplementation و androidTestImplementation
+    // لأنها كانت تُستخدم فقط مع debug variant
 }
 
 // ==================== اسم APK مخصص ====================
 android.applicationVariants.all { variant ->
     variant.outputs.all { output ->
         def versionName = variant.versionName
-        def buildType = variant.buildType.name
-
-        def apkName = "MIRA_ID_Smart_Jewelry_Tag_v${versionName}_${buildType}.apk"
-
+        def apkName = "MIRA_ID_Smart_Jewelry_Tag_v${versionName}.apk"
         output.outputFileName = apkName
     }
 }
