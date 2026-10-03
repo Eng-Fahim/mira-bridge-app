@@ -78,7 +78,7 @@ public class SetupStep5UsersFragment extends Fragment {
         
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getWithAuth("auth/users");
+                MiraApiClient.ApiResponse response = apiClient.getAccounting("auth/users");
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
@@ -179,7 +179,7 @@ public class SetupStep5UsersFragment extends Fragment {
                 payload.put("users", usersArray);
                 
                 MiraApiClient.ApiResponse response = 
-                    apiClient.postWithAuth("setup/step/5", payload);
+                    apiClient.postAccounting("setup/step/5", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     btnNext.setEnabled(true);
