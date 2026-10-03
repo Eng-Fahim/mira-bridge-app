@@ -125,7 +125,7 @@ public class SetupStep3CurrenciesFragment extends Fragment {
                 payload.put("rates", rates);
                 
                 MiraApiClient.ApiResponse response = 
-                    apiClient.postWithAuth("setup/step/3", payload);
+                    apiClient.postAccounting("setup/step/3", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     btnNext.setEnabled(true);
