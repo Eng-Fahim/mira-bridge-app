@@ -7,7 +7,9 @@
     android:layout_marginBottom="6dp"
     app:cardCornerRadius="8dp"
     app:cardElevation="1dp"
-    app:cardBackgroundColor="#FFFFFF">
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -20,7 +22,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1301 - مخزون الذهب"
-            android:textColor="#2C3E50"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="14sp"
             android:textStyle="bold"/>
 
@@ -29,7 +31,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="بيع 100 جرام"
-            android:textColor="#7F8C8D"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:layout_marginTop="2dp"/>
 
@@ -50,7 +52,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="مدين"
-                    android:textColor="#7F8C8D"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"/>
 
                 <TextView
@@ -58,7 +60,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="—"
-                    android:textColor="#3498DB"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="13sp"
                     android:textStyle="bold"/>
             </LinearLayout>
@@ -74,7 +76,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="دائن"
-                    android:textColor="#7F8C8D"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"/>
 
                 <TextView
@@ -82,7 +84,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="—"
-                    android:textColor="#E74C3C"
+                    android:textColor="?attr/colorError"
                     android:textSize="13sp"
                     android:textStyle="bold"/>
             </LinearLayout>
@@ -100,7 +102,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ذهب"
-                    android:textColor="#7F8C8D"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"/>
 
                 <TextView
@@ -108,7 +110,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="+10.500 g"
-                    android:textColor="#D4AF37"
+                    android:textColor="@color/mira_gold"
                     android:textSize="13sp"
                     android:textStyle="bold"/>
             </LinearLayout>
