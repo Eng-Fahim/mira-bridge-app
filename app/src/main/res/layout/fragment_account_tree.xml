@@ -4,21 +4,21 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
-    <!-- البحث + الفلترة -->
+    <!-- ═══════ البحث + الفلترة ═══════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="8dp"
-        android:background="#FFFFFF">
+        android:background="?attr/colorSurfaceContainer">
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="بحث..."
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
             app:startIconDrawable="@android:drawable/ic_menu_search">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -37,7 +37,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipAll"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الكل"
@@ -45,49 +45,50 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipAsset"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="أصول"/>
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipLiability"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="التزامات"/>
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipEquity"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="حقوق"/>
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipRevenue"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="إيرادات"/>
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipExpense"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/AppChipStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="مصروفات"/>
         </com.google.android.material.chip.ChipGroup>
     </LinearLayout>
 
-    <!-- شجرة الحسابات -->
+    <!-- ═══════ RecyclerView ═══════ -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvAccounts"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#FFFFFF"/>
+        android:background="?attr/colorSurface"/>
 
+    <!-- ═══════ Progress ═══════ -->
     <ProgressBar
         android:id="@+id/pbLoading"
         android:layout_width="wrap_content"
