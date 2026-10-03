@@ -3,6 +3,7 @@ package com.example.uhf.activity;
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.AppWatchdog;
 import android.content.BroadcastReceiver;
+import com.example.uhf.fragment.MiraAccountingFragment;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -1552,6 +1553,9 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         } else if (id == R.id.action_export_data) {
             loadFragment(new MiraReportsProFragment(), "Reports");
             return true;
+        } else if (id == R.id.action_accounting) {
+            openAccounting();
+            return true;
         } else if (id == R.id.action_device_status) {
     showHardwareOptionsDialog();
     return true;
@@ -1636,7 +1640,25 @@ return super.onOptionsItemSelected(item);
                 .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
                 .show();
     }
+/**
+ * ✅ فتح شاشة المحاسبة (تجريبي)
+ */
+public void openAccounting() {
+    try {
+        Log.e(TAG, "🚀 openAccounting called");
 
+        MiraAccountingFragment fragment = new MiraAccountingFragment();
+        loadFragmentDirectly(fragment, "Accounting");
+
+        Toast.makeText(this, "✅ تم فتح المحاسبة", Toast.LENGTH_SHORT).show();
+
+    } catch (Throwable e) {
+        Log.e(TAG, "❌ openAccounting error", e);
+        Toast.makeText(this, 
+            "❌ خطأ: " + e.getClass().getSimpleName() + " — " + e.getMessage(), 
+            Toast.LENGTH_LONG).show();
+    }
+}
     private void showInventoryStatsDialog() {
         try {
             int scannedCount = 0;
