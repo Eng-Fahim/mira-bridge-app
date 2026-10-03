@@ -86,7 +86,7 @@ public class SetupStep6ReviewFragment extends Fragment {
         new Thread(() -> {
             try {
                 MiraApiClient.ApiResponse response = 
-                    apiClient.getWithAuth("setup/step/6/preview");
+                    apiClient.getAccounting("setup/step/6/preview");
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
@@ -216,7 +216,7 @@ public class SetupStep6ReviewFragment extends Fragment {
                 JSONObject payload = new JSONObject();
                 
                 MiraApiClient.ApiResponse response = 
-                    apiClient.postWithAuth("setup/step/6/approve", payload);
+                    apiClient.postAccounting("setup/step/6/approve", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
