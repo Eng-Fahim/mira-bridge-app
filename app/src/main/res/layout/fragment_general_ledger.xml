@@ -4,16 +4,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
-    <!-- شريط البحث والفلترة -->
+    <!-- ═══════ شريط البحث والفلترة ═══════ -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="8dp"
         app:cardCornerRadius="10dp"
         app:cardElevation="2dp"
-        app:cardBackgroundColor="#FFFFFF">
+        app:cardBackgroundColor="?attr/colorSurfaceContainer"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -21,12 +23,11 @@
             android:orientation="vertical"
             android:padding="12dp">
 
-            <!-- عنوان -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="📖 دفتر الأستاذ العام"
-                android:textColor="#2C3E50"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp"/>
@@ -36,7 +37,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="الحساب"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 app:startIconDrawable="@android:drawable/ic_menu_sort_by_size">
 
                 <AutoCompleteTextView
@@ -59,7 +60,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="من"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/AppButtonStyle.Outlined"
                     android:layout_marginEnd="4dp"
                     android:textSize="12sp"/>
 
@@ -69,7 +70,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="إلى"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/AppButtonStyle.Outlined"
                     android:layout_marginStart="4dp"
                     android:textSize="12sp"/>
             </LinearLayout>
@@ -87,8 +88,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="🔍 عرض"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#3498DB"
+                    android:textColor="?attr/colorOnPrimary"
+                    app:backgroundTint="?attr/colorPrimary"
                     android:layout_marginEnd="4dp"/>
 
                 <com.google.android.material.button.MaterialButton
@@ -96,13 +97,13 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="📥"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/AppButtonStyle.Outlined"
                     android:layout_marginStart="4dp"/>
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- KPIs -->
+    <!-- ═══════ KPIs ═══════ -->
     <LinearLayout
         android:id="@+id/kpiContainer"
         android:layout_width="match_parent"
@@ -111,19 +112,19 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"/>
 
-    <!-- رأس الجدول -->
+    <!-- ═══════ رأس الجدول ═══════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="8dp"
-        android:background="#2C3E50">
+        android:background="?attr/colorPrimaryContainer">
 
         <TextView
             android:layout_width="70dp"
             android:layout_height="wrap_content"
             android:text="التاريخ"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="11sp"
             android:textStyle="bold"/>
 
@@ -132,7 +133,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="البيان"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="11sp"
             android:textStyle="bold"/>
 
@@ -140,7 +141,7 @@
             android:layout_width="70dp"
             android:layout_height="wrap_content"
             android:text="مدين"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="11sp"
             android:textStyle="bold"
             android:gravity="end"/>
@@ -149,7 +150,7 @@
             android:layout_width="70dp"
             android:layout_height="wrap_content"
             android:text="دائن"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="11sp"
             android:textStyle="bold"
             android:gravity="end"/>
@@ -158,21 +159,21 @@
             android:layout_width="75dp"
             android:layout_height="wrap_content"
             android:text="الرصيد"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimaryContainer"
             android:textSize="11sp"
             android:textStyle="bold"
             android:gravity="end"/>
     </LinearLayout>
 
-    <!-- RecyclerView -->
+    <!-- ═══════ RecyclerView ═══════ -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvLedger"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#FFFFFF"/>
+        android:background="?attr/colorSurface"/>
 
-    <!-- Progress -->
+    <!-- ═══════ Progress ═══════ -->
     <ProgressBar
         android:id="@+id/pbLoading"
         android:layout_width="wrap_content"
@@ -180,7 +181,7 @@
         android:layout_gravity="center"
         android:visibility="gone"/>
 
-    <!-- Empty -->
+    <!-- ═══════ حالة فارغة ═══════ -->
     <LinearLayout
         android:id="@+id/emptyState"
         android:layout_width="match_parent"
@@ -201,7 +202,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="اختر حساباً لعرض دفتر الأستاذ"
-            android:textColor="#7F8C8D"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp"
             android:layout_marginTop="8dp"/>
     </LinearLayout>
