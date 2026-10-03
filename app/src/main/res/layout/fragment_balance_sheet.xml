@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,17 +12,17 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- التاريخ -->
+        <!-- ═══════ التاريخ ═══════ -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAsOf"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="كما في: 01/01/2026"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             app:icon="@android:drawable/ic_menu_my_calendar"
             android:layout_marginBottom="12dp"/>
 
-        <!-- KPIs -->
+        <!-- ═══════ KPIs ═══════ -->
         <LinearLayout
             android:id="@+id/kpiContainer"
             android:layout_width="match_parent"
@@ -30,32 +30,36 @@
             android:orientation="horizontal"
             android:layout_marginBottom="12dp"/>
 
-        <!-- حالة التوازن -->
+        <!-- ═══════ حالة التوازن ═══════ -->
         <TextView
             android:id="@+id/tvBalanceStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="⏳ جاري الحساب..."
+            android:textColor="?attr/colorOnSurface"
             android:textSize="14sp"
             android:textStyle="bold"
             android:gravity="center"
             android:padding="12dp"
-            android:background="#FFFFFF"
+            android:background="?attr/colorSurfaceContainer"
             android:layout_marginBottom="12dp"/>
 
-        <!-- 3 أقسام -->
+        <!-- ═══════ الأقسام الثلاثة ═══════ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- الأصول -->
+            <!-- ─── الأصول ─── -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 app:cardCornerRadius="10dp"
-                app:cardElevation="2dp">
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -67,7 +71,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="📊 الأصول"
-                        android:textColor="#3498DB"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:layout_marginBottom="8dp"/>
@@ -83,22 +87,24 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="إجمالي: 0.00"
-                        android:textColor="#2C3E50"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:paddingTop="8dp"
-                        android:background="#ECF0F1"
-                        android:padding="8dp"/>
+                        android:padding="8dp"
+                        android:background="?attr/colorSurfaceVariant"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- الالتزامات -->
+            <!-- ─── الالتزامات ─── -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 app:cardCornerRadius="10dp"
-                app:cardElevation="2dp">
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -110,7 +116,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="📉 الالتزامات"
-                        android:textColor="#E74C3C"
+                        android:textColor="?attr/colorError"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:layout_marginBottom="8dp"/>
@@ -126,22 +132,24 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="إجمالي: 0.00"
-                        android:textColor="#2C3E50"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:paddingTop="8dp"
-                        android:background="#ECF0F1"
-                        android:padding="8dp"/>
+                        android:padding="8dp"
+                        android:background="?attr/colorSurfaceVariant"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- حقوق الملكية -->
+            <!-- ─── حقوق الملكية ─── -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 app:cardCornerRadius="10dp"
-                app:cardElevation="2dp">
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -153,7 +161,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="💰 حقوق الملكية"
-                        android:textColor="#9B59B6"
+                        android:textColor="?attr/colorTertiary"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:layout_marginBottom="8dp"/>
@@ -169,17 +177,16 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="إجمالي: 0.00"
-                        android:textColor="#2C3E50"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:paddingTop="8dp"
-                        android:background="#ECF0F1"
-                        android:padding="8dp"/>
+                        android:padding="8dp"
+                        android:background="?attr/colorSurfaceVariant"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
         </LinearLayout>
 
-        <!-- Progress -->
+        <!-- ═══════ Progress ═══════ -->
         <ProgressBar
             android:id="@+id/pbLoading"
             android:layout_width="wrap_content"
