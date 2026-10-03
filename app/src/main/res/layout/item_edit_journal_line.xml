@@ -7,7 +7,9 @@
     android:layout_marginBottom="8dp"
     app:cardCornerRadius="8dp"
     app:cardElevation="1dp"
-    app:cardBackgroundColor="#FFFFFF">
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -27,7 +29,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:hint="الحساب *"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
 
                 <AutoCompleteTextView
                     android:id="@+id/spLineAccount"
@@ -44,7 +46,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_delete"
                 android:contentDescription="حذف"
-                app:tint="#E74C3C"/>
+                app:tint="@color/danger_500"/>
         </LinearLayout>
 
         <!-- المبلغ -->
@@ -60,7 +62,7 @@
                 android:layout_weight="1"
                 android:hint="مدين"
                 android:layout_marginEnd="4dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etLineDebit"
@@ -75,7 +77,7 @@
                 android:layout_weight="1"
                 android:hint="دائن"
                 android:layout_marginStart="4dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etLineCredit"
@@ -98,7 +100,7 @@
                 android:layout_weight="1"
                 android:hint="ذهب مدين (g)"
                 android:layout_marginEnd="4dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etLineGoldDebit"
@@ -113,7 +115,7 @@
                 android:layout_weight="1"
                 android:hint="ذهب دائن (g)"
                 android:layout_marginStart="4dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etLineGoldCredit"
@@ -136,7 +138,7 @@
                 android:layout_weight="1"
                 android:hint="العيار"
                 android:layout_marginEnd="4dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
 
                 <AutoCompleteTextView
                     android:id="@+id/spLineKarat"
@@ -151,7 +153,7 @@
                 android:layout_weight="1"
                 android:hint="الوزن الأصلي (g)"
                 android:layout_marginStart="4dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etLineWeight"
