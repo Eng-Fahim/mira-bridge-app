@@ -18,10 +18,6 @@ import com.google.gson.GsonBuilder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.logging.HttpLoggingInterceptor;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -154,7 +150,8 @@ public class MiraApiClient {
         // ملاحظة: تأكد من أن الـ Constructor يقبل (MiraApiClient, Context)
         // إذا كان يقبل (Context) فقط، عدّل السطر التالي:
         // ═══════════════════════════════════════════════════════════
-//  ✅ OkHttpClient مع Interceptor لإضافة Authorization
+//  ✅ OkHttpClient مع Interceptor لإضافة X-MIRA-API-Key
+//  ⚠️ هذا نفس النظام الذي يستخدمه ActivityAPI
 // ═══════════════════════════════════════════════════════════
 okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
     .connectTimeout(30, TimeUnit.SECONDS)
@@ -162,41 +159,58 @@ okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
     .writeTimeout(30, TimeUnit.SECONDS)
     .addInterceptor(chain -> {
         okhttp3.Request original = chain.request();
+
+        // ✅ اقرأ القيم مباشرة من sessionManager
+        String token = "";
+        String apiKey = "";
+        String gateId = "";
         
+        try {
+            token = sessionManager.getAuthToken();
+            apiKey = sessionManager.getApiKey();
+            gateId = sessionManager.getGateId();
+        } catch (Exception e) {
+            Log.e(TAG, "Auth read error", e);
+        }
+
+        // ✅ Log للتشخيص
+        Log.e(TAG, "═══════════════════════════════");
+        Log.e(TAG, "URL: " + original.url());
+        Log.e(TAG, "API Key: " + (apiKey == null || apiKey.isEmpty() 
+            ? "❌ NULL" : "✅ " + apiKey.substring(0, Math.min(15, apiKey.length())) + "..."));
+        Log.e(TAG, "Token: " + (token == null || token.isEmpty() 
+            ? "❌ NULL" : "✅ " + token.length() + " chars"));
+        Log.e(TAG, "═══════════════════════════════");
+
+        // ✅ ابنِ الطلب مع الرؤوس
         okhttp3.Request.Builder builder = original.newBuilder()
-            .header("Accept", "application/json")
-            .header("User-Agent", "MIRA-Android/2.0");
+            .header("Accept", "application/json");
+
+        // ✅ الأهم: X-MIRA-API-Key (هذا ما يقرأه ApiKeyManager)
+        if (apiKey != null && !apiKey.isEmpty()) {
+            builder.header("X-MIRA-API-Key", apiKey);
+        }
         
-        // ✅ إضافة الـ Token
-        String token = getAuthToken();
+        // ✅ Authorization (للتوافق)
         if (token != null && !token.isEmpty()) {
             builder.header("Authorization", "Bearer " + token);
-            Log.d(TAG, "✅ Adding Authorization header (" + token.length() + " chars)");
-        } else {
-            Log.w(TAG, "⚠️ No auth token available for: " + original.url());
         }
         
-        // ✅ إضافة API Key
-        String key = getEffectiveApiKey();
-        if (key != null && !key.isEmpty()) {
-            builder.header("X-MIRA-API-Key", key);
+        // ✅ Gate ID
+        if (gateId != null && !gateId.isEmpty()) {
+            builder.header("X-MIRA-Gate-ID", gateId);
         }
-        
-        okhttp3.Request request = builder.build();
-        Log.d(TAG, "📡 → " + request.method() + " " + request.url());
-        
-        return chain.proceed(request);
+
+        return chain.proceed(builder.build());
     })
-    .addInterceptor(new okhttp3.logging.HttpLoggingInterceptor()
-        .setLevel(okhttp3.logging.HttpLoggingInterceptor.Level.BASIC))
     .build();
 
 // ═══════════════════════════════════════════════════════════
-//  ✅ Retrofit مع OkHttpClient
+//  ✅ Retrofit مع OkHttpClient المخصص
 // ═══════════════════════════════════════════════════════════
 this.accountingService = new retrofit2.Retrofit.Builder()
     .baseUrl("https://sa.mirabarcode.com/wp-json/mira/v2/")
-    .client(accountingOkHttp)  // ← ⚠️ إضافة هذا السطر
+    .client(accountingOkHttp)  // ← ⚠️⚠️⚠️ الأهم! هذا السطر مفقود حالياً
     .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
     .build()
     .create(AccountingApiService.class);
@@ -2260,4 +2274,4 @@ this.accountingService = new retrofit2.Retrofit.Builder()
             return t;
         }
     }
-                                }
+}
