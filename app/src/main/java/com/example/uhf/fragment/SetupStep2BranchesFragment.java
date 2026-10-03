@@ -78,7 +78,7 @@ public class SetupStep2BranchesFragment extends Fragment {
         
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getWithAuth("branches");
+                MiraApiClient.ApiResponse response = apiClient.getAccounting("branches");
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
@@ -177,7 +177,7 @@ public class SetupStep2BranchesFragment extends Fragment {
                 payload.put("branches", branchesArray);
                 
                 MiraApiClient.ApiResponse response = 
-                    apiClient.postWithAuth("setup/step/2", payload);
+                    apiClient.postAccounting("setup/step/2", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     btnNext.setEnabled(true);
