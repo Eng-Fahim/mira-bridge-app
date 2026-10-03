@@ -3,7 +3,6 @@ package com.example.uhf.activity;
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.AppWatchdog;
 import android.content.BroadcastReceiver;
-import com.example.uhf.fragment.MiraAccountingFragment;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
