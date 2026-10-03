@@ -15,7 +15,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="الإيرادات"
-        android:textColor="#2C3E50"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="13sp"/>
 
     <TextView
@@ -23,7 +23,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0.00"
-        android:textColor="#2C3E50"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="13sp"
         android:textStyle="bold"
         android:gravity="end"/>
