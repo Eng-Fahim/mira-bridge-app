@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- الفترة -->
+        <!-- ═══════ الفترة ═══════ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -25,7 +25,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="من"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/AppButtonStyle.Outlined"
                 android:layout_marginEnd="4dp"/>
 
             <com.google.android.material.button.MaterialButton
@@ -34,11 +34,11 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="إلى"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/AppButtonStyle.Outlined"
                 android:layout_marginStart="4dp"/>
         </LinearLayout>
 
-        <!-- KPIs -->
+        <!-- ═══════ KPIs ═══════ -->
         <LinearLayout
             android:id="@+id/kpiContainer"
             android:layout_width="match_parent"
@@ -46,12 +46,15 @@
             android:orientation="horizontal"
             android:layout_marginBottom="12dp"/>
 
-        <!-- قائمة الدخل -->
+        <!-- ═══════ قائمة الدخل ═══════ -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardCornerRadius="10dp"
-            app:cardElevation="2dp">
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:id="@+id/statementContainer"
@@ -61,6 +64,7 @@
                 android:padding="12dp"/>
         </androidx.cardview.widget.CardView>
 
+        <!-- ═══════ Progress ═══════ -->
         <ProgressBar
             android:id="@+id/pbLoading"
             android:layout_width="wrap_content"
