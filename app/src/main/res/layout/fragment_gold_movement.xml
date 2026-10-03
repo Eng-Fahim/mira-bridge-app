@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F6FA">
+    android:background="?attr/colorSurface">
 
-    <!-- الفترة -->
+    <!-- ═══════ الفترة ═══════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="من"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_marginEnd="4dp"
             android:textSize="12sp"/>
 
@@ -29,12 +29,12 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="إلى"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/AppButtonStyle.Outlined"
             android:layout_marginStart="4dp"
             android:textSize="12sp"/>
     </LinearLayout>
 
-    <!-- KPIs (ذهبية) -->
+    <!-- ═══════ KPIs ═══════ -->
     <LinearLayout
         android:id="@+id/kpiContainer"
         android:layout_width="match_parent"
@@ -44,15 +44,15 @@
         android:paddingEnd="8dp"
         android:layout_marginBottom="8dp"/>
 
-    <!-- RecyclerView -->
+    <!-- ═══════ RecyclerView ═══════ -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvGoldAccounts"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#FFFFFF"/>
+        android:background="?attr/colorSurface"/>
 
-    <!-- Progress -->
+    <!-- ═══════ Progress ═══════ -->
     <ProgressBar
         android:id="@+id/pbLoading"
         android:layout_width="wrap_content"
@@ -60,7 +60,7 @@
         android:layout_gravity="center"
         android:visibility="gone"/>
 
-    <!-- Empty -->
+    <!-- ═══════ حالة فارغة ═══════ -->
     <LinearLayout
         android:id="@+id/emptyState"
         android:layout_width="match_parent"
@@ -81,7 +81,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="لا توجد حركات ذهب في هذه الفترة"
-            android:textColor="#7F8C8D"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp"
             android:layout_marginTop="8dp"/>
     </LinearLayout>
