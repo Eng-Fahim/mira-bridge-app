@@ -172,7 +172,7 @@ public class SetupStep4OpeningBalancesFragment extends Fragment {
         new Thread(() -> {
             try {
                 MiraApiClient.ApiResponse response = 
-                    apiClient.getWithAuth("gold-rates");
+                    apiClient.getAccounting("gold-rates");
                 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject data = response.data.optJSONObject("data");
@@ -316,7 +316,7 @@ public class SetupStep4OpeningBalancesFragment extends Fragment {
                 payload.put("balances", balances);
                 
                 MiraApiClient.ApiResponse response = 
-                    apiClient.postWithAuth("setup/step/4", payload);
+                    apiClient.postAccounting("setup/step/4", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     btnNext.setEnabled(true);
