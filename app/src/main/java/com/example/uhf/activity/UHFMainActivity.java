@@ -391,22 +391,35 @@ setupOrgProfileListener();
 // 🛡️ تعطيل التنقل حتى نتحقق من حالة الإعداد (في كل الحالات)
 disableNavigationUntilSetupChecked();
 
-if (savedInstanceState == null) {
-    // ✅ فحص حالة الإعداد قبل التوجيه (المعيار العالمي)
-    checkSetupStatusAndNavigate();
-} else {
-    String savedTag = savedInstanceState.getString(
-            "current_fragment", NavigationManager.TAG_DASHBOARD);
-    Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
-    if (savedFragment != null) {
-        // ✅ النظام قد يكون مُعدًا — اسمح بالتنقل مؤقتًا
-        //    الفحص في guardSetupAccess سيمنع أي وصول غير مسموح
-        enableNavigationAfterSetup();
-        navigationManager.loadFragmentDirectly(savedFragment, savedTag);
+// 🛡️ دائماً افحص حالة الإعداد — بغض النظر عن savedInstanceState
+// السبب: عند تغيير الثيم/اللغة، يُعاد إنشاء Activity لكن حالة الإعداد قد تكون تغيّرت
+String cachedSetupStatus = getCachedSetupStatus();
+boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
+        || SETUP_LOCKED.equals(cachedSetupStatus);
+
+if (setupIsComplete) {
+    // ✅ النظام مُعد → اسمح بالاستعادة العادية
+    if (savedInstanceState == null) {
+        navigateByRole();
     } else {
-        // Fallback آمن → فحص كامل
-        checkSetupStatusAndNavigate();
+        String savedTag = savedInstanceState.getString(
+                "current_fragment", NavigationManager.TAG_DASHBOARD);
+        Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
+        if (savedFragment != null) {
+            enableNavigationAfterSetup();
+            // المرور عبر الحارس المركزي
+            loadFragmentDirectly(savedFragment, savedTag);
+        } else {
+            navigateByRole();
+        }
     }
+} else {
+    // ⚠️ النظام غير مُعد → تجاهل savedInstanceState وافحص مجددًا
+    // السبب: المستخدم يجب أن يبقى في شاشة الإعداد
+    Log.d(TAG, "🔒 Setup pending → ignoring savedInstanceState, re-checking");
+
+    // لا نستخدم savedInstanceState هنا
+    checkSetupStatusAndNavigate();
 }
             try {
                 if (sessionManager != null) {
@@ -1506,13 +1519,24 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        String tag = navigationManager != null
-                ? navigationManager.getCurrentFragmentTag()
-                : "Dashboard";
+    super.onSaveInstanceState(outState);
+
+    String tag = navigationManager != null
+            ? navigationManager.getCurrentFragmentTag()
+            : "Dashboard";
+
+    // 🛡️ احفظ فقط إذا كان النظام مُعدًا
+    String cachedSetupStatus = getCachedSetupStatus();
+    boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
+            || SETUP_LOCKED.equals(cachedSetupStatus);
+
+    if (setupIsComplete) {
         outState.putString("current_fragment", tag);
         saveFragmentTagToPrefs(tag);
+    } else {
+        Log.d(TAG, "🔒 onSaveInstanceState: skipping save (setup pending)");
     }
+}
 
     // ==================== إعدادات ====================
 
@@ -3148,4 +3172,4 @@ public void setBottomNavVisible(boolean visible) {
         Log.e(TAG, "setBottomNavVisible error: " + e.getMessage());
     }
 }
- }
+}
