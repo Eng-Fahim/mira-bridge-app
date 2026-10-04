@@ -149,29 +149,35 @@
     <!-- ═══════════════════════════════════════════════════════════════
          💬 DIALOG THEME
          ═══════════════════════════════════════════════════════════════ -->
-    <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
-        <item name="android:windowBackground">@drawable/bg_mira_dialog</item>
-        <item name="android:backgroundDimAmount">0.55</item>
+  <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+    <item name="android:backgroundDimAmount">0.55</item>
 
-        <item name="android:textColorPrimary">@color/text_primary</item>
-        <item name="android:textColorSecondary">@color/text_secondary</item>
-        <item name="android:titleTextColor">@color/text_gold_accent</item>
+    <!-- ✅ نصوص -->
+    <item name="android:textColorPrimary">@color/text_primary</item>
+    <item name="android:textColorSecondary">@color/text_secondary</item>
+    <item name="android:titleTextColor">@color/text_gold_accent</item>
 
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="fontFamily">@font/cairo</item>
+    <!-- ✅ خلفية الحوار - صريحة فاتحة -->
+    <item name="colorSurface">@color/md_surface</item>
+    <item name="colorOnSurface">@color/md_on_surface</item>
+    <item name="colorSurfaceVariant">@color/md_surface_variant</item>
+    <item name="colorOnSurfaceVariant">@color/md_on_surface_variant</item>
+    <item name="colorPrimary">@color/md_primary</item>
+    <item name="colorOnPrimary">@color/md_on_primary</item>
+    <item name="colorAccent">@color/md_primary</item>
 
-        <item name="colorPrimary">@color/md_primary</item>
-        <item name="colorOnPrimary">@color/md_on_primary</item>
-        <item name="colorSurface">@color/md_surface</item>
-        <item name="colorOnSurface">@color/md_on_surface</item>
-        <item name="colorAccent">@color/md_primary</item>
+    <!-- ✅ خلفية الحوار نفسها - صريحة فاتحة -->
+    <item name="colorBackgroundFloating">@color/pure_white</item>
 
-        <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="fontFamily">@font/cairo</item>
 
-        <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
-        <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
-        <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
-    </style>
+    <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
+
+    <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
+    <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
+    <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
+</style>
 
     <style name="MiraDialogShape" parent="">
         <item name="cornerFamily">rounded</item>
