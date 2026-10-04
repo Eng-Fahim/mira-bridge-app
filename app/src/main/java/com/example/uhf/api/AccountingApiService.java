@@ -97,4 +97,12 @@ public interface AccountingApiService {
     
     @GET("currencies/rates")
     Call<ApiResponseDto<Object[]>> getExchangeRates();
+
+    @GET("reports/general-ledger/{account_id}")
+    Call<ApiResponseDto<GeneralLedgerDto>> getGeneralLedger(
+    @Path("account_id") long accountId,
+    @Query("from_date") String fromDate,
+    @Query("to_date") String toDate,
+    @Query("branch_id") Integer branchId
+);
 }
