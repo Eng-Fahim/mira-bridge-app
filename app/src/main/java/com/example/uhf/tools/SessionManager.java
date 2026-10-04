@@ -108,6 +108,44 @@ public class SessionManager {
     public boolean isAdmin() {
         return secureManager.isAnyAdmin();
     }
+    
+    // ==================== الأدوار الجديدة (ACCOUNTANT + FINANCE_MANAGER) ====================
+
+public boolean isAccountant() {
+    return secureManager.isAccountant();
+}
+
+public boolean isFinanceManager() {
+    return secureManager.isFinanceManager();
+}
+
+public boolean canPerformAccountingSetup() {
+    return secureManager.canPerformAccountingSetup();
+}
+
+public boolean isBranchManager() {
+    return secureManager.isBranchManager();
+}
+
+public boolean isInventoryManager() {
+    return secureManager.isInventoryManager();
+}
+
+public boolean isPosOperator() {
+    return secureManager.isPosOperator();
+}
+
+public boolean isSecurity() {
+    return secureManager.isSecurity();
+}
+
+public boolean isGateSecurity() {
+    return secureManager.isGateSecurity();
+}
+
+public boolean isAuditor() {
+    return secureManager.isAuditor();
+}
 
     public boolean isManager() {
         return secureManager.isManager();
