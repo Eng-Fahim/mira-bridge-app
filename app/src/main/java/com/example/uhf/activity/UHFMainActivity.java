@@ -122,6 +122,21 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final String TAG = "UHFMainActivity";
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
+    
+    // ═══════════════════════════════════════════════════════
+// ✅ ثوابت حالة الإعداد المحاسبي — المعيار العالمي
+// ═══════════════════════════════════════════════════════
+private static final String PREFS_SETUP = "mira_setup_state";
+private static final String KEY_SETUP_STATUS = "setup_status";
+private static final String KEY_SETUP_CACHED_AT = "cached_at";
+private static final long SETUP_CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقائق
+
+// حالات الإعداد
+private static final String SETUP_PENDING = "pending";
+private static final String SETUP_IN_PROGRESS = "in_progress";
+private static final String SETUP_COMPLETED = "completed";
+private static final String SETUP_LOCKED = "locked";
+
 
     // ==================== ✅ ثوابت عداد التحويلات ====================
     private static final long TRANSFER_REFRESH_INTERVAL = 60_000L; // كل 60 ثانية
@@ -374,16 +389,19 @@ getWindow().setSoftInputMode(
             setupOrgProfileListener();
 
             if (savedInstanceState == null) {
-                navigationManager.loadFragmentDirectly(
-                        new MiraDashboardFragment(),
-                        NavigationManager.TAG_DASHBOARD
-                );
-            } else {
-                String savedTag = savedInstanceState.getString(
-                        "current_fragment", NavigationManager.TAG_DASHBOARD);
-                Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
-                navigationManager.loadFragmentDirectly(savedFragment, savedTag);
-            }
+    // ✅ فحص حالة الإعداد قبل التوجيه (المعيار العالمي)
+    checkSetupStatusAndNavigate();
+} else {
+    String savedTag = savedInstanceState.getString(
+            "current_fragment", NavigationManager.TAG_DASHBOARD);
+    Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
+    if (savedFragment != null) {
+        navigationManager.loadFragmentDirectly(savedFragment, savedTag);
+    } else {
+        // Fallback آمن
+        checkSetupStatusAndNavigate();
+    }
+}
 
             try {
                 if (sessionManager != null) {
@@ -437,7 +455,264 @@ getWindow().setSoftInputMode(
             
         }
     }
+    
+    
+    
+// ═══════════════════════════════════════════════════════════
+//  ✅ فحص حالة الإعداد المحاسبي — قبل التوجيه (المعيار العالمي)
+//  القاعدة: لا يمكن لأي مستخدم استخدام النظام قبل اكتمال الإعداد
+//  الاستثناء الوحيد: System Admin (مهندس النظام)
+// ═══════════════════════════════════════════════════════════
 
+private void checkSetupStatusAndNavigate() {
+    // ✅ 1) اقرأ حالة الإعداد من الكاش أولاً (سريع)
+    String cachedStatus = getCachedSetupStatus();
+
+    // ✅ 2) إذا الكاش صالح → تابع فوراً
+    if (cachedStatus != null) {
+        Log.d(TAG, "✅ Setup status from cache: " + cachedStatus);
+        navigateBySetupStatus(cachedStatus);
+        // ⚠️ حدّث الكاش في الخلفية (stale-while-revalidate)
+        refreshSetupStatusInBackground();
+        return;
+    }
+
+    // ✅ 3) إذا لا يوجد كاش → اجلب من API (مع شاشة تحميل)
+    Log.d(TAG, "⏳ Fetching setup status from API...");
+    fetchSetupStatusAndNavigate();
+}
+
+/**
+ * جلب حالة الإعداد من API ثم التوجيه
+ */
+private void fetchSetupStatusAndNavigate() {
+    // عرض شاشة تحميل مؤقتة
+    showSetupLoadingScreen();
+
+    new Thread(() -> {
+        String status = null;
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+
+            if (response != null && response.isSuccess && response.data != null) {
+                status = response.data.optString("status", SETUP_PENDING);
+                Log.d(TAG, "✅ Setup status from API: " + status);
+            } else {
+                // ❌ فشل الاتصال → استخدم pending كافتراضي آمن
+                Log.w(TAG, "⚠️ Failed to fetch setup status → assuming pending");
+                status = SETUP_PENDING;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
+            status = SETUP_PENDING;
+        }
+
+        final String finalStatus = status;
+        runOnUiThread(() -> {
+            hideSetupLoadingScreen();
+            if (isActivityAlive()) {
+                // حفظ في الكاش
+                cacheSetupStatus(finalStatus);
+                // توجيه
+                navigateBySetupStatus(finalStatus);
+            }
+        });
+    }).start();
+}
+
+/**
+ * تحديث حالة الإعداد في الخلفية (بدون تجميد المستخدم)
+ */
+private void refreshSetupStatusInBackground() {
+    new Thread(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+
+            if (response != null && response.isSuccess && response.data != null) {
+                String status = response.data.optString("status", SETUP_PENDING);
+                cacheSetupStatus(status);
+                Log.d(TAG, "✅ Setup status refreshed: " + status);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Setup status refresh failed: " + e.getMessage());
+        }
+    }).start();
+}
+
+/**
+ * التوجيه بناءً على حالة الإعداد + صلاحية المستخدم
+ *
+ * المنطق:
+ * - pending/in_progress + System Admin → الإعداد المحاسبي
+ * - pending/in_progress + غير System Admin → رسالة "قيد الإعداد"
+ * - completed/locked → التوجيه حسب الدور
+ */
+private void navigateBySetupStatus(String setupStatus) {
+    boolean isSystemAdmin = permissionManager != null
+            && permissionManager.isSystemAdmin();
+
+    boolean isSetupPending = SETUP_PENDING.equals(setupStatus)
+            || SETUP_IN_PROGRESS.equals(setupStatus);
+
+    Log.d(TAG, "🧭 Navigate: status=" + setupStatus
+            + ", isSystemAdmin=" + isSystemAdmin);
+
+    if (isSetupPending) {
+        if (isSystemAdmin) {
+            // ✅ System Admin → شاشة الإعداد
+            loadFragmentDirectly(
+                    new MiraAccountingSetupFragment(),
+                    "AccountingSetup"
+            );
+            Toast.makeText(this,
+                    isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
+                             : "🔧 Welcome — Please complete setup",
+                    Toast.LENGTH_LONG).show();
+        } else {
+            // ❌ غير System Admin → منع الدخول
+            showSetupBlockedScreen();
+        }
+    } else {
+        // ✅ النظام جاهز → التوجيه حسب الدور
+        navigateByRole();
+    }
+}
+
+/**
+ * التوجيه حسب دور المستخدم (عندما يكون النظام جاهزاً)
+ */
+private void navigateByRole() {
+    try {
+        Fragment targetFragment;
+        String targetTag;
+
+        if (permissionManager.isCashier()) {
+            targetFragment = new MiraPosFragment();
+            targetTag = NavigationManager.TAG_POS;
+        } else if (permissionManager.isInventoryManager()) {
+            targetFragment = new MiraInventoryProFragment();
+            targetTag = NavigationManager.TAG_INVENTORY;
+        } else {
+            // admin, manager, accountant, viewer
+            targetFragment = new MiraDashboardFragment();
+            targetTag = NavigationManager.TAG_DASHBOARD;
+        }
+
+        loadFragmentDirectly(targetFragment, targetTag);
+        Log.d(TAG, "✅ Navigated by role to: " + targetTag);
+
+    } catch (Exception e) {
+        Log.e(TAG, "navigateByRole error: " + e.getMessage());
+        // Fallback → Dashboard
+        loadFragmentDirectly(new MiraDashboardFragment(),
+                NavigationManager.TAG_DASHBOARD);
+    }
+}
+
+/**
+ * شاشة "النظام قيد الإعداد" — غير قابلة للتخطي
+ */
+private void showSetupBlockedScreen() {
+    if (isFinishing() || isDestroyed()) return;
+
+    try {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic
+                        ? "⚠️ النظام قيد الإعداد"
+                        : "⚠️ System Under Setup")
+                .setMessage(isArabic
+                        ? "لم يتم استكمال الإعداد المحاسبي بعد.\n\n" +
+                          "📌 لا يمكن استخدام النظام قبل اكتمال الإعداد.\n\n" +
+                          "يرجى التواصل مع مهندس النظام لإتمام الإعداد وتفعيل حسابك.\n\n" +
+                          "📧 sa.mirabarcode.com"
+                        : "Accounting setup is not complete yet.\n\n" +
+                          "📌 The system cannot be used before completing setup.\n\n" +
+                          "Please contact the system engineer to complete setup and activate your account.\n\n" +
+                          "📧 sa.mirabarcode.com")
+                .setCancelable(false)
+                .setPositiveButton(isArabic ? "تسجيل الخروج" : "Logout",
+                        (dialog, which) -> performFullLogout())
+                .show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "showSetupBlockedScreen error: " + e.getMessage());
+        performFullLogout();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Cache لـ Setup Status (سريع + آمن)
+// ═══════════════════════════════════════════════════════════
+
+private void cacheSetupStatus(String status) {
+    try {
+        getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_SETUP_STATUS, status)
+                .putLong(KEY_SETUP_CACHED_AT, System.currentTimeMillis())
+                .apply();
+    } catch (Exception e) {
+        Log.w(TAG, "cacheSetupStatus error: " + e.getMessage());
+    }
+}
+
+private String getCachedSetupStatus() {
+    try {
+        SharedPreferences prefs = getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE);
+        long cachedAt = prefs.getLong(KEY_SETUP_CACHED_AT, 0);
+        long now = System.currentTimeMillis();
+
+        // إذا انتهت صلاحية الكاش → null
+        if (now - cachedAt > SETUP_CACHE_TTL_MS) {
+            return null;
+        }
+
+        return prefs.getString(KEY_SETUP_STATUS, null);
+    } catch (Exception e) {
+        Log.w(TAG, "getCachedSetupStatus error: " + e.getMessage());
+        return null;
+    }
+}
+
+/**
+ * إبطال كاش الإعداد (يُستدعى بعد إتمام الإعداد)
+ */
+public void invalidateSetupCache() {
+    try {
+        getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply();
+        Log.d(TAG, "✅ Setup cache invalidated");
+    } catch (Exception e) {
+        Log.w(TAG, "invalidateSetupCache error: " + e.getMessage());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  شاشة تحميل مؤقتة (قبل تحديد الوجهة)
+// ═══════════════════════════════════════════════════════════
+
+private void showSetupLoadingScreen() {
+    mainHandler.post(() -> {
+        View loadingOverlay = findViewById(R.id.successOverlayMain);
+        if (loadingOverlay != null) {
+            loadingOverlay.setVisibility(View.VISIBLE);
+            loadingOverlay.setAlpha(1.0f);
+        }
+    });
+}
+
+private void hideSetupLoadingScreen() {
+    mainHandler.post(() -> {
+        View loadingOverlay = findViewById(R.id.successOverlayMain);
+        if (loadingOverlay != null) {
+            loadingOverlay.setVisibility(View.GONE);
+        }
+    });
+}
 
 private void setupKeyboardBehavior() {
     try {
@@ -1158,10 +1433,7 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
 
 
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    Toast.makeText(this,
-            "4️⃣ UHF.loadFragment: " + tag,
-            Toast.LENGTH_SHORT).show();
-
+   
     if (isFinishing() || isDestroyed()) {
         Toast.makeText(this, "❌ Activity finishing", Toast.LENGTH_SHORT).show();
         return;
