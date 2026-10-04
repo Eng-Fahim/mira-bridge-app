@@ -16,6 +16,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.google.android.material.button.MaterialButton;
 
@@ -23,7 +24,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * المرحلة 5: المستخدمون والصلاحيات (اختيارية)
+ * المرحلة 5: المستخدمون والصلاحيات
+ * 
+ * يعرض المستخدمين الحاليين + يفتح شاشة الإدارة المتكاملة
  */
 public class SetupStep5UsersFragment extends Fragment {
 
@@ -34,6 +37,7 @@ public class SetupStep5UsersFragment extends Fragment {
     private MaterialButton btnNext;
     private MaterialButton btnManageUsers;
     private View pbLoading;
+    private TextView tvStats;
 
     private MiraApiClient apiClient;
 
@@ -48,9 +52,15 @@ public class SetupStep5UsersFragment extends Fragment {
         
         initViews(view);
         setupListeners();
-        loadUsers();
         
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // ✅ إعادة تحميل عند العودة
+        loadUsers();
     }
 
     private void initViews(View v) {
@@ -59,16 +69,21 @@ public class SetupStep5UsersFragment extends Fragment {
         btnNext = v.findViewById(R.id.btnNext);
         btnManageUsers = v.findViewById(R.id.btnManageUsers);
         pbLoading = v.findViewById(R.id.pbLoading);
+        tvStats = v.findViewById(R.id.tvStats);
     }
 
     private void setupListeners() {
         btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
         btnNext.setOnClickListener(v -> saveAndNext());
+        
+        // ✅ فتح شاشة إدارة المستخدمين المتكاملة
         btnManageUsers.setOnClickListener(v -> {
-            // فتح شاشة إدارة المستخدمين
-            if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
-                ((com.example.uhf.activity.UHFMainActivity) getActivity())
-                    .loadFragment(new UsersManagementFragment(), "UsersManagement");
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity())
+                    .loadFragment(
+                        new UsersManagementFragment(),
+                        "UsersManagement"
+                    );
             }
         });
     }
@@ -78,14 +93,26 @@ public class SetupStep5UsersFragment extends Fragment {
         
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getAccounting("auth/users");
+                MiraApiClient.ApiResponse response = apiClient.getWithAuth("auth/users");
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
                     
                     if (response != null && response.isSuccess && response.data != null) {
+                        // ✅ جرّب عدة مستويات
                         JSONArray users = response.data.optJSONArray("users");
-                        if (users == null) users = response.data.optJSONArray("data");
+                        
+                        if (users == null) {
+                            JSONObject dataObj = response.data.optJSONObject("data");
+                            if (dataObj != null) {
+                                users = dataObj.optJSONArray("users");
+                            }
+                        }
+                        
+                        if (users == null) {
+                            users = response.data.optJSONArray("data");
+                        }
+                        
                         renderUsers(users);
                     } else {
                         renderUsers(new JSONArray());
@@ -109,8 +136,11 @@ public class SetupStep5UsersFragment extends Fragment {
                 View empty = LayoutInflater.from(requireContext())
                     .inflate(R.layout.item_setup_empty, usersContainer, false);
                 usersContainer.addView(empty);
+                tvStats.setText("لا يوجد مستخدمون");
                 return;
             }
+            
+            tvStats.setText("عدد المستخدمين: " + users.length());
             
             for (int i = 0; i < users.length(); i++) {
                 addUserCard(users.getJSONObject(i));
@@ -135,18 +165,18 @@ public class SetupStep5UsersFragment extends Fragment {
             
             tvName.setText(name);
             tvRole.setText(translateRole(role));
+            tvPermissions.setText("👤 " + user.optString("username", ""));
             
-            // صلاحيات
-            StringBuilder perms = new StringBuilder("الصلاحيات: ");
-            if (user.optBoolean("can_post_journal", false)) perms.append("✅ نشر القيود | ");
-            if (user.optBoolean("can_approve_journal", false)) perms.append("✅ اعتماد القيود | ");
-            if (user.optBoolean("can_edit_opening", false)) perms.append("✅ تعديل الأرصدة | ");
-            
-            if (perms.length() <= "الصلاحيات: ".length()) {
-                perms.append("لا صلاحيات محاسبية");
-            }
-            
-            tvPermissions.setText(perms.toString());
+            // ✅ عند النقر → فتح شاشة الإدارة
+            card.setOnClickListener(v -> {
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity())
+                        .loadFragment(
+                            new UsersManagementFragment(),
+                            "UsersManagement"
+                        );
+                }
+            });
             
             usersContainer.addView(card);
             
@@ -157,13 +187,15 @@ public class SetupStep5UsersFragment extends Fragment {
 
     private String translateRole(String role) {
         switch (role) {
-            case "SYSTEM_ADMIN": return "🔑 مدير النظام";
-            case "ORG_ADMIN":    return "🏢 مدير المؤسسة";
-            case "ADMIN":        return "👑 مدير";
+            case "SYSTEM_ADMIN":   return "🔑 مدير النظام";
+            case "ORG_ADMIN":      return "🏢 مدير المؤسسة";
+            case "ADMIN":          return "👑 مدير";
             case "BRANCH_MANAGER": return "🏬 مدير فرع";
-            case "ACCOUNTANT":   return "💰 محاسب";
-            case "AUDITOR":      return "🔍 مدقق";
-            default:             return role;
+            case "ACCOUNTANT":     return "💰 محاسب";
+            case "AUDITOR":        return "🔍 مدقق";
+            case "INVENTORY_MGR":  return "📦 مدير مخزون";
+            case "POS_OPERATOR":   return "🛒 كاشير";
+            default:               return role;
         }
     }
 
@@ -173,10 +205,8 @@ public class SetupStep5UsersFragment extends Fragment {
         
         new Thread(() -> {
             try {
-                // ✅ نرسل قائمة فارغة — المستخدمون يُعدَّلون من شاشة الإدارة
                 JSONObject payload = new JSONObject();
-                JSONArray usersArray = new JSONArray();
-                payload.put("users", usersArray);
+                payload.put("users", new JSONArray());
                 
                 MiraApiClient.ApiResponse response = 
                     apiClient.postAccounting("setup/step/5", payload);
