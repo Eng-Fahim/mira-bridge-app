@@ -3,12 +3,15 @@ package com.example.uhf.fragment;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,57 +30,31 @@ import org.json.JSONObject;
 
 import java.util.Locale;
 
-/**
- * المرحلة 4: الأرصدة الافتتاحية
- * 
- * النموذج المحاسبي:
- * - نقدية (صندوق) — إلزامي
- * - ذهب (بالجرام × العيار) — اختياري
- * - ذمم العملاء — اختياري
- * - ذمم الموردين — اختياري
- * - أصول ثابتة — اختياري
- */
 public class SetupStep4OpeningBalancesFragment extends Fragment {
 
     private static final String TAG = "SetupStep4";
 
-    // Cash
-    private TextInputEditText etCashBalance;
-    private TextInputEditText etCashNotes;
-
-    // Banks
-    private TextInputEditText etBankBalance;
-    private TextInputEditText etBankName;
-
-    // Gold
-    private TextInputEditText etGoldWeight;
-    private AutoCompleteTextView spGoldKarat;
-    private TextInputEditText etGoldPricePerGram;
+    // Containers
+    private LinearLayout cashContainer;
+    private LinearLayout banksContainer;
+    private LinearLayout goldContainer;
+    private LinearLayout receivablesContainer;
+    private LinearLayout payablesContainer;
+    private LinearLayout fixedAssetsContainer;
 
     // Diamonds
     private TextInputEditText etDiamondValue;
 
-    // Receivables
-    private TextInputEditText etReceivables;
-
-    // Payables
-    private TextInputEditText etPayables;
-
-    // Fixed Assets
-    private TextInputEditText etFixedAssets;
-    private TextInputEditText etFixedAssetsDesc;
+    // Buttons
+    private MaterialButton btnAddCash, btnAddBank, btnAddGold;
+    private MaterialButton btnAddReceivable, btnAddPayable, btnAddFixedAsset;
+    private MaterialButton btnBack, btnNext;
 
     // Summary
-    private TextView tvTotalAssets;
-    private TextView tvTotalGold;
-    private TextView tvCapital;
-
-    private MaterialButton btnBack;
-    private MaterialButton btnNext;
-    private View pbLoading;
+    private TextView tvTotalAssets, tvTotalGold, tvCapital;
 
     private MiraApiClient apiClient;
-    private double currentGoldPrice = 65000; // سعر افتراضي
+    private double goldPrice24k = 65000;
 
     @Nullable
     @Override
@@ -85,276 +62,244 @@ public class SetupStep4OpeningBalancesFragment extends Fragment {
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_setup_step4_opening, container, false);
-        
+
         apiClient = MiraApiClient.getInstance(requireContext());
-        
+
         initViews(view);
         setupListeners();
-        setupTextWatchers();
         loadGoldPrice();
-        
+
+        // ✅ نضيف صفًا افتراضيًا لكل قسم
+        addCashRow();
+        addBankRow();
+        addGoldRow();
+        addReceivableRow();
+        addPayableRow();
+        addFixedAssetRow();
+
         return view;
     }
 
     private void initViews(View v) {
-        etCashBalance = v.findViewById(R.id.etCashBalance);
-        etCashNotes = v.findViewById(R.id.etCashNotes);
-        
-        etBankBalance = v.findViewById(R.id.etBankBalance);
-        etBankName = v.findViewById(R.id.etBankName);
-        
-        etGoldWeight = v.findViewById(R.id.etGoldWeight);
-        spGoldKarat = v.findViewById(R.id.spGoldKarat);
-        etGoldPricePerGram = v.findViewById(R.id.etGoldPricePerGram);
-        
+        cashContainer = v.findViewById(R.id.cashContainer);
+        banksContainer = v.findViewById(R.id.banksContainer);
+        goldContainer = v.findViewById(R.id.goldContainer);
+        receivablesContainer = v.findViewById(R.id.receivablesContainer);
+        payablesContainer = v.findViewById(R.id.payablesContainer);
+        fixedAssetsContainer = v.findViewById(R.id.fixedAssetsContainer);
         etDiamondValue = v.findViewById(R.id.etDiamondValue);
-        
-        etReceivables = v.findViewById(R.id.etReceivables);
-        etPayables = v.findViewById(R.id.etPayables);
-        
-        etFixedAssets = v.findViewById(R.id.etFixedAssets);
-        etFixedAssetsDesc = v.findViewById(R.id.etFixedAssetsDesc);
-        
+
+        btnAddCash = v.findViewById(R.id.btnAddCash);
+        btnAddBank = v.findViewById(R.id.btnAddBank);
+        btnAddGold = v.findViewById(R.id.btnAddGold);
+        btnAddReceivable = v.findViewById(R.id.btnAddReceivable);
+        btnAddPayable = v.findViewById(R.id.btnAddPayable);
+        btnAddFixedAsset = v.findViewById(R.id.btnAddFixedAsset);
+
+        btnBack = v.findViewById(R.id.btnBack);
+        btnNext = v.findViewById(R.id.btnNext);
+
         tvTotalAssets = v.findViewById(R.id.tvTotalAssets);
         tvTotalGold = v.findViewById(R.id.tvTotalGold);
         tvCapital = v.findViewById(R.id.tvCapital);
-        
-        btnBack = v.findViewById(R.id.btnBack);
-        btnNext = v.findViewById(R.id.btnNext);
-        pbLoading = v.findViewById(R.id.pbLoading);
-        
-        // Spinner للعيارات
+    }
+
+    private void setupListeners() {
+        btnAddCash.setOnClickListener(v -> addCashRow());
+        btnAddBank.setOnClickListener(v -> addBankRow());
+        btnAddGold.setOnClickListener(v -> addGoldRow());
+        btnAddReceivable.setOnClickListener(v -> addReceivableRow());
+        btnAddPayable.setOnClickListener(v -> addPayableRow());
+        btnAddFixedAsset.setOnClickListener(v -> addFixedAssetRow());
+
+        etDiamondValue.addTextChangedListener(new SimpleWatcher(this::updateSummary));
+
+        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        btnNext.setOnClickListener(v -> saveAndNext());
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Add Rows
+    // ═══════════════════════════════════════════════════════
+
+    private void addCashRow() {
+        View row = LayoutInflater.from(requireContext())
+            .inflate(R.layout.item_setup_cash_row, cashContainer, false);
+
+        TextInputEditText etAmount = row.findViewById(R.id.etCashAmount);
+        TextInputEditText etNotes = row.findViewById(R.id.etCashNotes);
+        ImageButton btnRemove = row.findViewById(R.id.btnRemoveCash);
+
+        etAmount.addTextChangedListener(new SimpleWatcher(this::updateSummary));
+        btnRemove.setOnClickListener(v -> {
+            if (cashContainer.getChildCount() > 1) {
+                cashContainer.removeView(row);
+                updateSummary();
+            } else {
+                etAmount.setText("0");
+            }
+        });
+
+        cashContainer.addView(row);
+    }
+
+    private void addBankRow() {
+        View row = LayoutInflater.from(requireContext())
+            .inflate(R.layout.item_setup_bank_row, banksContainer, false);
+
+        TextInputEditText etAmount = row.findViewById(R.id.etBankAmount);
+        ImageButton btnRemove = row.findViewById(R.id.btnRemoveBank);
+
+        etAmount.addTextChangedListener(new SimpleWatcher(this::updateSummary));
+        btnRemove.setOnClickListener(v -> {
+            if (banksContainer.getChildCount() > 1) {
+                banksContainer.removeView(row);
+                updateSummary();
+            } else {
+                etAmount.setText("0");
+            }
+        });
+
+        banksContainer.addView(row);
+    }
+
+    private void addGoldRow() {
+        View row = LayoutInflater.from(requireContext())
+            .inflate(R.layout.item_setup_gold_row, goldContainer, false);
+
+        TextInputEditText etWeight = row.findViewById(R.id.etGoldWeight);
+        TextInputEditText etPrice = row.findViewById(R.id.etGoldPrice);
+        AutoCompleteTextView spKarat = row.findViewById(R.id.spGoldKarat);
+        ImageButton btnRemove = row.findViewById(R.id.btnRemoveGold);
+
         String[] karats = {"24K", "22K", "21K", "18K", "14K"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
             requireContext(),
             android.R.layout.simple_dropdown_item_1line,
             karats
         );
-        spGoldKarat.setAdapter(adapter);
-        spGoldKarat.setText("21K", false);
-        
-        // قيم افتراضية
-        etGoldPricePerGram.setText(String.format(Locale.US, "%.0f", currentGoldPrice));
-        etCashBalance.setText("0");
-        etBankBalance.setText("0");
-        etGoldWeight.setText("0");
-        etDiamondValue.setText("0");
-        etReceivables.setText("0");
-        etPayables.setText("0");
-        etFixedAssets.setText("0");
-    }
+        spKarat.setAdapter(adapter);
+        spKarat.setText("21K", false);
+        etPrice.setText(String.format(Locale.US, "%.0f", goldPrice24k));
 
-    private void setupListeners() {
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(v -> saveAndNext());
-    }
+        etWeight.addTextChangedListener(new SimpleWatcher(this::updateSummary));
+        etPrice.addTextChangedListener(new SimpleWatcher(this::updateSummary));
+        spKarat.setOnItemClickListener((p, v, pos, id) -> updateSummary());
 
-    private void setupTextWatchers() {
-        android.text.TextWatcher watcher = new android.text.TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(android.text.Editable s) {
+        btnRemove.setOnClickListener(v -> {
+            if (goldContainer.getChildCount() > 1) {
+                goldContainer.removeView(row);
                 updateSummary();
+            } else {
+                etWeight.setText("0");
             }
-        };
-        
-        etCashBalance.addTextChangedListener(watcher);
-        etBankBalance.addTextChangedListener(watcher);
-        etGoldWeight.addTextChangedListener(watcher);
-        etGoldPricePerGram.addTextChangedListener(watcher);
-        etDiamondValue.addTextChangedListener(watcher);
-        etReceivables.addTextChangedListener(watcher);
-        etPayables.addTextChangedListener(watcher);
-        etFixedAssets.addTextChangedListener(watcher);
+        });
+
+        goldContainer.addView(row);
     }
 
-    private void loadGoldPrice() {
-        new Thread(() -> {
-            try {
-                MiraApiClient.ApiResponse response = 
-                    apiClient.getAccounting("gold-rates");
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject data = response.data.optJSONObject("data");
-                    if (data != null) {
-                        double price = data.optDouble("price_per_gram_24k", 0);
-                        if (price > 0) {
-                            currentGoldPrice = price;
-                            new Handler(Looper.getMainLooper()).post(() -> {
-                                etGoldPricePerGram.setText(String.format(Locale.US, "%.0f", price));
-                            });
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "loadGoldPrice error", e);
-            }
-        }).start();
+    private void addReceivableRow() {
+        addGenericRow(receivablesContainer, "اسم العميل");
     }
+
+    private void addPayableRow() {
+        addGenericRow(payablesContainer, "اسم المورد");
+    }
+
+    private void addFixedAssetRow() {
+        addGenericRow(fixedAssetsContainer, "اسم الأصل");
+    }
+
+    private void addGenericRow(LinearLayout container, String nameHint) {
+        View row = LayoutInflater.from(requireContext())
+            .inflate(R.layout.item_setup_generic_row, container, false);
+
+        TextInputEditText etName = row.findViewById(R.id.etName);
+        TextInputEditText etAmount = row.findViewById(R.id.etAmount);
+        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
+
+        etName.setHint(nameHint);
+        etAmount.addTextChangedListener(new SimpleWatcher(this::updateSummary));
+
+        btnRemove.setOnClickListener(v -> {
+            if (container.getChildCount() > 1) {
+                container.removeView(row);
+                updateSummary();
+            } else {
+                etAmount.setText("0");
+            }
+        });
+
+        container.addView(row);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Summary
+    // ═══════════════════════════════════════════════════════
 
     private void updateSummary() {
-        double cash = parseDouble(etCashBalance, 0);
-        double bank = parseDouble(etBankBalance, 0);
-        double goldWeight = parseDouble(etGoldWeight, 0);
-        double goldPrice = parseDouble(etGoldPricePerGram, currentGoldPrice);
-        double diamond = parseDouble(etDiamondValue, 0);
-        double receivables = parseDouble(etReceivables, 0);
-        double fixedAssets = parseDouble(etFixedAssets, 0);
-        
-        String karat = spGoldKarat.getText().toString();
-        double factor = getKaratFactor(karat);
-        double gold24k = goldWeight * factor;
-        double goldValue = gold24k * goldPrice;
-        
-        double totalAssets = cash + bank + goldValue + diamond + receivables + fixedAssets;
-        
+        double totalCash = 0;
+        double totalBanks = 0;
+        double totalGoldMoney = 0;
+        double totalGold24k = 0;
+        double totalReceivables = 0;
+        double totalFixedAssets = 0;
+
+        // Cash
+        for (int i = 0; i < cashContainer.getChildCount(); i++) {
+            TextInputEditText et = cashContainer.getChildAt(i).findViewById(R.id.etCashAmount);
+            totalCash += parseDouble(et);
+        }
+
+        // Banks
+        for (int i = 0; i < banksContainer.getChildCount(); i++) {
+            TextInputEditText et = banksContainer.getChildAt(i).findViewById(R.id.etBankAmount);
+            totalBanks += parseDouble(et);
+        }
+
+        // Gold
+        for (int i = 0; i < goldContainer.getChildCount(); i++) {
+            View row = goldContainer.getChildAt(i);
+            TextInputEditText etWeight = row.findViewById(R.id.etGoldWeight);
+            TextInputEditText etPrice = row.findViewById(R.id.etGoldPrice);
+            AutoCompleteTextView spKarat = row.findViewById(R.id.spGoldKarat);
+
+            double weight = parseDouble(etWeight);
+            double price = parseDouble(etPrice);
+            if (price <= 0) price = goldPrice24k;
+
+            String karat = spKarat.getText().toString();
+            double factor = karatFactor(karat);
+
+            double weight24k = weight * factor;
+            totalGold24k += weight24k;
+            totalGoldMoney += weight24k * price;
+        }
+
+        // Diamonds
+        double diamonds = parseDouble(etDiamondValue);
+
+        // Receivables
+        for (int i = 0; i < receivablesContainer.getChildCount(); i++) {
+            TextInputEditText et = receivablesContainer.getChildAt(i).findViewById(R.id.etAmount);
+            totalReceivables += parseDouble(et);
+        }
+
+        // Fixed Assets
+        for (int i = 0; i < fixedAssetsContainer.getChildCount(); i++) {
+            TextInputEditText et = fixedAssetsContainer.getChildAt(i).findViewById(R.id.etAmount);
+            totalFixedAssets += parseDouble(et);
+        }
+
+        double totalAssets = totalCash + totalBanks + totalGoldMoney +
+                             diamonds + totalReceivables + totalFixedAssets;
+
         tvTotalAssets.setText(String.format(Locale.US, "%,.2f", totalAssets));
-        tvTotalGold.setText(String.format(Locale.US, "%.3f g", gold24k));
+        tvTotalGold.setText(String.format(Locale.US, "%.3f g", totalGold24k));
         tvCapital.setText(String.format(Locale.US, "%,.2f", totalAssets));
     }
 
-    private void saveAndNext() {
-        double cash = parseDouble(etCashBalance, 0);
-        double bank = parseDouble(etBankBalance, 0);
-        double goldWeight = parseDouble(etGoldWeight, 0);
-        double goldPrice = parseDouble(etGoldPricePerGram, currentGoldPrice);
-        double diamond = parseDouble(etDiamondValue, 0);
-        double receivables = parseDouble(etReceivables, 0);
-        double payables = parseDouble(etPayables, 0);
-        double fixedAssets = parseDouble(etFixedAssets, 0);
-        
-        String karat = spGoldKarat.getText().toString();
-        
-        // فحص أساسي
-        if (cash <= 0 && bank <= 0 && goldWeight <= 0 && 
-            diamond <= 0 && receivables <= 0 && fixedAssets <= 0) {
-            Toast.makeText(requireContext(), 
-                "يجب إدخال رصيد واحد على الأقل", Toast.LENGTH_LONG).show();
-            return;
-        }
-        
-        btnNext.setEnabled(false);
-        btnNext.setText("جاري الحفظ...");
-        
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                JSONArray balances = new JSONArray();
-                
-                // Cash
-                if (cash > 0) {
-                    JSONObject b = new JSONObject();
-                    b.put("type", "cash");
-                    b.put("amount_money", cash);
-                    b.put("currency", "YER");
-                    b.put("description", etCashNotes.getText().toString());
-                    balances.put(b);
-                }
-                
-                // Bank
-                if (bank > 0) {
-                    JSONObject b = new JSONObject();
-                    b.put("type", "bank");
-                    b.put("amount_money", bank);
-                    b.put("currency", "YER");
-                    b.put("description", etBankName.getText().toString());
-                    balances.put(b);
-                }
-                
-                // Gold
-                if (goldWeight > 0) {
-                    JSONObject b = new JSONObject();
-                    b.put("type", "gold");
-                    b.put("weight_grams", goldWeight);
-                    b.put("karat", karat);
-                    b.put("amount_money", goldWeight * getKaratFactor(karat) * goldPrice);
-                    b.put("currency", "YER");
-                    b.put("description", "مخزون ذهب " + karat);
-                    balances.put(b);
-                }
-                
-                // Diamond
-                if (diamond > 0) {
-                    JSONObject b = new JSONObject();
-                    b.put("type", "diamond");
-                    b.put("amount_money", diamond);
-                    b.put("currency", "YER");
-                    b.put("description", "مخزون الألماس والأحجار");
-                    balances.put(b);
-                }
-                
-                // Receivables
-                if (receivables > 0) {
-                    JSONObject b = new JSONObject();
-                    b.put("type", "receivable");
-                    b.put("amount_money", receivables);
-                    b.put("currency", "YER");
-                    b.put("description", "ذمم العملاء");
-                    balances.put(b);
-                }
-                
-                // Payables (كالتزام — لكن يُحسب في رأس المال)
-                if (payables > 0) {
-                    JSONObject b = new JSONObject();
-                    b.put("type", "payable");
-                    b.put("amount_money", payables);
-                    b.put("currency", "YER");
-                    b.put("description", "ذمم الموردين");
-                    balances.put(b);
-                }
-                
-                // Fixed Assets
-                if (fixedAssets > 0) {
-                    JSONObject b = new JSONObject();
-                    b.put("type", "fixed_asset");
-                    b.put("amount_money", fixedAssets);
-                    b.put("currency", "YER");
-                    b.put("description", etFixedAssetsDesc.getText().toString());
-                    balances.put(b);
-                }
-                
-                payload.put("balances", balances);
-                
-                MiraApiClient.ApiResponse response = 
-                    apiClient.postAccounting("setup/step/4", payload);
-                
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    btnNext.setEnabled(true);
-                    btnNext.setText("التالي ←");
-                    
-                    if (response != null && response.isSuccess) {
-                        Toast.makeText(requireContext(), 
-                            "✅ تم حفظ الأرصدة الافتتاحية", Toast.LENGTH_SHORT).show();
-                        openNextStep();
-                    } else {
-                        String error = response != null ? response.error : "غير معروف";
-                        Toast.makeText(requireContext(), 
-                            "❌ فشل: " + error, Toast.LENGTH_LONG).show();
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "save error", e);
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    btnNext.setEnabled(true);
-                    btnNext.setText("التالي ←");
-                    Toast.makeText(requireContext(), 
-                        "❌ " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
-            }
-        }).start();
-    }
-
-    private double parseDouble(TextInputEditText et, double def) {
-        try {
-            if (et == null || et.getText() == null) return def;
-            String str = et.getText().toString().trim();
-            return str.isEmpty() ? def : Double.parseDouble(str);
-        } catch (Exception e) {
-            return def;
-        }
-    }
-
-    private double getKaratFactor(String karat) {
+    private double karatFactor(String karat) {
         switch (karat.toUpperCase()) {
             case "24K": return 1.0;
             case "22K": return 0.9166;
@@ -365,6 +310,224 @@ public class SetupStep4OpeningBalancesFragment extends Fragment {
         }
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  Save
+    // ═══════════════════════════════════════════════════════
+
+    private void saveAndNext() {
+        btnNext.setEnabled(false);
+        btnNext.setText("جاري الحفظ...");
+
+        new Thread(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                JSONArray balances = new JSONArray();
+
+                // ─── Cash ───
+                for (int i = 0; i < cashContainer.getChildCount(); i++) {
+                    View row = cashContainer.getChildAt(i);
+                    TextInputEditText etAmount = row.findViewById(R.id.etCashAmount);
+                    TextInputEditText etNotes = row.findViewById(R.id.etCashNotes);
+
+                    double amount = parseDouble(etAmount);
+                    if (amount > 0) {
+                        JSONObject b = new JSONObject();
+                        b.put("type", "cash");
+                        b.put("amount_money", amount);
+                        b.put("currency", "YER");
+                        b.put("description", etNotes.getText().toString());
+                        balances.put(b);
+                    }
+                }
+
+                // ─── Banks ───
+                for (int i = 0; i < banksContainer.getChildCount(); i++) {
+                    View row = banksContainer.getChildAt(i);
+                    TextInputEditText etName = row.findViewById(R.id.etBankName);
+                    TextInputEditText etAmount = row.findViewById(R.id.etBankAmount);
+
+                    double amount = parseDouble(etAmount);
+                    if (amount > 0) {
+                        JSONObject b = new JSONObject();
+                        b.put("type", "bank");
+                        b.put("amount_money", amount);
+                        b.put("currency", "YER");
+                        b.put("description", etName.getText().toString());
+                        balances.put(b);
+                    }
+                }
+
+                // ─── Gold ───
+                for (int i = 0; i < goldContainer.getChildCount(); i++) {
+                    View row = goldContainer.getChildAt(i);
+                    TextInputEditText etWeight = row.findViewById(R.id.etGoldWeight);
+                    TextInputEditText etPrice = row.findViewById(R.id.etGoldPrice);
+                    AutoCompleteTextView spKarat = row.findViewById(R.id.spGoldKarat);
+
+                    double weight = parseDouble(etWeight);
+                    if (weight > 0) {
+                        double price = parseDouble(etPrice);
+                        if (price <= 0) price = goldPrice24k;
+                        String karat = spKarat.getText().toString();
+                        double weight24k = weight * karatFactor(karat);
+
+                        JSONObject b = new JSONObject();
+                        b.put("type", "gold");
+                        b.put("weight_grams", weight);
+                        b.put("karat", karat);
+                        b.put("amount_money", weight24k * price);
+                        b.put("currency", "YER");
+                        b.put("description", "ذهب " + karat);
+                        balances.put(b);
+                    }
+                }
+
+                // ─── Diamonds ───
+                double diamonds = parseDouble(etDiamondValue);
+                if (diamonds > 0) {
+                    JSONObject b = new JSONObject();
+                    b.put("type", "diamond");
+                    b.put("amount_money", diamonds);
+                    b.put("currency", "YER");
+                    b.put("description", "ألماس وأحجار");
+                    balances.put(b);
+                }
+
+                // ─── Receivables ───
+                for (int i = 0; i < receivablesContainer.getChildCount(); i++) {
+                    View row = receivablesContainer.getChildAt(i);
+                    TextInputEditText etName = row.findViewById(R.id.etName);
+                    TextInputEditText etAmount = row.findViewById(R.id.etAmount);
+
+                    double amount = parseDouble(etAmount);
+                    if (amount > 0) {
+                        JSONObject b = new JSONObject();
+                        b.put("type", "receivable");
+                        b.put("amount_money", amount);
+                        b.put("currency", "YER");
+                        b.put("description", etName.getText().toString());
+                        balances.put(b);
+                    }
+                }
+
+                // ─── Payables ───
+                for (int i = 0; i < payablesContainer.getChildCount(); i++) {
+                    View row = payablesContainer.getChildAt(i);
+                    TextInputEditText etName = row.findViewById(R.id.etName);
+                    TextInputEditText etAmount = row.findViewById(R.id.etAmount);
+
+                    double amount = parseDouble(etAmount);
+                    if (amount > 0) {
+                        JSONObject b = new JSONObject();
+                        b.put("type", "payable");
+                        b.put("amount_money", amount);
+                        b.put("currency", "YER");
+                        b.put("description", etName.getText().toString());
+                        balances.put(b);
+                    }
+                }
+
+                // ─── Fixed Assets ───
+                for (int i = 0; i < fixedAssetsContainer.getChildCount(); i++) {
+                    View row = fixedAssetsContainer.getChildAt(i);
+                    TextInputEditText etName = row.findViewById(R.id.etName);
+                    TextInputEditText etAmount = row.findViewById(R.id.etAmount);
+
+                    double amount = parseDouble(etAmount);
+                    if (amount > 0) {
+                        JSONObject b = new JSONObject();
+                        b.put("type", "fixed_asset");
+                        b.put("amount_money", amount);
+                        b.put("currency", "YER");
+                        b.put("description", etName.getText().toString());
+                        balances.put(b);
+                    }
+                }
+
+                if (balances.length() == 0) {
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        btnNext.setEnabled(true);
+                        btnNext.setText("التالي ←");
+                        Toast.makeText(requireContext(),
+                            "يجب إدخال رصيد واحد على الأقل",
+                            Toast.LENGTH_LONG).show();
+                    });
+                    return;
+                }
+
+                payload.put("balances", balances);
+
+                MiraApiClient.ApiResponse response =
+                    apiClient.postAccounting("setup/step/4", payload);
+
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    btnNext.setEnabled(true);
+                    btnNext.setText("التالي ←");
+
+                    if (response != null && response.isSuccess) {
+                        Toast.makeText(requireContext(),
+                            "✅ تم حفظ الأرصدة", Toast.LENGTH_SHORT).show();
+                        openNextStep();
+                    } else {
+                        String err = response != null ? response.error : "غير معروف";
+                        Toast.makeText(requireContext(),
+                            "❌ فشل: " + err, Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "save error", e);
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    btnNext.setEnabled(true);
+                    btnNext.setText("التالي ←");
+                    Toast.makeText(requireContext(),
+                        "❌ " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    private void loadGoldPrice() {
+        new Thread(() -> {
+            try {
+                MiraApiClient.ApiResponse response =
+                    apiClient.getWithAuth("gold-rates");
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject data = response.data.optJSONObject("data");
+                    if (data != null) {
+                        double price = data.optDouble("price_per_gram_24k", 0);
+                        if (price > 0) {
+                            goldPrice24k = price;
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                // تحديث كل أسعار الذهب
+                                for (int i = 0; i < goldContainer.getChildCount(); i++) {
+                                    View row = goldContainer.getChildAt(i);
+                                    TextInputEditText etPrice = row.findViewById(R.id.etGoldPrice);
+                                    if (etPrice != null) {
+                                        etPrice.setText(String.format(Locale.US, "%.0f", price));
+                                    }
+                                }
+                                updateSummary();
+                            });
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadGoldPrice error", e);
+            }
+        }).start();
+    }
+
+    private double parseDouble(TextInputEditText et) {
+        try {
+            if (et == null || et.getText() == null) return 0;
+            String str = et.getText().toString().trim();
+            return str.isEmpty() ? 0 : Double.parseDouble(str);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private void openNextStep() {
         SetupStep5UsersFragment next = new SetupStep5UsersFragment();
         requireActivity().getSupportFragmentManager()
@@ -372,5 +535,13 @@ public class SetupStep4OpeningBalancesFragment extends Fragment {
             .replace(R.id.fragment_container, next)
             .addToBackStack("SetupStep5")
             .commit();
+    }
+
+    private static class SimpleWatcher implements TextWatcher {
+        private final Runnable onChanged;
+        SimpleWatcher(Runnable onChanged) { this.onChanged = onChanged; }
+        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+        @Override public void afterTextChanged(Editable s) { onChanged.run(); }
     }
 }
