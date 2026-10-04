@@ -105,16 +105,18 @@ public class SecureSessionManager {
     private long serverUrlCacheTime = 0;
     
     public enum Role {
-        SYSTEM_ADMIN,
-        ORG_ADMIN,
-        ADMIN,
-        BRANCH_MANAGER,
-        INVENTORY_MGR,
-        POS_OPERATOR,
-        SECURITY,
-        GATE_SECURITY,
-        AUDITOR
-    }
+    SYSTEM_ADMIN,
+    ORG_ADMIN,
+    FINANCE_MANAGER,   // ⭐ جديد
+    INVENTORY_MGR,
+    BRANCH_MANAGER,
+    ACCOUNTANT,        // ⭐ جديد
+    AUDITOR,
+    POS_OPERATOR,
+    GATE_SECURITY,
+    SECURITY,
+    ADMIN              // alias قديم
+}
     
     // ═══════════════════════════════════════════════════════
     // ✅ Singleton Pattern
@@ -466,31 +468,86 @@ public class SecureSessionManager {
     
     // ==================== فحوصات الأدوار ====================
     
-    public boolean isSystemAdmin() {
-        return Role.SYSTEM_ADMIN.name().equals(getRoleString());
-    }
-    
-    public boolean isAnyAdmin() {
-        String role = getRoleString();
-        return Role.SYSTEM_ADMIN.name().equals(role) ||
-                Role.ORG_ADMIN.name().equals(role) ||
-                Role.ADMIN.name().equals(role);
-    }
-    
-    public boolean isAdmin() {
-        return isAnyAdmin();
-    }
-    
-    public boolean isManager() {
-        String role = getRoleString();
-        return isAnyAdmin() || Role.BRANCH_MANAGER.name().equals(role);
-    }
-    
-    public boolean isSecurityRelated() {
-        String role = getRoleString();
-        return Role.SECURITY.name().equals(role) ||
-                Role.GATE_SECURITY.name().equals(role);
-    }
+    // ==================== فحوصات الأدوار ====================
+
+public boolean isSystemAdmin() {
+    return Role.SYSTEM_ADMIN.name().equals(getRoleString());
+}
+
+/**
+ * ✅ "Admin" يشمل: SYSTEM_ADMIN + ORG_ADMIN + FINANCE_MANAGER + ADMIN (legacy)
+ * هذه الأدوار يمكنها إدارة النظام والمستخدمين.
+ */
+public boolean isAnyAdmin() {
+    String role = getRoleString();
+    return Role.SYSTEM_ADMIN.name().equals(role)
+        || Role.ORG_ADMIN.name().equals(role)
+        || Role.FINANCE_MANAGER.name().equals(role)
+        || Role.ADMIN.name().equals(role);
+}
+
+/**
+ * ✅ هل يمكنه إعداد النظام المحاسبي؟
+ * SYSTEM_ADMIN + ORG_ADMIN + FINANCE_MANAGER + ACCOUNTANT
+ */
+public boolean canPerformAccountingSetup() {
+    String role = getRoleString();
+    return Role.SYSTEM_ADMIN.name().equals(role)
+        || Role.ORG_ADMIN.name().equals(role)
+        || Role.FINANCE_MANAGER.name().equals(role)
+        || Role.ACCOUNTANT.name().equals(role);
+}
+
+/**
+ * ✅ المدير — يشمل admin + branch manager
+ */
+public boolean isManager() {
+    String role = getRoleString();
+    return isAnyAdmin()
+        || Role.BRANCH_MANAGER.name().equals(role);
+}
+
+public boolean isAccountant() {
+    return Role.ACCOUNTANT.name().equals(getRoleString());
+}
+
+public boolean isFinanceManager() {
+    return Role.FINANCE_MANAGER.name().equals(getRoleString());
+}
+
+public boolean isInventoryManager() {
+    return Role.INVENTORY_MGR.name().equals(getRoleString());
+}
+
+public boolean isPosOperator() {
+    return Role.POS_OPERATOR.name().equals(getRoleString());
+}
+
+public boolean isBranchManager() {
+    return Role.BRANCH_MANAGER.name().equals(getRoleString());
+}
+
+public boolean isAuditor() {
+    return Role.AUDITOR.name().equals(getRoleString());
+}
+
+public boolean isSecurity() {
+    return Role.SECURITY.name().equals(getRoleString());
+}
+
+public boolean isGateSecurity() {
+    return Role.GATE_SECURITY.name().equals(getRoleString());
+}
+
+public boolean isAdmin() {
+    return isAnyAdmin();
+}
+
+public boolean isSecurityRelated() {
+    String role = getRoleString();
+    return Role.SECURITY.name().equals(role)
+        || Role.GATE_SECURITY.name().equals(role);
+}
     
     // ═══════════════════════════════════════════════════════
     // ✅ الحقول الإضافية للمستخدم (Email, Phone, Username)
