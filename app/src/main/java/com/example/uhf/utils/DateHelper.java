@@ -19,11 +19,16 @@ public class DateHelper {
     }
     
     public static String startOfYearApi() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.MONTH, Calendar.JANUARY);
-        cal.set(Calendar.DAY_OF_MONTH, 1);
-        return API_FMT.format(cal.getTime());
+    Calendar cal = Calendar.getInstance();
+    int currentYear = cal.get(Calendar.YEAR);
+    // ⚠️ إذا كان تاريخ الجهاز قبل 2026-01-01، استخدم 2026 (سنة البداية)
+    if (currentYear < 2026) {
+        currentYear = 2026;
     }
+    cal.set(currentYear, Calendar.JANUARY, 1, 0, 0, 0);
+    cal.set(Calendar.MILLISECOND, 0);
+    return API_FMT.format(cal.getTime());
+}
     
     public static String startOfMonthApi() {
         Calendar cal = Calendar.getInstance();
