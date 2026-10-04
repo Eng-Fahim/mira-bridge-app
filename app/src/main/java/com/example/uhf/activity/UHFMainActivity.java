@@ -588,10 +588,10 @@ private void navigateByRole() {
         Fragment targetFragment;
         String targetTag;
 
-        if (permissionManager.isCashier()) {
-            targetFragment = new MiraPosFragment();
-            targetTag = NavigationManager.TAG_POS;
-        } else if (permissionManager.isInventoryManager()) {
+        if (permissionManager.isPosOperator()) {
+    targetFragment = new MiraPosFragment();
+    targetTag = NavigationManager.TAG_POS;
+    } else if (permissionManager.isInventoryManager()) {
             targetFragment = new MiraInventoryProFragment();
             targetTag = NavigationManager.TAG_INVENTORY;
         } else {
@@ -2999,4 +2999,4 @@ public void setBottomNavVisible(boolean visible) {
         Log.e(TAG, "setBottomNavVisible error: " + e.getMessage());
     }
 }
-                                        }
+ }
