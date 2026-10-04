@@ -45,154 +45,139 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="أدخل الأرصدة الحقيقية لمؤسستك. ستُستخدم لإنشاء القيد الافتتاحي."
+                android:text="أدخل الأرصدة الحقيقية لمؤسستك. يمكنك إضافة أكثر من صندوق/بنك/عيار."
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp"
                 android:layout_marginBottom="16dp"/>
 
-            <!-- ═══════ النقدية ═══════ -->
-            <TextView
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 💵 النقدية                              -->
+            <!-- ═══════════════════════════════════════ -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="💵 النقدية"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="المبلغ (YER)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etCashBalance"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:text="💵 النقدية"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="ملاحظات (اختياري)"
-                android:layout_marginTop="8dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etCashNotes"
-                    android:layout_width="match_parent"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddCash"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:inputType="text"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:text="+ إضافة"
+                    android:textSize="12sp"
+                    style="@style/AppButtonStyle.Outlined"
+                    android:minHeight="32dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"/>
+            </LinearLayout>
 
-            <!-- ═══════ البنوك ═══════ -->
-            <TextView
+            <LinearLayout
+                android:id="@+id/cashContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="🏦 البنوك"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="8dp"/>
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp"/>
 
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 🏦 البنوك                              -->
+            <!-- ═══════════════════════════════════════ -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="المبلغ (YER)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etBankBalance"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:text="🏦 البنوك"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="اسم البنك"
-                android:layout_marginTop="8dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etBankName"
-                    android:layout_width="match_parent"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddBank"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:inputType="text"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:text="+ إضافة"
+                    android:textSize="12sp"
+                    style="@style/AppButtonStyle.Outlined"
+                    android:minHeight="32dp"/>
+            </LinearLayout>
 
-            <!-- ═══════ الذهب ═══════ -->
-            <TextView
+            <LinearLayout
+                android:id="@+id/banksContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="🥇 مخزون الذهب"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="8dp"/>
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp"/>
 
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 🥇 الذهب                              -->
+            <!-- ═══════════════════════════════════════ -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="الوزن (جرام)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etGoldWeight"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:text="🥇 مخزون الذهب (بالعيارات)"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
 
-            <com.google.android.material.textfield.TextInputLayout
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddGold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ عيار"
+                    android:textSize="12sp"
+                    style="@style/AppButtonStyle.Outlined"
+                    android:minHeight="32dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/goldContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="العيار"
-                android:layout_marginTop="8dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp"/>
 
-                <AutoCompleteTextView
-                    android:id="@+id/spGoldKarat"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="none"/>
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="سعر الجرام 24K (YER)"
-                android:layout_marginTop="8dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etGoldPricePerGram"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- ═══════ الألماس ═══════ -->
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 💎 الألماس                              -->
+            <!-- ═══════════════════════════════════════ -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="💎 الألماس والأحجار"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:layout_marginTop="20dp"
                 android:layout_marginBottom="8dp"/>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="القيمة الإجمالية (YER)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="16dp">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDiamondValue"
@@ -201,97 +186,121 @@
                     android:inputType="numberDecimal"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- ═══════ الذمم ═══════ -->
-            <TextView
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 👥 الذمم المدينة                        -->
+            <!-- ═══════════════════════════════════════ -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="👥 الذمم المدينة (العملاء)"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="8dp"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="المبلغ (YER)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etReceivables"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:text="👥 ذمم العملاء"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
 
-            <!-- ═══════ الموردين ═══════ -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="🏢 الذمم الدائنة (الموردين)"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="8dp"/>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="المبلغ (YER)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etPayables"
-                    android:layout_width="match_parent"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddReceivable"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:text="+ عميل"
+                    android:textSize="12sp"
+                    style="@style/AppButtonStyle.Outlined"
+                    android:minHeight="32dp"/>
+            </LinearLayout>
 
-            <!-- ═══════ الأصول الثابتة ═══════ -->
-            <TextView
+            <LinearLayout
+                android:id="@+id/receivablesContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="🪑 الأصول الثابتة"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="8dp"/>
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp"/>
 
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 🏢 الذمم الدائنة                        -->
+            <!-- ═══════════════════════════════════════ -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="القيمة (YER)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etFixedAssets"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:text="🏢 ذمم الموردين"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
 
-            <com.google.android.material.textfield.TextInputLayout
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddPayable"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ مورد"
+                    android:textSize="12sp"
+                    style="@style/AppButtonStyle.Outlined"
+                    android:minHeight="32dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/payablesContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="الوصف"
-                android:layout_marginTop="8dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp"/>
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etFixedAssetsDesc"
-                    android:layout_width="match_parent"
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 🪑 الأصول الثابتة                       -->
+            <!-- ═══════════════════════════════════════ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="text"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:text="🪑 الأصول الثابتة"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
 
-            <!-- ═══════ الملخص ═══════ -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddFixedAsset"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ أصل"
+                    android:textSize="12sp"
+                    style="@style/AppButtonStyle.Outlined"
+                    android:minHeight="32dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/fixedAssetsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- ═══════════════════════════════════════ -->
+            <!-- 📊 الملخص                                -->
+            <!-- ═══════════════════════════════════════ -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="8dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp"
                 app:cardBackgroundColor="?attr/colorPrimaryContainer">
@@ -376,7 +385,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="رأس المال الافتتاحي:"
+                            android:text="رأس المال:"
                             android:textColor="?attr/colorOnPrimaryContainer"
                             android:textSize="14sp"
                             android:textStyle="bold"/>
@@ -395,6 +404,7 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
+    <!-- Actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
