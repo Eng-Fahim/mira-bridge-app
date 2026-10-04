@@ -385,10 +385,13 @@ getWindow().setSoftInputMode(
             statusIndicatorManager = new StatusIndicatorManager(
                     findViewById(android.R.id.content), hardwareManager);
 
-            setupQuickNav();
-            setupOrgProfileListener();
+           setupQuickNav();
+setupOrgProfileListener();
 
-            if (savedInstanceState == null) {
+// 🛡️ تعطيل التنقل حتى نتحقق من حالة الإعداد (في كل الحالات)
+disableNavigationUntilSetupChecked();
+
+if (savedInstanceState == null) {
     // ✅ فحص حالة الإعداد قبل التوجيه (المعيار العالمي)
     checkSetupStatusAndNavigate();
 } else {
@@ -396,13 +399,15 @@ getWindow().setSoftInputMode(
             "current_fragment", NavigationManager.TAG_DASHBOARD);
     Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
     if (savedFragment != null) {
+        // ✅ النظام قد يكون مُعدًا — اسمح بالتنقل مؤقتًا
+        //    الفحص في guardSetupAccess سيمنع أي وصول غير مسموح
+        enableNavigationAfterSetup();
         navigationManager.loadFragmentDirectly(savedFragment, savedTag);
     } else {
-        // Fallback آمن
+        // Fallback آمن → فحص كامل
         checkSetupStatusAndNavigate();
     }
 }
-
             try {
                 if (sessionManager != null) {
                     appLifecycleObserver = new AppLifecycleObserver(sessionManager);
@@ -456,7 +461,42 @@ getWindow().setSoftInputMode(
         }
     }
     
+    /**
+ * 🛡️ تعطيل التنقل مؤقتًا حتى نتحقق من حالة الإعداد
+ * يُستدعى في onCreate قبل checkSetupStatusAndNavigate()
+ */
+private void disableNavigationUntilSetupChecked() {
+    try {
+        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+        if (nav != null) {
+            nav.setEnabled(false);
+            nav.setAlpha(0.4f);
+        }
+
+        FloatingActionButton fab = findViewById(R.id.fabActionCenter);
+        if (fab != null) {
+            fab.setEnabled(false);
+            fab.setAlpha(0.4f);
+        }
+
+        Log.d(TAG, "🔒 Navigation disabled until setup check");
+    } catch (Exception e) {
+        Log.e(TAG, "disableNavigationUntilSetupChecked error: " + e.getMessage());
+    }
+}
     
+    private void enableNavigationAfterSetup() {
+    BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+    if (nav != null) {
+        nav.setEnabled(true);
+        nav.setAlpha(1.0f);
+    }
+    FloatingActionButton fab = findViewById(R.id.fabActionCenter);
+    if (fab != null) {
+        fab.setEnabled(true);
+        fab.setAlpha(1.0f);
+    }
+}
     
 // ═══════════════════════════════════════════════════════════
 //  ✅ فحص حالة الإعداد المحاسبي — قبل التوجيه (المعيار العالمي)
@@ -545,37 +585,48 @@ private void refreshSetupStatusInBackground() {
  * التوجيه بناءً على حالة الإعداد + صلاحية المستخدم
  *
  * المنطق:
- * - pending/in_progress + System Admin → الإعداد المحاسبي
- * - pending/in_progress + غير System Admin → رسالة "قيد الإعداد"
- * - completed/locked → التوجيه حسب الدور
+ * - pending/in_progress + System Admin أو Org Admin → شاشة الإعداد
+ * - pending/in_progress + أي دور آخر → رسالة "قيد الإعداد" + منع الدخول
+ * - completed/locked → التوجيه حسب الدور + تفعيل التنقل
  */
 private void navigateBySetupStatus(String setupStatus) {
-    boolean isSystemAdmin = permissionManager != null
-            && permissionManager.isSystemAdmin();
+    boolean isSystemAdmin  = permissionManager != null && permissionManager.isSystemAdmin();
+    boolean isOrgAdmin     = permissionManager != null && permissionManager.isOrgAdmin();
+    boolean canPerformSetup = isSystemAdmin || isOrgAdmin;
 
     boolean isSetupPending = SETUP_PENDING.equals(setupStatus)
             || SETUP_IN_PROGRESS.equals(setupStatus);
 
     Log.d(TAG, "🧭 Navigate: status=" + setupStatus
-            + ", isSystemAdmin=" + isSystemAdmin);
+            + ", isSystemAdmin=" + isSystemAdmin
+            + ", isOrgAdmin=" + isOrgAdmin);
 
     if (isSetupPending) {
-        if (isSystemAdmin) {
-            // ✅ System Admin → شاشة الإعداد
+        if (canPerformSetup) {
+            // ✅ فعّل التنقل (المستخدم سيُوجَّه للإعداد ويحتاج التنقل داخله)
+            enableNavigationAfterSetup();
+
+            // ✅ System Admin أو Org Admin → شاشة الإعداد
             loadFragmentDirectly(
                     new MiraAccountingSetupFragment(),
                     "AccountingSetup"
             );
-            Toast.makeText(this,
-                    isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
-                             : "🔧 Welcome — Please complete setup",
-                    Toast.LENGTH_LONG).show();
+
+            String welcomeMsg = isSystemAdmin
+                    ? (isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
+                                : "🔧 Welcome Engineer — Please complete setup")
+                    : (isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
+                                : "🏢 Welcome Org Admin — Please configure accounting");
+            Toast.makeText(this, welcomeMsg, Toast.LENGTH_LONG).show();
+
         } else {
-            // ❌ غير System Admin → منع الدخول
+            // ❌ أي دور آخر → منع الدخول (الـ Nav يبقى معطلاً)
             showSetupBlockedScreen();
         }
+
     } else {
-        // ✅ النظام جاهز → التوجيه حسب الدور
+        // ✅ النظام جاهز → فعّل التنقل ثم وجّه حسب الدور
+        enableNavigationAfterSetup();
         navigateByRole();
     }
 }
@@ -616,30 +667,108 @@ private void navigateByRole() {
  */
 private void showSetupBlockedScreen() {
     if (isFinishing() || isDestroyed()) return;
+    if (!isActivityAlive()) return;
 
     try {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic
-                        ? "⚠️ النظام قيد الإعداد"
-                        : "⚠️ System Under Setup")
-                .setMessage(isArabic
-                        ? "لم يتم استكمال الإعداد المحاسبي بعد.\n\n" +
-                          "📌 لا يمكن استخدام النظام قبل اكتمال الإعداد.\n\n" +
-                          "يرجى التواصل مع مهندس النظام لإتمام الإعداد وتفعيل حسابك.\n\n" +
-                          "📧 sa.mirabarcode.com"
-                        : "Accounting setup is not complete yet.\n\n" +
-                          "📌 The system cannot be used before completing setup.\n\n" +
-                          "Please contact the system engineer to complete setup and activate your account.\n\n" +
-                          "📧 sa.mirabarcode.com")
-                .setCancelable(false)
-                .setPositiveButton(isArabic ? "تسجيل الخروج" : "Logout",
-                        (dialog, which) -> performFullLogout())
-                .show();
+        BottomSheetDialog dialog = new BottomSheetDialog(
+                this, R.style.TransparentBottomSheetDialog);
+
+        View view = getLayoutInflater().inflate(
+                R.layout.dialog_system_under_setup, null);
+        dialog.setContentView(view);
+
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+
+        // تطبيق اللغة
+        TextView tvTitle = view.findViewById(R.id.tvSetupTitle);
+        TextView tvMessage = view.findViewById(R.id.tvSetupMessage);
+        TextView tvSysAdmin = view.findViewById(R.id.tvContactSystemAdmin);
+        TextView tvOrgAdmin = view.findViewById(R.id.tvContactOrgAdmin);
+        TextView tvEmail = view.findViewById(R.id.tvContactEmail);
+        MaterialButton btnLogout = view.findViewById(R.id.btnSetupLogout);
+
+        if (isArabic) {
+            tvTitle.setText("⚠️ النظام قيد الإعداد");
+            tvMessage.setText("لم يتم استكمال الإعداد المحاسبي بعد.\n\n" +
+                    "لا يمكن استخدام النظام قبل اكتمال الإعداد.");
+            tvSysAdmin.setText("🔧  مهندس النظام (System Admin)");
+            tvOrgAdmin.setText("🏢  مدير الجهة (Org Admin)");
+            tvEmail.setText("📧  support@mirabarcode.com");
+            btnLogout.setText("تسجيل الخروج");
+        } else {
+            tvTitle.setText("⚠️ System Under Setup");
+            tvMessage.setText("Accounting setup is not yet complete.\n\n" +
+                    "The system cannot be used until setup is finished.");
+            tvSysAdmin.setText("🔧  System Admin");
+            tvOrgAdmin.setText("🏢  Org Admin");
+            tvEmail.setText("📧  support@mirabarcode.com");
+            btnLogout.setText("Logout");
+        }
+
+        btnLogout.setOnClickListener(v -> {
+            dialog.dismiss();
+            performFullLogout();
+        });
+
+        dialog.show();
 
     } catch (Exception e) {
-        Log.e(TAG, "showSetupBlockedScreen error: " + e.getMessage());
+        Log.e(TAG, "showSetupBlockedScreen error: " + e.getMessage(), e);
         performFullLogout();
     }
+}
+
+// ═══════════════════════════════════════════════════════
+//  🛡️ حارس النظام المركزي — يمنع أي تنقل إذا كان النظام غير مُعد
+// ═══════════════════════════════════════════════════════
+
+/**
+ * قائمة الشاشات المسموح بها دائمًا حتى لو النظام غير مُعد
+ */
+private boolean isSetupAllowedFragment(String tag) {
+    if (tag == null) return false;
+    return "AccountingSetup".equals(tag)
+        || "Profile".equals(tag)
+        || "ServerConfig".equals(tag)
+        || "Login".equals(tag);
+}
+
+/**
+ * هل يُسمح بالمتابعة؟
+ * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
+ */
+private boolean guardSetupAccess(String tag) {
+    // إذا النظام مُعد → سماح كامل
+    String cachedStatus = getCachedSetupStatus();
+    boolean setupDone = SETUP_COMPLETED.equals(cachedStatus)
+            || SETUP_LOCKED.equals(cachedStatus);
+
+    if (setupDone) return true;
+
+    // النظام غير مُعد:
+
+    // 1) الشاشات المسموح بها دائمًا
+    if (isSetupAllowedFragment(tag)) return true;
+
+    // 2) System Admin / Org Admin → يُوجَّه لشاشة الإعداد
+    boolean canSetup = permissionManager != null
+            && (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
+    
+    if (canSetup) {
+    Log.d(TAG, "🛡️ Setup pending → redirecting admin to Setup");
+    Toast.makeText(this,
+            isArabic ? "⚠️ يجب إكمال الإعداد أولاً"
+                     : "⚠️ Setup must be completed first",
+            Toast.LENGTH_SHORT).show();
+    loadFragmentDirectly(new MiraAccountingSetupFragment(), "AccountingSetup");
+    return false;
+}
+
+    // 3) أي مستخدم آخر → يُمنع ويُخرَج
+    Log.d(TAG, "🛡️ Setup pending → blocking user: " + tag);
+    showSetupBlockedScreen();
+    return false;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1427,35 +1556,22 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
 
     // ==================== التنقل ====================
 
-    public void loadFragment(Fragment fragment, String tag) {
+public void loadFragment(Fragment fragment, String tag) {
     loadFragment(fragment, tag, true);
 }
 
-
 public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-   
-    if (isFinishing() || isDestroyed()) {
-        Toast.makeText(this, "❌ Activity finishing", Toast.LENGTH_SHORT).show();
-        return;
-    }
-    if (navigationManager == null) {
-        Toast.makeText(this, "❌ navMgr NULL", Toast.LENGTH_SHORT).show();
-        return;
-    }
-    if (fragment == null) {
-        Toast.makeText(this, "❌ fragment NULL", Toast.LENGTH_SHORT).show();
-        return;
-    }
+    if (isFinishing() || isDestroyed()) return;
+    if (navigationManager == null || fragment == null) return;
 
-    Toast.makeText(this, "5️⃣ Calling navMgr", Toast.LENGTH_SHORT).show();
+    // 🛡️ الحارس المركزي
+    if (!guardSetupAccess(tag)) return;
 
     navigationManager.loadFragment(fragment, tag, addToBackStack);
     this.currentFragment = fragment;
 
     updateBottomNavSelectionByTag(tag);
     updateSecondaryToolbar(tag);
-
-    Toast.makeText(this, "6️⃣ DONE", Toast.LENGTH_SHORT).show();
 }
 
 public void loadFragmentDirectly(Fragment fragment, String tag) {
@@ -1468,6 +1584,9 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
     }
 
     if (navigationManager == null) return;
+
+    // 🛡️ الحارس المركزي
+    if (!guardSetupAccess(tag)) return;
 
     navigationManager.loadFragmentDirectly(fragment, tag);
     this.currentFragment = fragment;
