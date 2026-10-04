@@ -8,6 +8,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -15,19 +16,17 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.google.android.material.button.MaterialButton;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.Locale;
-
 /**
  * المرحلة 2: الفروع
  * 
- * ملاحظة: يعرض الفروع الحالية من mira-gate/v1/branches
- * ويمكن للمستخدم تفعيلها أو إضافة جديدة
+ * يعرض الفروع الحالية + يسمح بإدارة الفروع عبر الشاشة المتكاملة
  */
 public class SetupStep2BranchesFragment extends Fragment {
 
@@ -36,11 +35,11 @@ public class SetupStep2BranchesFragment extends Fragment {
     private LinearLayout branchesContainer;
     private MaterialButton btnBack;
     private MaterialButton btnNext;
-    private MaterialButton btnAddBranch;
+    private MaterialButton btnManageBranches;
     private View pbLoading;
+    private TextView tvStats;
 
     private MiraApiClient apiClient;
-    private boolean isArabic;
 
     @Nullable
     @Override
@@ -50,27 +49,43 @@ public class SetupStep2BranchesFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_setup_step2_branches, container, false);
         
         apiClient = MiraApiClient.getInstance(requireContext());
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
         
         initViews(view);
         setupListeners();
-        loadBranches();
         
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // ✅ إعادة تحميل الفروع عند العودة من شاشة الإدارة
+        loadBranches();
     }
 
     private void initViews(View v) {
         branchesContainer = v.findViewById(R.id.branchesContainer);
         btnBack = v.findViewById(R.id.btnBack);
         btnNext = v.findViewById(R.id.btnNext);
-        btnAddBranch = v.findViewById(R.id.btnAddBranch);
+        btnManageBranches = v.findViewById(R.id.btnManageBranches);
         pbLoading = v.findViewById(R.id.pbLoading);
+        tvStats = v.findViewById(R.id.tvStats);
     }
 
     private void setupListeners() {
         btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
         btnNext.setOnClickListener(v -> saveAndNext());
-        btnAddBranch.setOnClickListener(v -> showAddBranchDialog());
+        
+        // ✅ فتح شاشة إدارة الفروع المتكاملة
+        btnManageBranches.setOnClickListener(v -> {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity())
+                    .loadFragment(
+                        new MiraBranchesManagementFragment(),
+                        "Branches"
+                    );
+            }
+        });
     }
 
     private void loadBranches() {
@@ -78,7 +93,7 @@ public class SetupStep2BranchesFragment extends Fragment {
         
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getAccounting("branches");
+                MiraApiClient.ApiResponse response = apiClient.getWithAuth("branches");
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     showLoading(false);
@@ -109,8 +124,12 @@ public class SetupStep2BranchesFragment extends Fragment {
                 View empty = LayoutInflater.from(requireContext())
                     .inflate(R.layout.item_setup_empty, branchesContainer, false);
                 branchesContainer.addView(empty);
+                tvStats.setText("لا توجد فروع");
                 return;
             }
+            
+            // ✅ إحصائيات
+            tvStats.setText("عدد الفروع: " + branches.length());
             
             for (int i = 0; i < branches.length(); i++) {
                 JSONObject branch = branches.getJSONObject(i);
@@ -126,9 +145,9 @@ public class SetupStep2BranchesFragment extends Fragment {
             View card = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_branch, branchesContainer, false);
             
-            android.widget.TextView tvName = card.findViewById(R.id.tvBranchName);
-            android.widget.TextView tvCode = card.findViewById(R.id.tvBranchCode);
-            android.widget.TextView tvCity = card.findViewById(R.id.tvBranchCity);
+            TextView tvName = card.findViewById(R.id.tvBranchName);
+            TextView tvCode = card.findViewById(R.id.tvBranchCode);
+            TextView tvCity = card.findViewById(R.id.tvBranchCity);
             
             String name = branch.optString("branch_name_ar", 
                          branch.optString("branch_name", "فرع"));
@@ -139,17 +158,22 @@ public class SetupStep2BranchesFragment extends Fragment {
             tvCode.setText(code);
             tvCity.setText(city);
             
+            // ✅ عند النقر → فتح شاشة الإدارة
+            card.setOnClickListener(v -> {
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity())
+                        .loadFragment(
+                            new MiraBranchesManagementFragment(),
+                            "Branches"
+                        );
+                }
+            });
+            
             branchesContainer.addView(card);
             
         } catch (Exception e) {
             Log.e(TAG, "addBranchCard error", e);
         }
-    }
-
-    private void showAddBranchDialog() {
-        // TODO: نافذة إضافة فرع جديد
-        Toast.makeText(requireContext(), 
-            "قريبًا: إضافة فرع جديد", Toast.LENGTH_SHORT).show();
     }
 
     private void saveAndNext() {
@@ -158,14 +182,14 @@ public class SetupStep2BranchesFragment extends Fragment {
         
         new Thread(() -> {
             try {
-                // ✅ نجمع الفروع المعروضة ونحفظها
+                // ✅ نجمع الفروع من الـ UI
                 JSONArray branchesArray = new JSONArray();
                 
                 for (int i = 0; i < branchesContainer.getChildCount(); i++) {
                     View card = branchesContainer.getChildAt(i);
-                    android.widget.TextView tvName = card.findViewById(R.id.tvBranchName);
+                    TextView tvName = card.findViewById(R.id.tvBranchName);
                     
-                    if (tvName != null) {
+                    if (tvName != null && tvName.getText().length() > 0) {
                         JSONObject b = new JSONObject();
                         b.put("name_ar", tvName.getText().toString());
                         b.put("status", "active");
@@ -182,16 +206,7 @@ public class SetupStep2BranchesFragment extends Fragment {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     btnNext.setEnabled(true);
                     btnNext.setText("التالي ←");
-                    
-                    if (response != null && response.isSuccess) {
-                        Toast.makeText(requireContext(), 
-                            "✅ تم حفظ الفروع", Toast.LENGTH_SHORT).show();
-                        
-                        openNextStep();
-                    } else {
-                        // نقبل النجاح المتسامح
-                        openNextStep();
-                    }
+                    openNextStep();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "save error", e);
