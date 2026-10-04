@@ -6,6 +6,7 @@
     android:orientation="vertical"
     android:background="?attr/colorSurface">
 
+    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -44,18 +45,31 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="الفروع التي ستُسجَّل فيها العمليات المحاسبية. يمكنك تفعيل/إضافة فروع جديدة."
+                android:text="الفروع التي ستُسجَّل فيها العمليات المحاسبية. يمكنك إدارة الفروع من الشاشة المتكاملة."
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp"
                 android:layout_marginBottom="16dp"/>
 
+            <!-- ✅ زر الإدارة -->
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnAddBranch"
+                android:id="@+id/btnManageBranches"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="➕ إضافة فرع جديد"
-                style="@style/AppButtonStyle.Outlined"
+                android:text="🏢 فتح إدارة الفروع"
+                android:textColor="?attr/colorOnPrimary"
+                app:backgroundTint="?attr/colorPrimary"
                 android:layout_marginBottom="16dp"/>
+
+            <!-- إحصائيات -->
+            <TextView
+                android:id="@+id/tvStats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="جاري التحميل..."
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:layout_marginBottom="12dp"/>
 
             <ProgressBar
                 android:id="@+id/pbLoading"
@@ -64,6 +78,7 @@
                 android:layout_gravity="center"
                 android:visibility="gone"/>
 
+            <!-- قائمة الفروع -->
             <LinearLayout
                 android:id="@+id/branchesContainer"
                 android:layout_width="match_parent"
@@ -72,6 +87,7 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
+    <!-- Actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
