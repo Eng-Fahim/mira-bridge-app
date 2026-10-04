@@ -589,43 +589,60 @@ private void refreshSetupStatusInBackground() {
  * - pending/in_progress + أي دور آخر → رسالة "قيد الإعداد" + منع الدخول
  * - completed/locked → التوجيه حسب الدور + تفعيل التنقل
  */
+/**
+ * التوجيه بناءً على حالة الإعداد + صلاحية المستخدم
+ *
+ * المنطق:
+ * - pending/in_progress + (System Admin / Org Admin / Finance Mgr / Accountant) → الإعداد
+ * - pending/in_progress + أي دور آخر → رسالة "قيد الإعداد" + منع الدخول
+ * - completed/locked → التوجيه حسب الدور + تفعيل التنقل
+ */
 private void navigateBySetupStatus(String setupStatus) {
-    boolean isSystemAdmin  = permissionManager != null && permissionManager.isSystemAdmin();
-    boolean isOrgAdmin     = permissionManager != null && permissionManager.isOrgAdmin();
-    boolean canPerformSetup = isSystemAdmin || isOrgAdmin;
+    boolean isSystemAdmin   = permissionManager != null && permissionManager.isSystemAdmin();
+    boolean isOrgAdmin      = permissionManager != null && permissionManager.isOrgAdmin();
+    boolean isFinanceMgr    = permissionManager != null && permissionManager.isFinanceManager();
+    boolean isAccountant    = permissionManager != null && permissionManager.isAccountant();
+
+    boolean canPerformSetup = isSystemAdmin || isOrgAdmin || isFinanceMgr || isAccountant;
 
     boolean isSetupPending = SETUP_PENDING.equals(setupStatus)
             || SETUP_IN_PROGRESS.equals(setupStatus);
 
     Log.d(TAG, "🧭 Navigate: status=" + setupStatus
             + ", isSystemAdmin=" + isSystemAdmin
-            + ", isOrgAdmin=" + isOrgAdmin);
+            + ", isOrgAdmin=" + isOrgAdmin
+            + ", isFinanceMgr=" + isFinanceMgr
+            + ", isAccountant=" + isAccountant);
 
     if (isSetupPending) {
         if (canPerformSetup) {
-            // ✅ فعّل التنقل (المستخدم سيُوجَّه للإعداد ويحتاج التنقل داخله)
             enableNavigationAfterSetup();
 
-            // ✅ System Admin أو Org Admin → شاشة الإعداد
             loadFragmentDirectly(
                     new MiraAccountingSetupFragment(),
                     "AccountingSetup"
             );
 
-            String welcomeMsg = isSystemAdmin
-                    ? (isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
-                                : "🔧 Welcome Engineer — Please complete setup")
-                    : (isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
-                                : "🏢 Welcome Org Admin — Please configure accounting");
+            String welcomeMsg;
+            if (isSystemAdmin) {
+                welcomeMsg = isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
+                                      : "🔧 Welcome Engineer — Please complete setup";
+            } else if (isOrgAdmin) {
+                welcomeMsg = isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
+                                      : "🏢 Welcome Org Admin — Please configure accounting";
+            } else if (isFinanceMgr) {
+                welcomeMsg = isArabic ? "💰 مرحباً المدير المالي — يرجى إعداد النظام المحاسبي"
+                                      : "💰 Welcome Finance Manager — Please configure accounting";
+            } else {
+                welcomeMsg = isArabic ? "📊 مرحباً المحاسب — يرجى إكمال الإعداد"
+                                      : "📊 Welcome Accountant — Please complete setup";
+            }
             Toast.makeText(this, welcomeMsg, Toast.LENGTH_LONG).show();
 
         } else {
-            // ❌ أي دور آخر → منع الدخول (الـ Nav يبقى معطلاً)
             showSetupBlockedScreen();
         }
-
     } else {
-        // ✅ النظام جاهز → فعّل التنقل ثم وجّه حسب الدور
         enableNavigationAfterSetup();
         navigateByRole();
     }
@@ -640,13 +657,20 @@ private void navigateByRole() {
         String targetTag;
 
         if (permissionManager.isPosOperator()) {
-    targetFragment = new MiraPosFragment();
-    targetTag = NavigationManager.TAG_POS;
-    } else if (permissionManager.isInventoryManager()) {
+            targetFragment = new MiraPosFragment();
+            targetTag = NavigationManager.TAG_POS;
+
+        } else if (permissionManager.isInventoryManager()) {
             targetFragment = new MiraInventoryProFragment();
             targetTag = NavigationManager.TAG_INVENTORY;
+
+        } else if (permissionManager.isSecurity()
+                || permissionManager.isGateSecurity()) {
+            targetFragment = new MiraSecureGateFragment();
+            targetTag = NavigationManager.TAG_SECURE_GATE;
+
         } else {
-            // admin, manager, accountant, viewer
+            // admin, finance manager, accountant, auditor, branch manager → Dashboard
             targetFragment = new MiraDashboardFragment();
             targetTag = NavigationManager.TAG_DASHBOARD;
         }
@@ -656,12 +680,10 @@ private void navigateByRole() {
 
     } catch (Exception e) {
         Log.e(TAG, "navigateByRole error: " + e.getMessage());
-        // Fallback → Dashboard
         loadFragmentDirectly(new MiraDashboardFragment(),
                 NavigationManager.TAG_DASHBOARD);
     }
 }
-
 /**
  * شاشة "النظام قيد الإعداد" — غير قابلة للتخطي
  */
@@ -738,6 +760,12 @@ private boolean isSetupAllowedFragment(String tag) {
  * هل يُسمح بالمتابعة؟
  * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
  */
+/**
+ * 🛡️ الحارس المركزي — يمنع أي تنقل إذا كان النظام غير مُعد
+ *
+ * @param tag الشاشة المطلوب الانتقال إليها
+ * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
+ */
 private boolean guardSetupAccess(String tag) {
     // إذا النظام مُعد → سماح كامل
     String cachedStatus = getCachedSetupStatus();
@@ -751,26 +779,28 @@ private boolean guardSetupAccess(String tag) {
     // 1) الشاشات المسموح بها دائمًا
     if (isSetupAllowedFragment(tag)) return true;
 
-    // 2) System Admin / Org Admin → يُوجَّه لشاشة الإعداد
+    // 2) الأدوار المخوّلة بالإعداد → يُوجَّهون لشاشة الإعداد
     boolean canSetup = permissionManager != null
-            && (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
-    
+            && (permissionManager.isSystemAdmin()
+                || permissionManager.isOrgAdmin()
+                || permissionManager.isFinanceManager()
+                || permissionManager.isAccountant());
+
     if (canSetup) {
-    Log.d(TAG, "🛡️ Setup pending → redirecting admin to Setup");
-    Toast.makeText(this,
-            isArabic ? "⚠️ يجب إكمال الإعداد أولاً"
-                     : "⚠️ Setup must be completed first",
-            Toast.LENGTH_SHORT).show();
-    loadFragmentDirectly(new MiraAccountingSetupFragment(), "AccountingSetup");
-    return false;
-}
+        Log.d(TAG, "🛡️ Setup pending → redirecting to Setup: " + tag);
+        Toast.makeText(this,
+                isArabic ? "⚠️ يجب إكمال الإعداد أولاً"
+                         : "⚠️ Setup must be completed first",
+                Toast.LENGTH_SHORT).show();
+        loadFragmentDirectly(new MiraAccountingSetupFragment(), "AccountingSetup");
+        return false;
+    }
 
     // 3) أي مستخدم آخر → يُمنع ويُخرَج
     Log.d(TAG, "🛡️ Setup pending → blocking user: " + tag);
     showSetupBlockedScreen();
     return false;
 }
-
 // ═══════════════════════════════════════════════════════════
 //  Cache لـ Setup Status (سريع + آمن)
 // ═══════════════════════════════════════════════════════════
