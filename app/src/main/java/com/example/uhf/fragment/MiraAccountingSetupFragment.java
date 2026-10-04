@@ -224,6 +224,24 @@ public class MiraAccountingSetupFragment extends Fragment {
             Log.e(TAG, "addStepCard error", e);
         }
     }
+    
+    @Override
+public void onStart() {
+    super.onStart();
+    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+            .setBottomNavVisible(false);
+    }
+}
+
+@Override
+public void onStop() {
+    super.onStop();
+    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+            .setBottomNavVisible(true);
+    }
+}
 
     // ═══════════════════════════════════════════════════════════
     //  Actions
