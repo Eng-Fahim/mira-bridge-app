@@ -2676,8 +2676,21 @@ public void setBottomNavVisible(boolean visible) {
         View bottomNavContainer = findViewById(R.id.bottomNavContainer);
         if (bottomNavContainer == null) return;
 
+        // ✅ حماية من الاستدعاءات المتكررة
+        if (visible && bottomNavContainer.getVisibility() == View.VISIBLE
+                && bottomNavContainer.getAlpha() == 1f) {
+            return;
+        }
+        if (!visible && bottomNavContainer.getVisibility() == View.GONE) {
+            return;
+        }
+
+        bottomNavContainer.animate().cancel();
+
         if (visible) {
             bottomNavContainer.setVisibility(View.VISIBLE);
+            bottomNavContainer.setTranslationY(bottomNavContainer.getHeight());
+            bottomNavContainer.setAlpha(0f);
             bottomNavContainer.animate()
                     .translationY(0f)
                     .alpha(1f)
@@ -2698,10 +2711,20 @@ public void setBottomNavVisible(boolean visible) {
                     .start();
         }
 
-        Log.d(TAG, "📱 BottomNav visibility set to: " + visible);
+        // ✅ تغيير padding الـ fragment_container
+        View fragmentContainer = findViewById(R.id.fragment_container);
+        if (fragmentContainer != null) {
+            fragmentContainer.setPadding(
+                fragmentContainer.getPaddingLeft(),
+                fragmentContainer.getPaddingTop(),
+                fragmentContainer.getPaddingRight(),
+                visible ? 90 : 0  // ✅ بدون padding عند الإخفاء
+            );
+        }
 
+        Log.d(TAG, "📱 BottomNav visibility: " + visible);
     } catch (Exception e) {
         Log.e(TAG, "setBottomNavVisible error: " + e.getMessage());
     }
 }
-}
+                                        }
