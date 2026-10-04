@@ -98,6 +98,24 @@ public class MiraAccountingFragment extends Fragment {
 
         return view;
     }
+    
+    @Override
+public void onStart() {
+    super.onStart();
+    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+            .setBottomNavVisible(false);
+    }
+}
+
+@Override
+public void onStop() {
+    super.onStop();
+    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+            .setBottomNavVisible(true);
+    }
+}
 
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
