@@ -23,34 +23,38 @@ public class PermissionManager {
     private JSONObject permissions;
     private SharedPreferences prefs;
 
-    // الأدوار
-    public static final String ROLE_SYSTEM_ADMIN = "SYSTEM_ADMIN";
-    public static final String ROLE_ORG_ADMIN = "ORG_ADMIN";
-    public static final String ROLE_ADMIN = "ADMIN";
-    public static final String ROLE_BRANCH_MANAGER = "BRANCH_MANAGER";
-    public static final String ROLE_INVENTORY_MGR = "INVENTORY_MGR";
-    public static final String ROLE_POS_OPERATOR = "POS_OPERATOR";
-    public static final String ROLE_SECURITY = "SECURITY";
-    public static final String ROLE_GATE_SECURITY = "GATE_SECURITY";
-    public static final String ROLE_AUDITOR = "AUDITOR";
+    // ═══════════════════════════════════════════════════════
+    //  الأدوار
+    // ═══════════════════════════════════════════════════════
+    public static final String ROLE_SYSTEM_ADMIN    = "SYSTEM_ADMIN";
+    public static final String ROLE_ORG_ADMIN       = "ORG_ADMIN";
+    public static final String ROLE_FINANCE_MANAGER = "FINANCE_MANAGER";   // ⭐ جديد
+    public static final String ROLE_INVENTORY_MGR   = "INVENTORY_MGR";
+    public static final String ROLE_BRANCH_MANAGER  = "BRANCH_MANAGER";
+    public static final String ROLE_ACCOUNTANT      = "ACCOUNTANT";        // ⭐ جديد
+    public static final String ROLE_AUDITOR         = "AUDITOR";
+    public static final String ROLE_POS_OPERATOR    = "POS_OPERATOR";
+    public static final String ROLE_GATE_SECURITY   = "GATE_SECURITY";
+    public static final String ROLE_SECURITY        = "SECURITY";
+    public static final String ROLE_ADMIN           = "ADMIN";  // legacy alias
 
     // الميزات
-    public static final String FEATURE_DASHBOARD = "dashboard";
-    public static final String FEATURE_INVENTORY = "inventory";
-    public static final String FEATURE_POS = "pos";
-    public static final String FEATURE_TRANSFERS = "transfers";
-    public static final String FEATURE_IDENTITY = "identity";
-    public static final String FEATURE_RADAR = "radar";
-    public static final String FEATURE_GATES = "gates";
-    public static final String FEATURE_REPORTS = "reports";
-    public static final String FEATURE_ACCOUNTING = "accounting";
-    public static final String FEATURE_ADMIN = "admin";
-    public static final String FEATURE_USERS = "users";
-    public static final String FEATURE_SERVER_CONFIG = "server_config";
-    public static final String FEATURE_GOLD_RATES = "gold_rates";
-    public static final String FEATURE_PROFILE = "profile";
-    public static final String FEATURE_SALES_HISTORY = "sales_history";
-    public static final String FEATURE_QUICK_ACCESS = "quick_access";
+    public static final String FEATURE_DASHBOARD      = "dashboard";
+    public static final String FEATURE_INVENTORY      = "inventory";
+    public static final String FEATURE_POS            = "pos";
+    public static final String FEATURE_TRANSFERS      = "transfers";
+    public static final String FEATURE_IDENTITY       = "identity";
+    public static final String FEATURE_RADAR          = "radar";
+    public static final String FEATURE_GATES          = "gates";
+    public static final String FEATURE_REPORTS        = "reports";
+    public static final String FEATURE_ACCOUNTING     = "accounting";
+    public static final String FEATURE_ADMIN          = "admin";
+    public static final String FEATURE_USERS          = "users";
+    public static final String FEATURE_SERVER_CONFIG  = "server_config";
+    public static final String FEATURE_GOLD_RATES     = "gold_rates";
+    public static final String FEATURE_PROFILE        = "profile";
+    public static final String FEATURE_SALES_HISTORY  = "sales_history";
+    public static final String FEATURE_QUICK_ACCESS   = "quick_access";
 
     private PermissionManager(Context context) {
         this.context = context.getApplicationContext();
@@ -107,9 +111,7 @@ public class PermissionManager {
     }
 
     public boolean hasPermission(String feature, String action) {
-        // المدير الإداري والمشرف العام يستطيعان الوصول دائماً
         if (isAdmin()) return true;
-
         if (permissions == null) return false;
 
         try {
@@ -125,7 +127,9 @@ public class PermissionManager {
 
     public boolean canView(String feature) {
         if (isAdmin()) return true;
-        return hasPermission(feature, "view") || hasPermission(feature, "edit") || hasPermission(feature, "delete");
+        return hasPermission(feature, "view")
+            || hasPermission(feature, "edit")
+            || hasPermission(feature, "delete");
     }
 
     public boolean canEdit(String feature) {
@@ -142,27 +146,26 @@ public class PermissionManager {
         if (isAdmin()) return true;
         return hasPermission(feature, "export") || canView(feature);
     }
-    
+
     public List<String> getAllowedQuickActions() {
-    List<String> allowed = new ArrayList<>();
-    // أضف المعرفات بناءً على الصلاحيات المتاحة للمستخدم الحالي
-    if (canAccessFragment("IdentityStudio")) allowed.add("identity");
-    if (canAccessFragment("Radar")) allowed.add("radar");
-    if (canAccessFragment("SecureGate")) allowed.add("gate");
-    if (canAccessFragment("Reports")) allowed.add("reports");
-    if (canAccessFragment("Accounting")) allowed.add("accounting");
-    if (canAccessFragment("Transfers")) allowed.add("transfers");
-    if (canAccessFragment("AdminHub")) allowed.add("admin_hub");
-    if (canAccessFragment("SalesHistory")) allowed.add("sales_history");
-    if (canAccessFragment("ServerConfig")) allowed.add("server_config");
-    if (canAccessFragment("GoldRates")) allowed.add("gold_rates");
-    if (canAccessFragment("UsersManagement")) allowed.add("users");
-    
-    return allowed;
-}
+        List<String> allowed = new ArrayList<>();
+        if (canAccessFragment("IdentityStudio"))    allowed.add("identity");
+        if (canAccessFragment("Radar"))             allowed.add("radar");
+        if (canAccessFragment("SecureGate"))        allowed.add("gate");
+        if (canAccessFragment("Reports"))           allowed.add("reports");
+        if (canAccessFragment("Accounting"))        allowed.add("accounting");
+        if (canAccessFragment("Transfers"))         allowed.add("transfers");
+        if (canAccessFragment("AdminHub"))          allowed.add("admin_hub");
+        if (canAccessFragment("SalesHistory"))      allowed.add("sales_history");
+        if (canAccessFragment("ServerConfig"))      allowed.add("server_config");
+        if (canAccessFragment("GoldRates"))         allowed.add("gold_rates");
+        if (canAccessFragment("UsersManagement"))   allowed.add("users");
+        return allowed;
+    }
 
-
-    // ==================== أدوار المستخدمين ====================
+    // ═══════════════════════════════════════════════════════
+    //  فحوصات الأدوار
+    // ═══════════════════════════════════════════════════════
 
     public boolean isSystemAdmin() {
         return ROLE_SYSTEM_ADMIN.equalsIgnoreCase(sessionManager.getRoleString());
@@ -172,18 +175,20 @@ public class PermissionManager {
         return ROLE_ORG_ADMIN.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
-    public boolean isAdmin() {
-        String role = sessionManager.getRoleString();
-        if (role == null) return false;
-        return ROLE_ADMIN.equalsIgnoreCase(role) || isSystemAdmin() || isOrgAdmin();
+    public boolean isFinanceManager() {
+        return ROLE_FINANCE_MANAGER.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
-    public boolean isBranchManager() {
-        return ROLE_BRANCH_MANAGER.equalsIgnoreCase(sessionManager.getRoleString());
+    public boolean isAccountant() {
+        return ROLE_ACCOUNTANT.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isInventoryManager() {
         return ROLE_INVENTORY_MGR.equalsIgnoreCase(sessionManager.getRoleString());
+    }
+
+    public boolean isBranchManager() {
+        return ROLE_BRANCH_MANAGER.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isPosOperator() {
@@ -202,15 +207,54 @@ public class PermissionManager {
         return ROLE_AUDITOR.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
+    /**
+     * ✅ "Admin" يشمل: SYSTEM_ADMIN + ORG_ADMIN + FINANCE_MANAGER (+ ADMIN legacy)
+     */
+    public boolean isAdmin() {
+        String role = sessionManager.getRoleString();
+        if (role == null) return false;
+        return ROLE_ADMIN.equalsIgnoreCase(role)
+            || isSystemAdmin()
+            || isOrgAdmin()
+            || isFinanceManager();
+    }
+
+    /**
+     * ✅ هل يمكنه إعداد النظام المحاسبي؟
+     * يُستخدم في UHFMainActivity.navigateBySetupStatus() + guardSetupAccess()
+     */
+    public boolean canPerformAccountingSetup() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isFinanceManager() || isAccountant();
+    }
+
+    /**
+     * ✅ هل يمكنه إدارة المستخدمين (إنشاء/تعديل/حذف)؟
+     * SYSTEM_ADMIN + ORG_ADMIN + FINANCE_MANAGER فقط
+     */
+    public boolean canManageUsersAdvanced() {
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager();
+    }
+
+    /**
+     * ✅ المدير — يشمل admin + branch manager + inventory manager
+     */
     public boolean isManager() {
         return isAdmin() || isBranchManager() || isInventoryManager();
     }
 
-    // ==================== صلاحيات الواجهات ====================
-
-    public boolean canViewDashboard() {
-        return true; // الصفحة الرئيسية مسموحة للجميع
+    /**
+     * ✅ هل هو مستخدم محاسبي؟ (يستخدم في التقارير والواجهات)
+     */
+    public boolean isAccountingUser() {
+        return isAccountant() || isFinanceManager() || isAuditor();
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  صلاحيات الواجهات
+    // ═══════════════════════════════════════════════════════
+
+    public boolean canViewDashboard() { return true; }
 
     public boolean canViewInventory() {
         return canView(FEATURE_INVENTORY) || isManager();
@@ -228,9 +272,7 @@ public class PermissionManager {
         return canView(FEATURE_POS) || isPosOperator() || isManager();
     }
 
-    public boolean canUsePos() {
-        return canViewPos();
-    }
+    public boolean canUsePos() { return canViewPos(); }
 
     public boolean canViewTransfers() {
         return canView(FEATURE_TRANSFERS) || isManager();
@@ -269,11 +311,18 @@ public class PermissionManager {
     }
 
     public boolean canViewAccounting() {
-        return canView(FEATURE_ACCOUNTING) || isAdmin() || isBranchManager() || isAuditor();
+        return canView(FEATURE_ACCOUNTING)
+            || isAdmin()
+            || isBranchManager()
+            || isAuditor()
+            || isAccountant();
     }
 
     public boolean canEditAccounting() {
-        return canEdit(FEATURE_ACCOUNTING) || isAdmin();
+        return canEdit(FEATURE_ACCOUNTING)
+            || isAdmin()
+            || isFinanceManager()
+            || isAccountant();
     }
 
     public boolean canViewAdminHub() {
@@ -281,7 +330,8 @@ public class PermissionManager {
     }
 
     public boolean canManageUsers() {
-        return isAdmin() || (isBranchManager() && canEdit(FEATURE_USERS));
+        return canManageUsersAdvanced()
+            || (isBranchManager() && canEdit(FEATURE_USERS));
     }
 
     public boolean canViewServerConfig() {
@@ -296,9 +346,7 @@ public class PermissionManager {
         return canEdit(FEATURE_GOLD_RATES) || isAdmin() || isBranchManager();
     }
 
-    public boolean canViewProfile() {
-        return true;
-    }
+    public boolean canViewProfile() { return true; }
 
     public boolean canViewSalesHistory() {
         return canView(FEATURE_SALES_HISTORY) || isPosOperator() || isManager();
@@ -307,33 +355,35 @@ public class PermissionManager {
     public boolean canManageQuickAccess() {
         return isAdmin() || isBranchManager();
     }
-    
+
     public boolean canViewRfidBindings() {
-    return isAdmin() || isInventoryManager() || isManager();
-}
+        return isAdmin() || isInventoryManager() || isManager();
+    }
 
-public boolean canAccessIdentityStudio() {
-    return isAdmin() || isInventoryManager() || isManager();
-}
+    public boolean canAccessIdentityStudio() {
+        return isAdmin() || isInventoryManager() || isManager();
+    }
 
-public boolean canAccessRadar() {
-    return isAdmin() || isSecurity() || isInventoryManager() || isManager();
-}
+    public boolean canAccessRadar() {
+        return isAdmin() || isSecurity() || isInventoryManager() || isManager();
+    }
 
-public boolean canAccessGate() {
-    return isAdmin() || isSecurity() || isGateSecurity();
-}
+    public boolean canAccessGate() {
+        return isAdmin() || isSecurity() || isGateSecurity();
+    }
 
-public boolean canAccessAccounting() {
-    return isAdmin() || isManager() || isAuditor();
-}
+    public boolean canAccessAccounting() {
+        return isAdmin() || isManager() || isAuditor()
+            || isAccountant() || isFinanceManager();
+    }
 
-public boolean canAccessTransfers() {
-    return isAdmin() || isManager() || isInventoryManager();
-}
+    public boolean canAccessTransfers() {
+        return isAdmin() || isManager() || isInventoryManager();
+    }
 
-
-    // ==================== فحص الوصول للواجهات (محدث وآمن مرن) ====================
+    // ═══════════════════════════════════════════════════════
+    //  فحص الوصول للواجهات
+    // ═══════════════════════════════════════════════════════
 
     public boolean canAccessFragment(String fragmentTag) {
         if (fragmentTag == null || fragmentTag.trim().isEmpty()) return true;
@@ -341,16 +391,22 @@ public boolean canAccessTransfers() {
         String tag = fragmentTag.trim();
 
         // 1. الواجهات المتاحة دائماً للجميع
-        if (tag.equalsIgnoreCase("Dashboard") || tag.equalsIgnoreCase("Home") ||
-            tag.equalsIgnoreCase("HomeFragment") || tag.equalsIgnoreCase("Profile")) {
+        if (tag.equalsIgnoreCase("Dashboard") || tag.equalsIgnoreCase("Home")
+                || tag.equalsIgnoreCase("HomeFragment") || tag.equalsIgnoreCase("Profile")) {
             return true;
         }
 
-        // 2. إذا كان مدير نظام أو أدمن افتح كل شيء
+        // 2. مدير النظام يفتح كل شيء
         if (isAdmin()) return true;
 
-        // 3. مطابقة مرنة لا تتأثر بالـ Capital/Small letters
-        if (tag.equalsIgnoreCase("Scan") || tag.equalsIgnoreCase("Inventory") || tag.equalsIgnoreCase("InventoryPro")) {
+        // 3. ⭐ شاشة الإعداد المحاسبي — تُفتح فقط لمن canPerformAccountingSetup
+        if (tag.equalsIgnoreCase("AccountingSetup")) {
+            return canPerformAccountingSetup();
+        }
+
+        // 4. مطابقة مرنة
+        if (tag.equalsIgnoreCase("Scan") || tag.equalsIgnoreCase("Inventory")
+                || tag.equalsIgnoreCase("InventoryPro")) {
             return canViewInventory();
         }
         if (tag.equalsIgnoreCase("POS") || tag.equalsIgnoreCase("PosFragment")) {
@@ -371,10 +427,11 @@ public boolean canAccessTransfers() {
         if (tag.equalsIgnoreCase("Reports") || tag.equalsIgnoreCase("ReportsPro")) {
             return canViewReports();
         }
-        if (tag.equalsIgnoreCase("Accounting") || tag.equalsIgnoreCase("Vouchers") ||
-            tag.equalsIgnoreCase("FiscalYears") || tag.equalsIgnoreCase("OpeningBalances") ||
-            tag.equalsIgnoreCase("FinancialReports") || tag.equalsIgnoreCase("ProfitReport") ||
-            tag.equalsIgnoreCase("AccountingCharts") || tag.equalsIgnoreCase("AccountingAuditLog")) {
+        if (tag.equalsIgnoreCase("Accounting") || tag.equalsIgnoreCase("Vouchers")
+                || tag.equalsIgnoreCase("FiscalYears") || tag.equalsIgnoreCase("OpeningBalances")
+                || tag.equalsIgnoreCase("FinancialReports") || tag.equalsIgnoreCase("ProfitReport")
+                || tag.equalsIgnoreCase("AccountingCharts")
+                || tag.equalsIgnoreCase("AccountingAuditLog")) {
             return canViewAccounting();
         }
         if (tag.equalsIgnoreCase("AdminHub")) {
@@ -405,7 +462,7 @@ public boolean canAccessTransfers() {
             return isManager();
         }
 
-        // افتراض الأمان: إذا لم نجد الـ Tag وكان مستخدماً عادياً، اسمح بالتحميل لتجنب الشاشة السوداء طالما أتى من القائمة
+        // افتراض الأمان
         return true;
     }
 
