@@ -207,57 +207,65 @@ public class SetupStep6ReviewFragment extends Fragment {
     }
 
     private void performApprove() {
-        btnApprove.setEnabled(false);
-        btnApprove.setText("جاري الاعتماد...");
-        showLoading(true);
-        
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
+    btnApprove.setEnabled(false);
+    btnApprove.setText("جاري الاعتماد...");
+    showLoading(true);
+    
+    new Thread(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            
+            MiraApiClient.ApiResponse response = 
+                apiClient.postAccounting("setup/step/6/approve", payload);
+            
+            new Handler(Looper.getMainLooper()).post(() -> {
+                showLoading(false);
                 
-                MiraApiClient.ApiResponse response = 
-                    apiClient.postAccounting("setup/step/6/approve", payload);
-                
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    showLoading(false);
+                if (response != null && response.isSuccess) {
+                    String entryNumber = response.optString("entry_number", "");
                     
-                    if (response != null && response.isSuccess) {
-                        String entryNumber = response.optString("entry_number", "");
-                        
-                        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                            .setTitle("✅ تم الاعتماد بنجاح")
-                            .setMessage("تم إنشاء القيد الافتتاحي:\n" + entryNumber +
-                                       "\n\nالنظام المحاسبي جاهز للاستخدام.")
-                            .setPositiveButton("فتح المحاسبة", (d, w) -> {
-                                if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
-                                    ((com.example.uhf.activity.UHFMainActivity) getActivity())
-                                        .openAccounting();
-                                }
-                            })
-                            .setNegativeButton("إغلاق", null)
-                            .setCancelable(false)
-                            .show();
-                    } else {
-                        btnApprove.setEnabled(true);
-                        btnApprove.setText("✅ اعتماد نهائي");
-                        
-                        String error = response != null ? response.error : "غير معروف";
-                        Toast.makeText(requireContext(), 
-                            "❌ فشل: " + error, Toast.LENGTH_LONG).show();
+                    // ⬇️⬇️⬇️ الإضافة المطلوبة — سطر واحد فقط ⬇️⬇️⬇️
+                    // ✅ إبطال كاش حالة الإعداد — ليُعيد التوجيه في المرة القادمة
+                    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+                        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+                            .invalidateSetupCache();
                     }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "performApprove error", e);
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    showLoading(false);
+                    // ⬆️⬆️⬆️ نهاية الإضافة ⬆️⬆️⬆️
+                    
+                    new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle("✅ تم الاعتماد بنجاح")
+                        .setMessage("تم إنشاء القيد الافتتاحي:\n" + entryNumber +
+                                   "\n\nالنظام المحاسبي جاهز للاستخدام.")
+                        .setPositiveButton("فتح المحاسبة", (d, w) -> {
+                            if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+                                ((com.example.uhf.activity.UHFMainActivity) getActivity())
+                                    .openAccounting();
+                            }
+                        })
+                        .setNegativeButton("إغلاق", null)
+                        .setCancelable(false)
+                        .show();
+                } else {
                     btnApprove.setEnabled(true);
                     btnApprove.setText("✅ اعتماد نهائي");
+                    
+                    String error = response != null ? response.error : "غير معروف";
                     Toast.makeText(requireContext(), 
-                        "❌ " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
-            }
-        }).start();
-    }
+                        "❌ فشل: " + error, Toast.LENGTH_LONG).show();
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "performApprove error", e);
+            new Handler(Looper.getMainLooper()).post(() -> {
+                showLoading(false);
+                btnApprove.setEnabled(true);
+                btnApprove.setText("✅ اعتماد نهائي");
+                Toast.makeText(requireContext(), 
+                    "❌ " + e.getMessage(), Toast.LENGTH_LONG).show();
+            });
+        }
+    }).start();
+}
 
     private void showLoading(boolean show) {
         pbLoading.setVisibility(show ? View.VISIBLE : View.GONE);
