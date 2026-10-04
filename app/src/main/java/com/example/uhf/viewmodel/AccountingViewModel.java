@@ -61,19 +61,19 @@ public class AccountingViewModel extends AndroidViewModel {
     public LiveData<JournalEntryDto> getSelectedEntry() {
         return selectedEntry;
     }
-    
     public void loadJournalEntries(int page, int perPage, String status) {
-        loading.setValue(true);
-        error.setValue(null);
-        
-        api.accounting().getJournalEntries(
-            currentBranchId > 0 ? currentBranchId : null,
-            currentFromDate,
-            currentToDate,
-            status,
-            perPage,
-            page
-        ).enqueue(new Callback<ApiResponseDto<JournalEntryDto[]>>() {
+    loading.setValue(true);
+    error.setValue(null);
+    
+    // ✅ لا ترسل فلاتر التاريخ مؤقتاً — لتجاوز مشكلة الصيغة
+    api.accounting().getJournalEntries(
+        null,   // branch_id: null
+        null,   // from_date: null ← أزلنا
+        null,   // to_date: null   ← أزلنا
+        status,
+        perPage,
+        page
+    ).enqueue(new Callback<ApiResponseDto<JournalEntryDto[]>>() {
             @Override
             public void onResponse(Call<ApiResponseDto<JournalEntryDto[]>> call, 
                                   Response<ApiResponseDto<JournalEntryDto[]>> response) {
@@ -320,4 +320,4 @@ public class AccountingViewModel extends AndroidViewModel {
     public String getFromDate() { return currentFromDate; }
     public String getToDate() { return currentToDate; }
     public int getBranchId() { return currentBranchId; }
-}
+    }
