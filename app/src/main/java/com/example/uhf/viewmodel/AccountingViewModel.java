@@ -10,7 +10,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.api.dto.*;
 import com.example.uhf.utils.DateHelper;
-
+import com.example.uhf.api.dto.GeneralLedgerDto;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -307,7 +307,47 @@ public class AccountingViewModel extends AndroidViewModel {
                 }
             });
     }
-    
+    // ═══ LiveData لدفتر الأستاذ ═══
+private final MutableLiveData<GeneralLedgerDto> generalLedger = new MutableLiveData<>();
+
+public LiveData<GeneralLedgerDto> getGeneralLedger() {
+    return generalLedger;
+}
+
+public void loadGeneralLedger(long accountId, String from, String to, int branchId) {
+    if (accountId <= 0) {
+        error.setValue("يرجى اختيار حساب");
+        return;
+    }
+
+    loading.setValue(true);
+    error.setValue(null);
+
+    api.accounting().getGeneralLedger(
+        accountId,
+        from,
+        to,
+        branchId > 0 ? branchId : null
+    ).enqueue(new Callback<ApiResponseDto<GeneralLedgerDto>>() {
+        @Override
+        public void onResponse(Call<ApiResponseDto<GeneralLedgerDto>> call,
+                              Response<ApiResponseDto<GeneralLedgerDto>> response) {
+            loading.setValue(false);
+
+            if (response.isSuccessful() && response.body() != null && response.body().success) {
+                generalLedger.setValue(response.body().data);
+            } else {
+                error.setValue("فشل تحميل دفتر الأستاذ: " + response.code());
+            }
+        }
+
+        @Override
+        public void onFailure(Call<ApiResponseDto<GeneralLedgerDto>> call, Throwable t) {
+            loading.setValue(false);
+            error.setValue("خطأ في الشبكة: " + t.getMessage());
+        }
+    });
+}
     // ═══════════════════════════════════════════════════════
     //  الحالة
     // ═══════════════════════════════════════════════════════
