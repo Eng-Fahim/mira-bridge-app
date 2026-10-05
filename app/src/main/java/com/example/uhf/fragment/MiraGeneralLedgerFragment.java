@@ -62,6 +62,11 @@ public class MiraGeneralLedgerFragment extends Fragment {
     private String selectedAccountName = "";
     private final List<AccountDto> accountsList = new ArrayList<>();
     private LedgerRowAdapter adapter;
+    
+    private double currentOpening = 0;
+    private double currentClosing = 0;
+    private double currentTotalDebit = 0;
+    private double currentTotalCredit = 0;
 
     // ═══════════════════════════════════════════════════════════
     //  Lifecycle
@@ -298,9 +303,43 @@ public class MiraGeneralLedgerFragment extends Fragment {
         });
 
         btnExport.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "📥 جاري التصدير...", Toast.LENGTH_SHORT).show();
-            // TODO: تصدير CSV
-        });
+    if (selectedAccountId <= 0) {
+        Toast.makeText(requireContext(),
+            "اختر حساباً أولاً", Toast.LENGTH_SHORT).show();
+        return;
+    }
+
+    // نجمع البيانات الحالية
+    List<LedgerRowAdapter.LedgerRow> currentRows = adapter.getItems();
+    if (currentRows == null || currentRows.isEmpty()) {
+        Toast.makeText(requireContext(),
+            "لا توجد بيانات للتصدير", Toast.LENGTH_SHORT).show();
+        return;
+    }
+
+    // نستخرج KPIs من العارض الحالي
+    double opening = 0, closing = 0;
+    // (يمكن تخزينها في المتغيرات عند renderKPIs)
+
+    Uri uri = LedgerCsvExporter.exportAndShare(
+        requireContext(),
+        currentRows,
+        selectedAccountCode,
+        selectedAccountName,
+        fromDate,
+        toDate,
+        opening,   // سيتم تعبئتها لاحقاً
+        closing
+    );
+
+    if (uri != null) {
+        Toast.makeText(requireContext(),
+            "📥 تم إنشاء الملف", Toast.LENGTH_SHORT).show();
+    } else {
+        Toast.makeText(requireContext(),
+            "❌ فشل التصدير", Toast.LENGTH_SHORT).show();
+    }
+});
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -358,13 +397,18 @@ public class MiraGeneralLedgerFragment extends Fragment {
     // ═══════════════════════════════════════════════════════════
 
     private void renderKPIs(double opening, double debit, double credit, double closing) {
-        kpiContainer.removeAllViews();
+    // ✅ احفظ للتصدير
+    currentOpening = opening;
+    currentClosing = closing;
+    currentTotalDebit = debit;
+    currentTotalCredit = credit;
 
-        addKpi("افتتاحي", NumberFormatter.moneyShort(opening), "#3498DB");
-        addKpi("مدين",    NumberFormatter.moneyShort(debit),   "#9B59B6");
-        addKpi("دائن",    NumberFormatter.moneyShort(credit),  "#E74C3C");
-        addKpi("ختامي",   NumberFormatter.moneyShort(closing), "#27AE60");
-    }
+    kpiContainer.removeAllViews();
+    addKpi("افتتاحي", NumberFormatter.moneyShort(opening), "#3498DB");
+    addKpi("مدين",    NumberFormatter.moneyShort(debit),   "#9B59B6");
+    addKpi("دائن",    NumberFormatter.moneyShort(credit),  "#E74C3C");
+    addKpi("ختامي",   NumberFormatter.moneyShort(closing), "#27AE60");
+}
 
     private void addKpi(String title, String value, String color) {
         View card = LayoutInflater.from(getContext())
