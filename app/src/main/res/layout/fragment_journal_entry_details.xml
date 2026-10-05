@@ -31,7 +31,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="12dp"
+            android:paddingBottom="80dp">
 
             <!-- ═══════ بطاقة الرأس ═══════ -->
             <androidx.cardview.widget.CardView
@@ -106,18 +107,17 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp"
                         android:layout_marginTop="4dp"/>
-                        
+
                     <TextView
-    android:id="@+id/tvInvoiceAmount"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text=""
-    android:textColor="@color/mira_gold"
-    android:textSize="13sp"
-    android:textStyle="bold"
-    android:layout_marginTop="6dp"
-    android:visibility="gone"/>
-                        
+                        android:id="@+id/tvInvoiceAmount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="@color/mira_gold"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -129,7 +129,7 @@
                 android:orientation="horizontal"
                 android:layout_marginTop="12dp"/>
 
-            <!-- ═══════ سطور القيد ═══════ -->
+            <!-- ═══════ عنوان السطور ═══════ -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -140,7 +140,7 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="8dp"/>
 
-            <!-- رأس الجدول -->
+            <!-- ═══════ رأس الجدول ═══════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -237,13 +237,17 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- ═══════ أزرار الإجراءات ═══════ -->
+    <!-- ═══════ زر الطباعة ═══════ -->
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/fabActions"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
-        android:text="إجراءات"
+        android:text="🖨️ طباعة PDF"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="@color/mira_gold"
+        app:iconTint="#FFFFFF"
         android:visibility="gone"/>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
