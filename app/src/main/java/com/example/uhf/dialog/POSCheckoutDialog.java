@@ -296,62 +296,73 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     private void setupSpinner() {
-        if (spPaymentMethod == null || getContext() == null) return;
+    if (spPaymentMethod == null || getContext() == null) return;
 
-        String[] methods = isArabic
-                ? new String[]{"💵 نقداً", "💳 بطاقة", "🏦 تحويل بنكي", "⏳ آجل"}
-                : new String[]{"CASH", "CARD", "BANK_TRANSFER", "CREDIT"};
+    // ✅ نصوص واضحة بدون emoji في البداية (لتفادي مشاكل dropdown)
+    String[] methods = isArabic
+            ? new String[]{"نقداً", "بطاقة", "تحويل بنكي", "آجل"}
+            : new String[]{"Cash", "Card", "Bank Transfer", "Credit"};
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
-                android.R.layout.simple_dropdown_item_1line, methods);
-        spPaymentMethod.setAdapter(adapter);
+    // ✅ الطريقة الحديثة في Material3
+    spPaymentMethod.setSimpleItems(methods);
 
-        spPaymentMethod.setOnItemClickListener((parent, view, position, id) -> {
-            updateAccountNumber(position);
-        });
+    spPaymentMethod.setOnItemClickListener((parent, view, position, id) -> {
+        updateAccountNumber(position);
+    });
 
-        spPaymentMethod.setText(methods[0], false);
-        updateAccountNumber(0);
-    }
+    // ✅ اختيار افتراضي
+    spPaymentMethod.setText(methods[0], false);
+    updateAccountNumber(0);
+}
 
     private void updateAccountNumber(int position) {
-        if (tvAccountNumber == null) return;
+    if (tvAccountNumber == null) return;
 
-        String[] accountNumbers = isArabic
-                ? new String[]{
-                "🏦 حساب النقدية: 110101",
-                "💳 حساب البطاقات: 110201",
-                "🏦 حساب التحويلات: 110202",
-                "⏳ حساب الآجل: 110301"
-        }
-                : new String[]{
-                "🏦 Cash Account: 110101",
-                "💳 Card Account: 110201",
-                "🏦 Transfer Account: 110202",
-                "⏳ Credit Account: 110301"
-        };
+    // ⚠️ ملاحظة: هذه أكواد ثابتة — يُفضّل جلبها من السيرفر لاحقاً
+    String[] accountNumbers = isArabic
+            ? new String[]{
+                "🏦 حساب النقدية: 1101",
+                "💳 حساب البطاقات: 1102",
+                "🏦 حساب التحويلات: 1103",
+                "⏳ حساب الآجل: 1104"
+            }
+            : new String[]{
+                "🏦 Cash Account: 1101",
+                "💳 Card Account: 1102",
+                "🏦 Transfer Account: 1103",
+                "⏳ Credit Account: 1104"
+            };
 
-        if (position >= 0 && position < accountNumbers.length) {
-            tvAccountNumber.setText(accountNumbers[position]);
-            tvAccountNumber.setVisibility(View.VISIBLE);
-        } else {
-            tvAccountNumber.setVisibility(View.GONE);
-        }
+    if (position >= 0 && position < accountNumbers.length) {
+        tvAccountNumber.setText(accountNumbers[position]);
+        tvAccountNumber.setVisibility(View.VISIBLE);
+    } else {
+        tvAccountNumber.setVisibility(View.GONE);
     }
+}
 
     /**
      * ✅ استخراج payment method من النص الظاهر (MaterialAutoCompleteTextView)
      */
     private String getCurrentPaymentMethod() {
-        if (spPaymentMethod == null || spPaymentMethod.getText() == null) {
-            return "CASH";
-        }
-        String text = spPaymentMethod.getText().toString();
-        if (text.contains("CARD") || text.contains("بطاقة")) return "CARD";
-        if (text.contains("BANK") || text.contains("تحويل")) return "BANK_TRANSFER";
-        if (text.contains("CREDIT") || text.contains("آجل")) return "CREDIT";
+    if (spPaymentMethod == null || spPaymentMethod.getText() == null) {
         return "CASH";
     }
+
+    String text = spPaymentMethod.getText().toString().trim();
+
+    // ✅ الترتيب مهم: "تحويل بنكي" قبل "بنكي"
+    if (text.contains("تحويل") || text.contains("Bank") || text.contains("BANK")) {
+        return "BANK_TRANSFER";
+    }
+    if (text.contains("بطاقة") || text.contains("Card") || text.contains("CARD")) {
+        return "CARD";
+    }
+    if (text.contains("آجل") || text.contains("Credit") || text.contains("CREDIT")) {
+        return "CREDIT";
+    }
+    return "CASH";
+}
 
     private String getCurrentAccountCode() {
         String method = getCurrentPaymentMethod();
