@@ -392,6 +392,10 @@ public void onPause() {
         tilManualEpc = view.findViewById(R.id.tilPosManualEpc);
         etManualEpc = view.findViewById(R.id.etPosManualEpc);
         btnAddManual = view.findViewById(R.id.btnPosAddManual);
+        // ✅ إخفاء زر "إضافة" — الإضافة تلقائية
+        if (btnAddManual != null) {
+        btnAddManual.setVisibility(View.GONE);
+        }
         btnCheckout = view.findViewById(R.id.btnPosCheckout);
         btnClearCart = view.findViewById(R.id.btnPosClearCart);
         btnPosRefund = view.findViewById(R.id.btnPosRefund);
@@ -494,22 +498,46 @@ public void onPause() {
     private void setupListeners() {
         try {
             // Manual EPC input
-            if (etManualEpc != null) {
-                etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
-                    if (actionId == EditorInfo.IME_ACTION_DONE
-                            || actionId == EditorInfo.IME_ACTION_SEARCH
-                            || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
-                            && event.getAction() == KeyEvent.ACTION_DOWN)) {
+            // ✅ إضافة تلقائية عند اكتمال الإدخال
+if (etManualEpc != null) {
+    etManualEpc.addTextChangedListener(new android.text.TextWatcher() {
+        private Runnable pendingCheck;
+
+        @Override
+        public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+
+        @Override
+        public void onTextChanged(CharSequence s, int st, int b, int c) {}
+
+        @Override
+        public void afterTextChanged(android.text.Editable s) {
+            String code = s.toString().trim();
+
+            // ✅ ألغِ أي فحص سابق
+            if (pendingCheck != null) {
+                mainHandler.removeCallbacks(pendingCheck);
+            }
+
+            // ✅ EPC عادة 24 حرف، GTIN 13-14، Serial ≥ 6
+            int minLen = 6;
+
+            if (code.length() >= minLen) {
+                pendingCheck = () -> {
+                    if (code.equals(etManualEpc.getText().toString().trim())) {
                         submitManualEpc();
-                        return true;
                     }
+                };
+                // انتظر 300ms بعد آخر حرف
+                mainHandler.postDelayed(pendingCheck, 300);
+            }
+        }
+    });
+}
                     return false;
                 });
             }
 
-            if (btnAddManual != null) {
-                btnAddManual.setOnClickListener(v -> submitManualEpc());
-            }
+            
 
             if (btnClearCart != null) {
                 btnClearCart.setOnClickListener(v -> {
@@ -923,27 +951,46 @@ if (btnPosLastReceipt != null) {
             // ✅ الجديدة — مع حماية شاملة
 if (tvTotalAmount != null) {
     String totalText;
-    if (count > 0) {
-        if (priceManager != null) {
-            try {
-                totalText = priceManager.formatPriceDefault(totalUsd);
-                if (totalText == null || totalText.isEmpty()) {
-                    totalText = String.format(
-                            java.util.Locale.US, "$%.2f", totalUsd);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "formatPrice error: " + e.getMessage());
-                totalText = String.format(
-                        java.util.Locale.US, "$%.2f", totalUsd);
-            }
-        } else {
-            totalText = String.format(
-                    java.util.Locale.US, "$%.2f", totalUsd);
+
+    if (count > 0 && totalUsd > 0) {
+        // ✅ المسار 1: القيمة سليمة
+        totalText = tryFormatViaManager(totalUsd);
+
+        if (totalText == null) {
+            // ✅ المسار 2: fallback
+            totalText = String.format(Locale.US, "%,.2f YER",
+                    priceManager.convertFromUSD(totalUsd,
+                            priceManager.getDefaultCurrency()));
+        }
+
+    } else if (count > 0 && totalUsd == 0) {
+        // 🚨 حالة خطأ: يوجد عناصر لكن المجموع صفر!
+        Log.e(TAG, "🚨 CART HAS " + count + " ITEMS BUT totalUsd=0!");
+        totalText = "⚠️ خطأ في حساب الإجمالي";
+        // ✅ سجل تفاصيل كل عنصر للتشخيص
+        for (CartItem c : cartManager.getItems()) {
+            Log.e(TAG, "  → item: " + c.name + " | price=" + c.price);
         }
     } else {
+        // ✅ القيمة الافتراضية
         totalText = getString(R.string.pos_default_amount);
+        if (totalText == null || totalText.trim().isEmpty()) {
+            totalText = "0.00";
+        }
     }
+
+    // ✅ حماية نهائية
+    if (totalText == null || totalText.trim().isEmpty()) {
+        totalText = "0.00";
+    }
+
     tvTotalAmount.setText(totalText);
+
+    // ✅ Log حاسم — يُظهر القيم الحقيقية
+    Log.e(TAG, "💰 [SUMMARY] count=" + count
+            + " | totalUsd=" + totalUsd
+            + " | displayed='" + totalText + "'"
+            + " | tvVisibility=" + tvTotalAmount.getVisibility());
 }
 
                 // Status
@@ -957,6 +1004,38 @@ if (tvTotalAmount != null) {
                     }
                 }
 
+
+/**
+ * ✅ تنسيق عبر priceManager — يُعيد null عند أي فشل
+ */
+private String tryFormatViaManager(double amountUsd) {
+    if (priceManager == null) {
+        Log.e(TAG, "💰 priceManager = NULL");
+        return null;
+    }
+
+    try {
+        String formatted = priceManager.formatPriceDefault(amountUsd);
+
+        if (formatted == null) {
+            Log.e(TAG, "💰 formatPriceDefault returned NULL");
+            return null;
+        }
+        if (formatted.trim().isEmpty()) {
+            Log.e(TAG, "💰 formatPriceDefault returned EMPTY");
+            return null;
+        }
+        if (formatted.equals("—")) {
+            Log.e(TAG, "💰 formatPriceDefault returned '—' (zero/neg)");
+            return null;
+        }
+
+        return formatted;
+    } catch (Exception e) {
+        Log.e(TAG, "💰 formatPriceDefault error: " + e.getMessage());
+        return null;
+    }
+}
                 // ═══════════════════════════════════════════════════════
 // ✅ Footer Sticky (Summary + CTA) — يظهر فقط عند وجود قطع
 // ═══════════════════════════════════════════════════════
@@ -1920,6 +1999,23 @@ payload.put("customer", customerObj);
         }
     }
 
+@Override
+public void onStart() {
+    super.onStart();
+    // ✅ إخفاء BottomNav في شاشة البيع
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
+    }
+}
+
+@Override
+public void onStop() {
+    super.onStop();
+    // ✅ إعادة إظهاره عند المغادرة
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
+    }
+}
     // ═══════════════════════════════════════════════════════
     // Utilities
     // ═══════════════════════════════════════════════════════
