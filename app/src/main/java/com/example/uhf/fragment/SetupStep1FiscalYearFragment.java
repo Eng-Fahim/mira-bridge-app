@@ -30,7 +30,7 @@ import java.util.Locale;
 /**
  * المرحلة 1: السنة المالية
  */
-public class SetupStep1FiscalYearFragment extends Fragment {
+public class SetupStep1FiscalYearFragment extends BaseSetupStepFragment {
 
     private static final String TAG = "SetupStep1";
 
