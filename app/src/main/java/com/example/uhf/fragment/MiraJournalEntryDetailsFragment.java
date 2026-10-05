@@ -24,43 +24,40 @@ import com.example.uhf.api.dto.JournalEntryDetailsDto;
 import com.example.uhf.api.dto.JournalEntryDto;
 import com.example.uhf.api.dto.JournalLineDto;
 import com.example.uhf.utils.DateHelper;
+import com.example.uhf.utils.JournalPdfExporter;
 import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 /**
  * ✅ شاشة تفاصيل القيد المحاسبي
- *
- * الميزات:
- * - رأس القيد (رقم، تاريخ، حالة، وصف، مرجع)
- * - 💰 مبلغ الفاتورة الأصلي (لقيود POS)
- * - KPIs: مدين / دائن / ذهب / توازن
- * - سطور القيد
- * - ملاحظات
- * - سجل التعديلات
+ * - رأس القيد + مبلغ الفاتورة + KPIs + السطور + Audit
+ * - زر PDF احترافي
  */
 public class MiraJournalEntryDetailsFragment extends Fragment {
 
     private static final String ARG_ENTRY_ID = "entry_id";
 
-    // Views
     private MaterialToolbar toolbar;
     private TextView tvEntryNumber, tvStatus, tvDate, tvDescription, tvReference;
-    private TextView tvInvoiceAmount;   // ✅ جديد
+    private TextView tvInvoiceAmount;
     private LinearLayout kpiContainer;
     private RecyclerView rvLines;
     private TextView tvNotesLabel, tvNotes;
     private TextView tvAuditLabel;
     private LinearLayout auditContainer;
     private ProgressBar pbLoading;
+    private ExtendedFloatingActionButton fabActions;
 
-    // State
     private long entryId = 0;
     private AccountingViewModel viewModel;
     private JournalLineAdapter lineAdapter;
+    private JournalEntryDto currentEntry;
 
     // ═══════════════════════════════════════════════════════════
     //  Factory
@@ -104,7 +101,6 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
         setupRecycler();
         setupViewModel();
 
-        // تحميل
         pbLoading.setVisibility(View.VISIBLE);
         viewModel.loadJournalEntryDetails(entryId);
 
@@ -112,20 +108,21 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     }
 
     private void initViews(View v) {
-        toolbar          = v.findViewById(R.id.toolbar);
-        tvEntryNumber    = v.findViewById(R.id.tvEntryNumber);
-        tvStatus         = v.findViewById(R.id.tvStatus);
-        tvDate           = v.findViewById(R.id.tvDate);
-        tvDescription    = v.findViewById(R.id.tvDescription);
-        tvReference      = v.findViewById(R.id.tvReference);
-        tvInvoiceAmount  = v.findViewById(R.id.tvInvoiceAmount);   // ✅ جديد
-        kpiContainer     = v.findViewById(R.id.kpiContainer);
-        rvLines          = v.findViewById(R.id.rvLines);
-        tvNotesLabel     = v.findViewById(R.id.tvNotesLabel);
-        tvNotes          = v.findViewById(R.id.tvNotes);
-        tvAuditLabel     = v.findViewById(R.id.tvAuditLabel);
-        auditContainer   = v.findViewById(R.id.auditContainer);
-        pbLoading        = v.findViewById(R.id.pbLoading);
+        toolbar         = v.findViewById(R.id.toolbar);
+        tvEntryNumber   = v.findViewById(R.id.tvEntryNumber);
+        tvStatus        = v.findViewById(R.id.tvStatus);
+        tvDate          = v.findViewById(R.id.tvDate);
+        tvDescription   = v.findViewById(R.id.tvDescription);
+        tvReference     = v.findViewById(R.id.tvReference);
+        tvInvoiceAmount = v.findViewById(R.id.tvInvoiceAmount);
+        kpiContainer    = v.findViewById(R.id.kpiContainer);
+        rvLines         = v.findViewById(R.id.rvLines);
+        tvNotesLabel    = v.findViewById(R.id.tvNotesLabel);
+        tvNotes         = v.findViewById(R.id.tvNotes);
+        tvAuditLabel    = v.findViewById(R.id.tvAuditLabel);
+        auditContainer  = v.findViewById(R.id.auditContainer);
+        pbLoading       = v.findViewById(R.id.pbLoading);
+        fabActions      = v.findViewById(R.id.fabActions);
     }
 
     private void setupToolbar() {
@@ -171,6 +168,7 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
 
     private void renderDetails(JournalEntryDetailsDto details) {
         JournalEntryDto entry = details.entry;
+        currentEntry = entry;
 
         // ─── الرأس ───
         tvEntryNumber.setText(entry.entryNumber != null
@@ -185,7 +183,8 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
                 ? "📅 " + DateHelper.toDisplay(entry.entryDate)
                 : "");
 
-        tvDescription.setText(entry.description != null && !entry.description.isEmpty()
+        tvDescription.setText(entry.description != null
+                && !entry.description.isEmpty()
                 ? entry.description : "—");
 
         // ─── المرجع ───
@@ -197,8 +196,7 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
             tvReference.setVisibility(View.GONE);
         }
 
-        // ✅✅✅ مبلغ الفاتورة الأصلي — للقيود POS فقط
-        // (يُخفى إذا كان مساوياً لـ totalDebit — أي قيد يدوي)
+        // ─── مبلغ الفاتورة الأصلي ───
         if (entry.displayAmount > 0
                 && Math.abs(entry.displayAmount - entry.totalDebit) > 0.01) {
             tvInvoiceAmount.setVisibility(View.VISIBLE);
@@ -231,12 +229,14 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
 
         // ─── سجل التعديلات ───
         renderAudit(details.audit);
+
+        // ─── زر PDF ───
+        setupPdfButton(entry, details.lines);
     }
 
     private void renderKpis(JournalEntryDto entry) {
         kpiContainer.removeAllViews();
 
-        // ✅ إذا كان قيد POS، أظهر مبلغ الفاتورة كأول KPI
         boolean isPosSale = "pos_sale".equalsIgnoreCase(entry.sourceType)
                 && entry.displayAmount > 0
                 && Math.abs(entry.displayAmount - entry.totalDebit) > 0.01;
@@ -257,7 +257,6 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
                 NumberFormatter.goldSigned(goldDiff), "#D4AF37");
         }
 
-        // حالة التوازن
         addKpi(
             entry.isBalanced() ? "متوازن ✅" : "غير متوازن ⚠️",
             NumberFormatter.moneyShort(entry.totalDebit),
@@ -284,45 +283,73 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     }
 
     private void renderAudit(JournalAuditDto[] audit) {
-    if (audit == null || audit.length == 0) {
-        tvAuditLabel.setVisibility(View.GONE);
-        auditContainer.setVisibility(View.GONE);
-        return;
-    }
-
-    tvAuditLabel.setVisibility(View.VISIBLE);
-    auditContainer.setVisibility(View.VISIBLE);
-    auditContainer.removeAllViews();
-
-    for (JournalAuditDto a : audit) {
-        LinearLayout row = new LinearLayout(getContext());
-        row.setOrientation(LinearLayout.VERTICAL);
-        row.setPadding(12, 8, 12, 8);
-
-        // ─── السطر الأول: الإجراء + المستخدم ───
-        TextView line1 = new TextView(getContext());
-        String user   = a.getUserName();          // ✅ getter
-        String action = a.getActionLabelAr();
-        line1.setText("• " + action + " — " + user);
-        line1.setTextSize(12);
-        line1.setTextColor(Color.parseColor("#2C3E50"));
-
-        // ─── السطر الثاني: التاريخ + السبب ───
-        TextView line2 = new TextView(getContext());
-        String when = "";
-        String performedAt = a.getCreatedAt();   // ✅ getter
-        if (performedAt != null && performedAt.length() >= 10) {
-            when = DateHelper.toDisplay(performedAt.substring(0, 10));
+        if (audit == null || audit.length == 0) {
+            tvAuditLabel.setVisibility(View.GONE);
+            auditContainer.setVisibility(View.GONE);
+            return;
         }
-        String reason = (a.reason != null && !a.reason.isEmpty())
-                ? " — " + a.reason : "";
-        line2.setText(when + reason);
-        line2.setTextSize(10);
-        line2.setTextColor(Color.parseColor("#7F8C8D"));
 
-        row.addView(line1);
-        row.addView(line2);
-        auditContainer.addView(row);
+        tvAuditLabel.setVisibility(View.VISIBLE);
+        auditContainer.setVisibility(View.VISIBLE);
+        auditContainer.removeAllViews();
+
+        for (JournalAuditDto a : audit) {
+            LinearLayout row = new LinearLayout(getContext());
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(12, 8, 12, 8);
+
+            TextView line1 = new TextView(getContext());
+            String user   = a.getUserName();
+            String action = a.getActionLabelAr();
+            line1.setText("• " + action + " — " + user);
+            line1.setTextSize(12);
+            line1.setTextColor(Color.parseColor("#2C3E50"));
+
+            TextView line2 = new TextView(getContext());
+            String when = "";
+            String performedAt = a.getCreatedAt();
+            if (performedAt != null && performedAt.length() >= 10) {
+                when = DateHelper.toDisplay(performedAt.substring(0, 10));
+            }
+            String reason = (a.reason != null && !a.reason.isEmpty())
+                    ? " — " + a.reason : "";
+            line2.setText(when + reason);
+            line2.setTextSize(10);
+            line2.setTextColor(Color.parseColor("#7F8C8D"));
+
+            row.addView(line1);
+            row.addView(line2);
+            auditContainer.addView(row);
+        }
     }
-}
+
+    // ═══════════════════════════════════════════════════════════
+    //  PDF Button
+    // ═══════════════════════════════════════════════════════════
+
+    private void setupPdfButton(JournalEntryDto entry,
+                                JournalLineDto[] linesArr) {
+        if (fabActions == null) return;
+
+        fabActions.setVisibility(View.VISIBLE);
+        fabActions.setText("🖨️ طباعة PDF");
+        fabActions.setOnClickListener(v -> {
+            if (entry == null) return;
+
+            List<JournalLineDto> lineList = (linesArr != null)
+                ? Arrays.asList(linesArr)
+                : new ArrayList<>();
+
+            android.net.Uri uri = JournalPdfExporter.exportAndShare(
+                requireContext(), entry, lineList);
+
+            if (uri != null) {
+                Toast.makeText(requireContext(),
+                    "📄 تم إنشاء PDF بنجاح", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(requireContext(),
+                    "❌ فشل إنشاء PDF", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
 }
