@@ -677,37 +677,41 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
      * التوجيه حسب دور المستخدم
      */
     private void navigateByRole() {
-        try {
-            Fragment targetFragment;
-            String targetTag;
+    try {
+        // ⭐ تفعيل التنقل أولاً (يضمن أن الـ Nav ليس معطلًا)
+        enableNavigationAfterSetup();
 
-            if (permissionManager.isPosOperator()) {
-                targetFragment = new MiraPosFragment();
-                targetTag = NavigationManager.TAG_POS;
+        Fragment targetFragment;
+        String targetTag;
 
-            } else if (permissionManager.isInventoryManager()) {
-                targetFragment = new MiraInventoryProFragment();
-                targetTag = NavigationManager.TAG_INVENTORY;
+        if (permissionManager.isPosOperator()) {
+            targetFragment = new MiraPosFragment();
+            targetTag = NavigationManager.TAG_POS;
 
-            } else if (permissionManager.isSecurity()
-                    || permissionManager.isGateSecurity()) {
-                targetFragment = new MiraSecureGateFragment();
-                targetTag = NavigationManager.TAG_SECURE_GATE;
+        } else if (permissionManager.isInventoryManager()) {
+            targetFragment = new MiraInventoryProFragment();
+            targetTag = NavigationManager.TAG_INVENTORY;
 
-            } else {
-                targetFragment = new MiraDashboardFragment();
-                targetTag = NavigationManager.TAG_DASHBOARD;
-            }
+        } else if (permissionManager.isSecurity()
+                || permissionManager.isGateSecurity()) {
+            targetFragment = new MiraSecureGateFragment();
+            targetTag = NavigationManager.TAG_SECURE_GATE;
 
-            loadFragmentDirectly(targetFragment, targetTag);
-            Log.d(TAG, "✅ Navigated by role to: " + targetTag);
-
-        } catch (Exception e) {
-            Log.e(TAG, "navigateByRole error: " + e.getMessage());
-            loadFragmentDirectly(new MiraDashboardFragment(),
-                    NavigationManager.TAG_DASHBOARD);
+        } else {
+            targetFragment = new MiraDashboardFragment();
+            targetTag = NavigationManager.TAG_DASHBOARD;
         }
+
+        loadFragmentDirectly(targetFragment, targetTag);
+        Log.d(TAG, "✅ Navigated by role to: " + targetTag);
+
+    } catch (Exception e) {
+        Log.e(TAG, "navigateByRole error: " + e.getMessage());
+        enableNavigationAfterSetup();   // ⭐ في حالة الفشل أيضًا
+        loadFragmentDirectly(new MiraDashboardFragment(),
+                NavigationManager.TAG_DASHBOARD);
     }
+}
 
     /**
      * شاشة الحظر
@@ -3288,4 +3292,4 @@ private void performConnectionTest() {
             return 0;
         }
     }
-}
+        }
