@@ -146,33 +146,42 @@ public class AccountingViewModel extends AndroidViewModel {
     // ═══════════════════════════════════════════════════════
     
     public LiveData<AccountDto[]> getAccounts() {
-        return accounts;
+    return accounts;
     }
-    
     public LiveData<AccountDto[]> getAccountsTree() {
-        return accountsTree;
+    return accountsTree;
     }
-    
+    // ✅ Overload للتوافق
     public void loadAccounts(String type, String search) {
-        loading.setValue(true);
-        api.accounting().getAccounts(type, search)
-            .enqueue(new Callback<ApiResponseDto<AccountDto[]>>() {
-                @Override
-                public void onResponse(Call<ApiResponseDto<AccountDto[]>> call,
-                                      Response<ApiResponseDto<AccountDto[]>> response) {
-                    loading.setValue(false);
-                    if (response.isSuccessful() && response.body() != null && response.body().success) {
-                        accounts.setValue(response.body().data);
-                    }
-                }
-                
-                @Override
-                public void onFailure(Call<ApiResponseDto<AccountDto[]>> call, Throwable t) {
-                    loading.setValue(false);
-                    error.setValue(t.getMessage());
-                }
-            });
+    loadAccounts(type, search, null);
     }
+    // ✅ النسخة الكاملة
+    public void loadAccounts(String type, String search, Boolean leafOnly) {
+    loading.setValue(true);
+    error.setValue(null);
+
+    api.accounting().getAccounts(type, search, leafOnly)
+        .enqueue(new Callback<ApiResponseDto<AccountDto[]>>() {
+            @Override
+            public void onResponse(Call<ApiResponseDto<AccountDto[]>> call,
+                                  Response<ApiResponseDto<AccountDto[]>> response) {
+                loading.setValue(false);
+                if (response.isSuccessful()
+                        && response.body() != null
+                        && response.body().success) {
+                    accounts.setValue(response.body().data);
+                } else {
+                    error.setValue("فشل تحميل الحسابات: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponseDto<AccountDto[]>> call, Throwable t) {
+                loading.setValue(false);
+                error.setValue("خطأ في الشبكة: " + t.getMessage());
+            }
+        });
+}
     
     public void loadAccountsTree() {
         loading.setValue(true);
@@ -360,4 +369,4 @@ public void loadGeneralLedger(long accountId, String from, String to, int branch
     public String getFromDate() { return currentFromDate; }
     public String getToDate() { return currentToDate; }
     public int getBranchId() { return currentBranchId; }
-    }
+}
