@@ -107,6 +107,9 @@ public class JournalEntryDto implements Serializable {
     @SerializedName("updated_at")
     public String updatedAt;
 
+    @SerializedName("lines")
+    public JournalLineDto[] lines;   // ✅ يُملأ عند استدعاء /journal/{id}
+    
     // ==================== Helpers ====================
 
     public boolean isBalanced() {
