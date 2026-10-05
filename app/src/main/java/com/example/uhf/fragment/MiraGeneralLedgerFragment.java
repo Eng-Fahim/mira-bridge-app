@@ -45,18 +45,17 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * ✅ شاشة دفتر الأستاذ العام — النسخة الاحترافية الكاملة
+ * ✅ شاشة دفتر الأستاذ العام — النسخة النهائية
  *
  * الميزات:
- * - عرض الحركات الفعلية من API
- * - KPIs: افتتاحي / مدين / دائن / ختامي
- * - Pagination ذكي (Lazy Loading)
+ * - عرض كل الحسابات (أبوية + ورقية) في الـ dropdown
+ * - التحميل التلقائي عند وصول account_id
+ * - Pagination ذكي
  * - Pull-to-Refresh
  * - حفظ واستعادة الفلاتر
  * - Debounce على البحث
  * - تصدير CSV
  * - النقر على صف → تفاصيل القيد
- * - التحميل التلقائي عند وصول account_id
  */
 public class MiraGeneralLedgerFragment extends Fragment {
 
@@ -90,9 +89,9 @@ public class MiraGeneralLedgerFragment extends Fragment {
     // ═══════════════════════════════════════════════════════════
     //  State
     // ═══════════════════════════════════════════════════════════
-    private String  fromDate          = DateHelper.startOfYearApi();
-    private String  toDate            = DateHelper.todayApi();
-    private long    selectedAccountId = 0;
+    private String  fromDate            = DateHelper.startOfYearApi();
+    private String  toDate              = DateHelper.todayApi();
+    private long    selectedAccountId   = 0;
     private String  selectedAccountCode = "";
     private String  selectedAccountName = "";
 
@@ -142,8 +141,8 @@ public class MiraGeneralLedgerFragment extends Fragment {
         restoreFilters();
         updateDateButtons();
 
-        // 4. تحميل الحسابات — leaf_only=1
-        viewModel.loadAccounts(null, null, true);
+        // ✅ 4. تحميل كل الحسابات (أبوية + ورقية)
+        viewModel.loadAccounts(null, null, null);
 
         return v;
     }
@@ -151,7 +150,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        // ✅ تنظيف Debounce
         if (debounceHandler != null && pendingSearch != null) {
             debounceHandler.removeCallbacks(pendingSearch);
             pendingSearch = null;
@@ -185,50 +183,49 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
         // ─── الحسابات ───
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
-    if (accounts == null) return;
+            if (accounts == null) return;
 
-    accountsList.clear();
-    for (AccountDto a : accounts) {
-        if (a.isLeaf()) accountsList.add(a);
-    }
-    setupAccountSpinner();
-
-    // ✅ التحميل التلقائي — حتى لو الحساب غير موجود في القائمة
-    if (selectedAccountId > 0) {
-        AccountDto matched = null;
-        for (AccountDto a : accountsList) {
-            if (a.id == selectedAccountId) {
-                matched = a;
-                break;
+            // ✅ عرض كل الحسابات (بدون فلترة)
+            accountsList.clear();
+            for (AccountDto a : accounts) {
+                accountsList.add(a);
             }
-        }
+            setupAccountSpinner();
 
-        if (matched != null) {
-            // ✅ وُجد في القائمة — املأ الاسم + حدّد
-            selectedAccountCode = matched.accountCode;
-            selectedAccountName = matched.accountNameAr;
-            spAccount.setText(
-                matched.accountCode + " - " + matched.accountNameAr, false);
-        } else {
-            // ✅ لم يُوجد (حساب أبوي) — حمّل مباشرة بالـ ID
-            selectedAccountCode = "";
-            selectedAccountName = "حساب #" + selectedAccountId;
-            spAccount.setText("حساب #" + selectedAccountId, false);
-        }
+            // ✅✅✅ التحميل التلقائي عند وصول account_id
+            if (selectedAccountId > 0 && !accountsList.isEmpty()) {
+                AccountDto matched = null;
+                for (AccountDto a : accountsList) {
+                    if (a.id == selectedAccountId) {
+                        matched = a;
+                        break;
+                    }
+                }
 
-        // ✅ حمّل دفتر الأستاذ بأي حال
-        spAccount.post(this::loadLedger);
-    }
-});
+                if (matched != null) {
+                    // ✅ وُجد في القائمة — املأ الاسم + حدّد
+                    selectedAccountCode = matched.accountCode;
+                    selectedAccountName = matched.accountNameAr;
+                    spAccount.setText(
+                        matched.accountCode + " - " + matched.accountNameAr, false);
+                } else {
+                    // ✅ لم يُوجد — حمّل بـ ID مباشرة
+                    selectedAccountCode = "";
+                    selectedAccountName = "حساب #" + selectedAccountId;
+                    spAccount.setText("حساب #" + selectedAccountId, false);
+                }
+
+                // ✅ حمّل دفتر الأستاذ بأي حال
+                spAccount.post(this::loadLedger);
+            }
+        });
 
         // ─── دفتر الأستاذ ───
         viewModel.getGeneralLedger().observe(getViewLifecycleOwner(), ledger -> {
             pbLoading.setVisibility(View.GONE);
 
-            // ✅ أوقف SwipeRefresh
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
 
-            // ✅ أعد تعيين حالة التحميل
             isLoadingMore = false;
 
             if (ledger == null) {
@@ -242,7 +239,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 renderKPIs(opening, 0, 0, ledger.closingBalance);
 
                 if (currentPage > 1) {
-                    hasMorePages = false;   // لا مزيد
+                    hasMorePages = false;
                 } else {
                     showEmpty("لا توجد حركات لهذا الحساب في الفترة المحددة");
                 }
@@ -337,7 +334,9 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 TextView tv = view.findViewById(android.R.id.text1);
                 AccountDto a = getItem(position);
                 if (a != null && tv != null) {
-                    tv.setText(a.accountCode + " - " + a.accountNameAr);
+                    // ✅ تمييز الحساب الأبوي
+                    String prefix = a.isLeaf() ? "" : "📁 ";
+                    tv.setText(prefix + a.accountCode + " - " + a.accountNameAr);
                 }
                 return view;
             }
@@ -349,13 +348,14 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 TextView tv = view.findViewById(android.R.id.text1);
                 AccountDto a = getItem(position);
                 if (a != null && tv != null) {
-                    tv.setText(a.accountCode + " - " + a.accountNameAr);
+                    // ✅ تمييز الحساب الأبوي في القائمة المنسدلة
+                    String prefix = a.isLeaf() ? "" : "📁 ";
+                    tv.setText(prefix + a.accountCode + " - " + a.accountNameAr);
                 }
                 return view;
             }
         };
 
-        // ✅ ربط Adapter
         spAccount.setAdapter(arrayAdapter);
 
         // ✅ Debounce للبحث
@@ -373,9 +373,10 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 pendingSearch = () -> {
                     String query = s.toString().trim();
                     if (query.length() >= 2) {
-                        viewModel.loadAccounts(null, query, true);
+                        // ✅ ابحث في كل الحسابات
+                        viewModel.loadAccounts(null, query, null);
                     } else if (query.isEmpty()) {
-                        viewModel.loadAccounts(null, null, true);
+                        viewModel.loadAccounts(null, null, null);
                     }
                 };
                 debounceHandler.postDelayed(pendingSearch, DEBOUNCE_MS);
@@ -424,7 +425,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
         rvLedger.setLayoutManager(lm);
         rvLedger.setAdapter(adapter);
 
-        // ✅✅✅ ScrollListener للتحميل التدريجي
+        // ✅ ScrollListener للتحميل التدريجي
         rvLedger.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView,
@@ -435,11 +436,10 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 if (isLoadingMore || !hasMorePages) return;
                 if (selectedAccountId <= 0) return;
 
-                int visibleCount  = lm.getChildCount();
-                int totalCount    = lm.getItemCount();
-                int firstVisible  = lm.findFirstVisibleItemPosition();
+                int visibleCount = lm.getChildCount();
+                int totalCount   = lm.getItemCount();
+                int firstVisible = lm.findFirstVisibleItemPosition();
 
-                // ✅ عند الوصول لآخر 5 عناصر
                 if (firstVisible + visibleCount >= totalCount - 5) {
                     loadNextPage();
                 }
@@ -475,7 +475,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
             loadLedger();
         });
 
-        // ✅✅✅ زر التصدير — يستخدم القيم الحقيقية
+        // ✅ زر التصدير
         btnExport.setOnClickListener(v -> {
             if (selectedAccountId <= 0) {
                 Toast.makeText(requireContext(),
@@ -497,8 +497,8 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 selectedAccountName,
                 fromDate,
                 toDate,
-                currentOpening,      // ✅ حقيقي
-                currentClosing       // ✅ حقيقي
+                currentOpening,
+                currentClosing
             );
 
             if (uri != null) {
@@ -510,7 +510,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
             }
         });
 
-        // ✅✅✅ Swipe-to-Refresh
+        // ✅ Swipe-to-Refresh
         if (swipeRefresh != null) {
             swipeRefresh.setColorSchemeResources(
                 R.color.mira_gold,
@@ -566,9 +566,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
         btnTo.setText("إلى: " + DateHelper.toDisplay(toDate));
     }
 
-    /**
-     * ✅ تحميل دفتر الأستاذ — يبدأ صفحة جديدة
-     */
     private void loadLedger() {
         if (selectedAccountId <= 0) {
             Toast.makeText(requireContext(),
@@ -576,12 +573,10 @@ public class MiraGeneralLedgerFragment extends Fragment {
             return;
         }
 
-        // ✅ إعادة تعيين Pagination
         currentPage   = 1;
         hasMorePages  = true;
         isLoadingMore = false;
 
-        // ✅ مسح القائمة القديمة
         adapter.setItems(new ArrayList<>());
 
         pbLoading.setVisibility(View.VISIBLE);
@@ -602,7 +597,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
     private void renderKPIs(double opening, double debit,
                             double credit, double closing) {
-        // ✅ احفظ للتصدير
         currentOpening     = opening;
         currentClosing     = closing;
         currentTotalDebit  = debit;
@@ -669,14 +663,12 @@ public class MiraGeneralLedgerFragment extends Fragment {
         SharedPreferences prefs = ctx.getSharedPreferences(
             PREFS_FILTERS, Context.MODE_PRIVATE);
 
-        // التاريخ
         String savedFrom = prefs.getString(KEY_FROM_DATE, null);
         String savedTo   = prefs.getString(KEY_TO_DATE, null);
 
         if (savedFrom != null && !savedFrom.isEmpty()) fromDate = savedFrom;
         if (savedTo != null && !savedTo.isEmpty())     toDate   = savedTo;
 
-        // آخر حساب (فقط إن لم يُمرَّر عبر Arguments)
         if (selectedAccountId <= 0) {
             long lastAccount = prefs.getLong(KEY_LAST_ACCOUNT, 0);
             if (lastAccount > 0) selectedAccountId = lastAccount;
