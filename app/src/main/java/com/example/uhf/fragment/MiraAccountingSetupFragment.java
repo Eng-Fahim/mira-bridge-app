@@ -75,22 +75,26 @@ public class MiraAccountingSetupFragment extends Fragment {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        Log.d(TAG, "onResume: reloading setup status");
-        loadStatus();
+public void onStart() {
+    super.onStart();
+    // 🔒 أخفِ الـ BottomNav في كل مرة تظهر الشاشة
+    // (يشمل: فتح الإعداد لأول مرة، والعودة من خطوة فرعية)
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
     }
+}
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        mainHandler.removeCallbacksAndMessages(null);
-
-        // ⭐ أعِد إظهار BottomNav عند تدمير الواجهة
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
-        }
-    }
+@Override
+public void onResume() {
+    super.onResume();
+    Log.d(TAG, "onResume: reloading setup status");
+    loadStatus();
+}
+@Override
+public void onStop() {
+    super.onStop();
+    mainHandler.removeCallbacksAndMessages(null);
+}
 
     private void initViews(View v) {
         tvProgressPercent = v.findViewById(R.id.tvProgressPercent);
