@@ -284,39 +284,45 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     }
 
     private void renderAudit(JournalAuditDto[] audit) {
-        if (audit == null || audit.length == 0) {
-            tvAuditLabel.setVisibility(View.GONE);
-            auditContainer.setVisibility(View.GONE);
-            return;
-        }
-
-        tvAuditLabel.setVisibility(View.VISIBLE);
-        auditContainer.setVisibility(View.VISIBLE);
-        auditContainer.removeAllViews();
-
-        for (JournalAuditDto a : audit) {
-            LinearLayout row = new LinearLayout(getContext());
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(12, 8, 12, 8);
-
-            TextView line1 = new TextView(getContext());
-            String user = a.userName != null ? a.userName : "مستخدم";
-            String action = a.getActionLabelAr();
-            line1.setText("• " + action + " — " + user);
-            line1.setTextSize(12);
-            line1.setTextColor(Color.parseColor("#2C3E50"));
-
-            TextView line2 = new TextView(getContext());
-            String when = a.createdAt != null
-                ? DateHelper.toDisplay(a.createdAt.substring(0, 10)) : "";
-            String reason = a.reason != null ? " — " + a.reason : "";
-            line2.setText(when + reason);
-            line2.setTextSize(10);
-            line2.setTextColor(Color.parseColor("#7F8C8D"));
-
-            row.addView(line1);
-            row.addView(line2);
-            auditContainer.addView(row);
-        }
+    if (audit == null || audit.length == 0) {
+        tvAuditLabel.setVisibility(View.GONE);
+        auditContainer.setVisibility(View.GONE);
+        return;
     }
+
+    tvAuditLabel.setVisibility(View.VISIBLE);
+    auditContainer.setVisibility(View.VISIBLE);
+    auditContainer.removeAllViews();
+
+    for (JournalAuditDto a : audit) {
+        LinearLayout row = new LinearLayout(getContext());
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(12, 8, 12, 8);
+
+        // ─── السطر الأول: الإجراء + المستخدم ───
+        TextView line1 = new TextView(getContext());
+        String user   = a.getUserName();          // ✅ getter
+        String action = a.getActionLabelAr();
+        line1.setText("• " + action + " — " + user);
+        line1.setTextSize(12);
+        line1.setTextColor(Color.parseColor("#2C3E50"));
+
+        // ─── السطر الثاني: التاريخ + السبب ───
+        TextView line2 = new TextView(getContext());
+        String when = "";
+        String performedAt = a.getCreatedAt();   // ✅ getter
+        if (performedAt != null && performedAt.length() >= 10) {
+            when = DateHelper.toDisplay(performedAt.substring(0, 10));
+        }
+        String reason = (a.reason != null && !a.reason.isEmpty())
+                ? " — " + a.reason : "";
+        line2.setText(when + reason);
+        line2.setTextSize(10);
+        line2.setTextColor(Color.parseColor("#7F8C8D"));
+
+        row.addView(line1);
+        row.addView(line2);
+        auditContainer.addView(row);
+    }
+}
 }
