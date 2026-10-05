@@ -92,43 +92,50 @@ public class POSManager {
         }
     }
 
-    private JSONObject createPayload(List<CartItem> cartList, POSCheckoutDialog.POSCheckoutData data, 
-                                     int branchId) throws Exception {
-        JSONObject payload = new JSONObject();
-        payload.put("action", "COMPLETE_POS_SALE");
-        payload.put("branch_id", branchId);
-        payload.put("customer_name", data.customerName);
-        payload.put("customer_phone", data.customerPhone);
-        
-        JSONObject customer = new JSONObject();
-        customer.put("name", data.customerName);
-        customer.put("phone", data.customerPhone);
-        customer.put("payment_method", data.paymentMethod);
-        payload.put("customer", customer);
-        
-        JSONArray itemsArr = new JSONArray();
-        for (CartItem item : cartList) {
-            JSONObject obj = new JSONObject();
-            obj.put("epc", item.epc);
-            obj.put("title", item.name);
-            obj.put("karat", item.karat);
-            obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-            obj.put("price_usd", item.price);
-            obj.put("item_id", item.itemId);
-            obj.put("serial_no", item.serialNo);
-            itemsArr.put(obj);
-        }
-        payload.put("items", itemsArr);
-        
-        JSONObject payment = new JSONObject();
-        payment.put("subtotal_usd", data.originalTotal);
-        payment.put("discount_amount_usd", data.discountAmount);
-        payment.put("final_amount_usd", data.finalAmount);
-        payment.put("payment_method", data.paymentMethod);
-        payload.put("payment", payment);
-        
-        return payload;
+    private JSONObject createPayload(List<CartItem> cartList,
+                                 POSCheckoutDialog.POSCheckoutData data,
+                                 int branchId) throws Exception {
+    JSONObject payload = new JSONObject();
+    payload.put("action", "COMPLETE_POS_SALE");
+    payload.put("branch_id", branchId);
+
+    // ✅ على الجذر (للتوافق)
+    payload.put("customer_name", data.customerName);
+    payload.put("customer_phone", data.customerPhone);
+
+    // ✅ داخل customer object (للفهم الموحد)
+    JSONObject customer = new JSONObject();
+    customer.put("name", data.customerName);
+    customer.put("phone", data.customerPhone);
+    customer.put("email", data.customerEmail != null ? data.customerEmail : "");
+    customer.put("address", data.customerAddress != null ? data.customerAddress : "");
+    customer.put("notes", data.customerNotes != null ? data.customerNotes : "");
+    customer.put("payment_method", data.paymentMethod);
+    payload.put("customer", customer);
+
+    JSONArray itemsArr = new JSONArray();
+    for (CartItem item : cartList) {
+        JSONObject obj = new JSONObject();
+        obj.put("epc", item.epc);
+        obj.put("title", item.name);
+        obj.put("karat", item.karat);
+        obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+        obj.put("price_usd", item.price);
+        obj.put("item_id", item.itemId);
+        obj.put("serial_no", item.serialNo);
+        itemsArr.put(obj);
     }
+    payload.put("items", itemsArr);
+
+    JSONObject payment = new JSONObject();
+    payment.put("subtotal_usd", data.originalTotal);
+    payment.put("discount_amount_usd", data.discountAmount);
+    payment.put("final_amount_usd", data.finalAmount);
+    payment.put("payment_method", data.paymentMethod);
+    payload.put("payment", payment);
+
+    return payload;
+}
 
     private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckoutData data, 
                                    int itemCount, int branchId) {
