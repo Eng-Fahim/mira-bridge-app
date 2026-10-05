@@ -803,7 +803,7 @@
     <color name="pos_summary_bg_active">#E8C766</color>
     <color name="pos_summary_text_idle">#6B6B6B</color>
     <color name="pos_summary_text_active">#1A1A1A</color>
-
+    <color name="pos_summary_bg">#F5E6B8</color>          <!-- ذهبي فاتح جداً -->
     <!-- ═══════════════════════════════════════════════════════
          Quick Actions — Primary CTA
          ═══════════════════════════════════════════════════════ -->
