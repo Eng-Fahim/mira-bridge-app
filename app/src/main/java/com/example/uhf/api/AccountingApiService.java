@@ -8,15 +8,20 @@ import retrofit2.Call;
 import retrofit2.http.*;
 
 /**
- * خدمة API المحاسبة
+ * ✅ خدمة API المحاسبة
  * Base URL: https://sa.mirabarcode.com/wp-json/mira/v2/
+ *
+ * @version 2.1.0 (FINAL)
  */
 public interface AccountingApiService {
-    
+
     // ═══════════════════════════════════════════════════════
-    //  القيود
+    //  القيود (Journal Entries)
     // ═══════════════════════════════════════════════════════
-    
+
+    /**
+     * ✅ قائمة القيود مع دعم الصفحات
+     */
     @GET("journal")
     Call<ApiResponseDto<JournalEntryDto[]>> getJournalEntries(
         @Query("branch_id") Integer branchId,
@@ -26,40 +31,66 @@ public interface AccountingApiService {
         @Query("per_page") Integer perPage,
         @Query("page") Integer page
     );
-    @GET("journal/{id}")
-    Call<JournalEntryDetailsDto> getJournalEntryDetails(@Path("id") long id);
 
+    /**
+     * ✅ تفاصيل قيد واحد (entry + lines + audit)
+     * هذا هو الـ endpoint المستخدم فعلياً
+     */
+    @GET("journal/{id}")
+    Call<JournalEntryDetailsDto> getJournalEntryDetails(
+        @Path("id") long id
+    );
+
+    /**
+     * ✅ إنشاء قيد جديد
+     */
     @POST("journal")
     Call<ApiResponseDto<JournalEntryDto>> createJournalEntry(
         @Body JournalEntryDto entry
     );
-    
+
+    /**
+     * ✅ ترحيل قيد
+     */
     @POST("journal/{id}/post")
     Call<ApiResponseDto<Object>> postJournalEntry(@Path("id") long id);
-    
+
+    /**
+     * ✅ عكس قيد
+     */
     @POST("journal/{id}/reverse")
     Call<ApiResponseDto<Object>> reverseJournalEntry(
         @Path("id") long id,
         @Body Map<String, String> body
     );
-    
+
     // ═══════════════════════════════════════════════════════
-    //  دليل الحسابات
+    //  دليل الحسابات (Chart of Accounts)
     // ═══════════════════════════════════════════════════════
+
+    /**
+     * ✅ قائمة الحسابات — مع دعم leaf_only
+     */
     @GET("accounts")
     Call<ApiResponseDto<AccountDto[]>> getAccounts(
-    @Query("type") String type,
-    @Query("search") String search,
-    @Query("leaf_only") Boolean leafOnly
+        @Query("type") String type,
+        @Query("search") String search,
+        @Query("leaf_only") Boolean leafOnly
     );
 
+    /**
+     * ✅ شجرة الحسابات
+     */
     @GET("accounts/tree")
     Call<ApiResponseDto<AccountDto[]>> getAccountsTree();
-    
+
     // ═══════════════════════════════════════════════════════
-    //  التقارير
+    //  التقارير (Reports)
     // ═══════════════════════════════════════════════════════
-    
+
+    /**
+     * ✅ ميزان المراجعة
+     */
     @GET("reports/trial-balance")
     Call<ApiResponseDto<TrialBalanceDto>> getTrialBalance(
         @Query("from_date") String fromDate,
@@ -67,19 +98,28 @@ public interface AccountingApiService {
         @Query("branch_id") Integer branchId,
         @Query("include_zero") Boolean includeZero
     );
-    
+
+    /**
+     * ✅ الميزانية العمومية
+     */
     @GET("reports/balance-sheet")
     Call<ApiResponseDto<BalanceSheetDto>> getBalanceSheet(
         @Query("as_of") String asOf
     );
-    
+
+    /**
+     * ✅ قائمة الدخل
+     */
     @GET("reports/income-statement")
     Call<ApiResponseDto<IncomeStatementDto>> getIncomeStatement(
         @Query("from_date") String fromDate,
         @Query("to_date") String toDate,
         @Query("branch_id") Integer branchId
     );
-    
+
+    /**
+     * ✅ حركة الذهب
+     */
     @GET("reports/gold-movement")
     Call<ApiResponseDto<GoldMovementDto>> getGoldMovement(
         @Query("from_date") String fromDate,
@@ -87,25 +127,26 @@ public interface AccountingApiService {
         @Query("branch_id") Integer branchId
     );
 
-    @GET("journal/{id}")
-Call<ApiResponseDto<JournalEntryDto>> getJournalEntry(
-    @Path("id") long id
-);
-    // ═══════════════════════════════════════════════════════
-    //  العملات
-    // ═══════════════════════════════════════════════════════
-    
-    @GET("currencies")
-    Call<ApiResponseDto<Object[]>> getCurrencies();
-    
-    @GET("currencies/rates")
-    Call<ApiResponseDto<Object[]>> getExchangeRates();
-
+    /**
+     * ✅✅✅ دفتر الأستاذ العام — مع دعم Pagination
+     */
     @GET("reports/general-ledger/{account_id}")
     Call<ApiResponseDto<GeneralLedgerDto>> getGeneralLedger(
-    @Path("account_id") long accountId,
-    @Query("from_date") String fromDate,
-    @Query("to_date") String toDate,
-    @Query("branch_id") Integer branchId
-);
+        @Path("account_id") long accountId,
+        @Query("from_date") String fromDate,
+        @Query("to_date") String toDate,
+        @Query("branch_id") Integer branchId,
+        @Query("page") Integer page,          // ✅ مضاف
+        @Query("per_page") Integer perPage    // ✅ مضاف
+    );
+
+    // ═══════════════════════════════════════════════════════
+    //  العملات (Currencies)
+    // ═══════════════════════════════════════════════════════
+
+    @GET("currencies")
+    Call<ApiResponseDto<Object[]>> getCurrencies();
+
+    @GET("currencies/rates")
+    Call<ApiResponseDto<Object[]>> getExchangeRates();
 }
