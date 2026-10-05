@@ -91,6 +91,19 @@ public class JournalLineDto implements Serializable {
         return goldDebitGrams - goldCreditGrams;
     }
 
+    /**
+ * ✅ صافي الذهب (مدين - دائن) بالجرامات
+ */
+public double getNetGold() {
+    return goldDebitGrams - goldCreditGrams;
+}
+
+/**
+ * ✅ صافي الوزن الأصلي
+ */
+public double getNetOriginalWeight() {
+    return originalWeightGrams;
+}
     public String getDisplayAccount() {
         StringBuilder sb = new StringBuilder();
         if (accountCode != null) sb.append(accountCode);
