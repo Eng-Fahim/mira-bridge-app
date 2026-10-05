@@ -2,6 +2,7 @@ package com.example.uhf.api.dto;
 
 import com.google.gson.annotations.SerializedName;
 import java.io.Serializable;
+import java.util.List;   // ✅ مضاف
 
 /**
  * نموذج القيد المحاسبي — يطابق جدول wp_mira_jewelry_journal_entries
@@ -107,17 +108,19 @@ public class JournalEntryDto implements Serializable {
     @SerializedName("updated_at")
     public String updatedAt;
 
-
-
+    // ═══ سطور القيد (تُملأ عند استدعاء /journal/{id}) ═══
     @SerializedName("lines")
-public List<JournalLineDto> lines;   // ← List
+    public List<JournalLineDto> lines;
+
     // ==================== Helpers ====================
-/**
- * ✅ صافي الذهب (مدين - دائن) بالجرامات
- */
-public double getNetGold() {
-    return totalGoldDebitGrams - totalGoldCreditGrams;
-}
+
+    /**
+     * ✅ صافي الذهب (مدين - دائن) بالجرامات
+     */
+    public double getNetGold() {
+        return totalGoldDebitGrams - totalGoldCreditGrams;
+    }
+
     public boolean isBalanced() {
         return Math.abs(totalDebit - totalCredit) < 0.01;
     }
