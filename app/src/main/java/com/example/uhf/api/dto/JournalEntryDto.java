@@ -107,11 +107,17 @@ public class JournalEntryDto implements Serializable {
     @SerializedName("updated_at")
     public String updatedAt;
 
+
     @SerializedName("lines")
     public JournalLineDto[] lines;   // ✅ يُملأ عند استدعاء /journal/{id}
     
     // ==================== Helpers ====================
-
+/**
+ * ✅ صافي الذهب (مدين - دائن) بالجرامات
+ */
+public double getNetGold() {
+    return totalGoldDebitGrams - totalGoldCreditGrams;
+}
     public boolean isBalanced() {
         return Math.abs(totalDebit - totalCredit) < 0.01;
     }
