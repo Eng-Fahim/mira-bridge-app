@@ -141,6 +141,20 @@
                 android:layout_marginTop="8dp"
                 android:visibility="gone"/>
 
+            <com.google.android.material.button.MaterialButton
+    android:id="@+id/btnGoToSystem"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:layout_marginTop="12dp"
+    android:text="🚀 الانتقال إلى النظام"
+    android:textSize="16sp"
+    android:textStyle="bold"
+    android:textColor="#FFFFFF"
+    android:visibility="gone"
+    app:backgroundTint="#27AE60"
+    app:cornerRadius="14dp"
+    app:icon="@android:drawable/ic_menu_send"
+    app:iconGravity="textStart" />
             <View
                 android:layout_width="match_parent"
                 android:layout_height="60dp"/>
