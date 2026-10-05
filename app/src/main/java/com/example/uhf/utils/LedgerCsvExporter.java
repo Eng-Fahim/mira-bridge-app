@@ -69,112 +69,126 @@ public class LedgerCsvExporter {
         }
     }
 
-    private static File generateCsvFile(Context context,
-                                        List<LedgerRowAdapter.LedgerRow> rows,
-                                        String accountCode,
-                                        String accountName,
-                                        String fromDate,
-                                        String toDate,
-                                        double openingBalance,
-                                        double closingBalance) {
-        try {
-            File dir = new File(context.getExternalFilesDir(null), "exports");
-            if (!dir.exists() && !dir.mkdirs()) {
-                Log.e(TAG, "Cannot create exports dir");
-                return null;
-            }
+   private static File generateCsvFile(Context context,
+                                    List<LedgerRowAdapter.LedgerRow> rows,
+                                    String accountCode,
+                                    String accountName,
+                                    String fromDate,
+                                    String toDate,
+                                    double openingBalance,
+                                    double closingBalance) {
+    try {
+        File dir = new File(context.getExternalFilesDir(null), "exports");
+        if (!dir.exists() && !dir.mkdirs()) return null;
 
-            String ts = new SimpleDateFormat("yyyyMMdd_HHmmss",
-                Locale.US).format(new Date());
+        String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+            .format(new Date());
+        String safeCode = (accountCode != null)
+            ? accountCode.replaceAll("[^0-9A-Za-z_-]", "_")
+            : "account";
 
-            String safeCode = (accountCode != null)
-                ? accountCode.replaceAll("[^0-9A-Za-z_-]", "_")
-                : "account";
+        File file = new File(dir, "ledger_" + safeCode + "_" + ts + ".csv");
 
-            File file = new File(dir,
-                "ledger_" + safeCode + "_" + ts + ".csv");
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            // ✅ UTF-8 BOM لـ Excel العربي
+            fos.write(0xEF);
+            fos.write(0xBB);
+            fos.write(0xBF);
 
-            try (FileOutputStream fos = new FileOutputStream(file)) {
-                // ✅ UTF-8 BOM لـ Excel العربي
-                fos.write(0xEF);
-                fos.write(0xBB);
-                fos.write(0xBF);
+            try (OutputStreamWriter w = new OutputStreamWriter(
+                    fos, StandardCharsets.UTF_8)) {
 
-                try (OutputStreamWriter w = new OutputStreamWriter(
-                        fos, StandardCharsets.UTF_8)) {
+                // ✅ تلميح Excel: استخدم الفاصلة كفاصل
+                w.write("sep=,\n");
 
-                    // ─── الترويسة ───
-                    w.write("MIRA Trust Platform — دفتر الأستاذ العام\n");
-                    w.write("الحساب," + esc(accountCode) + " - " + esc(accountName) + "\n");
-                    w.write("من," + fromDate + "\n");
-                    w.write("إلى," + toDate + "\n");
-                    w.write("الرصيد الافتتاحي," + num(openingBalance) + "\n");
-                    w.write("الرصيد الختامي," + num(closingBalance) + "\n");
-                    w.write("\n");
+                // ─── ترويسة ───
+                w.write(esc("MIRA Trust Platform — دفتر الأستاذ العام") + "\n\n");
 
-                    // ─── الأعمدة ───
-                    w.write("التاريخ,رقم القيد,البيان,المرجع,مدين,دائن,الرصيد,الذهب (g)\n");
+                w.write(esc("الحساب") + "," + esc(accountCode + " - " + accountName) + "\n");
+                w.write(esc("من") + "," + forceText(fromDate) + "\n");
+                w.write(esc("إلى") + "," + forceText(toDate) + "\n");
+                w.write(esc("الرصيد الافتتاحي") + "," + num(openingBalance) + "\n");
+                w.write(esc("الرصيد الختامي")   + "," + num(closingBalance) + "\n");
+                w.write("\n");
 
-                    // ─── السطور ───
-                    double totalDebit = 0, totalCredit = 0;
-                    for (LedgerRowAdapter.LedgerRow r : rows) {
-                        w.write(
-                            esc(r.date) + "," +
-                            esc(r.entryNumber) + "," +
-                            esc(r.description) + "," +
-                            esc(r.reference) + "," +
-                            num(r.baseDebit) + "," +
-                            num(r.baseCredit) + "," +
-                            num(r.runningBalance) + "," +
-                            numGold(r.runningGold) +
-                            "\n"
-                        );
-                        totalDebit  += r.baseDebit;
-                        totalCredit += r.baseCredit;
-                    }
+                // ─── الأعمدة ───
+                w.write(
+                    esc("التاريخ") + "," +
+                    esc("رقم القيد") + "," +
+                    esc("البيان")   + "," +
+                    esc("المرجع")   + "," +
+                    esc("مدين")     + "," +
+                    esc("دائن")     + "," +
+                    esc("الرصيد")   + "," +
+                    esc("الذهب (g)") + "\n"
+                );
 
-                    // ─── الإجماليات ───
-                    w.write("\n");
-                    w.write("الإجمالي,,,," + num(totalDebit) + "," +
-                            num(totalCredit) + ",,\n");
-
-                    w.write("\n");
-                    w.write("تم الإنشاء بواسطة MIRA Trust Platform," +
-                            new SimpleDateFormat("yyyy-MM-dd HH:mm",
-                                Locale.US).format(new Date()) + "\n");
-
-                    w.flush();
+                // ─── السطور ───
+                double totalDebit = 0, totalCredit = 0;
+                for (LedgerRowAdapter.LedgerRow r : rows) {
+                    w.write(
+                        forceText(r.date) + "," +                    // ✅ تاريخ كنص
+                        esc(r.entryNumber) + "," +
+                        esc(r.description) + "," +
+                        esc(r.reference) + "," +
+                        num(r.baseDebit) + "," +
+                        num(r.baseCredit) + "," +
+                        num(r.runningBalance) + "," +
+                        numGold(r.runningGold) + "\n"
+                    );
+                    totalDebit  += r.baseDebit;
+                    totalCredit += r.baseCredit;
                 }
+
+                // ─── الإجماليات ───
+                w.write("\n");
+                w.write(esc("الإجمالي") + ",,," +
+                        num(totalDebit) + "," + num(totalCredit) + ",,\n");
+                w.write("\n");
+                w.write(esc("تم الإنشاء بواسطة MIRA Trust Platform") + "," +
+                        esc(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+                            .format(new Date())) + "\n");
+
+                w.flush();
             }
-
-            Log.d(TAG, "✅ CSV saved: " + file.getAbsolutePath());
-            return file;
-
-        } catch (Exception e) {
-            Log.e(TAG, "generateCsvFile error", e);
-            return null;
         }
-    }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════════
+        Log.d(TAG, "✅ CSV saved: " + file.getAbsolutePath());
+        return file;
 
-    /** رقم بفواصل آلاف — Excel يفهمها */
-    private static String num(double v) {
-        return String.format(Locale.US, "%.2f", v);
+    } catch (Exception e) {
+        Log.e(TAG, "generateCsvFile error", e);
+        return null;
     }
+}
 
-    private static String numGold(double v) {
-        return String.format(Locale.US, "%.3f", v);
-    }
+// ═══════════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════════
 
-    /** escape للـ CSV */
-    private static String esc(String s) {
-        if (s == null) return "";
-        String clean = s.replace("\"", "\"\"")
-                         .replace("\n", " ")
-                         .replace("\r", " ");
-        return "\"" + clean + "\"";
-    }
+/** رقم بفواصل آلاف — Excel يفهمها كأرقام */
+private static String num(double v) {
+    return String.format(Locale.US, "%.2f", v);
+}
+
+private static String numGold(double v) {
+    return String.format(Locale.US, "%.3f", v);
+}
+
+/** escape للـ CSV */
+private static String esc(String s) {
+    if (s == null) return "\"\"";
+    String clean = s.replace("\"", "\"\"")
+                     .replace("\n", " ")
+                     .replace("\r", " ");
+    return "\"" + clean + "\"";
+}
+
+/** ✅ فرض النص — يمنع Excel من تحويل التاريخ */
+private static String forceText(String s) {
+    if (s == null) return "\"\"";
+    String clean = s.replace("\"", "\"\"");
+    // مسافة بادئة → Excel يعرضها كنص بدون تحويل
+    return "\" " + clean + "\"";
+}
 }
