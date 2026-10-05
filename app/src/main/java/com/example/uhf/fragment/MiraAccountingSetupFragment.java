@@ -27,44 +27,32 @@ import org.json.JSONObject;
 import java.util.Locale;
 
 /**
- * MIRA Accounting Setup Fragment — النسخة النهائية
+ * MIRA Accounting Setup Fragment
  *
- * الشاشة الرئيسية لإعداد النظام المحاسبي
- * - 6 مراحل
- * - تتبع التقدم
- * - البدء والاستمرار
- * - إشعار النشاط عند الاكتمال (v2.0)
- * - زر الانتقال للنظام بعد الاكتمال
+ * ✅ v3.0:
+ * - onDestroyView يُعيد إظهار BottomNav
+ * - notifySetupCompleted() عند الاكتمال
+ * - زر "الانتقال للنظام" عند الاكتمال
  */
 public class MiraAccountingSetupFragment extends Fragment {
 
     private static final String TAG = "MiraSetup";
 
-    // ═══════════════════════════════════════════════════════════
-    //  Views
-    // ═══════════════════════════════════════════════════════════
     private TextView tvProgressPercent;
     private TextView tvProgressText;
     private ProgressBar pbProgress;
     private LinearLayout stepsContainer;
     private MaterialButton btnStart;
     private MaterialButton btnReset;
-    private MaterialButton btnGoToSystem;   // ⭐ جديد: زر الانتقال للنظام
+    private MaterialButton btnGoToSystem;
     private ProgressBar pbLoading;
     private View contentContainer;
 
-    // ═══════════════════════════════════════════════════════════
-    //  State
-    // ═══════════════════════════════════════════════════════════
     private MiraApiClient apiClient;
     private boolean isArabic;
     private JSONObject currentStatus;
-    private boolean setupCompletedNotified = false;   // ⭐ لتجنب التكرار
+    private boolean setupCompletedNotified = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
-    // ═══════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════════
 
     @Nullable
     @Override
@@ -87,34 +75,22 @@ public class MiraAccountingSetupFragment extends Fragment {
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
-        // ✅ إخفاء BottomNav أثناء شاشة الإعداد
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
-        }
-    }
-
-    @Override
     public void onResume() {
         super.onResume();
-        // ✅ أعد تحميل الحالة عند العودة (مثلاً بعد إتمام خطوة فرعية)
         Log.d(TAG, "onResume: reloading setup status");
         loadStatus();
     }
 
-@Override
-public void onDestroyView() {
-    super.onDestroyView();
-    // ✅ أعِد إظهار BottomNav عند تدمير الواجهة
-    if (getActivity() instanceof UHFMainActivity) {
-        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
-    }
-}
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        mainHandler.removeCallbacksAndMessages(null);
 
-    // ═══════════════════════════════════════════════════════════
-    //  Init
-    // ═══════════════════════════════════════════════════════════
+        // ⭐ أعِد إظهار BottomNav عند تدمير الواجهة
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
+        }
+    }
 
     private void initViews(View v) {
         tvProgressPercent = v.findViewById(R.id.tvProgressPercent);
@@ -125,13 +101,10 @@ public void onDestroyView() {
         btnReset          = v.findViewById(R.id.btnReset);
         pbLoading         = v.findViewById(R.id.pbLoading);
         contentContainer  = v.findViewById(R.id.contentContainer);
+        btnGoToSystem     = v.findViewById(R.id.btnGoToSystem);
 
-        // ⭐ زر الانتقال للنظام — قد لا يكون موجودًا في الـ layout القديم
-        btnGoToSystem = v.findViewById(R.id.btnGoToSystem);
-
-        // إذا لم يكن موجودًا في الـ XML، نخفيه ديناميكيًا
         if (btnGoToSystem == null) {
-            Log.d(TAG, "btnGoToSystem not found in layout — dynamic mode");
+            Log.d(TAG, "btnGoToSystem not found in layout");
         }
     }
 
@@ -147,9 +120,9 @@ public void onDestroyView() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
     //  Load Status
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
 
     private void loadStatus() {
         if (!isAdded() || pbLoading == null) return;
@@ -170,8 +143,7 @@ public void onDestroyView() {
                         renderStatus(currentStatus);
                     } else {
                         String err = (response != null && response.error != null)
-                                ? response.error
-                                : "غير معروف";
+                                ? response.error : "غير معروف";
                         showError(isArabic ? "فشل تحميل الحالة: " + err
                                            : "Failed to load status: " + err);
                     }
@@ -187,15 +159,10 @@ public void onDestroyView() {
         }).start();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Render Status
-    // ═══════════════════════════════════════════════════════════
-
     private void renderStatus(JSONObject response) {
         if (response == null) return;
 
         try {
-            // ✅ البنية: قد يكون الرد مباشر أو داخله "data"
             JSONObject status = response;
             JSONObject nested = response.optJSONObject("data");
             if (nested != null) {
@@ -205,7 +172,6 @@ public void onDestroyView() {
             int progress = status.optInt("progress_percent", 0);
             String setupStatus = status.optString("status", "pending");
 
-            // ─── Progress ───
             pbProgress.setProgress(progress);
             tvProgressPercent.setText(progress + "%");
 
@@ -219,18 +185,15 @@ public void onDestroyView() {
             }
             tvProgressText.setText(statusText);
 
-            // ═══════════════════════════════════════════════════════
-            // ⭐ عند الاكتمال → أخطر النشاط فورًا (مرة واحدة)
-            // ═══════════════════════════════════════════════════════
             boolean completed = "completed".equals(setupStatus)
                     || "locked".equals(setupStatus);
 
+            // ⭐ عند الاكتمال → أخطر النشاط (مرة واحدة)
             if (completed && !setupCompletedNotified) {
                 setupCompletedNotified = true;
                 notifySetupCompleted();
             }
 
-            // ─── Steps ───
             stepsContainer.removeAllViews();
             JSONArray steps = status.optJSONArray("steps");
 
@@ -243,9 +206,7 @@ public void onDestroyView() {
                 }
             }
 
-            // ─── Buttons ───
             if (completed) {
-                // ✅ النظام مُعد → أعرض زر "الانتقال للنظام"
                 btnStart.setText(isArabic ? "👁️ مراجعة الإعداد" : "👁️ Review Setup");
                 btnStart.setEnabled(true);
                 btnReset.setVisibility(View.VISIBLE);
@@ -256,10 +217,6 @@ public void onDestroyView() {
                             ? "🚀 الانتقال إلى النظام"
                             : "🚀 Enter System");
                 }
-
-                // ✅ عرض رسالة نجاح
-                showSuccessBanner();
-
             } else {
                 int completedCount = status.optInt("completed_count", 0);
 
@@ -281,43 +238,6 @@ public void onDestroyView() {
             Log.e(TAG, "renderStatus error", e);
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  ⭐ Notify Completion (v2.0)
-    // ═══════════════════════════════════════════════════════════
-
-    /**
-     * إشعار UHFMainActivity بأن الإعداد اكتمل
-     * - يُبطل الكاش القديم
-     * - يحفظ "completed"
-     * - يحدّث الواجهة
-     */
-    private void notifySetupCompleted() {
-        if (!isAdded()) return;
-
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-            activity.onSetupCompleted();
-            Log.d(TAG, "✅ Notified UHFMainActivity: setup completed");
-        } else {
-            Log.w(TAG, "⚠️ Cannot notify: activity is not UHFMainActivity");
-        }
-    }
-
-    /**
-     * عرض رسالة نجاح مؤقتة أسفل Progress
-     */
-    private void showSuccessBanner() {
-        if (getContext() == null) return;
-
-        // يمكن استخدام Snackbar أو Toast — هنا نستخدم Toast بسيط
-        // لتجنب تجاوز التصميم
-        Log.d(TAG, "🎉 Setup completed — success banner shown");
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Step Card
-    // ═══════════════════════════════════════════════════════════
 
     private void addStepCard(JSONObject step, int stepNumber) {
         try {
@@ -361,7 +281,6 @@ public void onDestroyView() {
             }
 
             card.setOnClickListener(v -> openStep(stepNumber));
-
             stepsContainer.addView(card);
 
         } catch (Exception e) {
@@ -369,9 +288,23 @@ public void onDestroyView() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
+    //  Notify Completion
+    // ═══════════════════════════════════════════════════════
+
+    private void notifySetupCompleted() {
+        if (!isAdded()) return;
+
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            activity.onSetupCompleted();
+            Log.d(TAG, "✅ Notified UHFMainActivity: setup completed");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
     //  Actions
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
 
     private void startOrContinue() {
         try {
@@ -387,7 +320,7 @@ public void onDestroyView() {
             String setupStatus = status.optString("status", "pending");
 
             if ("completed".equals(setupStatus) || "locked".equals(setupStatus)) {
-                openStep(6);   // مراجعة
+                openStep(6);
             } else {
                 openStep(currentStep);
             }
@@ -424,9 +357,6 @@ public void onDestroyView() {
                 .commit();
     }
 
-    /**
-     * ⭐ الانتقال إلى النظام بعد اكتمال الإعداد
-     */
     private void navigateToSystem() {
         Log.d(TAG, "🚀 navigateToSystem called");
 
@@ -434,14 +364,8 @@ public void onDestroyView() {
 
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
-
-            // ✅ إخفاء BottomNav مرة أخرى (في حال كان مخفيًا)
             activity.setBottomNavVisible(true);
-
-            // ✅ استدعاء onSetupCompleted لضمان التحديث
             activity.onSetupCompleted();
-
-            Log.d(TAG, "✅ Navigated to system");
         }
     }
 
@@ -478,7 +402,7 @@ public void onDestroyView() {
                         Toast.makeText(requireContext(),
                                 isArabic ? "✅ تم إعادة التعيين" : "✅ Reset complete",
                                 Toast.LENGTH_LONG).show();
-                        setupCompletedNotified = false;   // ⭐ أعِد التعيين
+                        setupCompletedNotified = false;
                         loadStatus();
                     } else {
                         Toast.makeText(requireContext(),
@@ -500,9 +424,9 @@ public void onDestroyView() {
         }).start();
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
     //  Helpers
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
 
     private void showLoading(boolean show) {
         if (pbLoading == null || contentContainer == null) return;
@@ -515,11 +439,8 @@ public void onDestroyView() {
         Toast.makeText(requireContext(), "❌ " + msg, Toast.LENGTH_LONG).show();
     }
 
-    /**
-     * ✅ Method عام لإعادة التحميل (يُستدعى من الشاشات الفرعية)
-     */
     public void reload() {
-        setupCompletedNotified = false;   // ⭐ أعِد التعيين عند إعادة التحميل
+        setupCompletedNotified = false;
         loadStatus();
     }
 }
