@@ -28,7 +28,7 @@ import java.util.Locale;
 /**
  * المرحلة 3: العملات وأسعار الصرف
  */
-public class SetupStep3CurrenciesFragment extends Fragment {
+public class SetupStep3CurrenciesFragment extends BaseSetupStepFragment {
 
     private static final String TAG = "SetupStep3";
 
