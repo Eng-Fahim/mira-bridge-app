@@ -421,7 +421,8 @@ public class MiraCreateJournalFragment extends Fragment {
         // بناء القيد
         JournalEntryDto entry = new JournalEntryDto();
         entry.entryDate = selectedDate;
-        entry.branchId = 1;
+        entry.branchId = 1L;   // ✅ L في النهاية
+        
         entry.reference = etReference.getText() != null ? etReference.getText().toString() : "";
         entry.description = etDescription.getText().toString();
         entry.sourceType = "manual";
