@@ -966,6 +966,259 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         });
     }
+// ═══════════════════════════════════════════════════════
+//  التولبار الثانوي
+// ═══════════════════════════════════════════════════════
+
+private void setupSecondaryToolbar() {
+    MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
+
+    if (secondaryToolbar == null) {
+        Log.w(TAG, "Secondary toolbar not found");
+        return;
+    }
+
+    secondaryToolbarManager = new SecondaryToolbarManager(secondaryToolbar);
+
+    secondaryToolbarManager.setOnMenuItemClickListener((item, currentTag) -> {
+        int id = item.getItemId();
+
+        if (id == R.id.action_device_status) {
+            showHardwareOptionsDialog();
+            return true;
+        } else if (id == R.id.action_search) {
+            showGlobalSearchDialog();
+            return true;
+        } else if (id == R.id.action_sync) {
+            performDataSync();
+            return true;
+        } else if (id == R.id.action_quick_access_settings) {
+            loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
+            return true;
+        } else if (id == R.id.action_inventory_power) {
+            if (activeInventoryFragment != null
+                    && activeInventoryFragment.isAdded()
+                    && !activeInventoryFragment.isRemoving()) {
+                activeInventoryFragment.showInventoryScannerSettings();
+            } else {
+                loadFragment(new MiraInventoryProFragment(), "Scan");
+                mainHandler.postDelayed(() -> {
+                    if (activeInventoryFragment != null) {
+                        activeInventoryFragment.showInventoryScannerSettings();
+                    }
+                }, 500);
+            }
+            return true;
+        } else if (id == R.id.action_inventory_stats) {
+            showInventoryStatsDialog();
+            return true;
+        } else if (id == R.id.action_inventory_settings) {
+            if (activeInventoryFragment != null
+                    && activeInventoryFragment.isAdded()
+                    && !activeInventoryFragment.isRemoving()) {
+                activeInventoryFragment.showInventorySessionSettings();
+            } else {
+                loadFragment(new MiraInventoryProFragment(), "Scan");
+                mainHandler.postDelayed(() -> {
+                    if (activeInventoryFragment != null) {
+                        activeInventoryFragment.showInventorySessionSettings();
+                    }
+                }, 500);
+            }
+            return true;
+        } else if (id == R.id.action_inventory_archive) {
+            showInventoryArchiveDialog();
+            return true;
+        } else if (id == R.id.action_pos_cart) {
+            showPOSCartDialog();
+            return true;
+        } else if (id == R.id.action_pos_search) {
+            showPOSSearchDialog();
+            return true;
+        } else if (id == R.id.action_pos_discount) {
+            showPOSDiscountDialog();
+            return true;
+        } else if (id == R.id.action_pos_receipt) {
+            showPOSReceiptDialog();
+            return true;
+        } else if (id == R.id.action_transfers_sync) {
+            performDataSync();
+            return true;
+        } else if (id == R.id.action_transfers_export) {
+            showTransfersExportDialog();
+            return true;
+        } else if (id == R.id.action_transfers_import) {
+            showTransfersImportDialog();
+            return true;
+        } else if (id == R.id.action_transfers_history) {
+            loadFragment(new MiraTransferFragment(), "Transfers");
+            return true;
+        }
+
+        return false;
+    });
+
+    secondaryToolbarManager.setMenuForTag("Dashboard");
+    mainHandler.post(this::setupCustomViewsForCurrentMenu);
+}
+
+private void setupCustomViewsForCurrentMenu() {
+    try {
+        MaterialToolbar toolbar = findViewById(R.id.secondaryToolbar);
+        if (toolbar == null) return;
+
+        Menu menu = toolbar.getMenu();
+
+        MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
+        if (deviceStatusItem != null && deviceStatusItem.getActionView() != null) {
+            View actionView = deviceStatusItem.getActionView();
+            View dot = actionView.findViewById(R.id.deviceStatusDot);
+            TextView text = actionView.findViewById(R.id.deviceStatusText);
+            ImageView icon = actionView.findViewById(R.id.deviceStatusIcon);
+
+            if (dot != null && text != null) {
+                actionView.setOnClickListener(v -> showHardwareOptionsDialog());
+                updateDeviceStatusUI(dot, text, icon);
+            }
+        }
+
+        MenuItem powerItem = menu.findItem(R.id.action_inventory_power);
+        if (powerItem != null && powerItem.getActionView() != null) {
+            View actionView = powerItem.getActionView();
+            View dot = actionView.findViewById(R.id.deviceStatusDot);
+            TextView text = actionView.findViewById(R.id.deviceStatusText);
+            ImageView icon = actionView.findViewById(R.id.deviceStatusIcon);
+
+            if (dot != null && text != null) {
+                actionView.setOnClickListener(v -> showHardwareOptionsDialog());
+                updateDeviceStatusUI(dot, text, icon);
+            }
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "setupCustomViewsForCurrentMenu error: " + e.getMessage(), e);
+    }
+}
+
+private void updateSecondaryToolbar(String tag) {
+    if (secondaryToolbarManager == null) return;
+    try {
+        secondaryToolbarManager.setMenuForTag(tag);
+
+        Menu menu = secondaryToolbarManager.getCurrentMenu();
+        if (menu != null) {
+            applyToolbarMenuPermissions(menu);
+        }
+
+        mainHandler.post(this::setupCustomViewsForCurrentMenu);
+        Log.d(TAG, "✅ Secondary toolbar updated for: " + tag);
+    } catch (Exception e) {
+        Log.e(TAG, "updateSecondaryToolbar error: " + e.getMessage(), e);
+    }
+}
+
+private void updateDeviceStatusUI(View statusDot, TextView statusText, ImageView statusIcon) {
+    try {
+        if (statusDot == null || statusText == null) return;
+
+        boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
+
+        int greenColor = getResources().getColor(android.R.color.holo_green_dark);
+        int redColor = getResources().getColor(android.R.color.holo_red_dark);
+
+        if (isConnected) {
+            statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
+            statusText.setText(isArabic ? "متصل" : "Connected");
+            statusText.setTextColor(greenColor);
+
+            if (statusIcon != null) {
+                statusIcon.setImageResource(R.drawable.ic_device_connected);
+                statusIcon.setColorFilter(greenColor);
+            }
+        } else {
+            statusDot.setBackgroundResource(R.drawable.bg_status_dot_red);
+            statusText.setText(isArabic ? "غير متصل" : "Disconnected");
+            statusText.setTextColor(redColor);
+
+            if (statusIcon != null) {
+                statusIcon.setImageResource(R.drawable.ic_device_disconnected);
+                statusIcon.setColorFilter(redColor);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "updateDeviceStatusUI error: " + e.getMessage());
+    }
+}
+
+private void showHardwareOptionsDialog() {
+    PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+    List<String> optionsList = new ArrayList<>();
+    List<Runnable> actionsList = new ArrayList<>();
+
+    if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
+        optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
+        actionsList.add(() -> loadFragment(new MiraReaderSetupFragment(), "ReaderSetup"));
+    }
+
+    if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
+        optionsList.add(isArabic ? "🚧 تهيئة البوابات الأمنية" : "🚧 Gate Security Setup");
+        actionsList.add(() -> loadFragment(new MiraGateSettingsFragment(), "GateSettings"));
+    }
+
+    if (pm.canViewServerConfig()) {
+        optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
+        actionsList.add(() -> loadFragment(new MiraServerConfigFragment(), "ServerConfig"));
+    }
+
+    if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
+        optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
+        actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
+    }
+    if (pm.isAdmin() || pm.isSystemAdmin()) {
+        optionsList.add(isArabic ? "🔐 إعدادات أمان الشرائح" : "🔐 RFID Security Settings");
+        actionsList.add(() -> loadFragment(new MiraRfidSettingsFragment(), "RfidSettings"));
+    }
+
+    if (pm.canManageQuickAccess() || pm.isManager() || pm.isAdmin()) {
+        optionsList.add(isArabic ? "⚙️ إعدادات الوصول السريع" : "⚙️ Quick Access Settings");
+        actionsList.add(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+    }
+
+    optionsList.add(isArabic ? "🔄 اختبار التوصيل والربط" : "🔄 Connection Test");
+    actionsList.add(this::performConnectionTest);
+
+    String[] options = optionsList.toArray(new String[0]);
+
+    new MaterialAlertDialogBuilder(this)
+            .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
+            .setItems(options, (dialog, which) -> {
+                if (which >= 0 && which < actionsList.size()) {
+                    actionsList.get(which).run();
+                }
+            })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+}
+
+private void performConnectionTest() {
+    showLoading();
+    mainHandler.postDelayed(() -> {
+        hideLoading();
+        boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
+
+        String message = isConnected
+                ? (isArabic ? "✅ الاتصال بالجهاز سليم\nجميع الأجهزة تعمل بشكل صحيح"
+                : "✅ Device connection OK\nAll devices operational")
+                : (isArabic ? "⚠️ لا يوجد اتصال بالجهاز\nيرجى التحقق من الاتصال"
+                : "⚠️ No device connection\nPlease check connection");
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "نتيجة الاختبار" : "Test Result")
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .show();
+    }, 1500);
+}
 
     // ═══════════════════════════════════════════════════════
     //  Keyboard Behavior
