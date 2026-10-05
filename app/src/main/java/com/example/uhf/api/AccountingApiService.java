@@ -47,13 +47,13 @@ public interface AccountingApiService {
     // ═══════════════════════════════════════════════════════
     //  دليل الحسابات
     // ═══════════════════════════════════════════════════════
-    
     @GET("accounts")
     Call<ApiResponseDto<AccountDto[]>> getAccounts(
-        @Query("type") String type,
-        @Query("search") String search
+    @Query("type") String type,
+    @Query("search") String search,
+    @Query("leaf_only") Boolean leafOnly
     );
-    
+
     @GET("accounts/tree")
     Call<ApiResponseDto<AccountDto[]>> getAccountsTree();
     
