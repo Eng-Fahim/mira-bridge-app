@@ -31,37 +31,28 @@ import java.util.Locale;
 import com.example.uhf.navigation.FragmentFactory;
 
 /**
- * ✅ QuickActionsBottomSheetFragment — v5.0 "Final Edition"
+ * ✅ QuickActionsBottomSheetFragment — v6.0 "Clean Edition"
  *
- * - Stagger Fade-in Animation (40ms بين كل عنصر)
- * - Haptic Feedback خفيف
- * - Header-less design
- * - CTA يعمل بشكل صحيح (setDescendantFocusability)
+ * - Stagger Fade-in Animation
+ * - Haptic Feedback
+ * - نظيف من الـ Toasts التشخيصية
+ * - يمر عبر الحارس المركزي في UHFMainActivity
  */
 public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
     private static final String TAG = "QuickActionsSheet";
 
-    // ═══════════════════════════════════════════════════════
-    // Animation Constants
-    // ═══════════════════════════════════════════════════════
     private static final long STAGGER_DELAY_MS = 40L;
     private static final long ITEM_FADE_DURATION_MS = 250L;
     private static final long INITIAL_DELAY_MS = 100L;
+    private static final long NAV_DELAY_MS = 250L;  // تأخير بعد dismiss
 
     private boolean isArabic;
     private PermissionManager permissionManager;
     private MiraQuickAccessSettings quickAccessSettings;
 
-    // ═══════════════════════════════════════════════════════
-    // Animation state
-    // ═══════════════════════════════════════════════════════
     private final List<View> animatedViews = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
-    // ═══════════════════════════════════════════════════════
-    // Lifecycle
-    // ═══════════════════════════════════════════════════════
 
     @Nullable
     @Override
@@ -81,67 +72,22 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             permissionManager = PermissionManager.getInstance(context);
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
 
-            // ═══════════════════════════════════════════════════
-            // PRIMARY CTA — استوديو التكويد
-            // ═══════════════════════════════════════════════════
+            // ─── PRIMARY CTA ───
             setupPrimaryCta(view);
 
-            // ═══════════════════════════════════════════════════
-            // GRID
-            // ═══════════════════════════════════════════════════
-            setupGridAction(view, R.id.cardRfidWrite,
-                    "rfid_write",
-                    permissionManager.canEditInventory(),
-                    new MiraUHFReadWriteFragment(), "RFIDWrite");
+            // ─── GRID ───
+            setupGridAction(view, R.id.cardRfidWrite,      "rfid_write",    permissionManager.canEditInventory(),    new MiraUHFReadWriteFragment(),        "RFIDWrite");
+            setupGridAction(view, R.id.cardRadarLocation,  "radar",         permissionManager.canAccessRadar(),      new MiraUHFRadarLocationFragment(),    "Radar");
+            setupGridAction(view, R.id.cardRfidBindings,   "rfid",          permissionManager.canViewRfidBindings(), new MiraRfidBindingsFragment(),        "RfidBindings");
+            setupGridAction(view, R.id.cardSecureGate,     "gate",          permissionManager.canAccessGate(),       new MiraSecureGateFragment(),          "SecureGate");
+            setupGridAction(view, R.id.cardReports,        "reports",       permissionManager.canExportReports(),    new MiraReportsProFragment(),          "Reports");
+            setupGridAction(view, R.id.cardAccounting,     "accounting",    permissionManager.canAccessAccounting(), new MiraAccountingFragment(),          "Accounting");
+            setupGridAction(view, R.id.cardTransfer,       "transfers",     permissionManager.canAccessTransfers(),  new MiraTransferFragment(),            "Transfers");
+            setupGridAction(view, R.id.cardSalesHistory,   "sales_history", permissionManager.canViewSalesHistory(), new MiraSalesHistoryFragment(),        "SalesHistory");
+            setupGridAction(view, R.id.cardAdminHub,       "admin_hub",     permissionManager.isAdmin(),             new MiraAdminHubFragment(),            "AdminHub");
+            setupGridAction(view, R.id.cardServerConfig,   "server_config", permissionManager.canViewServerConfig(), new MiraServerConfigFragment(),        "ServerConfig");
 
-            setupGridAction(view, R.id.cardRadarLocation,
-                    "radar",
-                    permissionManager.canAccessRadar(),
-                    new MiraUHFRadarLocationFragment(), "Radar");
-
-            setupGridAction(view, R.id.cardRfidBindings,
-                    "rfid",
-                    permissionManager.canViewRfidBindings(),
-                    new MiraRfidBindingsFragment(), "RfidBindings");
-
-            setupGridAction(view, R.id.cardSecureGate,
-                    "gate",
-                    permissionManager.canAccessGate(),
-                    new MiraSecureGateFragment(), "SecureGate");
-
-            setupGridAction(view, R.id.cardReports,
-                    "reports",
-                    permissionManager.canExportReports(),
-                    new MiraReportsProFragment(), "Reports");
-
-            setupGridAction(view, R.id.cardAccounting,
-                    "accounting",
-                    permissionManager.canAccessAccounting(),
-                    new MiraAccountingFragment(), "Accounting");
-
-            setupGridAction(view, R.id.cardTransfer,
-                    "transfers",
-                    permissionManager.canAccessTransfers(),
-                    new MiraTransferFragment(), "Transfers");
-
-            setupGridAction(view, R.id.cardSalesHistory,
-                    "sales_history",
-                    permissionManager.canViewSalesHistory(),
-                    new MiraSalesHistoryFragment(), "SalesHistory");
-
-            setupGridAction(view, R.id.cardAdminHub,
-                    "admin_hub",
-                    permissionManager.isAdmin(),
-                    new MiraAdminHubFragment(), "AdminHub");
-
-            setupGridAction(view, R.id.cardServerConfig,
-                    "server_config",
-                    permissionManager.canViewServerConfig(),
-                    new MiraServerConfigFragment(), "ServerConfig");
-
-            // ═══════════════════════════════════════════════════
-            // CLOSE BUTTON
-            // ═══════════════════════════════════════════════════
+            // ─── CLOSE BUTTON ───
             View btnClose = view.findViewById(R.id.btnClose);
             if (btnClose != null) {
                 animatedViews.add(btnClose);
@@ -151,9 +97,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 });
             }
 
-            // ═══════════════════════════════════════════════════
-            // STAGGER FADE-IN ANIMATION
-            // ═══════════════════════════════════════════════════
+            // ─── ANIMATION ───
             runStaggerAnimation();
 
         } catch (Exception e) {
@@ -162,7 +106,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // PRIMARY CTA
+    // PRIMARY CTA — Identity Studio
     // ═══════════════════════════════════════════════════════
 
     private void setupPrimaryCta(View view) {
@@ -173,7 +117,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 return;
             }
 
-            // ✅ منع الأبناء من التقاط اللمس
             if (cta instanceof ViewGroup) {
                 ViewGroup vg = (ViewGroup) cta;
                 vg.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
@@ -181,7 +124,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 vg.setFocusable(true);
             }
 
-            // فحص الصلاحيات
             boolean hasPermission = permissionManager.canAccessIdentityStudio();
             boolean quickAccessAllowed = quickAccessSettings == null
                     || quickAccessSettings.isActionEnabled("identity");
@@ -193,22 +135,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             cta.setVisibility(View.VISIBLE);
 
-            // ✅ الـ listener
             cta.setOnClickListener(v -> {
                 performHaptic();
-
-                final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity)
-                        ? (UHFMainActivity) getActivity() : null;
-
-                dismiss();
-
-                if (activity != null) {
-                    mainHandler.post(() -> {
-                        activity.loadFragment(
-                                new MiraIdentityStudioFragment(),
-                                "IdentityStudio");
-                    });
-                }
+                navigateTo("IdentityStudio", new MiraIdentityStudioFragment());
             });
 
             animatedViews.add(cta);
@@ -223,102 +152,80 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     // ═══════════════════════════════════════════════════════
 
     private void setupGridAction(View root,
-                             int cardId,
-                             String actionKey,
-                             boolean hasPermission,
-                             Fragment targetFragment,
-                             String tag) {
+                                 int cardId,
+                                 String actionKey,
+                                 boolean hasPermission,
+                                 Fragment targetFragment,
+                                 String tag) {
+        try {
+            View card = root.findViewById(cardId);
+            if (card == null) {
+                Log.w(TAG, "Grid item not found: id=" + cardId + ", key=" + actionKey);
+                return;
+            }
 
-    try {
-        View card = root.findViewById(cardId);
+            boolean quickAccessAllowed = quickAccessSettings == null
+                    || quickAccessSettings.isActionEnabled(actionKey);
+            boolean isVisible = hasPermission && quickAccessAllowed;
 
-        if (card == null) {
-            Log.w(TAG, "Grid item not found: id=" + cardId + ", key=" + actionKey);
-            return;
-        }
+            if (!isVisible) {
+                card.setVisibility(View.GONE);
+                return;
+            }
 
-        boolean quickAccessAllowed = quickAccessSettings == null
-                || quickAccessSettings.isActionEnabled(actionKey);
-        boolean isVisible = hasPermission && quickAccessAllowed;
+            card.setVisibility(View.VISIBLE);
+            animatedViews.add(card);
 
-        if (!isVisible) {
-            card.setVisibility(View.GONE);
-            return;
-        }
-
-        card.setVisibility(View.VISIBLE);
-        animatedViews.add(card);
-
-        card.setOnClickListener(v -> {
-            try {
+            card.setOnClickListener(v -> {
                 performHaptic();
+                navigateTo(tag, targetFragment);
+            });
 
-                // ✅ 1. احصل على Activity قبل dismiss
-                final UHFMainActivity activity =
-                    (getActivity() instanceof UHFMainActivity)
+        } catch (Exception e) {
+            Log.e(TAG, "setupGridAction(" + actionKey + ") error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ التنقل الموحّد — يستدعي الحارس المركزي في UHFMainActivity
+     */
+    private void navigateTo(String tag, Fragment fallbackFragment) {
+        final UHFMainActivity activity =
+                (getActivity() instanceof UHFMainActivity)
                         ? (UHFMainActivity) getActivity()
                         : null;
 
-                // ✅ 2. أظهر رسالة تشخيص
-                android.widget.Toast.makeText(
-                    requireContext(),
-                    "▶ فتح: " + tag,
-                    android.widget.Toast.LENGTH_SHORT
-                ).show();
+        // ⭐ أنشئ Fragment أولاً (قبل dismiss)
+        Fragment fragment = FragmentFactory.createFragmentByTag(tag);
+        if (fragment == null) {
+            fragment = fallbackFragment;
+        }
 
-                Log.e(TAG, "🔵 Clicked: " + tag + " | activity=" + (activity != null));
+        if (fragment == null) {
+            Log.e(TAG, "❌ Cannot create fragment for tag: " + tag);
+            return;
+        }
 
-                // ✅ 3. إذا activity = null → خطأ
-                if (activity == null) {
-                    Log.e(TAG, "❌ activity is NULL!");
-                    android.widget.Toast.makeText(
-                        requireContext(),
-                        "❌ خطأ: Activity NULL",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show();
-                    return;
-                }
+        if (activity == null) {
+            Log.e(TAG, "❌ activity is NULL for tag: " + tag);
+            return;
+        }
 
-                // ✅ 4. dismiss أولاً
-                dismiss();
+        final Fragment finalFragment = fragment;
 
-                // ✅ 5. ثم التنقل
-                mainHandler.postDelayed(() -> {
-                    try {
-                        Fragment fragment = FragmentFactory.createFragmentByTag(tag);
+        // ⭐ أغلق القائمة
+        dismiss();
 
-                        if (fragment == null) {
-                            Log.e(TAG, "❌ FragmentFactory returned null for: " + tag);
-                            android.widget.Toast.makeText(
-                                activity,
-                                "❌ شاشة غير معروفة: " + tag,
-                                android.widget.Toast.LENGTH_LONG
-                            ).show();
-                            return;
-                        }
-
-                        Log.e(TAG, "✅ Loading fragment: " + fragment.getClass().getSimpleName());
-                        activity.loadFragmentDirectly(fragment, tag);
-
-                    } catch (Throwable e) {
-                        Log.e(TAG, "❌ loadFragment error", e);
-                        android.widget.Toast.makeText(
-                            activity,
-                            "❌ خطأ: " + e.getMessage(),
-                            android.widget.Toast.LENGTH_LONG
-                        ).show();
-                    }
-                }, 250); // ← تأخير صغير لضمان إغلاق القائمة
-
+        // ⭐ نفّذ التنقل (يمر عبر guardSetupAccess)
+        mainHandler.postDelayed(() -> {
+            try {
+                activity.loadFragmentDirectly(finalFragment, tag);
+                Log.d(TAG, "✅ Navigated to: " + tag);
             } catch (Throwable e) {
-                Log.e(TAG, "❌ Click handler error", e);
+                Log.e(TAG, "❌ loadFragmentDirectly error", e);
             }
-        });
-
-    } catch (Exception e) {
-        Log.e(TAG, "setupGridAction(" + actionKey + ") error: " + e.getMessage(), e);
+        }, NAV_DELAY_MS);
     }
-}
 
     // ═══════════════════════════════════════════════════════
     // Haptic Feedback
@@ -336,7 +243,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // STAGGER FADE-IN ANIMATION
+    // STAGGER ANIMATION
     // ═══════════════════════════════════════════════════════
 
     private void runStaggerAnimation() {
@@ -351,7 +258,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             for (View v : animatedViews) {
                 if (v == null || v.getVisibility() != View.VISIBLE) continue;
 
-                // الحالة الأولية: مخفي + مُنزاح قليلاً
                 v.setAlpha(0f);
                 v.setTranslationY(16f);
 
@@ -377,7 +283,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         } catch (Exception e) {
             Log.e(TAG, "runStaggerAnimation error: " + e.getMessage(), e);
 
-            // Fallback: إظهار كل العناصر فوراً
             for (View v : animatedViews) {
                 if (v != null) {
                     v.setAlpha(1f);
