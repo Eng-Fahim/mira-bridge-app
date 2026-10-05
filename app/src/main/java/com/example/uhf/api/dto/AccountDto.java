@@ -60,6 +60,11 @@ public class AccountDto implements Serializable {
 
     @SerializedName("status")
     public String status;
+    
+    @SerializedName("is_leaf")
+    public Boolean isLeafDb;
+    
+    public void setLeafDb(Boolean leafDb) { isLeafDb = leafDb; }
 
     @SerializedName("children")
     public List<AccountDto> children;
@@ -125,10 +130,17 @@ public class AccountDto implements Serializable {
     // ==================== Helpers ====================
 
     /**
-     * ✅ هل الحساب ورقة (بدون أبناء)
-     */
+    * ✅ محدّثة — تعتمد على is_leaf من DB أولاً
+    */
     public boolean isLeaf() {
-        return children == null || children.isEmpty();
+    // 1. أفضل مصدر: is_leaf من DB
+    if (isLeafDb != null) return isLeafDb;
+
+    // 2. ثانياً: children من /accounts/tree
+    if (children != null && !children.isEmpty()) return false;
+
+    // 3. fallback: level >= 3 (عادةً leaf)
+    return level >= 3;
     }
 
     /**
