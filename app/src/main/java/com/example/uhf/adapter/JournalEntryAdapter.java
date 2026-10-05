@@ -17,24 +17,32 @@ import com.example.uhf.utils.NumberFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * ✅ Adapter لقائمة القيود المحاسبية
+ *
+ * التحديثات:
+ * - يستخدم getDisplayAmount() لعرض مبلغ الفاتورة الأصلي (POS)
+ * - بدل totalDebit (مجموع حركات القيد)
+ */
 public class JournalEntryAdapter extends RecyclerView.Adapter<JournalEntryAdapter.VH> {
-    
+
     public interface OnEntryClick {
         void onClick(JournalEntryDto entry);
     }
-    
-    private List<JournalEntryDto> items = new ArrayList<>();
+
+    private final List<JournalEntryDto> items = new ArrayList<>();
     private final OnEntryClick listener;
-    
+
     public JournalEntryAdapter(OnEntryClick listener) {
         this.listener = listener;
     }
-    
+
     public void setItems(List<JournalEntryDto> newItems) {
-        this.items = newItems != null ? newItems : new ArrayList<>();
+        items.clear();
+        if (newItems != null) items.addAll(newItems);
         notifyDataSetChanged();
     }
-    
+
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -42,17 +50,21 @@ public class JournalEntryAdapter extends RecyclerView.Adapter<JournalEntryAdapte
             .inflate(R.layout.item_journal_entry, parent, false);
         return new VH(v);
     }
-    
+
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
         JournalEntryDto e = items.get(position);
-        
+
         h.tvNumber.setText(e.entryNumber != null ? e.entryNumber : "—");
         h.tvDate.setText(DateHelper.toDisplay(e.entryDate));
         h.tvDescription.setText(e.description != null ? e.description : "—");
-        h.tvAmount.setText(NumberFormatter.money(e.totalDebit));
-        
-        // لون الحالة
+
+        // ✅✅✅ التعديل الحاسم: استخدام getDisplayAmount()
+        // - لقيود POS: يعرض مبلغ الفاتورة الأصلي (مثل 93,152.80)
+        // - لقيود يدوية: يعرض totalDebit (السلوك القديم)
+        h.tvAmount.setText(NumberFormatter.money(e.getDisplayAmount()));
+
+        // ─── لون الحالة ───
         int statusColor;
         String statusText;
         switch (e.status != null ? e.status : "draft") {
@@ -76,45 +88,49 @@ public class JournalEntryAdapter extends RecyclerView.Adapter<JournalEntryAdapte
                 statusColor = Color.GRAY;
                 statusText = e.status;
         }
-        
+
         h.tvStatus.setText(statusText);
         h.tvStatus.setTextColor(statusColor);
         h.statusIndicator.setBackgroundColor(statusColor);
-        
-        // الذهب
+
+        // ─── الذهب ───
         double netGold = e.getNetGold();
         if (Math.abs(netGold) > 0.0001) {
             h.tvGold.setVisibility(View.VISIBLE);
             h.tvGold.setText(NumberFormatter.goldSigned(netGold));
-            h.tvGold.setTextColor(netGold > 0 
-                ? Color.parseColor("#27AE60") 
+            h.tvGold.setTextColor(netGold > 0
+                ? Color.parseColor("#27AE60")
                 : Color.parseColor("#E74C3C"));
         } else {
             h.tvGold.setVisibility(View.GONE);
         }
-        
+
+        // ─── النقر ───
         h.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(e);
         });
     }
-    
+
     @Override
     public int getItemCount() {
         return items.size();
     }
-    
+
+    // ═══════════════════════════════════════════════════════════
+    //  ViewHolder
+    // ═══════════════════════════════════════════════════════════
     static class VH extends RecyclerView.ViewHolder {
         TextView tvNumber, tvDate, tvDescription, tvAmount, tvStatus, tvGold;
         View statusIndicator;
-        
+
         VH(@NonNull View itemView) {
             super(itemView);
-            tvNumber = itemView.findViewById(R.id.tvEntryNumber);
-            tvDate = itemView.findViewById(R.id.tvEntryDate);
-            tvDescription = itemView.findViewById(R.id.tvEntryDescription);
-            tvAmount = itemView.findViewById(R.id.tvEntryAmount);
-            tvStatus = itemView.findViewById(R.id.tvEntryStatus);
-            tvGold = itemView.findViewById(R.id.tvEntryGold);
+            tvNumber        = itemView.findViewById(R.id.tvEntryNumber);
+            tvDate          = itemView.findViewById(R.id.tvEntryDate);
+            tvDescription   = itemView.findViewById(R.id.tvEntryDescription);
+            tvAmount        = itemView.findViewById(R.id.tvEntryAmount);
+            tvStatus        = itemView.findViewById(R.id.tvEntryStatus);
+            tvGold          = itemView.findViewById(R.id.tvEntryGold);
             statusIndicator = itemView.findViewById(R.id.statusIndicator);
         }
     }
