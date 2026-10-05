@@ -21,6 +21,7 @@ import java.util.List;
 public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> {
 
     public static class LedgerRow {
+        public long entryId; 
         public String date;
         public String entryNumber;
         public String description;
