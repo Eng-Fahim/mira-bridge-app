@@ -103,12 +103,14 @@ public class MiraAccountingSetupFragment extends Fragment {
         loadStatus();
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        // ✅ إيقاف الـ Handler لتجنب تسريب الذاكرة
-        mainHandler.removeCallbacksAndMessages(null);
+@Override
+public void onDestroyView() {
+    super.onDestroyView();
+    // ✅ أعِد إظهار BottomNav عند تدمير الواجهة
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
     }
+}
 
     // ═══════════════════════════════════════════════════════════
     //  Init
