@@ -185,32 +185,41 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
         // ─── الحسابات ───
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
-            if (accounts == null) return;
+    if (accounts == null) return;
 
-            accountsList.clear();
-            for (AccountDto a : accounts) {
-                if (a.isLeaf()) accountsList.add(a);
+    accountsList.clear();
+    for (AccountDto a : accounts) {
+        if (a.isLeaf()) accountsList.add(a);
+    }
+    setupAccountSpinner();
+
+    // ✅ التحميل التلقائي — حتى لو الحساب غير موجود في القائمة
+    if (selectedAccountId > 0) {
+        AccountDto matched = null;
+        for (AccountDto a : accountsList) {
+            if (a.id == selectedAccountId) {
+                matched = a;
+                break;
             }
-            setupAccountSpinner();
+        }
 
-            // ✅✅✅ التحميل التلقائي عند وصول account_id
-            if (selectedAccountId > 0 && !accountsList.isEmpty()) {
-                for (AccountDto a : accountsList) {
-                    if (a.id == selectedAccountId) {
-                        selectedAccountCode = a.accountCode;
-                        selectedAccountName = a.accountNameAr;
+        if (matched != null) {
+            // ✅ وُجد في القائمة — املأ الاسم + حدّد
+            selectedAccountCode = matched.accountCode;
+            selectedAccountName = matched.accountNameAr;
+            spAccount.setText(
+                matched.accountCode + " - " + matched.accountNameAr, false);
+        } else {
+            // ✅ لم يُوجد (حساب أبوي) — حمّل مباشرة بالـ ID
+            selectedAccountCode = "";
+            selectedAccountName = "حساب #" + selectedAccountId;
+            spAccount.setText("حساب #" + selectedAccountId, false);
+        }
 
-                        // اختيار برمجي (بدون إطلاق TextWatcher)
-                        spAccount.setText(
-                            a.accountCode + " - " + a.accountNameAr, false);
-
-                        // تحميل بعد لحظة قصيرة
-                        spAccount.post(this::loadLedger);
-                        break;
-                    }
-                }
-            }
-        });
+        // ✅ حمّل دفتر الأستاذ بأي حال
+        spAccount.post(this::loadLedger);
+    }
+});
 
         // ─── دفتر الأستاذ ───
         viewModel.getGeneralLedger().observe(getViewLifecycleOwner(), ledger -> {
