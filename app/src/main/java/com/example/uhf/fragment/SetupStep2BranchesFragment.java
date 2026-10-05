@@ -28,7 +28,7 @@ import org.json.JSONObject;
  * 
  * يعرض الفروع الحالية + يسمح بإدارة الفروع عبر الشاشة المتكاملة
  */
-public class SetupStep2BranchesFragment extends Fragment {
+public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
 
     private static final String TAG = "SetupStep2";
 
