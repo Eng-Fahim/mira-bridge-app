@@ -257,12 +257,32 @@ public class MiraGeneralLedgerFragment extends Fragment {
     }
 
     private void setupRecycler() {
-        adapter = new LedgerRowAdapter(row -> {
-            // TODO: فتح تفاصيل الحركة (قيد / فاتورة)
-        });
-        rvLedger.setLayoutManager(new LinearLayoutManager(getContext()));
-        rvLedger.setAdapter(adapter);
-    }
+    adapter = new LedgerRowAdapter(row -> {
+        // ✅ فتح تفاصيل القيد
+        if (row.entryId > 0) {
+            MiraJournalEntryDetailsFragment details =
+                MiraJournalEntryDetailsFragment.newInstance(row.entryId);
+
+            // حاول استخدام UHFMainActivity إن وُجدت
+            if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+                ((com.example.uhf.activity.UHFMainActivity) getActivity())
+                    .loadFragment(details, "JournalEntryDetails");
+            } else {
+                // fallback: داخل نفس الـ container
+                requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, details)
+                    .addToBackStack("JournalEntryDetails")
+                    .commit();
+            }
+        } else {
+            Toast.makeText(requireContext(),
+                "معرف القيد مفقود", Toast.LENGTH_SHORT).show();
+        }
+    });
+    rvLedger.setLayoutManager(new LinearLayoutManager(getContext()));
+    rvLedger.setAdapter(adapter);
+}
 
     private void setupListeners() {
         btnFrom.setOnClickListener(v -> pickDate(true));
@@ -374,4 +394,4 @@ public class MiraGeneralLedgerFragment extends Fragment {
         emptyState.setVisibility(View.GONE);
         rvLedger.setVisibility(View.VISIBLE);
     }
-                    }
+}
