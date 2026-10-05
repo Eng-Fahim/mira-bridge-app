@@ -16,12 +16,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Adapter لعرض سطور دفتر الأستاذ
+ * ✅ Adapter لعرض سطور دفتر الأستاذ
+ *
+ * الميزات:
+ * - عرض تاريخ/بيان/مدين/دائن/رصيد/ذهب
+ * - دعم Pagination عبر appendItems
+ * - النقر على صف
  */
 public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> {
 
+    // ═══════════════════════════════════════════════════════════
+    //  Row Model
+    // ═══════════════════════════════════════════════════════════
     public static class LedgerRow {
-        public long entryId; 
+        public long entryId;      // ✅ لفتح التفاصيل
         public String date;
         public String entryNumber;
         public String description;
@@ -31,25 +39,68 @@ public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> 
         public double runningBalance;
         public double runningGold;
     }
-    
-    public List<LedgerRow> getItems() {
-    return items;
-    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Callback
+    // ═══════════════════════════════════════════════════════════
     public interface OnRowClick {
         void onClick(LedgerRow row);
     }
 
-    private List<LedgerRow> items = new ArrayList<>();
+    // ═══════════════════════════════════════════════════════════
+    //  State
+    // ═══════════════════════════════════════════════════════════
+    private final List<LedgerRow> items = new ArrayList<>();
     private final OnRowClick listener;
 
     public LedgerRowAdapter(OnRowClick listener) {
         this.listener = listener;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Data Management
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * ✅ استبدال كامل للقائمة (يُستخدم عند تغيير الحساب/الفترة)
+     */
     public void setItems(List<LedgerRow> newItems) {
-        this.items = newItems != null ? newItems : new ArrayList<>();
+        items.clear();
+        if (newItems != null) items.addAll(newItems);
         notifyDataSetChanged();
     }
+
+    /**
+     * ✅ إضافة سطور جديدة في النهاية (للـ Pagination)
+     * يستخدم notifyItemRangeInserted لتحديث أسرع
+     */
+    public void appendItems(List<LedgerRow> newItems) {
+        if (newItems == null || newItems.isEmpty()) return;
+        int startPos = items.size();
+        items.addAll(newItems);
+        notifyItemRangeInserted(startPos, newItems.size());
+    }
+
+    /**
+     * ✅ الحصول على القائمة الحالية (للتصدير CSV)
+     */
+    public List<LedgerRow> getItems() {
+        return items;
+    }
+
+    /**
+     * ✅ مسح كل السطور
+     */
+    public void clear() {
+        if (items.isEmpty()) return;
+        int size = items.size();
+        items.clear();
+        notifyItemRangeRemoved(0, size);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  RecyclerView.Adapter
+    // ═══════════════════════════════════════════════════════════
 
     @NonNull
     @Override
@@ -67,7 +118,7 @@ public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> 
         h.tvDescription.setText(r.description != null ? r.description : "—");
         h.tvEntryNumber.setText(r.entryNumber != null ? r.entryNumber : "");
 
-        // مدين
+        // ─── مدين ───
         if (r.baseDebit > 0.01) {
             h.tvDebit.setText(NumberFormatter.moneyShort(r.baseDebit));
             h.tvDebit.setTextColor(Color.parseColor("#3498DB"));
@@ -76,7 +127,7 @@ public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> 
             h.tvDebit.setTextColor(Color.parseColor("#BDC3C7"));
         }
 
-        // دائن
+        // ─── دائن ───
         if (r.baseCredit > 0.01) {
             h.tvCredit.setText(NumberFormatter.moneyShort(r.baseCredit));
             h.tvCredit.setTextColor(Color.parseColor("#E74C3C"));
@@ -85,13 +136,13 @@ public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> 
             h.tvCredit.setTextColor(Color.parseColor("#BDC3C7"));
         }
 
-        // الرصيد
+        // ─── الرصيد ───
         h.tvBalance.setText(NumberFormatter.moneyShort(r.runningBalance));
         h.tvBalance.setTextColor(r.runningBalance >= 0
             ? Color.parseColor("#27AE60")
             : Color.parseColor("#C0392B"));
 
-        // الذهب
+        // ─── الذهب ───
         if (Math.abs(r.runningGold) > 0.001) {
             h.tvGold.setVisibility(View.VISIBLE);
             h.tvGold.setText(NumberFormatter.goldSigned(r.runningGold));
@@ -102,6 +153,7 @@ public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> 
             h.tvGold.setVisibility(View.GONE);
         }
 
+        // ─── النقر ───
         h.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(r);
         });
@@ -112,18 +164,22 @@ public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> 
         return items.size();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  ViewHolder
+    // ═══════════════════════════════════════════════════════════
     static class VH extends RecyclerView.ViewHolder {
-        TextView tvDate, tvDescription, tvEntryNumber, tvDebit, tvCredit, tvBalance, tvGold;
+        TextView tvDate, tvDescription, tvEntryNumber,
+                 tvDebit, tvCredit, tvBalance, tvGold;
 
         VH(@NonNull View v) {
             super(v);
-            tvDate = v.findViewById(R.id.tvDate);
-            tvDescription = v.findViewById(R.id.tvDescription);
-            tvEntryNumber = v.findViewById(R.id.tvEntryNumber);
-            tvDebit = v.findViewById(R.id.tvDebit);
-            tvCredit = v.findViewById(R.id.tvCredit);
-            tvBalance = v.findViewById(R.id.tvBalance);
-            tvGold = v.findViewById(R.id.tvGold);
+            tvDate         = v.findViewById(R.id.tvDate);
+            tvDescription  = v.findViewById(R.id.tvDescription);
+            tvEntryNumber  = v.findViewById(R.id.tvEntryNumber);
+            tvDebit        = v.findViewById(R.id.tvDebit);
+            tvCredit       = v.findViewById(R.id.tvCredit);
+            tvBalance      = v.findViewById(R.id.tvBalance);
+            tvGold         = v.findViewById(R.id.tvGold);
         }
     }
 }
