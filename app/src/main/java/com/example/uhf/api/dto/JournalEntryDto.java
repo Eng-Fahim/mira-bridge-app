@@ -107,13 +107,25 @@ public class JournalEntryDto implements Serializable {
 
     @SerializedName("updated_at")
     public String updatedAt;
+    
+    @SerializedName("display_amount")
+    public double displayAmount;   // ✅ مبلغ العرض (فاتورة POS أو total_debit)
+    
 
     // ═══ سطور القيد (تُملأ عند استدعاء /journal/{id}) ═══
     @SerializedName("lines")
     public List<JournalLineDto> lines;
 
     // ==================== Helpers ====================
-
+    
+    /**
+ * ✅ المبلغ المناسب للعرض
+ * - للقيود POS: مبلغ الفاتورة الأصلي
+ * - للقيود اليدوية: total_debit
+ */
+public double getDisplayAmount() {
+    return displayAmount > 0 ? displayAmount : totalDebit;
+}
     /**
      * ✅ صافي الذهب (مدين - دائن) بالجرامات
      */
