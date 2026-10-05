@@ -80,8 +80,8 @@ public class MiraGeneralLedgerFragment extends Fragment {
         setupListeners();
         updateDateButtons();
 
-        // تحميل قائمة الحسابات
-        viewModel.loadAccounts(null, null);
+        // ✅ leaf_only=1 — قائمة نظيفة
+        viewModel.loadAccounts(null, null, true);
 
         // إذا تم تمرير account_id عبر Arguments
         if (getArguments() != null) {
@@ -116,15 +116,32 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
         // ─── الحسابات ───
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
-            if (accounts != null) {
-                accountsList.clear();
-                for (AccountDto a : accounts) {
-                    if (a.isLeaf()) accountsList.add(a);
-                }
-                setupAccountSpinner();
-            }
-        });
+        if (accounts == null) return;
+        accountsList.clear();
+        for (AccountDto a : accounts) {
+        // مع leaf_only=true من السيرفر، كلها leaves
+        if (a.isLeaf()) accountsList.add(a);
+        }
+        setupAccountSpinner();
 
+    // ✅✅✅ التحميل التلقائي عند وصول account_id
+    if (selectedAccountId > 0 && !accountsList.isEmpty()) {
+        for (AccountDto a : accountsList) {
+            if (a.id == selectedAccountId) {
+                selectedAccountCode = a.accountCode;
+                selectedAccountName = a.accountNameAr;
+
+                // اختيار برمجي
+                spAccount.setText(
+                    a.accountCode + " - " + a.accountNameAr, false);
+
+                // تحميل بعد لحظة لضمان جاهزية الواجهة
+                spAccount.post(() -> loadLedger());
+                break;
+            }
+        }
+    }
+});
         // ─── دفتر الأستاذ ───
         viewModel.getGeneralLedger().observe(getViewLifecycleOwner(), ledger -> {
             pbLoading.setVisibility(View.GONE);
