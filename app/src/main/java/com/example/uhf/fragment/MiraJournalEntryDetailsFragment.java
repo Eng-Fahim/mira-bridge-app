@@ -33,8 +33,11 @@ import java.util.List;
 
 /**
  * ✅ شاشة تفاصيل القيد المحاسبي
- * - رأس القيد (رقم، تاريخ، حالة، وصف)
- * - KPIs: مدين / دائن / ذهب
+ *
+ * الميزات:
+ * - رأس القيد (رقم، تاريخ، حالة، وصف، مرجع)
+ * - 💰 مبلغ الفاتورة الأصلي (لقيود POS)
+ * - KPIs: مدين / دائن / ذهب / توازن
  * - سطور القيد
  * - ملاحظات
  * - سجل التعديلات
@@ -46,6 +49,7 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     // Views
     private MaterialToolbar toolbar;
     private TextView tvEntryNumber, tvStatus, tvDate, tvDescription, tvReference;
+    private TextView tvInvoiceAmount;   // ✅ جديد
     private LinearLayout kpiContainer;
     private RecyclerView rvLines;
     private TextView tvNotesLabel, tvNotes;
@@ -108,19 +112,20 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     }
 
     private void initViews(View v) {
-        toolbar         = v.findViewById(R.id.toolbar);
-        tvEntryNumber   = v.findViewById(R.id.tvEntryNumber);
-        tvStatus        = v.findViewById(R.id.tvStatus);
-        tvDate          = v.findViewById(R.id.tvDate);
-        tvDescription   = v.findViewById(R.id.tvDescription);
-        tvReference     = v.findViewById(R.id.tvReference);
-        kpiContainer    = v.findViewById(R.id.kpiContainer);
-        rvLines         = v.findViewById(R.id.rvLines);
-        tvNotesLabel    = v.findViewById(R.id.tvNotesLabel);
-        tvNotes         = v.findViewById(R.id.tvNotes);
-        tvAuditLabel    = v.findViewById(R.id.tvAuditLabel);
-        auditContainer  = v.findViewById(R.id.auditContainer);
-        pbLoading       = v.findViewById(R.id.pbLoading);
+        toolbar          = v.findViewById(R.id.toolbar);
+        tvEntryNumber    = v.findViewById(R.id.tvEntryNumber);
+        tvStatus         = v.findViewById(R.id.tvStatus);
+        tvDate           = v.findViewById(R.id.tvDate);
+        tvDescription    = v.findViewById(R.id.tvDescription);
+        tvReference      = v.findViewById(R.id.tvReference);
+        tvInvoiceAmount  = v.findViewById(R.id.tvInvoiceAmount);   // ✅ جديد
+        kpiContainer     = v.findViewById(R.id.kpiContainer);
+        rvLines          = v.findViewById(R.id.rvLines);
+        tvNotesLabel     = v.findViewById(R.id.tvNotesLabel);
+        tvNotes          = v.findViewById(R.id.tvNotes);
+        tvAuditLabel     = v.findViewById(R.id.tvAuditLabel);
+        auditContainer   = v.findViewById(R.id.auditContainer);
+        pbLoading        = v.findViewById(R.id.pbLoading);
     }
 
     private void setupToolbar() {
@@ -172,7 +177,6 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
                 ? entry.entryNumber : "—");
 
         tvStatus.setText(entry.getStatusLabelAr());
-        // لون الشارة
         try {
             tvStatus.getBackground().setTint(entry.getStatusColor());
         } catch (Exception ignored) {}
@@ -184,12 +188,24 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
         tvDescription.setText(entry.description != null && !entry.description.isEmpty()
                 ? entry.description : "—");
 
+        // ─── المرجع ───
         if (entry.reference != null && !entry.reference.isEmpty()) {
             tvReference.setVisibility(View.VISIBLE);
             tvReference.setText("🔖 المرجع: " + entry.reference
                 + " · " + entry.getSourceTypeLabelAr());
         } else {
             tvReference.setVisibility(View.GONE);
+        }
+
+        // ✅✅✅ مبلغ الفاتورة الأصلي — للقيود POS فقط
+        // (يُخفى إذا كان مساوياً لـ totalDebit — أي قيد يدوي)
+        if (entry.displayAmount > 0
+                && Math.abs(entry.displayAmount - entry.totalDebit) > 0.01) {
+            tvInvoiceAmount.setVisibility(View.VISIBLE);
+            tvInvoiceAmount.setText("💰 مبلغ الفاتورة الأصلي: "
+                + NumberFormatter.money(entry.displayAmount));
+        } else {
+            tvInvoiceAmount.setVisibility(View.GONE);
         }
 
         // ─── KPIs ───
@@ -220,8 +236,20 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     private void renderKpis(JournalEntryDto entry) {
         kpiContainer.removeAllViews();
 
-        addKpi("مدين",  NumberFormatter.moneyShort(entry.totalDebit),  "#3498DB");
-        addKpi("دائن",  NumberFormatter.moneyShort(entry.totalCredit), "#E74C3C");
+        // ✅ إذا كان قيد POS، أظهر مبلغ الفاتورة كأول KPI
+        boolean isPosSale = "pos_sale".equalsIgnoreCase(entry.sourceType)
+                && entry.displayAmount > 0
+                && Math.abs(entry.displayAmount - entry.totalDebit) > 0.01;
+
+        if (isPosSale) {
+            addKpi("مبلغ الفاتورة",
+                NumberFormatter.moneyShort(entry.displayAmount), "#D4AF37");
+        }
+
+        addKpi("إجمالي مدين",
+            NumberFormatter.moneyShort(entry.totalDebit),  "#3498DB");
+        addKpi("إجمالي دائن",
+            NumberFormatter.moneyShort(entry.totalCredit), "#E74C3C");
 
         double goldDiff = entry.totalGoldDebitGrams - entry.totalGoldCreditGrams;
         if (Math.abs(goldDiff) > 0.001) {
@@ -243,7 +271,7 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
 
         TextView tvTitle = card.findViewById(R.id.tvKpiTitle);
         TextView tvValue = card.findViewById(R.id.tvKpiValue);
-        View indicator = card.findViewById(R.id.kpiIndicator);
+        View indicator   = card.findViewById(R.id.kpiIndicator);
 
         tvTitle.setText(title);
         tvValue.setText(value);
