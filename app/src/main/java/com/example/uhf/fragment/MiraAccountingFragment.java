@@ -51,6 +51,7 @@ public class MiraAccountingFragment extends Fragment {
 
     // State
     private int currentTabIndex = 0;
+    private Long pendingLedgerAccountId = null; 
 
     // ═══════════════════════════════════════════════════════════
     //  Lifecycle
@@ -264,7 +265,18 @@ public void onStop() {
                 case TAB_INCOME:   return new MiraIncomeStatementFragment();
                 case TAB_BALANCE:  return new MiraBalanceSheetFragment();
                 case TAB_GOLD:     return new MiraGoldMovementFragment();
-                case TAB_LEDGER:   return new MiraGeneralLedgerFragment();
+                case TAB_LEDGER: {
+                    MiraGeneralLedgerFragment f = new MiraGeneralLedgerFragment();
+                    if (pendingLedgerAccountId != null && pendingLedgerAccountId > 0)
+                    {
+                     Bundle args = new Bundle();
+                     args.putLong("account_id", pendingLedgerAccountId);
+                     f.setArguments(args);
+                     Log.d(TAG, "Ledger fragment created with accountId="+ pendingLedgerAccountId);
+                     pendingLedgerAccountId = null; 
+                     }
+                     return f;
+                     }
                 default:           return new MiraJournalFragment();
             }
         } catch (Exception e) {
@@ -290,4 +302,31 @@ public void onStop() {
     public void refreshCurrentTab() {
         loadTab(currentTabIndex);
     }
+    
+    /**
+ * ✅ ينتقل لتبويب دفتر الأستاذ مع تمرير الحساب
+ */
+public void navigateToLedgerWithAccount(long accountId) {
+    this.pendingLedgerAccountId = accountId;
+
+    if (tabLayout == null) {
+        Log.e(TAG, "navigateToLedgerWithAccount: tabLayout is null");
+        return;
+    }
+
+    TabLayout.Tab ledgerTab = tabLayout.getTabAt(TAB_LEDGER);
+    if (ledgerTab == null) {
+        Log.e(TAG, "navigateToLedgerWithAccount: tab " + TAB_LEDGER + " not found");
+        return;
+    }
+
+    if (currentTabIndex == TAB_LEDGER) {
+        // ✅ نحن بالفعل على التبويب → أعد التحميل يدوياً
+        Log.d(TAG, "Already on Ledger tab → forcing reload with accountId=" + accountId);
+        loadTab(TAB_LEDGER);
+    } else {
+        // ✅ سيُطلق onTabSelected → loadTab
+        ledgerTab.select();
+    }
+}
 }
