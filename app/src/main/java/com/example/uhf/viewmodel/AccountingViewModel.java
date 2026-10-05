@@ -53,7 +53,15 @@ public class AccountingViewModel extends AndroidViewModel {
     // ═══════════════════════════════════════════════════════
     //  القيود
     // ═══════════════════════════════════════════════════════
-    
+    // ═══ LiveData لتفاصيل القيد ═══
+    private final MutableLiveData<JournalEntryDetailsDto> journalEntryDetails
+        = new MutableLiveData<>();
+    public LiveData<JournalEntryDetailsDto> getJournalEntryDetails() {
+    return journalEntryDetails;
+    }
+    public LiveData<JournalEntryDto[]> getJournalEntries() {
+        return journalEntries;
+    }
     public LiveData<JournalEntryDto[]> getJournalEntries() {
         return journalEntries;
     }
@@ -61,41 +69,46 @@ public class AccountingViewModel extends AndroidViewModel {
     public LiveData<JournalEntryDto> getSelectedEntry() {
         return selectedEntry;
     }
-    public void loadJournalEntries(int page, int perPage, String status) {
+    /**
+ * ✅ تحميل تفاصيل قيد كامل (entry + lines + audit)
+ */
+public void loadJournalEntryDetails(long entryId) {
+    if (entryId <= 0) {
+        error.setValue("معرف القيد غير صالح");
+        return;
+    }
+
     loading.setValue(true);
     error.setValue(null);
-    
-    // ✅ لا ترسل فلاتر التاريخ مؤقتاً — لتجاوز مشكلة الصيغة
-    api.accounting().getJournalEntries(
-        null,   // branch_id: null
-        null,   // from_date: null ← أزلنا
-        null,   // to_date: null   ← أزلنا
-        status,
-        perPage,
-        page
-    ).enqueue(new Callback<ApiResponseDto<JournalEntryDto[]>>() {
+
+    api.accounting().getJournalEntryDetails(entryId)
+        .enqueue(new Callback<JournalEntryDetailsDto>() {
             @Override
-            public void onResponse(Call<ApiResponseDto<JournalEntryDto[]>> call, 
-                                  Response<ApiResponseDto<JournalEntryDto[]>> response) {
+            public void onResponse(Call<JournalEntryDetailsDto> call,
+                                  Response<JournalEntryDetailsDto> response) {
                 loading.setValue(false);
-                if (response.isSuccessful() && response.body() != null) {
-                    if (response.body().success) {
-                        journalEntries.setValue(response.body().data);
-                    } else {
-                        error.setValue(response.body().error);
-                    }
+
+                if (response.isSuccessful()
+                        && response.body() != null
+                        && response.body().success
+                        && response.body().entry != null) {
+                    journalEntryDetails.setValue(response.body());
                 } else {
-                    error.setValue("فشل تحميل القيود: " + response.code());
+                    String msg = (response.body() != null
+                            && response.body().error != null)
+                            ? response.body().error
+                            : "فشل تحميل تفاصيل القيد: " + response.code();
+                    error.setValue(msg);
                 }
             }
-            
+
             @Override
-            public void onFailure(Call<ApiResponseDto<JournalEntryDto[]>> call, Throwable t) {
+            public void onFailure(Call<JournalEntryDetailsDto> call, Throwable t) {
                 loading.setValue(false);
                 error.setValue("خطأ في الشبكة: " + t.getMessage());
             }
         });
-    }
+}
     
     public void loadJournalEntry(long id) {
         loading.setValue(true);
