@@ -17,15 +17,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Adapter لسطور القيد في شاشة التفاصيل
+ * ✅ Adapter لسطور القيد
+ * مطابق لـ item_journal_line.xml
  */
 public class JournalLineAdapter
         extends RecyclerView.Adapter<JournalLineAdapter.VH> {
 
-    private List<JournalLineDto> items = new ArrayList<>();
+    private final List<JournalLineDto> items = new ArrayList<>();
 
     public void setItems(List<JournalLineDto> newItems) {
-        this.items = newItems != null ? newItems : new ArrayList<>();
+        items.clear();
+        if (newItems != null) items.addAll(newItems);
         notifyDataSetChanged();
     }
 
@@ -41,9 +43,10 @@ public class JournalLineAdapter
     public void onBindViewHolder(@NonNull VH h, int position) {
         JournalLineDto line = items.get(position);
 
-        h.tvAccount.setText(line.getDisplayAccount());
+        // ✅ ID الصحيح: tvLineAccount
+        h.tvLineAccount.setText(line.getDisplayAccount());
 
-        // وصف السطر
+        // ─── وصف السطر ───
         if (line.description != null && !line.description.trim().isEmpty()) {
             h.tvLineDescription.setVisibility(View.VISIBLE);
             h.tvLineDescription.setText(line.description);
@@ -51,7 +54,7 @@ public class JournalLineAdapter
             h.tvLineDescription.setVisibility(View.GONE);
         }
 
-        // مدين
+        // ─── مدين ───
         if (line.baseDebit > 0.01) {
             h.tvLineDebit.setText(NumberFormatter.moneyShort(line.baseDebit));
             h.tvLineDebit.setTextColor(Color.parseColor("#3498DB"));
@@ -60,7 +63,7 @@ public class JournalLineAdapter
             h.tvLineDebit.setTextColor(Color.parseColor("#BDC3C7"));
         }
 
-        // دائن
+        // ─── دائن ───
         if (line.baseCredit > 0.01) {
             h.tvLineCredit.setText(NumberFormatter.moneyShort(line.baseCredit));
             h.tvLineCredit.setTextColor(Color.parseColor("#E74C3C"));
@@ -69,16 +72,20 @@ public class JournalLineAdapter
             h.tvLineCredit.setTextColor(Color.parseColor("#BDC3C7"));
         }
 
-        // الذهب
+        // ─── الذهب ───
         if (line.hasGold()) {
-            h.tvLineGold.setVisibility(View.VISIBLE);
-            double gold = line.getGoldSigned();
+            h.goldContainer.setVisibility(View.VISIBLE);
+
+            double gold = line.getNetGold();
             String sign = gold >= 0 ? "+" : "";
-            String karat = line.originalKarat != null && !line.originalKarat.isEmpty()
+            String karat = (line.originalKarat != null
+                    && !line.originalKarat.isEmpty())
                     ? " (" + line.originalKarat + ")" : "";
-            h.tvLineGold.setText(sign + NumberFormatter.goldSigned(gold) + karat);
+
+            h.tvLineGold.setText(sign
+                + NumberFormatter.goldSigned(gold) + karat);
         } else {
-            h.tvLineGold.setVisibility(View.GONE);
+            h.goldContainer.setVisibility(View.GONE);
         }
     }
 
@@ -87,16 +94,25 @@ public class JournalLineAdapter
         return items.size();
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  ViewHolder
+    // ═══════════════════════════════════════════════════════
     static class VH extends RecyclerView.ViewHolder {
-        TextView tvAccount, tvLineDescription, tvLineGold, tvLineDebit, tvLineCredit;
+        TextView tvLineAccount;      // ✅
+        TextView tvLineDescription;
+        TextView tvLineDebit;
+        TextView tvLineCredit;
+        TextView tvLineGold;
+        View     goldContainer;      // ✅
 
         VH(@NonNull View v) {
             super(v);
-            tvAccount         = v.findViewById(R.id.tvAccount);
+            tvLineAccount     = v.findViewById(R.id.tvLineAccount);      // ✅
             tvLineDescription = v.findViewById(R.id.tvLineDescription);
-            tvLineGold        = v.findViewById(R.id.tvLineGold);
             tvLineDebit       = v.findViewById(R.id.tvLineDebit);
             tvLineCredit      = v.findViewById(R.id.tvLineCredit);
+            tvLineGold        = v.findViewById(R.id.tvLineGold);
+            goldContainer     = v.findViewById(R.id.goldContainer);      // ✅
         }
     }
 }
