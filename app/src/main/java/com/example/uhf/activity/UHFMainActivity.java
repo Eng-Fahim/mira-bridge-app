@@ -806,36 +806,29 @@ private boolean guardSetupAccess(String tag) {
 
     // 2) cache miss → اقرأ في الخلفية + اسمح بالمرور فقط للمخوّلين
     if (cachedStatus == null) {
-    Log.d(TAG, "🛡️ cache miss → fetching in background");
+        Log.d(TAG, "🛡️ cache miss → fetching in background");
 
-    // ⏳ اعرض شاشة تحميل مؤقتة
-    showSetupLoadingScreen();
+        // أرسل طلب تحديث في الخلفية
+        refreshSetupStatusInBackground();
 
-    // أرسل الطلب
-    refreshSetupStatusInBackground();
+        // الشاشات المسموح بها دائمًا
+        if (isSetupAllowedFragment(tag)) return true;
 
-    // ⏱️ انتظر قليلًا قبل اتخاذ القرار
-    mainHandler.postDelayed(() -> {
-        hideSetupLoadingScreen();
-        // أعد الفحص
-        String newStatus = getCachedSetupStatus();
-        if (SETUP_COMPLETED.equals(newStatus) || SETUP_LOCKED.equals(newStatus)) {
-            // اسمح بالمرور
-            loadFragmentDirectly(createFragmentByTag(tag), tag);
-        } else {
-            // لا يزال pending → طبّق الحظر
-            if (isSetupAllowedFragment(tag)) return;
-            boolean canSetup = ...;
-            if (canSetup) {
-                loadFragmentDirectly(new MiraAccountingSetupFragment(), "AccountingSetup");
-            } else {
-                showSetupBlockedScreen();
-            }
+        // هل المستخدم مخوّل بالإعداد؟
+        boolean canSetup = permissionManager != null
+                && (permissionManager.isSystemAdmin()
+                    || permissionManager.isOrgAdmin()
+                    || permissionManager.isFinanceManager()
+                    || permissionManager.isAccountant());
+
+        if (canSetup) {
+            return true;
         }
-    }, 1500); // انتظر 1.5 ثانية
 
-    return false;
-}
+        // ❌ غير مخوّل → امنعه
+        showSetupBlockedScreen();
+        return false;
+    }
 
     // 3) cache موجود = "pending" أو "in_progress"
     if (isSetupAllowedFragment(tag)) return true;
