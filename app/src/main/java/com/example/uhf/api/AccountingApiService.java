@@ -86,7 +86,11 @@ public interface AccountingApiService {
         @Query("to_date") String toDate,
         @Query("branch_id") Integer branchId
     );
-    
+
+    @GET("journal/{id}")
+Call<ApiResponseDto<JournalEntryDto>> getJournalEntry(
+    @Path("id") long id
+);
     // ═══════════════════════════════════════════════════════
     //  العملات
     // ═══════════════════════════════════════════════════════
