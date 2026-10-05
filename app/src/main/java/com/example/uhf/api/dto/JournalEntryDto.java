@@ -108,9 +108,9 @@ public class JournalEntryDto implements Serializable {
     public String updatedAt;
 
 
+
     @SerializedName("lines")
-    public JournalLineDto[] lines;   // ✅ يُملأ عند استدعاء /journal/{id}
-    
+public List<JournalLineDto> lines;   // ← List
     // ==================== Helpers ====================
 /**
  * ✅ صافي الذهب (مدين - دائن) بالجرامات
