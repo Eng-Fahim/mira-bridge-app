@@ -1184,8 +1184,19 @@ if (posSummaryStrip != null) {
                 && !"—".equals(data.customerPhone.trim()))
                 ? data.customerPhone.trim() : "";
 
-        payload.put("customer_name", customerName);
-        payload.put("customer_phone", customerPhone);
+        // ✅ على الجذر (للتوافق)
+payload.put("customer_name", customerName);
+payload.put("customer_phone", customerPhone);
+
+// ✅ داخل كائن customer (للفهم الصحيح)
+JSONObject customerObj = new JSONObject();
+customerObj.put("name", customerName);
+customerObj.put("phone", customerPhone);
+customerObj.put("email", data.customerEmail != null ? data.customerEmail : "");
+customerObj.put("address", data.customerAddress != null ? data.customerAddress : "");
+customerObj.put("notes", data.customerNotes != null ? data.customerNotes : "");
+customerObj.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
+payload.put("customer", customerObj);
 
         JSONArray itemsArr = new JSONArray();
         for (CartItem item : cartManager.getItems()) {
