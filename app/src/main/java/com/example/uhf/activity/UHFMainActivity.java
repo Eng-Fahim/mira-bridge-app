@@ -110,37 +110,38 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import com.google.android.material.badge.BadgeDrawable;
 
 /**
- * UHFMainActivity — النسخة النهائية مع عداد التحويلات الواردة
+ * UHFMainActivity — النسخة النهائية المستقرة
  *
- * ✅ يستخدم OnBackPressedDispatcher
- * ✅ NavigationManager هو المسؤول الوحيد عن التنقل
- * ✅ عداد تحويلات واردة احترافي مع Badge + كاش محلي
- * ✅ Throttle لمنع الطلبات المتكررة
+ * ✅ Setup Guard المركزي
+ * ✅ Setup Stamp لكشف التغييرات
+ * ✅ BottomNav container + items management
+ * ✅ Transfers counter + Badge
  */
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
-    
+
     // ═══════════════════════════════════════════════════════
-// ✅ ثوابت حالة الإعداد المحاسبي — المعيار العالمي
-// ═══════════════════════════════════════════════════════
-private static final String PREFS_SETUP = "mira_setup_state";
-private static final String KEY_SETUP_STATUS = "setup_status";
-private static final String KEY_SETUP_CACHED_AT = "cached_at";
-private static final long SETUP_CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقائق
+    //  ثوابت حالة الإعداد المحاسبي
+    // ═══════════════════════════════════════════════════════
+    private static final String PREFS_SETUP = "mira_setup_state";
+    private static final String KEY_SETUP_STATUS = "setup_status";
+    private static final String KEY_SETUP_CACHED_AT = "cached_at";
+    private static final String KEY_SETUP_STAMP = "setup_stamp";
+    private static final long SETUP_CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقائق
 
-// حالات الإعداد
-private static final String SETUP_PENDING = "pending";
-private static final String SETUP_IN_PROGRESS = "in_progress";
-private static final String SETUP_COMPLETED = "completed";
-private static final String SETUP_LOCKED = "locked";
+    private static final String SETUP_PENDING = "pending";
+    private static final String SETUP_IN_PROGRESS = "in_progress";
+    private static final String SETUP_COMPLETED = "completed";
+    private static final String SETUP_LOCKED = "locked";
 
-
-    // ==================== ✅ ثوابت عداد التحويلات ====================
-    private static final long TRANSFER_REFRESH_INTERVAL = 60_000L; // كل 60 ثانية
-    private static final long MIN_TRANSFER_REFRESH_INTERVAL = 3_000L; // Throttle: 3 ثواني
+    // ═══════════════════════════════════════════════════════
+    //  ثوابت عداد التحويلات
+    // ═══════════════════════════════════════════════════════
+    private static final long TRANSFER_REFRESH_INTERVAL = 60_000L;
+    private static final long MIN_TRANSFER_REFRESH_INTERVAL = 3_000L;
     private static final String PREFS_TRANSFERS_BADGE = "transfers_badge_prefs";
     private static final String KEY_LAST_TRANSFERS_COUNT = "last_transfers_count";
 
@@ -174,8 +175,7 @@ private static final String SETUP_LOCKED = "locked";
     public ArrayList<UHFTAGInfo> tagList = new ArrayList<>();
     public boolean loopFlag = false;
     private boolean isArabic = true;
-    
-    
+
     private boolean lastKeyboardState = false;
 
     private long lastBackPressTime = 0;
@@ -184,7 +184,6 @@ private static final String SETUP_LOCKED = "locked";
 
     private AppLifecycleObserver appLifecycleObserver;
 
-    // ==================== ✅ متغيرات عداد التحويلات ====================
     private int incomingTransfersCount = 0;
     private long lastTransferRefreshTime = 0;
     private final Handler transferCountHandler = new Handler(Looper.getMainLooper());
@@ -214,7 +213,6 @@ private static final String SETUP_LOCKED = "locked";
     }
 
     // ==================== Setters ====================
-
     public void setActiveEncodingFragment(MiraIdentityStudioFragment fragment) {
         this.activeEncodingFragment = fragment;
     }
@@ -239,14 +237,8 @@ private static final String SETUP_LOCKED = "locked";
     }
 
     // ==================== Getters ====================
-
-    public NavigationManager getNavigationManager() {
-        return navigationManager;
-    }
-
-    public PermissionManager getPermissionManager() {
-        return permissionManager;
-    }
+    public NavigationManager getNavigationManager() { return navigationManager; }
+    public PermissionManager getPermissionManager() { return permissionManager; }
 
     public String getCurrentFragmentTag() {
         return navigationManager != null
@@ -254,9 +246,7 @@ private static final String SETUP_LOCKED = "locked";
                 : "Dashboard";
     }
 
-    public int getIncomingTransfersCount() {
-        return incomingTransfersCount;
-    }
+    public int getIncomingTransfersCount() { return incomingTransfersCount; }
 
     // ==================== دورة الحياة ====================
 
@@ -271,14 +261,11 @@ private static final String SETUP_LOCKED = "locked";
         try {
             SharedPreferences prefs = getSharedPreferences("app_theme", Context.MODE_PRIVATE);
             int savedMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-
             int currentMode = AppCompatDelegate.getDefaultNightMode();
 
             if (currentMode != savedMode) {
                 Log.d(TAG, "Applying saved theme: " + modeToString(savedMode));
                 AppCompatDelegate.setDefaultNightMode(savedMode);
-            } else {
-                Log.d(TAG, "Theme already correct: " + modeToString(savedMode));
             }
         } catch (Exception e) {
             Log.e(TAG, "applySavedTheme error: " + e.getMessage());
@@ -297,7 +284,7 @@ private static final String SETUP_LOCKED = "locked";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-    DiagTracer.init(this);
+        DiagTracer.init(this);
         applySavedTheme();
         super.onCreate(savedInstanceState);
         try {
@@ -309,14 +296,12 @@ private static final String SETUP_LOCKED = "locked";
 
             setContentView(R.layout.activity_main);
 
-// ✅ حل جذري لتعارض الـ Theme
-findViewById(android.R.id.content).setFitsSystemWindows(true);
+            findViewById(android.R.id.content).setFitsSystemWindows(true);
 
-// ✅ إجبار نمط الكيبورد
-getWindow().setSoftInputMode(
-    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-    | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
-);
+            getWindow().setSoftInputMode(
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
+            );
 
             setupWindowInsets();
             setupKeyboardBehavior();
@@ -385,42 +370,36 @@ getWindow().setSoftInputMode(
             statusIndicatorManager = new StatusIndicatorManager(
                     findViewById(android.R.id.content), hardwareManager);
 
-           setupQuickNav();
-setupOrgProfileListener();
+            setupQuickNav();
+            setupOrgProfileListener();
 
-// 🛡️ تعطيل التنقل حتى نتحقق من حالة الإعداد (في كل الحالات)
-disableNavigationUntilSetupChecked();
+            // 🛡️ تعطيل التنقل مؤقتًا
+            disableNavigationUntilSetupChecked();
 
-// 🛡️ دائماً افحص حالة الإعداد — بغض النظر عن savedInstanceState
-// السبب: عند تغيير الثيم/اللغة، يُعاد إنشاء Activity لكن حالة الإعداد قد تكون تغيّرت
-String cachedSetupStatus = getCachedSetupStatus();
-boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
-        || SETUP_LOCKED.equals(cachedSetupStatus);
+            // 🛡️ فحص حالة الإعداد (مع مراعاة savedInstanceState)
+            String cachedSetupStatus = getCachedSetupStatus();
+            boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
+                    || SETUP_LOCKED.equals(cachedSetupStatus);
 
-if (setupIsComplete) {
-    // ✅ النظام مُعد → اسمح بالاستعادة العادية
-    if (savedInstanceState == null) {
-        navigateByRole();
-    } else {
-        String savedTag = savedInstanceState.getString(
-                "current_fragment", NavigationManager.TAG_DASHBOARD);
-        Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
-        if (savedFragment != null) {
-            enableNavigationAfterSetup();
-            // المرور عبر الحارس المركزي
-            loadFragmentDirectly(savedFragment, savedTag);
-        } else {
-            navigateByRole();
-        }
-    }
-} else {
-    // ⚠️ النظام غير مُعد → تجاهل savedInstanceState وافحص مجددًا
-    // السبب: المستخدم يجب أن يبقى في شاشة الإعداد
-    Log.d(TAG, "🔒 Setup pending → ignoring savedInstanceState, re-checking");
+            if (setupIsComplete) {
+                if (savedInstanceState == null) {
+                    navigateByRole();
+                } else {
+                    String savedTag = savedInstanceState.getString(
+                            "current_fragment", NavigationManager.TAG_DASHBOARD);
+                    Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
+                    if (savedFragment != null) {
+                        enableNavigationAfterSetup();
+                        loadFragmentDirectly(savedFragment, savedTag);
+                    } else {
+                        navigateByRole();
+                    }
+                }
+            } else {
+                Log.d(TAG, "🔒 Setup pending → ignoring savedInstanceState");
+                checkSetupStatusAndNavigate();
+            }
 
-    // لا نستخدم savedInstanceState هنا
-    checkSetupStatusAndNavigate();
-}
             try {
                 if (sessionManager != null) {
                     appLifecycleObserver = new AppLifecycleObserver(sessionManager);
@@ -432,7 +411,6 @@ if (setupIsComplete) {
 
             syncUIWithNavigation();
 
-            // ✅ تسجيل BroadcastReceiver
             try {
                 LocalBroadcastManager lbm = LocalBroadcastManager.getInstance(this);
                 IntentFilter filter = new IntentFilter();
@@ -444,7 +422,6 @@ if (setupIsComplete) {
                 Log.e(TAG, "Register transfers receiver error: " + e.getMessage());
             }
 
-            // ✅ استعادة آخر قيمة للعداد من الكاش المحلي
             int cachedCount = loadTransfersCountLocally();
             if (cachedCount > 0) {
                 mainHandler.postDelayed(() -> updateTransfersBadge(cachedCount), 500);
@@ -463,358 +440,375 @@ if (setupIsComplete) {
     }
 
     private void setupWindowInsets() {
-        View bottomNavView = findViewById(R.id.bottomNavigationView);
-        if (bottomNavView != null) {
-            
-        }
+        // Window insets handled by other components
+    }
 
-        View toolbarView = findViewById(R.id.toolbar);
-        if (toolbarView != null) {
-            
+    // ═══════════════════════════════════════════════════════
+    //  🛡️ Navigation Enable/Disable
+    // ═══════════════════════════════════════════════════════
+
+    private void disableNavigationUntilSetupChecked() {
+        try {
+            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+            if (nav != null) {
+                nav.setEnabled(false);
+                nav.setAlpha(0.4f);
+            }
+
+            FloatingActionButton fab = findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setEnabled(false);
+                fab.setAlpha(0.4f);
+            }
+
+            Log.d(TAG, "🔒 Navigation disabled until setup check");
+        } catch (Exception e) {
+            Log.e(TAG, "disableNavigationUntilSetupChecked error: " + e.getMessage());
         }
     }
-    
+
     /**
- * 🛡️ تعطيل التنقل مؤقتًا حتى نتحقق من حالة الإعداد
- * يُستدعى في onCreate قبل checkSetupStatusAndNavigate()
- */
-private void disableNavigationUntilSetupChecked() {
-    try {
-        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-        if (nav != null) {
-            nav.setEnabled(false);
-            nav.setAlpha(0.4f);
-        }
-
-        FloatingActionButton fab = findViewById(R.id.fabActionCenter);
-        if (fab != null) {
-            fab.setEnabled(false);
-            fab.setAlpha(0.4f);
-        }
-
-        Log.d(TAG, "🔒 Navigation disabled until setup check");
-    } catch (Exception e) {
-        Log.e(TAG, "disableNavigationUntilSetupChecked error: " + e.getMessage());
-    }
-}
-    
+     * ✅ فعّل التنقل — يُظهر Container + يُفعّل العناصر
+     */
     private void enableNavigationAfterSetup() {
-    BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-    if (nav != null) {
-        nav.setEnabled(true);
-        nav.setAlpha(1.0f);
-    }
-    FloatingActionButton fab = findViewById(R.id.fabActionCenter);
-    if (fab != null) {
-        fab.setEnabled(true);
-        fab.setAlpha(1.0f);
-    }
-}
-    
-// ═══════════════════════════════════════════════════════════
-//  ✅ فحص حالة الإعداد المحاسبي — قبل التوجيه (المعيار العالمي)
-//  القاعدة: لا يمكن لأي مستخدم استخدام النظام قبل اكتمال الإعداد
-//  الاستثناء الوحيد: System Admin (مهندس النظام)
-// ═══════════════════════════════════════════════════════════
+        // ⭐ 1. أظهر Container أولاً
+        setBottomNavVisible(true);
 
-private void checkSetupStatusAndNavigate() {
-    // ✅ 1) اقرأ حالة الإعداد من الكاش أولاً (سريع)
-    String cachedStatus = getCachedSetupStatus();
+        // ⭐ 2. فعّل العناصر
+        applyNavEnabledState(true);
 
-    // ✅ 2) إذا الكاش صالح → تابع فوراً
-    if (cachedStatus != null) {
-        Log.d(TAG, "✅ Setup status from cache: " + cachedStatus);
-        navigateBySetupStatus(cachedStatus);
-        // ⚠️ حدّث الكاش في الخلفية (stale-while-revalidate)
-        refreshSetupStatusInBackground();
-        return;
+        Log.d(TAG, "✅ Navigation enabled (container + items)");
     }
 
-    // ✅ 3) إذا لا يوجد كاش → اجلب من API (مع شاشة تحميل)
-    Log.d(TAG, "⏳ Fetching setup status from API...");
-    fetchSetupStatusAndNavigate();
-}
-
-/**
- * جلب حالة الإعداد من API ثم التوجيه
- */
-private void fetchSetupStatusAndNavigate() {
-    // عرض شاشة تحميل مؤقتة
-    showSetupLoadingScreen();
-
-    new Thread(() -> {
-        String status = null;
+    /**
+     * ✅ ضبط تفعيل عناصر BottomNav
+     */
+    private void applyNavEnabledState(boolean enabled) {
         try {
-            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
-
-            if (response != null && response.isSuccess && response.data != null) {
-                status = response.data.optString("status", SETUP_PENDING);
-                Log.d(TAG, "✅ Setup status from API: " + status);
-            } else {
-                // ❌ فشل الاتصال → استخدم pending كافتراضي آمن
-                Log.w(TAG, "⚠️ Failed to fetch setup status → assuming pending");
-                status = SETUP_PENDING;
+            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+            if (nav != null) {
+                nav.setEnabled(enabled);
+                nav.setAlpha(enabled ? 1.0f : 0.4f);
+            }
+            FloatingActionButton fab = findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setEnabled(enabled);
+                fab.setAlpha(enabled ? 1.0f : 0.4f);
             }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
-            status = SETUP_PENDING;
+            Log.e(TAG, "applyNavEnabledState error: " + e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  ✅ Setup Status — Check & Navigate
+    // ═══════════════════════════════════════════════════════
+
+    private void checkSetupStatusAndNavigate() {
+        String cachedStatus = getCachedSetupStatus();
+
+        if (cachedStatus != null) {
+            Log.d(TAG, "✅ Setup status from cache: " + cachedStatus);
+            navigateBySetupStatus(cachedStatus);
+            refreshSetupStatusInBackground();
+            return;
         }
 
-        final String finalStatus = status;
-        runOnUiThread(() -> {
-            hideSetupLoadingScreen();
-            if (isActivityAlive()) {
-                // حفظ في الكاش
-                cacheSetupStatus(finalStatus);
-                // توجيه
-                navigateBySetupStatus(finalStatus);
-            }
-        });
-    }).start();
-}
+        Log.d(TAG, "⏳ Fetching setup status from API...");
+        fetchSetupStatusAndNavigate();
+    }
 
-/**
- * تحديث حالة الإعداد في الخلفية (بدون تجميد المستخدم)
- */
-private void refreshSetupStatusInBackground() {
-    new Thread(() -> {
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+    private void fetchSetupStatusAndNavigate() {
+        showSetupLoadingScreen();
 
-            if (response != null && response.isSuccess && response.data != null) {
-                String status = response.data.optString("status", SETUP_PENDING);
-                cacheSetupStatus(status);   // ✅ احفظ في الكاش
+        new Thread(() -> {
+            String status = SETUP_PENDING;
+            String stamp  = null;
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
 
-                Log.d(TAG, "✅ Setup status refreshed: " + status);
-
-                // إذا اكتمل → حدث الواجهة
-                if (SETUP_COMPLETED.equals(status) || SETUP_LOCKED.equals(status)) {
-                    mainHandler.post(() -> {
-                        if (isActivityAlive()) {
-                            Log.d(TAG, "🎉 Setup completed detected in background");
-                            navigateByRole();
-                        }
-                    });
+                if (response != null && response.isSuccess && response.data != null) {
+                    status = response.data.optString("status", SETUP_PENDING);
+                    stamp  = response.data.optString("setup_stamp", null);
+                    Log.d(TAG, "✅ Setup status from API: " + status
+                            + " | stamp: " + (stamp != null ? stamp.substring(0, 8) + "..." : "null"));
+                } else {
+                    Log.w(TAG, "⚠️ Failed to fetch setup status → assuming pending");
                 }
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.w(TAG, "Setup status refresh failed: " + e.getMessage());
-        }
-    }).start();
-}
 
-/**
- * التوجيه بناءً على حالة الإعداد + صلاحية المستخدم
- *
- * المنطق:
- * - pending/in_progress + System Admin أو Org Admin → شاشة الإعداد
- * - pending/in_progress + أي دور آخر → رسالة "قيد الإعداد" + منع الدخول
- * - completed/locked → التوجيه حسب الدور + تفعيل التنقل
- */
-/**
- * التوجيه بناءً على حالة الإعداد + صلاحية المستخدم
- *
- * المنطق:
- * - pending/in_progress + (System Admin / Org Admin / Finance Mgr / Accountant) → الإعداد
- * - pending/in_progress + أي دور آخر → رسالة "قيد الإعداد" + منع الدخول
- * - completed/locked → التوجيه حسب الدور + تفعيل التنقل
- */
-private void navigateBySetupStatus(String setupStatus) {
-    boolean isSystemAdmin   = permissionManager != null && permissionManager.isSystemAdmin();
-    boolean isOrgAdmin      = permissionManager != null && permissionManager.isOrgAdmin();
-    boolean isFinanceMgr    = permissionManager != null && permissionManager.isFinanceManager();
-    boolean isAccountant    = permissionManager != null && permissionManager.isAccountant();
+            final String finalStatus = status;
+            final String finalStamp  = stamp;
+            runOnUiThread(() -> {
+                hideSetupLoadingScreen();
+                if (isActivityAlive()) {
+                    cacheSetupStatus(finalStatus, finalStamp);
+                    navigateBySetupStatus(finalStatus);
+                }
+            });
+        }).start();
+    }
 
-    boolean canPerformSetup = isSystemAdmin || isOrgAdmin || isFinanceMgr || isAccountant;
+    /**
+     * ⭐ تحديث حالة الإعداد في الخلفية — مع حماية من الرجوع الخطأ
+     */
+    private void refreshSetupStatusInBackground() {
+        new Thread(() -> {
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
 
-    boolean isSetupPending = SETUP_PENDING.equals(setupStatus)
-            || SETUP_IN_PROGRESS.equals(setupStatus);
+                if (response != null && response.isSuccess && response.data != null) {
+                    String serverStatus = response.data.optString("status", SETUP_PENDING);
+                    String serverStamp  = response.data.optString("setup_stamp", null);
+                    String localStamp   = getCachedSetupStamp();
+                    String localStatus  = getCachedSetupStatus();
 
-    Log.d(TAG, "🧭 Navigate: status=" + setupStatus
-            + ", isSystemAdmin=" + isSystemAdmin
-            + ", isOrgAdmin=" + isOrgAdmin
-            + ", isFinanceMgr=" + isFinanceMgr
-            + ", isAccountant=" + isAccountant);
+                    boolean stampChanged = (localStamp != null && serverStamp != null
+                            && !localStamp.equals(serverStamp));
 
-    if (isSetupPending) {
-        if (canPerformSetup) {
-            enableNavigationAfterSetup();
+                    // ⭐ حماية: منع الرجوع من completed → pending بدون تغيّر الختم
+                    if (SETUP_COMPLETED.equals(localStatus)
+                            && !SETUP_COMPLETED.equals(serverStatus)
+                            && !SETUP_LOCKED.equals(serverStatus)
+                            && !stampChanged) {
+                        Log.w(TAG, "🛡️ Ignoring server downgrade (no stamp change)");
+                        return;
+                    }
 
-            loadFragmentDirectly(
-                    new MiraAccountingSetupFragment(),
-                    "AccountingSetup"
-            );
+                    if (stampChanged) {
+                        Log.w(TAG, "🔄 Stamp changed! invalidating cache");
+                        invalidateSetupCache();
+                        cacheSetupStatus(serverStatus, serverStamp);
 
-            String welcomeMsg;
-            if (isSystemAdmin) {
-                welcomeMsg = isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
-                                      : "🔧 Welcome Engineer — Please complete setup";
-            } else if (isOrgAdmin) {
-                welcomeMsg = isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
-                                      : "🏢 Welcome Org Admin — Please configure accounting";
-            } else if (isFinanceMgr) {
-                welcomeMsg = isArabic ? "💰 مرحباً المدير المالي — يرجى إعداد النظام المحاسبي"
-                                      : "💰 Welcome Finance Manager — Please configure accounting";
+                        if (!SETUP_COMPLETED.equals(serverStatus)
+                                && !SETUP_LOCKED.equals(serverStatus)) {
+                            mainHandler.post(() -> {
+                                if (isActivityAlive()) {
+                                    Log.w(TAG, "🔄 Setup reset detected");
+                                    navigateBySetupStatus(serverStatus);
+                                }
+                            });
+                            return;
+                        }
+                    } else {
+                        cacheSetupStatus(serverStatus, serverStamp);
+                    }
+
+                    Log.d(TAG, "✅ Setup status refreshed: " + serverStatus
+                            + " (stampChanged=" + stampChanged + ")");
+
+                    if (SETUP_COMPLETED.equals(serverStatus)
+                            || SETUP_LOCKED.equals(serverStatus)) {
+                        mainHandler.post(() -> {
+                            if (isActivityAlive()) {
+                                navigateByRole();
+                            }
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Setup status refresh failed: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * التوجيه حسب حالة الإعداد
+     */
+    private void navigateBySetupStatus(String setupStatus) {
+        boolean isSystemAdmin   = permissionManager != null && permissionManager.isSystemAdmin();
+        boolean isOrgAdmin      = permissionManager != null && permissionManager.isOrgAdmin();
+        boolean isFinanceMgr    = permissionManager != null && permissionManager.isFinanceManager();
+        boolean isAccountant    = permissionManager != null && permissionManager.isAccountant();
+
+        boolean canPerformSetup = isSystemAdmin || isOrgAdmin || isFinanceMgr || isAccountant;
+
+        boolean isSetupPending = SETUP_PENDING.equals(setupStatus)
+                || SETUP_IN_PROGRESS.equals(setupStatus);
+
+        Log.d(TAG, "🧭 Navigate: status=" + setupStatus
+                + ", isSystemAdmin=" + isSystemAdmin
+                + ", isOrgAdmin=" + isOrgAdmin
+                + ", isFinanceMgr=" + isFinanceMgr
+                + ", isAccountant=" + isAccountant);
+
+        if (isSetupPending) {
+            if (canPerformSetup) {
+                enableNavigationAfterSetup();
+
+                // ⭐ أخفِ الـ Nav مؤقتًا (لأن Fragment الإعداد سيطلب ذلك)
+                setBottomNavVisible(false);
+
+                loadFragmentDirectly(
+                        new MiraAccountingSetupFragment(),
+                        "AccountingSetup"
+                );
+
+                String welcomeMsg;
+                if (isSystemAdmin) {
+                    welcomeMsg = isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
+                                          : "🔧 Welcome Engineer — Please complete setup";
+                } else if (isOrgAdmin) {
+                    welcomeMsg = isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
+                                          : "🏢 Welcome Org Admin — Please configure accounting";
+                } else if (isFinanceMgr) {
+                    welcomeMsg = isArabic ? "💰 مرحباً المدير المالي — يرجى إعداد النظام المحاسبي"
+                                          : "💰 Welcome Finance Manager — Please configure accounting";
+                } else {
+                    welcomeMsg = isArabic ? "📊 مرحباً المحاسب — يرجى إكمال الإعداد"
+                                          : "📊 Welcome Accountant — Please complete setup";
+                }
+                Toast.makeText(this, welcomeMsg, Toast.LENGTH_LONG).show();
+
             } else {
-                welcomeMsg = isArabic ? "📊 مرحباً المحاسب — يرجى إكمال الإعداد"
-                                      : "📊 Welcome Accountant — Please complete setup";
+                showSetupBlockedScreen();
             }
-            Toast.makeText(this, welcomeMsg, Toast.LENGTH_LONG).show();
-
         } else {
-            showSetupBlockedScreen();
+            enableNavigationAfterSetup();
+            navigateByRole();
         }
-    } else {
-        enableNavigationAfterSetup();
-        navigateByRole();
     }
-}
 
-/**
- * التوجيه حسب دور المستخدم (عندما يكون النظام جاهزاً)
- */
-private void navigateByRole() {
-    try {
-        Fragment targetFragment;
-        String targetTag;
+    /**
+     * التوجيه حسب دور المستخدم
+     */
+    private void navigateByRole() {
+        try {
+            Fragment targetFragment;
+            String targetTag;
 
-        if (permissionManager.isPosOperator()) {
-            targetFragment = new MiraPosFragment();
-            targetTag = NavigationManager.TAG_POS;
+            if (permissionManager.isPosOperator()) {
+                targetFragment = new MiraPosFragment();
+                targetTag = NavigationManager.TAG_POS;
 
-        } else if (permissionManager.isInventoryManager()) {
-            targetFragment = new MiraInventoryProFragment();
-            targetTag = NavigationManager.TAG_INVENTORY;
+            } else if (permissionManager.isInventoryManager()) {
+                targetFragment = new MiraInventoryProFragment();
+                targetTag = NavigationManager.TAG_INVENTORY;
 
-        } else if (permissionManager.isSecurity()
-                || permissionManager.isGateSecurity()) {
-            targetFragment = new MiraSecureGateFragment();
-            targetTag = NavigationManager.TAG_SECURE_GATE;
+            } else if (permissionManager.isSecurity()
+                    || permissionManager.isGateSecurity()) {
+                targetFragment = new MiraSecureGateFragment();
+                targetTag = NavigationManager.TAG_SECURE_GATE;
 
-        } else {
-            // admin, finance manager, accountant, auditor, branch manager → Dashboard
-            targetFragment = new MiraDashboardFragment();
-            targetTag = NavigationManager.TAG_DASHBOARD;
+            } else {
+                targetFragment = new MiraDashboardFragment();
+                targetTag = NavigationManager.TAG_DASHBOARD;
+            }
+
+            loadFragmentDirectly(targetFragment, targetTag);
+            Log.d(TAG, "✅ Navigated by role to: " + targetTag);
+
+        } catch (Exception e) {
+            Log.e(TAG, "navigateByRole error: " + e.getMessage());
+            loadFragmentDirectly(new MiraDashboardFragment(),
+                    NavigationManager.TAG_DASHBOARD);
         }
-
-        loadFragmentDirectly(targetFragment, targetTag);
-        Log.d(TAG, "✅ Navigated by role to: " + targetTag);
-
-    } catch (Exception e) {
-        Log.e(TAG, "navigateByRole error: " + e.getMessage());
-        loadFragmentDirectly(new MiraDashboardFragment(),
-                NavigationManager.TAG_DASHBOARD);
     }
-}
-/**
- * شاشة "النظام قيد الإعداد" — غير قابلة للتخطي
- */
-private void showSetupBlockedScreen() {
-    if (isFinishing() || isDestroyed()) return;
-    if (!isActivityAlive()) return;
 
-    try {
-        BottomSheetDialog dialog = new BottomSheetDialog(
-                this, R.style.TransparentBottomSheetDialog);
+    /**
+     * شاشة الحظر
+     */
+    private void showSetupBlockedScreen() {
+        if (isFinishing() || isDestroyed()) return;
+        if (!isActivityAlive()) return;
 
-        View view = getLayoutInflater().inflate(
-                R.layout.dialog_system_under_setup, null);
-        dialog.setContentView(view);
+        try {
+            BottomSheetDialog dialog = new BottomSheetDialog(
+                    this, R.style.TransparentBottomSheetDialog);
 
-        dialog.setCancelable(false);
-        dialog.setCanceledOnTouchOutside(false);
+            View view = getLayoutInflater().inflate(
+                    R.layout.dialog_system_under_setup, null);
+            dialog.setContentView(view);
 
-        // تطبيق اللغة
-        TextView tvTitle = view.findViewById(R.id.tvSetupTitle);
-        TextView tvMessage = view.findViewById(R.id.tvSetupMessage);
-        TextView tvSysAdmin = view.findViewById(R.id.tvContactSystemAdmin);
-        TextView tvOrgAdmin = view.findViewById(R.id.tvContactOrgAdmin);
-        TextView tvEmail = view.findViewById(R.id.tvContactEmail);
-        MaterialButton btnLogout = view.findViewById(R.id.btnSetupLogout);
+            dialog.setCancelable(false);
+            dialog.setCanceledOnTouchOutside(false);
 
-        if (isArabic) {
-            tvTitle.setText("⚠️ النظام قيد الإعداد");
-            tvMessage.setText("لم يتم استكمال الإعداد المحاسبي بعد.\n\n" +
-                    "لا يمكن استخدام النظام قبل اكتمال الإعداد.");
-            tvSysAdmin.setText("🔧  مهندس النظام (System Admin)");
-            tvOrgAdmin.setText("🏢  مدير الجهة (Org Admin)");
-            tvEmail.setText("📧  support@mirabarcode.com");
-            btnLogout.setText("تسجيل الخروج");
-        } else {
-            tvTitle.setText("⚠️ System Under Setup");
-            tvMessage.setText("Accounting setup is not yet complete.\n\n" +
-                    "The system cannot be used until setup is finished.");
-            tvSysAdmin.setText("🔧  System Admin");
-            tvOrgAdmin.setText("🏢  Org Admin");
-            tvEmail.setText("📧  support@mirabarcode.com");
-            btnLogout.setText("Logout");
-        }
+            TextView tvTitle = view.findViewById(R.id.tvSetupTitle);
+            TextView tvMessage = view.findViewById(R.id.tvSetupMessage);
+            TextView tvSysAdmin = view.findViewById(R.id.tvContactSystemAdmin);
+            TextView tvOrgAdmin = view.findViewById(R.id.tvContactOrgAdmin);
+            TextView tvEmail = view.findViewById(R.id.tvContactEmail);
+            MaterialButton btnLogout = view.findViewById(R.id.btnSetupLogout);
 
-        btnLogout.setOnClickListener(v -> {
-            dialog.dismiss();
+            if (isArabic) {
+                tvTitle.setText("⚠️ النظام قيد الإعداد");
+                tvMessage.setText("لم يتم استكمال الإعداد المحاسبي بعد.\n\n" +
+                        "لا يمكن استخدام النظام قبل اكتمال الإعداد.");
+                tvSysAdmin.setText("🔧  مهندس النظام (System Admin)");
+                tvOrgAdmin.setText("🏢  مدير الجهة (Org Admin)");
+                tvEmail.setText("📧  support@mirabarcode.com");
+                btnLogout.setText("تسجيل الخروج");
+            } else {
+                tvTitle.setText("⚠️ System Under Setup");
+                tvMessage.setText("Accounting setup is not yet complete.\n\n" +
+                        "The system cannot be used until setup is finished.");
+                tvSysAdmin.setText("🔧  System Admin");
+                tvOrgAdmin.setText("🏢  Org Admin");
+                tvEmail.setText("📧  support@mirabarcode.com");
+                btnLogout.setText("Logout");
+            }
+
+            btnLogout.setOnClickListener(v -> {
+                dialog.dismiss();
+                performFullLogout();
+            });
+
+            dialog.show();
+
+        } catch (Exception e) {
+            Log.e(TAG, "showSetupBlockedScreen error: " + e.getMessage(), e);
             performFullLogout();
-        });
-
-        dialog.show();
-
-    } catch (Exception e) {
-        Log.e(TAG, "showSetupBlockedScreen error: " + e.getMessage(), e);
-        performFullLogout();
+        }
     }
-}
 
-// ═══════════════════════════════════════════════════════
-//  🛡️ حارس النظام المركزي — يمنع أي تنقل إذا كان النظام غير مُعد
-// ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
+    //  🛡️ الحارس المركزي
+    // ═══════════════════════════════════════════════════════
 
-/**
- * قائمة الشاشات المسموح بها دائمًا حتى لو النظام غير مُعد
- */
-private boolean isSetupAllowedFragment(String tag) {
-    if (tag == null) return false;
-    return "AccountingSetup".equals(tag)
-        || "Profile".equals(tag)
-        || "ServerConfig".equals(tag)
-        || "Login".equals(tag);
-}
+    private boolean isSetupAllowedFragment(String tag) {
+        if (tag == null) return false;
+        return "AccountingSetup".equals(tag)
+            || "Profile".equals(tag)
+            || "ServerConfig".equals(tag)
+            || "Login".equals(tag);
+    }
 
-/**
- * هل يُسمح بالمتابعة؟
- * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
- */
-/**
- * 🛡️ الحارس المركزي — يمنع أي تنقل إذا كان النظام غير مُعد
- *
- * @param tag الشاشة المطلوب الانتقال إليها
- * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
- */
-/**
- * 🛡️ الحارس المركزي — يمنع أي تنقل إذا كان النظام غير مُعد
- *
- * @param tag الشاشة المطلوب الانتقال إليها
- * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
- */
-private boolean guardSetupAccess(String tag) {
-    // 1) اقرأ من الكاش
-    String cachedStatus = getCachedSetupStatus();
-    boolean setupDone = SETUP_COMPLETED.equals(cachedStatus)
-            || SETUP_LOCKED.equals(cachedStatus);
+    private boolean guardSetupAccess(String tag) {
+        // 1) النظام مُعد؟
+        String cachedStatus = getCachedSetupStatus();
+        boolean setupDone = SETUP_COMPLETED.equals(cachedStatus)
+                || SETUP_LOCKED.equals(cachedStatus);
 
-    if (setupDone) return true;
+        if (setupDone) return true;
 
-    // 2) cache miss → اقرأ في الخلفية + اسمح بالمرور فقط للمخوّلين
-    if (cachedStatus == null) {
-        Log.d(TAG, "🛡️ cache miss → fetching in background");
+        // 2) cache miss
+        if (cachedStatus == null) {
+            Log.d(TAG, "🛡️ cache miss → fetching in background");
+            refreshSetupStatusInBackground();
 
-        // أرسل طلب تحديث في الخلفية
-        refreshSetupStatusInBackground();
+            if (isSetupAllowedFragment(tag)) return true;
 
-        // الشاشات المسموح بها دائمًا
+            boolean canSetup = permissionManager != null
+                    && (permissionManager.isSystemAdmin()
+                        || permissionManager.isOrgAdmin()
+                        || permissionManager.isFinanceManager()
+                        || permissionManager.isAccountant());
+
+            if (canSetup) return true;
+
+            showSetupBlockedScreen();
+            return false;
+        }
+
+        // 3) cache = pending/in_progress
         if (isSetupAllowedFragment(tag)) return true;
 
-        // هل المستخدم مخوّل بالإعداد؟
+        refreshSetupStatusInBackground();
+
         boolean canSetup = permissionManager != null
                 && (permissionManager.isSystemAdmin()
                     || permissionManager.isOrgAdmin()
@@ -822,77 +816,82 @@ private boolean guardSetupAccess(String tag) {
                     || permissionManager.isAccountant());
 
         if (canSetup) {
-            return true;
+            Log.d(TAG, "🛡️ Setup pending → redirecting to Setup: " + tag);
+            Toast.makeText(this,
+                    isArabic ? "⚠️ يجب إكمال الإعداد أولاً"
+                             : "⚠️ Setup must be completed first",
+                    Toast.LENGTH_SHORT).show();
+            loadFragmentDirectly(new MiraAccountingSetupFragment(), "AccountingSetup");
+            return false;
         }
 
-        // ❌ غير مخوّل → امنعه
+        Log.d(TAG, "🛡️ Setup pending → blocking user: " + tag);
         showSetupBlockedScreen();
         return false;
     }
 
-    // 3) cache موجود = "pending" أو "in_progress"
-    if (isSetupAllowedFragment(tag)) return true;
+    // ═══════════════════════════════════════════════════════
+    //  Cache Management
+    // ═══════════════════════════════════════════════════════
 
-    // أرسل طلب تحديث في الخلفية (قد يكون قد تغيّر)
-    refreshSetupStatusInBackground();
-
-    boolean canSetup = permissionManager != null
-            && (permissionManager.isSystemAdmin()
-                || permissionManager.isOrgAdmin()
-                || permissionManager.isFinanceManager()
-                || permissionManager.isAccountant());
-
-    if (canSetup) {
-        Log.d(TAG, "🛡️ Setup pending → redirecting to Setup: " + tag);
-        Toast.makeText(this,
-                isArabic ? "⚠️ يجب إكمال الإعداد أولاً"
-                         : "⚠️ Setup must be completed first",
-                Toast.LENGTH_SHORT).show();
-        loadFragmentDirectly(new MiraAccountingSetupFragment(), "AccountingSetup");
-        return false;
+    private void cacheSetupStatus(String status) {
+        cacheSetupStatus(status, null);
     }
 
-    Log.d(TAG, "🛡️ Setup pending → blocking user: " + tag);
-    showSetupBlockedScreen();
-    return false;
-}
-// ═══════════════════════════════════════════════════════════
-//  Cache لـ Setup Status (سريع + آمن)
-// ═══════════════════════════════════════════════════════════
+    private void cacheSetupStatus(String status, String stamp) {
+        try {
+            SharedPreferences.Editor editor = getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_SETUP_STATUS, status)
+                    .putLong(KEY_SETUP_CACHED_AT, System.currentTimeMillis());
 
-private void cacheSetupStatus(String status) {
-    try {
-        getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_SETUP_STATUS, status)
-                .putLong(KEY_SETUP_CACHED_AT, System.currentTimeMillis())
-                .apply();
-    } catch (Exception e) {
-        Log.w(TAG, "cacheSetupStatus error: " + e.getMessage());
+            if (stamp != null && !stamp.isEmpty()) {
+                editor.putString(KEY_SETUP_STAMP, stamp);
+            }
+
+            editor.apply();
+        } catch (Exception e) {
+            Log.w(TAG, "cacheSetupStatus error: " + e.getMessage());
+        }
     }
-}
 
-private String getCachedSetupStatus() {
-    try {
-        SharedPreferences prefs = getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE);
-        long cachedAt = prefs.getLong(KEY_SETUP_CACHED_AT, 0);
-        long now = System.currentTimeMillis();
-
-        // إذا انتهت صلاحية الكاش → null
-        if (now - cachedAt > SETUP_CACHE_TTL_MS) {
+    private String getCachedSetupStamp() {
+        try {
+            return getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
+                    .getString(KEY_SETUP_STAMP, null);
+        } catch (Exception e) {
+            Log.w(TAG, "getCachedSetupStamp error: " + e.getMessage());
             return null;
         }
-
-        return prefs.getString(KEY_SETUP_STATUS, null);
-    } catch (Exception e) {
-        Log.w(TAG, "getCachedSetupStatus error: " + e.getMessage());
-        return null;
     }
-}
 
-public void onSetupCompleted() {
-    Log.d(TAG, "🎉 onSetupCompleted: invalidating cache and updating state");
-    try {
+    private String getCachedSetupStatus() {
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE);
+            long cachedAt = prefs.getLong(KEY_SETUP_CACHED_AT, 0);
+            long now = System.currentTimeMillis();
+
+            if (now - cachedAt > SETUP_CACHE_TTL_MS) {
+                return null;
+            }
+
+            return prefs.getString(KEY_SETUP_STATUS, null);
+        } catch (Exception e) {
+            Log.w(TAG, "getCachedSetupStatus error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ⭐ يُستدعى من MiraAccountingSetupFragment عند اكتمال الإعداد
+     */
+    public void onSetupCompleted() {
+        Log.d(TAG, "🎉 onSetupCompleted");
+
+        // ⭐ 1. أظهر BottomNav
+        setBottomNavVisible(true);
+
+        // ⭐ 2. امسح الكاش القديم
         invalidateSetupCache();
         cacheSetupStatus(SETUP_COMPLETED);
 
@@ -901,6 +900,29 @@ public void onSetupCompleted() {
                          : "✅ Setup complete — You can now use the system",
                 Toast.LENGTH_LONG).show();
 
+        // ⭐ 3. اجلب الختم الفعلي
+        new Thread(() -> {
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    String serverStatus = response.data.optString("status", SETUP_COMPLETED);
+                    String serverStamp  = response.data.optString("setup_stamp", null);
+
+                    cacheSetupStatus(serverStatus, serverStamp);
+
+                    Log.d(TAG, "✅ Saved final setup state: " + serverStatus
+                            + " | stamp: " + (serverStamp != null
+                                    ? serverStamp.substring(0, 8) + "..."
+                                    : "null"));
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to fetch final setup stamp: " + e.getMessage());
+            }
+        }).start();
+
+        // ⭐ 4. التوجيه لـ Dashboard
         mainHandler.postDelayed(() -> {
             if (isActivityAlive()) {
                 Log.d(TAG, "🎉 Re-navigating after setup completed");
@@ -908,401 +930,228 @@ public void onSetupCompleted() {
                 navigateByRole();
             }
         }, 700);
-    } catch (Exception e) {
-        Log.e(TAG, "onSetupCompleted error: " + e.getMessage(), e);
     }
-}
 
-/**
- * إبطال كاش الإعداد (يُستدعى بعد إتمام الإعداد)
- */
-public void invalidateSetupCache() {
-    try {
-        getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
-                .edit()
-                .clear()
-                .apply();
-        Log.d(TAG, "✅ Setup cache invalidated");
-    } catch (Exception e) {
-        Log.w(TAG, "invalidateSetupCache error: " + e.getMessage());
+    public void invalidateSetupCache() {
+        try {
+            getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
+                    .edit()
+                    .clear()
+                    .apply();
+            Log.d(TAG, "✅ Setup cache invalidated");
+        } catch (Exception e) {
+            Log.w(TAG, "invalidateSetupCache error: " + e.getMessage());
+        }
     }
-}
 
-// ═══════════════════════════════════════════════════════════
-//  شاشة تحميل مؤقتة (قبل تحديد الوجهة)
-// ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
+    //  Setup Loading Screen
+    // ═══════════════════════════════════════════════════════
 
-private void showSetupLoadingScreen() {
-    mainHandler.post(() -> {
-        View loadingOverlay = findViewById(R.id.successOverlayMain);
-        if (loadingOverlay != null) {
-            loadingOverlay.setVisibility(View.VISIBLE);
-            loadingOverlay.setAlpha(1.0f);
-        }
-    });
-}
-
-private void hideSetupLoadingScreen() {
-    mainHandler.post(() -> {
-        View loadingOverlay = findViewById(R.id.successOverlayMain);
-        if (loadingOverlay != null) {
-            loadingOverlay.setVisibility(View.GONE);
-        }
-    });
-}
-
-private void setupKeyboardBehavior() {
-    try {
-        final View rootView = findViewById(android.R.id.content);
-        if (rootView == null) return;
-
-        final View bottomNavContainer = findViewById(R.id.bottomNavContainer);
-        final View fragmentContainer = findViewById(R.id.fragment_container);
-
-        if (bottomNavContainer == null) return;
-
-        // ═══════════════════════════════════════════════════════
-        // Approach 1: ViewTreeObserver (يعمل على كل الأجهزة)
-        // ═══════════════════════════════════════════════════════
-        final int KEYBOARD_THRESHOLD_DP = 150;
-        final float density = getResources().getDisplayMetrics().density;
-        final int thresholdPx = (int) (KEYBOARD_THRESHOLD_DP * density);
-
-        final android.graphics.Rect visibleFrame = new android.graphics.Rect();
-
-        rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            try {
-                rootView.getWindowVisibleDisplayFrame(visibleFrame);
-
-                int screenHeight = rootView.getRootView().getHeight();
-                int keyboardHeight = screenHeight - visibleFrame.bottom;
-                boolean isKeyboardVisible = keyboardHeight > thresholdPx;
-
-                if (isKeyboardVisible == lastKeyboardState) return;
-                lastKeyboardState = isKeyboardVisible;
-
-                applyKeyboardVisibility(isKeyboardVisible,
-                        bottomNavContainer, fragmentContainer);
-
-            } catch (Exception e) {
-                Log.e(TAG, "VTO listener error: " + e.getMessage());
+    private void showSetupLoadingScreen() {
+        mainHandler.post(() -> {
+            View loadingOverlay = findViewById(R.id.successOverlayMain);
+            if (loadingOverlay != null) {
+                loadingOverlay.setVisibility(View.VISIBLE);
+                loadingOverlay.setAlpha(1.0f);
             }
         });
-
-        // ═══════════════════════════════════════════════════════
-        // Approach 2: WindowInsets (Android 11+)
-        // ═══════════════════════════════════════════════════════
-        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-            try {
-                Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
-                Insets sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                boolean isKeyboardVisible = ime.bottom > sysBars.bottom;
-
-                if (isKeyboardVisible == lastKeyboardState) return insets;
-
-                lastKeyboardState = isKeyboardVisible;
-                applyKeyboardVisibility(isKeyboardVisible,
-                        bottomNavContainer, fragmentContainer);
-
-            } catch (Exception e) {
-                Log.e(TAG, "Insets listener error: " + e.getMessage());
-            }
-            return insets;
-        });
-
-        Log.d(TAG, "✅ setupKeyboardBehavior: Dual listeners attached");
-
-    } catch (Exception e) {
-        Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage(), e);
     }
-}
 
-private void applyKeyboardVisibility(boolean isKeyboardVisible,
-                                     View bottomNavContainer,
-                                     View fragmentContainer) {
-    try {
-        if (bottomNavContainer != null) {
-            float targetY = isKeyboardVisible
-                    ? bottomNavContainer.getHeight() : 0f;
+    private void hideSetupLoadingScreen() {
+        mainHandler.post(() -> {
+            View loadingOverlay = findViewById(R.id.successOverlayMain);
+            if (loadingOverlay != null) {
+                loadingOverlay.setVisibility(View.GONE);
+            }
+        });
+    }
 
-            if (bottomNavContainer.getTranslationY() != targetY) {
+    // ═══════════════════════════════════════════════════════
+    //  Keyboard Behavior
+    // ═══════════════════════════════════════════════════════
+
+    private void setupKeyboardBehavior() {
+        try {
+            final View rootView = findViewById(android.R.id.content);
+            if (rootView == null) return;
+
+            final View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+            final View fragmentContainer = findViewById(R.id.fragment_container);
+
+            if (bottomNavContainer == null) return;
+
+            final int KEYBOARD_THRESHOLD_DP = 150;
+            final float density = getResources().getDisplayMetrics().density;
+            final int thresholdPx = (int) (KEYBOARD_THRESHOLD_DP * density);
+
+            final android.graphics.Rect visibleFrame = new android.graphics.Rect();
+
+            rootView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+                try {
+                    rootView.getWindowVisibleDisplayFrame(visibleFrame);
+                    int screenHeight = rootView.getRootView().getHeight();
+                    int keyboardHeight = screenHeight - visibleFrame.bottom;
+                    boolean isKeyboardVisible = keyboardHeight > thresholdPx;
+
+                    if (isKeyboardVisible == lastKeyboardState) return;
+                    lastKeyboardState = isKeyboardVisible;
+
+                    applyKeyboardVisibility(isKeyboardVisible,
+                            bottomNavContainer, fragmentContainer);
+
+                } catch (Exception e) {
+                    Log.e(TAG, "VTO listener error: " + e.getMessage());
+                }
+            });
+
+            ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+                try {
+                    Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+                    Insets sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    boolean isKeyboardVisible = ime.bottom > sysBars.bottom;
+
+                    if (isKeyboardVisible == lastKeyboardState) return insets;
+
+                    lastKeyboardState = isKeyboardVisible;
+                    applyKeyboardVisibility(isKeyboardVisible,
+                            bottomNavContainer, fragmentContainer);
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Insets listener error: " + e.getMessage());
+                }
+                return insets;
+            });
+
+            Log.d(TAG, "✅ setupKeyboardBehavior: Dual listeners attached");
+
+        } catch (Exception e) {
+            Log.e(TAG, "setupKeyboardBehavior error: " + e.getMessage(), e);
+        }
+    }
+
+    private void applyKeyboardVisibility(boolean isKeyboardVisible,
+                                         View bottomNavContainer,
+                                         View fragmentContainer) {
+        try {
+            if (bottomNavContainer != null) {
+                float targetY = isKeyboardVisible
+                        ? bottomNavContainer.getHeight() : 0f;
+
+                if (bottomNavContainer.getTranslationY() != targetY) {
+                    bottomNavContainer.animate()
+                            .translationY(targetY)
+                            .setDuration(250)
+                            .setInterpolator(
+                                    new android.view.animation.DecelerateInterpolator())
+                            .start();
+                }
+            }
+
+            if (fragmentContainer != null) {
+                int targetPadding = isKeyboardVisible ? 8 : 90;
+                if (fragmentContainer.getPaddingBottom() != targetPadding) {
+                    fragmentContainer.setPadding(
+                            fragmentContainer.getPaddingLeft(),
+                            fragmentContainer.getPaddingTop(),
+                            fragmentContainer.getPaddingRight(),
+                            targetPadding);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyKeyboardVisibility error: " + e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  BottomNav Visibility — النسخة المُصلحة
+    // ═══════════════════════════════════════════════════════
+
+    public void setBottomNavVisible(boolean visible) {
+        try {
+            final View bottomNavContainer = findViewById(R.id.bottomNavContainer);
+            if (bottomNavContainer == null) {
+                Log.w(TAG, "setBottomNavVisible: container not found");
+                return;
+            }
+
+            if (visible) {
+                // ─── إظهار ───
+                if (bottomNavContainer.getVisibility() == View.VISIBLE
+                        && bottomNavContainer.getAlpha() == 1f
+                        && bottomNavContainer.getTranslationY() == 0f) {
+                    applyNavEnabledState(true);
+                    return;
+                }
+
+                bottomNavContainer.animate().cancel();
+                bottomNavContainer.setVisibility(View.VISIBLE);
+
+                float startY = bottomNavContainer.getTranslationY() > 0
+                        ? bottomNavContainer.getTranslationY()
+                        : (bottomNavContainer.getHeight() > 0
+                            ? bottomNavContainer.getHeight() : 200f);
+
+                bottomNavContainer.setTranslationY(startY);
+                bottomNavContainer.setAlpha(0f);
+
                 bottomNavContainer.animate()
-                        .translationY(targetY)
+                        .translationY(0f)
+                        .alpha(1f)
                         .setDuration(250)
-                        .setInterpolator(
-                                new android.view.animation.DecelerateInterpolator())
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                        .withEndAction(() -> applyNavEnabledState(true))
                         .start();
-            }
-        }
 
-        if (fragmentContainer != null) {
-            int targetPadding = isKeyboardVisible ? 8 : 90;
-            if (fragmentContainer.getPaddingBottom() != targetPadding) {
-                fragmentContainer.setPadding(
-                        fragmentContainer.getPaddingLeft(),
-                        fragmentContainer.getPaddingTop(),
-                        fragmentContainer.getPaddingRight(),
-                        targetPadding);
-            }
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "applyKeyboardVisibility error: " + e.getMessage());
-    }
-}
+                Log.d(TAG, "📱 BottomNav showing");
 
-    // ==================== التولبار الثانوي ====================
-
-    private void setupSecondaryToolbar() {
-        MaterialToolbar secondaryToolbar = findViewById(R.id.secondaryToolbar);
-
-        if (secondaryToolbar == null) {
-            Log.w(TAG, "Secondary toolbar not found");
-            return;
-        }
-
-        secondaryToolbarManager = new SecondaryToolbarManager(secondaryToolbar);
-
-        secondaryToolbarManager.setOnMenuItemClickListener((item, currentTag) -> {
-            int id = item.getItemId();
-
-            if (id == R.id.action_device_status) {
-                showHardwareOptionsDialog();
-                return true;
-            } else if (id == R.id.action_search) {
-                showGlobalSearchDialog();
-                return true;
-            } else if (id == R.id.action_sync) {
-                performDataSync();
-                return true;
-            } else if (id == R.id.action_quick_access_settings) {
-                loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings");
-                return true;
-            } else if (id == R.id.action_inventory_power) {
-                if (activeInventoryFragment != null
-                        && activeInventoryFragment.isAdded()
-                        && !activeInventoryFragment.isRemoving()) {
-                    activeInventoryFragment.showInventoryScannerSettings();
-                } else {
-                    loadFragment(new MiraInventoryProFragment(), "Scan");
-                    mainHandler.postDelayed(() -> {
-                        if (activeInventoryFragment != null) {
-                            activeInventoryFragment.showInventoryScannerSettings();
-                        }
-                    }, 500);
-                }
-                return true;
-            } else if (id == R.id.action_inventory_stats) {
-                showInventoryStatsDialog();
-                return true;
-            } else if (id == R.id.action_inventory_settings) {
-                if (activeInventoryFragment != null
-                        && activeInventoryFragment.isAdded()
-                        && !activeInventoryFragment.isRemoving()) {
-                    activeInventoryFragment.showInventorySessionSettings();
-                } else {
-                    loadFragment(new MiraInventoryProFragment(), "Scan");
-                    mainHandler.postDelayed(() -> {
-                        if (activeInventoryFragment != null) {
-                            activeInventoryFragment.showInventorySessionSettings();
-                        }
-                    }, 500);
-                }
-                return true;
-            } else if (id == R.id.action_inventory_archive) {
-                showInventoryArchiveDialog();
-                return true;
-            } else if (id == R.id.action_pos_cart) {
-                showPOSCartDialog();
-                return true;
-            } else if (id == R.id.action_pos_search) {
-                showPOSSearchDialog();
-                return true;
-            } else if (id == R.id.action_pos_discount) {
-                showPOSDiscountDialog();
-                return true;
-            } else if (id == R.id.action_pos_receipt) {
-                showPOSReceiptDialog();
-                return true;
-            } else if (id == R.id.action_transfers_sync) {
-                performDataSync();
-                return true;
-            } else if (id == R.id.action_transfers_export) {
-                showTransfersExportDialog();
-                return true;
-            } else if (id == R.id.action_transfers_import) {
-                showTransfersImportDialog();
-                return true;
-            } else if (id == R.id.action_transfers_history) {
-                loadFragment(new MiraTransferFragment(), "Transfers");
-                return true;
-            }
-
-            return false;
-        });
-
-        secondaryToolbarManager.setMenuForTag("Dashboard");
-        mainHandler.post(this::setupCustomViewsForCurrentMenu);
-    }
-
-    private void setupCustomViewsForCurrentMenu() {
-        try {
-            MaterialToolbar toolbar = findViewById(R.id.secondaryToolbar);
-            if (toolbar == null) return;
-
-            Menu menu = toolbar.getMenu();
-
-            MenuItem deviceStatusItem = menu.findItem(R.id.action_device_status);
-            if (deviceStatusItem != null && deviceStatusItem.getActionView() != null) {
-                View actionView = deviceStatusItem.getActionView();
-                View dot = actionView.findViewById(R.id.deviceStatusDot);
-                TextView text = actionView.findViewById(R.id.deviceStatusText);
-                ImageView icon = actionView.findViewById(R.id.deviceStatusIcon);
-
-                if (dot != null && text != null) {
-                    actionView.setOnClickListener(v -> showHardwareOptionsDialog());
-                    updateDeviceStatusUI(dot, text, icon);
-                }
-            }
-
-            MenuItem powerItem = menu.findItem(R.id.action_inventory_power);
-            if (powerItem != null && powerItem.getActionView() != null) {
-                View actionView = powerItem.getActionView();
-                View dot = actionView.findViewById(R.id.deviceStatusDot);
-                TextView text = actionView.findViewById(R.id.deviceStatusText);
-                ImageView icon = actionView.findViewById(R.id.deviceStatusIcon);
-
-                if (dot != null && text != null) {
-                    actionView.setOnClickListener(v -> showHardwareOptionsDialog());
-                    updateDeviceStatusUI(dot, text, icon);
-                }
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "setupCustomViewsForCurrentMenu error: " + e.getMessage(), e);
-        }
-    }
-
-    private void updateSecondaryToolbar(String tag) {
-        if (secondaryToolbarManager == null) return;
-        try {
-            secondaryToolbarManager.setMenuForTag(tag);
-
-            Menu menu = secondaryToolbarManager.getCurrentMenu();
-            if (menu != null) {
-                applyToolbarMenuPermissions(menu);
-            }
-
-            mainHandler.post(this::setupCustomViewsForCurrentMenu);
-            Log.d(TAG, "✅ Secondary toolbar updated for: " + tag);
-        } catch (Exception e) {
-            Log.e(TAG, "updateSecondaryToolbar error: " + e.getMessage(), e);
-        }
-    }
-
-    private void updateDeviceStatusUI(View statusDot, TextView statusText, ImageView statusIcon) {
-        try {
-            if (statusDot == null || statusText == null) return;
-
-            boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
-
-            int greenColor = getResources().getColor(android.R.color.holo_green_dark);
-            int redColor = getResources().getColor(android.R.color.holo_red_dark);
-
-            if (isConnected) {
-                statusDot.setBackgroundResource(R.drawable.bg_status_dot_green);
-                statusText.setText(isArabic ? "متصل" : "Connected");
-                statusText.setTextColor(greenColor);
-
-                if (statusIcon != null) {
-                    statusIcon.setImageResource(R.drawable.ic_device_connected);
-                    statusIcon.setColorFilter(greenColor);
-                }
             } else {
-                statusDot.setBackgroundResource(R.drawable.bg_status_dot_red);
-                statusText.setText(isArabic ? "غير متصل" : "Disconnected");
-                statusText.setTextColor(redColor);
+                // ─── إخفاء ───
+                if (bottomNavContainer.getVisibility() == View.GONE) {
+                    return;
+                }
 
-                if (statusIcon != null) {
-                    statusIcon.setImageResource(R.drawable.ic_device_disconnected);
-                    statusIcon.setColorFilter(redColor);
+                bottomNavContainer.animate().cancel();
+
+                float endY = bottomNavContainer.getHeight() > 0
+                        ? bottomNavContainer.getHeight() : 200f;
+
+                bottomNavContainer.animate()
+                        .translationY(endY)
+                        .alpha(0f)
+                        .setDuration(250)
+                        .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                        .withEndAction(() -> {
+                            bottomNavContainer.setVisibility(View.GONE);
+                            bottomNavContainer.setTranslationY(0f);
+                        })
+                        .start();
+
+                Log.d(TAG, "📱 BottomNav hiding");
+            }
+
+            // Padding
+            View fragmentContainer = findViewById(R.id.fragment_container);
+            if (fragmentContainer != null) {
+                int targetPadding = visible ? 90 : 0;
+                if (fragmentContainer.getPaddingBottom() != targetPadding) {
+                    fragmentContainer.setPadding(
+                            fragmentContainer.getPaddingLeft(),
+                            fragmentContainer.getPaddingTop(),
+                            fragmentContainer.getPaddingRight(),
+                            targetPadding
+                    );
                 }
             }
+
         } catch (Exception e) {
-            Log.e(TAG, "updateDeviceStatusUI error: " + e.getMessage());
+            Log.e(TAG, "setBottomNavVisible error: " + e.getMessage(), e);
         }
     }
 
-    private void showHardwareOptionsDialog() {
-        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-        List<String> optionsList = new ArrayList<>();
-        List<Runnable> actionsList = new ArrayList<>();
-
-        if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
-            optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
-            actionsList.add(() -> loadFragment(new MiraReaderSetupFragment(), "ReaderSetup"));
-        }
-
-        if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
-            optionsList.add(isArabic ? "🚧 تهيئة البوابات الأمنية" : "🚧 Gate Security Setup");
-            actionsList.add(() -> loadFragment(new MiraGateSettingsFragment(), "GateSettings"));
-        }
-
-        if (pm.canViewServerConfig()) {
-            optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
-            actionsList.add(() -> loadFragment(new MiraServerConfigFragment(), "ServerConfig"));
-        }
-
-        if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
-            optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
-            actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
-        }
-        if (pm.isAdmin() || pm.isSystemAdmin()) {
-            optionsList.add(isArabic ? "🔐 إعدادات أمان الشرائح" : "🔐 RFID Security Settings");
-            actionsList.add(() -> loadFragment(new MiraRfidSettingsFragment(), "RfidSettings"));
-        }
-
-        if (pm.canManageQuickAccess() || pm.isManager() || pm.isAdmin()) {
-            optionsList.add(isArabic ? "⚙️ إعدادات الوصول السريع" : "⚙️ Quick Access Settings");
-            actionsList.add(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
-        }
-
-        optionsList.add(isArabic ? "🔄 اختبار التوصيل والربط" : "🔄 Connection Test");
-        actionsList.add(this::performConnectionTest);
-
-        String[] options = optionsList.toArray(new String[0]);
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
-                .setItems(options, (dialog, which) -> {
-                    if (which >= 0 && which < actionsList.size()) {
-                        actionsList.get(which).run();
-                    }
-                })
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
-    }
-
-    private void performConnectionTest() {
-        showLoading();
-        mainHandler.postDelayed(() -> {
-            hideLoading();
-            boolean isConnected = hardwareManager != null && hardwareManager.isConnected();
-
-            String message = isConnected
-                    ? (isArabic ? "✅ الاتصال بالجهاز سليم\nجميع الأجهزة تعمل بشكل صحيح"
-                    : "✅ Device connection OK\nAll devices operational")
-                    : (isArabic ? "⚠️ لا يوجد اتصال بالجهاز\nيرجى التحقق من الاتصال"
-                    : "⚠️ No device connection\nPlease check connection");
-
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle(isArabic ? "نتيجة الاختبار" : "Test Result")
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "موافق" : "OK", null)
-                    .show();
-        }, 1500);
-    }
-
-    // ==================== دورة الحياة (مصححة) ====================
+    // ═══════════════════════════════════════════════════════
+    //  دورة الحياة
+    // ═══════════════════════════════════════════════════════
 
     @Override
     public void onResume() {
@@ -1317,13 +1166,51 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         syncUIWithNavigation();
-        // ✅ لا يوجد تشغيل للعداد هنا (في onStart فقط)
+
+        checkSetupStampOnResume();
+    }
+
+    private void checkSetupStampOnResume() {
+        String cachedStatus = getCachedSetupStatus();
+        if (cachedStatus == null) return;
+
+        new Thread(() -> {
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+
+                if (response == null || !response.isSuccess || response.data == null) return;
+
+                String serverStatus = response.data.optString("status", SETUP_PENDING);
+                String serverStamp  = response.data.optString("setup_stamp", null);
+                String localStamp   = getCachedSetupStamp();
+
+                boolean stampMismatch = (localStamp != null && serverStamp != null
+                        && !localStamp.equals(serverStamp));
+
+                if (stampMismatch) {
+                    Log.w(TAG, "🔄 Stamp mismatch in onResume!");
+
+                    invalidateSetupCache();
+                    cacheSetupStatus(serverStatus, serverStamp);
+
+                    mainHandler.post(() -> {
+                        if (isActivityAlive()) {
+                            Log.w(TAG, "🔄 Re-navigating after stamp mismatch");
+                            enableNavigationAfterSetup();
+                            navigateBySetupStatus(serverStatus);
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "checkSetupStampOnResume error: " + e.getMessage());
+            }
+        }).start();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        // ✅ تشغيل العداد هنا فقط
         transferCountHandler.removeCallbacks(transferRefreshRunnable);
         transferCountHandler.post(transferRefreshRunnable);
     }
@@ -1331,7 +1218,6 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
     @Override
     protected void onStop() {
         super.onStop();
-        // ✅ إيقاف العداد هنا فقط
         transferCountHandler.removeCallbacks(transferRefreshRunnable);
     }
 
@@ -1497,8 +1383,6 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
 
     public void onPreLogout() {
         try {
-            Log.d(TAG, "🔓 onPreLogout: cleaning up resources...");
-
             forceHideLoadingImmediate();
             stopActiveInventory();
 
@@ -1520,7 +1404,6 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
                 orgProfileManager.removeListener(orgProfileListener);
             }
 
-            Log.d(TAG, "✅ onPreLogout: cleanup complete");
         } catch (Exception e) {
             Log.e(TAG, "onPreLogout error: " + e.getMessage(), e);
         }
@@ -1545,8 +1428,6 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
         if (sessionManager != null) {
             sessionManager.touchActivity();
         }
-
-        // ✅ لا يوجد إيقاف للعداد هنا (في onStop فقط)
 
         forceHideLoadingImmediate();
         AppWatchdog.getInstance().stopMonitoring();
@@ -1584,26 +1465,27 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
-    super.onSaveInstanceState(outState);
+        super.onSaveInstanceState(outState);
 
-    String tag = navigationManager != null
-            ? navigationManager.getCurrentFragmentTag()
-            : "Dashboard";
+        String tag = navigationManager != null
+                ? navigationManager.getCurrentFragmentTag()
+                : "Dashboard";
 
-    // 🛡️ احفظ فقط إذا كان النظام مُعدًا
-    String cachedSetupStatus = getCachedSetupStatus();
-    boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
-            || SETUP_LOCKED.equals(cachedSetupStatus);
+        String cachedSetupStatus = getCachedSetupStatus();
+        boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
+                || SETUP_LOCKED.equals(cachedSetupStatus);
 
-    if (setupIsComplete) {
-        outState.putString("current_fragment", tag);
-        saveFragmentTagToPrefs(tag);
-    } else {
-        Log.d(TAG, "🔒 onSaveInstanceState: skipping save (setup pending)");
+        if (setupIsComplete) {
+            outState.putString("current_fragment", tag);
+            saveFragmentTagToPrefs(tag);
+        } else {
+            Log.d(TAG, "🔒 onSaveInstanceState: skipping save (setup pending)");
+        }
     }
-}
 
-    // ==================== إعدادات ====================
+    // ═══════════════════════════════════════════════════════
+    //  إعدادات
+    // ═══════════════════════════════════════════════════════
 
     private void initializeLanguageState() {
         try {
@@ -1673,46 +1555,46 @@ private void applyKeyboardVisibility(boolean isKeyboardVisible,
         }
     }
 
-    // ==================== التنقل ====================
+    // ═══════════════════════════════════════════════════════
+    //  التنقل
+    // ═══════════════════════════════════════════════════════
 
-public void loadFragment(Fragment fragment, String tag) {
-    loadFragment(fragment, tag, true);
-}
-
-public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (isFinishing() || isDestroyed()) return;
-    if (navigationManager == null || fragment == null) return;
-
-    // 🛡️ الحارس المركزي
-    if (!guardSetupAccess(tag)) return;
-
-    navigationManager.loadFragment(fragment, tag, addToBackStack);
-    this.currentFragment = fragment;
-
-    updateBottomNavSelectionByTag(tag);
-    updateSecondaryToolbar(tag);
-}
-
-public void loadFragmentDirectly(Fragment fragment, String tag) {
-    if (isFinishing() || isDestroyed()) return;
-    if (fragment == null) return;
-
-    if (getSupportFragmentManager().isStateSaved()) {
-        mainHandler.post(() -> loadFragmentDirectly(fragment, tag));
-        return;
+    public void loadFragment(Fragment fragment, String tag) {
+        loadFragment(fragment, tag, true);
     }
 
-    if (navigationManager == null) return;
+    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+        if (isFinishing() || isDestroyed()) return;
+        if (navigationManager == null || fragment == null) return;
 
-    // 🛡️ الحارس المركزي
-    if (!guardSetupAccess(tag)) return;
+        if (!guardSetupAccess(tag)) return;
 
-    navigationManager.loadFragmentDirectly(fragment, tag);
-    this.currentFragment = fragment;
+        navigationManager.loadFragment(fragment, tag, addToBackStack);
+        this.currentFragment = fragment;
 
-    updateBottomNavSelectionByTag(tag);
-    updateSecondaryToolbar(tag);
-}
+        updateBottomNavSelectionByTag(tag);
+        updateSecondaryToolbar(tag);
+    }
+
+    public void loadFragmentDirectly(Fragment fragment, String tag) {
+        if (isFinishing() || isDestroyed()) return;
+        if (fragment == null) return;
+
+        if (getSupportFragmentManager().isStateSaved()) {
+            mainHandler.post(() -> loadFragmentDirectly(fragment, tag));
+            return;
+        }
+
+        if (navigationManager == null) return;
+
+        if (!guardSetupAccess(tag)) return;
+
+        navigationManager.loadFragmentDirectly(fragment, tag);
+        this.currentFragment = fragment;
+
+        updateBottomNavSelectionByTag(tag);
+        updateSecondaryToolbar(tag);
+    }
 
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
@@ -1728,7 +1610,9 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         }
     }
 
-    // ==================== الأصوات ====================
+    // ═══════════════════════════════════════════════════════
+    //  الأصوات
+    // ═══════════════════════════════════════════════════════
 
     public void playSound(int id) {
         if (soundManager != null) {
@@ -1742,7 +1626,9 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         }
     }
 
-    // ==================== RFID ====================
+    // ═══════════════════════════════════════════════════════
+    //  RFID
+    // ═══════════════════════════════════════════════════════
 
     public void startUHFScan() {
         if (hardwareManager != null) {
@@ -1798,7 +1684,9 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
         });
     }
 
-    // ==================== التنقل السريع ====================
+    // ═══════════════════════════════════════════════════════
+    //  التنقل السريع
+    // ═══════════════════════════════════════════════════════
 
     private void setupQuickNav() {
         try {
@@ -1883,49 +1771,51 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
     }
 
     private String getFragmentTagForNavItem(int itemId) {
-    if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
-    if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
-    if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
-    if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;   // ✅ Gates
-    return "";
-}
+        if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
+        if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
+        if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
+        if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;
+        return "";
+    }
 
     private void updateBottomNavSelectionByTag(String tag) {
-    try {
-        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-        if (quickNav == null || tag == null) return;
+        try {
+            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+            if (quickNav == null || tag == null) return;
 
-        if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
-            quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
-        } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
-            quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
-        } else if (tag.equals(NavigationManager.TAG_POS)) {
-            quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
-        } else if (tag.equals(NavigationManager.TAG_GATES)
-                || tag.equals(NavigationManager.TAG_SECURE_GATE)) {
-            quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
+            if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
+                quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
+            } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
+                quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
+            } else if (tag.equals(NavigationManager.TAG_POS)) {
+                quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
+            } else if (tag.equals(NavigationManager.TAG_GATES)
+                    || tag.equals(NavigationManager.TAG_SECURE_GATE)) {
+                quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
     }
-}
 
     private void updateBottomNavLanguage() {
-    try {
-        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-        if (nav != null && nav.getMenu() != null) {
-            nav.getMenu().findItem(R.id.nav_home).setTitle(isArabic ? "الرئيسية" : "Home");
-            nav.getMenu().findItem(R.id.nav_inventory).setTitle(isArabic ? "الجرد" : "Inventory");
-            nav.getMenu().findItem(R.id.nav_sales).setTitle(isArabic ? "البيع" : "Sales");
-            nav.getMenu().findItem(R.id.nav_transfers).setTitle(
-                    isArabic ? "🛡️ البوابات" : "🛡️ Gates");
+        try {
+            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+            if (nav != null && nav.getMenu() != null) {
+                nav.getMenu().findItem(R.id.nav_home).setTitle(isArabic ? "الرئيسية" : "Home");
+                nav.getMenu().findItem(R.id.nav_inventory).setTitle(isArabic ? "الجرد" : "Inventory");
+                nav.getMenu().findItem(R.id.nav_sales).setTitle(isArabic ? "البيع" : "Sales");
+                nav.getMenu().findItem(R.id.nav_transfers).setTitle(
+                        isArabic ? "🛡️ البوابات" : "🛡️ Gates");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
     }
-}
 
-    // ==================== القوائم ====================
+    // ═══════════════════════════════════════════════════════
+    //  القوائم
+    // ═══════════════════════════════════════════════════════
 
     @SuppressLint("RestrictedApi")
     @Override
@@ -2071,17 +1961,17 @@ public void loadFragmentDirectly(Fragment fragment, String tag) {
             openAccounting();
             return true;
         } else if (id == R.id.action_device_status) {
-    showHardwareOptionsDialog();
-    return true;
-} else if (id == R.id.action_device_version) {
-    showSystemVersionDialog();
-    return true;
-} else if (id == R.id.action_logout) {
-    confirmLogout();
-    return true;
-}
+            showHardwareOptionsDialog();
+            return true;
+        } else if (id == R.id.action_device_version) {
+            showSystemVersionDialog();
+            return true;
+        } else if (id == R.id.action_logout) {
+            confirmLogout();
+            return true;
+        }
 
-return super.onOptionsItemSelected(item);
+        return super.onOptionsItemSelected(item);
     }
 
     private void toggleLanguage() {
@@ -2154,25 +2044,19 @@ return super.onOptionsItemSelected(item);
                 .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
                 .show();
     }
-/**
- * ✅ فتح شاشة المحاسبة (تجريبي)
- */
-public void openAccounting() {
-    try {
-        Log.e(TAG, "🚀 openAccounting called");
 
-        MiraAccountingFragment fragment = new MiraAccountingFragment();
-        loadFragmentDirectly(fragment, "Accounting");
-
-        Toast.makeText(this, "✅ تم فتح المحاسبة", Toast.LENGTH_SHORT).show();
-
-    } catch (Throwable e) {
-        Log.e(TAG, "❌ openAccounting error", e);
-        Toast.makeText(this, 
-            "❌ خطأ: " + e.getClass().getSimpleName() + " — " + e.getMessage(), 
-            Toast.LENGTH_LONG).show();
+    public void openAccounting() {
+        try {
+            MiraAccountingFragment fragment = new MiraAccountingFragment();
+            loadFragmentDirectly(fragment, "Accounting");
+        } catch (Throwable e) {
+            Log.e(TAG, "❌ openAccounting error", e);
+            Toast.makeText(this,
+                "❌ خطأ: " + e.getClass().getSimpleName() + " — " + e.getMessage(),
+                Toast.LENGTH_LONG).show();
+        }
     }
-}
+
     private void showInventoryStatsDialog() {
         try {
             int scannedCount = 0;
@@ -2336,7 +2220,9 @@ public void openAccounting() {
                 .show();
     }
 
-    // ==================== الإشعارات والمراسلات ====================
+    // ═══════════════════════════════════════════════════════
+    //  الإشعارات
+    // ═══════════════════════════════════════════════════════
 
     private void showNotificationsAndChatDialog() {
         String[] options = isArabic ? new String[]{
@@ -2665,7 +2551,9 @@ public void openAccounting() {
         }
     }
 
-    // ==================== البحث والمزامنة ====================
+    // ═══════════════════════════════════════════════════════
+    //  البحث والمزامنة
+    // ═══════════════════════════════════════════════════════
 
     private void showGlobalSearchDialog() {
         BottomSheetDialog searchDialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
@@ -2722,7 +2610,9 @@ public void openAccounting() {
         }, 1500);
     }
 
-    // ==================== قائمة الإجراءات السريعة ====================
+    // ═══════════════════════════════════════════════════════
+    //  قائمة الإجراءات السريعة
+    // ═══════════════════════════════════════════════════════
 
     private void showQuickActionMenu() {
         try {
@@ -2734,21 +2624,9 @@ public void openAccounting() {
         }
     }
 
-    private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog,
-                                        boolean allowed, Fragment fragment, String tag) {
-        View btn = root.findViewById(viewId);
-        if (btn != null) {
-            btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
-            if (allowed) {
-                btn.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    loadFragment(fragment, tag);
-                });
-            }
-        }
-    }
-
-    // ==================== حالة الجرد ====================
+    // ═══════════════════════════════════════════════════════
+    //  حالة الجرد
+    // ═══════════════════════════════════════════════════════
 
     public boolean isInventoryActive() {
         Fragment currentFragment = navigationManager != null
@@ -2799,7 +2677,9 @@ public void openAccounting() {
         }
     }
 
-    // ==================== التحميل والعرض ====================
+    // ═══════════════════════════════════════════════════════
+    //  التحميل والعرض
+    // ═══════════════════════════════════════════════════════
 
     public void showLoading() {
         mainHandler.post(() -> {
@@ -2865,7 +2745,9 @@ public void openAccounting() {
         showToast(getString(resId));
     }
 
-    // ==================== تسجيل الدخول ====================
+    // ═══════════════════════════════════════════════════════
+    //  تسجيل الدخول
+    // ═══════════════════════════════════════════════════════
 
     private void navigateToLogin() {
         try {
@@ -2934,7 +2816,9 @@ public void openAccounting() {
         return navigationLocked;
     }
 
-    // ==================== التنظيف والتدمير ====================
+    // ═══════════════════════════════════════════════════════
+    //  التنظيف
+    // ═══════════════════════════════════════════════════════
 
     @Override
     protected void onDestroy() {
@@ -2971,12 +2855,10 @@ public void openAccounting() {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage(), e);
         }
 
-        // ✅ إلغاء تسجيل BroadcastReceiver
         try {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(transfersUpdateReceiver);
         } catch (Exception ignored) {}
 
-        // ✅ إيقاف Handlers
         if (transferCountHandler != null) {
             transferCountHandler.removeCallbacksAndMessages(null);
         }
@@ -2984,7 +2866,9 @@ public void openAccounting() {
         super.onDestroy();
     }
 
-    // ==================== التفاعل مع الكيبورد ====================
+    // ═══════════════════════════════════════════════════════
+    //  التفاعل مع الكيبورد
+    // ═══════════════════════════════════════════════════════
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
@@ -3033,28 +2917,21 @@ public void openAccounting() {
         }
     }
 
-    // ==================== ✅ دوال عداد التحويلات الواردة ====================
+    // ═══════════════════════════════════════════════════════
+    //  عداد التحويلات
+    // ═══════════════════════════════════════════════════════
 
-    /**
-     * Throttled: منع الطلبات المتكررة خلال 3 ثواني
-     */
     private void refreshIncomingTransfersCountThrottled() {
         long now = System.currentTimeMillis();
         if (now - lastTransferRefreshTime < MIN_TRANSFER_REFRESH_INTERVAL) {
-            Log.d(TAG, "⏳ Throttled: skipping refresh (elapsed: " + (now - lastTransferRefreshTime) + "ms)");
             return;
         }
         lastTransferRefreshTime = now;
         refreshIncomingTransfersCount();
     }
 
-    /**
-     * جلب عدد التحويلات الواردة للفرع الحالي
-     * يعمل في Thread منفصل
-     */
     private void refreshIncomingTransfersCount() {
         if (branchesManager == null || !branchesManager.hasActiveBranch()) {
-            Log.d(TAG, "No active branch → skip transfer count");
             return;
         }
 
@@ -3067,9 +2944,7 @@ public void openAccounting() {
                 if (response != null && response.isSuccess && response.data != null) {
                     count = response.data.optInt("count", 0);
                 } else {
-                    // ✅ في حالة الفشل، استخدم آخر قيمة محفوظة
                     count = loadTransfersCountLocally();
-                    Log.d(TAG, "API failed, using cached count: " + count);
                 }
 
                 final int finalCount = count;
@@ -3081,14 +2956,9 @@ public void openAccounting() {
         }).start();
     }
 
-    /**
-     * تحديث الـ Badge على أيقونة التحويلات
-     */
     private void updateTransfersBadge(int count) {
         try {
             this.incomingTransfersCount = count;
-
-            // ✅ حفظ القيمة محلياً
             saveTransfersCountLocally(count);
 
             BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
@@ -3109,16 +2979,11 @@ public void openAccounting() {
                 badge.setVisible(false);
                 badge.clearNumber();
             }
-
-            Log.d(TAG, "✅ Transfers badge updated: " + count);
         } catch (Exception e) {
             Log.e(TAG, "updateTransfersBadge error: " + e.getMessage());
         }
     }
 
-    /**
-     * تأثير نبض خفيف على أيقونة التنقل
-     */
     private void pulseNavItem(BottomNavigationView nav, int itemId) {
         try {
             View itemView = null;
@@ -3150,9 +3015,6 @@ public void openAccounting() {
         } catch (Exception ignored) {}
     }
 
-    /**
-     * ✅ حفظ عدد التحويلات محلياً
-     */
     private void saveTransfersCountLocally(int count) {
         try {
             getSharedPreferences(PREFS_TRANSFERS_BADGE, Context.MODE_PRIVATE)
@@ -3164,9 +3026,6 @@ public void openAccounting() {
         }
     }
 
-    /**
-     * ✅ استعادة عدد التحويلات من الكاش المحلي
-     */
     private int loadTransfersCountLocally() {
         try {
             return getSharedPreferences(PREFS_TRANSFERS_BADGE, Context.MODE_PRIVATE)
@@ -3176,65 +3035,4 @@ public void openAccounting() {
             return 0;
         }
     }
-    
-    /**
- * ✅ إخفاء/إظهار Bottom Nav + FAB
- * يُستدعى من Fragments عند الحاجة (مثلاً شاشة التكويد)
- */
-public void setBottomNavVisible(boolean visible) {
-    try {
-        View bottomNavContainer = findViewById(R.id.bottomNavContainer);
-        if (bottomNavContainer == null) return;
-
-        // ✅ حماية من الاستدعاءات المتكررة
-        if (visible && bottomNavContainer.getVisibility() == View.VISIBLE
-                && bottomNavContainer.getAlpha() == 1f) {
-            return;
-        }
-        if (!visible && bottomNavContainer.getVisibility() == View.GONE) {
-            return;
-        }
-
-        bottomNavContainer.animate().cancel();
-
-        if (visible) {
-            bottomNavContainer.setVisibility(View.VISIBLE);
-            bottomNavContainer.setTranslationY(bottomNavContainer.getHeight());
-            bottomNavContainer.setAlpha(0f);
-            bottomNavContainer.animate()
-                    .translationY(0f)
-                    .alpha(1f)
-                    .setDuration(250)
-                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
-                    .start();
-        } else {
-            bottomNavContainer.animate()
-                    .translationY(bottomNavContainer.getHeight())
-                    .alpha(0f)
-                    .setDuration(250)
-                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
-                    .withEndAction(() -> {
-                        if (bottomNavContainer != null) {
-                            bottomNavContainer.setVisibility(View.GONE);
-                        }
-                    })
-                    .start();
-        }
-
-        // ✅ تغيير padding الـ fragment_container
-        View fragmentContainer = findViewById(R.id.fragment_container);
-        if (fragmentContainer != null) {
-            fragmentContainer.setPadding(
-                fragmentContainer.getPaddingLeft(),
-                fragmentContainer.getPaddingTop(),
-                fragmentContainer.getPaddingRight(),
-                visible ? 90 : 0  // ✅ بدون padding عند الإخفاء
-            );
-        }
-
-        Log.d(TAG, "📱 BottomNav visibility: " + visible);
-    } catch (Exception e) {
-        Log.e(TAG, "setBottomNavVisible error: " + e.getMessage());
-    }
-}
 }
