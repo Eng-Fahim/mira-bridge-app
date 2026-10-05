@@ -174,6 +174,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
             for (GeneralLedgerDto.LedgerRowDto dto : ledger.rows) {
                 LedgerRowAdapter.LedgerRow row = new LedgerRowAdapter.LedgerRow();
 
+                row.entryId = dto.entryId; 
                 row.date = dto.entryDate;
                 row.entryNumber = dto.entryNumber;
 
@@ -373,4 +374,4 @@ public class MiraGeneralLedgerFragment extends Fragment {
         emptyState.setVisibility(View.GONE);
         rvLedger.setVisibility(View.VISIBLE);
     }
-}
+                    }
