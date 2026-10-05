@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- المسارات الموجودة مسبقاً -->
-    <external-files-path name="documents" path="Documents/" />
-    <external-files-path name="mira_reports" path="Documents/MiraReports/" />
-    <external-files-path name="images" path="Pictures/" />
-    <external-files-path name="photos" path="." />
-    <files-path name="internal_images" path="Pictures/" />
 
-    <!-- ✅ مسارات الكاش وتصدير تقارير CSV -->
+    <!-- ═══════ المسارات الموجودة مسبقاً ═══════ -->
+    <external-files-path name="documents"     path="Documents/" />
+    <external-files-path name="mira_reports"  path="Documents/MiraReports/" />
+    <external-files-path name="images"        path="Pictures/" />
+    <external-files-path name="photos"        path="." />
+    <files-path          name="internal_images" path="Pictures/" />
+
+    <!-- ═══════ مسارات التصدير والكاش ═══════ -->
+    <!-- ✅ تصدير CSV — يستخدم getExternalFilesDir(null) -->
+    <external-files-path name="exports" path="exports/" />
+
+    <!-- ✅ الكاش العام (اختياري) -->
     <cache-path name="cache" path="." />
-    <cache-path name="exports" path="exports/" />
 </paths>
