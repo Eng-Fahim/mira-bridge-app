@@ -94,23 +94,37 @@ public class MiraAccountTreeFragment extends Fragment {
     }
 
     private void setupRecycler() {
-        adapter = new AccountTreeAdapter(account -> {
-            // فتح دفتر أستاذ الحساب
+    adapter = new AccountTreeAdapter(account -> {
+        Fragment parent = getParentFragment();
+
+        // ✅ الحالة المثالية: داخل MiraAccountingFragment
+        if (parent instanceof MiraAccountingFragment) {
+            ((MiraAccountingFragment) parent)
+                .navigateToLedgerWithAccount(account.id);
+            return;
+        }
+
+        // ✅ fallback: عبر UHFMainActivity
+        if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
             Bundle args = new Bundle();
             args.putLong("account_id", account.id);
 
             MiraGeneralLedgerFragment gl = new MiraGeneralLedgerFragment();
             gl.setArguments(args);
 
-            requireActivity().getSupportFragmentManager()
-                .beginTransaction()
-                .replace(android.R.id.content, gl)
-                .addToBackStack(null)
-                .commit();
-        });
-        rvAccounts.setLayoutManager(new LinearLayoutManager(getContext()));
-        rvAccounts.setAdapter(adapter);
-    }
+            ((com.example.uhf.activity.UHFMainActivity) getActivity())
+                .loadFragment(gl, "GeneralLedger");
+            return;
+        }
+
+        // ❌ لا يوجد مسار — إعلام
+        Toast.makeText(requireContext(),
+            "لا يمكن فتح دفتر الأستاذ حالياً",
+            Toast.LENGTH_SHORT).show();
+    });
+    rvAccounts.setLayoutManager(new LinearLayoutManager(getContext()));
+    rvAccounts.setAdapter(adapter);
+}
 
     private void setupListeners() {
         etSearch.addTextChangedListener(new TextWatcher() {
