@@ -136,8 +136,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             cta.setVisibility(View.VISIBLE);
 
             cta.setOnClickListener(v -> {
-                performHaptic();
-                navigateTo("IdentityStudio", new MiraIdentityStudioFragment());
+            performHaptic();
+            navigateTo("IdentityStudio", new MiraIdentityStudioFragment());
             });
 
             animatedViews.add(cta);
@@ -185,48 +185,55 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             Log.e(TAG, "setupGridAction(" + actionKey + ") error: " + e.getMessage(), e);
         }
     }
+/**
+ * ✅ التنقل الموحّد — يستخدم Handler جديد (غير مرتبط بدورة حياة Fragment)
+ *
+ * السبب: onDestroyView يُلغي كل الـ callbacks
+ * الحل: نستخدم Handler مستقل يُنفّذ التنقل حتى بعد إغلاق القائمة
+ */
+private void navigateTo(String tag, Fragment fallbackFragment) {
+    final UHFMainActivity activity =
+            (getActivity() instanceof UHFMainActivity)
+                    ? (UHFMainActivity) getActivity()
+                    : null;
 
-    /**
-     * ✅ التنقل الموحّد — يستدعي الحارس المركزي في UHFMainActivity
-     */
-    private void navigateTo(String tag, Fragment fallbackFragment) {
-        final UHFMainActivity activity =
-                (getActivity() instanceof UHFMainActivity)
-                        ? (UHFMainActivity) getActivity()
-                        : null;
-
-        // ⭐ أنشئ Fragment أولاً (قبل dismiss)
-        Fragment fragment = FragmentFactory.createFragmentByTag(tag);
-        if (fragment == null) {
-            fragment = fallbackFragment;
-        }
-
-        if (fragment == null) {
-            Log.e(TAG, "❌ Cannot create fragment for tag: " + tag);
-            return;
-        }
-
-        if (activity == null) {
-            Log.e(TAG, "❌ activity is NULL for tag: " + tag);
-            return;
-        }
-
-        final Fragment finalFragment = fragment;
-
-        // ⭐ أغلق القائمة
-        dismiss();
-
-        // ⭐ نفّذ التنقل (يمر عبر guardSetupAccess)
-        mainHandler.postDelayed(() -> {
-            try {
-                activity.loadFragmentDirectly(finalFragment, tag);
-                Log.d(TAG, "✅ Navigated to: " + tag);
-            } catch (Throwable e) {
-                Log.e(TAG, "❌ loadFragmentDirectly error", e);
-            }
-        }, NAV_DELAY_MS);
+    if (activity == null) {
+        Log.e(TAG, "❌ activity is NULL for tag: " + tag);
+        return;
     }
 
+    // ⭐ أنشئ Fragment أولاً
+    Fragment fragment = FragmentFactory.createFragmentByTag(tag);
+    if (fragment == null) {
+        fragment = fallbackFragment;
+    }
+
+    if (fragment == null) {
+        Log.e(TAG, "❌ Cannot create fragment for tag: " + tag);
+        return;
+    }
+
+    final Fragment finalFragment = fragment;
+    final String finalTag = tag;
+
+    // ⭐ أغلق القائمة
+    dismiss();
+
+    // ⭐⭐⭐ الحل: استخدم Handler جديد (مستقل عن دورة حياة Fragment)
+    // ⭐ هذا Handler لا يتأثر بـ onDestroyView
+    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+        try {
+            if (activity.isFinishing() || activity.isDestroyed()) {
+                Log.w(TAG, "⚠️ Activity is finishing, skipping navigation");
+                return;
+            }
+            activity.loadFragmentDirectly(finalFragment, finalTag);
+            Log.d(TAG, "✅ Navigated to: " + finalTag);
+        } catch (Throwable e) {
+            Log.e(TAG, "❌ loadFragmentDirectly error", e);
+        }
+    }, NAV_DELAY_MS);
+}
     // ═══════════════════════════════════════════════════════
     // Haptic Feedback
     // ═══════════════════════════════════════════════════════
@@ -321,7 +328,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         super.onDestroyView();
         animatedViews.clear();
         if (mainHandler != null) {
-            mainHandler.removeCallbacksAndMessages(null);
+          //  mainHandler.removeCallbacksAndMessages(null);
         }
     }
 }
