@@ -51,34 +51,47 @@ public class MiraAccountingFragment extends Fragment {
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+public void onCreate(@Nullable Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
 
-        if (getContext() != null) {
-            try {
-                permissionManager = PermissionManager.getInstance(requireContext());
-                sessionManager = new SessionManager(requireContext());
-            } catch (Exception e) {
-                Log.e(TAG, "Session init error: " + e.getMessage());
-            }
-            isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
+    if (getContext() != null) {
+        try {
+            permissionManager = PermissionManager.getInstance(requireContext());
+            sessionManager = new SessionManager(requireContext());
+        } catch (Exception e) {
+            Log.e(TAG, "Session init error: " + e.getMessage());
         }
-
-        if (savedInstanceState != null) {
-            currentTabIndex = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
-        }
-
-        // ✅ معالجة زر الرجوع
-        requireActivity().getOnBackPressedDispatcher().addCallback(
-            this,
-            new OnBackPressedCallback(true) {
-                @Override
-                public void handleOnBackPressed() {
-                    handleBackPress();
-                }
-            });
+        isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
     }
 
+    if (savedInstanceState != null) {
+        currentTabIndex = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
+    }
+
+    // ✅ معالجة زر الرجوع — بدون re-dispatch
+    requireActivity().getOnBackPressedDispatcher().addCallback(
+        this,
+        new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // الحالة 1: لسنا في القيود → ارجع للقيود
+                if (currentTabIndex != TAB_JOURNAL) {
+                    TabLayout.Tab firstTab = tabLayout != null
+                        ? tabLayout.getTabAt(TAB_JOURNAL) : null;
+                    if (firstTab != null) firstTab.select();
+                    return;
+                }
+
+                // الحالة 2: نحن في القيود → انتقل للداشبورد مباشرة
+                if (getActivity() instanceof UHFMainActivity) {
+                    UHFMainActivity act = (UHFMainActivity) getActivity();
+                    act.loadFragmentDirectly(
+                        new MiraDashboardFragment(),
+                        "Dashboard");
+                }
+            }
+        });
+}
     /**
      * ✅ منطق زر الرجوع:
      * - إذا لسنا في القيود → ارجع للقيود
