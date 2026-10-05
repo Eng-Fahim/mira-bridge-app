@@ -1,9 +1,38 @@
 package com.example.uhf.api.dto;
 
 import com.google.gson.annotations.SerializedName;
+
 import java.util.List;
 
+/**
+ * ✅ دفتر الأستاذ العام
+ * 
+ * بنية PHP:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "account": {...},
+ *     "opening": {...},
+ *     "rows": [...],
+ *     "has_gold": true,
+ *     "closing_balance": 1234.56,
+ *     "closing_gold": 0,
+ *     "from_date": "2026-01-01",
+ *     "to_date": "2026-10-05",
+ *     "branch_id": 0,
+ *     "page": 1,
+ *     "per_page": 100,
+ *     "total": 150,
+ *     "total_pages": 2,
+ *     "has_more": true
+ *   }
+ * }
+ */
 public class GeneralLedgerDto {
+
+    // ═══════════════════════════════════════════════════════
+    //  الحقول الرئيسية
+    // ═══════════════════════════════════════════════════════
 
     @SerializedName("account")
     public AccountDto account;
@@ -32,7 +61,28 @@ public class GeneralLedgerDto {
     @SerializedName("branch_id")
     public int branchId;
 
-    // ==================== Nested DTOs ====================
+    // ═══════════════════════════════════════════════════════
+    //  Pagination (في الجذر — وليس داخل LedgerRowDto)
+    // ═══════════════════════════════════════════════════════
+
+    @SerializedName("page")
+    public int currentPage;
+
+    @SerializedName("per_page")
+    public int perPage;
+
+    @SerializedName("total")
+    public int totalRows;
+
+    @SerializedName("total_pages")
+    public int totalPages;
+
+    @SerializedName("has_more")
+    public boolean hasMore;
+
+    // ═══════════════════════════════════════════════════════
+    //  Nested DTOs
+    // ═══════════════════════════════════════════════════════
 
     public static class OpeningDto {
         @SerializedName("total_debit")
