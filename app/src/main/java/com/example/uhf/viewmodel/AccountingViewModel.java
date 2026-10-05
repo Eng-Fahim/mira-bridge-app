@@ -369,7 +369,7 @@ public void loadGeneralLedger(long accountId, String from, String to, int branch
             error.setValue("خطأ في الشبكة: " + t.getMessage());
         }
     });
-}
+    }
     // ═══════════════════════════════════════════════════════
     //  الحالة
     // ═══════════════════════════════════════════════════════
@@ -382,4 +382,44 @@ public void loadGeneralLedger(long accountId, String from, String to, int branch
     public String getFromDate() { return currentFromDate; }
     public String getToDate() { return currentToDate; }
     public int getBranchId() { return currentBranchId; }
+    
+    
+    /**
+ * ✅ تحميل القيود مع دعم الصفحات
+ */
+public void loadJournalEntries(int page, int perPage, String status) {
+    loading.setValue(true);
+    error.setValue(null);
+
+    api.accounting().getJournalEntries(
+        null,        // branch_id
+        null,        // from_date
+        null,        // to_date
+        status,      // status
+        perPage,     // per_page
+        page         // page
+    ).enqueue(new Callback<ApiResponseDto<JournalEntryDto[]>>() {
+        @Override
+        public void onResponse(Call<ApiResponseDto<JournalEntryDto[]>> call,
+                              Response<ApiResponseDto<JournalEntryDto[]>> response) {
+            loading.setValue(false);
+            if (response.isSuccessful() && response.body() != null) {
+                if (response.body().success) {
+                    journalEntries.setValue(response.body().data);
+                } else {
+                    error.setValue(response.body().error);
+                }
+            } else {
+                error.setValue("فشل تحميل القيود: " + response.code());
+            }
+        }
+
+        @Override
+        public void onFailure(Call<ApiResponseDto<JournalEntryDto[]>> call,
+                             Throwable t) {
+            loading.setValue(false);
+            error.setValue("خطأ في الشبكة: " + t.getMessage());
+        }
+    });
+}
 }
