@@ -375,18 +375,17 @@ public class MiraPriceManager {
     }
 
     public String formatPrice(double priceUSD, String currency) {
-    if (priceUSD <= 0) return "—";
+    // ✅ اعرض 0 بشكل صحيح بدل "—"
+    if (priceUSD < 0) priceUSD = 0;
 
     double convertedPrice = convertFromUSD(priceUSD, currency);
     String symbol = getCurrencySymbol(currency);
-    
-    // ✅ largeFormat أصبح member بدل إنشائه محلياً
+
     if (CURRENCY_YER.equals(currency) || CURRENCY_EGP.equals(currency)) {
         return largeFormat.format(convertedPrice) + " " + symbol;
     }
     return symbol + " " + decimalFormat.format(convertedPrice);
 }
-
     public String formatPriceDefault(double priceUSD) {
         return formatPrice(priceUSD, getDefaultCurrency());
     }
