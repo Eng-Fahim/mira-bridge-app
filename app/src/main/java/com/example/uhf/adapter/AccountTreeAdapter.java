@@ -53,8 +53,11 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
 
         // المسافة حسب المستوى
         int indent = (a.level - 1) * 16;
-        h.container.setPadding(indent, h.container.getPaddingTop(),
-                              h.container.getPaddingRight(), h.container.getPaddingBottom());
+        h.container.setPaddingRelative(indent,                              // start
+        h.container.getPaddingTop(),
+        h.container.getPaddingEnd(),
+        h.container.getPaddingBottom()
+        );
 
         // لون حسب النوع
         String color;
