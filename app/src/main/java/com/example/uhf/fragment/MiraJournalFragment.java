@@ -19,10 +19,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.JournalEntryAdapter;
 import com.example.uhf.api.dto.JournalEntryDto;
 import com.example.uhf.utils.DateHelper;
-import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -32,6 +32,9 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Locale;
 
+/**
+ * ✅ شاشة القيود المحاسبية
+ */
 public class MiraJournalFragment extends Fragment {
 
     private AccountingViewModel viewModel;
@@ -47,7 +50,7 @@ public class MiraJournalFragment extends Fragment {
     private TextView tvEmptyText;
 
     private String fromDate = DateHelper.startOfYearApi();
-    private String toDate = DateHelper.todayApi();
+    private String toDate   = DateHelper.todayApi();
     private String statusFilter = null;
     private int currentPage = 1;
     private final int PER_PAGE = 50;
@@ -69,18 +72,18 @@ public class MiraJournalFragment extends Fragment {
     }
 
     private void initViews(View v) {
-        btnFromDate = v.findViewById(R.id.btnFromDate);
-        btnToDate = v.findViewById(R.id.btnToDate);
+        btnFromDate     = v.findViewById(R.id.btnFromDate);
+        btnToDate       = v.findViewById(R.id.btnToDate);
         chipStatusGroup = v.findViewById(R.id.chipStatusGroup);
-        chipAll = v.findViewById(R.id.chipAll);
-        chipPosted = v.findViewById(R.id.chipPosted);
-        chipDraft = v.findViewById(R.id.chipDraft);
-        chipReversed = v.findViewById(R.id.chipReversed);
-        rvEntries = v.findViewById(R.id.rvEntries);
-        swipeRefresh = v.findViewById(R.id.swipeRefresh);
-        pbLoading = v.findViewById(R.id.pbLoading);
-        emptyState = v.findViewById(R.id.emptyState);
-        tvEmptyText = v.findViewById(R.id.tvEmptyText);
+        chipAll         = v.findViewById(R.id.chipAll);
+        chipPosted      = v.findViewById(R.id.chipPosted);
+        chipDraft       = v.findViewById(R.id.chipDraft);
+        chipReversed    = v.findViewById(R.id.chipReversed);
+        rvEntries       = v.findViewById(R.id.rvEntries);
+        swipeRefresh    = v.findViewById(R.id.swipeRefresh);
+        pbLoading       = v.findViewById(R.id.pbLoading);
+        emptyState      = v.findViewById(R.id.emptyState);
+        tvEmptyText     = v.findViewById(R.id.tvEmptyText);
     }
 
     private void setupViewModel() {
@@ -88,9 +91,10 @@ public class MiraJournalFragment extends Fragment {
 
         viewModel.getJournalEntries().observe(getViewLifecycleOwner(), entries -> {
             swipeRefresh.setRefreshing(false);
+            pbLoading.setVisibility(View.GONE);
 
             if (entries == null || entries.length == 0) {
-                showEmpty("لا توجد قيود");
+                showEmpty("لا توجد قيود في هذه الفترة");
                 return;
             }
 
@@ -110,6 +114,7 @@ public class MiraJournalFragment extends Fragment {
             if (error != null && !error.isEmpty()) {
                 Toast.makeText(requireContext(), "❌ " + error, Toast.LENGTH_LONG).show();
                 swipeRefresh.setRefreshing(false);
+                pbLoading.setVisibility(View.GONE);
                 viewModel.clearError();
             }
         });
@@ -117,18 +122,26 @@ public class MiraJournalFragment extends Fragment {
 
     private void setupRecycler() {
         adapter = new JournalEntryAdapter(entry -> {
-            // فتح تفاصيل القيد
-            Bundle args = new Bundle();
-            args.putLong("entry_id", entry.id);
+            // ✅ فتح تفاصيل القيد
+            if (entry.id <= 0) {
+                Toast.makeText(requireContext(),
+                    "معرف القيد مفقود", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            MiraJournalDetailFragment detail = new MiraJournalDetailFragment();
-            detail.setArguments(args);
+            MiraJournalEntryDetailsFragment details =
+                MiraJournalEntryDetailsFragment.newInstance(entry.id);
 
-            requireActivity().getSupportFragmentManager()
-                .beginTransaction()
-                .replace(android.R.id.content, detail)
-                .addToBackStack(null)
-                .commit();
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity())
+                    .loadFragment(details, "JournalEntryDetails");
+            } else {
+                requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, details)
+                    .addToBackStack("JournalEntryDetails")
+                    .commit();
+            }
         });
 
         rvEntries.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -159,20 +172,22 @@ public class MiraJournalFragment extends Fragment {
         try {
             String dateStr = isFrom ? fromDate : toDate;
             String[] parts = dateStr.split("-");
-            cal.set(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]) - 1, Integer.parseInt(parts[2]));
+            cal.set(Integer.parseInt(parts[0]),
+                    Integer.parseInt(parts[1]) - 1,
+                    Integer.parseInt(parts[2]));
         } catch (Exception ignored) {}
 
         new DatePickerDialog(requireContext(),
             (view, year, month, dayOfMonth) -> {
-                String date = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                String date = String.format(Locale.US, "%04d-%02d-%02d",
+                        year, month + 1, dayOfMonth);
 
                 if (isFrom) {
                     fromDate = date;
-                    btnFromDate.setText("من: " + DateHelper.toDisplay(date));
                 } else {
                     toDate = date;
-                    btnToDate.setText("إلى: " + DateHelper.toDisplay(date));
                 }
+                updateDateButtons();
                 loadEntries();
             },
             cal.get(Calendar.YEAR),
