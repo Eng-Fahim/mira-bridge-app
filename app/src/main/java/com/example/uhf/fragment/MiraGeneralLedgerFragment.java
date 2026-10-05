@@ -1,8 +1,15 @@
 package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,12 +26,15 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.LedgerRowAdapter;
 import com.example.uhf.api.dto.AccountDto;
 import com.example.uhf.api.dto.GeneralLedgerDto;
 import com.example.uhf.utils.DateHelper;
+import com.example.uhf.utils.LedgerCsvExporter;
 import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
 import com.google.android.material.button.MaterialButton;
@@ -35,17 +45,34 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * شاشة دفتر الأستاذ العام
+ * ✅ شاشة دفتر الأستاذ العام — النسخة الاحترافية الكاملة
  *
- * ✅ يعرض الحركات الفعلية من API (reports/general-ledger/{account_id})
- * ✅ يحوّل GeneralLedgerDto.LedgerRowDto إلى LedgerRowAdapter.LedgerRow
- * ✅ يعرض KPIs: افتتاحي / مدين / دائن / ختامي
+ * الميزات:
+ * - عرض الحركات الفعلية من API
+ * - KPIs: افتتاحي / مدين / دائن / ختامي
+ * - Pagination ذكي (Lazy Loading)
+ * - Pull-to-Refresh
+ * - حفظ واستعادة الفلاتر
+ * - Debounce على البحث
+ * - تصدير CSV
+ * - النقر على صف → تفاصيل القيد
+ * - التحميل التلقائي عند وصول account_id
  */
 public class MiraGeneralLedgerFragment extends Fragment {
 
-    private AccountingViewModel viewModel;
+    // ═══════════════════════════════════════════════════════════
+    //  Constants
+    // ═══════════════════════════════════════════════════════════
+    private static final String PREFS_FILTERS    = "ledger_filters";
+    private static final String KEY_LAST_ACCOUNT = "last_account_id";
+    private static final String KEY_FROM_DATE    = "from_date";
+    private static final String KEY_TO_DATE      = "to_date";
+    private static final int    PAGE_SIZE        = 100;
+    private static final long   DEBOUNCE_MS      = 350;
 
-    // Views
+    // ═══════════════════════════════════════════════════════════
+    //  Views
+    // ═══════════════════════════════════════════════════════════
     private AutoCompleteTextView spAccount;
     private MaterialButton btnFrom, btnTo, btnLoad, btnExport;
     private LinearLayout kpiContainer;
@@ -53,20 +80,39 @@ public class MiraGeneralLedgerFragment extends Fragment {
     private ProgressBar pbLoading;
     private LinearLayout emptyState;
     private TextView tvEmptyText;
+    private SwipeRefreshLayout swipeRefresh;
 
-    // State
-    private String fromDate = DateHelper.startOfYearApi();
-    private String toDate = DateHelper.todayApi();
-    private long selectedAccountId = 0;
-    private String selectedAccountCode = "";
-    private String selectedAccountName = "";
+    // ═══════════════════════════════════════════════════════════
+    //  ViewModel
+    // ═══════════════════════════════════════════════════════════
+    private AccountingViewModel viewModel;
+
+    // ═══════════════════════════════════════════════════════════
+    //  State
+    // ═══════════════════════════════════════════════════════════
+    private String  fromDate          = DateHelper.startOfYearApi();
+    private String  toDate            = DateHelper.todayApi();
+    private long    selectedAccountId = 0;
+    private String  selectedAccountCode = "";
+    private String  selectedAccountName = "";
+
     private final List<AccountDto> accountsList = new ArrayList<>();
     private LedgerRowAdapter adapter;
-    
-    private double currentOpening = 0;
-    private double currentClosing = 0;
-    private double currentTotalDebit = 0;
+
+    // KPIs محفوظة للتصدير
+    private double currentOpening     = 0;
+    private double currentClosing     = 0;
+    private double currentTotalDebit  = 0;
     private double currentTotalCredit = 0;
+
+    // Pagination
+    private int     currentPage   = 1;
+    private boolean isLoadingMore = false;
+    private boolean hasMorePages  = true;
+
+    // Debounce
+    private final Handler debounceHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingSearch;
 
     // ═══════════════════════════════════════════════════════════
     //  Lifecycle
@@ -77,26 +123,39 @@ public class MiraGeneralLedgerFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_general_ledger, container, false);
+        View v = inflater.inflate(R.layout.fragment_general_ledger,
+                container, false);
 
+        // 1. قراءة account_id قبل أي شيء
+        if (getArguments() != null) {
+            long accId = getArguments().getLong("account_id", 0);
+            if (accId > 0) selectedAccountId = accId;
+        }
+
+        // 2. تهيئة الواجهة
         initViews(v);
         setupViewModel();
         setupRecycler();
         setupListeners();
+
+        // 3. الفلاتر (قد تستعيد accountId إن لم يكن موجوداً)
+        restoreFilters();
         updateDateButtons();
 
-        // ✅ leaf_only=1 — قائمة نظيفة
+        // 4. تحميل الحسابات — leaf_only=1
         viewModel.loadAccounts(null, null, true);
 
-        // إذا تم تمرير account_id عبر Arguments
-        if (getArguments() != null) {
-            long accId = getArguments().getLong("account_id", 0);
-            if (accId > 0) {
-                selectedAccountId = accId;
-            }
-        }
-
         return v;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // ✅ تنظيف Debounce
+        if (debounceHandler != null && pendingSearch != null) {
+            debounceHandler.removeCallbacks(pendingSearch);
+            pendingSearch = null;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -104,52 +163,64 @@ public class MiraGeneralLedgerFragment extends Fragment {
     // ═══════════════════════════════════════════════════════════
 
     private void initViews(View v) {
-        spAccount     = v.findViewById(R.id.spAccount);
-        btnFrom       = v.findViewById(R.id.btnFrom);
-        btnTo         = v.findViewById(R.id.btnTo);
-        btnLoad       = v.findViewById(R.id.btnLoad);
-        btnExport     = v.findViewById(R.id.btnExport);
-        kpiContainer  = v.findViewById(R.id.kpiContainer);
-        rvLedger      = v.findViewById(R.id.rvLedger);
-        pbLoading     = v.findViewById(R.id.pbLoading);
-        emptyState    = v.findViewById(R.id.emptyState);
-        tvEmptyText   = v.findViewById(R.id.tvEmptyText);
+        spAccount      = v.findViewById(R.id.spAccount);
+        btnFrom        = v.findViewById(R.id.btnFrom);
+        btnTo          = v.findViewById(R.id.btnTo);
+        btnLoad        = v.findViewById(R.id.btnLoad);
+        btnExport      = v.findViewById(R.id.btnExport);
+        kpiContainer   = v.findViewById(R.id.kpiContainer);
+        rvLedger       = v.findViewById(R.id.rvLedger);
+        pbLoading      = v.findViewById(R.id.pbLoading);
+        emptyState     = v.findViewById(R.id.emptyState);
+        tvEmptyText    = v.findViewById(R.id.tvEmptyText);
+        swipeRefresh   = v.findViewById(R.id.swipeRefresh);
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  ViewModel Setup
+    // ═══════════════════════════════════════════════════════════
 
     private void setupViewModel() {
         viewModel = new ViewModelProvider(this).get(AccountingViewModel.class);
 
         // ─── الحسابات ───
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
-        if (accounts == null) return;
-        accountsList.clear();
-        for (AccountDto a : accounts) {
-        // مع leaf_only=true من السيرفر، كلها leaves
-        if (a.isLeaf()) accountsList.add(a);
-        }
-        setupAccountSpinner();
+            if (accounts == null) return;
 
-    // ✅✅✅ التحميل التلقائي عند وصول account_id
-    if (selectedAccountId > 0 && !accountsList.isEmpty()) {
-        for (AccountDto a : accountsList) {
-            if (a.id == selectedAccountId) {
-                selectedAccountCode = a.accountCode;
-                selectedAccountName = a.accountNameAr;
-
-                // اختيار برمجي
-                spAccount.setText(
-                    a.accountCode + " - " + a.accountNameAr, false);
-
-                // تحميل بعد لحظة لضمان جاهزية الواجهة
-                spAccount.post(() -> loadLedger());
-                break;
+            accountsList.clear();
+            for (AccountDto a : accounts) {
+                if (a.isLeaf()) accountsList.add(a);
             }
-        }
-    }
-});
+            setupAccountSpinner();
+
+            // ✅✅✅ التحميل التلقائي عند وصول account_id
+            if (selectedAccountId > 0 && !accountsList.isEmpty()) {
+                for (AccountDto a : accountsList) {
+                    if (a.id == selectedAccountId) {
+                        selectedAccountCode = a.accountCode;
+                        selectedAccountName = a.accountNameAr;
+
+                        // اختيار برمجي (بدون إطلاق TextWatcher)
+                        spAccount.setText(
+                            a.accountCode + " - " + a.accountNameAr, false);
+
+                        // تحميل بعد لحظة قصيرة
+                        spAccount.post(this::loadLedger);
+                        break;
+                    }
+                }
+            }
+        });
+
         // ─── دفتر الأستاذ ───
         viewModel.getGeneralLedger().observe(getViewLifecycleOwner(), ledger -> {
             pbLoading.setVisibility(View.GONE);
+
+            // ✅ أوقف SwipeRefresh
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+
+            // ✅ أعد تعيين حالة التحميل
+            isLoadingMore = false;
 
             if (ledger == null) {
                 showEmpty("لم يتم استلام بيانات");
@@ -157,21 +228,31 @@ public class MiraGeneralLedgerFragment extends Fragment {
             }
 
             if (ledger.rows == null || ledger.rows.isEmpty()) {
-                double opening = (ledger.opening != null) ? ledger.opening.balance : 0;
+                double opening = (ledger.opening != null)
+                        ? ledger.opening.balance : 0;
                 renderKPIs(opening, 0, 0, ledger.closingBalance);
-                showEmpty("لا توجد حركات لهذا الحساب في الفترة المحددة");
+
+                if (currentPage > 1) {
+                    hasMorePages = false;   // لا مزيد
+                } else {
+                    showEmpty("لا توجد حركات لهذا الحساب في الفترة المحددة");
+                }
                 return;
             }
 
+            // ✅ هل هناك المزيد؟
+            hasMorePages = (ledger.rows.size() >= PAGE_SIZE);
+
             // إجماليات المدين/الدائن
-            double totalDebit = 0;
+            double totalDebit  = 0;
             double totalCredit = 0;
             for (GeneralLedgerDto.LedgerRowDto row : ledger.rows) {
                 totalDebit  += row.baseDebit;
                 totalCredit += row.baseCredit;
             }
 
-            double opening = (ledger.opening != null) ? ledger.opening.balance : 0;
+            double opening = (ledger.opening != null)
+                    ? ledger.opening.balance : 0;
             renderKPIs(opening, totalDebit, totalCredit, ledger.closingBalance);
 
             // تحويل DTO → LedgerRow
@@ -179,14 +260,14 @@ public class MiraGeneralLedgerFragment extends Fragment {
             for (GeneralLedgerDto.LedgerRowDto dto : ledger.rows) {
                 LedgerRowAdapter.LedgerRow row = new LedgerRowAdapter.LedgerRow();
 
-                row.entryId = dto.entryId; 
-                row.date = dto.entryDate;
+                row.entryId     = dto.entryId;
+                row.date        = dto.entryDate;
                 row.entryNumber = dto.entryNumber;
 
-                // فضّل description السطر، وإن كان فارغاً استخدم وصف القيد
                 if (dto.description != null && !dto.description.trim().isEmpty()) {
                     row.description = dto.description;
-                } else if (dto.entryDescription != null && !dto.entryDescription.trim().isEmpty()) {
+                } else if (dto.entryDescription != null
+                        && !dto.entryDescription.trim().isEmpty()) {
                     row.description = dto.entryDescription;
                 } else {
                     row.description = "—";
@@ -201,23 +282,37 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 uiRows.add(row);
             }
 
-            adapter.setItems(uiRows);
+            // ✅ إضافة أو استبدال
+            if (currentPage == 1) {
+                adapter.setItems(uiRows);
+            } else {
+                adapter.appendItems(uiRows);
+            }
+
             showData();
         });
 
         // ─── Loading ───
         viewModel.getLoading().observe(getViewLifecycleOwner(), loading -> {
-            pbLoading.setVisibility((loading != null && loading) ? View.VISIBLE : View.GONE);
+            boolean isLoading = (loading != null && loading);
+            if (!isLoadingMore) {
+                pbLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            }
         });
 
         // ─── Error ───
         viewModel.getError().observe(getViewLifecycleOwner(), error -> {
             if (error != null && !error.isEmpty()) {
-                Toast.makeText(requireContext(), "❌ " + error, Toast.LENGTH_LONG).show();
+                Toast.makeText(requireContext(),
+                    "❌ " + error, Toast.LENGTH_LONG).show();
                 viewModel.clearError();
             }
         });
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Account Spinner (with Debounce)
+    // ═══════════════════════════════════════════════════════════
 
     private void setupAccountSpinner() {
         ArrayAdapter<AccountDto> arrayAdapter = new ArrayAdapter<AccountDto>(
@@ -227,7 +322,8 @@ public class MiraGeneralLedgerFragment extends Fragment {
         ) {
             @NonNull
             @Override
-            public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+            public View getView(int position, @Nullable View convertView,
+                                @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
                 TextView tv = view.findViewById(android.R.id.text1);
                 AccountDto a = getItem(position);
@@ -238,7 +334,8 @@ public class MiraGeneralLedgerFragment extends Fragment {
             }
 
             @Override
-            public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+            public View getDropDownView(int position, @Nullable View convertView,
+                                        @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
                 TextView tv = view.findViewById(android.R.id.text1);
                 AccountDto a = getItem(position);
@@ -249,45 +346,112 @@ public class MiraGeneralLedgerFragment extends Fragment {
             }
         };
 
+        // ✅ ربط Adapter
         spAccount.setAdapter(arrayAdapter);
 
+        // ✅ Debounce للبحث
+        spAccount.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override
+            public void onTextChanged(CharSequence s, int st, int b, int c) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (pendingSearch != null) {
+                    debounceHandler.removeCallbacks(pendingSearch);
+                }
+                pendingSearch = () -> {
+                    String query = s.toString().trim();
+                    if (query.length() >= 2) {
+                        viewModel.loadAccounts(null, query, true);
+                    } else if (query.isEmpty()) {
+                        viewModel.loadAccounts(null, null, true);
+                    }
+                };
+                debounceHandler.postDelayed(pendingSearch, DEBOUNCE_MS);
+            }
+        });
+
+        // ✅ عند اختيار حساب
         spAccount.setOnItemClickListener((parent, view, position, id) -> {
             AccountDto selected = (AccountDto) parent.getItemAtPosition(position);
             if (selected != null) {
                 selectedAccountId   = selected.id;
                 selectedAccountCode = selected.accountCode;
                 selectedAccountName = selected.accountNameAr;
+                saveFilters();
             }
         });
     }
 
-    private void setupRecycler() {
-    adapter = new LedgerRowAdapter(row -> {
-        // ✅ فتح تفاصيل القيد
-        if (row.entryId > 0) {
-            MiraJournalEntryDetailsFragment details =
-                MiraJournalEntryDetailsFragment.newInstance(row.entryId);
+    // ═══════════════════════════════════════════════════════════
+    //  Recycler + Pagination
+    // ═══════════════════════════════════════════════════════════
 
-            // حاول استخدام UHFMainActivity إن وُجدت
-            if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
-                ((com.example.uhf.activity.UHFMainActivity) getActivity())
-                    .loadFragment(details, "JournalEntryDetails");
+    private void setupRecycler() {
+        adapter = new LedgerRowAdapter(row -> {
+            if (row.entryId > 0) {
+                MiraJournalEntryDetailsFragment details =
+                    MiraJournalEntryDetailsFragment.newInstance(row.entryId);
+
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity())
+                        .loadFragment(details, "JournalEntryDetails");
+                } else {
+                    requireActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, details)
+                        .addToBackStack("JournalEntryDetails")
+                        .commit();
+                }
             } else {
-                // fallback: داخل نفس الـ container
-                requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, details)
-                    .addToBackStack("JournalEntryDetails")
-                    .commit();
+                Toast.makeText(requireContext(),
+                    "معرف القيد مفقود", Toast.LENGTH_SHORT).show();
             }
-        } else {
-            Toast.makeText(requireContext(),
-                "معرف القيد مفقود", Toast.LENGTH_SHORT).show();
-        }
-    });
-    rvLedger.setLayoutManager(new LinearLayoutManager(getContext()));
-    rvLedger.setAdapter(adapter);
-}
+        });
+
+        LinearLayoutManager lm = new LinearLayoutManager(getContext());
+        rvLedger.setLayoutManager(lm);
+        rvLedger.setAdapter(adapter);
+
+        // ✅✅✅ ScrollListener للتحميل التدريجي
+        rvLedger.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView,
+                                   int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+
+                if (dy <= 0) return;
+                if (isLoadingMore || !hasMorePages) return;
+                if (selectedAccountId <= 0) return;
+
+                int visibleCount  = lm.getChildCount();
+                int totalCount    = lm.getItemCount();
+                int firstVisible  = lm.findFirstVisibleItemPosition();
+
+                // ✅ عند الوصول لآخر 5 عناصر
+                if (firstVisible + visibleCount >= totalCount - 5) {
+                    loadNextPage();
+                }
+            }
+        });
+    }
+
+    private void loadNextPage() {
+        if (isLoadingMore || !hasMorePages || selectedAccountId <= 0) return;
+
+        isLoadingMore = true;
+        currentPage++;
+        pbLoading.setVisibility(View.VISIBLE);
+
+        viewModel.loadGeneralLedger(
+            selectedAccountId, fromDate, toDate, 0, currentPage);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Listeners
+    // ═══════════════════════════════════════════════════════════
 
     private void setupListeners() {
         btnFrom.setOnClickListener(v -> pickDate(true));
@@ -296,50 +460,64 @@ public class MiraGeneralLedgerFragment extends Fragment {
         btnLoad.setOnClickListener(v -> {
             if (selectedAccountId <= 0) {
                 Toast.makeText(requireContext(),
-                        "يرجى اختيار حساب", Toast.LENGTH_SHORT).show();
+                    "يرجى اختيار حساب", Toast.LENGTH_SHORT).show();
                 return;
             }
             loadLedger();
         });
 
+        // ✅✅✅ زر التصدير — يستخدم القيم الحقيقية
         btnExport.setOnClickListener(v -> {
-    if (selectedAccountId <= 0) {
-        Toast.makeText(requireContext(),
-            "اختر حساباً أولاً", Toast.LENGTH_SHORT).show();
-        return;
-    }
+            if (selectedAccountId <= 0) {
+                Toast.makeText(requireContext(),
+                    "اختر حساباً أولاً", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-    // نجمع البيانات الحالية
-    List<LedgerRowAdapter.LedgerRow> currentRows = adapter.getItems();
-    if (currentRows == null || currentRows.isEmpty()) {
-        Toast.makeText(requireContext(),
-            "لا توجد بيانات للتصدير", Toast.LENGTH_SHORT).show();
-        return;
-    }
+            List<LedgerRowAdapter.LedgerRow> currentRows = adapter.getItems();
+            if (currentRows == null || currentRows.isEmpty()) {
+                Toast.makeText(requireContext(),
+                    "لا توجد بيانات للتصدير", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-    // نستخرج KPIs من العارض الحالي
-    double opening = 0, closing = 0;
-    // (يمكن تخزينها في المتغيرات عند renderKPIs)
+            Uri uri = LedgerCsvExporter.exportAndShare(
+                requireContext(),
+                currentRows,
+                selectedAccountCode,
+                selectedAccountName,
+                fromDate,
+                toDate,
+                currentOpening,      // ✅ حقيقي
+                currentClosing       // ✅ حقيقي
+            );
 
-    Uri uri = LedgerCsvExporter.exportAndShare(
-        requireContext(),
-        currentRows,
-        selectedAccountCode,
-        selectedAccountName,
-        fromDate,
-        toDate,
-        opening,   // سيتم تعبئتها لاحقاً
-        closing
-    );
+            if (uri != null) {
+                Toast.makeText(requireContext(),
+                    "📥 تم إنشاء الملف", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(requireContext(),
+                    "❌ فشل التصدير", Toast.LENGTH_SHORT).show();
+            }
+        });
 
-    if (uri != null) {
-        Toast.makeText(requireContext(),
-            "📥 تم إنشاء الملف", Toast.LENGTH_SHORT).show();
-    } else {
-        Toast.makeText(requireContext(),
-            "❌ فشل التصدير", Toast.LENGTH_SHORT).show();
-    }
-});
+        // ✅✅✅ Swipe-to-Refresh
+        if (swipeRefresh != null) {
+            swipeRefresh.setColorSchemeResources(
+                R.color.mira_gold,
+                android.R.color.holo_blue_bright,
+                android.R.color.holo_green_light);
+
+            swipeRefresh.setOnRefreshListener(() -> {
+                if (selectedAccountId > 0) {
+                    loadLedger();
+                } else {
+                    swipeRefresh.setRefreshing(false);
+                    Toast.makeText(requireContext(),
+                        "اختر حساباً أولاً", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -366,6 +544,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
                         toDate = date;
                     }
                     updateDateButtons();
+                    saveFilters();
                 },
                 cal.get(Calendar.YEAR),
                 cal.get(Calendar.MONTH),
@@ -378,45 +557,62 @@ public class MiraGeneralLedgerFragment extends Fragment {
         btnTo.setText("إلى: " + DateHelper.toDisplay(toDate));
     }
 
+    /**
+     * ✅ تحميل دفتر الأستاذ — يبدأ صفحة جديدة
+     */
     private void loadLedger() {
         if (selectedAccountId <= 0) {
             Toast.makeText(requireContext(),
-                    "يرجى اختيار حساب", Toast.LENGTH_SHORT).show();
+                "يرجى اختيار حساب", Toast.LENGTH_SHORT).show();
             return;
         }
+
+        // ✅ إعادة تعيين Pagination
+        currentPage   = 1;
+        hasMorePages  = true;
+        isLoadingMore = false;
+
+        // ✅ مسح القائمة القديمة
+        adapter.setItems(new ArrayList<>());
 
         pbLoading.setVisibility(View.VISIBLE);
         emptyState.setVisibility(View.GONE);
         rvLedger.setVisibility(View.GONE);
 
-        viewModel.loadGeneralLedger(selectedAccountId, fromDate, toDate, 0);
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(true);
+        }
+
+        viewModel.loadGeneralLedger(
+            selectedAccountId, fromDate, toDate, 0, currentPage);
     }
 
     // ═══════════════════════════════════════════════════════════
     //  UI Helpers
     // ═══════════════════════════════════════════════════════════
 
-    private void renderKPIs(double opening, double debit, double credit, double closing) {
-    // ✅ احفظ للتصدير
-    currentOpening = opening;
-    currentClosing = closing;
-    currentTotalDebit = debit;
-    currentTotalCredit = credit;
+    private void renderKPIs(double opening, double debit,
+                            double credit, double closing) {
+        // ✅ احفظ للتصدير
+        currentOpening     = opening;
+        currentClosing     = closing;
+        currentTotalDebit  = debit;
+        currentTotalCredit = credit;
 
-    kpiContainer.removeAllViews();
-    addKpi("افتتاحي", NumberFormatter.moneyShort(opening), "#3498DB");
-    addKpi("مدين",    NumberFormatter.moneyShort(debit),   "#9B59B6");
-    addKpi("دائن",    NumberFormatter.moneyShort(credit),  "#E74C3C");
-    addKpi("ختامي",   NumberFormatter.moneyShort(closing), "#27AE60");
-}
+        kpiContainer.removeAllViews();
+        addKpi("افتتاحي", NumberFormatter.moneyShort(opening), "#3498DB");
+        addKpi("مدين",    NumberFormatter.moneyShort(debit),   "#9B59B6");
+        addKpi("دائن",    NumberFormatter.moneyShort(credit),  "#E74C3C");
+        addKpi("ختامي",   NumberFormatter.moneyShort(closing), "#27AE60");
+    }
 
     private void addKpi(String title, String value, String color) {
         View card = LayoutInflater.from(getContext())
                 .inflate(R.layout.kpi_card, kpiContainer, false);
 
-        TextView tvTitle   = card.findViewById(R.id.tvKpiTitle);
-        TextView tvValue   = card.findViewById(R.id.tvKpiValue);
-        View indicator     = card.findViewById(R.id.kpiIndicator);
+        TextView tvTitle = card.findViewById(R.id.tvKpiTitle);
+        TextView tvValue = card.findViewById(R.id.tvKpiValue);
+        View indicator   = card.findViewById(R.id.kpiIndicator);
 
         tvTitle.setText(title);
         tvValue.setText(value);
@@ -437,5 +633,44 @@ public class MiraGeneralLedgerFragment extends Fragment {
     private void showData() {
         emptyState.setVisibility(View.GONE);
         rvLedger.setVisibility(View.VISIBLE);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Filters Persistence
+    // ═══════════════════════════════════════════════════════════
+
+    private void saveFilters() {
+        Context ctx = getContext();
+        if (ctx == null) return;
+
+        SharedPreferences prefs = ctx.getSharedPreferences(
+            PREFS_FILTERS, Context.MODE_PRIVATE);
+
+        prefs.edit()
+            .putLong(KEY_LAST_ACCOUNT, selectedAccountId)
+            .putString(KEY_FROM_DATE, fromDate)
+            .putString(KEY_TO_DATE, toDate)
+            .apply();
+    }
+
+    private void restoreFilters() {
+        Context ctx = getContext();
+        if (ctx == null) return;
+
+        SharedPreferences prefs = ctx.getSharedPreferences(
+            PREFS_FILTERS, Context.MODE_PRIVATE);
+
+        // التاريخ
+        String savedFrom = prefs.getString(KEY_FROM_DATE, null);
+        String savedTo   = prefs.getString(KEY_TO_DATE, null);
+
+        if (savedFrom != null && !savedFrom.isEmpty()) fromDate = savedFrom;
+        if (savedTo != null && !savedTo.isEmpty())     toDate   = savedTo;
+
+        // آخر حساب (فقط إن لم يُمرَّر عبر Arguments)
+        if (selectedAccountId <= 0) {
+            long lastAccount = prefs.getLong(KEY_LAST_ACCOUNT, 0);
+            if (lastAccount > 0) selectedAccountId = lastAccount;
+        }
     }
 }
