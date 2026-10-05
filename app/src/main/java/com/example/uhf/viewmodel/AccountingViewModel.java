@@ -205,32 +205,11 @@ public class AccountingViewModel extends AndroidViewModel {
     }
 
     /**
-     * ✅ تحميل قيد مفرد (بدون تفاصيل)
-     */
-    public void loadJournalEntry(long id) {
-        loading.setValue(true);
-
-        api.accounting().getJournalEntry(id)
-            .enqueue(new Callback<ApiResponseDto<JournalEntryDto>>() {
-                @Override
-                public void onResponse(Call<ApiResponseDto<JournalEntryDto>> call,
-                                      Response<ApiResponseDto<JournalEntryDto>> response) {
-                    loading.setValue(false);
-                    if (response.isSuccessful()
-                            && response.body() != null
-                            && response.body().success) {
-                        selectedEntry.setValue(response.body().data);
-                    }
-                }
-
-                @Override
-                public void onFailure(Call<ApiResponseDto<JournalEntryDto>> call,
-                                     Throwable t) {
-                    loading.setValue(false);
-                    error.setValue(t.getMessage());
-                }
-            });
-    }
+ * ✅ تحميل قيد مفرد — عبر تفاصيل القيد (نفس endpoint)
+ */
+public void loadJournalEntry(long id) {
+    loadJournalEntryDetails(id);
+}
 
     public void postJournalEntry(long id) {
         loading.setValue(true);
