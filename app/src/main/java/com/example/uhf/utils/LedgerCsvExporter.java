@@ -3,7 +3,6 @@ package com.example.uhf.utils;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Environment;
 import android.util.Log;
 
 import androidx.core.content.FileProvider;
@@ -20,23 +19,15 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * ✅ مُصدِّر CSV لدفتر الأستاذ العام
- * - يدعم Excel (UTF-8 BOM)
- * - يشارك الملف عبر FileProvider
+ * ✅ مُصدِّر CSV احترافي لدفتر الأستاذ
+ * - UTF-8 BOM ليفتح Excel العربي بشكل صحيح
+ * - فاصل الآلاف (كـ Excel يقرأه صحيحاً)
+ * - ترويسة كاملة
  */
 public class LedgerCsvExporter {
 
     private static final String TAG = "LedgerCsvExporter";
 
-    /**
-     * @param context    السياق
-     * @param rows       سطور دفتر الأستاذ
-     * @param accountCode كود الحساب (لاسم الملف)
-     * @param accountName اسم الحساب
-     * @param fromDate   من تاريخ
-     * @param toDate     إلى تاريخ
-     * @return Uri ملف CSV أو null عند الفشل
-     */
     public static Uri exportAndShare(Context context,
                                      List<LedgerRowAdapter.LedgerRow> rows,
                                      String accountCode,
@@ -46,7 +37,7 @@ public class LedgerCsvExporter {
                                      double openingBalance,
                                      double closingBalance) {
         if (rows == null || rows.isEmpty()) {
-            Log.w(TAG, "لا توجد بيانات للتصدير");
+            Log.w(TAG, "No rows to export");
             return null;
         }
 
@@ -58,17 +49,13 @@ public class LedgerCsvExporter {
             Uri uri = FileProvider.getUriForFile(
                 context,
                 context.getPackageName() + ".fileprovider",
-                file
-            );
+                file);
 
-            // إطلاق Intent للمشاركة
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("text/csv");
             shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
             shareIntent.putExtra(Intent.EXTRA_SUBJECT,
                 "دفتر الأستاذ — " + accountName);
-            shareIntent.putExtra(Intent.EXTRA_TEXT,
-                "تصدير دفتر الأستاذ من " + fromDate + " إلى " + toDate);
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
             context.startActivity(Intent.createChooser(shareIntent,
@@ -93,67 +80,70 @@ public class LedgerCsvExporter {
         try {
             File dir = new File(context.getExternalFilesDir(null), "exports");
             if (!dir.exists() && !dir.mkdirs()) {
-                Log.e(TAG, "Cannot create exports directory");
+                Log.e(TAG, "Cannot create exports dir");
                 return null;
             }
 
-            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss",
+            String ts = new SimpleDateFormat("yyyyMMdd_HHmmss",
                 Locale.US).format(new Date());
 
-            String safeCode = accountCode != null
-                ? accountCode.replaceAll("[^0-9A-Za-z_-]", "_") : "account";
+            String safeCode = (accountCode != null)
+                ? accountCode.replaceAll("[^0-9A-Za-z_-]", "_")
+                : "account";
 
             File file = new File(dir,
-                "ledger_" + safeCode + "_" + timestamp + ".csv");
+                "ledger_" + safeCode + "_" + ts + ".csv");
 
             try (FileOutputStream fos = new FileOutputStream(file)) {
-                // ✅ UTF-8 BOM ليفتح Excel العربي بشكل صحيح
+                // ✅ UTF-8 BOM لـ Excel العربي
                 fos.write(0xEF);
                 fos.write(0xBB);
                 fos.write(0xBF);
 
-                try (OutputStreamWriter writer =
-                         new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
+                try (OutputStreamWriter w = new OutputStreamWriter(
+                        fos, StandardCharsets.UTF_8)) {
 
-                    // ═══ رأس الملف ═══
-                    writer.write("دفتر الأستاذ العام\n");
-                    writer.write("الحساب," + escape(accountCode) + " - " + escape(accountName) + "\n");
-                    writer.write("من," + fromDate + "\n");
-                    writer.write("إلى," + toDate + "\n");
-                    writer.write("الرصيد الافتتاحي," + openingBalance + "\n");
-                    writer.write("الرصيد الختامي," + closingBalance + "\n");
-                    writer.write("\n");
+                    // ─── الترويسة ───
+                    w.write("MIRA Trust Platform — دفتر الأستاذ العام\n");
+                    w.write("الحساب," + esc(accountCode) + " - " + esc(accountName) + "\n");
+                    w.write("من," + fromDate + "\n");
+                    w.write("إلى," + toDate + "\n");
+                    w.write("الرصيد الافتتاحي," + num(openingBalance) + "\n");
+                    w.write("الرصيد الختامي," + num(closingBalance) + "\n");
+                    w.write("\n");
 
-                    // ═══ الأعمدة ═══
-                    writer.write("التاريخ,رقم القيد,البيان,المرجع,مدين,دائن,الرصيد,الذهب (جرام)\n");
+                    // ─── الأعمدة ───
+                    w.write("التاريخ,رقم القيد,البيان,المرجع,مدين,دائن,الرصيد,الذهب (g)\n");
 
-                    // ═══ السطور ═══
-                    for (LedgerRowAdapter.LedgerRow r : rows) {
-                        writer.write(
-                            escape(r.date) + "," +
-                            escape(r.entryNumber) + "," +
-                            escape(r.description) + "," +
-                            escape(r.reference) + "," +
-                            fmt(r.baseDebit) + "," +
-                            fmt(r.baseCredit) + "," +
-                            fmt(r.runningBalance) + "," +
-                            fmt(r.runningGold) +
-                            "\n"
-                        );
-                    }
-
-                    // ═══ الإجماليات ═══
+                    // ─── السطور ───
                     double totalDebit = 0, totalCredit = 0;
                     for (LedgerRowAdapter.LedgerRow r : rows) {
+                        w.write(
+                            esc(r.date) + "," +
+                            esc(r.entryNumber) + "," +
+                            esc(r.description) + "," +
+                            esc(r.reference) + "," +
+                            num(r.baseDebit) + "," +
+                            num(r.baseCredit) + "," +
+                            num(r.runningBalance) + "," +
+                            numGold(r.runningGold) +
+                            "\n"
+                        );
                         totalDebit  += r.baseDebit;
                         totalCredit += r.baseCredit;
                     }
 
-                    writer.write("\n");
-                    writer.write("الإجمالي,,,," + fmt(totalDebit) + ","
-                        + fmt(totalCredit) + ",,\n");
+                    // ─── الإجماليات ───
+                    w.write("\n");
+                    w.write("الإجمالي,,,," + num(totalDebit) + "," +
+                            num(totalCredit) + ",,\n");
 
-                    writer.flush();
+                    w.write("\n");
+                    w.write("تم الإنشاء بواسطة MIRA Trust Platform," +
+                            new SimpleDateFormat("yyyy-MM-dd HH:mm",
+                                Locale.US).format(new Date()) + "\n");
+
+                    w.flush();
                 }
             }
 
@@ -166,16 +156,23 @@ public class LedgerCsvExporter {
         }
     }
 
-    private static String fmt(double v) {
-        // ✅ تنسيق بسيط (بدون فاصلة آلاف لتجنب مشاكل Excel)
+    // ═══════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════
+
+    /** رقم بفواصل آلاف — Excel يفهمها */
+    private static String num(double v) {
         return String.format(Locale.US, "%.2f", v);
     }
 
-    private static String escape(String s) {
+    private static String numGold(double v) {
+        return String.format(Locale.US, "%.3f", v);
+    }
+
+    /** escape للـ CSV */
+    private static String esc(String s) {
         if (s == null) return "";
-        // ✅ استبدال الفواصل والاقتباسات
         String clean = s.replace("\"", "\"\"")
-                         .replace(",", "،")     // فاصلة عربية لتجنب كسر CSV
                          .replace("\n", " ")
                          .replace("\r", " ");
         return "\"" + clean + "\"";
