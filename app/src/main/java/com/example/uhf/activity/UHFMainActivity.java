@@ -585,8 +585,19 @@ private void refreshSetupStatusInBackground() {
 
             if (response != null && response.isSuccess && response.data != null) {
                 String status = response.data.optString("status", SETUP_PENDING);
-                cacheSetupStatus(status);
+                cacheSetupStatus(status);   // ✅ احفظ في الكاش
+
                 Log.d(TAG, "✅ Setup status refreshed: " + status);
+
+                // إذا اكتمل → حدث الواجهة
+                if (SETUP_COMPLETED.equals(status) || SETUP_LOCKED.equals(status)) {
+                    mainHandler.post(() -> {
+                        if (isActivityAlive()) {
+                            Log.d(TAG, "🎉 Setup completed detected in background");
+                            navigateByRole();
+                        }
+                    });
+                }
             }
         } catch (Exception e) {
             Log.w(TAG, "Setup status refresh failed: " + e.getMessage());
@@ -779,20 +790,59 @@ private boolean isSetupAllowedFragment(String tag) {
  * @param tag الشاشة المطلوب الانتقال إليها
  * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
  */
+/**
+ * 🛡️ الحارس المركزي — يمنع أي تنقل إذا كان النظام غير مُعد
+ *
+ * @param tag الشاشة المطلوب الانتقال إليها
+ * @return true → مسموح، false → ممنوع (وتُعرض الشاشة البديلة)
+ */
 private boolean guardSetupAccess(String tag) {
-    // إذا النظام مُعد → سماح كامل
+    // 1) اقرأ من الكاش
     String cachedStatus = getCachedSetupStatus();
     boolean setupDone = SETUP_COMPLETED.equals(cachedStatus)
             || SETUP_LOCKED.equals(cachedStatus);
 
     if (setupDone) return true;
 
-    // النظام غير مُعد:
+    // 2) cache miss → اقرأ في الخلفية + اسمح بالمرور فقط للمخوّلين
+    if (cachedStatus == null) {
+    Log.d(TAG, "🛡️ cache miss → fetching in background");
 
-    // 1) الشاشات المسموح بها دائمًا
+    // ⏳ اعرض شاشة تحميل مؤقتة
+    showSetupLoadingScreen();
+
+    // أرسل الطلب
+    refreshSetupStatusInBackground();
+
+    // ⏱️ انتظر قليلًا قبل اتخاذ القرار
+    mainHandler.postDelayed(() -> {
+        hideSetupLoadingScreen();
+        // أعد الفحص
+        String newStatus = getCachedSetupStatus();
+        if (SETUP_COMPLETED.equals(newStatus) || SETUP_LOCKED.equals(newStatus)) {
+            // اسمح بالمرور
+            loadFragmentDirectly(createFragmentByTag(tag), tag);
+        } else {
+            // لا يزال pending → طبّق الحظر
+            if (isSetupAllowedFragment(tag)) return;
+            boolean canSetup = ...;
+            if (canSetup) {
+                loadFragmentDirectly(new MiraAccountingSetupFragment(), "AccountingSetup");
+            } else {
+                showSetupBlockedScreen();
+            }
+        }
+    }, 1500); // انتظر 1.5 ثانية
+
+    return false;
+}
+
+    // 3) cache موجود = "pending" أو "in_progress"
     if (isSetupAllowedFragment(tag)) return true;
 
-    // 2) الأدوار المخوّلة بالإعداد → يُوجَّهون لشاشة الإعداد
+    // أرسل طلب تحديث في الخلفية (قد يكون قد تغيّر)
+    refreshSetupStatusInBackground();
+
     boolean canSetup = permissionManager != null
             && (permissionManager.isSystemAdmin()
                 || permissionManager.isOrgAdmin()
@@ -809,7 +859,6 @@ private boolean guardSetupAccess(String tag) {
         return false;
     }
 
-    // 3) أي مستخدم آخر → يُمنع ويُخرَج
     Log.d(TAG, "🛡️ Setup pending → blocking user: " + tag);
     showSetupBlockedScreen();
     return false;
@@ -845,6 +894,29 @@ private String getCachedSetupStatus() {
     } catch (Exception e) {
         Log.w(TAG, "getCachedSetupStatus error: " + e.getMessage());
         return null;
+    }
+}
+
+public void onSetupCompleted() {
+    Log.d(TAG, "🎉 onSetupCompleted: invalidating cache and updating state");
+    try {
+        invalidateSetupCache();
+        cacheSetupStatus(SETUP_COMPLETED);
+
+        Toast.makeText(this,
+                isArabic ? "✅ اكتمل الإعداد — يمكنك الآن استخدام النظام"
+                         : "✅ Setup complete — You can now use the system",
+                Toast.LENGTH_LONG).show();
+
+        mainHandler.postDelayed(() -> {
+            if (isActivityAlive()) {
+                Log.d(TAG, "🎉 Re-navigating after setup completed");
+                enableNavigationAfterSetup();
+                navigateByRole();
+            }
+        }, 700);
+    } catch (Exception e) {
+        Log.e(TAG, "onSetupCompleted error: " + e.getMessage(), e);
     }
 }
 
