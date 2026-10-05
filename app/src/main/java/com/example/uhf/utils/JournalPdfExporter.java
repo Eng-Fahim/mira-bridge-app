@@ -265,91 +265,109 @@ public class JournalPdfExporter {
     //  Lines Table
     // ═══════════════════════════════════════════════════════════
     private static int drawLinesTable(Canvas c, Paint p,
-                                      List<JournalLineDto> lines,
-                                      int pageNum, int rowsPerPage,
-                                      int startY) {
-        int y = startY;
+                                  List<JournalLineDto> lines,
+                                  int pageNum, int rowsPerPage,
+                                  int startY) {
+    int y = startY;
 
-        // ─── رأس الجدول ───
-        p.setColor(COLOR_PRIMARY);
-        c.drawRect(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT,
-            y + HEADER_ROW, p);
+    // ═══ رأس الجدول ═══
+    p.setColor(COLOR_PRIMARY);
+    c.drawRect(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT,
+        y + HEADER_ROW, p);
 
-        p.setColor(Color.WHITE);
-        p.setTextSize(11);
-        p.setFakeBoldText(true);
-        p.setTextAlign(Paint.Align.RIGHT);
+    p.setColor(Color.WHITE);
+    p.setTextSize(11);
+    p.setFakeBoldText(true);
 
-        int colDebit  = PAGE_WIDTH - MARGIN_RIGHT - 220;
-        int colCredit = PAGE_WIDTH - MARGIN_RIGHT - 110;
-        int colGold   = PAGE_WIDTH - MARGIN_RIGHT - 20;
+    // ✅ حدود الأعمدة الجديدة (مضبوطة يدوياً)
+    // Account:  40 → 275   (235)
+    // مدين:    275 → 375   (100)
+    // دائن:    375 → 475   (100)
+    // الذهب:   475 → 555   (80)
+    int accountRight = 275;
+    int debitRight   = 375;
+    int creditRight  = 475;
+    int goldRight    = 555;
 
-        c.drawText("الحساب", colDebit, y + 17, p);
-        c.drawText("مدين",  colDebit + 110, y + 17, p);
-        c.drawText("دائن",  colDebit + 220, y + 17, p);
+    int pad = 6;
 
-        y += HEADER_ROW;
+    // رأس مدين/دائن/الذهب — يمين
+    p.setTextAlign(Paint.Align.RIGHT);
+    c.drawText("مدين",  debitRight  - pad, y + 17, p);
+    c.drawText("دائن",  creditRight - pad, y + 17, p);
+    c.drawText("الذهب", goldRight   - pad, y + 17, p);
 
-        // ─── السطور ───
-        int start = pageNum * rowsPerPage;
-        int end   = Math.min(start + rowsPerPage, lines.size());
+    // رأس الحساب — يمين
+    c.drawText("الحساب", accountRight - pad, y + 17, p);
 
-        p.setFakeBoldText(false);
-        p.setTextSize(10);
+    y += HEADER_ROW;
 
-        for (int i = start; i < end; i++) {
-            JournalLineDto line = lines.get(i);
+    // ═══ السطور ═══
+    int start = pageNum * rowsPerPage;
+    int end   = Math.min(start + rowsPerPage, lines.size());
 
-            if ((i - start) % 2 == 0) {
-                p.setColor(COLOR_ROW_ALT);
-                c.drawRect(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT,
-                    y + ROW_HEIGHT, p);
-            }
+    p.setFakeBoldText(false);
+    p.setTextSize(9);
 
-            p.setColor(COLOR_PRIMARY);
-            p.setTextAlign(Paint.Align.RIGHT);
-            c.drawText(truncate(line.getDisplayAccount(), 55),
-                colDebit, y + 15, p);
+    for (int i = start; i < end; i++) {
+        JournalLineDto line = lines.get(i);
 
-            if (line.baseDebit > 0.01) {
-                p.setColor(COLOR_DEBIT);
-                p.setFakeBoldText(true);
-                c.drawText(fmt(line.baseDebit), colDebit + 110, y + 15, p);
-            } else {
-                p.setColor(COLOR_GRAY);
-                p.setFakeBoldText(false);
-                c.drawText("—", colDebit + 110, y + 15, p);
-            }
-
-            if (line.baseCredit > 0.01) {
-                p.setColor(COLOR_CREDIT);
-                p.setFakeBoldText(true);
-                c.drawText(fmt(line.baseCredit), colDebit + 220, y + 15, p);
-            } else {
-                p.setColor(COLOR_GRAY);
-                p.setFakeBoldText(false);
-                c.drawText("—", colDebit + 220, y + 15, p);
-            }
-
-            if (line.hasGold()) {
-                p.setColor(COLOR_GOLD);
-                p.setFakeBoldText(true);
-                double g = line.getNetGold();
-                String sign = g >= 0 ? "+" : "";
-                c.drawText(sign + String.format(Locale.US, "%.3f", g) + "g",
-                    colGold, y + 15, p);
-            }
-
-            y += ROW_HEIGHT;
+        // خلفية متناوبة
+        if ((i - start) % 2 == 0) {
+            p.setColor(COLOR_ROW_ALT);
+            c.drawRect(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT,
+                y + ROW_HEIGHT, p);
         }
 
+        // ─── اسم الحساب ───
         p.setColor(COLOR_PRIMARY);
-        p.setStrokeWidth(1);
-        c.drawLine(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT, y, p);
+        p.setTextAlign(Paint.Align.RIGHT);
+        String accName = truncate(line.getDisplayAccount(), 38);
+        c.drawText(accName, accountRight - pad, y + 15, p);
 
-        return y + 15;
+        // ─── مدين ───
+        p.setTextAlign(Paint.Align.RIGHT);
+        if (line.baseDebit > 0.01) {
+            p.setColor(COLOR_DEBIT);
+            p.setFakeBoldText(true);
+            c.drawText(fmt(line.baseDebit), debitRight - pad, y + 15, p);
+        } else {
+            p.setColor(COLOR_GRAY);
+            p.setFakeBoldText(false);
+            c.drawText("—", debitRight - pad, y + 15, p);
+        }
+
+        // ─── دائن ───
+        if (line.baseCredit > 0.01) {
+            p.setColor(COLOR_CREDIT);
+            p.setFakeBoldText(true);
+            c.drawText(fmt(line.baseCredit), creditRight - pad, y + 15, p);
+        } else {
+            p.setColor(COLOR_GRAY);
+            p.setFakeBoldText(false);
+            c.drawText("—", creditRight - pad, y + 15, p);
+        }
+
+        // ─── الذهب ───
+        if (line.hasGold()) {
+            p.setColor(COLOR_GOLD);
+            p.setFakeBoldText(true);
+            double g = line.getNetGold();
+            String sign = g >= 0 ? "+" : "";
+            c.drawText(sign + String.format(Locale.US, "%.3f", g) + "g",
+                goldRight - pad, y + 15, p);
+        }
+
+        y += ROW_HEIGHT;
     }
 
+    // خط سفلي
+    p.setColor(COLOR_PRIMARY);
+    p.setStrokeWidth(1);
+    c.drawLine(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT, y, p);
+
+    return y + 15;
+}
     // ═══════════════════════════════════════════════════════════
     //  Footer
     // ═══════════════════════════════════════════════════════════
