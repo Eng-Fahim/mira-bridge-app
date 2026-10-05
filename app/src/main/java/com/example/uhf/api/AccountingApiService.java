@@ -26,10 +26,9 @@ public interface AccountingApiService {
         @Query("per_page") Integer perPage,
         @Query("page") Integer page
     );
-    
     @GET("journal/{id}")
-    Call<ApiResponseDto<JournalEntryDto>> getJournalEntry(@Path("id") long id);
-    
+    Call<JournalEntryDetailsDto> getJournalEntryDetails(@Path("id") long id);
+
     @POST("journal")
     Call<ApiResponseDto<JournalEntryDto>> createJournalEntry(
         @Body JournalEntryDto entry
