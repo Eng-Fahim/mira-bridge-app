@@ -31,7 +31,10 @@ public class LedgerRowAdapter extends RecyclerView.Adapter<LedgerRowAdapter.VH> 
         public double runningBalance;
         public double runningGold;
     }
-
+    
+    public List<LedgerRow> getItems() {
+    return items;
+    }
     public interface OnRowClick {
         void onClick(LedgerRow row);
     }
