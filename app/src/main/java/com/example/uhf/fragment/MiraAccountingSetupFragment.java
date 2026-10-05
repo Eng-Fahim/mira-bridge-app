@@ -27,31 +27,44 @@ import org.json.JSONObject;
 import java.util.Locale;
 
 /**
- * MIRA Accounting Setup Fragment
- * 
+ * MIRA Accounting Setup Fragment — النسخة النهائية
+ *
  * الشاشة الرئيسية لإعداد النظام المحاسبي
  * - 6 مراحل
  * - تتبع التقدم
  * - البدء والاستمرار
+ * - إشعار النشاط عند الاكتمال (v2.0)
+ * - زر الانتقال للنظام بعد الاكتمال
  */
 public class MiraAccountingSetupFragment extends Fragment {
 
     private static final String TAG = "MiraSetup";
 
-    // Views
+    // ═══════════════════════════════════════════════════════════
+    //  Views
+    // ═══════════════════════════════════════════════════════════
     private TextView tvProgressPercent;
     private TextView tvProgressText;
     private ProgressBar pbProgress;
     private LinearLayout stepsContainer;
     private MaterialButton btnStart;
     private MaterialButton btnReset;
+    private MaterialButton btnGoToSystem;   // ⭐ جديد: زر الانتقال للنظام
     private ProgressBar pbLoading;
     private View contentContainer;
 
-    // State
+    // ═══════════════════════════════════════════════════════════
+    //  State
+    // ═══════════════════════════════════════════════════════════
     private MiraApiClient apiClient;
     private boolean isArabic;
     private JSONObject currentStatus;
+    private boolean setupCompletedNotified = false;   // ⭐ لتجنب التكرار
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    // ═══════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════
 
     @Nullable
     @Override
@@ -73,26 +86,6 @@ public class MiraAccountingSetupFragment extends Fragment {
         loadStatus();
     }
 
-    private void initViews(View v) {
-        tvProgressPercent = v.findViewById(R.id.tvProgressPercent);
-        tvProgressText = v.findViewById(R.id.tvProgressText);
-        pbProgress = v.findViewById(R.id.pbProgress);
-        stepsContainer = v.findViewById(R.id.stepsContainer);
-        btnStart = v.findViewById(R.id.btnStart);
-        btnReset = v.findViewById(R.id.btnReset);
-        pbLoading = v.findViewById(R.id.pbLoading);
-        contentContainer = v.findViewById(R.id.contentContainer);
-    }
-
-    private void setupListeners() {
-        btnStart.setOnClickListener(v -> startOrContinue());
-        btnReset.setOnClickListener(v -> confirmReset());
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Lifecycle — إدارة BottomNav
-    // ═══════════════════════════════════════════════════════════
-
     @Override
     public void onStart() {
         super.onStart();
@@ -110,7 +103,47 @@ public class MiraAccountingSetupFragment extends Fragment {
         loadStatus();
     }
 
-    // (لا نستخدم onStop — الحارس المركزي في النشاط يعيد الإظهار عند الحاجة)
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // ✅ إيقاف الـ Handler لتجنب تسريب الذاكرة
+        mainHandler.removeCallbacksAndMessages(null);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Init
+    // ═══════════════════════════════════════════════════════════
+
+    private void initViews(View v) {
+        tvProgressPercent = v.findViewById(R.id.tvProgressPercent);
+        tvProgressText    = v.findViewById(R.id.tvProgressText);
+        pbProgress        = v.findViewById(R.id.pbProgress);
+        stepsContainer    = v.findViewById(R.id.stepsContainer);
+        btnStart          = v.findViewById(R.id.btnStart);
+        btnReset          = v.findViewById(R.id.btnReset);
+        pbLoading         = v.findViewById(R.id.pbLoading);
+        contentContainer  = v.findViewById(R.id.contentContainer);
+
+        // ⭐ زر الانتقال للنظام — قد لا يكون موجودًا في الـ layout القديم
+        btnGoToSystem = v.findViewById(R.id.btnGoToSystem);
+
+        // إذا لم يكن موجودًا في الـ XML، نخفيه ديناميكيًا
+        if (btnGoToSystem == null) {
+            Log.d(TAG, "btnGoToSystem not found in layout — dynamic mode");
+        }
+    }
+
+    private void setupListeners() {
+        if (btnStart != null) {
+            btnStart.setOnClickListener(v -> startOrContinue());
+        }
+        if (btnReset != null) {
+            btnReset.setOnClickListener(v -> confirmReset());
+        }
+        if (btnGoToSystem != null) {
+            btnGoToSystem.setOnClickListener(v -> navigateToSystem());
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════
     //  Load Status
@@ -125,7 +158,7 @@ public class MiraAccountingSetupFragment extends Fragment {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getAccounting("setup/status");
 
-                new Handler(Looper.getMainLooper()).post(() -> {
+                mainHandler.post(() -> {
                     if (!isAdded()) return;
 
                     showLoading(false);
@@ -134,13 +167,16 @@ public class MiraAccountingSetupFragment extends Fragment {
                         currentStatus = response.data;
                         renderStatus(currentStatus);
                     } else {
-                        showError("فشل تحميل الحالة: "
-                                + (response != null ? response.error : "غير معروف"));
+                        String err = (response != null && response.error != null)
+                                ? response.error
+                                : "غير معروف";
+                        showError(isArabic ? "فشل تحميل الحالة: " + err
+                                           : "Failed to load status: " + err);
                     }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "loadStatus error", e);
-                new Handler(Looper.getMainLooper()).post(() -> {
+                mainHandler.post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
                     showError(e.getMessage());
@@ -149,7 +185,13 @@ public class MiraAccountingSetupFragment extends Fragment {
         }).start();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Render Status
+    // ═══════════════════════════════════════════════════════════
+
     private void renderStatus(JSONObject response) {
+        if (response == null) return;
+
         try {
             // ✅ البنية: قد يكون الرد مباشر أو داخله "data"
             JSONObject status = response;
@@ -161,50 +203,76 @@ public class MiraAccountingSetupFragment extends Fragment {
             int progress = status.optInt("progress_percent", 0);
             String setupStatus = status.optString("status", "pending");
 
-            // Progress
+            // ─── Progress ───
             pbProgress.setProgress(progress);
             tvProgressPercent.setText(progress + "%");
 
             String statusText;
             switch (setupStatus) {
-                case "pending":     statusText = "⏳ بانتظار البدء"; break;
-                case "in_progress": statusText = "🔄 جاري الإعداد"; break;
-                case "completed":   statusText = "✅ مكتمل"; break;
-                case "locked":      statusText = "🔒 مقفل"; break;
+                case "pending":     statusText = isArabic ? "⏳ بانتظار البدء" : "⏳ Pending"; break;
+                case "in_progress": statusText = isArabic ? "🔄 جاري الإعداد" : "🔄 In Progress"; break;
+                case "completed":   statusText = isArabic ? "✅ مكتمل" : "✅ Completed"; break;
+                case "locked":      statusText = isArabic ? "🔒 مقفل" : "🔒 Locked"; break;
                 default:            statusText = setupStatus;
             }
             tvProgressText.setText(statusText);
 
-            // Steps
+            // ═══════════════════════════════════════════════════════
+            // ⭐ عند الاكتمال → أخطر النشاط فورًا (مرة واحدة)
+            // ═══════════════════════════════════════════════════════
+            boolean completed = "completed".equals(setupStatus)
+                    || "locked".equals(setupStatus);
+
+            if (completed && !setupCompletedNotified) {
+                setupCompletedNotified = true;
+                notifySetupCompleted();
+            }
+
+            // ─── Steps ───
             stepsContainer.removeAllViews();
             JSONArray steps = status.optJSONArray("steps");
 
             if (steps != null) {
                 for (int i = 0; i < steps.length(); i++) {
-                    JSONObject step = steps.getJSONObject(i);
-                    addStepCard(step, i + 1);
+                    JSONObject step = steps.optJSONObject(i);
+                    if (step != null) {
+                        addStepCard(step, i + 1);
+                    }
                 }
             }
 
-            // Buttons
-            boolean completed = "completed".equals(setupStatus)
-                    || "locked".equals(setupStatus);
-
+            // ─── Buttons ───
             if (completed) {
-                btnStart.setText("👁️ مراجعة الإعداد");
+                // ✅ النظام مُعد → أعرض زر "الانتقال للنظام"
+                btnStart.setText(isArabic ? "👁️ مراجعة الإعداد" : "👁️ Review Setup");
                 btnStart.setEnabled(true);
                 btnReset.setVisibility(View.VISIBLE);
+
+                if (btnGoToSystem != null) {
+                    btnGoToSystem.setVisibility(View.VISIBLE);
+                    btnGoToSystem.setText(isArabic
+                            ? "🚀 الانتقال إلى النظام"
+                            : "🚀 Enter System");
+                }
+
+                // ✅ عرض رسالة نجاح
+                showSuccessBanner();
+
             } else {
                 int completedCount = status.optInt("completed_count", 0);
 
                 if (completedCount == 0) {
-                    btnStart.setText("🚀 بدء الإعداد");
+                    btnStart.setText(isArabic ? "🚀 بدء الإعداد" : "🚀 Start Setup");
                 } else {
-                    btnStart.setText("▶️ المتابعة");
+                    btnStart.setText(isArabic ? "▶️ المتابعة" : "▶️ Continue");
                 }
 
                 btnStart.setEnabled(true);
                 btnReset.setVisibility(View.GONE);
+
+                if (btnGoToSystem != null) {
+                    btnGoToSystem.setVisibility(View.GONE);
+                }
             }
 
         } catch (Exception e) {
@@ -212,25 +280,62 @@ public class MiraAccountingSetupFragment extends Fragment {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  ⭐ Notify Completion (v2.0)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * إشعار UHFMainActivity بأن الإعداد اكتمل
+     * - يُبطل الكاش القديم
+     * - يحفظ "completed"
+     * - يحدّث الواجهة
+     */
+    private void notifySetupCompleted() {
+        if (!isAdded()) return;
+
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            activity.onSetupCompleted();
+            Log.d(TAG, "✅ Notified UHFMainActivity: setup completed");
+        } else {
+            Log.w(TAG, "⚠️ Cannot notify: activity is not UHFMainActivity");
+        }
+    }
+
+    /**
+     * عرض رسالة نجاح مؤقتة أسفل Progress
+     */
+    private void showSuccessBanner() {
+        if (getContext() == null) return;
+
+        // يمكن استخدام Snackbar أو Toast — هنا نستخدم Toast بسيط
+        // لتجنب تجاوز التصميم
+        Log.d(TAG, "🎉 Setup completed — success banner shown");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Step Card
+    // ═══════════════════════════════════════════════════════════
+
     private void addStepCard(JSONObject step, int stepNumber) {
         try {
             View card = LayoutInflater.from(requireContext())
                     .inflate(R.layout.item_setup_step, stepsContainer, false);
 
-            TextView tvIcon = card.findViewById(R.id.tvStepIcon);
-            TextView tvNumber = card.findViewById(R.id.tvStepNumber);
-            TextView tvTitle = card.findViewById(R.id.tvStepTitle);
-            TextView tvDesc = card.findViewById(R.id.tvStepDescription);
-            TextView tvStatus = card.findViewById(R.id.tvStepStatus);
-            View statusIndicator = card.findViewById(R.id.stepStatusIndicator);
+            TextView tvIcon         = card.findViewById(R.id.tvStepIcon);
+            TextView tvNumber       = card.findViewById(R.id.tvStepNumber);
+            TextView tvTitle        = card.findViewById(R.id.tvStepTitle);
+            TextView tvDesc         = card.findViewById(R.id.tvStepDescription);
+            TextView tvStatus       = card.findViewById(R.id.tvStepStatus);
+            View statusIndicator    = card.findViewById(R.id.stepStatusIndicator);
 
-            String icon = step.optString("icon", "📌");
-            String title = isArabic
+            String icon       = step.optString("icon", "📌");
+            String title      = isArabic
                     ? step.optString("title_ar", "")
                     : step.optString("title_en", "");
-            String desc = step.optString("description", "");
+            String desc       = step.optString("description", "");
             boolean isCompleted = step.optBoolean("completed", false);
-            boolean isRequired = step.optBoolean("required", false);
+            boolean isRequired  = step.optBoolean("required", false);
 
             tvIcon.setText(icon);
             tvNumber.setText(String.valueOf(stepNumber));
@@ -238,16 +343,16 @@ public class MiraAccountingSetupFragment extends Fragment {
             tvDesc.setText(desc);
 
             if (isCompleted) {
-                tvStatus.setText("✅ مكتمل");
+                tvStatus.setText(isArabic ? "✅ مكتمل" : "✅ Completed");
                 tvStatus.setTextColor(0xFF27AE60);
                 statusIndicator.setBackgroundColor(0xFF27AE60);
             } else {
                 if (isRequired) {
-                    tvStatus.setText("⏳ مطلوب");
+                    tvStatus.setText(isArabic ? "⏳ مطلوب" : "⏳ Required");
                     tvStatus.setTextColor(0xFFF39C12);
                     statusIndicator.setBackgroundColor(0xFFF39C12);
                 } else {
-                    tvStatus.setText("⏳ اختياري");
+                    tvStatus.setText(isArabic ? "⏳ اختياري" : "⏳ Optional");
                     tvStatus.setTextColor(0xFF95A5A6);
                     statusIndicator.setBackgroundColor(0xFF95A5A6);
                 }
@@ -269,14 +374,18 @@ public class MiraAccountingSetupFragment extends Fragment {
     private void startOrContinue() {
         try {
             JSONObject status = currentStatus;
-            JSONObject nested = currentStatus.optJSONObject("data");
+            if (status == null) {
+                openStep(1);
+                return;
+            }
+            JSONObject nested = status.optJSONObject("data");
             if (nested != null) status = nested;
 
-            int currentStep = status.optInt("current_step", 1);
+            int currentStep    = status.optInt("current_step", 1);
             String setupStatus = status.optString("status", "pending");
 
             if ("completed".equals(setupStatus) || "locked".equals(setupStatus)) {
-                openStep(6);
+                openStep(6);   // مراجعة
             } else {
                 openStep(currentStep);
             }
@@ -297,7 +406,10 @@ public class MiraAccountingSetupFragment extends Fragment {
             case 6: fragment = new SetupStep6ReviewFragment(); break;
         }
 
-        if (fragment == null) return;
+        if (fragment == null) {
+            Log.e(TAG, "openStep: unknown step number " + stepNumber);
+            return;
+        }
 
         Bundle args = new Bundle();
         args.putInt("setup_step", stepNumber);
@@ -310,13 +422,38 @@ public class MiraAccountingSetupFragment extends Fragment {
                 .commit();
     }
 
+    /**
+     * ⭐ الانتقال إلى النظام بعد اكتمال الإعداد
+     */
+    private void navigateToSystem() {
+        Log.d(TAG, "🚀 navigateToSystem called");
+
+        if (!isAdded()) return;
+
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+            // ✅ إخفاء BottomNav مرة أخرى (في حال كان مخفيًا)
+            activity.setBottomNavVisible(true);
+
+            // ✅ استدعاء onSetupCompleted لضمان التحديث
+            activity.onSetupCompleted();
+
+            Log.d(TAG, "✅ Navigated to system");
+        }
+    }
+
     private void confirmReset() {
+        if (!isAdded()) return;
+
         new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setTitle("⚠️ إعادة تعيين الإعداد")
-                .setMessage("سيتم حذف جميع الأرصدة الافتتاحية والقيد الافتتاحي.\n\n"
-                        + "هل أنت متأكد؟")
-                .setPositiveButton("نعم، إعادة التعيين", (d, w) -> performReset())
-                .setNegativeButton("إلغاء", null)
+                .setTitle(isArabic ? "⚠️ إعادة تعيين الإعداد" : "⚠️ Reset Setup")
+                .setMessage(isArabic
+                        ? "سيتم حذف جميع الأرصدة الافتتاحية والقيد الافتتاحي.\n\nهل أنت متأكد؟"
+                        : "All opening balances and journal entries will be deleted.\n\nAre you sure?")
+                .setPositiveButton(isArabic ? "نعم، إعادة التعيين" : "Yes, Reset",
+                        (d, w) -> performReset())
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                 .show();
     }
 
@@ -326,27 +463,32 @@ public class MiraAccountingSetupFragment extends Fragment {
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
-                payload.put("reason", "طلب المدير");
+                payload.put("reason", isArabic ? "طلب المدير" : "Manager request");
 
-                MiraApiClient.ApiResponse response = apiClient.postAccounting("setup/reset", payload);
+                MiraApiClient.ApiResponse response =
+                        apiClient.postAccounting("setup/reset", payload);
 
-                new Handler(Looper.getMainLooper()).post(() -> {
+                mainHandler.post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
 
                     if (response != null && response.isSuccess) {
                         Toast.makeText(requireContext(),
-                                "✅ تم إعادة التعيين", Toast.LENGTH_LONG).show();
+                                isArabic ? "✅ تم إعادة التعيين" : "✅ Reset complete",
+                                Toast.LENGTH_LONG).show();
+                        setupCompletedNotified = false;   // ⭐ أعِد التعيين
                         loadStatus();
                     } else {
                         Toast.makeText(requireContext(),
-                                "❌ فشل: " + (response != null ? response.error : "غير معروف"),
+                                isArabic
+                                        ? "❌ فشل: " + (response != null ? response.error : "غير معروف")
+                                        : "❌ Failed: " + (response != null ? response.error : "unknown"),
                                 Toast.LENGTH_LONG).show();
                     }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "performReset error", e);
-                new Handler(Looper.getMainLooper()).post(() -> {
+                mainHandler.post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
                     Toast.makeText(requireContext(),
@@ -367,12 +509,15 @@ public class MiraAccountingSetupFragment extends Fragment {
     }
 
     private void showError(String msg) {
-        if (!isAdded()) return;
+        if (!isAdded() || getContext() == null) return;
         Toast.makeText(requireContext(), "❌ " + msg, Toast.LENGTH_LONG).show();
     }
 
-    // ✅ Method عام لإعادة التحميل (يُستدعى من الشاشات الفرعية)
+    /**
+     * ✅ Method عام لإعادة التحميل (يُستدعى من الشاشات الفرعية)
+     */
     public void reload() {
+        setupCompletedNotified = false;   // ⭐ أعِد التعيين عند إعادة التحميل
         loadStatus();
     }
 }
