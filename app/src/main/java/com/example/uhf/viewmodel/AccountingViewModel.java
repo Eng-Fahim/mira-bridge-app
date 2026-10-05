@@ -336,7 +336,19 @@ public LiveData<GeneralLedgerDto> getGeneralLedger() {
     return generalLedger;
 }
 
-public void loadGeneralLedger(long accountId, String from, String to, int branchId) {
+/**
+ * ✅ تحميل دفتر الأستاذ — الصفحة الأولى (للتوافق الخلفي)
+ */
+public void loadGeneralLedger(long accountId, String from, String to,
+                              int branchId) {
+    loadGeneralLedger(accountId, from, to, branchId, 1);
+}
+
+/**
+ * ✅ تحميل دفتر الأستاذ مع دعم الصفحات
+ */
+public void loadGeneralLedger(long accountId, String from, String to,
+                              int branchId, int page) {
     if (accountId <= 0) {
         error.setValue("يرجى اختيار حساب");
         return;
@@ -345,31 +357,40 @@ public void loadGeneralLedger(long accountId, String from, String to, int branch
     loading.setValue(true);
     error.setValue(null);
 
+    final int perPage = 100;
+
     api.accounting().getGeneralLedger(
         accountId,
         from,
         to,
-        branchId > 0 ? branchId : null
+        branchId > 0 ? branchId : null,
+        page,
+        perPage
     ).enqueue(new Callback<ApiResponseDto<GeneralLedgerDto>>() {
         @Override
         public void onResponse(Call<ApiResponseDto<GeneralLedgerDto>> call,
                               Response<ApiResponseDto<GeneralLedgerDto>> response) {
             loading.setValue(false);
 
-            if (response.isSuccessful() && response.body() != null && response.body().success) {
-                generalLedger.setValue(response.body().data);
+            if (response.isSuccessful()
+                    && response.body() != null
+                    && response.body().success) {
+                GeneralLedgerDto dto = response.body().data;
+                if (dto != null) dto.currentPage = page;
+                generalLedger.setValue(dto);
             } else {
                 error.setValue("فشل تحميل دفتر الأستاذ: " + response.code());
             }
         }
 
         @Override
-        public void onFailure(Call<ApiResponseDto<GeneralLedgerDto>> call, Throwable t) {
+        public void onFailure(Call<ApiResponseDto<GeneralLedgerDto>> call,
+                             Throwable t) {
             loading.setValue(false);
             error.setValue("خطأ في الشبكة: " + t.getMessage());
         }
     });
-    }
+}
     // ═══════════════════════════════════════════════════════
     //  الحالة
     // ═══════════════════════════════════════════════════════
