@@ -352,4 +352,24 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
             }
         });
     }
+    
+    @Override
+public void onStart() {
+    super.onStart();
+    // ✅ إخفاء BottomNav في شاشة التفاصيل
+    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+            .setBottomNavVisible(false);
+    }
+}
+
+@Override
+public void onStop() {
+    super.onStop();
+    // ✅ إظهار BottomNav عند المغادرة
+    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+            .setBottomNavVisible(true);
+    }
+}
 }
