@@ -10,21 +10,21 @@ import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * ✅ ChainwayReader v3.0 — النسخة النهائية المُحصّنة
+ * ✅ ChainwayReader v3.1 — نسخة محسّنة للمعادن (الذهب والمجوهرات)
  * 
  * متوافق مع: DeviceAPI_ver20251103_release.aar
  * 
- * التغييرات الجذرية:
- * - استخدام isRfidDevicePresent() بدلاً من RFID_DEVICE_PRESENT
- * - استخدام sSharedReader عند الإمكان
- * - Thread leak prevention
- * - AtomicBoolean للـ isScanning
- * - لا System.loadLibrary() — SDK يُحمّل تلقائياً
+ * التغييرات في v3.1:
+ * - الطاقة الافتراضية 30 dBm (الحد الأقصى لـ C72)
+ * - إعدادات متقدمة مطبقة فعلياً على العتاد عبر Reflection
+ * - Dynamic Power + FastID + TagFocus (ضرورية للمعادن)
+ * - فصل applySupportedSettings (خفيفة) عن applyAdvancedSettings (ثقيلة)
  */
 public class ChainwayReader implements MiraIRFIDReader {
     
@@ -33,23 +33,39 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     private static final String DEFAULT_PWD = "00000000";
     
+    // ═══════════════════════════════════════════════════════════════
+    //  القيم الافتراضية المُحسّنة للمعادن (الذهب والمجوهرات)
+    // ═══════════════════════════════════════════════════════════════
+    private static final int DEFAULT_POWER_DBM       = 30;   // الحد الأقصى لـ C72
+    private static final int DEFAULT_RSSI_THRESHOLD  = -75;  // أخفض قليلاً
+    private static final int DEFAULT_SCAN_INTERVAL   = 100;  // أسرع قليلاً
+    private static final int DEFAULT_BEEP_MODE       = 1;
+    private static final int DEFAULT_VIBRATION_MODE  = 1;
+    private static final int DEFAULT_CONTINUOUS_MODE = 1;
+    private static final int DEFAULT_SESSION         = 1;    // S1 أفضل للمعادن
+    private static final int DEFAULT_TARGET          = 2;    // A/B
+    private static final int DEFAULT_Q_VALUE         = 4;    // متوازن
+    private static final int DEFAULT_FREQUENCY_MODE  = 1;    // FCC 902-928
+    
     private Context context;
     private RFIDWithUHFUART reader;
     private OnTagReadListener listener;
     
     private final AtomicBoolean isScanning = new AtomicBoolean(false);
     private volatile boolean isConnected = false;
+    private volatile boolean advancedSettingsApplied = false;
     
     // إعدادات ديناميكية
-    private int powerDbm = 28;
-    private int rssiThreshold = -70;
-    private int scanIntervalMs = 200;
-    private int beepMode = 1;
-    private int vibrationMode = 1;
-    private int continuousMode = 1;
-    private int session = 0;
-    private int target = 0;
-    private int qValue = 4;
+    private int powerDbm = DEFAULT_POWER_DBM;
+    private int rssiThreshold = DEFAULT_RSSI_THRESHOLD;
+    private int scanIntervalMs = DEFAULT_SCAN_INTERVAL;
+    private int beepMode = DEFAULT_BEEP_MODE;
+    private int vibrationMode = DEFAULT_VIBRATION_MODE;
+    private int continuousMode = DEFAULT_CONTINUOUS_MODE;
+    private int session = DEFAULT_SESSION;
+    private int target = DEFAULT_TARGET;
+    private int qValue = DEFAULT_Q_VALUE;
+    private int frequencyMode = DEFAULT_FREQUENCY_MODE;
     
     private ExecutorService scanExecutor;
     private SharedPreferences prefs;
@@ -74,29 +90,31 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     private void loadSettings() {
         if (prefs == null) return;
-        powerDbm = prefs.getInt("power_dbm", 28);
-        rssiThreshold = prefs.getInt("rssi_threshold", -70);
-        scanIntervalMs = prefs.getInt("scan_interval_ms", 200);
-        beepMode = prefs.getInt("beep_mode", 1);
-        vibrationMode = prefs.getInt("vibration_mode", 1);
-        continuousMode = prefs.getInt("continuous_mode", 1);
-        session = prefs.getInt("session", 0);
-        target = prefs.getInt("target", 0);
-        qValue = prefs.getInt("q_value", 4);
+        powerDbm       = prefs.getInt("power_dbm",       DEFAULT_POWER_DBM);
+        rssiThreshold  = prefs.getInt("rssi_threshold",  DEFAULT_RSSI_THRESHOLD);
+        scanIntervalMs = prefs.getInt("scan_interval_ms", DEFAULT_SCAN_INTERVAL);
+        beepMode       = prefs.getInt("beep_mode",       DEFAULT_BEEP_MODE);
+        vibrationMode  = prefs.getInt("vibration_mode",  DEFAULT_VIBRATION_MODE);
+        continuousMode = prefs.getInt("continuous_mode", DEFAULT_CONTINUOUS_MODE);
+        session        = prefs.getInt("session",         DEFAULT_SESSION);
+        target         = prefs.getInt("target",          DEFAULT_TARGET);
+        qValue         = prefs.getInt("q_value",         DEFAULT_Q_VALUE);
+        frequencyMode  = prefs.getInt("frequency_mode",  DEFAULT_FREQUENCY_MODE);
     }
     
     private void saveSettings() {
         if (prefs == null) return;
         prefs.edit()
-            .putInt("power_dbm", powerDbm)
-            .putInt("rssi_threshold", rssiThreshold)
+            .putInt("power_dbm",       powerDbm)
+            .putInt("rssi_threshold",  rssiThreshold)
             .putInt("scan_interval_ms", scanIntervalMs)
-            .putInt("beep_mode", beepMode)
-            .putInt("vibration_mode", vibrationMode)
+            .putInt("beep_mode",       beepMode)
+            .putInt("vibration_mode",  vibrationMode)
             .putInt("continuous_mode", continuousMode)
-            .putInt("session", session)
-            .putInt("target", target)
-            .putInt("q_value", qValue)
+            .putInt("session",         session)
+            .putInt("target",          target)
+            .putInt("q_value",         qValue)
+            .putInt("frequency_mode",  frequencyMode)
             .apply();
     }
     
@@ -192,6 +210,10 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
     }
     
+    /**
+     * ✅ إعدادات خفيفة — تُستدعى عند كل Scan
+     * (فقط الطاقة لأنها الأسرع والأهم)
+     */
     private void applySupportedSettings() {
         if (reader == null) return;
         try {
@@ -199,6 +221,106 @@ public class ChainwayReader implements MiraIRFIDReader {
             Log.d(TAG, "⚡ Power applied: " + powerDbm + " dBm");
         } catch (Exception e) {
             Log.w(TAG, "⚠️ Failed to apply power: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ✅ إعدادات متقدمة — تُستدعى مرة واحدة بعد الاتصال
+     * تضبط Session، Q Value، Target، Dynamic Power، إلخ
+     */
+    private void applyAdvancedSettings() {
+        if (reader == null || !isConnected) {
+            Log.d(TAG, "applyAdvancedSettings: skipped (not connected)");
+            return;
+        }
+        
+        if (advancedSettingsApplied) {
+            Log.d(TAG, "applyAdvancedSettings: already applied");
+            return;
+        }
+        
+        Log.i(TAG, "⚙️ Applying advanced settings for metal tags...");
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  1) Session — S1 أو S2 أفضل من S0 للوسوم المتقاربة
+        // ═══════════════════════════════════════════════════════════════
+        invokeIntMethod("setSession", session);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  2) Target — A/B يقرأ الأوسمة الثابتة والمتحركة
+        // ═══════════════════════════════════════════════════════════════
+        invokeIntMethod("setTarget", target);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  3) Q Value — 4 متوازن، 3 أسرع، 5 أدق
+        // ═══════════════════════════════════════════════════════════════
+        invokeIntMethod("setQValue", qValue);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  4) Frequency Mode — FCC أو ETSI حسب المنطقة
+        // ═══════════════════════════════════════════════════════════════
+        invokeIntMethod("setFrequencyMode", frequencyMode);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  5) Beep + Vibration — تجربة المستخدم
+        // ═══════════════════════════════════════════════════════════════
+        invokeIntMethod("setBeepMode", beepMode);
+        invokeIntMethod("setVibrationMode", vibrationMode);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  6) Continuous Mode — 0=Command, 1=Continuous
+        // ═══════════════════════════════════════════════════════════════
+        invokeIntMethod("setContinuousMode", continuousMode);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  7) Dynamic Power — حاسم للمعادن!
+        //  يخفض الطاقة تلقائياً عند الاقتراب من الوسم (يمنع التشبع)
+        // ═══════════════════════════════════════════════════════════════
+        invokeBooleanMethod("setDynamicPower", true);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  8) FastID — تقليل القراءات المكررة من نفس الوسم
+        // ═══════════════════════════════════════════════════════════════
+        invokeBooleanMethod("setFastId", true);
+        
+        // ═══════════════════════════════════════════════════════════════
+        //  9) TagFocus — تحسين القراءة للوسوم القريبة جداً
+        // ═══════════════════════════════════════════════════════════════
+        invokeBooleanMethod("setTagFocus", true);
+        
+        advancedSettingsApplied = true;
+        Log.i(TAG, "✅ Advanced settings applied");
+    }
+    
+    /**
+     * ✅ استدعاء دالة SDK مع int عبر Reflection
+     */
+    private void invokeIntMethod(String methodName, int value) {
+        if (reader == null) return;
+        try {
+            Method m = reader.getClass().getMethod(methodName, int.class);
+            m.invoke(reader, value);
+            Log.d(TAG, "   ✅ " + methodName + "(" + value + ")");
+        } catch (NoSuchMethodException e) {
+            Log.w(TAG, "   ⚠️ " + methodName + " NOT FOUND in SDK");
+        } catch (Exception e) {
+            Log.e(TAG, "   ❌ " + methodName + " error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ✅ استدعاء دالة SDK مع boolean عبر Reflection
+     */
+    private void invokeBooleanMethod(String methodName, boolean value) {
+        if (reader == null) return;
+        try {
+            Method m = reader.getClass().getMethod(methodName, boolean.class);
+            m.invoke(reader, value);
+            Log.d(TAG, "   ✅ " + methodName + "(" + value + ")");
+        } catch (NoSuchMethodException e) {
+            Log.w(TAG, "   ⚠️ " + methodName + " NOT FOUND in SDK");
+        } catch (Exception e) {
+            Log.e(TAG, "   ❌ " + methodName + " error: " + e.getMessage());
         }
     }
     
@@ -221,6 +343,10 @@ public class ChainwayReader implements MiraIRFIDReader {
             
             if (isConnected) {
                 applySupportedSettings();
+                // ✅ الإعدادات المتقدمة — مرة واحدة فقط بعد الاتصال
+                if (!advancedSettingsApplied) {
+                    applyAdvancedSettings();
+                }
                 if (listener != null) {
                     listener.onConnectionChanged(true);
                 }
@@ -240,6 +366,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void disconnect() {
         stopScan();
         isConnected = false;
+        advancedSettingsApplied = false;  // ✅ أعِد التعيين عند الفصل
         if (listener != null) {
             listener.onConnectionChanged(false);
         }
@@ -262,6 +389,7 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
         reader = null;
         listener = null;
+        advancedSettingsApplied = false;
     }
     
     @Override
@@ -270,7 +398,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     // =========================================================================
-    // 📡 المسح - النسخة المُحصّنة
+    // 📡 المسح
     // =========================================================================
     
     @Override
@@ -301,10 +429,10 @@ public class ChainwayReader implements MiraIRFIDReader {
                 }
             }
             
-            // ✅ 4. طبّق الإعدادات
+            // ✅ 4. طبّق الإعدادات الخفيفة (الطاقة فقط)
             applySupportedSettings();
             
-            // ✅ 5. ابدأ القراءة (بدون Thread يدوي)
+            // ✅ 5. ابدأ القراءة
             boolean success = false;
             try {
                 success = reader.startInventoryTag();
@@ -416,34 +544,33 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-public void stopScan() {
-    // ✅ AtomicBoolean.getAndSet() — ذرّي وآمن
-    // إذا كانت القيمة false أصلاً، فهذا يعني أن الإيقاف تم — لا تكرر
-    if (!isScanning.getAndSet(false)) {
-        Log.d(TAG, "⏹️ stopScan() skipped — already stopped");
-        return;
-    }
-    
-    Log.d(TAG, "⏹️ stopScan() executing...");
-    
-    try {
-        if (reader != null) {
-            reader.stopInventory();
-            Log.d(TAG, "   └─ reader.stopInventory() OK");
+    public void stopScan() {
+        // ✅ AtomicBoolean.getAndSet() — ذرّي وآمن
+        if (!isScanning.getAndSet(false)) {
+            Log.d(TAG, "⏹️ stopScan() skipped — already stopped");
+            return;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "   └─ reader.stopInventory() error: " + e.getMessage());
-    }
-    
-    // ✅ أبلغ المستمع مرة واحدة فقط
-    if (listener != null) {
+        
+        Log.d(TAG, "⏹️ stopScan() executing...");
+        
         try {
-            listener.onScanStopped();
+            if (reader != null) {
+                reader.stopInventory();
+                Log.d(TAG, "   └─ reader.stopInventory() OK");
+            }
         } catch (Exception e) {
-            Log.e(TAG, "onScanStopped callback error", e);
+            Log.e(TAG, "   └─ reader.stopInventory() error: " + e.getMessage());
+        }
+        
+        // ✅ أبلغ المستمع مرة واحدة فقط
+        if (listener != null) {
+            try {
+                listener.onScanStopped();
+            } catch (Exception e) {
+                Log.e(TAG, "onScanStopped callback error", e);
+            }
         }
     }
-}
     
     @Override
     public boolean isScanning() {
@@ -451,7 +578,7 @@ public void stopScan() {
     }
     
     // =========================================================================
-    // ⚙️ الإعدادات
+    // ⚙️ الإعدادات — مع تطبيق فعلي على العتاد
     // =========================================================================
     
     @Override
@@ -459,7 +586,7 @@ public void stopScan() {
         this.powerDbm = powerDbm;
         saveSettings();
         try {
-            if (reader != null) {
+            if (reader != null && isConnected) {
                 reader.setPower(powerDbm);
                 Log.d(TAG, "⚡ Power set to: " + powerDbm + " dBm");
             }
@@ -472,21 +599,59 @@ public void stopScan() {
     public void setRssiThreshold(int threshold) {
         this.rssiThreshold = threshold;
         saveSettings();
+        // لا يحتاج SDK — يُطبّق في processTag()
     }
     
     @Override
     public void setScanInterval(int intervalMs) {
         this.scanIntervalMs = Math.max(50, intervalMs);
         saveSettings();
+        // لا يحتاج SDK — يُطبّق في scanLoop()
     }
     
-    public void setBeepMode(int mode) { this.beepMode = mode; saveSettings(); }
-    public void setVibrationMode(int mode) { this.vibrationMode = mode; saveSettings(); }
-    public void setContinuousMode(int mode) { this.continuousMode = mode; saveSettings(); }
-    public void setSession(int session) { this.session = session; saveSettings(); }
-    public void setTarget(int target) { this.target = target; saveSettings(); }
-    public void setQValue(int qValue) { this.qValue = qValue; saveSettings(); }
+    public void setBeepMode(int mode) {
+        this.beepMode = mode;
+        saveSettings();
+        invokeIntMethod("setBeepMode", mode);
+    }
     
+    public void setVibrationMode(int mode) {
+        this.vibrationMode = mode;
+        saveSettings();
+        invokeIntMethod("setVibrationMode", mode);
+    }
+    
+    public void setContinuousMode(int mode) {
+        this.continuousMode = mode;
+        saveSettings();
+        invokeIntMethod("setContinuousMode", mode);
+    }
+    
+    public void setSession(int session) {
+        this.session = session;
+        saveSettings();
+        invokeIntMethod("setSession", session);
+    }
+    
+    public void setTarget(int target) {
+        this.target = target;
+        saveSettings();
+        invokeIntMethod("setTarget", target);
+    }
+    
+    public void setQValue(int qValue) {
+        this.qValue = qValue;
+        saveSettings();
+        invokeIntMethod("setQValue", qValue);
+    }
+    
+    public void setFrequencyMode(int mode) {
+        this.frequencyMode = mode;
+        saveSettings();
+        invokeIntMethod("setFrequencyMode", mode);
+    }
+    
+    // ==================== Getters ====================
     public int getPowerDbm() { return powerDbm; }
     public int getRssiThreshold() { return rssiThreshold; }
     public int getScanIntervalMs() { return scanIntervalMs; }
@@ -496,6 +661,7 @@ public void stopScan() {
     public int getSession() { return session; }
     public int getTarget() { return target; }
     public int getQValue() { return qValue; }
+    public int getFrequencyMode() { return frequencyMode; }
     
     @Override
     public String getDeviceName() { 
