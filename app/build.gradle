@@ -19,7 +19,7 @@ android {
         buildConfigField "String", "DEFAULT_SERVER_URL", '"https://sa.mirabarcode.com/wp-json"'
         buildConfigField "String", "API_NAMESPACE", '"mira/v2"'
         buildConfigField "String", "API_BASE_URL", '"https://sa.mirabarcode.com/wp-json/mira/v2/"'
-
+        buildConfigField "boolean", "ALLOW_SIMULATOR", "true"
         buildConfigField "String", "DEFAULT_CURRENCY", '"YER"'
         buildConfigField "String", "DEFAULT_USD_RATE", '"535.0"'
         buildConfigField "String", "DEFAULT_SAR_RATE", '"142.5"'
