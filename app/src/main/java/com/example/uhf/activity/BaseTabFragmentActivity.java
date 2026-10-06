@@ -99,7 +99,6 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
 
     protected MiraDialogHelper dialogHelper;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
-    private static final int RFID_INIT_TIMEOUT_MS = 8000;  // 8 ثواني (كافية للـ AAR الجديد)
     private int initRetryCount = 0;
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
     protected final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -378,23 +377,7 @@ public void initUHF() {
     }
 }
 
-    private void showInitDialog() {
-        if (isDestroyed.get() || isFinishing()) return;
-        mainHandler.post(() -> {
-            try {
-                if (isDestroyed.get() || isFinishing()) return;
-                dismissInitDialogSafely();
-                initDialog = new ProgressDialog(BaseTabFragmentActivity.this);
-                initDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-                initDialog.setMessage("جاري تهيئة قارئ RFID...");
-                initDialog.setCanceledOnTouchOutside(false);
-                initDialog.setCancelable(false);
-                initDialog.show();
-            } catch (Exception e) {
-                Log.e(TAG, "Show dialog error: " + e.getMessage());
-            }
-        });
-    }
+    
 
     private void dismissInitDialogSafely() {
         mainHandler.post(() -> {
