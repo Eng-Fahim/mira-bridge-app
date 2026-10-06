@@ -154,33 +154,50 @@ public class RFIDManager {
         }
     }
     
-    /**
-     * ✅ كشف نوع الجهاز الفعلي
-     */
-    public MiraIRFIDReader.ReaderType detectDeviceType() {
-        String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
-        String manufacturer = Build.MANUFACTURER != null ? 
-            Build.MANUFACTURER.toUpperCase() : "";
-        
-        if (model.contains("C72")) return MiraIRFIDReader.ReaderType.CHAINWAY_C72;
-        if (model.contains("C61")) return MiraIRFIDReader.ReaderType.CHAINWAY_C61;
-        if (model.contains("C66")) return MiraIRFIDReader.ReaderType.CHAINWAY_C66;
-        if (model.contains("C71")) return MiraIRFIDReader.ReaderType.CHAINWAY_C71;
-        if (model.contains("MC33") || model.contains("MC32")) 
-            return MiraIRFIDReader.ReaderType.ZEBRA_MC3300;
-        if (model.contains("EDA5") || model.contains("CT40")) 
-            return MiraIRFIDReader.ReaderType.HONEYWELL_EDA50;
-        if (model.contains("RP90")) return MiraIRFIDReader.ReaderType.UNITECH_RP902;
-        
-        // ⚠️ غير معروف — لكن لا نُرجع SIMULATOR بصمت
-        // نُعيد C72 كافتراضي آمن على أجهزة Chainway، أو SIMULATOR فقط إذا فشل كل شيء
-        if (manufacturer.contains("CHAINWAY")) {
-            return MiraIRFIDReader.ReaderType.CHAINWAY_C72;
-        }
-        
-        Log.w(TAG, "⚠️ Unknown device model: " + model + " — using C72 default");
+/**
+ * ✅ كشف نوع الجهاز الفعلي — صارم ودقيق
+ * 
+ * على Samsung/هواتف عادية → SIMULATOR (لا يدّعي وجود C72)
+ * على C72 حقيقي → CHAINWAY_C72
+ */
+public MiraIRFIDReader.ReaderType detectDeviceType() {
+    String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
+    String manufacturer = Build.MANUFACTURER != null ? 
+        Build.MANUFACTURER.toUpperCase() : "";
+    String brand = Build.BRAND != null ? Build.BRAND.toUpperCase() : "";
+    
+    Log.d(TAG, "🔍 Detecting device: model=" + model 
+            + " manufacturer=" + manufacturer + " brand=" + brand);
+    
+    // ✅ Chainway — اكتشاف صارم من MODEL
+    if (model.contains("C72")) return MiraIRFIDReader.ReaderType.CHAINWAY_C72;
+    if (model.contains("C61")) return MiraIRFIDReader.ReaderType.CHAINWAY_C61;
+    if (model.contains("C66")) return MiraIRFIDReader.ReaderType.CHAINWAY_C66;
+    if (model.contains("C71")) return MiraIRFIDReader.ReaderType.CHAINWAY_C71;
+    
+    // ✅ Zebra
+    if (model.contains("MC33") || model.contains("MC32") 
+            || model.contains("TC51") || model.contains("TC52")) 
+        return MiraIRFIDReader.ReaderType.ZEBRA_MC3300;
+    
+    // ✅ Honeywell
+    if (model.contains("EDA5") || model.contains("CT40") 
+            || model.contains("CT60")) 
+        return MiraIRFIDReader.ReaderType.HONEYWELL_EDA50;
+    
+    // ✅ Unitech
+    if (model.contains("RP90") || model.contains("PA70")) 
+        return MiraIRFIDReader.ReaderType.UNITECH_RP902;
+    
+    // ✅ Chainway بالمصنّع فقط (احتياط)
+    if (manufacturer.contains("CHAINWAY") || brand.contains("CHAINWAY")) {
         return MiraIRFIDReader.ReaderType.CHAINWAY_C72;
     }
+    
+    // ❌ جهاز غير معروف — لا ندّعي أنه C72
+    Log.w(TAG, "⚠️ Unknown device: " + model + " → SIMULATOR");
+    return MiraIRFIDReader.ReaderType.SIMULATOR;
+}
     
     public boolean saveDevice(RFIDDevice device) {
         try {
