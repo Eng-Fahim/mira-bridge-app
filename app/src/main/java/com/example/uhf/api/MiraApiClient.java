@@ -389,7 +389,7 @@ this.accountingService = new retrofit2.Retrofit.Builder()
         });
     }
 
-    // ==================== الدوال الأساسية ====================
+    // ==================== الدوال الأساسية ===================
     private String getEffectiveApiKey() {
         String key = apiKey;
         if (key == null || key.isEmpty()) {
@@ -1251,6 +1251,50 @@ private ApiResponse accountingRequest(String method, String endpoint, JSONObject
         } catch (Exception ignored) {}
         return post("/authorize", payload);
     }
+
+    // ═══════════════════════════════════════════════════════════
+//  📝 قيود التسوية — بعد اعتماد الإعداد
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * ✅ إنشاء قيد تسوية مخصص
+ * 
+ * @param payload {entry_date, reference, description, lines[]}
+ */
+public ApiResponse createAdjustingEntry(JSONObject payload) {
+    return postAccounting("setup/adjusting-entry", payload);
+}
+
+/**
+ * ✅ إضافة رصيد جديد (واجهة مبسطة)
+ * 
+ * @param type   cash|bank|gold|receivable|payable|fixed_asset|diamond
+ * @param amount المبلغ (أو الوزن للذهب)
+ * @param extra  {karat, description, account_id}
+ */
+public ApiResponse addPostApprovalBalance(String type, double amount,
+                                          JSONObject extra) {
+    try {
+        JSONObject payload = new JSONObject();
+        payload.put("type", type);
+        payload.put("amount", amount);
+        if (extra != null) {
+            if (extra.has("karat")) {
+                payload.put("karat", extra.optString("karat"));
+            }
+            if (extra.has("description")) {
+                payload.put("description", extra.optString("description"));
+            }
+            if (extra.has("account_id")) {
+                payload.put("account_id", extra.optInt("account_id"));
+            }
+        }
+        return postAccounting("setup/add-balance", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "addPostApprovalBalance error: " + e.getMessage());
+        return new ApiResponse(-1, null, e.getMessage());
+    }
+}
 
     // ==================== Ping ====================
     /**
