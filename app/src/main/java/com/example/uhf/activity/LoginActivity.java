@@ -791,43 +791,53 @@ public class LoginActivity extends AppCompatActivity {
             Executor executor = ContextCompat.getMainExecutor(this);
             biometricPrompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
                 @Override
-                public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                    String lastUser = sessionManager.getLastBiometricUser();
-                    String lastRole = sessionManager.getLastBiometricRole();
-                    String lastDisplayName = sessionManager.getLastBiometricDisplayName();
-                    int lastUserId = sessionManager.getLastBiometricUserId();
-                    String lastToken = sessionManager.getLastBiometricToken();
+public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+    String lastUser        = sessionManager.getLastBiometricUser();
+    String lastRole        = sessionManager.getLastBiometricRole();
+    String lastDisplayName = sessionManager.getLastBiometricDisplayName();
+    int    lastUserId      = sessionManager.getLastBiometricUserId();
+    String lastToken       = sessionManager.getLastBiometricToken();
 
-                    if (!lastUser.isEmpty()) {
-                        if (!sessionManager.isLoggedIn()) {
-                            sessionManager.createLoginSession(lastUser, lastRole,
-                                    lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
-                                    sessionManager.getServerUrl());
-                            sessionManager.setDisplayName(lastDisplayName);
-                            sessionManager.setUserId(lastUserId);
+    if (lastUser.isEmpty()) {
+        playTone(false);
+        Toast.makeText(LoginActivity.this,
+                isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
+                Toast.LENGTH_LONG).show();
+        return;
+    }
 
-                            int savedBranchId = sessionManager.getLastBiometricBranchId();
-                            String savedBranchName = sessionManager.getLastBiometricBranchName();
-                            if (savedBranchId > 0) {
-                                MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
-                                bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
-                                bm.setUserBranchLocked(true);
-                            }
-                        }
+    // ✅ 1) أعد الجلسة دائماً (لا تعتمد على isLoggedIn المخزّن مؤقتاً)
+    sessionManager.createLoginSession(
+            lastUser,
+            lastRole,
+            lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
+            sessionManager.getServerUrl()
+    );
+    sessionManager.setDisplayName(lastDisplayName);
+    sessionManager.setUserId(lastUserId);
 
-                        // ✅ تصفير Auto-Lock بعد biometric login ناجح
-                        sessionManager.resetAutoLock();
+    // ✅ 2) استعد الفرع
+    int savedBranchId = sessionManager.getLastBiometricBranchId();
+    String savedBranchName = sessionManager.getLastBiometricBranchName();
+    if (savedBranchId > 0) {
+        MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+        bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+        bm.setUserBranchLocked(true);
+    }
 
-                        resetFailedAttempts();
-                        playTone(true);
-                        showSuccessOverlayAndNavigate();
-                    } else {
-                        playTone(false);
-                        Toast.makeText(LoginActivity.this,
-                                isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
-                                Toast.LENGTH_LONG).show();
-                    }
-                }
+    // ✅ 3) أنشئ مستخدماً بيومترياً احتياطياً لو غير موجود
+    if (sessionManager.getLastBiometricUser().isEmpty() == false) {
+        sessionManager.saveBiometricUser(lastUser, lastRole, lastDisplayName, lastUserId, lastToken);
+    }
+
+    // ✅ 4) صفّر Auto-Lock + أخطاء
+    sessionManager.resetAutoLock();
+    resetFailedAttempts();
+    playTone(true);
+
+    // ✅ 5) انتقل
+    showSuccessOverlayAndNavigate();
+}
 
                 @Override
                 public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
