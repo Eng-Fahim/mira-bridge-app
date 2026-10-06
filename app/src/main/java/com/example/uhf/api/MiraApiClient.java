@@ -1436,6 +1436,14 @@ private ApiResponse accountingRequest(String method, String endpoint, JSONObject
                 + "&limit=" + pageSize + "&per_page=" + pageSize
                 + "&payment_method=" + paymentMethod);
     }
+    
+    // ═══════════════════════════════════════════════════════════
+//  ✅ طرق الدفع (POS Payment Methods)
+// ═══════════════════════════════════════════════════════════
+
+public ApiResponse getPaymentMethods() {
+    return getWithAuth("/pos/payment-methods");
+}
 
     public ApiResponse getSalesStats() {
         return getWithAuth("/pos/sales/stats");
