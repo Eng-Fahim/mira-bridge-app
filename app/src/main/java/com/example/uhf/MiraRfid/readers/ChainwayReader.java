@@ -416,21 +416,34 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public void stopScan() {
-        Log.d(TAG, "⏹️ stopScan() called");
-        
-        isScanning.set(false);
-        
-        try {
-            if (reader != null) {
-                reader.stopInventory();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Stop inventory error: " + e.getMessage());
-        }
-        
-        if (listener != null) listener.onScanStopped();
+public void stopScan() {
+    // ✅ AtomicBoolean.getAndSet() — ذرّي وآمن
+    // إذا كانت القيمة false أصلاً، فهذا يعني أن الإيقاف تم — لا تكرر
+    if (!isScanning.getAndSet(false)) {
+        Log.d(TAG, "⏹️ stopScan() skipped — already stopped");
+        return;
     }
+    
+    Log.d(TAG, "⏹️ stopScan() executing...");
+    
+    try {
+        if (reader != null) {
+            reader.stopInventory();
+            Log.d(TAG, "   └─ reader.stopInventory() OK");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "   └─ reader.stopInventory() error: " + e.getMessage());
+    }
+    
+    // ✅ أبلغ المستمع مرة واحدة فقط
+    if (listener != null) {
+        try {
+            listener.onScanStopped();
+        } catch (Exception e) {
+            Log.e(TAG, "onScanStopped callback error", e);
+        }
+    }
+}
     
     @Override
     public boolean isScanning() {
