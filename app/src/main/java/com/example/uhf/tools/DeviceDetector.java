@@ -298,22 +298,21 @@ public static boolean isRfidHardwareSupported() {
     }
     
     private static void determinePowerRange() {
-        switch (activeProfile.model) {
-            case C5:
-                activeProfile.minPower = 5;
-                activeProfile.maxPower = 30;
-                break;
-            case C72:
-                activeProfile.minPower = 5;
-                activeProfile.maxPower = 33;
-                break;
-            default:
-                activeProfile.minPower = 10;
-                activeProfile.maxPower = 26;
-                break;
-        }
+    switch (activeProfile.model) {
+        case C5:
+            activeProfile.minPower = 5;
+            activeProfile.maxPower = 30;
+            break;
+        case C72:
+            activeProfile.minPower = 5;
+            activeProfile.maxPower = 30;  // ← كان 33 (C72 يدعم حتى 30 فقط عملياً)
+            break;
+        default:
+            activeProfile.minPower = 10;
+            activeProfile.maxPower = 26;
+            break;
     }
-    
+}
     private static void determineFrequencyRange() {
         switch (activeProfile.model) {
             case C5:
@@ -371,15 +370,15 @@ public static boolean isRfidHardwareSupported() {
     }
     
     private static int calculateOptimalPower() {
-        switch (activeProfile.model) {
-            case C5:
-                return 22;
-            case C72:
-                return 24;
-            default:
-                return 22;
-        }
+    switch (activeProfile.model) {
+        case C5:
+            return 25;       // ← كان 22
+        case C72:
+            return 30;       // ← كان 24 (الحد الأقصى للذهب)
+        default:
+            return 26;       // ← كان 22
     }
+}
     
     private static boolean verify(RFIDWithUHFUART reader) {
         try {
