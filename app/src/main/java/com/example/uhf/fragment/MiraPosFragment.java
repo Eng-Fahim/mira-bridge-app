@@ -76,12 +76,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * MiraPosFragment v5.0 — Refactored Edition
- *
- * يستخدم:
- * - PosCartManager     : إدارة السلة
- * - PosPriceResolver   : تحديد السعر
- * - PosHeroController  : إدارة حالات Hero
- * - PosUIManager       : Dialogs + Toasts + Broadcasts
  */
 public class MiraPosFragment extends MiraBaseFragment {
 
@@ -92,6 +86,8 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final long REFUND_MAX_DAYS = 30;
     private static final long LAST_SALE_VALIDITY_MS = 5 * 60 * 1000;
     private static final long ITEM_ADDED_DISPLAY_MS = 1000;
+    private static final long AUTO_ADD_DELAY_MS = 350;
+    private static final int  AUTO_ADD_MIN_LEN = 6;
 
     // ═══════════════════════════════════════════════════════
     // Managers
@@ -132,7 +128,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private volatile long lastSaleResponseTime = 0;
 
     private final AtomicReference<RefundItem> selectedRefundItem = new AtomicReference<>(null);
-    
+
     private ImageButton btnPosRefund;
     private ImageButton btnPosLastReceipt;
 
@@ -145,15 +141,14 @@ public class MiraPosFragment extends MiraBaseFragment {
     private TextView btnAddManual;
     private TextView btnCheckout;
     private TextView btnClearCart;
-    
+
     private RecyclerView rvCartItems;
     private View layoutCartEmptyState;
     private View posHeroContainer;
     private View posManualInputContainer;
     private View posSummaryStrip;
-    private View posFooterSticky;   
+    private View posFooterSticky;
 
-    // Scan buttons
     private View btnPosScanGs1, btnPosScanRfid, btnPosScanManual;
 
     private CartAdapter cartAdapter;
@@ -230,7 +225,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         try {
             Context ctx = requireContext().getApplicationContext();
 
-            // تهيئة Manager
             branchesManager = MiraBranchesManager.getInstance(ctx);
             priceManager = MiraPriceManager.getInstance(ctx);
             permissionManager = PermissionManager.getInstance(ctx);
@@ -248,7 +242,6 @@ public class MiraPosFragment extends MiraBaseFragment {
             priceResolver = new PosPriceResolver(priceManager);
             cartManager = new PosCartManager();
 
-            // RFID
             rfidManager = RFIDManager.getInstance(ctx);
             if (rfidManager != null) {
                 rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
@@ -258,7 +251,8 @@ public class MiraPosFragment extends MiraBaseFragment {
                     }
                     @Override public void onScanStarted() {}
                     @Override public void onScanStopped() {}
-                    @Override public void onConnectionChanged(boolean connected) {
+                    @Override
+                    public void onConnectionChanged(boolean connected) {
                         safeRun(() -> {
                             if (btnPosScanRfid != null && isRFIDModeActive) {
                                 btnPosScanRfid.setAlpha(connected ? 1.0f : 0.5f);
@@ -282,7 +276,6 @@ public class MiraPosFragment extends MiraBaseFragment {
             initSmartScale();
             updateCartSummary();
 
-            // الحالة الافتراضية
             heroController.setState(PosHeroController.State.IDLE);
 
         } catch (Exception e) {
@@ -291,50 +284,62 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     @Override
-public void onResume() {
-    super.onResume();
-    try {
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-
-            // ✅ إخفاء FAB في شاشة البيع
-            View fab = getActivity().findViewById(R.id.fabActionCenter);
-            if (fab != null) {
-                fab.setVisibility(View.GONE);
-                Log.d(TAG, "🙈 FAB hidden in POS");
+    public void onResume() {
+        super.onResume();
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+                View fab = getActivity().findViewById(R.id.fabActionCenter);
+                if (fab != null) {
+                    fab.setVisibility(View.GONE);
+                    Log.d(TAG, "🙈 FAB hidden in POS");
+                }
             }
+            if (scaleManager != null) scaleManager.connect();
+            updateCartSummary();
+        } catch (Exception e) {
+            Log.e(TAG, "onResume error: " + e.getMessage());
         }
-        if (scaleManager != null) scaleManager.connect();
-        updateCartSummary();
-    } catch (Exception e) {
-        Log.e(TAG, "onResume error: " + e.getMessage());
     }
-}
 
     @Override
-public void onPause() {
-    super.onPause();
-    try {
-        stopRFIDScan();
-        isCheckoutDialogShowing = false;
-        if (heroController != null) {
-            heroController.setState(PosHeroController.State.IDLE);
-        }
-
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-
-            // ✅ إعادة إظهار FAB
-            View fab = getActivity().findViewById(R.id.fabActionCenter);
-            if (fab != null) {
-                fab.setVisibility(View.VISIBLE);
-                Log.d(TAG, "👁️ FAB restored");
+    public void onPause() {
+        super.onPause();
+        try {
+            stopRFIDScan();
+            isCheckoutDialogShowing = false;
+            if (heroController != null) {
+                heroController.setState(PosHeroController.State.IDLE);
             }
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+                View fab = getActivity().findViewById(R.id.fabActionCenter);
+                if (fab != null) {
+                    fab.setVisibility(View.VISIBLE);
+                    Log.d(TAG, "👁️ FAB restored");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onPause error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "onPause error: " + e.getMessage());
     }
-}
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -392,27 +397,24 @@ public void onPause() {
         tilManualEpc = view.findViewById(R.id.tilPosManualEpc);
         etManualEpc = view.findViewById(R.id.etPosManualEpc);
         btnAddManual = view.findViewById(R.id.btnPosAddManual);
-        // ✅ إخفاء زر "إضافة" — الإضافة تلقائية
         if (btnAddManual != null) {
-        btnAddManual.setVisibility(View.GONE);
+            btnAddManual.setVisibility(View.GONE);
         }
         btnCheckout = view.findViewById(R.id.btnPosCheckout);
         btnClearCart = view.findViewById(R.id.btnPosClearCart);
         btnPosRefund = view.findViewById(R.id.btnPosRefund);
         btnPosLastReceipt = view.findViewById(R.id.btnPosLastReceipt);
-        
+
         rvCartItems = view.findViewById(R.id.rvPosCartItems);
         layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
         posHeroContainer = view.findViewById(R.id.posHeroContainer);
         posManualInputContainer = view.findViewById(R.id.posManualInputContainer);
         posSummaryStrip = view.findViewById(R.id.posSummaryStrip);
+        posFooterSticky = view.findViewById(R.id.posFooterSticky);
 
         btnPosScanGs1 = view.findViewById(R.id.btnPosScanGs1);
         btnPosScanRfid = view.findViewById(R.id.btnPosScanRfid);
         btnPosScanManual = view.findViewById(R.id.btnPosScanManual);
-        
-        posSummaryStrip = view.findViewById(R.id.posSummaryStrip);
-        posFooterSticky = view.findViewById(R.id.posFooterSticky); // ✅ أضف
 
         if (tvScaleStatus != null) {
             tvScaleStatus.setOnClickListener(v -> {
@@ -423,33 +425,33 @@ public void onPause() {
     }
 
     private void setupHeroController(View view) {
-    try {
-        heroController = new PosHeroController(
-                view.findViewById(R.id.posHeroGlow),            // 1  View
-                view.findViewById(R.id.posHeroRing),            // 2  View
-                view.findViewById(R.id.ivPosHeroIcon),          // 3  ImageView
-                view.findViewById(R.id.ivPosHeroSparkleTop),    // 4  ImageView
-                view.findViewById(R.id.ivPosHeroSparkleBottom), // 5  ImageView
-                view.findViewById(R.id.tvPosHeroTitleAr),       // 6  TextView
-                view.findViewById(R.id.tvPosHeroTitleEn),       // 7  TextView
-                view.findViewById(R.id.posHeroDivider),         // 8  View
-                view.findViewById(R.id.tvPosHeroMessage),       // 9  TextView
-                view.findViewById(R.id.tvPosHeroHint),          // 10 TextView
-                view.findViewById(R.id.tvPosRfidCount),         // 11 TextView
-                view.findViewById(R.id.btnPosScanGs1),          // 12 View
-                view.findViewById(R.id.btnPosScanRfid),         // 13 View
-                view.findViewById(R.id.btnPosScanManual),       // 14 View
-                view.findViewById(R.id.ivPosGs1Icon),           // 15 ImageView
-                view.findViewById(R.id.ivPosRfidIcon),          // 16 ImageView
-                view.findViewById(R.id.ivPosManualIcon),        // 17 ImageView
-                view.findViewById(R.id.tvPosGs1Label),          // 18 TextView
-                view.findViewById(R.id.tvPosRfidLabel),         // 19 TextView
-                view.findViewById(R.id.tvPosManualLabel)        // 20 TextView
-        );
-    } catch (Exception e) {
-        Log.e(TAG, "setupHeroController error: " + e.getMessage(), e);
+        try {
+            heroController = new PosHeroController(
+                    view.findViewById(R.id.posHeroGlow),
+                    view.findViewById(R.id.posHeroRing),
+                    view.findViewById(R.id.ivPosHeroIcon),
+                    view.findViewById(R.id.ivPosHeroSparkleTop),
+                    view.findViewById(R.id.ivPosHeroSparkleBottom),
+                    view.findViewById(R.id.tvPosHeroTitleAr),
+                    view.findViewById(R.id.tvPosHeroTitleEn),
+                    view.findViewById(R.id.posHeroDivider),
+                    view.findViewById(R.id.tvPosHeroMessage),
+                    view.findViewById(R.id.tvPosHeroHint),
+                    view.findViewById(R.id.tvPosRfidCount),
+                    view.findViewById(R.id.btnPosScanGs1),
+                    view.findViewById(R.id.btnPosScanRfid),
+                    view.findViewById(R.id.btnPosScanManual),
+                    view.findViewById(R.id.ivPosGs1Icon),
+                    view.findViewById(R.id.ivPosRfidIcon),
+                    view.findViewById(R.id.ivPosManualIcon),
+                    view.findViewById(R.id.tvPosGs1Label),
+                    view.findViewById(R.id.tvPosRfidLabel),
+                    view.findViewById(R.id.tvPosManualLabel)
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "setupHeroController error: " + e.getMessage(), e);
+        }
     }
-}
 
     private void setupCartListener() {
         if (cartManager == null) return;
@@ -497,47 +499,45 @@ public void onPause() {
 
     private void setupListeners() {
         try {
-            // Manual EPC input
-            // ✅ إضافة تلقائية عند اكتمال الإدخال
-if (etManualEpc != null) {
-    etManualEpc.addTextChangedListener(new android.text.TextWatcher() {
-        private Runnable pendingCheck;
-
-        @Override
-        public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-
-        @Override
-        public void onTextChanged(CharSequence s, int st, int b, int c) {}
-
-        @Override
-        public void afterTextChanged(android.text.Editable s) {
-            String code = s.toString().trim();
-
-            // ✅ ألغِ أي فحص سابق
-            if (pendingCheck != null) {
-                mainHandler.removeCallbacks(pendingCheck);
-            }
-
-            // ✅ EPC عادة 24 حرف، GTIN 13-14، Serial ≥ 6
-            int minLen = 6;
-
-            if (code.length() >= minLen) {
-                pendingCheck = () -> {
-                    if (code.equals(etManualEpc.getText().toString().trim())) {
+            // ✅ إضافة تلقائية بعد 350ms من آخر حرف (≥ 6 أحرف)
+            if (etManualEpc != null) {
+                etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
+                    if (actionId == EditorInfo.IME_ACTION_DONE
+                            || actionId == EditorInfo.IME_ACTION_SEARCH
+                            || (event != null
+                                && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                                && event.getAction() == KeyEvent.ACTION_DOWN)) {
                         submitManualEpc();
+                        return true;
                     }
-                };
-                // انتظر 300ms بعد آخر حرف
-                mainHandler.postDelayed(pendingCheck, 300);
-            }
-        }
-    });
-}
                     return false;
                 });
-            }
 
-            
+                final Runnable[] pendingAuto = new Runnable[1];
+                etManualEpc.addTextChangedListener(new android.text.TextWatcher() {
+                    @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+                    @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
+
+                    @Override
+                    public void afterTextChanged(android.text.Editable s) {
+                        if (pendingAuto[0] != null) {
+                            mainHandler.removeCallbacks(pendingAuto[0]);
+                        }
+                        final String code = s.toString().trim();
+                        if (code.length() < AUTO_ADD_MIN_LEN) return;
+
+                        pendingAuto[0] = () -> {
+                            if (etManualEpc != null
+                                    && code.equals(etManualEpc.getText()
+                                            .toString().trim())
+                                    && isAdded()) {
+                                submitManualEpc();
+                            }
+                        };
+                        mainHandler.postDelayed(pendingAuto[0], AUTO_ADD_DELAY_MS);
+                    }
+                });
+            }
 
             if (btnClearCart != null) {
                 btnClearCart.setOnClickListener(v -> {
@@ -553,7 +553,6 @@ if (etManualEpc != null) {
                 });
             }
 
-            // Scan buttons (3)
             if (btnPosScanGs1 != null) {
                 btnPosScanGs1.setOnClickListener(v -> {
                     if (heroController == null) return;
@@ -579,21 +578,19 @@ if (etManualEpc != null) {
                 });
             }
 
-           // Refund button (Header)
-if (btnPosRefund != null) {
-    btnPosRefund.setOnClickListener(v -> {
-        UIHelper.hideKeyboard(getActivity());
-        showRefundDialog();
-    });
-}
+            if (btnPosRefund != null) {
+                btnPosRefund.setOnClickListener(v -> {
+                    UIHelper.hideKeyboard(getActivity());
+                    showRefundDialog();
+                });
+            }
 
-// Last Receipt button (Header)
-if (btnPosLastReceipt != null) {
-    btnPosLastReceipt.setOnClickListener(v -> {
-        UIHelper.hideKeyboard(getActivity());
-        showLastReceiptDialog();
-    });
-}
+            if (btnPosLastReceipt != null) {
+                btnPosLastReceipt.setOnClickListener(v -> {
+                    UIHelper.hideKeyboard(getActivity());
+                    showLastReceiptDialog();
+                });
+            }
         } catch (Exception e) {
             Log.e(TAG, "setupListeners error: " + e.getMessage());
         }
@@ -673,7 +670,6 @@ if (btnPosLastReceipt != null) {
         }
     }
 
-   
     // ═══════════════════════════════════════════════════════
     // Process Item
     // ═══════════════════════════════════════════════════════
@@ -779,7 +775,6 @@ if (btnPosLastReceipt != null) {
 
             int karatNum = getKaratNumber(karat);
 
-            // ✅ استخدام PosPriceResolver
             PosPriceResolver.PriceResult priceResult =
                     priceResolver.resolve(item, karatNum, weight);
             double price = priceResult.priceUsd;
@@ -787,7 +782,6 @@ if (btnPosLastReceipt != null) {
             Log.d(TAG, "💰 Price resolved: " + price
                     + " (source=" + priceResult.source + ")");
 
-            // بناء CartItem
             CartItem cartItem = new CartItem(code, title, karat, weight,
                     liveScaleWeight, price, isAvailable,
                     vaultStatus.toUpperCase());
@@ -832,7 +826,6 @@ if (btnPosLastReceipt != null) {
                     return;
                 }
 
-                // ✅ إضافة عبر Manager
                 int pos = cartManager.addItem(cartItem);
                 if (pos < 0) {
                     showToast(getString(R.string.pos_msg_already_in_cart));
@@ -843,7 +836,6 @@ if (btnPosLastReceipt != null) {
                 playAlertSound(1);
                 showToast(getString(R.string.pos_msg_added, title));
 
-                // ✅ حالة Hero
                 if (heroController != null) {
                     heroController.setState(PosHeroController.State.ITEM_ADDED);
                     if (source != null && source.equals("rfid")) {
@@ -894,104 +886,68 @@ if (btnPosLastReceipt != null) {
     }
 
     private void updateCartSummaryFromManager(int count, double totalUsd,
-                                           boolean hasUnavailable) {
-    safeRun(() -> {
-        try {
-            // Hero visibility
-            if (posHeroContainer != null) {
-                posHeroContainer.setVisibility(count == 0
-                        ? View.VISIBLE : View.GONE);
-            }
-            if (rvCartItems != null) {
-                rvCartItems.setVisibility(count > 0
-                        ? View.VISIBLE : View.GONE);
-            }
+                                              boolean hasUnavailable) {
+        safeRun(() -> {
+            try {
+                // Hero visibility
+                if (posHeroContainer != null) {
+                    posHeroContainer.setVisibility(count == 0
+                            ? View.VISIBLE : View.GONE);
+                }
+                if (rvCartItems != null) {
+                    rvCartItems.setVisibility(count > 0
+                            ? View.VISIBLE : View.GONE);
+                }
 
-            // ═══════════════════════════════════════════════════
-            // ✅ Footer Sticky (Summary + CTA) — يظهر فقط عند وجود قطع
-            // ═══════════════════════════════════════════════════
-            if (posFooterSticky != null) {
-                if (count > 0) {
-                    // إظهار بحركة slide-up
-                    if (posFooterSticky.getVisibility() != View.VISIBLE) {
-                        posFooterSticky.setVisibility(View.VISIBLE);
-                        posFooterSticky.setTranslationY(
-                                posFooterSticky.getHeight() > 0
-                                        ? posFooterSticky.getHeight() : 300f);
-                        posFooterSticky.animate()
-                                .translationY(0f)
-                                .setDuration(300)
-                                .setInterpolator(
-                                        new android.view.animation.DecelerateInterpolator())
-                                .start();
-                    }
-                } else {
-                    // إخفاء بحركة slide-down
-                    if (posFooterSticky.getVisibility() == View.VISIBLE) {
-                        posFooterSticky.animate()
-                                .translationY(posFooterSticky.getHeight())
-                                .setDuration(250)
-                                .setInterpolator(
-                                        new android.view.animation.AccelerateInterpolator())
-                                .withEndAction(() -> {
-                                    if (posFooterSticky != null) {
-                                        posFooterSticky.setVisibility(View.GONE);
-                                        posFooterSticky.setTranslationY(0f);
-                                    }
-                                })
-                                .start();
+                // Footer Sticky
+                if (posFooterSticky != null) {
+                    if (count > 0) {
+                        if (posFooterSticky.getVisibility() != View.VISIBLE) {
+                            posFooterSticky.setVisibility(View.VISIBLE);
+                            posFooterSticky.setTranslationY(
+                                    posFooterSticky.getHeight() > 0
+                                            ? posFooterSticky.getHeight() : 300f);
+                            posFooterSticky.animate()
+                                    .translationY(0f)
+                                    .setDuration(300)
+                                    .setInterpolator(
+                                            new android.view.animation.DecelerateInterpolator())
+                                    .start();
+                        }
+                    } else {
+                        if (posFooterSticky.getVisibility() == View.VISIBLE) {
+                            posFooterSticky.animate()
+                                    .translationY(posFooterSticky.getHeight())
+                                    .setDuration(250)
+                                    .setInterpolator(
+                                            new android.view.animation.AccelerateInterpolator())
+                                    .withEndAction(() -> {
+                                        if (posFooterSticky != null) {
+                                            posFooterSticky.setVisibility(View.GONE);
+                                            posFooterSticky.setTranslationY(0f);
+                                        }
+                                    })
+                                    .start();
+                        }
                     }
                 }
-            }
 
-            // Count + Total
-            if (tvItemCount != null) {
-                tvItemCount.setText(String.valueOf(count));
-            }
-            // ✅ الجديدة — مع حماية شاملة
-if (tvTotalAmount != null) {
-    String totalText;
+                // Count
+                if (tvItemCount != null) {
+                    tvItemCount.setText(String.valueOf(count));
+                }
 
-    if (count > 0 && totalUsd > 0) {
-        // ✅ المسار 1: القيمة سليمة
-        totalText = tryFormatViaManager(totalUsd);
+                // ✅ Total amount — Bulletproof
+                if (tvTotalAmount != null) {
+                    String totalText = buildTotalText(count, totalUsd);
+                    tvTotalAmount.setText(totalText);
+                    tvTotalAmount.setVisibility(View.VISIBLE);
 
-        if (totalText == null) {
-            // ✅ المسار 2: fallback
-            totalText = String.format(Locale.US, "%,.2f YER",
-                    priceManager.convertFromUSD(totalUsd,
-                            priceManager.getDefaultCurrency()));
-        }
-
-    } else if (count > 0 && totalUsd == 0) {
-        // 🚨 حالة خطأ: يوجد عناصر لكن المجموع صفر!
-        Log.e(TAG, "🚨 CART HAS " + count + " ITEMS BUT totalUsd=0!");
-        totalText = "⚠️ خطأ في حساب الإجمالي";
-        // ✅ سجل تفاصيل كل عنصر للتشخيص
-        for (CartItem c : cartManager.getItems()) {
-            Log.e(TAG, "  → item: " + c.name + " | price=" + c.price);
-        }
-    } else {
-        // ✅ القيمة الافتراضية
-        totalText = getString(R.string.pos_default_amount);
-        if (totalText == null || totalText.trim().isEmpty()) {
-            totalText = "0.00";
-        }
-    }
-
-    // ✅ حماية نهائية
-    if (totalText == null || totalText.trim().isEmpty()) {
-        totalText = "0.00";
-    }
-
-    tvTotalAmount.setText(totalText);
-
-    // ✅ Log حاسم — يُظهر القيم الحقيقية
-    Log.e(TAG, "💰 [SUMMARY] count=" + count
-            + " | totalUsd=" + totalUsd
-            + " | displayed='" + totalText + "'"
-            + " | tvVisibility=" + tvTotalAmount.getVisibility());
-}
+                    Log.e(TAG, "💰 [SUMMARY] count=" + count
+                            + " | totalUsd=" + totalUsd
+                            + " | text='" + totalText + "'"
+                            + " | len=" + totalText.length());
+                }
 
                 // Status
                 if (tvCartStatus != null) {
@@ -1004,79 +960,10 @@ if (tvTotalAmount != null) {
                     }
                 }
 
-
-/**
- * ✅ تنسيق عبر priceManager — يُعيد null عند أي فشل
- */
-private String tryFormatViaManager(double amountUsd) {
-    if (priceManager == null) {
-        Log.e(TAG, "💰 priceManager = NULL");
-        return null;
-    }
-
-    try {
-        String formatted = priceManager.formatPriceDefault(amountUsd);
-
-        if (formatted == null) {
-            Log.e(TAG, "💰 formatPriceDefault returned NULL");
-            return null;
-        }
-        if (formatted.trim().isEmpty()) {
-            Log.e(TAG, "💰 formatPriceDefault returned EMPTY");
-            return null;
-        }
-        if (formatted.equals("—")) {
-            Log.e(TAG, "💰 formatPriceDefault returned '—' (zero/neg)");
-            return null;
-        }
-
-        return formatted;
-    } catch (Exception e) {
-        Log.e(TAG, "💰 formatPriceDefault error: " + e.getMessage());
-        return null;
-    }
-}
-                // ═══════════════════════════════════════════════════════
-// ✅ Footer Sticky (Summary + CTA) — يظهر فقط عند وجود قطع
-// ═══════════════════════════════════════════════════════
-if (posFooterSticky != null) {
-    if (count > 0) {
-        // إظهار بحركة slide-up
-        if (posFooterSticky.getVisibility() != View.VISIBLE) {
-            posFooterSticky.setVisibility(View.VISIBLE);
-            posFooterSticky.setTranslationY(
-                    posFooterSticky.getHeight() > 0
-                            ? posFooterSticky.getHeight() : 300f);
-            posFooterSticky.animate()
-                    .translationY(0f)
-                    .setDuration(300)
-                    .setInterpolator(
-                            new android.view.animation.DecelerateInterpolator())
-                    .start();
-        }
-    } else {
-        // إخفاء بحركة slide-down
-        if (posFooterSticky.getVisibility() == View.VISIBLE) {
-            posFooterSticky.animate()
-                    .translationY(posFooterSticky.getHeight())
-                    .setDuration(250)
-                    .setInterpolator(
-                            new android.view.animation.AccelerateInterpolator())
-                    .withEndAction(() -> {
-                        if (posFooterSticky != null) {
-                            posFooterSticky.setVisibility(View.GONE);
-                            posFooterSticky.setTranslationY(0f);
-                        }
-                    })
-                    .start();
-        }
-    }
-}
-
-// Summary strip state (للون الذهبي)
-if (posSummaryStrip != null) {
-    posSummaryStrip.setSelected(count > 0);
-}
+                // Summary strip state
+                if (posSummaryStrip != null) {
+                    posSummaryStrip.setSelected(count > 0);
+                }
 
                 // CTA
                 if (btnCheckout != null) {
@@ -1092,6 +979,58 @@ if (posSummaryStrip != null) {
                 Log.e(TAG, "updateCartSummaryFromManager error: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * ✅ بناء نص الإجمالي — مضمون 100%
+     */
+    private String buildTotalText(int count, double totalUsd) {
+        // count == 0 → القيمة الافتراضية
+        if (count <= 0) {
+            String def = getString(R.string.pos_default_amount);
+            if (def == null || def.trim().isEmpty()) {
+                return "0";
+            }
+            return def;
+        }
+
+        // count > 0 → حاول عبر priceManager
+        if (priceManager != null) {
+            try {
+                String formatted = priceManager.formatPriceDefault(totalUsd);
+                if (formatted != null
+                        && !formatted.trim().isEmpty()
+                        && !"—".equals(formatted.trim())
+                        && hasDigit(formatted)) {
+                    return formatted;
+                }
+                Log.e(TAG, "💰 formatPriceDefault invalid: '" + formatted
+                        + "' — using fallback");
+            } catch (Exception e) {
+                Log.e(TAG, "💰 formatPriceDefault error: " + e.getMessage());
+            }
+
+            // Fallback مباشر عبر priceManager
+            try {
+                String currency = priceManager.getDefaultCurrency();
+                double rate = priceManager.getExchangeRate(currency);
+                double local = totalUsd * rate;
+                return String.format(Locale.US, "%,.2f %s", local, currency);
+            } catch (Exception e) {
+                Log.e(TAG, "💰 fallback calc error: " + e.getMessage());
+            }
+        }
+
+        // Fallback نهائي — USD
+        return String.format(Locale.US, "$%,.2f", totalUsd);
+    }
+
+    private static boolean hasDigit(String s) {
+        if (s == null) return false;
+        for (int i = 0; i < s.length(); i++) {
+            if (Character.isDigit(s.charAt(i))) return true;
+        }
+        return false;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -1197,8 +1136,8 @@ if (posSummaryStrip != null) {
     }
 
     private void handleSaleSuccess(MiraApiClient.ApiResponse response,
-                                    POSCheckoutDialog.POSCheckoutData data,
-                                    boolean isOffline) {
+                                   POSCheckoutDialog.POSCheckoutData data,
+                                   boolean isOffline) {
         try {
             if (!isAdded()) return;
 
@@ -1242,7 +1181,7 @@ if (posSummaryStrip != null) {
     }
 
     private JSONObject buildCheckoutPayload(MiraApiClient client,
-                                             POSCheckoutDialog.POSCheckoutData data)
+                                            POSCheckoutDialog.POSCheckoutData data)
             throws Exception {
 
         JSONObject payload = new JSONObject();
@@ -1263,19 +1202,17 @@ if (posSummaryStrip != null) {
                 && !"—".equals(data.customerPhone.trim()))
                 ? data.customerPhone.trim() : "";
 
-        // ✅ على الجذر (للتوافق)
-payload.put("customer_name", customerName);
-payload.put("customer_phone", customerPhone);
+        payload.put("customer_name", customerName);
+        payload.put("customer_phone", customerPhone);
 
-// ✅ داخل كائن customer (للفهم الصحيح)
-JSONObject customerObj = new JSONObject();
-customerObj.put("name", customerName);
-customerObj.put("phone", customerPhone);
-customerObj.put("email", data.customerEmail != null ? data.customerEmail : "");
-customerObj.put("address", data.customerAddress != null ? data.customerAddress : "");
-customerObj.put("notes", data.customerNotes != null ? data.customerNotes : "");
-customerObj.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
-payload.put("customer", customerObj);
+        JSONObject customerObj = new JSONObject();
+        customerObj.put("name", customerName);
+        customerObj.put("phone", customerPhone);
+        customerObj.put("email", data.customerEmail != null ? data.customerEmail : "");
+        customerObj.put("address", data.customerAddress != null ? data.customerAddress : "");
+        customerObj.put("notes", data.customerNotes != null ? data.customerNotes : "");
+        customerObj.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "CASH");
+        payload.put("customer", customerObj);
 
         JSONArray itemsArr = new JSONArray();
         for (CartItem item : cartManager.getItems()) {
@@ -1460,7 +1397,7 @@ payload.put("customer", customerObj);
     }
 
     private void handleRefundSearchResponse(MiraApiClient.ApiResponse response,
-                                             String code) {
+                                            String code) {
         if (!isAdded()) return;
 
         if (response != null && response.isSuccess && response.data != null) {
@@ -1563,7 +1500,7 @@ payload.put("customer", customerObj);
     }
 
     private void showRefundItemInfoInDialog(JSONObject itemData,
-                                             RefundEligibility eligibility) {
+                                            RefundEligibility eligibility) {
         try {
             if (refundDialog == null || !refundDialog.isShowing()) return;
 
@@ -1999,23 +1936,6 @@ payload.put("customer", customerObj);
         }
     }
 
-@Override
-public void onStart() {
-    super.onStart();
-    // ✅ إخفاء BottomNav في شاشة البيع
-    if (getActivity() instanceof UHFMainActivity) {
-        ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
-    }
-}
-
-@Override
-public void onStop() {
-    super.onStop();
-    // ✅ إعادة إظهاره عند المغادرة
-    if (getActivity() instanceof UHFMainActivity) {
-        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
-    }
-}
     // ═══════════════════════════════════════════════════════
     // Utilities
     // ═══════════════════════════════════════════════════════
@@ -2109,27 +2029,19 @@ public void onStop() {
             Log.e(TAG, "refundBarcodeLauncher error: " + e.getMessage());
         }
     });
+
     // ═══════════════════════════════════════════════════════
-    // Backward Compatibility — Legacy API (deprecated)
+    // Backward Compatibility
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * @deprecated السلة أصبحت معروضة دائماً في الواجهة الرئيسية
-     *             — الدالة محفوظة للتوافق مع UHFMainActivity
-     */
     @Deprecated
     public void showCartBottomSheet() {
         Log.d(TAG, "showCartBottomSheet: no-op (cart is always visible)");
-        // لا شيء — السلة معروضة في الواجهة الرئيسية
     }
 
-    /**
-     * @deprecated الخصم أصبح جزءاً من POSCheckoutDialog
-     *             — الدالة محفوظة للتوافق، وتفتح شاشة الدفع مباشرة
-     */
     @Deprecated
     public void showDiscountDialog() {
         Log.d(TAG, "showDiscountDialog: redirecting to checkout dialog");
         processCheckoutAndStockUpdate();
     }
-} // end MiraPosFragment
+}
