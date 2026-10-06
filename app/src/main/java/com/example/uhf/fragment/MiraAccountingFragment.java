@@ -36,6 +36,7 @@ public class MiraAccountingFragment extends Fragment {
     private static final int TAB_BALANCE  = 4;
     private static final int TAB_GOLD     = 5;
     private static final int TAB_LEDGER   = 6;
+    private static final int TAB_ADJUSTING = 7;
 
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
@@ -213,6 +214,7 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
         addTab("💰 الميزانية",  "💰 Balance");
         addTab("🥇 الذهب",      "🥇 Gold");
         addTab("📖 الأستاذ",    "📖 Ledger");
+        addTab("📝 التسويات",   "📝 Adjust");
 
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
@@ -293,6 +295,8 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
                     }
                     return f;
                 }
+                case TAB_ADJUSTING:
+                return new MiraAdjustingEntryFragment();
 
                 default: return new MiraJournalFragment();
             }
