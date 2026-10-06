@@ -635,17 +635,17 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             layout.addView(etName);
             
             TextInputEditText etPower = new TextInputEditText(requireContext());
-            etPower.setHint(isArabic ? "قوة الإرسال (dBm) - افتراضي 28" : "Power (dBm) - default 28");
+            etPower.setHint(isArabic ? "قوة الإرسال (dBm) - افتراضي 30" : "Power (dBm) - default 30");
             etPower.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
             layout.addView(etPower);
             
             TextInputEditText etRssi = new TextInputEditText(requireContext());
-            etRssi.setHint(isArabic ? "عتبة RSSI - افتراضي -70" : "RSSI Threshold - default -70");
+            etRssi.setHint(isArabic ? "عتبة RSSI - افتراضي -75" : "RSSI Threshold - default -75");
             etRssi.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
             layout.addView(etRssi);
             
             TextInputEditText etInterval = new TextInputEditText(requireContext());
-            etInterval.setHint(isArabic ? "فترة المسح (ms) - افتراضي 200" : "Scan interval (ms) - default 200");
+            etInterval.setHint(isArabic ? "فترة المسح (ms) - افتراضي 100" : "Scan interval (ms) - default 100");
             etInterval.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
             layout.addView(etInterval);
             
@@ -1024,7 +1024,7 @@ private void showAdvancedReaderSettings() {
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 20, 40, 10);
-        
+       
         // قوة الإرسال
         TextInputEditText etPower = new TextInputEditText(requireContext());
         etPower.setHint("قوة الإرسال (dBm) - النطاق: 10-30");
@@ -1330,4 +1330,4 @@ private void applySettingsImmediately() {
             }
         }
     }
-                                                }
+                }
