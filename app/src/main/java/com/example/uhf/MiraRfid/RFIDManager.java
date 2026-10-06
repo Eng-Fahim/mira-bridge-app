@@ -314,45 +314,119 @@ public MiraIRFIDReader.ReaderType detectDeviceType() {
         return getOrCreateActiveDevice();
     }
     
-    /**
-     * ✅ getOrCreateActiveDevice — النسخة الآمنة
-     * - يبحث عن جهاز محفوظ أولاً
-     * - إذا لم يوجد، يكتشف النوع الفعلي من Build.MODEL
-     * - لا يُنشئ SIMULATOR بصمت (يستخدم C72 كافتراضي على Chainway)
-     */
-    private RFIDDevice getOrCreateActiveDevice() {
+   /**
+ * ✅ getOrCreateActiveDevice — النسخة الآمنة (v2)
+ * 
+ * ترتيب الأولويات:
+ *   1. العتاد الحقيقي (C72, VANCH محفوظ يدوياً) — يفوز دائماً
+ *   2. إذا لم يوجد عتاد حقيقي:
+ *      أ. جهاز محفوظ افتراضي (VANCH يدوي)
+ *      ب. SIMULATOR (في الذاكرة فقط، لا يُحفَظ)
+ * 
+ * ⚠️ قاعدة حرجة: SIMULATOR لا يُحفَظ أبداً في SharedPreferences
+ *    → حتى لا يحجب العتاد الحقيقي عند توصيله
+ */
+private RFIDDevice getOrCreateActiveDevice() {
     if (activeDevice != null) return activeDevice;
 
-    // 1) ابحث عن جهاز محفوظ
-    List<RFIDDevice> devices = getAllDevices();
-    for (RFIDDevice d : devices) {
-        if (d.isDefault()) {
-            activeDevice = d;
-            Log.i(TAG, "✅ Using saved default device: " + d.getType());
-            return activeDevice;
-        }
-    }
-
-    // 2) لا يوجد جهاز محفوظ — اكتشف النوع الفعلي
+    // ═══════════════════════════════════════════════════════
+    // 1) اكتشف العتاد الحقيقي أولاً (له الأولوية المطلقة)
+    // ═══════════════════════════════════════════════════════
     MiraIRFIDReader.ReaderType detected = detectDeviceType();
+    boolean hasRealHardware = (detected != MiraIRFIDReader.ReaderType.SIMULATOR);
 
-    // ✅ [جديد] VANCH و Bluetooth لا يحتاجان كشفاً — يُستخدمان فقط عند الحفظ
-    if (detected == MiraIRFIDReader.ReaderType.SIMULATOR) {
-        Log.e(TAG, "❌ Cannot detect real device type — " +
-                "not creating a silent SIMULATOR");
-        return null;
+    if (hasRealHardware) {
+        Log.i(TAG, "✅ Real hardware detected: " + detected);
+
+        // 1a) ابحث عن جهاز محفوظ مطابق للعتاد الحقيقي
+        List<RFIDDevice> devices = getAllDevices();
+        for (RFIDDevice d : devices) {
+            if (d.getType() == detected) {
+                activeDevice = d;
+                Log.i(TAG, "✅ Using saved matching device: " + detected);
+                return activeDevice;
+            }
+        }
+
+        // 1b) لم يوجد → أنشئ جهازاً جديداً للعتاد الحقيقي واحفظه
+        activeDevice = new RFIDDevice(detected, "");
+        activeDevice.setDefault(true);
+        activeDevice.setPowerDbm(DEFAULT_POWER_DBM);
+        activeDevice.setRssiThreshold(DEFAULT_RSSI_THRESHOLD);
+        activeDevice.setScanIntervalMs(DEFAULT_SCAN_INTERVAL_MS);
+        saveDevice(activeDevice);
+        Log.i(TAG, "✅ Auto-created real device: " + detected);
+        return activeDevice;
     }
 
-    activeDevice = new RFIDDevice(detected, "");
-    activeDevice.setDefault(true);
-    activeDevice.setPowerDbm(DEFAULT_POWER_DBM);
-    activeDevice.setRssiThreshold(DEFAULT_RSSI_THRESHOLD);
-    activeDevice.setScanIntervalMs(DEFAULT_SCAN_INTERVAL_MS);
+    // ═══════════════════════════════════════════════════════
+// 2) لا يوجد عتاد حقيقي — ابحث عن جهاز محفوظ افتراضي
+//    لكن فقط إذا كان نوعه قابلاً للعمل على هذا الجهاز
+// ═══════════════════════════════════════════════════════
+List<RFIDDevice> devices = getAllDevices();
+for (RFIDDevice d : devices) {
+    if (!d.isDefault()) continue;
+    if (d.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) continue;
 
-    saveDevice(activeDevice);
+    // ✅ تحقق: هل هذا النوع يعمل فعلياً على الجهاز الحالي؟
+    boolean canWork = canDeviceTypeWorkOnThisHardware(d.getType());
+    if (canWork) {
+        activeDevice = d;
+        Log.i(TAG, "✅ Using saved external device: " + d.getType());
+        return activeDevice;
+    } else {
+        Log.w(TAG, "⚠️ Saved device " + d.getType() 
+                + " cannot work on this hardware — skipping");
+    }
+}
 
-    Log.i(TAG, "✅ Created default device: " + detected);
-    return activeDevice;
+    // ═══════════════════════════════════════════════════════
+    // 3) لا عتاد حقيقي + لا جهاز محفوظ:
+    //    استخدم SIMULATOR — لكن في الذاكرة فقط (لا يُحفَظ!)
+    // ═══════════════════════════════════════════════════════
+    if (com.example.uhf.BuildConfig.ALLOW_SIMULATOR) {
+        Log.w(TAG, "🧪 No real hardware — using in-memory SIMULATOR " +
+                "(not persisted, will auto-replace when real hardware connects)");
+
+        activeDevice = new RFIDDevice(
+                MiraIRFIDReader.ReaderType.SIMULATOR, "");
+        activeDevice.setDefault(true);
+        activeDevice.setPowerDbm(DEFAULT_POWER_DBM);
+        activeDevice.setRssiThreshold(DEFAULT_RSSI_THRESHOLD);
+        activeDevice.setScanIntervalMs(DEFAULT_SCAN_INTERVAL_MS);
+
+        // ⚠️ مهم جداً: لا نستدعي saveDevice() هنا!
+        // SIMULATOR يبقى في الذاكرة فقط، ولا يحجب العتاد الحقيقي
+        
+        return activeDevice;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 4) لا شيء متاح — فشل نظيف
+    // ═══════════════════════════════════════════════════════
+    Log.e(TAG, "❌ No reader available");
+    return null;
+}
+
+
+/**
+ * ✅ هل يمكن لنوع الجهاز المحفوظ أن يعمل على هذا العتاد؟
+ * 
+ * - الأجهزة الخارجية (VANCH, Bluetooth, SIMULATOR) → تعمل دائماً
+ * - الأجهزة المدمجة (C72, Zebra, إلخ) → تحتاج عتاداً فعلياً
+ */
+private boolean canDeviceTypeWorkOnThisHardware(MiraIRFIDReader.ReaderType type) {
+    if (type == null) return false;
+
+    // ✅ الأجهزة الخارجية تعمل دائماً
+    if (type == MiraIRFIDReader.ReaderType.VANCH_FIXED
+            || type == MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH
+            || type == MiraIRFIDReader.ReaderType.SIMULATOR) {
+        return true;
+    }
+
+    // ✅ الأجهزة المدمجة تحتاج عتاداً فعلياً
+    return BaseTabFragmentActivity.isRfidDevicePresent();
 }
     
     /**
@@ -366,32 +440,36 @@ public MiraIRFIDReader.ReaderType detectDeviceType() {
         return activeReader;
     }
 
-    // 2) إذا كان الجهاز النشط من نوع لا يحتاج عتاداً مدمجاً (VANCH/Bluetooth)
+    // 2) احصل على الجهاز النشط
     RFIDDevice device = getOrCreateActiveDevice();
+
+    // 3) حدد: هل هذا جهاز خارجي أو SIMULATOR مسموح؟
     boolean isExternalReader = (device != null) &&
             (device.getType() == MiraIRFIDReader.ReaderType.VANCH_FIXED
-          || device.getType() == MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH);
+          || device.getType() == MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH
+          || (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR
+              && com.example.uhf.BuildConfig.ALLOW_SIMULATOR));
 
-    // 3) إذا لم يوجد عتاد مدمج AND ليس قارئاً خارجياً → null
+    // 4) إذا لم يوجد عتاد مدمج AND ليس قارئاً خارجياً → null
     if (!BaseTabFragmentActivity.isRfidDevicePresent() && !isExternalReader) {
         Log.w(TAG, "⚠️ RFID device not present — returning null");
         return null;
     }
 
-    // 4) لا يوجد جهاز نشط
+    // 5) لا يوجد جهاز نشط
     if (device == null) {
         Log.w(TAG, "⚠️ No active device — returning null");
         return null;
     }
 
-    // 5) SIMULATOR لا يُستخدم في الوضع الحقيقي
+    // 6) SIMULATOR غير مسموح صراحةً → null
     if (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR
             && !com.example.uhf.BuildConfig.ALLOW_SIMULATOR) {
         Log.w(TAG, "⚠️ Active device is SIMULATOR — returning null");
         return null;
     }
 
-    // 6) إنشاء القارئ الحقيقي (VANCH أو غيره)
+    // 7) إنشاء القارئ الحقيقي (VANCH أو SIMULATOR أو غيره)
     if (activeReader == null) {
         activeReader = RFIDReaderFactory.create(
                 device.getType(), device.getAddress());
@@ -413,11 +491,14 @@ public MiraIRFIDReader.ReaderType detectDeviceType() {
     public boolean startScan() {
     Log.i(TAG, "🚀 RFIDManager.startScan() called");
 
-    // ✅ اسمح بالقارئات الخارجية (VANCH)
     RFIDDevice device = getOrCreateActiveDevice();
+
+    // ✅ SIMULATOR يُعتبر "external" عندما ALLOW_SIMULATOR=true
     boolean isExternalReader = (device != null) &&
             (device.getType() == MiraIRFIDReader.ReaderType.VANCH_FIXED
-          || device.getType() == MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH);
+          || device.getType() == MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH
+          || (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR
+              && com.example.uhf.BuildConfig.ALLOW_SIMULATOR));
 
     if (!BaseTabFragmentActivity.isRfidDevicePresent() && !isExternalReader) {
         Log.e(TAG, "❌ Cannot start scan — RFID device not present");
