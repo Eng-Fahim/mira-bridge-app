@@ -20,11 +20,51 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * ✅ Thread-safe: يستخدم CopyOnWriteArrayList / CopyOnWriteArraySet
  * ✅ منع التكرار عبر EPC / serialNo / gtin
  * ✅ إشعار المستمعين (Listener) بأي تغيير
- * ✅ لا يحتوي على أي منطق UI — قابل للاختبار بشكل مستقل
+ * ✅ Singleton — يحافظ على السلة عبر Lifecycle (لا تُفقد عند تبديل الشاشات)
  */
 public final class PosCartManager {
 
     private static final String TAG = "PosCartManager";
+
+    // ============================================
+    // ✅ Singleton Instance
+    // ============================================
+
+    private static volatile PosCartManager INSTANCE;
+
+    /**
+     * ✅ الحصول على النسخة الوحيدة (Thread-Safe)
+     */
+    public static PosCartManager getInstance() {
+        if (INSTANCE == null) {
+            synchronized (PosCartManager.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = new PosCartManager();
+                }
+            }
+        }
+        return INSTANCE;
+    }
+
+    /**
+     * ✅ إعادة التعيين الكاملة
+     * تُستخدم فقط عند: Logout / Reset System
+     */
+    public static void resetInstance() {
+        synchronized (PosCartManager.class) {
+            if (INSTANCE != null) {
+                try {
+                    INSTANCE.cartList.clear();
+                    INSTANCE.scannedIds.clear();
+                    INSTANCE.listener = null;
+                } catch (Exception e) {
+                    Log.e(TAG, "resetInstance cleanup error: " + e.getMessage());
+                }
+                INSTANCE = null;
+            }
+        }
+        Log.d(TAG, "🔄 PosCartManager reset");
+    }
 
     // ============================================
     // الحالة
@@ -35,6 +75,14 @@ public final class PosCartManager {
 
     @Nullable
     private OnCartChangedListener listener;
+
+    // ============================================
+    // ✅ Constructor — private (Singleton)
+    // ============================================
+
+    private PosCartManager() {
+        // ✅ لا شيء — Singleton
+    }
 
     // ============================================
     // واجهة الإشعار
@@ -56,6 +104,12 @@ public final class PosCartManager {
 
     public void setListener(@Nullable OnCartChangedListener listener) {
         this.listener = listener;
+    }
+
+    public
+    @Nullable
+    OnCartChangedListener getListener() {
+        return listener;
     }
 
     // ============================================
@@ -148,7 +202,8 @@ public final class PosCartManager {
         notifyItemAdded(0);
         notifyChanged();
 
-        Log.d(TAG, "✅ Item added. Cart size = " + cartList.size());
+        Log.d(TAG, "✅ Item added. Cart size = " + cartList.size()
+                + " | totalUsd=" + getTotalUsd());
         return 0;
     }
 
