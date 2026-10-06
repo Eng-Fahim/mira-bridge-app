@@ -240,7 +240,7 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
 
             priceResolver = new PosPriceResolver(priceManager);
-            cartManager = new PosCartManager();
+            cartManager = PosCartManager.getInstance();
 
             rfidManager = RFIDManager.getInstance(ctx);
             if (rfidManager != null) {
