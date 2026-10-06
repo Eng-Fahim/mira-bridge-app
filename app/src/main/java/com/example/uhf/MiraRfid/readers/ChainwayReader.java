@@ -45,8 +45,8 @@ public class ChainwayReader implements MiraIRFIDReader {
     private static final int DEFAULT_SESSION         = 1;    // S1 أفضل للمعادن
     private static final int DEFAULT_TARGET          = 2;    // A/B
     private static final int DEFAULT_Q_VALUE         = 4;    // متوازن
-    private static final int DEFAULT_FREQUENCY_MODE  = 1;    // FCC 902-928
-    
+    //private static final int DEFAULT_FREQUENCY_MODE  = 1;    // FCC 902-928
+    private static final int DEFAULT_FREQUENCY_MODE  = 2;    // ✅ ETSI 865-868 (مطابق لوسومك)
     private Context context;
     private RFIDWithUHFUART reader;
     private OnTagReadListener listener;
