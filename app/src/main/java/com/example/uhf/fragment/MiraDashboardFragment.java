@@ -1893,23 +1893,6 @@ public void onDestroyView() {
     } catch (Exception e) {
         logNonFatal("initializeManagers", e);
     }
+    }
 }
-
-private void showLogDialog() {
-    String logContent = MiraFileLogger.getInstance() != null
-            ? MiraFileLogger.getInstance().readCurrentLog()
-            : "Logger not initialized";
-    
-    new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("📋 Application Log")
-            .setMessage(logContent)
-            .setPositiveButton("إغلاق", null)
-            .setNeutralButton("مسح", (d, w) -> {
-                if (MiraFileLogger.getInstance() != null) {
-                    MiraFileLogger.getInstance().clearAllLogs();
-                }
-            })
-            .show();
-}
-        }
         
