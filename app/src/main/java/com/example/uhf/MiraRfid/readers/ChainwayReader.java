@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
+
+import com.example.uhf.utils.MiraFileLogger;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.example.uhf.MiraRfid.adaptive.AdaptiveConfigurator;
@@ -237,49 +239,44 @@ public class ChainwayReader implements MiraIRFIDReader {
     if (reader == null || !isConnected) return;
     if (advancedSettingsApplied) return;
 
-    Log.i(TAG, "⚙️ Applying ADAPTIVE settings...");
+    MiraFileLogger.log(TAG, "⚙️ Applying ADAPTIVE settings...");
 
-    // ✅ Frequency ديناميكي!
     int freqMode = adaptiveConfigurator.getOptimalFrequencyMode();
     invokeIntMethod("setFrequencyMode", freqMode);
-    Log.i(TAG, "   🌍 Frequency Mode: " + freqMode 
+    MiraFileLogger.log(TAG, "   🌍 Frequency Mode: " + freqMode 
             + " (" + adaptiveConfigurator.getReaderCapabilities().getFrequencyRangeText() + ")");
 
-    // ✅ Session ديناميكي!
     int sessionValue = adaptiveConfigurator.getOptimalSession();
     invokeIntMethod("setSession", sessionValue);
 
-    // ✅ Q ديناميكي!
     int qValueDynamic = adaptiveConfigurator.getOptimalQValue();
     invokeIntMethod("setQValue", qValueDynamic);
 
-    // ✅ Target ثابت (A/B)
     invokeIntMethod("setTarget", 2);
 
-    // Dynamic Power + FastID + TagFocus (للمعادن)
     invokeBooleanMethod("setDynamicPower", true);
     invokeBooleanMethod("setFastId", true);
     invokeBooleanMethod("setTagFocus", true);
 
     advancedSettingsApplied = true;
-    Log.i(TAG, "✅ Adaptive settings applied");
+    MiraFileLogger.log(TAG, "✅ Adaptive settings applied");
 }
     
     /**
      * ✅ استدعاء دالة SDK مع int عبر Reflection
      */
     private void invokeIntMethod(String methodName, int value) {
-        if (reader == null) return;
-        try {
-            Method m = reader.getClass().getMethod(methodName, int.class);
-            m.invoke(reader, value);
-            Log.d(TAG, "   ✅ " + methodName + "(" + value + ")");
-        } catch (NoSuchMethodException e) {
-            Log.w(TAG, "   ⚠️ " + methodName + " NOT FOUND in SDK");
-        } catch (Exception e) {
-            Log.e(TAG, "   ❌ " + methodName + " error: " + e.getMessage());
-        }
+    if (reader == null) return;
+    try {
+        Method m = reader.getClass().getMethod(methodName, int.class);
+        m.invoke(reader, value);
+        MiraFileLogger.log(TAG, "   ✅ " + methodName + "(" + value + ")");
+    } catch (NoSuchMethodException e) {
+        MiraFileLogger.logWarn(TAG, "   ⚠️ " + methodName + " NOT FOUND in SDK");
+    } catch (Exception e) {
+        MiraFileLogger.logError(TAG, "   ❌ " + methodName + " error: " + e.getMessage());
     }
+}
     
     /**
      * ✅ استدعاء دالة SDK مع boolean عبر Reflection
@@ -373,9 +370,9 @@ public class ChainwayReader implements MiraIRFIDReader {
     // =========================================================================
     // 📡 المسح
     // =========================================================================
-    
     @Override
     public boolean startScan() {
+        MiraFileLogger.log(TAG, "🚀 startScan() called");
         Log.i(TAG, "🚀 startScan() called");
         
         // ✅ 1. تحقق من الحالة الديناميكية
@@ -491,17 +488,18 @@ public class ChainwayReader implements MiraIRFIDReader {
 
         if (rssi < rssiThreshold) return;
 
-        // ✅ حدّث Adaptive
         adaptiveConfigurator.updateLastTag(epc, rssi);
         adaptiveConfigurator.recordSuccess("read", "auto");
+
+        MiraFileLogger.log(TAG, "📡 Tag read: EPC=" + epc + " RSSI=" + rssi);
 
         if (epc != null && !epc.isEmpty() && listener != null) {
             listener.onTagRead(epc, rssi);
         }
     } catch (Exception e) {
-        Log.e(TAG, "processTag error", e);
+        MiraFileLogger.logError(TAG, "processTag error", e);
     }
-}
+    }
     
     private int parseRssi(String rssiStr) {
         if (rssiStr == null || rssiStr.isEmpty()) return -50;
@@ -519,32 +517,32 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public void stopScan() {
-        // ✅ AtomicBoolean.getAndSet() — ذرّي وآمن
-        if (!isScanning.getAndSet(false)) {
-            Log.d(TAG, "⏹️ stopScan() skipped — already stopped");
-            return;
+    // ✅ AtomicBoolean.getAndSet() — ذرّي وآمن
+    if (!isScanning.getAndSet(false)) {
+        MiraFileLogger.log(TAG, "⏹️ stopScan() skipped — already stopped");
+        return;
+    }
+    
+    MiraFileLogger.log(TAG, "⏹️ stopScan() executing...");
+    
+    try {
+        if (reader != null) {
+            reader.stopInventory();
+            MiraFileLogger.log(TAG, "   └─ reader.stopInventory() OK");
         }
-        
-        Log.d(TAG, "⏹️ stopScan() executing...");
-        
+    } catch (Exception e) {
+        MiraFileLogger.logError(TAG, "   └─ reader.stopInventory() error: " + e.getMessage());
+    }
+    
+    // ✅ أبلغ المستمع مرة واحدة فقط
+    if (listener != null) {
         try {
-            if (reader != null) {
-                reader.stopInventory();
-                Log.d(TAG, "   └─ reader.stopInventory() OK");
-            }
+            listener.onScanStopped();
         } catch (Exception e) {
-            Log.e(TAG, "   └─ reader.stopInventory() error: " + e.getMessage());
-        }
-        
-        // ✅ أبلغ المستمع مرة واحدة فقط
-        if (listener != null) {
-            try {
-                listener.onScanStopped();
-            } catch (Exception e) {
-                Log.e(TAG, "onScanStopped callback error", e);
-            }
+            MiraFileLogger.logError(TAG, "onScanStopped callback error", e);
         }
     }
+}
     
     @Override
     public boolean isScanning() {
