@@ -47,6 +47,9 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.service.MiraGateMonitorService;
 import com.example.uhf.tools.RfidHardwareHelper;
 import com.example.uhf.tools.SoundGenerator;
+import com.example.uhf.MiraRfid.GateRfidBridge;
+import com.example.uhf.utils.MiraFileLogger;
+
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
@@ -188,6 +191,7 @@ public class MiraSecureGateFragment extends Fragment {
     private volatile boolean isLockdown = false;
     private String logFilter = "ALL";
     private final Set<String> localAllowedEpcCache = ConcurrentHashMap.newKeySet();
+    private GateRfidBridge gateRfidBridge;
     private final ConcurrentHashMap<String, Long> scanDebounceMap = new ConcurrentHashMap<>();
     private Vibrator vibrator;
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
@@ -335,6 +339,7 @@ public class MiraSecureGateFragment extends Fragment {
         permissionManager = PermissionManager.getInstance(context);
         branchesManager = MiraBranchesManager.getInstance(context);
         vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+        gateRfidBridge = GateRfidBridge.getInstance(context);
 
         gateExecutor = Executors.newFixedThreadPool(8, r -> {
             Thread t = new Thread(r, "MiraGate-Worker");
@@ -415,29 +420,28 @@ public class MiraSecureGateFragment extends Fragment {
             });
         }
         if (btnScanBarcode != null) {
-            btnScanBarcode.setOnClickListener(v -> {
-                isCameraOpen = true;
-                if (mContext != null) {
-                    RfidHardwareHelper.getInstance().prepareForCamera(
-                            mContext.mReader, () -> {
-                        ScanOptions options = new ScanOptions();
-                        options.setPrompt(getLocalizedText(
-                                "📷 وجه الكاميرا نحو باركود القطعة", 
-                                "📷 Aim camera at item barcode"));
-                        options.setBeepEnabled(false);
-                        options.setOrientationLocked(true);
-                        try {
-                            barcodeLauncher.launch(options);
-                        } catch (Exception e) {
-                            isCameraOpen = false;
-                            logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", 
-                                    "⚠️ Camera error: ") + e.getMessage());
-                            autoStartScanning();
-                        }
-                    });
+    btnScanBarcode.setOnClickListener(v -> {
+        isCameraOpen = true;
+        if (gateRfidBridge != null) {
+            gateRfidBridge.prepareForCamera(() -> {
+                ScanOptions options = new ScanOptions();
+                options.setPrompt(getLocalizedText(
+                        "📷 وجه الكاميرا نحو باركود القطعة",
+                        "📷 Aim camera at item barcode"));
+                options.setBeepEnabled(false);
+                options.setOrientationLocked(true);
+                try {
+                    barcodeLauncher.launch(options);
+                } catch (Exception e) {
+                    isCameraOpen = false;
+                    logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ",
+                            "⚠️ Camera error: ") + e.getMessage());
+                    autoStartScanning();
                 }
             });
         }
+    });
+}
 
         if (btnEmergencyLockdown != null) {
             btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
@@ -1154,58 +1158,86 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void startScanning() {
-        if (isDestroyed || mContext == null || mContext.mReader == null 
-                || isCameraOpen) return;
+    if (isDestroyed || mContext == null || isCameraOpen) return;
+    if (gateRfidBridge == null) return;
 
-        RfidHardwareHelper.getInstance().startAsync(
-                mContext.mReader,
-                miraGatesSettings.getRfidPower(),
-                info -> {
-                    if (!isDestroyed && info != null && info.getEPC() != null) {
-                        processInputEpc(info.getEPC(), "RFID");
-                    }
-                },
-                () -> {
-                    isScanning = true;
-                    if (btnToggleScan != null) {
-                        btnToggleScan.setText(getLocalizedText("🔴 إيقاف المسح", 
-                                "🔴 Stop Scan"));
-                    }
-                    logConsole(getLocalizedText("🛡️ قارئ RFID يعمل", 
-                            "🛡️ RFID reader active"));
-                }
-        );
-    }
+    boolean accepted = gateRfidBridge.startScan(
+            new GateRfidBridge.GateTagListener() {
+        @Override
+        public void onTagRead(String epc, int rssi) {
+            if (!isDestroyed && isAdded() && epc != null && !epc.isEmpty()) {
+                processInputEpc(epc, "RFID");
+            }
+        }
 
-    private void stopScanning() {
-        if (mContext != null) {
-            RfidHardwareHelper.getInstance().stopAsync(mContext.mReader, () -> {
-                isScanning = false;
+        @Override
+        public void onScanStarted() {
+            isScanning = true;
+            mainHandler.post(() -> {
                 if (btnToggleScan != null) {
-                    btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", 
-                            "🛡️ Start Scan"));
+                    btnToggleScan.setText(getLocalizedText(
+                            "🔴 إيقاف المسح", "🔴 Stop Scan"));
+                }
+                logConsole(getLocalizedText(
+                        "🛡️ قارئ RFID يعمل", "🛡️ RFID reader active"));
+            });
+        }
+
+        @Override
+        public void onScanStopped() {
+            isScanning = false;
+            mainHandler.post(() -> {
+                if (btnToggleScan != null) {
+                    btnToggleScan.setText(getLocalizedText(
+                            "🛡️ تفعيل المسح", "🛡️ Start Scan"));
                 }
             });
         }
-    }
 
-    private void stopScanningSync() {
-        if (mContext != null && mContext.mReader != null) {
-            try {
-                mContext.mReader.stopInventory();
-                mContext.mReader.setInventoryCallback(null);
-            } catch (Exception e) {
-                Log.e(TAG, "stopScanningSync: " + e.getMessage());
-            }
+        @Override
+        public void onError(String error) {
+            MiraFileLogger.logError(TAG, "Gate scan error: " + error);
+            mainHandler.post(() -> {
+                if (isAdded() && !isDestroyed) {
+                    logConsole("❌ " + getLocalizedText(
+                            "خطأ المسح: ", "Scan error: ") + error);
+                }
+            });
         }
+    }, miraGatesSettings.getRfidPower());
+
+    if (!accepted) {
+        logConsole(getLocalizedText(
+                "⚠️ القارئ غير جاهز", "⚠️ Reader not ready"));
+        isScanning = false;
+    }
+}
+
+    private void stopScanning() {
+    if (gateRfidBridge == null) return;
+    gateRfidBridge.stopScan(() -> {
         isScanning = false;
         mainHandler.post(() -> {
             if (btnToggleScan != null) {
-                btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", 
-                        "🛡️ Start Scan"));
+                btnToggleScan.setText(getLocalizedText(
+                        "🛡️ تفعيل المسح", "🛡️ Start Scan"));
             }
         });
+    });
+}
+
+private void stopScanningSync() {
+    if (gateRfidBridge != null) {
+        gateRfidBridge.stopScan(null);
     }
+    isScanning = false;
+    mainHandler.post(() -> {
+        if (btnToggleScan != null) {
+            btnToggleScan.setText(getLocalizedText(
+                    "🛡️ تفعيل المسح", "🛡️ Start Scan"));
+        }
+    });
+}
 
     // ==================== Gate Status ====================
 
@@ -1988,4 +2020,4 @@ public class MiraSecureGateFragment extends Fragment {
         localAllowedEpcCache.clear();
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+                                             }
