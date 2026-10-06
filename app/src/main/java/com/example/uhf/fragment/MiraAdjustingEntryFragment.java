@@ -123,11 +123,19 @@ public class MiraAdjustingEntryFragment extends Fragment {
 
         // زر: تسوية مخصصة
         btnCreateCustomEntry.setOnClickListener(v -> {
-            Toast.makeText(requireContext(),
-                "🚧 قيد مخصص متعدد السطور — قريباً",
-                Toast.LENGTH_SHORT).show();
-            // TODO: فتح شاشة قيد مخصص (المرحلة التالية)
-        });
+    MiraCustomAdjustingFragment fragment = new MiraCustomAdjustingFragment();
+
+    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+        ((com.example.uhf.activity.UHFMainActivity) getActivity())
+            .loadFragment(fragment, "CustomAdjusting");
+    } else {
+        requireActivity().getSupportFragmentManager()
+            .beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack("CustomAdjusting")
+            .commit();
+    }
+});
     }
 
     private void openAddBalanceSheet() {
