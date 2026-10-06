@@ -95,18 +95,25 @@ public class VanchReader implements MiraIRFIDReader {
     // ==================== Constructor ====================
 
     public VanchReader(Context context, String host, int port) {
-        if (context == null) {
-            throw new IllegalArgumentException("VanchReader: context cannot be null");
-        }
-        this.context = context.getApplicationContext();
-        this.prefs   = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-
-        this.host = (host != null && !host.isEmpty()) ? host : loadSavedHost();
-        if (port > 0) this.port = port;
-
-        loadSettings();
-        MiraFileLogger.log(TAG, "🚀 VanchReader created for " + this.host + ":" + this.port);
+    if (context == null) {
+        throw new IllegalArgumentException("VanchReader: context cannot be null");
     }
+    this.context = context.getApplicationContext();
+    this.prefs   = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+    // ✅ 1. حمّل القيم المحفوظة أولاً
+    loadSettings();
+
+    // ✅ 2. ثم طبّق القيم المُمرَّرة صراحةً (لها الأولوية)
+    if (host != null && !host.isEmpty()) {
+        this.host = host;
+    }
+    if (port > 0) {
+        this.port = port;
+    }
+
+    MiraFileLogger.log(TAG, "🚀 VanchReader created for " + this.host + ":" + this.port);
+}
 
     // ==================== الإعدادات ====================
 
