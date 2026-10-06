@@ -461,6 +461,81 @@ public void initUHF() {
         return super.onKeyDown(keyCode, event);
     }
     
+    /**
+ * ✅ onKeyUp — إيقاف الجرد المضمون عند إفلات زر الزناد
+ *
+ * استراتيجية مزدوجة لضمان الإيقاف 100%:
+ *   1. إبلاغ الـ Fragment (إن كان يدعم onKeyUp عبر Reflection)
+ *   2. استدعاء RFIDManager.stopScan() مباشرة كضمان نهائي
+ *
+ * الحماية من الاستدعاء المزدوج:
+ *   - ChainwayReader.isScanning (AtomicBoolean) يمنع التنفيذ المكرر
+ */
+@Override
+public boolean onKeyUp(int keyCode, KeyEvent event) {
+    if (!isScanKey(keyCode)) {
+        return super.onKeyUp(keyCode, event);
+    }
+
+    Log.d(TAG, "🔓 onKeyUp received: " + keyCode);
+
+    // ═══════════════════════════════════════════════════════
+    // 1️⃣ إبلاغ الـ Fragment (اختياري — عبر Reflection)
+    // ═══════════════════════════════════════════════════════
+    if (currentFragment instanceof KeyDwonFragment) {
+        try {
+            java.lang.reflect.Method m = currentFragment.getClass()
+                .getMethod("myOnKeyUp", int.class, KeyEvent.class);
+            m.invoke(currentFragment, keyCode, event);
+            Log.d(TAG, "   └─ myOnKeyUp invoked on Fragment");
+        } catch (NoSuchMethodException ignored) {
+            // طبيعي — الواجهة قد لا تحتوي على myOnKeyUp
+            Log.d(TAG, "   └─ Fragment has no myOnKeyUp (ok)");
+        } catch (Exception e) {
+            Log.e(TAG, "   └─ myOnKeyUp error", e);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 2️⃣ ضمان نهائي: أوقف المسح عبر RFIDManager مباشرة
+    // ═══════════════════════════════════════════════════════
+    stopRfidScanSafely();
+
+    return true;
+}
+
+/**
+ * ✅ onKeyLongPress — تجاهل الضغط الطويل لتفادي السلوك الافتراضي
+ */
+@Override
+public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+    if (isScanKey(keyCode)) {
+        Log.d(TAG, "⏸️ onKeyLongPress ignored: " + keyCode);
+        return true;
+    }
+    return super.onKeyLongPress(keyCode, event);
+}
+
+/**
+ * ✅ الإيقاف الآمن للقارئ مع حماية من الاستدعاء المزدوج
+ */
+private void stopRfidScanSafely() {
+    try {
+        com.example.uhf.MiraRfid.RFIDManager manager =
+            com.example.uhf.MiraRfid.RFIDManager
+                .getInstance(getApplicationContext());
+
+        if (manager != null) {
+            manager.stopScan();
+            Log.d(TAG, "✅ Scan stopped via onKeyUp");
+        } else {
+            Log.w(TAG, "⚠️ RFIDManager is null in onKeyUp");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "❌ stopRfidScanSafely error: " + e.getMessage(), e);
+    }
+}
+    
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
