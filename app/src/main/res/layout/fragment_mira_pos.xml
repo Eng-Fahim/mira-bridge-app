@@ -22,7 +22,6 @@
         android:orientation="horizontal"
         android:paddingHorizontal="@dimen/screen_padding_h">
 
-        <!-- Icon — يمين -->
         <ImageView
             android:layout_width="@dimen/pos_header_icon"
             android:layout_height="@dimen/pos_header_icon"
@@ -30,7 +29,6 @@
             android:src="@drawable/ic_pos_cart_gold"
             app:tint="@color/pos_gold_primary" />
 
-        <!-- Title — عربي فقط -->
         <TextView
             android:id="@+id/tvPosHeaderTitle"
             android:layout_width="0dp"
@@ -45,7 +43,6 @@
             android:textStyle="bold"
             tools:text="نظام البيع" />
 
-        <!-- Refund Button -->
         <ImageButton
             android:id="@+id/btnPosRefund"
             android:layout_width="36dp"
@@ -57,7 +54,6 @@
             android:src="@drawable/ic_pos_refund"
             app:tint="@color/pos_gold_primary" />
 
-        <!-- Last Receipt Button -->
         <ImageButton
             android:id="@+id/btnPosLastReceipt"
             android:layout_width="36dp"
@@ -69,7 +65,6 @@
             android:src="@drawable/ic_pos_receipt"
             app:tint="@color/pos_gold_primary" />
 
-        <!-- Scale Status Badge — قابل للضغط -->
         <TextView
             android:id="@+id/tvPosScaleStatus"
             android:layout_width="wrap_content"
@@ -89,16 +84,17 @@
     <!-- ═══════════════════════════════════════════════════════
          2. NESTED SCROLL — Hero + Cart
          ═══════════════════════════════════════════════════════ -->
-   <androidx.core.widget.NestedScrollView
-    android:id="@+id/posScrollView"
-    android:layout_width="match_parent"
-    android:layout_height="0dp"
-    android:layout_weight="1"
-    android:clipToPadding="false"
-    android:fillViewport="true"
-    android:overScrollMode="never"
-    android:paddingBottom="20dp"
-    android:scrollbars="none">
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/posScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:paddingBottom="20dp"
+        android:scrollbars="none">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -175,16 +171,17 @@
                     android:textColor="@color/pos_hero_title"
                     android:textSize="@dimen/pos_hero_title_size"
                     android:textStyle="bold" />
+
                 <TextView
-    android:id="@+id/tvPosHeroTitleEn"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="2dp"
-    android:letterSpacing="0.02"
-    android:text="POS Terminal"
-    android:textAllCaps="true"
-    android:textColor="@color/pos_text_secondary"
-    android:textSize="11sp" />
+                    android:id="@+id/tvPosHeroTitleEn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:letterSpacing="0.02"
+                    android:text="POS Terminal"
+                    android:textAllCaps="true"
+                    android:textColor="@color/pos_text_secondary"
+                    android:textSize="11sp" />
 
                 <View
                     android:id="@+id/posHeroDivider"
@@ -239,7 +236,6 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="@dimen/screen_padding_h">
 
-                <!-- GS1 -->
                 <FrameLayout
                     android:id="@+id/btnPosScanGs1"
                     android:layout_width="@dimen/pos_scan_btn_size"
@@ -276,7 +272,6 @@
                     </LinearLayout>
                 </FrameLayout>
 
-                <!-- RFID -->
                 <FrameLayout
                     android:id="@+id/btnPosScanRfid"
                     android:layout_width="@dimen/pos_scan_btn_size"
@@ -313,7 +308,6 @@
                     </LinearLayout>
                 </FrameLayout>
 
-                <!-- Manual -->
                 <FrameLayout
                     android:id="@+id/btnPosScanManual"
                     android:layout_width="@dimen/pos_scan_btn_size"
@@ -396,6 +390,7 @@
                     android:layout_height="@dimen/button_height_sm"
                     android:minWidth="76dp"
                     android:paddingHorizontal="@dimen/space_4"
+                    android:visibility="gone"
                     android:text="@string/pos_add" />
             </LinearLayout>
 
@@ -446,16 +441,16 @@
          3. FOOTER STICKY (Summary + CTA)
          ═══════════════════════════════════════════════════════ -->
     <LinearLayout
-    android:id="@+id/posFooterSticky"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="?attr/colorSurface"
-    android:elevation="@dimen/elevation_4"
-    android:orientation="vertical"
-    android:paddingTop="@dimen/space_3"
-    android:paddingBottom="@dimen/space_3"
-    android:visibility="gone"> 
-    
+        android:id="@+id/posFooterSticky"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        android:elevation="@dimen/elevation_4"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/space_3"
+        android:paddingBottom="@dimen/space_3"
+        android:visibility="gone">
+
         <!-- Summary Strip -->
         <LinearLayout
             android:id="@+id/posSummaryStrip"
@@ -478,7 +473,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/pos_item_count"
-                    android:textColor="@color/pos_summary_text_idle"
+                    android:textColor="#7F8C8D"
                     android:textSize="11sp" />
 
                 <TextView
@@ -486,7 +481,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0"
-                    android:textColor="@color/pos_text_primary"
+                    android:textColor="#1A1A1A"
                     android:textSize="@dimen/pos_summary_count_size"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -507,7 +502,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/pos_total_amount"
-                    android:textColor="@color/pos_summary_text_idle"
+                    android:textColor="#7F8C8D"
                     android:textSize="11sp" />
 
                 <TextView
@@ -515,7 +510,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/pos_default_amount"
-                    android:textColor="@color/pos_gold_primary"
+                    android:textColor="#1A1A1A"
                     android:textDirection="ltr"
                     android:textSize="@dimen/pos_summary_amount_size"
                     android:textStyle="bold" />
