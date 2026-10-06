@@ -320,9 +320,14 @@ public static boolean isRfidHardwareSupported() {
                 activeProfile.frequencyRange = "865-868 MHz (ETSI)";
                 break;
             case C72:
+                activeProfile.frequencyMode = 2;                              // ✅ ETSI
+                activeProfile.frequencyRange = "865-868 MHz (ETSI)";
+                break;
+            /*case C72:
                 activeProfile.frequencyMode = 1;
                 activeProfile.frequencyRange = "902-928 MHz (FCC)";
-                break;
+                break;*/
+                
             default:
                 activeProfile.frequencyMode = 1;
                 activeProfile.frequencyRange = "902-928 MHz (FCC Default)";
