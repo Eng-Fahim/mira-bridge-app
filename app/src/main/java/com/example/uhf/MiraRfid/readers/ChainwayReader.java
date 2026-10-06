@@ -7,6 +7,7 @@ import android.util.Log;
 
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.activity.BaseTabFragmentActivity;
+import com.example.uhf.MiraRfid.adaptive.AdaptiveConfigurator;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
@@ -27,6 +28,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * - فصل applySupportedSettings (خفيفة) عن applyAdvancedSettings (ثقيلة)
  */
 public class ChainwayReader implements MiraIRFIDReader {
+    
+    private AdaptiveConfigurator adaptiveConfigurator;
     
     private static final String TAG = "ChainwayReader";
     private static final String PREFS_NAME = "mira_rfid_dynamic_settings";
@@ -71,12 +74,14 @@ public class ChainwayReader implements MiraIRFIDReader {
     private SharedPreferences prefs;
     
     public ChainwayReader(Context context) {
-        if (context != null) {
-            this.context = context.getApplicationContext();
-            this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            loadSettings();
-        }
+    if (context != null) {
+        this.context = context.getApplicationContext();
+        this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        this.adaptiveConfigurator = new AdaptiveConfigurator(this.context);
+        this.adaptiveConfigurator.initializeReader();
+        loadSettings();
     }
+}
 
     private synchronized void ensureExecutor() {
         if (scanExecutor == null || scanExecutor.isShutdown() || scanExecutor.isTerminated()) {
@@ -229,68 +234,36 @@ public class ChainwayReader implements MiraIRFIDReader {
      * تضبط Session، Q Value، Target، Dynamic Power، إلخ
      */
     private void applyAdvancedSettings() {
-        if (reader == null || !isConnected) {
-            Log.d(TAG, "applyAdvancedSettings: skipped (not connected)");
-            return;
-        }
-        
-        if (advancedSettingsApplied) {
-            Log.d(TAG, "applyAdvancedSettings: already applied");
-            return;
-        }
-        
-        Log.i(TAG, "⚙️ Applying advanced settings for metal tags...");
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  1) Session — S1 أو S2 أفضل من S0 للوسوم المتقاربة
-        // ═══════════════════════════════════════════════════════════════
-        invokeIntMethod("setSession", session);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  2) Target — A/B يقرأ الأوسمة الثابتة والمتحركة
-        // ═══════════════════════════════════════════════════════════════
-        invokeIntMethod("setTarget", target);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  3) Q Value — 4 متوازن، 3 أسرع، 5 أدق
-        // ═══════════════════════════════════════════════════════════════
-        invokeIntMethod("setQValue", qValue);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  4) Frequency Mode — FCC أو ETSI حسب المنطقة
-        // ═══════════════════════════════════════════════════════════════
-        invokeIntMethod("setFrequencyMode", frequencyMode);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  5) Beep + Vibration — تجربة المستخدم
-        // ═══════════════════════════════════════════════════════════════
-        invokeIntMethod("setBeepMode", beepMode);
-        invokeIntMethod("setVibrationMode", vibrationMode);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  6) Continuous Mode — 0=Command, 1=Continuous
-        // ═══════════════════════════════════════════════════════════════
-        invokeIntMethod("setContinuousMode", continuousMode);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  7) Dynamic Power — حاسم للمعادن!
-        //  يخفض الطاقة تلقائياً عند الاقتراب من الوسم (يمنع التشبع)
-        // ═══════════════════════════════════════════════════════════════
-        invokeBooleanMethod("setDynamicPower", true);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  8) FastID — تقليل القراءات المكررة من نفس الوسم
-        // ═══════════════════════════════════════════════════════════════
-        invokeBooleanMethod("setFastId", true);
-        
-        // ═══════════════════════════════════════════════════════════════
-        //  9) TagFocus — تحسين القراءة للوسوم القريبة جداً
-        // ═══════════════════════════════════════════════════════════════
-        invokeBooleanMethod("setTagFocus", true);
-        
-        advancedSettingsApplied = true;
-        Log.i(TAG, "✅ Advanced settings applied");
-    }
+    if (reader == null || !isConnected) return;
+    if (advancedSettingsApplied) return;
+
+    Log.i(TAG, "⚙️ Applying ADAPTIVE settings...");
+
+    // ✅ Frequency ديناميكي!
+    int freqMode = adaptiveConfigurator.getOptimalFrequencyMode();
+    invokeIntMethod("setFrequencyMode", freqMode);
+    Log.i(TAG, "   🌍 Frequency Mode: " + freqMode 
+            + " (" + adaptiveConfigurator.getReaderCapabilities().getFrequencyRangeText() + ")");
+
+    // ✅ Session ديناميكي!
+    int sessionValue = adaptiveConfigurator.getOptimalSession();
+    invokeIntMethod("setSession", sessionValue);
+
+    // ✅ Q ديناميكي!
+    int qValueDynamic = adaptiveConfigurator.getOptimalQValue();
+    invokeIntMethod("setQValue", qValueDynamic);
+
+    // ✅ Target ثابت (A/B)
+    invokeIntMethod("setTarget", 2);
+
+    // Dynamic Power + FastID + TagFocus (للمعادن)
+    invokeBooleanMethod("setDynamicPower", true);
+    invokeBooleanMethod("setFastId", true);
+    invokeBooleanMethod("setTagFocus", true);
+
+    advancedSettingsApplied = true;
+    Log.i(TAG, "✅ Adaptive settings applied");
+}
     
     /**
      * ✅ استدعاء دالة SDK مع int عبر Reflection
@@ -511,23 +484,24 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     private void processTag(UHFTAGInfo tag) {
-        if (tag == null) return;
-        try {
-            String epc = tag.getEPC();
-            String rssiStr = tag.getRssi();
-            int rssi = parseRssi(rssiStr);
-            
-            if (rssi < rssiThreshold) {
-                return;
-            }
-            
-            if (epc != null && !epc.isEmpty() && listener != null) {
-                listener.onTagRead(epc, rssi);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Process tag error", e);
+    if (tag == null) return;
+    try {
+        String epc = tag.getEPC();
+        int rssi = parseRssi(tag.getRssi());
+
+        if (rssi < rssiThreshold) return;
+
+        // ✅ حدّث Adaptive
+        adaptiveConfigurator.updateLastTag(epc, rssi);
+        adaptiveConfigurator.recordSuccess("read", "auto");
+
+        if (epc != null && !epc.isEmpty() && listener != null) {
+            listener.onTagRead(epc, rssi);
         }
+    } catch (Exception e) {
+        Log.e(TAG, "processTag error", e);
     }
+}
     
     private int parseRssi(String rssiStr) {
         if (rssiStr == null || rssiStr.isEmpty()) return -50;
