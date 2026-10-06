@@ -86,9 +86,15 @@ public class MiraApplication extends AppContext {
     // ==================== Lifecycle ====================
 
     @Override
-public void onCreate() {
+    public void onCreate() {
     super.onCreate();
     
+    
+     // ✅ تهيئة نظام التسجيل في ملف
+    com.example.uhf.utils.MiraFileLogger.init(this);
+    com.example.uhf.utils.MiraFileLogger.log("MiraApplication", 
+        "🚀 Application started");
+        
     // ✅✅✅ طبّق الثيم المحفوظ فوراً قبل أي شيء آخر
     applySavedTheme();
 
