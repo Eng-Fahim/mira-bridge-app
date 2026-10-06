@@ -15,15 +15,15 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * MiraPriceManager v2.0 — الحصين ضد Thread-Leak
+ * MiraPriceManager v2.1 — الحصين ضد Thread-Leak + إصلاح formatPrice
  *
- * ✅ الإصلاحات v2.0:
+ * ✅ الإصلاحات:
  *  1. hasLoadedFromServer flag — يمنع تحميل مكرر
  *  2. loadFromServer مع Daemon Thread
  *  3. logging للأداء
  *  4. Null-safety في كل مكان
+ *  5. ✅ [v2.1] formatPrice لا تُعيد "—" — تُعيد "0 YER" للقيم <= 0
  */
- 
 public class MiraPriceManager {
 
     private static final String TAG = "MiraPriceManager";
@@ -79,12 +79,10 @@ public class MiraPriceManager {
         return instance;
     }
 
-
     /**
      * ✅ إعادة تحميل يدوية (من Settings مثلاً)
      */
     public void refreshNow() {
-        // ✅ لا نُعيد التحميل إذا كان جارياً
         if (isLoading) {
             Log.d(TAG, "refreshNow: already loading, skip");
             return;
@@ -108,12 +106,10 @@ public class MiraPriceManager {
 
             try {
                 MiraApiClient client = MiraApiClient.getInstance(appContext);
-
-                // ✅ timeout safety داخلي — لا ينتظر أكثر من 15 ثانية
                 MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
 
                 long elapsed = System.currentTimeMillis() - startTime;
-                Log.d(TAG, "📥 loadFromServer took " + elapsed + "ms, success=" 
+                Log.d(TAG, "📥 loadFromServer took " + elapsed + "ms, success="
                         + (response != null && response.isSuccess));
 
                 if (response != null && response.isSuccess && response.data != null) {
@@ -177,14 +173,14 @@ public class MiraPriceManager {
             }
         }, "MiraPriceLoader");
 
-        // ✅ [إصلاح v2.0] Daemon — لا يمنع إغلاق التطبيق
         loaderThread.setDaemon(true);
         loaderThread.start();
     }
 
     private void notifyPriceUpdated() {
         try {
-            android.content.Intent intent = new android.content.Intent("MIRA_PRICES_UPDATED");
+            android.content.Intent intent =
+                    new android.content.Intent("MIRA_PRICES_UPDATED");
             appContext.sendBroadcast(intent);
         } catch (Exception e) {
             Log.e(TAG, "notifyPriceUpdated error: " + e.getMessage());
@@ -374,18 +370,23 @@ public class MiraPriceManager {
         return convertFromUSD(amountUSD, toCurrency);
     }
 
+    /**
+     * ✅ [v2.1] formatPrice — لا تُعيد "—" — تُعيد 0 مع العملة للقيم <= 0
+     * السبب: "—" على خلفية ذهبية يصبح غير مرئي، ويُظهر كأن المبلغ فارغ
+     */
     public String formatPrice(double priceUSD, String currency) {
-    // ✅ اعرض 0 بشكل صحيح بدل "—"
-    if (priceUSD < 0) priceUSD = 0;
+        // ✅ إذا القيمة سلبية → صفّرها. لا نُعيد "—" أبداً
+        if (priceUSD < 0) priceUSD = 0;
 
-    double convertedPrice = convertFromUSD(priceUSD, currency);
-    String symbol = getCurrencySymbol(currency);
+        double convertedPrice = convertFromUSD(priceUSD, currency);
+        String symbol = getCurrencySymbol(currency);
 
-    if (CURRENCY_YER.equals(currency) || CURRENCY_EGP.equals(currency)) {
-        return largeFormat.format(convertedPrice) + " " + symbol;
+        if (CURRENCY_YER.equals(currency) || CURRENCY_EGP.equals(currency)) {
+            return largeFormat.format(convertedPrice) + " " + symbol;
+        }
+        return symbol + " " + decimalFormat.format(convertedPrice);
     }
-    return symbol + " " + decimalFormat.format(convertedPrice);
-}
+
     public String formatPriceDefault(double priceUSD) {
         return formatPrice(priceUSD, getDefaultCurrency());
     }
@@ -419,9 +420,9 @@ public class MiraPriceManager {
         String defaultCurrency = getDefaultCurrency();
         double priceInCurrency = convertFromUSD(priceUSD, defaultCurrency);
         return String.format(Locale.US, "%s %s ($%s)",
-        decimalFormat.format(priceInCurrency),
-        getCurrencySymbol(defaultCurrency),
-        decimalFormat.format(priceUSD));
+                decimalFormat.format(priceInCurrency),
+                getCurrencySymbol(defaultCurrency),
+                decimalFormat.format(priceUSD));
     }
 
     public Map<String, Double> getAllGoldPrices() {
