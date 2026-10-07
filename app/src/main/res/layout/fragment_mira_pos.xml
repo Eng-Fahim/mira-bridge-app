@@ -22,6 +22,22 @@
         android:orientation="horizontal"
         android:paddingHorizontal="@dimen/screen_padding_h">
 
+        <!-- ✅ زر الإغلاق — البداية في RTL (يمين الشاشة) -->
+        <ImageButton
+            android:id="@+id/btnPosClose"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="@dimen/space_2"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/pos_close"
+            android:focusable="true"
+            android:padding="8dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_close_rounded"
+            app:tint="@color/pos_gold_primary" />
+
+        <!-- أيقونة العنوان -->
         <ImageView
             android:layout_width="@dimen/pos_header_icon"
             android:layout_height="@dimen/pos_header_icon"
@@ -29,6 +45,7 @@
             android:src="@drawable/ic_pos_cart_gold"
             app:tint="@color/pos_gold_primary" />
 
+        <!-- عنوان الواجهة -->
         <TextView
             android:id="@+id/tvPosHeaderTitle"
             android:layout_width="0dp"
@@ -43,6 +60,7 @@
             android:textStyle="bold"
             tools:text="نظام البيع" />
 
+        <!-- زر الإرجاع -->
         <ImageButton
             android:id="@+id/btnPosRefund"
             android:layout_width="36dp"
@@ -54,6 +72,7 @@
             android:src="@drawable/ic_pos_refund"
             app:tint="@color/pos_gold_primary" />
 
+        <!-- زر آخر إيصال -->
         <ImageButton
             android:id="@+id/btnPosLastReceipt"
             android:layout_width="36dp"
@@ -65,6 +84,7 @@
             android:src="@drawable/ic_pos_receipt"
             app:tint="@color/pos_gold_primary" />
 
+        <!-- حالة الميزان -->
         <TextView
             android:id="@+id/tvPosScaleStatus"
             android:layout_width="wrap_content"
