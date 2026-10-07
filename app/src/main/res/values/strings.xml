@@ -2647,7 +2647,7 @@
 <!-- ═══════════════════════════════════════════════════════
      Quick Actions — Bottom Sheet
      ═══════════════════════════════════════════════════════ -->
-
+<string name="inventory_close">إغلاق شاشة الجرد</string>
 <string name="qa_radar">رادار التتبع</string>
 <string name="qa_rfid_bindings">إدارة الشرائح</string>
 
