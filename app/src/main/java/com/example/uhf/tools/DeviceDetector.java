@@ -8,6 +8,8 @@ import com.rscja.deviceapi.RFIDWithUHFUART;
 
 /**
  * نظام ذكي لاكتشاف وتكوين أجهزة Chainway RFID
+ * 
+ * ✅ v2.1: إضافة دعم VH-C83 و VH-C72 (عائلة Vanch/Chainway المشتركة)
  */
 public class DeviceDetector {
 
@@ -15,7 +17,7 @@ public class DeviceDetector {
     
     // ==================== حالة الجهاز ====================
     
-    public enum DeviceModel { C5, C72, UNKNOWN }
+    public enum DeviceModel { C5, C72, C83, UNKNOWN }
     
     public enum ProfileStatus {
         UNKNOWN,
@@ -70,10 +72,22 @@ public class DeviceDetector {
         return Build.MODEL != null ? Build.MODEL : "UNKNOWN";
     }
 
+    /**
+     * ✅ [تعديل 1] اكتشاف الموديل — مع دعم C83
+     */
     public static DeviceModel getDeviceModel() {
         if (cachedModel != null) return cachedModel;
         
         String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
+        String device = Build.DEVICE != null ? Build.DEVICE.toUpperCase() : "";
+        
+        // ✅ [جديد] VH-C83 / C83
+        if (model.contains("C83") || device.contains("C83")) {
+            cachedModel = DeviceModel.C83;
+            Log.i(TAG, "✅ Detected: VH-C83 (Chainway family)");
+            return cachedModel;
+        }
+        
         if (model.contains("C72")) {
             cachedModel = DeviceModel.C72;
         } else if (model.contains("C5")) {
@@ -84,90 +98,111 @@ public class DeviceDetector {
         return cachedModel;
     }
 
+    /**
+     * ✅ [تعديل 2] isChainwayC72 — يشمل C83 أيضاً
+     */
     public static boolean isChainwayC72() {
         String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
         String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toUpperCase() : "";
+        String brand = Build.BRAND != null ? Build.BRAND.toUpperCase() : "";
+        String device = Build.DEVICE != null ? Build.DEVICE.toUpperCase() : "";
         
-        return model.contains("C72") || model.contains("CHAINWAY") || 
-               manufacturer.contains("CHAINWAY") || getDeviceModel() == DeviceModel.C72;
+        return model.contains("C72") 
+            || model.contains("C83")        // ✅ [جديد]
+            || device.contains("C83")        // ✅ [جديد]
+            || model.contains("CHAINWAY") 
+            || manufacturer.contains("CHAINWAY") 
+            || brand.contains("CHAINWAY")
+            || getDeviceModel() == DeviceModel.C72
+            || getDeviceModel() == DeviceModel.C83;  // ✅ [جديد]
     }
     
     /**
- * ✅✅✅ دالة حرجة: هل الجهاز يدعم قارئ RFID؟
- * 
- * تُستخدم قبل استدعاء initUHF() لتجنب:
- * - ANR بسبب timeout 8 ثوان
- * - محاولة تهيئة AAR على جهاز بدون قارئ
- * - استدعاء getInstance() المكلف
- * 
- * @return true فقط إذا كان الجهاز من أجهزة Chainway/Zebra/Honeywell المدعومة
- */
-public static boolean isRfidHardwareSupported() {
-    try {
-        String model = Build.MODEL != null 
-            ? Build.MODEL.toUpperCase() 
-            : "";
-        String manufacturer = Build.MANUFACTURER != null 
-            ? Build.MANUFACTURER.toUpperCase() 
-            : "";
-        String device = Build.DEVICE != null 
-            ? Build.DEVICE.toUpperCase() 
-            : "";
-        String brand = Build.BRAND != null 
-            ? Build.BRAND.toUpperCase() 
-            : "";
-        
-        Log.d(TAG, "🔍 Checking RFID support: model=" + model 
-            + ", manufacturer=" + manufacturer 
-            + ", device=" + device
-            + ", brand=" + brand);
-        
-        // ✅ الأجهزة المدعومة
-        boolean isChainway = model.contains("C72") 
-                          || model.contains("C61") 
-                          || model.contains("C66")
-                          || model.contains("C5")
-                          || device.contains("C72")
-                          || manufacturer.contains("CHAINWAY")
-                          || brand.contains("CHAINWAY");
-        
-        boolean isZebra = model.contains("MC33") 
-                       || model.contains("MC32") 
-                       || model.contains("TC51")
-                       || model.contains("TC52")
-                       || model.contains("TC72")
-                       || manufacturer.contains("ZEBRA")
-                       || brand.contains("ZEBRA");
-        
-        boolean isHoneywell = model.contains("EDA5") 
-                           || model.contains("CT40")
-                           || model.contains("CT60")
-                           || manufacturer.contains("HONEYWELL")
-                           || brand.contains("HONEYWELL");
-        
-        boolean isUnitech = model.contains("RP90") 
-                         || model.contains("PA70")
-                         || manufacturer.contains("UNITECH");
-        
-        boolean isUrovo = model.contains("DT50") 
-                       || model.contains("RT40")
-                       || manufacturer.contains("UROVO");
-        
-        boolean supported = isChainway || isZebra || isHoneywell 
-                         || isUnitech || isUrovo;
-        
-        Log.i(TAG, "✅ RFID hardware supported: " + supported);
-        return supported;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "isRfidHardwareSupported error: " + e.getMessage(), e);
-        return false;
+     * ✅✅✅ دالة حرجة: هل الجهاز يدعم قارئ RFID؟
+     * 
+     * ✅ [تعديل 3] إضافة VH-C83 + VANCH/VANQUAN
+     */
+    public static boolean isRfidHardwareSupported() {
+        try {
+            String model = Build.MODEL != null 
+                ? Build.MODEL.toUpperCase() 
+                : "";
+            String manufacturer = Build.MANUFACTURER != null 
+                ? Build.MANUFACTURER.toUpperCase() 
+                : "";
+            String device = Build.DEVICE != null 
+                ? Build.DEVICE.toUpperCase() 
+                : "";
+            String brand = Build.BRAND != null 
+                ? Build.BRAND.toUpperCase() 
+                : "";
+            
+            Log.d(TAG, "🔍 Checking RFID support: model=" + model 
+                + ", manufacturer=" + manufacturer 
+                + ", device=" + device
+                + ", brand=" + brand);
+            
+            // ✅ Chainway — يشمل VH-C83
+            boolean isChainway = model.contains("C72") 
+                              || model.contains("C61") 
+                              || model.contains("C66")
+                              || model.contains("C83")           // ✅ [جديد]
+                              || model.contains("VH-C83")        // ✅ [جديد]
+                              || model.contains("C5")
+                              || device.contains("C72")
+                              || device.contains("C83")          // ✅ [جديد]
+                              || manufacturer.contains("CHAINWAY")
+                              || brand.contains("CHAINWAY");
+            
+            // ✅ Vanch/Vanquan (احتياط)
+            boolean isVanch = manufacturer.contains("VANCH")
+                           || brand.contains("VANCH")
+                           || manufacturer.contains("VANQUAN")
+                           || brand.contains("VANQUAN");
+            
+            boolean isZebra = model.contains("MC33") 
+                           || model.contains("MC32") 
+                           || model.contains("TC51")
+                           || model.contains("TC52")
+                           || model.contains("TC72")
+                           || manufacturer.contains("ZEBRA")
+                           || brand.contains("ZEBRA");
+            
+            boolean isHoneywell = model.contains("EDA5") 
+                               || model.contains("CT40")
+                               || model.contains("CT60")
+                               || manufacturer.contains("HONEYWELL")
+                               || brand.contains("HONEYWELL");
+            
+            boolean isUnitech = model.contains("RP90") 
+                             || model.contains("PA70")
+                             || manufacturer.contains("UNITECH");
+            
+            boolean isUrovo = model.contains("DT50") 
+                           || model.contains("RT40")
+                           || manufacturer.contains("UROVO");
+            
+            boolean supported = isChainway 
+                             || isVanch                // ✅ [جديد]
+                             || isZebra 
+                             || isHoneywell 
+                             || isUnitech 
+                             || isUrovo;
+            
+            Log.i(TAG, "✅ RFID hardware supported: " + supported 
+                    + " (Chainway=" + isChainway 
+                    + ", Vanch=" + isVanch + ")");
+            return supported;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "isRfidHardwareSupported error: " + e.getMessage(), e);
+            return false;
+        }
     }
-}
 
     public static boolean isC5() { return getDeviceModel() == DeviceModel.C5; }
     public static boolean isC72() { return isChainwayC72(); }
-
+    
     public static ProfileStatus getStatus() { return profileStatus; }
     public static DeviceProfile getProfile() { return activeProfile; }
     public static String getLastError() { return lastError; }
@@ -176,21 +211,19 @@ public static boolean isRfidHardwareSupported() {
      * التدفق الكامل: اكتشاف → قدرات → Profile → تحقق → تسجيل
      */
     public static DeviceProfile configure(RFIDWithUHFUART reader) {
-    // ✅ استخدم الحالة الديناميكية الجديدة
-    if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-        Log.i(TAG, "RFID device not present - skipping configuration");
-        profileStatus = ProfileStatus.FAILED;
-        lastError = "RFID device not present";
-        return null;
-    }
-    
-    if (reader == null) {
-        Log.e(TAG, "Reader is null - cannot configure");
-        profileStatus = ProfileStatus.FAILED;
-        lastError = "Reader is null";
-        return null;
-    }
-    
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            Log.i(TAG, "RFID device not present - skipping configuration");
+            profileStatus = ProfileStatus.FAILED;
+            lastError = "RFID device not present";
+            return null;
+        }
+        
+        if (reader == null) {
+            Log.e(TAG, "Reader is null - cannot configure");
+            profileStatus = ProfileStatus.FAILED;
+            lastError = "Reader is null";
+            return null;
+        }
         
         detectionTime = System.currentTimeMillis();
         activeProfile = new DeviceProfile();
@@ -199,19 +232,11 @@ public static boolean isRfidHardwareSupported() {
         activeProfile.sdkInt = Build.VERSION.SDK_INT;
         
         try {
-            // المرحلة 1: الاكتشاف
             if (!detect(reader)) return fail("Detection failed");
-            
-            // المرحلة 2: قراءة القدرات
             if (!readCapabilities(reader)) return fail("Capabilities read failed");
-            
-            // المرحلة 3: تطبيق Profile
             if (!applyProfile(reader)) return fail("Profile application failed");
-            
-            // المرحلة 4: التحقق
             if (!verify(reader)) return fail("Verification failed");
             
-            // المرحلة 5: التسجيل
             logProfile();
             
             profileStatus = ProfileStatus.READY;
@@ -248,7 +273,6 @@ public static boolean isRfidHardwareSupported() {
         try {
             Log.i(TAG, "🔍 Phase 2 - Reading capabilities...");
             
-            // ✅ استخدام timeout للقراءات
             final String[] versions = new String[2];
             versions[0] = "Unknown";
             versions[1] = "Unknown";
@@ -263,7 +287,7 @@ public static boolean isRfidHardwareSupported() {
             });
             readThread.setDaemon(true);
             readThread.start();
-            readThread.join(3000); // ✅ 3 ثواني timeout
+            readThread.join(3000);
             
             if (readThread.isAlive()) {
                 Log.w(TAG, "Version read timeout - using defaults");
@@ -272,7 +296,6 @@ public static boolean isRfidHardwareSupported() {
             activeProfile.softwareVersion = versions[0];
             activeProfile.hardwareVersion = versions[1];
             
-            // درجة الحرارة
             activeProfile.temperature = 25;
             activeProfile.temperatureOK = true;
             
@@ -297,22 +320,30 @@ public static boolean isRfidHardwareSupported() {
         }
     }
     
+    /**
+     * ✅ [تعديل 4] نطاق الطاقة — مع C83
+     */
     private static void determinePowerRange() {
-    switch (activeProfile.model) {
-        case C5:
-            activeProfile.minPower = 5;
-            activeProfile.maxPower = 30;
-            break;
-        case C72:
-            activeProfile.minPower = 5;
-            activeProfile.maxPower = 30;  // ← كان 33 (C72 يدعم حتى 30 فقط عملياً)
-            break;
-        default:
-            activeProfile.minPower = 10;
-            activeProfile.maxPower = 26;
-            break;
+        switch (activeProfile.model) {
+            case C5:
+                activeProfile.minPower = 5;
+                activeProfile.maxPower = 30;
+                break;
+            case C72:
+            case C83:                                  // ✅ [جديد]
+                activeProfile.minPower = 5;
+                activeProfile.maxPower = 30;
+                break;
+            default:
+                activeProfile.minPower = 10;
+                activeProfile.maxPower = 26;
+                break;
+        }
     }
-}
+    
+    /**
+     * ✅ [تعديل 5] نطاق الترددات — مع C83
+     */
     private static void determineFrequencyRange() {
         switch (activeProfile.model) {
             case C5:
@@ -320,14 +351,10 @@ public static boolean isRfidHardwareSupported() {
                 activeProfile.frequencyRange = "865-868 MHz (ETSI)";
                 break;
             case C72:
-                activeProfile.frequencyMode = 2;                              // ✅ ETSI
+            case C83:                                  // ✅ [جديد]
+                activeProfile.frequencyMode = 2;
                 activeProfile.frequencyRange = "865-868 MHz (ETSI)";
                 break;
-            /*case C72:
-                activeProfile.frequencyMode = 1;
-                activeProfile.frequencyRange = "902-928 MHz (FCC)";
-                break;*/
-                
             default:
                 activeProfile.frequencyMode = 1;
                 activeProfile.frequencyRange = "902-928 MHz (FCC Default)";
@@ -374,22 +401,24 @@ public static boolean isRfidHardwareSupported() {
         }
     }
     
+    /**
+     * ✅ [تعديل 6] الطاقة المثلى — مع C83
+     */
     private static int calculateOptimalPower() {
-    switch (activeProfile.model) {
-        case C5:
-            return 25;       // ← كان 22
-        case C72:
-            return 30;       // ← كان 24 (الحد الأقصى للذهب)
-        default:
-            return 26;       // ← كان 22
+        switch (activeProfile.model) {
+            case C5:
+                return 25;
+            case C72:
+            case C83:                                  // ✅ [جديد]
+                return 30;
+            default:
+                return 26;
+        }
     }
-}
     
     private static boolean verify(RFIDWithUHFUART reader) {
         try {
             Log.i(TAG, "✅ Phase 4 - Verifying configuration...");
-            
-            boolean allOK = true;
             
             if (!activeProfile.powerVerified) {
                 Log.w(TAG, "   ⚠️ Power setting not verified");
