@@ -35,6 +35,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.example.uhf.MiraRfid.RFIDManager;
+import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.MiraRfidService;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
@@ -932,69 +934,170 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void activateRFIDModeForEncoding() {
-        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
+    }
+
+    try {
+        if (!(getActivity() instanceof UHFMainActivity)) return;
+
+        if (appContext == null) {
+            Log.e(TAG, "appContext is null");
             return;
         }
 
-        try {
-            if (!(getActivity() instanceof UHFMainActivity)) return;
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-
-            if (appContext != null) {
-                MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
-                rfidService.resetForNewTag();
-                Log.i(TAG, "🔄 Reset simulator for new tag");
-            }
-
-            isRfidScanning = true;
-            if (binding != null) {
-                binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
-                binding.tvStatusBadge.setText("SCANNING...");
-            }
-
-            activity.setActiveRfidListener(epc -> {
-                final String scannedEpc = epc != null ?
-                        epc.trim().toUpperCase(Locale.US) : "";
-                Log.i(TAG, "📡 RFID event received (EPC ignored: " + scannedEpc + ")");
-                processRfidTagAsync(true);
-            });
-
-            activity.startUHFScan();
-            showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
-
-            if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
-            rfidTimeoutRunnable = this::stopRfidScanningMode;
-            handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
-
-        } catch (Exception e) {
-            Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
+        isRfidScanning = true;
+        if (binding != null) {
+            binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
+            binding.tvStatusBadge.setText("SCANNING...");
         }
+
+        // ✅ الحل: استخدم RFIDManager مباشرة مثل POS
+        MiraIRFIDReader reader = RFIDManager.getInstance(appContext).getActiveReader();
+        if (reader == null) {
+            Log.e(TAG, "❌ No active reader");
+            stopRfidScanningMode();
+            return;
+        }
+
+        // ✅ سجّل مستمعاً يستقبل EPC مباشرة
+        reader.setOnTagReadListener(new MiraIRFIDReader.OnTagReadListener() {
+            @Override
+            public void onTagRead(String epc, int rssi) {
+                if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
+                
+                final String receivedEpc = epc.trim().toUpperCase(Locale.US);
+                Log.i(TAG, "📡 EPC received: " + receivedEpc);
+                
+                // ✅ أوقف المسح فوراً
+                stopRfidScanningMode();
+                
+                // ✅ استخدم EPC المستلم مباشرة
+                safeRun(() -> processReceivedTag(receivedEpc));
+            }
+
+            @Override public void onScanStarted() {}
+            @Override public void onScanStopped() {}
+            @Override public void onConnectionChanged(boolean connected) {}
+            @Override public void onError(String error) {
+                Log.e(TAG, "RFID error: " + error);
+            }
+        });
+
+        // ✅ ابدأ المسح
+        boolean ok = reader.startScan();
+        Log.i(TAG, "startScan result: " + ok);
+
+        if (!ok) {
+            stopRfidScanningMode();
+            showErrorDialog(
+                    isArabic ? "❌ فشل بدء المسح" : "❌ Scan start failed",
+                    isArabic ? "تعذر تشغيل القارئ" : "Could not start reader"
+            );
+            return;
+        }
+
+        showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
+
+        // ✅ timeout
+        if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
+        rfidTimeoutRunnable = this::stopRfidScanningMode;
+        handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
+
+    } catch (Exception e) {
+        Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
+        stopRfidScanningMode();
     }
+}
+
+/**
+ * ✅ معالجة EPC المستلم مباشرة (بدون قراءة TID)
+ */
+private void processReceivedTag(String epc) {
+    if (epc == null || epc.isEmpty()) return;
+
+    // نستخدم EPC كـ TID (لأنه نفس الشيء في كثير من الحالات)
+    // أو نستخدم EPC مباشرة للتحقق
+    
+    Log.i(TAG, "🎯 Processing received EPC: " + epc);
+    
+    // ✅ التحقق من EPC
+    MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
+    final boolean isSim = rfidService.isSimulationMode();
+    final boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(epc);
+    final boolean isDuplicate = syncManager.isEpcDuplicateLocally(epc);
+
+    safeRun(() -> {
+        if (binding == null) return;
+
+        if (!isTagAllowed) {
+            playErrorSound();
+            showErrorDialog(
+                    isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
+                    isArabic ? "هذه الشريحة (" + epc + ") غير مسجلة في مخزون الشرائح المعتمدة."
+                             : "This tag (" + epc + ") is not in the authorized inventory."
+            );
+            return;
+        }
+
+        if (isDuplicate) {
+            playErrorSound();
+            showErrorDialog(
+                    isArabic ? "شريحة مكررة" : "Duplicate Tag",
+                    isArabic ? "هذه الشريحة (" + epc + ") مسجلة بالفعل." 
+                             : "This tag (" + epc + ") is already registered."
+            );
+            return;
+        }
+
+        // ✅ ضع EPC في الحقل
+        if (binding.etEpc != null) {
+            binding.etEpc.setText(epc);
+            binding.etEpc.setTag(epc);
+        }
+        if (binding.tvStatusBadge != null) {
+            binding.tvStatusBadge.setText("BOUND");
+        }
+
+        Log.i(TAG, "✅ Tag accepted: " + epc);
+        playSuccessSound();
+    });
+}
 
     private void stopRfidScanningMode() {
-        try {
-            isRfidScanning = false;
-            if (rfidTimeoutRunnable != null) {
-                handler.removeCallbacks(rfidTimeoutRunnable);
-                rfidTimeoutRunnable = null;
-            }
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity activity = (UHFMainActivity) getActivity();
-                activity.stopUHFScan();
-                activity.setActiveRfidListener(null);
-            }
-            if (binding != null && binding.btnScanRfid != null) {
-                binding.btnScanRfid.setText(isArabic ? "مسح رمز RFID" : "Scan RFID Tag");
-                if (binding.tvStatusBadge != null &&
-                        "SCANNING...".equals(binding.tvStatusBadge.getText().toString())) {
-                    binding.tvStatusBadge.setText("WAITING");
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "stopRfidScanningMode error: " + e.getMessage(), e);
+    try {
+        isRfidScanning = false;
+        
+        if (rfidTimeoutRunnable != null) {
+            handler.removeCallbacks(rfidTimeoutRunnable);
+            rfidTimeoutRunnable = null;
         }
+
+        // ✅ أوقف القارئ
+        if (appContext != null) {
+            try {
+                MiraIRFIDReader reader = RFIDManager.getInstance(appContext).getActiveReader();
+                if (reader != null) {
+                    reader.stopScan();
+                    reader.setOnTagReadListener(null);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "stopReader error: " + e.getMessage());
+            }
+        }
+
+        if (binding != null && binding.btnScanRfid != null) {
+            binding.btnScanRfid.setText(isArabic ? "مسح رمز RFID" : "Scan RFID Tag");
+            if (binding.tvStatusBadge != null &&
+                    "SCANNING...".equals(binding.tvStatusBadge.getText().toString())) {
+                binding.tvStatusBadge.setText("WAITING");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "stopRfidScanningMode error: " + e.getMessage(), e);
     }
+}
 
     public void onRfidScanned(String epc) {
         if (!isAdded() || getActivity() == null) return;
@@ -2518,4 +2621,4 @@ public void onPause() {
 
         super.onDestroyView();
     }
-                    }
+                        }
