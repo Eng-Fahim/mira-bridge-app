@@ -549,7 +549,8 @@ public View onCreateView(@NonNull LayoutInflater inflater,
 
     private void initViews(View view) {
         if (view == null) return;
-
+             // ⭐ زر الإغلاق
+        btnInventoryClose = view.findViewById(R.id.btnInventoryClose);
         // Hero Circle
         tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
         progressScanned = view.findViewById(R.id.progressScanned);
@@ -653,8 +654,7 @@ public View onCreateView(@NonNull LayoutInflater inflater,
         // Setup Segmented Control
         setupSegmentedControl();
         
-        // ⭐ زر الإغلاق
-        btnInventoryClose = view.findViewById(R.id.btnInventoryClose);
+   
     }
 
     private void setupRecyclerView() {
@@ -4117,6 +4117,50 @@ private String getCurrentUserName() {
     // ================================================================
     //  Lifecycle Cleanup
     // ================================================================
+@Override
+public void onStart() {
+    super.onStart();
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+            // ⭐ أخفِ BottomNav
+            activity.setBottomNavVisible(false);
+
+            // ⭐ أخفِ FAB
+            View fab = activity.findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setVisibility(View.GONE);
+                Log.d(TAG, "🙈 FAB hidden in Inventory");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onStart error", e);
+    }
+}
+
+@Override
+public void onStop() {
+    super.onStop();
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+            // ⭐ أعِد BottomNav
+            activity.setBottomNavVisible(true);
+
+            // ⭐ أعِد FAB
+            View fab = activity.findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setVisibility(View.VISIBLE);
+                Log.d(TAG, "👁️ FAB restored");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onStop error", e);
+    }
+}
+
 @Override
 public void onResume() {
     super.onResume();
