@@ -351,6 +351,18 @@ public class GateRfidBridge {
             return false;
         }
     }
+/**
+ * ✅ هل القارئ النشط محاكياً (SIMULATOR)؟
+ */
+public boolean isSimulationMode() {
+    try {
+        RFIDManager manager = RFIDManager.getInstance(appContext);
+        MiraIRFIDReader reader = manager.getActiveReader();
+        return reader instanceof com.example.uhf.MiraRfid.readers.SimulatorReader;
+    } catch (Exception e) {
+        return false;
+    }
+}
 
     /**
      * ✅ إغلاق نظيف (يُستدعى عند إنهاء التطبيق)
