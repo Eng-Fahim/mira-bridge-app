@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
@@ -58,6 +59,16 @@
                     android:textColor="?attr/colorPrimary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
+
+                <!-- ✅ جديد: نوع الجهاز -->
+                <TextView
+                    android:id="@+id/tvGateDeviceType"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="📱 Chainway C72"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="10sp" />
             </LinearLayout>
 
             <TextView
