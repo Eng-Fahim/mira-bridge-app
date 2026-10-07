@@ -927,14 +927,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }).start();
 
-        // ⭐ 4. التوجيه لـ Dashboard
-        mainHandler.postDelayed(() -> {
-            if (isActivityAlive()) {
-                Log.d(TAG, "🎉 Re-navigating after setup completed");
-                enableNavigationAfterSetup();
-                navigateByRole();
-            }
-        }, 700);
+        // ⭐ 4. التوجيه الفوري لـ Dashboard (بدون تأخير)
+mainHandler.post(() -> {
+    if (isActivityAlive()) {
+        enableNavigationAfterSetup();
+        navigateByRole();
+    }
+});
     }
 
     public void invalidateSetupCache() {
@@ -2243,8 +2242,13 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
             loadFragment(new MiraReportsProFragment(), "Reports");
             return true;
         } else if (id == R.id.action_accounting_setup) {
-            loadFragment(new MiraAccountingSetupFragment(), "AccountingSetup");
-            return true;
+    // ⭐ علّم أنه فتح يدوي — لا تُحوّل تلقائيًا
+    Bundle args = new Bundle();
+    args.putBoolean("manual_open", true);
+    MiraAccountingSetupFragment frag = new MiraAccountingSetupFragment();
+    frag.setArguments(args);
+    loadFragment(frag, "AccountingSetup");
+    return true;
         } else if (id == R.id.action_accounting) {
             openAccounting();
             return true;
