@@ -1256,22 +1256,32 @@ public class MiraSecureGateFragment extends Fragment {
     // ==================== RFID Scanning ====================
 
     private void autoStartScanning() {
-        mainHandler.postDelayed(() -> {
-            if (!isDestroyed && isAdded() && !isLockdown && !isCameraOpen) {
-                startScanning();
-            }
-        }, 1200);
-    }
+    // ✅ فحص مزدوج قبل الجدولة
+    if (isScanning) return;
+    if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
+
+    mainHandler.postDelayed(() -> {
+        if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
+        // ✅ فحص ثانٍ قبل التنفيذ
+        if (isScanning) return;
+        if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
+        startScanning();
+    }, 1200);
+}
 
     private void toggleScanning() {
         if (isScanning) stopScanning();
         else startScanning();
     }
-
-    private void startScanning() {
-        if (isDestroyed || mContext == null || isCameraOpen) return;
-        if (gateRfidBridge == null) return;
-
+private void startScanning() {
+    if (isDestroyed || mContext == null || isCameraOpen) return;
+    if (gateRfidBridge == null) return;
+    
+    // ✅ فحص إضافي: لا تبدأ إذا كان المسح يعمل
+    if (isScanning) {
+        Log.d(TAG, "⏸️ Scan already active — skipping");
+        return;
+    }
         boolean accepted = gateRfidBridge.startScan(
                 new GateRfidBridge.GateTagListener() {
             @Override
@@ -2100,15 +2110,17 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        applyOperationMode(currentOperationMode);
-        mainHandler.postDelayed(() -> {
-            if (!isScanning && isAdded() && !isLockdown && !isCameraOpen) {
-                startScanning();
-            }
-        }, 600);
-    }
+public void onResume() {
+    super.onResume();
+    applyOperationMode(currentOperationMode);
+    mainHandler.postDelayed(() -> {
+        if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
+        // ✅ فحص مزدوج قبل البدء
+        if (isScanning) return;
+        if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
+        startScanning();
+    }, 600);
+}
 
     @Override
     public void onDestroyView() {
