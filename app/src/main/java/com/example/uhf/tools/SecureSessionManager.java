@@ -99,6 +99,9 @@ public class SecureSessionManager {
     private long    usernameCacheTime = 0;
     private String  cachedServerUrl  = null;
     private long    serverUrlCacheTime = 0;
+    
+    private Long cachedLastActiveTime = null;
+    private Boolean cachedSessionLocked = null;
 
     public enum Role {
         SYSTEM_ADMIN,
@@ -195,18 +198,23 @@ public class SecureSessionManager {
      *   - استعادة الجلسة بعد البصمة
      */
     public void invalidateCache() {
-        cachedAuthToken   = null;
-        tokenCacheTime    = 0;
-        cachedApiKey      = null;
-        apiKeyCacheTime   = 0;
-        cachedLoggedIn    = null;   // ⚠️ null وليس false
-        loggedInCacheTime = 0;
-        cachedUsername    = null;
-        usernameCacheTime = 0;
-        cachedServerUrl   = null;
-        serverUrlCacheTime = 0;
-        Log.d(TAG, "🗑️ Session cache invalidated");
-    }
+    cachedAuthToken   = null;
+    tokenCacheTime    = 0;
+    cachedApiKey      = null;
+    apiKeyCacheTime   = 0;
+    cachedLoggedIn    = null;
+    loggedInCacheTime = 0;
+    cachedUsername    = null;
+    usernameCacheTime = 0;
+    cachedServerUrl   = null;
+    serverUrlCacheTime = 0;
+    
+    // ✅ جديد:
+    cachedLastActiveTime = null;
+    cachedSessionLocked  = null;
+    
+    Log.d(TAG, "🗑️ Session cache invalidated");
+}
 
     // ═══════════════════════════════════════════════════════
     // إدارة الجلسة
@@ -926,41 +934,51 @@ public class SecureSessionManager {
     // Auto-Lock
     // ═══════════════════════════════════════════════════════
 
-    public void setLastAppActiveTime(long timestamp) {
-        try {
-            userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "setLastAppActiveTime error: " + e.getMessage());
-        }
+public void setLastAppActiveTime(long timestamp) {
+    cachedLastActiveTime = timestamp;   // ⭐ فوري في الذاكرة
+    try {
+        userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "setLastAppActiveTime error: " + e.getMessage());
     }
+}
 
-    public long getLastAppActiveTime() {
-        try {
-            return userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0);
-        } catch (Exception e) {
-            return 0;
-        }
+public long getLastAppActiveTime() {
+    if (cachedLastActiveTime != null) return cachedLastActiveTime;  // ⭐ اقرأ من الذاكرة
+    try {
+        long val = userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0);
+        cachedLastActiveTime = val;
+        return val;
+    } catch (Exception e) {
+        return 0;
     }
+}
 
+public void setSessionLocked(boolean locked) {
+    cachedSessionLocked = locked;       // ⭐ فوري في الذاكرة
+    try {
+        userPrefs.edit().putBoolean(KEY_SESSION_LOCKED, locked).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "setSessionLocked error: " + e.getMessage());
+    }
+}
+
+public boolean isSessionLocked() {
+    if (cachedSessionLocked != null) return cachedSessionLocked;  // ⭐ اقرأ من الذاكرة
+    try {
+        boolean val = userPrefs.getBoolean(KEY_SESSION_LOCKED, false);
+        cachedSessionLocked = val;
+        return val;
+    } catch (Exception e) {
+        return false;
+    }
+}
     public void touchActivity() {
         setLastAppActiveTime(System.currentTimeMillis());
     }
 
-    public void setSessionLocked(boolean locked) {
-        try {
-            userPrefs.edit().putBoolean(KEY_SESSION_LOCKED, locked).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "setSessionLocked error: " + e.getMessage());
-        }
-    }
-
-    public boolean isSessionLocked() {
-        try {
-            return userPrefs.getBoolean(KEY_SESSION_LOCKED, false);
-        } catch (Exception e) {
-            return false;
-        }
-    }
+    
+    
 
     public boolean isInactivityTimeout(long timeoutMs) {
         try {
