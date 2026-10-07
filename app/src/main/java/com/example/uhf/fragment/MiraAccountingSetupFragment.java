@@ -52,6 +52,7 @@ public class MiraAccountingSetupFragment extends Fragment {
     private boolean isArabic;
     private JSONObject currentStatus;
     private boolean setupCompletedNotified = false;
+    private boolean isManualOpen = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Nullable
@@ -63,16 +64,22 @@ public class MiraAccountingSetupFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
 
-        apiClient = MiraApiClient.getInstance(requireContext());
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
+    apiClient = MiraApiClient.getInstance(requireContext());
+    isArabic = Locale.getDefault().getLanguage().equals("ar");
 
-        initViews(view);
-        setupListeners();
-        loadStatus();
+    // ⭐ اقرأ العلم
+    if (getArguments() != null) {
+        isManualOpen = getArguments().getBoolean("manual_open", false);
     }
+    Log.d(TAG, "onViewCreated: isManualOpen=" + isManualOpen);
+
+    initViews(view);
+    setupListeners();
+    // ⭐ احذف loadStatus() من هنا — onResume سيستدعيها بعد قليل
+}
 
     @Override
 public void onStart() {
@@ -96,6 +103,18 @@ public void onStop() {
     mainHandler.removeCallbacksAndMessages(null);
 }
 
+
+@Override
+public void onDestroyView() {
+    super.onDestroyView();
+    
+    // ⭐ أعِد إظهار BottomNav عند مغادرة الشاشة
+    // (يضمن عدم بقائه مخفيًا عند الرجوع بعد فتح يدوي)
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
+    }
+    Log.d(TAG, "onDestroyView: restored BottomNav");
+}
     private void initViews(View v) {
         tvProgressPercent = v.findViewById(R.id.tvProgressPercent);
         tvProgressText    = v.findViewById(R.id.tvProgressText);
@@ -190,16 +209,23 @@ public void onStop() {
             tvProgressText.setText(statusText);
 
             boolean completed = "completed".equals(setupStatus)
-                    || "locked".equals(setupStatus);
+        || "locked".equals(setupStatus);
 
-            // ⭐ عند الاكتمال → أخطر النشاط (مرة واحدة)
-            if (completed && !setupCompletedNotified) {
-                setupCompletedNotified = true;
-                notifySetupCompleted();
-            }
+// ⭐ عند الاكتمال + ليس فتحًا يدويًا + لم يُخطر بعد → انتقال فوري
+if (completed && !setupCompletedNotified && !isManualOpen) {
+    setupCompletedNotified = true;
 
-            stepsContainer.removeAllViews();
-            JSONArray steps = status.optJSONArray("steps");
+    // ⭐ أخفِ المحتوى فورًا — لا يرى المستخدم شاشة الإعداد
+    if (contentContainer != null) contentContainer.setVisibility(View.GONE);
+    if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
+
+    Log.d(TAG, "🚀 Auto-redirect to Dashboard (setup completed)");
+    notifySetupCompleted();
+    return;   // ⭐ لا تُكمل رسم الواجهة
+}
+
+stepsContainer.removeAllViews();
+JSONArray steps = status.optJSONArray("steps");
 
             if (steps != null) {
                 for (int i = 0; i < steps.length(); i++) {
