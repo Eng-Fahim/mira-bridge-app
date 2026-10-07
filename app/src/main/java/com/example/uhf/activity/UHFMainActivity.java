@@ -162,6 +162,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private volatile boolean navigationLocked = false;
+    private volatile boolean justUnlockedWithBiometric = false;
 
     private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener =
             this::updateAppTitle;
@@ -1412,20 +1413,33 @@ private void performConnectionTest() {
 
     @Override
     public void onResume() {
-        super.onResume();
-        loadingCounter = 0;
-        forceHideLoadingImmediate();
+    super.onResume();
+    loadingCounter = 0;
+    forceHideLoadingImmediate();
 
-        if (!checkAutoLock()) {
-            return;
-        }
+    // ⭐ تجاهل فحص Auto-Lock مباشرة بعد نجاح البصمة
+    if (justUnlockedWithBiometric) {
+        Log.d(TAG, "✅ Skipping Auto-Lock check (just unlocked with biometric)");
+        justUnlockedWithBiometric = false;
 
+        // استمر بالمنطق العادي بدون فحص Auto-Lock
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         syncUIWithNavigation();
-
         checkSetupStampOnResume();
+        return;
     }
+
+    if (!checkAutoLock()) {
+        return;
+    }
+
+    updateToolbarTitle();
+    if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
+    syncUIWithNavigation();
+
+    checkSetupStampOnResume();
+}
 
     private void checkSetupStampOnResume() {
         String cachedStatus = getCachedSetupStatus();
@@ -1501,8 +1515,15 @@ private void performConnectionTest() {
     }
 
     private void showAutoLockDialog() {
-        if (isFinishing() || isDestroyed()) return;
-        if (!isActivityAlive()) return;
+    if (isFinishing() || isDestroyed()) return;
+    if (!isActivityAlive()) return;
+    
+    // ⭐ احتياط: لا تفتح الـDialog إذا كنا قد فُتحنا للتو بالبصمة
+    if (justUnlockedWithBiometric) {
+        Log.d(TAG, "⏭️ Skipping showAutoLockDialog (just unlocked)");
+        justUnlockedWithBiometric = false;
+        return;
+    }
 
         try {
             BottomSheetDialog lockDialog = new BottomSheetDialog(
@@ -1548,10 +1569,10 @@ private void performConnectionTest() {
 
             lockDialog.show();
 
-        } catch (Exception e) {
-            Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
-        }
+            } catch (Exception e) {
+        Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
     }
+}
 
     private void triggerBiometricUnlock() {
         try {
@@ -1569,30 +1590,40 @@ private void performConnectionTest() {
             BiometricPrompt prompt = new BiometricPrompt(this, executor,
                     new BiometricPrompt.AuthenticationCallback() {
                         @Override
-                        public void onAuthenticationSucceeded(
-                                @NonNull BiometricPrompt.AuthenticationResult result) {
-                            Log.d(TAG, "✅ Biometric unlock success");
-                            sessionManager.unlockSession();
-                            Toast.makeText(UHFMainActivity.this,
-                                    isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
-                                    Toast.LENGTH_SHORT).show();
-                        }
+public void onAuthenticationSucceeded(
+        @NonNull BiometricPrompt.AuthenticationResult result) {
+    Log.d(TAG, "✅ Biometric unlock success");
+    
+    // ⭐ ضع الـflag أولاً — قبل أي شيء آخر
+    justUnlockedWithBiometric = true;
+    
+    sessionManager.unlockSession();
+    Toast.makeText(UHFMainActivity.this,
+            isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
+            Toast.LENGTH_SHORT).show();
+}
 
                         @Override
-                        public void onAuthenticationError(int code, @NonNull CharSequence msg) {
-                            Log.e(TAG, "Biometric error: " + code + " - " + msg);
+public void onAuthenticationError(int code, @NonNull CharSequence msg) {
+    Log.e(TAG, "Biometric error: " + code + " - " + msg);
 
-                            if (code == BiometricPrompt.ERROR_USER_CANCELED
-                                    || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                                    || code == BiometricPrompt.ERROR_CANCELED) {
+    if (code == BiometricPrompt.ERROR_USER_CANCELED
+            || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+            || code == BiometricPrompt.ERROR_CANCELED) {
 
-                                mainHandler.postDelayed(() -> {
-                                    if (isActivityAlive()) {
-                                        showAutoLockDialog();
-                                    }
-                                }, 300);
-                            }
-                        }
+        // ⭐ لا تعد فتح الـDialog إذا كان هناك نجاح بيومتري سابق
+        if (justUnlockedWithBiometric) {
+            Log.d(TAG, "⏭️ Skip reopening dialog (biometric already succeeded)");
+            return;
+        }
+
+        mainHandler.postDelayed(() -> {
+            if (isActivityAlive()) {
+                showAutoLockDialog();
+            }
+        }, 300);
+    }
+}
 
                         @Override
                         public void onAuthenticationFailed() {
