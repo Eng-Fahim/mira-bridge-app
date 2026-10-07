@@ -34,7 +34,7 @@
             android:focusable="true"
             android:padding="8dp"
             android:scaleType="centerInside"
-            android:src="@drawable/ic_close_rounded"
+            android:src="@drawable/ic_close"
             app:tint="@color/pos_gold_primary" />
 
         <!-- أيقونة العنوان -->
