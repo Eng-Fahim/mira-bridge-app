@@ -14,15 +14,15 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- 🏢 رأس القائمة والإحصائيات -->
+        <!-- 🏢 رأس القائمة -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
+            android:text="🚪 لوحة تحكم البوابات الأمنية"
             android:textColor="?attr/colorPrimary"
             android:textSize="20sp"
-            android:textStyle="bold"
-            tools:text="🚪 لوحة تحكم البوابات الأمنية" />
+            android:textStyle="bold" />
 
         <!-- بطاقة الإحصائيات -->
         <com.google.android.material.card.MaterialCardView
@@ -48,6 +48,7 @@
                     android:orientation="horizontal"
                     android:weightSum="3">
 
+                    <!-- الإجمالي -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -59,19 +60,20 @@
                             android:id="@+id/tvTotalGates"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:text="0"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="20sp"
-                            android:textStyle="bold"
-                            tools:text="0" />
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:text="الإجمالي"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp"
-                            tools:text="الإجمالي" />
+                            android:textSize="11sp" />
                     </LinearLayout>
 
+                    <!-- متصل -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -83,19 +85,20 @@
                             android:id="@+id/tvOnlineGates"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:text="0"
                             android:textColor="?attr/colorTertiary"
                             android:textSize="20sp"
-                            android:textStyle="bold"
-                            tools:text="0" />
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:text="متصل"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp"
-                            tools:text="متصل" />
+                            android:textSize="11sp" />
                     </LinearLayout>
 
+                    <!-- غير متصل -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -107,17 +110,17 @@
                             android:id="@+id/tvOfflineGates"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:text="0"
                             android:textColor="?attr/colorError"
                             android:textSize="20sp"
-                            android:textStyle="bold"
-                            tools:text="0" />
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:text="غير متصل"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp"
-                            tools:text="غير متصل" />
+                            android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -127,21 +130,21 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:gravity="center"
+                    android:text="آخر حدث: -"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp"
-                    tools:text="آخر حدث: -" />
+                    android:textSize="11sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- فلتر الفرع (للمدراء) -->
+        <!-- فلتر الفرع -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilBranchFilter"
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:visibility="gone"
-            tools:hint="🏢 تصفية حسب الفرع">
+            android:hint="🏢 تصفية حسب الفرع"
+            android:visibility="gone">
 
             <AutoCompleteTextView
                 android:id="@+id/spBranchFilter"
@@ -163,12 +166,11 @@
                 android:layout_height="48dp"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
+                android:text="➕ إضافة بوابة جديدة"
                 android:textColor="?attr/colorOnPrimary"
                 android:textSize="13sp"
                 app:backgroundTint="?attr/colorPrimary"
-                app:cornerRadius="10dp"
-                app:icon="@android:drawable/ic_input_add"
-                tools:text="إضافة بوابة جديد" />
+                app:cornerRadius="10dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRefreshStatus"
@@ -177,12 +179,11 @@
                 android:layout_height="48dp"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
+                android:text="🔄 تحديث الحالة"
                 android:textColor="?attr/colorPrimary"
                 android:textSize="13sp"
                 app:cornerRadius="10dp"
-                app:icon="@android:drawable/ic_popup_sync"
-                app:strokeColor="?attr/colorPrimary"
-                tools:text="تحديث الحالة" />
+                app:strokeColor="?attr/colorPrimary" />
         </LinearLayout>
 
         <!-- قائمة البوابات -->
@@ -194,7 +195,6 @@
             android:minHeight="120dp"
             android:nestedScrollingEnabled="false" />
 
-        <!-- خط فاصل -->
         <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -205,17 +205,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
+            android:text="🔊 إعدادات الأصوات والتنبيهات"
             android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
-            android:textStyle="bold"
-            tools:text="🔊 إعدادات الأصوات والتنبيهات" />
+            android:textStyle="bold" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            tools:hint="صوت النجاح (المرور المقبول)">
+            android:hint="صوت النجاح (المرور المقبول)">
 
             <AutoCompleteTextView
                 android:id="@+id/spSoundPass"
@@ -229,7 +229,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            tools:hint="صوت الرفض (العوائق والمنع)">
+            android:hint="صوت الرفض (العوائق والمنع)">
 
             <AutoCompleteTextView
                 android:id="@+id/spSoundDeny"
@@ -243,7 +243,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            tools:hint="صوت الإنذار الأمني">
+            android:hint="صوت الإنذار الأمني">
 
             <AutoCompleteTextView
                 android:id="@+id/spSoundAlarm"
@@ -265,10 +265,10 @@
                 android:layout_height="48dp"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
+                android:text="🔊 اختبار الصوت"
                 android:textColor="?attr/colorPrimary"
                 app:cornerRadius="10dp"
-                app:strokeColor="?attr/colorPrimary"
-                tools:text="اختبار الصوت" />
+                app:strokeColor="?attr/colorPrimary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSaveSounds"
@@ -276,27 +276,26 @@
                 android:layout_height="48dp"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
+                android:text="💾 حفظ الأصوات"
                 android:textColor="?attr/colorOnPrimary"
                 app:backgroundTint="?attr/colorPrimary"
-                app:cornerRadius="10dp"
-                tools:text="حفظ الأصوات" />
+                app:cornerRadius="10dp" />
         </LinearLayout>
 
-        <!-- خط فاصل -->
         <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp" />
 
-        <!-- ⚙️ إعدادات النظام الإضافية -->
+        <!-- ⚙️ إعدادات النظام -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
+            android:text="⚙️ خصائص الهاردوير والنظام"
             android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
-            android:textStyle="bold"
-            tools:text="⚙️ خصائص الهاردوير والنظام" />
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -309,9 +308,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:text="تفعيل الاهتزاز عند القراءة"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="14sp"
-                tools:text="تفعيل الاهتزاز عند القراءة" />
+                android:textSize="14sp" />
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switchVibration"
@@ -330,9 +329,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:text="وميض الشاشة عند الإنذار"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="14sp"
-                tools:text="وميض الشاشة عند الإنذار" />
+                android:textSize="14sp" />
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switchFlash"
@@ -345,23 +344,23 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            tools:hint="مدة الإنذار (بالثواني)">
+            android:hint="مدة الإنذار (بالثواني)">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etAlarmDuration"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="number"
-                tools:text="10" />
+                android:text="10" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
+            android:text="قوة قارئ RFID الافتراضية"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            tools:text="قوة قارئ RFID الافتراضية" />
+            android:textSize="12sp" />
 
         <SeekBar
             android:id="@+id/seekRfidPower"
@@ -369,7 +368,8 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
             android:max="30"
-            android:progress="28" />
+            android:min="5"
+            android:progress="30" />
 
         <TextView
             android:id="@+id/tvRfidPowerValue"
@@ -377,21 +377,21 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
             android:gravity="center"
+            android:text="30 dBm"
             android:textColor="?attr/colorPrimary"
             android:textSize="15sp"
-            android:textStyle="bold"
-            tools:text="28 dBm" />
+            android:textStyle="bold" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSaveAll"
             android:layout_width="match_parent"
             android:layout_height="52dp"
+            android:text="💾 حفظ جميع الإعدادات العامة"
             android:textColor="?attr/colorOnPrimary"
             android:textSize="15sp"
             android:textStyle="bold"
             app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="12dp"
-            tools:text="حفظ جميع الإعدادات العامة" />
+            app:cornerRadius="12dp" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
