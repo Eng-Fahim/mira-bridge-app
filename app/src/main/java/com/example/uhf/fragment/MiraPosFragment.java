@@ -90,7 +90,10 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final long ITEM_ADDED_DISPLAY_MS = 1000;
     private static final long AUTO_ADD_DELAY_MS = 350;
     private static final int  AUTO_ADD_MIN_LEN = 6;
-
+    
+    // ⭐ حالة وضع المسح الموحدة
+    private enum ScanMode { NONE, RFID, MANUAL, GS1 }
+    private volatile ScanMode currentScanMode = ScanMode.NONE;
     // ═══════════════════════════════════════════════════════
     // Managers
     // ═══════════════════════════════════════════════════════
@@ -308,28 +311,42 @@ public class MiraPosFragment extends MiraBaseFragment {
             Log.e(TAG, "onResume error: " + e.getMessage());
         }
     }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        try {
+@Override
+public void onPause() {
+    super.onPause();
+    try {
+        // ⭐ عالج كل الأوضاع (RFID + MANUAL + GS1)
+        if (currentScanMode != ScanMode.NONE) {
+            switchScanMode(ScanMode.NONE);
+        } else {
+            // احتياط
             stopRFIDScan();
-            isCheckoutDialogShowing = false;
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-                View fab = getActivity().findViewById(R.id.fabActionCenter);
-                if (fab != null) {
-                    fab.setVisibility(View.VISIBLE);
-                    Log.d(TAG, "👁️ FAB restored");
+            isRFIDModeActive = false;
+            // احتياط: أخفِ الإدخال اليدوي لو ظاهر
+            try {
+                if (posManualInputContainer != null
+                        && posManualInputContainer.getVisibility() == View.VISIBLE) {
+                    hideManualInput();
                 }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onPause error: " + e.getMessage());
+            } catch (Exception ignored) {}
         }
+
+        isCheckoutDialogShowing = false;
+        if (heroController != null) {
+            heroController.setState(PosHeroController.State.IDLE);
+        }
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setVisibility(View.VISIBLE);
+                Log.d(TAG, "👁️ FAB restored");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onPause error: " + e.getMessage());
     }
+}
 
     @Override
     public void onStart() {
@@ -346,7 +363,6 @@ public class MiraPosFragment extends MiraBaseFragment {
             ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
         }
     }
-
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -380,7 +396,9 @@ if (backPressedCallback != null) {
             pendingEpcs.clear();
             lastScannedTimes.clear();
             selectedRefundItem.set(null);
-
+// ⭐ تصفير الحالة
+currentScanMode = ScanMode.NONE;
+isRFIDModeActive = false;
             if (mainHandler != null) {
                 mainHandler.removeCallbacksAndMessages(null);
             }
@@ -569,30 +587,39 @@ if (backPressedCallback != null) {
                 });
             }
 
-            if (btnPosScanGs1 != null) {
-                btnPosScanGs1.setOnClickListener(v -> {
-                    if (heroController == null) return;
-                    UIHelper.hideKeyboard(getActivity());
-                    heroController.setState(PosHeroController.State.GS1_SCANNING);
-                    openBarcodeScanner();
-                });
-            }
+            // ⭐ GS1 — Barcode
+if (btnPosScanGs1 != null) {
+    btnPosScanGs1.setOnClickListener(v -> {
+        UIHelper.hideKeyboard(getActivity());
+        switchScanMode(ScanMode.GS1);
+    });
+}
 
-            if (btnPosScanRfid != null) {
-                btnPosScanRfid.setOnClickListener(v -> {
-                    if (heroController == null) return;
-                    UIHelper.hideKeyboard(getActivity());
-                    toggleRFIDMode();
-                });
-            }
+// ⭐ RFID — Toggle
+if (btnPosScanRfid != null) {
+    btnPosScanRfid.setOnClickListener(v -> {
+        UIHelper.hideKeyboard(getActivity());
+        // إذا RFID نشط → أوقفه | وإلا → ابدأه
+        if (currentScanMode == ScanMode.RFID) {
+            switchScanMode(ScanMode.NONE);
+        } else {
+            switchScanMode(ScanMode.RFID);
+        }
+    });
+}
 
-            if (btnPosScanManual != null) {
-                btnPosScanManual.setOnClickListener(v -> {
-                    if (heroController == null) return;
-                    UIHelper.hideKeyboard(getActivity());
-                    showManualInput();
-                });
-            }
+// ⭐ Manual
+if (btnPosScanManual != null) {
+    btnPosScanManual.setOnClickListener(v -> {
+        UIHelper.hideKeyboard(getActivity());
+        // إذا Manual مفتوح → أغلقه | وإلا → افتحه
+        if (currentScanMode == ScanMode.MANUAL) {
+            switchScanMode(ScanMode.NONE);
+        } else {
+            switchScanMode(ScanMode.MANUAL);
+        }
+    });
+}
 
             if (btnPosRefund != null) {
                 btnPosRefund.setOnClickListener(v -> {
@@ -1748,22 +1775,18 @@ private void handleCustomBack() {
         }
 
         // 2. RFID نشط → أوقفه
-        if (isRFIDModeActive) {
-            Log.d(TAG, "⏹️ Back: stopping RFID scan");
-            toggleRFIDMode();
-            return;
-        }
+if (currentScanMode == ScanMode.RFID) {
+    Log.d(TAG, "⏹️ Back: stopping RFID scan");
+    switchScanMode(ScanMode.NONE);
+    return;
+}
 
-        // 3. حقل الإدخال اليدوي
-        if (posManualInputContainer != null
-                && posManualInputContainer.getVisibility() == View.VISIBLE) {
-            Log.d(TAG, "⬇️ Back: hiding manual input");
-            hideManualInput();
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-            return;
-        }
+        // 3. الإدخال اليدوي
+if (currentScanMode == ScanMode.MANUAL) {
+    Log.d(TAG, "⬇️ Back: closing manual input");
+    switchScanMode(ScanMode.NONE);
+    return;
+}
 
         // 4. السلة غير فارغة → تأكيد
         if (cartManager != null && !cartManager.isEmpty()) {
@@ -1836,28 +1859,94 @@ private void navigateAwayFromPos() {
     // RFID & Barcode
     // ═══════════════════════════════════════════════════════
 
-    private void toggleRFIDMode() {
-        try {
-            if (!isAdded() || rfidManager == null) return;
+// ═══════════════════════════════════════════════════════
+// ⭐ إدارة وضع المسح الموحد
+// ═══════════════════════════════════════════════════════
 
-            isRFIDModeActive = !isRFIDModeActive;
-            if (isRFIDModeActive) {
-                startRFIDScan();
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.RFID_LISTENING);
-                    heroController.resetRfidCount();
-                }
-            } else {
+/**
+ * تبديل ذكي بين أوضاع المسح الثلاثة:
+ * - GS1: فتح ماسح الباركود
+ * - RFID: تشغيل/إيقاف مسح RFID
+ * - MANUAL: إظهار حقل الإدخال اليدوي
+ *
+ * الميزة: عند التبديل، يتم تنظيف الوضع السابق أولاً
+ * حتى لا تتداخل الأوضاع.
+ */
+private void switchScanMode(ScanMode target) {
+    if (isFragmentDestroyed || !isAdded()) return;
+    if (heroController == null) return;
+
+    Log.d(TAG, "🔄 Scan mode: " + currentScanMode + " → " + target);
+
+    // ─────────────────────────────────────
+    // 1) تنظيف الوضع الحالي
+    // ─────────────────────────────────────
+    switch (currentScanMode) {
+        case RFID:
+            // أوقف RFID
+            try {
                 stopRFIDScan();
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.IDLE);
-                }
+                isRFIDModeActive = false;
+            } catch (Exception e) {
+                Log.e(TAG, "Stop RFID error: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "toggleRFIDMode error: " + e.getMessage());
-            isRFIDModeActive = false;
-        }
+            break;
+
+        case MANUAL:
+            // أخفِ حقل الإدخال اليدوي
+            try {
+                hideManualInput();
+            } catch (Exception e) {
+                Log.e(TAG, "Hide manual error: " + e.getMessage());
+            }
+            break;
+
+        case GS1:
+            // لا شيء — الماسح Fragment مؤقت
+            break;
+
+        case NONE:
+        default:
+            // لا شيء
+            break;
     }
+
+    // ─────────────────────────────────────
+    // 2) تفعيل الوضع الجديد
+    // ─────────────────────────────────────
+    currentScanMode = target;
+
+    switch (target) {
+        case GS1:
+            // أظهر حالة GS1 + افتح الماسح
+            heroController.setState(PosHeroController.State.GS1_SCANNING);
+            openBarcodeScanner();
+            // ملاحظة: بعد إغلاق الماسح، onBarcodeScannerResult
+            // سيُعيد الوضع إلى NONE تلقائياً
+            break;
+
+        case RFID:
+            // ابدأ RFID
+            heroController.setState(PosHeroController.State.RFID_LISTENING);
+            heroController.resetRfidCount();
+            isRFIDModeActive = true;
+            startRFIDScan();
+            break;
+
+        case MANUAL:
+            // أظهر حقل الإدخال
+            heroController.setState(PosHeroController.State.MANUAL_ENTRY);
+            showManualInput();
+            break;
+
+        case NONE:
+        default:
+            // العودة للحالة الطبيعية
+            heroController.setState(PosHeroController.State.IDLE);
+            break;
+    }
+}
+    
 
     private void startRFIDScan() {
         try {
@@ -1929,17 +2018,19 @@ private void navigateAwayFromPos() {
 
             MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
             sf.setOnBarcodeScannedListener((data, format) -> {
-                try {
-                    if (isAdded() && data != null && !data.isEmpty()) {
-                        processRingEpc(data, "barcode");
-                    }
-                    if (heroController != null) {
-                        heroController.setState(PosHeroController.State.IDLE);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Barcode callback error: " + e.getMessage());
-                }
-            });
+    try {
+        if (isAdded() && data != null && !data.isEmpty()) {
+            processRingEpc(data, "barcode");
+        }
+        // ⭐ أعِد الوضع إلى NONE بعد المسح
+        currentScanMode = ScanMode.NONE;
+        if (heroController != null) {
+            heroController.setState(PosHeroController.State.IDLE);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Barcode callback error: " + e.getMessage());
+    }
+});
 
             int containerId = android.R.id.content;
             try {
@@ -2193,4 +2284,4 @@ private void navigateAwayFromPos() {
         Log.d(TAG, "showDiscountDialog: redirecting to checkout dialog");
         processCheckoutAndStockUpdate();
     }
-}
+                }
