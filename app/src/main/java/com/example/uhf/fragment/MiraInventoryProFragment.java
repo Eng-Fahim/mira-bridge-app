@@ -13,6 +13,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageButton; 
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -51,6 +52,7 @@ import com.example.uhf.utils.MiraExecutorService;
 import com.example.uhf.utils.RFIDCodeUtils;
 import com.example.uhf.utils.SoundManager;
 import com.example.uhf.manager.inventory.InventorySnapshotManager;
+import com.example.uhf.fragment.MiraDashboardFragment;
 
 
 import com.google.android.material.button.MaterialButton;
@@ -114,7 +116,7 @@ private View metricsRow;
 private View fancyDivider;
 private View iconActionsRow;
 private View nestedScroll;
-
+private ImageButton btnInventoryClose;
 
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
@@ -650,6 +652,9 @@ public View onCreateView(@NonNull LayoutInflater inflater,
 
         // Setup Segmented Control
         setupSegmentedControl();
+        
+        // ⭐ زر الإغلاق
+        btnInventoryClose = view.findViewById(R.id.btnInventoryClose);
     }
 
     private void setupRecyclerView() {
@@ -728,6 +733,24 @@ if (btnGenerateReport != null) {
         if (btnArchiveReportsCompact != null) {
             btnArchiveReportsCompact.setOnClickListener(v -> showArchiveReports());
         }
+        
+        // ⭐ زر الإغلاق
+if (btnInventoryClose != null) {
+    btnInventoryClose.setOnClickListener(v -> {
+        try {
+            if (getActivity() != null) {
+                // أخفِ الكيبورد إن كان مفتوحاً
+                android.view.inputmethod.InputMethodManager imm =
+                        (android.view.inputmethod.InputMethodManager)
+                        getActivity().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null && etSearchItems != null) {
+                    imm.hideSoftInputFromWindow(etSearchItems.getWindowToken(), 0);
+                }
+            }
+        } catch (Exception ignored) {}
+        handleCustomBack();
+    });
+}
     }
 
     private void setupSearchBar() {
@@ -972,25 +995,125 @@ private void animateCount(TextView textView, int from, int to) {
     // ==================== Back Press ====================
 
     private void setupBackPressHandler() {
-        backPressedCallback = new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                if (isScanning) {
-                    showExitWarning(() -> {
-                        stopScanning();
-                        setEnabled(false);
-                        requireActivity().getOnBackPressedDispatcher().onBackPressed();
-                    });
-                } else {
-                    setEnabled(false);
-                    requireActivity().getOnBackPressedDispatcher().onBackPressed();
-                }
-            }
-        };
+    backPressedCallback = new OnBackPressedCallback(true) {
+        @Override
+        public void handleOnBackPressed() {
+            handleCustomBack();
+        }
+    };
 
-        requireActivity().getOnBackPressedDispatcher().addCallback(
-                getViewLifecycleOwner(), backPressedCallback);
+    requireActivity().getOnBackPressedDispatcher().addCallback(
+            getViewLifecycleOwner(), backPressedCallback);
+}
+
+// ═══════════════════════════════════════════════════════
+// Back Press Handler
+// ═══════════════════════════════════════════════════════
+
+/**
+ * ✅ المنطق الذكي للرجوع:
+ *   1. جرد نشط → تحذير ثم إنهاء الجرد والمغادرة
+ *   2. جرد غير فارغ → تأكيد المغادرة
+ *   3. خلاف ذلك → انتقال للـDashboard
+ */
+private void handleCustomBack() {
+    try {
+        // 1. الجرد نشط → تحذير أولاً
+        if (isScanning) {
+            Log.d(TAG, "⚠️ Back: scanning active → warning");
+            showExitWarning(this::navigateAwayFromInventory);
+            return;
+        }
+
+        // 2. جرد غير فارغ → تأكيد المغادرة
+        if (scannedItemsDisplayList != null && !scannedItemsDisplayList.isEmpty()) {
+            Log.d(TAG, "⚠️ Back: " + scannedItemsDisplayList.size()
+                    + " items → confirming");
+            showExitConfirmation();
+            return;
+        }
+
+        // 3. اذهب للشاشة السابقة
+        Log.d(TAG, "🚪 Back: navigating away");
+        navigateAwayFromInventory();
+    } catch (Exception e) {
+        Log.e(TAG, "handleCustomBack error", e);
+        navigateAwayFromInventory();
     }
+}
+
+/**
+ * ✅ تأكيد المغادرة عند وجود قطع في الجرد
+ */
+private void showExitConfirmation() {
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📦 مغادرة شاشة الجرد؟" : "📦 Leave Inventory?")
+            .setMessage(isArabic
+                    ? "لديك " + scannedItemsDisplayList.size() + " قطعة في الجلسة الحالية.\n\n"
+                    + "هل تريد المغادرة؟ (سيتم حفظ الجلسة تلقائياً)"
+                    : "You have " + scannedItemsDisplayList.size() + " items in the session.\n\n"
+                    + "Leave anyway? (Session will be saved)")
+            .setPositiveButton(isArabic ? "مغادرة" : "Leave",
+                    (d, w) -> navigateAwayFromInventory())
+            .setNegativeButton(isArabic ? "البقاء" : "Stay", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show();
+}
+
+/**
+ * ✅ المغادرة الفعلية: إيقاف الجرد + حفظ الجلسة + فتح القفل + الانتقال للـDashboard
+ */
+private void navigateAwayFromInventory() {
+    try {
+        // 1. أوقف المسح إن كان نشطاً
+        try {
+            if (isScanning) {
+                Log.d(TAG, "⏹️ Stopping scan before leaving");
+                stopScanning();
+            }
+        } catch (Exception ignored) {}
+
+        // 2. احفظ الجلسة دائماً قبل المغادرة
+        try {
+            if (scannedItemsDisplayList != null
+                    && !scannedItemsDisplayList.isEmpty()
+                    && sessionManager != null) {
+                sessionManager.saveSession(
+                        expectedCount,
+                        scanStartTime,
+                        selectedCategoryFilter,
+                        scannedItemsDisplayList);
+                Log.d(TAG, "💾 Session saved before leaving");
+            }
+        } catch (Exception ignored) {}
+
+        // 3. فك قفل التنقل
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setNavigationLocked(false);
+            }
+        } catch (Exception ignored) {}
+
+        // 4. انتقل للـDashboard
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+            if (activity.getNavigationManager() != null) {
+                activity.getNavigationManager().goToDashboard();
+                Log.d(TAG, "✅ Navigated to Dashboard via NavigationManager");
+            } else {
+                activity.loadFragmentDirectly(
+                        new MiraDashboardFragment(),
+                        com.example.uhf.navigation.NavigationManager.TAG_DASHBOARD);
+                Log.d(TAG, "✅ Navigated to Dashboard (fallback)");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "navigateAwayFromInventory error", e);
+    }
+}
 
     private void showExitWarning(Runnable onConfirm) {
         if (!isAdded() || isFragmentDestroyed) return;
