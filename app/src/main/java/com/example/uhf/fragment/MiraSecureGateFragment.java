@@ -7,7 +7,6 @@ import androidx.activity.OnBackPressedCallback;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.content.pm.ApplicationInfo;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -42,6 +41,7 @@ import androidx.annotation.RequiresApi;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
@@ -50,7 +50,6 @@ import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.service.MiraGateMonitorService;
-import com.example.uhf.tools.RfidHardwareHelper;
 import com.example.uhf.tools.SoundGenerator;
 import com.example.uhf.MiraRfid.GateRfidBridge;
 import com.example.uhf.navigation.NavigationManager;
@@ -83,14 +82,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * MiraSecureGateFragment v3.0
+ * ✅ MiraSecureGateFragment v3.1 — النسخة النهائية المُحصّنة
  * ═══════════════════════════════════════════════════════════════
- * ✅ v3.0 الجديد:
- *  - 🎯 Grid ديناميكي (1 على الهاتف، 2 على التابلت)
- *  - 🔙 زر إغلاق + OnBackPressedCallback
- *  - 🧹 إخفاء أدوات التطوير في الإنتاج
- *  - 📊 تحسين عرض بطاقات البوابات
- *  - 🛡️ تأكيد الخروج أثناء Lockdown
+ * إصلاحات v3.1:
+ *  - ✅ hideDevTools() يستخدم BuildConfig.ALLOW_SIMULATOR
+ *  - ✅ handleGateDecision() تتحقق من SIMULATOR قبل الإنذار
+ *  - ✅ autoStartScanning() لا تبدأ على SIMULATOR تلقائياً
+ *  - ✅ فحص مزدوج لمنع بدء المسح المتكرر
+ *  - ✅ stopScanningSync() فحص قبل الإيقاف
  */
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MiraSecureGateFragment extends Fragment {
@@ -186,10 +185,7 @@ public class MiraSecureGateFragment extends Fragment {
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
     private boolean isArabic = true;
 
-    // ⭐ الجديد: Back press
     private OnBackPressedCallback backPressedCallback;
-
-    // ⭐ الجديد: زر الإغلاق
     private ImageButton btnGateClose;
 
     private final Runnable continuousScanTask = new Runnable() {
@@ -211,8 +207,6 @@ public class MiraSecureGateFragment extends Fragment {
             mainHandler.postDelayed(this, CONTINUOUS_SCAN_INTERVAL_MS);
         }
     };
-
-    // ==================== Activity Result Launcher ====================
 
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher =
             registerForActivityResult(new ScanContract(), result -> {
@@ -295,6 +289,17 @@ public class MiraSecureGateFragment extends Fragment {
             Log.w(TAG, "Task rejected: " + e.getMessage());
         } catch (Exception e) {
             Log.e(TAG, "executeOnGateExecutor error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ هل نحن في وضع المحاكاة؟
+     */
+    private boolean isSimulatorMode() {
+        try {
+            return gateRfidBridge != null && gateRfidBridge.isSimulationMode();
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -383,8 +388,6 @@ public class MiraSecureGateFragment extends Fragment {
 
         spBranchSelector = view.findViewById(R.id.spBranchSelector);
         tvCurrentBranch = view.findViewById(R.id.tvCurrentBranch);
-
-        // ⭐ زر الإغلاق الجديد
         btnGateClose = view.findViewById(R.id.btnGateClose);
 
         rgOperationMode = view.findViewById(R.id.rgOperationMode);
@@ -399,7 +402,6 @@ public class MiraSecureGateFragment extends Fragment {
         swSimulateExitOnSale = view.findViewById(R.id.swSimulateExitOnSale);
 
         if (rvGatesMonitor != null) {
-            // ⭐ Grid ديناميكي: 1 على الهاتف، 2 على التابلت
             int spanCount = isTablet() ? 2 : 1;
             rvGatesMonitor.setLayoutManager(new GridLayoutManager(getContext(), spanCount));
             monitorAdapter = new GateMonitorAdapter();
@@ -473,7 +475,6 @@ public class MiraSecureGateFragment extends Fragment {
             logConsole(getLocalizedText("🔍 فلتر: المقبول", "🔍 Filter: Pass"));
         });
 
-        // ⭐ زر الإغلاق في الـHeader
         if (btnGateClose != null) {
             btnGateClose.setOnClickListener(v -> handleCustomBack());
         }
@@ -482,15 +483,14 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // ⭐ إخفاء أدوات التطوير في الإنتاج
+    // ✅ إخفاء أدوات التطوير — يستخدم BuildConfig
     // ═══════════════════════════════════════════════════════
 
     private void hideDevTools() {
         try {
-            boolean isDebugMode = (requireContext().getApplicationInfo().flags
-                    & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+            boolean showDevTools = BuildConfig.ALLOW_SIMULATOR;
 
-            int visibility = isDebugMode ? View.VISIBLE : View.GONE;
+            int visibility = showDevTools ? View.VISIBLE : View.GONE;
 
             if (btnSimulateAllowed != null) btnSimulateAllowed.setVisibility(visibility);
             if (btnSimulateDenied != null) btnSimulateDenied.setVisibility(visibility);
@@ -503,14 +503,14 @@ public class MiraSecureGateFragment extends Fragment {
             if (btnFilterPass != null) btnFilterPass.setVisibility(visibility);
             if (swSimulateExitOnSale != null) swSimulateExitOnSale.setVisibility(visibility);
 
-            Log.d(TAG, "🧹 Dev tools visibility: " + (isDebugMode ? "VISIBLE" : "GONE"));
+            Log.d(TAG, "🧹 Dev tools: " + (showDevTools ? "VISIBLE" : "GONE"));
         } catch (Exception e) {
             Log.e(TAG, "hideDevTools error: " + e.getMessage());
         }
     }
 
     // ═══════════════════════════════════════════════════════
-    // ⭐ Back Press Handler — يعيد للـDashboard
+    // Back Press Handler
     // ═══════════════════════════════════════════════════════
 
     private void setupBackPressHandler() {
@@ -530,13 +530,11 @@ public class MiraSecureGateFragment extends Fragment {
 
     private void handleCustomBack() {
         try {
-            // 1. نافذة الإنذار مفتوحة → أوقفها
             if (overlayAlarm != null && overlayAlarm.getVisibility() == View.VISIBLE) {
                 stopAlarm();
                 return;
             }
 
-            // 2. في lockdown → اطلب تأكيد
             if (isLockdown) {
                 new MaterialAlertDialogBuilder(requireContext())
                         .setTitle(isArabic ? "⚠️ إغلاق طارئ نشط" : "⚠️ Lockdown Active")
@@ -553,7 +551,6 @@ public class MiraSecureGateFragment extends Fragment {
                 return;
             }
 
-            // 3. انتقال للـ Dashboard
             navigateAwayFromGate();
 
         } catch (Exception e) {
@@ -564,7 +561,6 @@ public class MiraSecureGateFragment extends Fragment {
 
     private void navigateAwayFromGate() {
         try {
-            // أوقف كل شيء
             try { stopScanningSync(); } catch (Exception ignored) {}
             try { stopContinuousScan(); } catch (Exception ignored) {}
             try { applyKeepScreenOn(false); } catch (Exception ignored) {}
@@ -576,11 +572,6 @@ public class MiraSecureGateFragment extends Fragment {
                 if (activity.getNavigationManager() != null) {
                     activity.getNavigationManager().goToDashboard();
                     Log.d(TAG, "✅ Navigated to Dashboard via NavigationManager");
-                } else {
-                    activity.loadFragmentDirectly(
-                            new MiraDashboardFragment(),
-                            NavigationManager.TAG_DASHBOARD);
-                    Log.d(TAG, "✅ Navigated to Dashboard (fallback)");
                 }
             }
         } catch (Exception e) {
@@ -789,7 +780,8 @@ public class MiraSecureGateFragment extends Fragment {
         mainHandler.removeCallbacks(continuousScanTask);
         Log.d(TAG, "⏹️ Continuous scan stopped");
     }
-        // ==================== Branch Management ====================
+
+    // ==================== Branch Management ====================
 
     private void loadCurrentBranchInfo() {
         try {
@@ -871,12 +863,6 @@ public class MiraSecureGateFragment extends Fragment {
                                                 branchesList.get(position - 1).branchId;
                                     }
                                     loadAllGatesStatus();
-                                    String branchName = position == 0
-                                            ? getLocalizedText("كل الفروع", "All Branches")
-                                            : branchesList.get(position - 1).branchName;
-                                    logConsole(getLocalizedText(
-                                            "🔄 تم تغيير الفرع إلى: ",
-                                            "🔄 Branch changed to: ") + branchName);
                                 }
 
                                 @Override
@@ -960,8 +946,6 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    // ==================== Background Service ====================
-
     private void startBackgroundService() {
         try {
             Context context = getContext();
@@ -976,8 +960,6 @@ public class MiraSecureGateFragment extends Fragment {
             Log.e(TAG, "Start service: " + e.getMessage());
         }
     }
-
-    // ==================== Lockdown ====================
 
     private void toggleLockdown() {
         isLockdown = !isLockdown;
@@ -1082,12 +1064,6 @@ public class MiraSecureGateFragment extends Fragment {
                 });
             } catch (Exception e) {
                 Log.e(TAG, "toggleGateState: " + e.getMessage());
-                mainHandler.post(() -> {
-                    if (isAdded() && !isDestroyed) {
-                        logConsole(getLocalizedText("❌ خطأ في التحكم بالبوابة: ",
-                                "❌ Gate control error: ") + e.getMessage());
-                    }
-                });
             }
         });
     }
@@ -1255,33 +1231,48 @@ public class MiraSecureGateFragment extends Fragment {
 
     // ==================== RFID Scanning ====================
 
+    /**
+     * ✅ بدء المسح التلقائي — لا يبدأ على SIMULATOR
+     */
     private void autoStartScanning() {
-    // ✅ فحص مزدوج قبل الجدولة
-    if (isScanning) return;
-    if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
+        // ✅ في وضع SIMULATOR: لا تبدأ تلقائياً
+        if (isSimulatorMode()) {
+            logConsole(getLocalizedText(
+                    "🧪 وضع المحاكاة — اضغط 'تفعيل المسح' يدوياً",
+                    "🧪 Simulation mode — Press 'Start Scan' manually"));
+            return;
+        }
 
-    mainHandler.postDelayed(() -> {
-        if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
-        // ✅ فحص ثانٍ قبل التنفيذ
         if (isScanning) return;
         if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
-        startScanning();
-    }, 1200);
-}
+
+        mainHandler.postDelayed(() -> {
+            if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
+            if (isScanning) return;
+            if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
+            startScanning();
+        }, 1200);
+    }
 
     private void toggleScanning() {
         if (isScanning) stopScanning();
         else startScanning();
     }
-private void startScanning() {
-    if (isDestroyed || mContext == null || isCameraOpen) return;
-    if (gateRfidBridge == null) return;
-    
-    // ✅ فحص إضافي: لا تبدأ إذا كان المسح يعمل
-    if (isScanning) {
-        Log.d(TAG, "⏸️ Scan already active — skipping");
-        return;
-    }
+
+    private void startScanning() {
+        if (isDestroyed || mContext == null || isCameraOpen) return;
+        if (gateRfidBridge == null) return;
+
+        // ✅ فحص مزدوج
+        if (isScanning) {
+            Log.d(TAG, "⏸️ Scan already active — skipping");
+            return;
+        }
+        if (gateRfidBridge.isScanning()) {
+            Log.d(TAG, "⏸️ Bridge already scanning — skipping");
+            return;
+        }
+
         boolean accepted = gateRfidBridge.startScan(
                 new GateRfidBridge.GateTagListener() {
             @Override
@@ -1348,7 +1339,8 @@ private void startScanning() {
     }
 
     private void stopScanningSync() {
-        if (gateRfidBridge != null) {
+        // ✅ فحص قبل الإيقاف
+        if (gateRfidBridge != null && gateRfidBridge.isScanning()) {
             gateRfidBridge.stopScan(null);
         }
         isScanning = false;
@@ -1591,6 +1583,14 @@ private void startScanning() {
 
         logConsole("[".concat(sourceType).concat("] ") + cleanedEpc);
 
+        // ✅ في وضع SIMULATOR: سجل فقط، لا استعلام ولا إنذار
+        if (isSimulatorMode()) {
+            logConsole(getLocalizedText(
+                    "🧪 [SIM] تم تجاهل القراءة (وضع الاختبار)",
+                    "🧪 [SIM] Read ignored (test mode)"));
+            return;
+        }
+
         if (offlineCache != null && offlineCache.isAllowedLocally(cleanedEpc)) {
             mainHandler.post(() -> {
                 if (isAdded() && !isDestroyed) {
@@ -1694,6 +1694,14 @@ private void startScanning() {
 
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
+
+        // ✅ الحماية: لا إنذار حقيقي في وضع SIMULATOR
+        if (isSimulatorMode()) {
+            String mode = allowed ? "PASS" : "DENY";
+            logConsole("[SIM] " + mode + ": " + itemTitle + " → " + serial);
+            return;
+        }
+
         if (allowed && "ALERTS".equals(logFilter)) return;
         if (!allowed && "PASS".equals(logFilter)) return;
 
@@ -2110,17 +2118,16 @@ private void startScanning() {
     }
 
     @Override
-public void onResume() {
-    super.onResume();
-    applyOperationMode(currentOperationMode);
-    mainHandler.postDelayed(() -> {
-        if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
-        // ✅ فحص مزدوج قبل البدء
-        if (isScanning) return;
-        if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
-        startScanning();
-    }, 600);
-}
+    public void onResume() {
+        super.onResume();
+        applyOperationMode(currentOperationMode);
+        mainHandler.postDelayed(() -> {
+            if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
+            if (isScanning) return;
+            if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
+            startScanning();
+        }, 600);
+    }
 
     @Override
     public void onDestroyView() {
@@ -2132,7 +2139,6 @@ public void onResume() {
         stopContinuousScan();
         applyKeepScreenOn(false);
 
-        // ⭐ إزالة Back press callback
         if (backPressedCallback != null) {
             backPressedCallback.setEnabled(false);
             backPressedCallback.remove();
@@ -2154,4 +2160,3 @@ public void onResume() {
         mainHandler.removeCallbacksAndMessages(null);
     }
 }
-    
