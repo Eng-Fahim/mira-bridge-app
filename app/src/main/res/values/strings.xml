@@ -2242,7 +2242,7 @@
     <string name="gate_inactive">⚪ غير نشطة</string>
     <string name="gate_alert_status">🔴 إنذار</string>
 
-
+<string name="gate_close">إغلاق مركز البوابات</string>
  
     <!-- إدارة الشرائح -->
     <string name="rfid_bindings_title">إدارة الشرائح المبرمجة</string>
