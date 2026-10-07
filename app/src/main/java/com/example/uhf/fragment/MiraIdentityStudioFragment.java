@@ -2087,7 +2087,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 formManager.clearDraft();
             }
 
-            activateRFIDModeForEncoding();
+            handler.postDelayed(() -> {
+    if (isAdded() && !isRfidScanning && !isFormLocked) {
+        activateRFIDModeForEncoding();
+    }
+}, 500);
         } catch (Exception e) {
             Log.e(TAG, "resetFormForNextScan error: " + e.getMessage(), e);
         }
@@ -2349,22 +2353,52 @@ public void onResume() {
 
     if (!isAdded() || getActivity() == null) return;
 
-    // ✅ إخفاء Bottom Nav أولاً (قبل أي فحص)
+    // ✅ إخفاء Bottom Nav
     if (getActivity() instanceof UHFMainActivity) {
         ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
         ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
     }
 
-    // ✅ إذا الـ binding غير جاهز → أجّل بقية التنفيذ
     if (binding == null || getView() == null) {
         handler.postDelayed(() -> {
             if (!isAdded() || binding == null) return;
             performOnResumeSetup();
+            // ✅ [جديد] ابدأ المسح تلقائياً بعد تحميل الشاشة
+            autoStartRfidScanning();
         }, 100);
         return;
     }
 
     performOnResumeSetup();
+    // ✅ [جديد] ابدأ المسح تلقائياً
+    autoStartRfidScanning();
+}
+
+/**
+ * ✅ بدء المسح التلقائي عند فتح شاشة التكويد
+ */
+private void autoStartRfidScanning() {
+    if (isDestroyed() || !isAdded()) return;
+    if (binding == null) return;
+    if (isFormLocked) return;
+    if (isRfidScanning) return;
+
+    // ✅ بعد تأخير بسيط لضمان جاهزية الواجهة
+    handler.postDelayed(() -> {
+        if (isDestroyed() || !isAdded() || binding == null) return;
+        if (isFormLocked || isRfidScanning) return;
+
+        try {
+            Log.i(TAG, "🚀 Auto-starting RFID scan for encoding");
+            activateRFIDModeForEncoding();
+        } catch (Exception e) {
+            Log.e(TAG, "autoStartRfidScanning error: " + e.getMessage());
+        }
+    }, 800);
+}
+
+private boolean isDestroyed() {
+    return isRemoving() || isDetached() || !isAdded();
 }
 
 private void performOnResumeSetup() {
