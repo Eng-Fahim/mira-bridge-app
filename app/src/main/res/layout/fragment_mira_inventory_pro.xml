@@ -42,6 +42,21 @@
             android:paddingHorizontal="@dimen/space_3"
             android:paddingVertical="@dimen/space_2">
 
+            <!-- ⭐ زر الإغلاق — يظهر يمين الشاشة في RTL -->
+            <ImageButton
+                android:id="@+id/btnInventoryClose"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="@dimen/space_2"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/inventory_close"
+                android:focusable="true"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_close_rounded"
+                app:tint="@color/scan_status_text" />
+
             <View
                 android:id="@+id/statusDot"
                 android:layout_width="10dp"
