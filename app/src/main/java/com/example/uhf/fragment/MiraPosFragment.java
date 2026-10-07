@@ -27,6 +27,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.activity.OnBackPressedCallback;
 
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputLayout;
@@ -59,6 +60,7 @@ import com.example.uhf.model.CartItem;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.UIHelper;
 import com.example.uhf.utils.ScaleSimulationHelper;
+import com.example.uhf.navigation.NavigationManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -131,6 +133,10 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private ImageButton btnPosRefund;
     private ImageButton btnPosLastReceipt;
+    
+    private ImageButton btnPosClose;
+    private OnBackPressedCallback backPressedCallback;
+
 
     // ═══════════════════════════════════════════════════════
     // Views
@@ -277,6 +283,7 @@ public class MiraPosFragment extends MiraBaseFragment {
             updateCartSummary();
 
             heroController.setState(PosHeroController.State.IDLE);
+            setupBackPressedHandler();
 
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
@@ -346,6 +353,14 @@ public class MiraPosFragment extends MiraBaseFragment {
         try {
             stopRFIDScan();
             isCheckoutDialogShowing = false;
+            
+            // ⭐ إزالة معالج زر الرجوع
+if (backPressedCallback != null) {
+    backPressedCallback.setEnabled(false);
+    backPressedCallback.remove();
+    backPressedCallback = null;
+    Log.d(TAG, "🗑️ Back press handler removed");
+}
 
             if (rfidManager != null) rfidManager.setListener(null);
             if (scaleManager != null) scaleManager.cleanup();
@@ -404,6 +419,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         btnClearCart = view.findViewById(R.id.btnPosClearCart);
         btnPosRefund = view.findViewById(R.id.btnPosRefund);
         btnPosLastReceipt = view.findViewById(R.id.btnPosLastReceipt);
+        btnPosClose = view.findViewById(R.id.btnPosClose);
 
         rvCartItems = view.findViewById(R.id.rvPosCartItems);
         layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
@@ -591,6 +607,13 @@ public class MiraPosFragment extends MiraBaseFragment {
                     showLastReceiptDialog();
                 });
             }
+            // ⭐ زر الإغلاق في الأعلى
+if (btnPosClose != null) {
+    btnPosClose.setOnClickListener(v -> {
+        UIHelper.hideKeyboard(getActivity());
+        handleCustomBack();
+    });
+}
         } catch (Exception e) {
             Log.e(TAG, "setupListeners error: " + e.getMessage());
         }
@@ -1683,6 +1706,132 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
+
+// ═══════════════════════════════════════════════════════
+// Back Press Handler
+// ═══════════════════════════════════════════════════════
+
+/**
+ * ✅ يعالج زر الرجوع فيزيائيًا — يتفوق على Callback الـActivity
+ * لأن OnBackPressedDispatcher يُنفّذ الـCallbacks بترتيب LIFO
+ * وgetViewLifecycleOwner يجعل الـcallback مُقيّدًا بحياة الـView
+ */
+private void setupBackPressedHandler() {
+    if (getActivity() == null) return;
+
+    backPressedCallback = new OnBackPressedCallback(true) {
+        @Override
+        public void handleOnBackPressed() {
+            handleCustomBack();
+        }
+    };
+
+    requireActivity().getOnBackPressedDispatcher()
+            .addCallback(getViewLifecycleOwner(), backPressedCallback);
+    Log.d(TAG, "✅ Back press handler registered");
+}
+
+/**
+ * ✅ المنطق الذكي للرجوع:
+ *   1. نافذة الدفع مفتوحة → تجاهل (النافذة تعالج)
+ *   2. RFID نشط → أوقفه
+ *   3. حقل الإدخال اليدوي ظاهر → أخفِه
+ *   4. السلة غير فارغة → اطلب تأكيد
+ *   5. خلاف ذلك → انتقل للشاشة السابقة
+ */
+private void handleCustomBack() {
+    try {
+        // 1. نافذة الدفع
+        if (isCheckoutDialogShowing) {
+            Log.d(TAG, "⏭️ Back: checkout dialog showing");
+            return;
+        }
+
+        // 2. RFID نشط → أوقفه
+        if (isRFIDModeActive) {
+            Log.d(TAG, "⏹️ Back: stopping RFID scan");
+            toggleRFIDMode();
+            return;
+        }
+
+        // 3. حقل الإدخال اليدوي
+        if (posManualInputContainer != null
+                && posManualInputContainer.getVisibility() == View.VISIBLE) {
+            Log.d(TAG, "⬇️ Back: hiding manual input");
+            hideManualInput();
+            if (heroController != null) {
+                heroController.setState(PosHeroController.State.IDLE);
+            }
+            return;
+        }
+
+        // 4. السلة غير فارغة → تأكيد
+        if (cartManager != null && !cartManager.isEmpty()) {
+            Log.d(TAG, "⚠️ Back: cart not empty → confirming");
+            showExitConfirmation();
+            return;
+        }
+
+        // 5. اذهب للشاشة السابقة
+        Log.d(TAG, "🚪 Back: navigating away");
+        navigateAwayFromPos();
+    } catch (Exception e) {
+        Log.e(TAG, "handleCustomBack error: " + e.getMessage());
+        navigateAwayFromPos();
+    }
+}
+
+/**
+ * ✅ تأكيد المغادرة عند وجود عناصر في السلة
+ */
+private void showExitConfirmation() {
+    if (!isAdded() || getContext() == null) return;
+
+    new AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "🛒 مغادرة شاشة البيع؟" : "🛒 Leave POS?")
+            .setMessage(isArabic
+                    ? "لديك " + cartManager.size() + " عنصر في السلة.\n\n"
+                    + "هل تريد المغادرة؟ (سيتم الاحتفاظ بالسلة)"
+                    : "You have " + cartManager.size() + " items in cart.\n\n"
+                    + "Leave anyway? (Cart will be preserved)")
+            .setPositiveButton(isArabic ? "مغادرة" : "Leave",
+                    (d, w) -> navigateAwayFromPos())
+            .setNegativeButton(isArabic ? "البقاء" : "Stay", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show();
+}
+
+/**
+ * ✅ الانتقال للشاشة السابقة (Dashboard)
+ */
+private void navigateAwayFromPos() {
+    try {
+        // أوقف كل الأنشطة أولاً
+        try { stopRFIDScan(); } catch (Exception ignored) {}
+        try { UIHelper.hideKeyboard(getActivity()); } catch (Exception ignored) {}
+
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+            // فعّل الـBottomNav وأظهره
+            activity.setBottomNavVisible(true);
+
+            // انتقل للـDashboard عبر NavigationManager
+            if (activity.getNavigationManager() != null) {
+                activity.getNavigationManager().goToDashboard();
+                Log.d(TAG, "✅ Navigated to Dashboard");
+            } else {
+                // احتياط: انتقل بـ Fragment مباشرة
+                activity.loadFragmentDirectly(
+                        new MiraDashboardFragment(),
+                        NavigationManager.TAG_DASHBOARD);
+                Log.d(TAG, "✅ Navigated to Dashboard (fallback)");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "navigateAwayFromPos error: " + e.getMessage());
+    }
+}
     // ═══════════════════════════════════════════════════════
     // RFID & Barcode
     // ═══════════════════════════════════════════════════════
