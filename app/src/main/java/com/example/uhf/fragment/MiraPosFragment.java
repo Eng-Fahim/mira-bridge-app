@@ -1873,8 +1873,9 @@ private void navigateAwayFromPos() {
  * حتى لا تتداخل الأوضاع.
  */
 private void switchScanMode(ScanMode target) {
-    if (isFragmentDestroyed || !isAdded()) return;
+    if (!isAdded() || isDetached() || isRemoving()) return;
     if (heroController == null) return;
+   
 
     Log.d(TAG, "🔄 Scan mode: " + currentScanMode + " → " + target);
 
