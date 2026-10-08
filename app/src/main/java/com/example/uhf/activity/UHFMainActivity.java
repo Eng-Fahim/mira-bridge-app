@@ -183,6 +183,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
     private static final long INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 
+// ⭐ فترة سماح بعد اكتمال الإعداد (السيرفر يحتاج وقتاً للتحديث)
+private static final long SETUP_GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 دقائق
+private volatile long setupCompletedAt = 0;
+
     private AppLifecycleObserver appLifecycleObserver;
 
     private int incomingTransfersCount = 0;
@@ -557,122 +561,144 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
      * ⭐ تحديث حالة الإعداد في الخلفية — مع حماية من الرجوع الخطأ
      */
     private void refreshSetupStatusInBackground() {
-        new Thread(() -> {
-            try {
-                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+    // ⭐✅ تجاهل خلال فترة السماح
+    if (isWithinSetupGracePeriod()) {
+        Log.d(TAG, "🛡️ Skipping refresh during grace period");
+        return;
+    }
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    String serverStatus = response.data.optString("status", SETUP_PENDING);
-                    String serverStamp  = response.data.optString("setup_stamp", null);
-                    String localStamp   = getCachedSetupStamp();
-                    String localStatus  = getCachedSetupStatus();
+    new Thread(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
 
-                    boolean stampChanged = (localStamp != null && serverStamp != null
-                            && !localStamp.equals(serverStamp));
+            if (response != null && response.isSuccess && response.data != null) {
+                String serverStatus = response.data.optString("status", SETUP_PENDING);
+                String serverStamp  = response.data.optString("setup_stamp", null);
+                String localStamp   = getCachedSetupStamp();
+                String localStatus  = getCachedSetupStatus();
 
-                    // ⭐ حماية: منع الرجوع من completed → pending بدون تغيّر الختم
+                boolean stampChanged = (localStamp != null && serverStamp != null
+                        && !localStamp.equals(serverStamp));
+
+                // ⭐✅ حماية إضافية: completed محلي vs pending من السيرفر
+                if (SETUP_COMPLETED.equals(localStatus)
+                        && (SETUP_PENDING.equals(serverStatus)
+                            || SETUP_IN_PROGRESS.equals(serverStatus))
+                        && !stampChanged) {
+                    Log.w(TAG, "🛡️ Ignoring downgrade (completed → pending, no stamp change)");
+                    return;
+                }
+
+                if (stampChanged) {
+                    Log.w(TAG, "🔄 Stamp changed! invalidating cache");
+
+                    // ⭐✅ إذا كنا completed محلياً والسيرفر pending بدون سبب واضح
                     if (SETUP_COMPLETED.equals(localStatus)
-                            && !SETUP_COMPLETED.equals(serverStatus)
-                            && !SETUP_LOCKED.equals(serverStatus)
-                            && !stampChanged) {
-                        Log.w(TAG, "🛡️ Ignoring server downgrade (no stamp change)");
+                            && (SETUP_PENDING.equals(serverStatus)
+                                || SETUP_IN_PROGRESS.equals(serverStatus))) {
+                        Log.w(TAG, "🛡️ Keeping completed (server lag)");
+                        cacheSetupStatus(SETUP_COMPLETED, serverStamp);
                         return;
                     }
 
-                    if (stampChanged) {
-                        Log.w(TAG, "🔄 Stamp changed! invalidating cache");
-                        invalidateSetupCache();
-                        cacheSetupStatus(serverStatus, serverStamp);
+                    invalidateSetupCache();
+                    cacheSetupStatus(serverStatus, serverStamp);
 
-                        if (!SETUP_COMPLETED.equals(serverStatus)
-                                && !SETUP_LOCKED.equals(serverStatus)) {
-                            mainHandler.post(() -> {
-                                if (isActivityAlive()) {
-                                    Log.w(TAG, "🔄 Setup reset detected");
-                                    navigateBySetupStatus(serverStatus);
-                                }
-                            });
-                            return;
-                        }
-                    } else {
-                        cacheSetupStatus(serverStatus, serverStamp);
-                    }
-
-                    Log.d(TAG, "✅ Setup status refreshed: " + serverStatus
-                            + " (stampChanged=" + stampChanged + ")");
-
-                    if (SETUP_COMPLETED.equals(serverStatus)
-                            || SETUP_LOCKED.equals(serverStatus)) {
+                    if (!SETUP_COMPLETED.equals(serverStatus)
+                            && !SETUP_LOCKED.equals(serverStatus)) {
                         mainHandler.post(() -> {
                             if (isActivityAlive()) {
-                                navigateByRole();
+                                navigateBySetupStatus(serverStatus);
                             }
                         });
+                        return;
                     }
+                } else {
+                    cacheSetupStatus(serverStatus, serverStamp);
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "Setup status refresh failed: " + e.getMessage());
+
+                Log.d(TAG, "✅ Setup status refreshed: " + serverStatus);
+
+                if (SETUP_COMPLETED.equals(serverStatus)
+                        || SETUP_LOCKED.equals(serverStatus)) {
+                    mainHandler.post(() -> {
+                        if (isActivityAlive()) {
+                            navigateByRole();
+                        }
+                    });
+                }
             }
-        }).start();
-    }
+        } catch (Exception e) {
+            Log.w(TAG, "Setup status refresh failed: " + e.getMessage());
+        }
+    }).start();
+}
 
     /**
      * التوجيه حسب حالة الإعداد
      */
     private void navigateBySetupStatus(String setupStatus) {
-        boolean isSystemAdmin   = permissionManager != null && permissionManager.isSystemAdmin();
-        boolean isOrgAdmin      = permissionManager != null && permissionManager.isOrgAdmin();
-        boolean isFinanceMgr    = permissionManager != null && permissionManager.isFinanceManager();
-        boolean isAccountant    = permissionManager != null && permissionManager.isAccountant();
-
-        boolean canPerformSetup = isSystemAdmin || isOrgAdmin || isFinanceMgr || isAccountant;
-
-        boolean isSetupPending = SETUP_PENDING.equals(setupStatus)
-                || SETUP_IN_PROGRESS.equals(setupStatus);
-
-        Log.d(TAG, "🧭 Navigate: status=" + setupStatus
-                + ", isSystemAdmin=" + isSystemAdmin
-                + ", isOrgAdmin=" + isOrgAdmin
-                + ", isFinanceMgr=" + isFinanceMgr
-                + ", isAccountant=" + isAccountant);
-
-        if (isSetupPending) {
-            if (canPerformSetup) {
-                enableNavigationAfterSetup();
-
-                // ⭐ أخفِ الـ Nav مؤقتًا (لأن Fragment الإعداد سيطلب ذلك)
-                setBottomNavVisible(false);
-
-                loadFragmentDirectly(
-                        new MiraAccountingSetupFragment(),
-                        "AccountingSetup"
-                );
-
-                String welcomeMsg;
-                if (isSystemAdmin) {
-                    welcomeMsg = isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
-                                          : "🔧 Welcome Engineer — Please complete setup";
-                } else if (isOrgAdmin) {
-                    welcomeMsg = isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
-                                          : "🏢 Welcome Org Admin — Please configure accounting";
-                } else if (isFinanceMgr) {
-                    welcomeMsg = isArabic ? "💰 مرحباً المدير المالي — يرجى إعداد النظام المحاسبي"
-                                          : "💰 Welcome Finance Manager — Please configure accounting";
-                } else {
-                    welcomeMsg = isArabic ? "📊 مرحباً المحاسب — يرجى إكمال الإعداد"
-                                          : "📊 Welcome Accountant — Please complete setup";
-                }
-                Toast.makeText(this, welcomeMsg, Toast.LENGTH_LONG).show();
-
-            } else {
-                showSetupBlockedScreen();
-            }
-        } else {
-            enableNavigationAfterSetup();
-            navigateByRole();
-        }
+    // ⭐✅ الحماية الحاسمة: داخل فترة السماح → تجاهل كل شيء وتوجّه للـ Dashboard
+    if (isWithinSetupGracePeriod()) {
+        Log.d(TAG, "🛡️ Within grace period → forcing COMPLETED navigation "
+                + "(ignoring server status: " + setupStatus + ")");
+        enableNavigationAfterSetup();
+        navigateByRole();
+        return;
     }
+
+    boolean isSystemAdmin   = permissionManager != null && permissionManager.isSystemAdmin();
+    boolean isOrgAdmin      = permissionManager != null && permissionManager.isOrgAdmin();
+    boolean isFinanceMgr    = permissionManager != null && permissionManager.isFinanceManager();
+    boolean isAccountant    = permissionManager != null && permissionManager.isAccountant();
+
+    boolean canPerformSetup = isSystemAdmin || isOrgAdmin || isFinanceMgr || isAccountant;
+
+    boolean isSetupPending = SETUP_PENDING.equals(setupStatus)
+            || SETUP_IN_PROGRESS.equals(setupStatus);
+
+    Log.d(TAG, "🧭 Navigate: status=" + setupStatus
+            + ", isSystemAdmin=" + isSystemAdmin
+            + ", isOrgAdmin=" + isOrgAdmin
+            + ", isFinanceMgr=" + isFinanceMgr
+            + ", isAccountant=" + isAccountant);
+
+    if (isSetupPending) {
+        if (canPerformSetup) {
+            enableNavigationAfterSetup();
+            setBottomNavVisible(false);
+
+            loadFragmentDirectly(
+                    new MiraAccountingSetupFragment(),
+                    "AccountingSetup"
+            );
+
+            // ⭐ رسالة الترحيب — تظهر مرة واحدة فقط
+            String welcomeMsg;
+            if (isSystemAdmin) {
+                welcomeMsg = isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
+                                      : "🔧 Welcome Engineer — Please complete setup";
+            } else if (isOrgAdmin) {
+                welcomeMsg = isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
+                                      : "🏢 Welcome Org Admin — Please configure accounting";
+            } else if (isFinanceMgr) {
+                welcomeMsg = isArabic ? "💰 مرحباً المدير المالي — يرجى إعداد النظام المحاسبي"
+                                      : "💰 Welcome Finance Manager — Please configure accounting";
+            } else {
+                welcomeMsg = isArabic ? "📊 مرحباً المحاسب — يرجى إكمال الإعداد"
+                                      : "📊 Welcome Accountant — Please complete setup";
+            }
+            Toast.makeText(this, welcomeMsg, Toast.LENGTH_LONG).show();
+
+        } else {
+            showSetupBlockedScreen();
+        }
+    } else {
+        enableNavigationAfterSetup();
+        navigateByRole();
+    }
+}
 
     /**
      * التوجيه حسب دور المستخدم
@@ -891,51 +917,63 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
      * ⭐ يُستدعى من MiraAccountingSetupFragment عند اكتمال الإعداد
      */
     public void onSetupCompleted() {
-        Log.d(TAG, "🎉 onSetupCompleted");
+    Log.d(TAG, "🎉 onSetupCompleted");
 
-        // ⭐ 1. أظهر BottomNav
-        setBottomNavVisible(true);
+    // ⭐ 1. سجّل وقت الاكتمال لبدء فترة السماح
+    setupCompletedAt = System.currentTimeMillis();
 
-        // ⭐ 2. امسح الكاش القديم
-        invalidateSetupCache();
-        cacheSetupStatus(SETUP_COMPLETED);
+    // ⭐ 2. أظهر BottomNav
+    setBottomNavVisible(true);
 
-       /* Toast.makeText(this,
-                isArabic ? "✅ اكتمل الإعداد — يمكنك الآن استخدام النظام"
-                         : "✅ Setup complete — You can now use the system",
-                Toast.LENGTH_LONG).show();
-*/
+    // ⭐ 3. امسح الكاش القديم واحفظ "completed" فوراً
+    invalidateSetupCache();
+    cacheSetupStatus(SETUP_COMPLETED);
 
-        // ⭐ 3. اجلب الختم الفعلي
-        new Thread(() -> {
-            try {
-                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+    // ⭐ 4. اجلب الختم الفعلي — مع حماية من حالة "pending" المتأخرة
+    new Thread(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    String serverStatus = response.data.optString("status", SETUP_COMPLETED);
-                    String serverStamp  = response.data.optString("setup_stamp", null);
+            if (response != null && response.isSuccess && response.data != null) {
+                String serverStatus = response.data.optString("status", SETUP_COMPLETED);
+                String serverStamp  = response.data.optString("setup_stamp", null);
 
-                    cacheSetupStatus(serverStatus, serverStamp);
+                // ⭐✅ الحماية الحاسمة: إذا السيرفر لا يزال "pending" خلال فترة السماح
+                //      → احتفظ بـ "completed" محلياً ولا تستبدله
+                if ((SETUP_PENDING.equals(serverStatus)
+                        || SETUP_IN_PROGRESS.equals(serverStatus))
+                        && isWithinSetupGracePeriod()) {
 
-                    Log.d(TAG, "✅ Saved final setup state: " + serverStatus
-                            + " | stamp: " + (serverStamp != null
-                                    ? serverStamp.substring(0, 8) + "..."
-                                    : "null"));
+                    Log.w(TAG, "🛡️ Server still pending within grace period "
+                            + "→ keeping local COMPLETED");
+
+                    // احفظ "completed" مع الختم الجديد (للتتبع)
+                    cacheSetupStatus(SETUP_COMPLETED, serverStamp);
+                    return;
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "Failed to fetch final setup stamp: " + e.getMessage());
-            }
-        }).start();
 
-        // ⭐ 4. التوجيه الفوري لـ Dashboard (بدون تأخير)
-mainHandler.post(() -> {
-    if (isActivityAlive()) {
-        enableNavigationAfterSetup();
-        navigateByRole();
-    }
-});
-    }
+                // السيرفر محدّث — احفظ الحالة الحقيقية
+                cacheSetupStatus(serverStatus, serverStamp);
+
+                Log.d(TAG, "✅ Saved final setup state: " + serverStatus
+                        + " | stamp: " + (serverStamp != null
+                                ? serverStamp.substring(0, Math.min(8, serverStamp.length())) + "..."
+                                : "null"));
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to fetch final setup stamp: " + e.getMessage());
+        }
+    }).start();
+
+    // ⭐ 5. التوجيه الفوري لـ Dashboard
+    mainHandler.post(() -> {
+        if (isActivityAlive()) {
+            enableNavigationAfterSetup();
+            navigateByRole();
+        }
+    });
+}
 
     public void invalidateSetupCache() {
         try {
@@ -948,7 +986,15 @@ mainHandler.post(() -> {
             Log.w(TAG, "invalidateSetupCache error: " + e.getMessage());
         }
     }
-
+/**
+ * ⭐ هل نحن داخل فترة السماح بعد اكتمال الإعداد؟
+ * خلال هذه الفترة، نتجاهل أي حالة "pending" من السيرفر
+ */
+private boolean isWithinSetupGracePeriod() {
+    if (setupCompletedAt == 0) return false;
+    long elapsed = System.currentTimeMillis() - setupCompletedAt;
+    return elapsed < SETUP_GRACE_PERIOD_MS;
+}
     // ═══════════════════════════════════════════════════════
     //  Setup Loading Screen
     // ═══════════════════════════════════════════════════════
@@ -1442,42 +1488,68 @@ private void performConnectionTest() {
 }
 
     private void checkSetupStampOnResume() {
-        String cachedStatus = getCachedSetupStatus();
-        if (cachedStatus == null) return;
-
-        new Thread(() -> {
-            try {
-                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
-
-                if (response == null || !response.isSuccess || response.data == null) return;
-
-                String serverStatus = response.data.optString("status", SETUP_PENDING);
-                String serverStamp  = response.data.optString("setup_stamp", null);
-                String localStamp   = getCachedSetupStamp();
-
-                boolean stampMismatch = (localStamp != null && serverStamp != null
-                        && !localStamp.equals(serverStamp));
-
-                if (stampMismatch) {
-                    Log.w(TAG, "🔄 Stamp mismatch in onResume!");
-
-                    invalidateSetupCache();
-                    cacheSetupStatus(serverStatus, serverStamp);
-
-                    mainHandler.post(() -> {
-                        if (isActivityAlive()) {
-                            Log.w(TAG, "🔄 Re-navigating after stamp mismatch");
-                            enableNavigationAfterSetup();
-                            navigateBySetupStatus(serverStatus);
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "checkSetupStampOnResume error: " + e.getMessage());
-            }
-        }).start();
+    // ⭐✅ تجاهل كل شيء خلال فترة السماح
+    if (isWithinSetupGracePeriod()) {
+        Log.d(TAG, "🛡️ Skipping stamp check during grace period");
+        return;
     }
+
+    String cachedStatus = getCachedSetupStatus();
+    if (cachedStatus == null) return;
+
+    new Thread(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+
+            if (response == null || !response.isSuccess || response.data == null) return;
+
+            String serverStatus = response.data.optString("status", SETUP_PENDING);
+            String serverStamp  = response.data.optString("setup_stamp", null);
+            String localStamp   = getCachedSetupStamp();
+            String localStatus  = getCachedSetupStatus();
+
+            boolean stampMismatch = (localStamp != null && serverStamp != null
+                    && !localStamp.equals(serverStamp));
+
+            // ⭐✅ الحماية: منع الرجوع من completed → pending بدون تغيير الختم
+            if (SETUP_COMPLETED.equals(localStatus)
+                    && !SETUP_COMPLETED.equals(serverStatus)
+                    && !SETUP_LOCKED.equals(serverStatus)
+                    && !stampMismatch) {
+                Log.w(TAG, "🛡️ Ignoring server downgrade (no stamp change)");
+                return;
+            }
+
+            if (stampMismatch) {
+                Log.w(TAG, "🔄 Stamp mismatch in onResume!");
+
+                // ⭐✅ حماية إضافية: إذا كنا محلياً completed والسيرفر يقول pending
+                //      بسبب تأخير → احتفظ بـ completed
+                if (SETUP_COMPLETED.equals(localStatus)
+                        && (SETUP_PENDING.equals(serverStatus)
+                            || SETUP_IN_PROGRESS.equals(serverStatus))) {
+                    Log.w(TAG, "🛡️ Server pending but local completed → keeping completed");
+                    cacheSetupStatus(SETUP_COMPLETED, serverStamp);
+                    return;
+                }
+
+                invalidateSetupCache();
+                cacheSetupStatus(serverStatus, serverStamp);
+
+                mainHandler.post(() -> {
+                    if (isActivityAlive()) {
+                        Log.w(TAG, "🔄 Re-navigating after stamp mismatch");
+                        enableNavigationAfterSetup();
+                        navigateBySetupStatus(serverStatus);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "checkSetupStampOnResume error: " + e.getMessage());
+        }
+    }).start();
+}
 
     @Override
     protected void onStart() {
@@ -3328,4 +3400,4 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
             return 0;
         }
     }
-                    }
+        }
