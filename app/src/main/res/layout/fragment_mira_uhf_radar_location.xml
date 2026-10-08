@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -7,7 +8,51 @@
     android:layout_marginHorizontal="5dp"
     android:background="?android:attr/colorBackground">
 
-    <!-- ========== أزرار الأوضاع والأدوات ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  شريط العنوان مع زر الإغلاق (جديد)              -->
+    <!-- ══════════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/layoutTitleBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="2dp"
+        android:background="?attr/colorSurface"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnRadarClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close"
+            app:tint="?attr/colorOnSurface" />
+
+        <TextView
+            android:id="@+id/tvRadarTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="📡 رادار تحديد الموقع"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- عنصر وهمي للتوازن -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="40dp" />
+    </LinearLayout>
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  أزرار الأوضاع والأدوات                        -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutModes"
         android:layout_width="match_parent"
@@ -15,7 +60,7 @@
         android:orientation="horizontal"
         android:padding="6dp"
         android:background="?attr/colorSurfaceVariant"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layoutTitleBar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -53,7 +98,9 @@
             android:backgroundTint="?attr/colorSurfaceVariant" />
     </LinearLayout>
 
-    <!-- ========== حالة القارئ ✅ ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  حالة القارئ                                   -->
+    <!-- ══════════════════════════════════════════════ -->
     <TextView
         android:id="@+id/tvReaderStatus"
         android:layout_width="match_parent"
@@ -68,7 +115,9 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- ========== حقل EPC + أزرار الاختيار والتصدير ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  حقل EPC + أزرار الاختيار والتصدير             -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/epcLayout"
         android:layout_width="match_parent"
@@ -113,7 +162,9 @@
             android:textColor="?attr/colorOnSurface" />
     </LinearLayout>
 
-    <!-- ========== مؤشر القرب المتقدم و Geiger RSSI ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  مؤشر القرب المتقدم و Geiger RSSI              -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutRssi"
         android:layout_width="match_parent"
@@ -151,7 +202,6 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- ✅ المسافة التقديرية -->
         <TextView
             android:id="@+id/tvEstimatedDistance"
             android:layout_width="match_parent"
@@ -174,7 +224,9 @@
             android:progressBackgroundTint="?attr/colorSurfaceVariant" />
     </LinearLayout>
 
-    <!-- ========== شاشة الرادار البصرية ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  شاشة الرادار البصرية                          -->
+    <!-- ══════════════════════════════════════════════ -->
     <com.example.uhf.view.RadarView
         android:id="@+id/radarView"
         android:layout_width="match_parent"
@@ -184,7 +236,9 @@
         app:center_image="@drawable/phone"
         android:layout_margin="4dp" />
 
-    <!-- ========== بطاقة معلومات القطعة المكتشفة وزر التأكيد ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  بطاقة معلومات القطعة المكتشفة                 -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutMiraRadarInfo"
         android:layout_width="match_parent"
@@ -245,7 +299,9 @@
             android:layout_marginTop="1dp" />
     </LinearLayout>
 
-    <!-- ========== سجل آخر 5 عمليات ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  سجل آخر 5 عمليات                              -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutRecent"
         android:layout_width="match_parent"
@@ -267,7 +323,9 @@
             android:maxLines="3" />
     </LinearLayout>
 
-    <!-- ========== إحصائيات القطع المكتشفة ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  إحصائيات القطع المكتشفة                       -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutStats"
         android:layout_width="match_parent"
@@ -353,7 +411,9 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- ========== النطاق وتعديل قوة الإشارة ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  النطاق وتعديل قوة الإشارة                     -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/_llSearchRange"
         android:layout_width="match_parent"
@@ -405,16 +465,22 @@
         android:padding="2dp"
         android:background="?attr/colorSurfaceVariant"
         app:layout_constraintBottom_toTopOf="@id/llButton" />
-        
-    <!-- نص وضع الرادار -->
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  وضع الرادار (نص مخفي للتوافق فقط)             -->
+    <!-- ══════════════════════════════════════════════ -->
     <TextView
         android:id="@+id/tvRadarMode"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
         android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         tools:ignore="MissingConstraints" />
 
-    <!-- ========== أزرار التحكم والتشغيل ========== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!--  أزرار التحكم والتشغيل                          -->
+    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/llButton"
         android:layout_width="match_parent"
@@ -433,7 +499,7 @@
             android:layout_height="42dp"
             android:layout_weight="1"
             android:layout_marginEnd="4dp"
-            android:text="▶ بدء التتبع Geiger"
+            android:text="▶ بدء التتبع"
             android:backgroundTint="?attr/colorPrimary"
             android:textColor="?attr/colorOnPrimary"
             android:textStyle="bold" />
