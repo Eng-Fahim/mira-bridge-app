@@ -79,10 +79,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private static final String TAG = "MiraIdentityStudio";
 
     // ==================== الثوابت ====================
-    private static final long RFID_TIMEOUT_MS = 30000;
-    private static final int MIN_TID_LENGTH = 12;
-    private static final int MAX_TID_LENGTH = 32;
-    private static final int MAX_PHOTOS = 5;
+private static final long RFID_TIMEOUT_MS = 30000;
+private static final int MIN_TID_LENGTH = 12;
+private static final int MAX_TID_LENGTH = 32;
+private static final int MAX_PHOTOS = 5;
+
+// ⚠️ مؤقت: تعطيل فحص طول TID لدعم شرائح ذات TID قصير (مثل "2020")
+//    أعد القيمة إلى true لتفعيل الفحص مجدداً
+private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
 
     // ==================== الحالة ====================
     private FragmentMiraIdentityStudioBinding binding;
@@ -752,40 +756,42 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     // ==================== RFID ====================
 
     private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
-        if (appContext == null) {
-            safeRun(() -> {
-                playErrorSound();
-                showErrorDialog(
-                        isArabic ? "❌ خطأ داخلي" : "❌ Internal Error",
-                        isArabic ? "لم يتم تهيئة السياق" : "Context not initialized"
-                );
-                stopRfidScanningMode();
-            });
-            return;
-        }
+    if (appContext == null) {
+        safeRun(() -> {
+            playErrorSound();
+            showErrorDialog(
+                    isArabic ? "❌ خطأ داخلي" : "❌ Internal Error",
+                    isArabic ? "لم يتم تهيئة السياق" : "Context not initialized"
+            );
+            stopRfidScanningMode();
+        });
+        return;
+    }
 
-        miraExecutor.getBackgroundExecutor().execute(() -> {
-            try {
-                MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
+    miraExecutor.getBackgroundExecutor().execute(() -> {
+        try {
+            MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
 
-                final String tid = rfidService.readTid(null);
-                final boolean isSim = rfidService.isSimulationMode();
+            final String tid = rfidService.readTid(null);
+            final boolean isSim = rfidService.isSimulationMode();
 
-                if (tid == null || tid.trim().isEmpty()) {
-                    safeRun(() -> {
-                        playErrorSound();
-                        showErrorDialog(
-                                isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
-                                isArabic ? "تعذّر قراءة TID الشريحة. يرجى إعادة المسح."
-                                         : "Failed to read tag TID. Please re-scan."
-                        );
-                        stopRfidScanningMode();
-                    });
-                    return;
-                }
+            if (tid == null || tid.trim().isEmpty()) {
+                safeRun(() -> {
+                    playErrorSound();
+                    showErrorDialog(
+                            isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
+                            isArabic ? "تعذّر قراءة TID الشريحة. يرجى إعادة المسح."
+                                     : "Failed to read tag TID. Please re-scan."
+                    );
+                    stopRfidScanningMode();
+                });
+                return;
+            }
 
-                final String normalizedTid = tid.trim().toUpperCase(Locale.US);
+            final String normalizedTid = tid.trim().toUpperCase(Locale.US);
 
+            // ✅ فحص طول TID (يمكن تعطيله عبر ENABLE_TID_LENGTH_VALIDATION)
+            if (ENABLE_TID_LENGTH_VALIDATION) {
                 if (normalizedTid.length() < MIN_TID_LENGTH) {
                     safeRun(() -> {
                         playErrorSound();
@@ -813,69 +819,73 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     });
                     return;
                 }
+            } else {
+                Log.d(TAG, "⏭️ TID length validation DISABLED — accepting TID: "
+                        + normalizedTid + " (len=" + normalizedTid.length() + ")");
+            }
 
-                final boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(normalizedTid);
-                final boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedTid);
+            final boolean isTagAllowed = isSim || rfidService.verifyTagAllowed(normalizedTid);
+            final boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedTid);
 
-                safeRun(() -> {
-                    if (binding == null) {
-                        stopRfidScanningMode();
-                        return;
-                    }
-
-                    if (!isTagAllowed) {
-                        playErrorSound();
-                        showErrorDialog(
-                                isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
-                                isArabic ?
-                                        "هذه الشريحة (TID: " + normalizedTid + ") غير مسجلة في مخزون الشرائح المعتمدة.\n\n" +
-                                        "يرجى استخدام شريحة من مورد معتمد (SunlandRFID)." :
-                                        "This tag (TID: " + normalizedTid + ") is not in the authorized inventory.\n\n" +
-                                        "Please use a tag from an approved supplier."
-                        );
-                        stopRfidScanningMode();
-                        return;
-                    }
-
-                    if (isDuplicate) {
-                        playErrorSound();
-                        showErrorDialog(
-                                isArabic ? "شريحة مكررة" : "Duplicate Tag",
-                                isArabic ?
-                                        "هذه الشريحة (TID: " + normalizedTid + ") مسجلة بالفعل." :
-                                        "This tag (TID: " + normalizedTid + ") is already registered."
-                        );
-                        stopRfidScanningMode();
-                        return;
-                    }
-
-                    if (binding.etEpc != null) {
-                        binding.etEpc.setText(normalizedTid);
-                        binding.etEpc.setTag(normalizedTid);
-                    }
-                    if (binding.tvStatusBadge != null) {
-                        binding.tvStatusBadge.setText("BOUND");
-                    }
-
-                    Log.i(TAG, "✅ Tag verified: TID=" + normalizedTid);
-                    playSuccessSound();
+            safeRun(() -> {
+                if (binding == null) {
                     stopRfidScanningMode();
-                });
+                    return;
+                }
 
-            } catch (Exception e) {
-                Log.e(TAG, "processRfidTagAsync error: " + e.getMessage(), e);
-                safeRun(() -> {
+                if (!isTagAllowed) {
                     playErrorSound();
                     showErrorDialog(
-                            isArabic ? "❌ خطأ في قراءة الشريحة" : "❌ Tag Read Error",
-                            e.getMessage() != null ? e.getMessage() :
-                                    (isArabic ? "حدث خطأ غير متوقع" : "Unexpected error")
+                            isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
+                            isArabic ?
+                                    "هذه الشريحة (TID: " + normalizedTid + ") غير مسجلة في مخزون الشرائح المعتمدة.\n\n" +
+                                    "يرجى استخدام شريحة من مورد معتمد (SunlandRFID)." :
+                                    "This tag (TID: " + normalizedTid + ") is not in the authorized inventory.\n\n" +
+                                    "Please use a tag from an approved supplier."
                     );
                     stopRfidScanningMode();
-                });
-            }
-        });
-    }
+                    return;
+                }
+
+                if (isDuplicate) {
+                    playErrorSound();
+                    showErrorDialog(
+                            isArabic ? "شريحة مكررة" : "Duplicate Tag",
+                            isArabic ?
+                                    "هذه الشريحة (TID: " + normalizedTid + ") مسجلة بالفعل." :
+                                    "This tag (TID: " + normalizedTid + ") is already registered."
+                    );
+                    stopRfidScanningMode();
+                    return;
+                }
+
+                if (binding.etEpc != null) {
+                    binding.etEpc.setText(normalizedTid);
+                    binding.etEpc.setTag(normalizedTid);
+                }
+                if (binding.tvStatusBadge != null) {
+                    binding.tvStatusBadge.setText("BOUND");
+                }
+
+                Log.i(TAG, "✅ Tag verified: TID=" + normalizedTid);
+                playSuccessSound();
+                stopRfidScanningMode();
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "processRfidTagAsync error: " + e.getMessage(), e);
+            safeRun(() -> {
+                playErrorSound();
+                showErrorDialog(
+                        isArabic ? "❌ خطأ في قراءة الشريحة" : "❌ Tag Read Error",
+                        e.getMessage() != null ? e.getMessage() :
+                                (isArabic ? "حدث خطأ غير متوقع" : "Unexpected error")
+                );
+                stopRfidScanningMode();
+            });
+        }
+    });
+}
 
     private void activateRFIDModeForEncoding() {
         if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
@@ -1411,37 +1421,43 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 return;
             }
 
-            if (tidFromField.length() < MIN_TID_LENGTH) {
-                safeRun(() -> {
-                    dismissDialog(activeLoadingDialog);
-                    activeLoadingDialog = null;
-                    unlockFormFast();
-                    setFormEnabled(true);
-                    showErrorDialog(
-                            isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
-                            isArabic ? "طول TID غير كافٍ (" + tidFromField.length() +
-                                       " حرف، الحد الأدنى " + MIN_TID_LENGTH + ")"
-                                     : "TID length too short (" + tidFromField.length() +
-                                       " chars, minimum " + MIN_TID_LENGTH + ")"
-                    );
-                });
-                return;
-            }
+            // ✅ فحص طول TID (يمكن تعطيله عبر ENABLE_TID_LENGTH_VALIDATION)
+if (ENABLE_TID_LENGTH_VALIDATION) {
+    if (tidFromField.length() < MIN_TID_LENGTH) {
+        safeRun(() -> {
+            dismissDialog(activeLoadingDialog);
+            activeLoadingDialog = null;
+            unlockFormFast();
+            setFormEnabled(true);
+            showErrorDialog(
+                    isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
+                    isArabic ? "طول TID غير كافٍ (" + tidFromField.length() +
+                               " حرف، الحد الأدنى " + MIN_TID_LENGTH + ")"
+                             : "TID length too short (" + tidFromField.length() +
+                               " chars, minimum " + MIN_TID_LENGTH + ")"
+            );
+        });
+        return;
+    }
 
-            if (tidFromField.length() > MAX_TID_LENGTH) {
-                safeRun(() -> {
-                    dismissDialog(activeLoadingDialog);
-                    activeLoadingDialog = null;
-                    unlockFormFast();
-                    setFormEnabled(true);
-                    showErrorDialog(
-                            isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
-                            isArabic ? "طول TID أكبر من المتوقع (" + tidFromField.length() + ")"
-                                     : "TID length exceeds expected (" + tidFromField.length() + ")"
-                    );
-                });
-                return;
-            }
+    if (tidFromField.length() > MAX_TID_LENGTH) {
+        safeRun(() -> {
+            dismissDialog(activeLoadingDialog);
+            activeLoadingDialog = null;
+            unlockFormFast();
+            setFormEnabled(true);
+            showErrorDialog(
+                    isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
+                    isArabic ? "طول TID أكبر من المتوقع (" + tidFromField.length() + ")"
+                             : "TID length exceeds expected (" + tidFromField.length() + ")"
+            );
+        });
+        return;
+    }
+} else {
+    Log.d(TAG, "⏭️ TID length validation DISABLED — proceeding with TID: "
+            + tidFromField + " (len=" + tidFromField.length() + ")");
+}
 
             final String tid = tidFromField;
             final String gtin = tid;
