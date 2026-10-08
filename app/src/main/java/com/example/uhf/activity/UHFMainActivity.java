@@ -900,10 +900,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         invalidateSetupCache();
         cacheSetupStatus(SETUP_COMPLETED);
 
-        Toast.makeText(this,
+       /* Toast.makeText(this,
                 isArabic ? "✅ اكتمل الإعداد — يمكنك الآن استخدام النظام"
                          : "✅ Setup complete — You can now use the system",
                 Toast.LENGTH_LONG).show();
+*/
 
         // ⭐ 3. اجلب الختم الفعلي
         new Thread(() -> {
@@ -3327,4 +3328,4 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
             return 0;
         }
     }
-        }
+                    }
