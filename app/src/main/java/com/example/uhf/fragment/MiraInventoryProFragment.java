@@ -217,6 +217,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private volatile int lastScannedForAnimation = 0;
     private JSONObject lastServerReport = null;
     private boolean autoSnapshotEnabled = true;
+    // ✅ [جديد] لمنع تكرار الاحتفال
+    private volatile boolean hasCelebrated = false;
 
     private long scanStartTime = 0;
     private volatile boolean pendingUiUpdate = false;
@@ -1603,14 +1605,16 @@ private void loadCatalogInBackground() {
             });
         });
     }
+private void clearAllLists() {
+    try {
+        synchronized (scannedItemsDisplayList) {
+            scannedItemsDisplayList.clear();
+        }
+        aggregateTotalWeight = 0;
+        aggregateTotalValue = 0;
 
-    private void clearAllLists() {
-        try {
-            synchronized (scannedItemsDisplayList) {
-                scannedItemsDisplayList.clear();
-            }
-            aggregateTotalWeight = 0;
-            aggregateTotalValue = 0;
+        // ✅ [جديد] أعِد تعيين حالة الاحتفال
+        hasCelebrated = false;
 
             if (modernAdapter != null) {
                 modernAdapter.submitList(new ArrayList<>());
@@ -2163,70 +2167,77 @@ private void loadCatalogInBackground() {
     }
 
     private void updateUI() {
-        if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
+    if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
 
-        int scanned = inventoryEngine.getUniqueCount();
+    int scanned = inventoryEngine.getUniqueCount();
 
-        if (tvScannedCount != null) {
-            String newText = String.valueOf(scanned);
-            if (!newText.equals(tvScannedCount.getText().toString())) {
-                if (animationHelper != null) {
-                    animationHelper.animateNumberChange(
-                            tvScannedCount, lastScannedForAnimation, scanned);
-                } else {
-                    tvScannedCount.setText(newText);
-                }
+    // ✅ عدد الممسوحات
+    if (tvScannedCount != null) {
+        String newText = String.valueOf(scanned);
+        if (!newText.equals(tvScannedCount.getText().toString())) {
+            if (animationHelper != null) {
+                animationHelper.animateNumberChange(
+                        tvScannedCount, lastScannedForAnimation, scanned);
+            } else {
+                tvScannedCount.setText(newText);
             }
         }
-        if (tvItemCount != null) tvItemCount.setText(String.valueOf(scanned));
+    }
+    if (tvItemCount != null) tvItemCount.setText(String.valueOf(scanned));
 
-        if (expectedCount > 0) {
-            int progress = Math.min((int) (((float) scanned / expectedCount) * 100), 100);
+    if (expectedCount > 0) {
+        // ✅ التقدم
+        int progress = Math.min((int) (((float) scanned / expectedCount) * 100), 100);
 
-            if (progressScanned != null && animationHelper != null) {
-                int prev = progressScanned.getProgress();
-                if (progress != prev) {
-                    animationHelper.animateProgressBar(progressScanned, prev, progress);
-                }
-            } else if (progressScanned != null) {
-                progressScanned.setProgress(progress);
+        if (progressScanned != null && animationHelper != null) {
+            int prev = progressScanned.getProgress();
+            if (progress != prev) {
+                animationHelper.animateProgressBar(progressScanned, prev, progress);
             }
+        } else if (progressScanned != null) {
+            progressScanned.setProgress(progress);
+        }
 
-            if (tvProgressPercent != null && animationHelper != null) {
-                animationHelper.animateProgressText(tvProgressPercent, progress);
-            } else if (tvProgressPercent != null) {
-                tvProgressPercent.setText(progress + "%");
+        if (tvProgressPercent != null && animationHelper != null) {
+            animationHelper.animateProgressText(tvProgressPercent, progress);
+        } else if (tvProgressPercent != null) {
+            tvProgressPercent.setText(progress + "%");
+        }
+
+        // ✅ الدقة
+        if (tvAccuracy != null) {
+            tvAccuracy.setText(progress + "%");
+            int color = progress >= 100
+                    ? ContextCompat.getColor(requireContext(), R.color.success_green)
+                    : progress >= 70
+                    ? ContextCompat.getColor(requireContext(), R.color.warning_amber)
+                    : ContextCompat.getColor(requireContext(), R.color.text_primary);
+            tvAccuracy.setTextColor(color);
+        }
+
+        // ✅ الفارق
+        if (tvVariance != null) {
+            int variance = expectedCount - scanned;
+            if (variance > 0) {
+                tvVariance.setText("−" + variance);
+                tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                        R.color.warning_amber));
+            } else if (variance < 0) {
+                tvVariance.setText("+" + Math.abs(variance));
+                tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                        R.color.info_blue));
+            } else {
+                tvVariance.setText("0");
+                tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                        R.color.success_green));
             }
+        }
 
-            if (tvAccuracy != null) {
-                tvAccuracy.setText(progress + "%");
-                int color = progress >= 100
-                        ? ContextCompat.getColor(requireContext(), R.color.success_green)
-                        : progress >= 70
-                        ? ContextCompat.getColor(requireContext(), R.color.warning_amber)
-                        : ContextCompat.getColor(requireContext(), R.color.text_primary);
-                tvAccuracy.setTextColor(color);
-            }
+        // ✅ الاحتفال عند اكتمال العدد المتوقع — بدون إيقاف تلقائي
+        if (scanned >= expectedCount && isScanning) {
+            if (!hasCelebrated) {
+                hasCelebrated = true;
 
-            if (tvVariance != null) {
-                int variance = expectedCount - scanned;
-                if (variance > 0) {
-                    tvVariance.setText("−" + variance);
-                    tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
-                            R.color.warning_amber));
-                } else if (variance < 0) {
-                    tvVariance.setText("+" + Math.abs(variance));
-                    tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
-                            R.color.info_blue));
-                } else {
-                    tvVariance.setText("0");
-                    tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
-                            R.color.success_green));
-                }
-            }
-
-            if (expectedCount > 0 && scanned >= expectedCount && isScanning) {
-                stopScanning();
                 if (soundManager != null) {
                     soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
                 }
@@ -2234,31 +2245,40 @@ private void loadCatalogInBackground() {
                     animationHelper.celebrateCompletion(
                             tvProgressPercent, progressScanned, tvScannedCount);
                 }
-                showToast(isArabic ? "🎉 اكتمل جرد جميع المواد المتوقعة!"
-                                   : "🎉 All expected items scanned!");
+                showToast(isArabic
+                        ? "🎉 تم مسح كل المواد المتوقعة — يمكنك الاستمرار أو الإيقاف يدوياً"
+                        : "🎉 All expected items scanned — continue or stop manually");
             }
         } else {
-            if (tvProgressPercent != null) tvProgressPercent.setText("—");
-            if (tvAccuracy != null) tvAccuracy.setText("—");
-            if (tvVariance != null) {
-                tvVariance.setText("—");
-                tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
-                        R.color.text_secondary));
-            }
+            // ✅ إعادة التعيين عند العودة تحت العدد المتوقع (بعد حذف أو مسح جديد)
+            hasCelebrated = false;
         }
 
-        if (tvEmptyState != null) {
-            tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
+    } else {
+        // ✅ وضع الجرد الأعمى — لا توقعات
+        if (tvProgressPercent != null) tvProgressPercent.setText("—");
+        if (tvAccuracy != null) tvAccuracy.setText("—");
+        if (tvVariance != null) {
+            tvVariance.setText("—");
+            tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
+                    R.color.text_secondary));
         }
-
-        if (tvInventoryStatus != null && isScanning) {
-            tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (" : "📡 Scanning... (")
-                    + scanned + ")");
-        }
-
-        lastScannedForAnimation = scanned;
-        updateButtonsState();
     }
+
+    // ✅ حالة القائمة الفارغة
+    if (tvEmptyState != null) {
+        tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
+    }
+
+    // ✅ الحالة النصية
+    if (tvInventoryStatus != null && isScanning) {
+        tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (" : "📡 Scanning... (")
+                + scanned + ")");
+    }
+
+    lastScannedForAnimation = scanned;
+    updateButtonsState();
+}
 
     private void updateTotalWeightAndValue() {
         final double finalWeight = aggregateTotalWeight;
