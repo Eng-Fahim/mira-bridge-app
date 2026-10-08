@@ -423,29 +423,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
 
         // ✅✅✅ 15) RFID Manager — تهيئة فورية (قبل initViews)
-        try {
-            com.example.uhf.MiraRfid.RFIDManager rfidManager =
-                    com.example.uhf.MiraRfid.RFIDManager.getInstance(requireContext());
+try {
+    com.example.uhf.MiraRfid.RFIDManager rfidManager =
+            com.example.uhf.MiraRfid.RFIDManager.getInstance(requireContext());
 
-            if (rfidManager != null) {
-                // إذا لم يكن هناك قارئ نشط، حاول الربط
-                if (rfidManager.getActiveReader() == null) {
-                    Log.w(TAG, "⚠️ No active reader — attempting attach...");
-                    try {
-                        rfidManager.attachReader(requireContext());
-                    } catch (Exception ignored) {}
-                }
+    if (rfidManager != null && scanController != null) {
+        scanController.attachRfidManager(rfidManager);
 
-                if (scanController != null) {
-                    scanController.attachRfidManager(rfidManager);
-                }
-
-                Log.d(TAG, "✅ RFID attached EARLY: "
-                        + (rfidManager.getActiveReader() != null ? "READY" : "NOT_READY"));
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Early RFID init error", e);
-        }
+        Log.d(TAG, "✅ RFID attached EARLY: "
+                + (rfidManager.getActiveReader() != null ? "READY" : "NOT_READY"));
+    }
+} catch (Exception e) {
+    Log.e(TAG, "Early RFID init error", e);
+}
 
         // 16) Views
         try {
@@ -1426,60 +1416,66 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     /**
      * ✅ تحميل الكتالوج في الخلفية (لا يمنع المسح)
      */
-    private void loadCatalogInBackground() {
-        if (!isAdded() || isFragmentDestroyed || catalogManager == null) return;
+    /**
+ * ✅ تحميل الكتالوج في الخلفية (لا يمنع المسح)
+ * يُستدعى من startScanning() بعد أن يكون المسح قد بدأ بالفعل
+ */
+private void loadCatalogInBackground() {
+    if (!isAdded() || isFragmentDestroyed || catalogManager == null) return;
 
-        backgroundExecutor.execute(() -> {
-            if (isFragmentDestroyed) return;
+    backgroundExecutor.execute(() -> {
+        if (isFragmentDestroyed) return;
 
-            catalogManager.fetchCatalog(apiClient, branchesManager,
-                    new InventoryCatalogManager.CatalogCallback() {
-                        @Override
-                        public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
-                            mainHandler.post(() -> {
-                                if (!isAdded() || isFragmentDestroyed) return;
+        catalogManager.fetchCatalog(apiClient, branchesManager,
+                new InventoryCatalogManager.CatalogCallback() {
+                    @Override
+                    public void onCatalogLoaded(Map<String, InventoryItem> catalog) {
+                        mainHandler.post(() -> {
+                            if (!isAdded() || isFragmentDestroyed) return;
 
-                                catalogEpcs.clear();
-                                if (catalog != null) {
-                                    catalogEpcs.addAll(catalog.keySet());
-                                }
+                            // ✅ 1) احفظ الـ EPCs في الذاكرة
+                            catalogEpcs.clear();
+                            if (catalog != null) {
+                                catalogEpcs.addAll(catalog.keySet());
+                            }
 
-                                expectedCount = catalog != null ? catalog.size() : 0;
+                            // ✅ 2) حدّث العدد المتوقع
+                            expectedCount = catalog != null ? catalog.size() : 0;
 
-                                if (tvExpectedCount != null) {
-                                    tvExpectedCount.setText(
-                                            expectedCount > 0 ? String.valueOf(expectedCount) : "—");
-                                }
-                                if (progressScanned != null) {
-                                    progressScanned.setMax(100);
-                                }
+                            if (tvExpectedCount != null) {
+                                tvExpectedCount.setText(
+                                        expectedCount > 0 ? String.valueOf(expectedCount) : "—");
+                            }
+                            if (progressScanned != null) {
+                                progressScanned.setMax(100);
+                            }
 
-                                if (scanController != null) {
-                                    scanController.updateCatalog(catalog);
-                                }
+                            // ✅ 3) أعِد تقييم المواد الممسوحة (بدون updateCatalog)
+                            //    reclassifyScannedItems تقرأ من catalogManager.getItemByEpc()
+                            reclassifyScannedItems();
 
-                                reclassifyScannedItems();
+                            Log.i(TAG, "✅ Catalog loaded in background: "
+                                    + expectedCount + " items");
+                        });
+                    }
 
-                                Log.i(TAG, "✅ Catalog loaded in background: "
-                                        + expectedCount + " items");
-                            });
-                        }
+                    @Override
+                    public void onError(String error) {
+                        Log.w(TAG, "⚠️ Catalog load failed (blind mode active): " + error);
+                        mainHandler.post(() -> {
+                            if (!isAdded() || isFragmentDestroyed) return;
 
-                        @Override
-                        public void onError(String error) {
-                            Log.w(TAG, "⚠️ Catalog load failed (blind mode active): " + error);
-                            mainHandler.post(() -> {
-                                if (!isAdded() || isFragmentDestroyed) return;
-                                if (tvInventoryStatus != null) {
-                                    tvInventoryStatus.setText(isArabic
-                                            ? "📡 جرد بدون كتالوج"
-                                            : "📡 Blind inventory (no catalog)");
-                                }
-                            });
-                        }
-                    });
-        });
-    }
+                            // ✅ الجرد يعمل أصلاً (blind) — لا نوقف شيء
+                            if (tvInventoryStatus != null) {
+                                tvInventoryStatus.setText(isArabic
+                                        ? "📡 جرد بدون كتالوج"
+                                        : "📡 Blind inventory (no catalog)");
+                            }
+                        });
+                    }
+                });
+    });
+}
 
     /**
      * ✅ إيقاف فوري
@@ -1830,19 +1826,22 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
         }
 
-        if (wasEmpty && !scannedItemsDisplayList.isEmpty()) {
-            switchToActiveState(true);
-        }
+            if (wasEmpty && !scannedItemsDisplayList.isEmpty()) {
+        switchToActiveState(true);
+    }
 
-        if (soundManager != null) soundManager.playBeep(feedbackType);
-        if (feedbackHelper != null) feedbackHelper.feedback(feedbackType);
+    if (soundManager != null) soundManager.playBeep(feedbackType);
+    if (feedbackHelper != null) feedbackHelper.feedback(feedbackType);
 
-        if (currentDisplay != null) {
-            updateLastScanCard(currentDisplay, isDuplicate);
-        }
+    if (currentDisplay != null) {
+        updateLastScanCard(currentDisplay, isDuplicate);
+    }
 
+    // ✅ حدّث القائمة فقط عند إضافة قطعة جديدة (ليس عند تكرار قراءة)
+    if (!isDuplicate) {
         updateAdapterList();
     }
+}
 
     private void updateAdapterList() {
         if (modernAdapter == null || isFragmentDestroyed || filterManager == null) return;
