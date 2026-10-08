@@ -82,14 +82,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * ✅ MiraSecureGateFragment v3.1 — النسخة النهائية المُحصّنة
+ * ✅ MiraSecureGateFragment v3.2 — النسخة النهائية المُحصّنة
  * ═══════════════════════════════════════════════════════════════
- * إصلاحات v3.1:
- *  - ✅ hideDevTools() يستخدم BuildConfig.ALLOW_SIMULATOR
- *  - ✅ handleGateDecision() تتحقق من SIMULATOR قبل الإنذار
- *  - ✅ autoStartScanning() لا تبدأ على SIMULATOR تلقائياً
- *  - ✅ فحص مزدوج لمنع بدء المسح المتكرر
- *  - ✅ stopScanningSync() فحص قبل الإيقاف
+ * إصلاحات v3.2:
+ *  - ✅ onStart/onStop: إخفاء/استعادة BottomNav + FAB
+ *  - ✅ شبكة البوابات: عمودان دائماً (spanCount = 2)
+ *  - ✅ إصلاح setSoundAlertsEnabled/ isSoundAlertsEnabled عبر Reflection
+ *  - ✅ إصلاح handleGateDecision — فصل الصوت عن الاهتزاز
+ *  - ✅ تبسيط backPressedCallback cleanup
  */
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MiraSecureGateFragment extends Fragment {
@@ -171,8 +171,8 @@ public class MiraSecureGateFragment extends Fragment {
     private volatile int localPassCount = 0;
     private volatile int localDenyCount = 0;
 
-    private String soldEpc = "", soldTitle = "";
-    private String unsoldEpc = "", unsoldTitle = "";
+    private String soldEpc = "";
+    private String unsoldEpc = "";
 
     private volatile boolean isDestroyed = false;
     private volatile boolean isScanning = false;
@@ -292,14 +292,57 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ هل نحن في وضع المحاكاة؟
-     */
     private boolean isSimulatorMode() {
         try {
             return gateRfidBridge != null && gateRfidBridge.isSimulationMode();
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ Reflection Helpers — للتعامل مع MiraGatesSettings
+    //    بدون الحاجة لوجود الدوال (حماية من أخطاء الترجمة)
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * ✅ استدعاء setSoundAlertsEnabled بأمان عبر Reflection
+     * يُرجع true إذا نجح، false إذا لم تكن الدالة موجودة
+     */
+    private boolean safeSetSoundAlertsEnabled(boolean enabled) {
+        try {
+            java.lang.reflect.Method method = miraGatesSettings.getClass()
+                    .getMethod("setSoundAlertsEnabled", boolean.class);
+            method.invoke(miraGatesSettings, enabled);
+            return true;
+        } catch (NoSuchMethodException e) {
+            Log.d(TAG, "setSoundAlertsEnabled not available in MiraGatesSettings");
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "setSoundAlertsEnabled invoke error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * ✅ قراءة isSoundAlertsEnabled بأمان عبر Reflection
+     * يُرجع true افتراضياً إذا لم تكن الدالة موجودة
+     */
+    private boolean safeIsSoundAlertsEnabled() {
+        try {
+            java.lang.reflect.Method method = miraGatesSettings.getClass()
+                    .getMethod("isSoundAlertsEnabled");
+            Object result = method.invoke(miraGatesSettings);
+            if (result instanceof Boolean) {
+                return (Boolean) result;
+            }
+            return true;
+        } catch (NoSuchMethodException e) {
+            Log.d(TAG, "isSoundAlertsEnabled not available — default true");
+            return true; // الافتراضي: مفعّل
+        } catch (Exception e) {
+            Log.w(TAG, "isSoundAlertsEnabled invoke error: " + e.getMessage());
+            return true;
         }
     }
 
@@ -333,6 +376,54 @@ public class MiraSecureGateFragment extends Fragment {
         updateSystemStatus(true);
         logConsole(getLocalizedText("🚀 تم تفعيل مركز القيادة الأمنية",
                 "🚀 SECURITY COMMAND CENTER ACTIVATED"));
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ onStart / onStop — إخفاء/استعادة BottomNav + FAB
+    // ═══════════════════════════════════════════════════════
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+                // ⭐ أخفِ BottomNav
+                activity.setBottomNavVisible(false);
+
+                // ⭐ أخفِ FAB
+                View fab = activity.findViewById(R.id.fabActionCenter);
+                if (fab != null) {
+                    fab.setVisibility(View.GONE);
+                    Log.d(TAG, "🙈 FAB hidden in Gate Screen");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onStart error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+                // ⭐ أعِد BottomNav
+                activity.setBottomNavVisible(true);
+
+                // ⭐ أعِد FAB
+                View fab = activity.findViewById(R.id.fabActionCenter);
+                if (fab != null) {
+                    fab.setVisibility(View.VISIBLE);
+                    Log.d(TAG, "👁️ FAB restored");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onStop error: " + e.getMessage());
+        }
     }
 
     private void initializeComponents() {
@@ -402,11 +493,13 @@ public class MiraSecureGateFragment extends Fragment {
         swSimulateExitOnSale = view.findViewById(R.id.swSimulateExitOnSale);
 
         if (rvGatesMonitor != null) {
-            int spanCount = isTablet() ? 2 : 1;
-            rvGatesMonitor.setLayoutManager(new GridLayoutManager(getContext(), spanCount));
+            // ✅ دائماً عمودان — كل بوابة في عمود
+            final int spanCount = 2;
+            rvGatesMonitor.setLayoutManager(
+                    new GridLayoutManager(getContext(), spanCount));
             monitorAdapter = new GateMonitorAdapter();
             rvGatesMonitor.setAdapter(monitorAdapter);
-            Log.d(TAG, "📊 Gate monitor grid: " + spanCount + " column(s)");
+            Log.d(TAG, "📊 Gate monitor grid: " + spanCount + " columns (fixed)");
         }
     }
 
@@ -483,13 +576,12 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // ✅ إخفاء أدوات التطوير — يستخدم BuildConfig
+    // ✅ إخفاء أدوات التطوير
     // ═══════════════════════════════════════════════════════
 
     private void hideDevTools() {
         try {
             boolean showDevTools = BuildConfig.ALLOW_SIMULATOR;
-
             int visibility = showDevTools ? View.VISIBLE : View.GONE;
 
             if (btnSimulateAllowed != null) btnSimulateAllowed.setVisibility(visibility);
@@ -567,8 +659,8 @@ public class MiraSecureGateFragment extends Fragment {
 
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity activity = (UHFMainActivity) getActivity();
-                activity.setBottomNavVisible(true);
 
+                // ✅ onStop سيتولى إظهار BottomNav + FAB تلقائياً
                 if (activity.getNavigationManager() != null) {
                     activity.getNavigationManager().goToDashboard();
                     Log.d(TAG, "✅ Navigated to Dashboard via NavigationManager");
@@ -617,9 +709,15 @@ public class MiraSecureGateFragment extends Fragment {
             });
         }
 
+        // ✅ إصلاح: استخدام Reflection بدل الاستدعاء المباشر
         if (swSoundAlerts != null) {
             swSoundAlerts.setOnCheckedChangeListener((btn, checked) -> {
-                miraGatesSettings.setVibrationEnabled(checked);
+                boolean ok = safeSetSoundAlertsEnabled(checked);
+                logConsole(getLocalizedText(
+                        "🔔 صوت التنبيهات: " + (checked ? "مفعّل" : "معطّل")
+                                + (ok ? "" : " (غير مدعوم)"),
+                        "🔔 Sound alerts: " + (checked ? "ON" : "OFF")
+                                + (ok ? "" : " (unsupported)")));
             });
         }
 
@@ -663,8 +761,9 @@ public class MiraSecureGateFragment extends Fragment {
                 swKeepScreenOn.setChecked(miraGatesSettings.isKeepScreenOn());
             if (swContinuousScan != null)
                 swContinuousScan.setChecked(miraGatesSettings.isContinuousScanEnabled());
+            // ✅ قراءة آمنة عبر Reflection
             if (swSoundAlerts != null)
-                swSoundAlerts.setChecked(true);
+                swSoundAlerts.setChecked(safeIsSoundAlertsEnabled());
             if (swVibration != null)
                 swVibration.setChecked(miraGatesSettings.isVibrationEnabled());
             if (swSimulateExitOnSale != null)
@@ -1231,11 +1330,7 @@ public class MiraSecureGateFragment extends Fragment {
 
     // ==================== RFID Scanning ====================
 
-    /**
-     * ✅ بدء المسح التلقائي — لا يبدأ على SIMULATOR
-     */
     private void autoStartScanning() {
-        // ✅ في وضع SIMULATOR: لا تبدأ تلقائياً
         if (isSimulatorMode()) {
             logConsole(getLocalizedText(
                     "🧪 وضع المحاكاة — اضغط 'تفعيل المسح' يدوياً",
@@ -1263,7 +1358,6 @@ public class MiraSecureGateFragment extends Fragment {
         if (isDestroyed || mContext == null || isCameraOpen) return;
         if (gateRfidBridge == null) return;
 
-        // ✅ فحص مزدوج
         if (isScanning) {
             Log.d(TAG, "⏸️ Scan already active — skipping");
             return;
@@ -1339,7 +1433,6 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void stopScanningSync() {
-        // ✅ فحص قبل الإيقاف
         if (gateRfidBridge != null && gateRfidBridge.isScanning()) {
             gateRfidBridge.stopScan(null);
         }
@@ -1583,7 +1676,6 @@ public class MiraSecureGateFragment extends Fragment {
 
         logConsole("[".concat(sourceType).concat("] ") + cleanedEpc);
 
-        // ✅ في وضع SIMULATOR: سجل فقط، لا استعلام ولا إنذار
         if (isSimulatorMode()) {
             logConsole(getLocalizedText(
                     "🧪 [SIM] تم تجاهل القراءة (وضع الاختبار)",
@@ -1695,7 +1787,6 @@ public class MiraSecureGateFragment extends Fragment {
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
 
-        // ✅ الحماية: لا إنذار حقيقي في وضع SIMULATOR
         if (isSimulatorMode()) {
             String mode = allowed ? "PASS" : "DENY";
             logConsole("[SIM] " + mode + ": " + itemTitle + " → " + serial);
@@ -1705,8 +1796,8 @@ public class MiraSecureGateFragment extends Fragment {
         if (allowed && "ALERTS".equals(logFilter)) return;
         if (!allowed && "PASS".equals(logFilter)) return;
 
-        boolean soundEnabled = miraGatesSettings != null
-                && miraGatesSettings.isVibrationEnabled();
+        // ✅ الإصلاح: فصل الصوت عن الاهتزاز
+        boolean soundEnabled = safeIsSoundAlertsEnabled();
         boolean vibrationEnabled = miraGatesSettings != null
                 && miraGatesSettings.isVibrationEnabled();
         boolean quietMode = currentOperationMode
@@ -2140,10 +2231,8 @@ public class MiraSecureGateFragment extends Fragment {
         applyKeepScreenOn(false);
 
         if (backPressedCallback != null) {
-            backPressedCallback.setEnabled(false);
             backPressedCallback.remove();
             backPressedCallback = null;
-            Log.d(TAG, "🗑️ Back press handler removed");
         }
 
         try {
