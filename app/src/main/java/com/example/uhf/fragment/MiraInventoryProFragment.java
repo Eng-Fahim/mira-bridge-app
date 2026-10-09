@@ -232,6 +232,25 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
     private MaterialButton btnTakeSnapshot;
     private InventorySnapshotManager snapshotManager;
+    
+    // ═══════════════════════════════════════════════════════
+//  ✅ [جديد - Stage 1] حالة الجلسة
+// ═══════════════════════════════════════════════════════
+
+/** هل الجلسة مُوقفة مؤقتاً (يمكن الاستئناف)؟ */
+private volatile boolean isPaused = false;
+
+/** هل هناك جلسة محفوظة لم تُعتمد بعد؟ */
+private volatile boolean hasUncommittedSession = false;
+
+/** متى بدأت الجلسة الفعلية (لا يتصفّر عند الإيقاف) */
+private volatile long sessionElapsedBeforePause = 0;
+
+/** زر الإيقاف المؤقت */
+private MaterialButton btnPauseScan;
+
+/** زر الإنهاء والمراجعة */
+private MaterialButton btnFinishAndReview;
 
     // ==================== Collections ====================
     private final List<ScannedItemDisplay> scannedItemsDisplayList =
@@ -586,6 +605,10 @@ try {
         tvLastScanTime = view.findViewById(R.id.tvLastScanTime);
         chipReadCount = view.findViewById(R.id.chipReadCount);
         rowSerialTime = view.findViewById(R.id.rowSerialTime);
+        
+        // ✅ [Stage-1] ربط الأزرار الجديدة
+btnPauseScan = view.findViewById(R.id.btnPauseScan);
+btnFinishAndReview = view.findViewById(R.id.btnFinishAndReview);
 
         setupRecyclerView();
         setupButtons();
@@ -616,69 +639,191 @@ try {
     }
 
     private void setupButtons() {
-        if (btnMainToggleScan != null) {
-            btnMainToggleScan.setOnClickListener(v -> {
-                if (isScanning) {
-                    stopScanning();
+    // ✅ زر Start/Pause الرئيسي
+    if (btnMainToggleScan != null) {
+        btnMainToggleScan.setOnClickListener(v -> {
+            if (isScanning) {
+                pauseScanning();  // ✅ Pause بدلاً من Stop
+            } else {
+                if (canEditInventory()) {
+                    startScanning();  // ✅ Resume أو New
                 } else {
-                    if (canEditInventory()) {
-                        startScanning();
-                    } else {
-                        showAccessDenied();
+                    showAccessDenied();
+                }
+            }
+        });
+    }
+
+    // ✅ [جديد] زر "إنهاء ومراجعة"
+    if (btnFinishAndReview != null) {
+        btnFinishAndReview.setOnClickListener(v -> {
+            if (isScanning) {
+                pauseScanning();
+                mainHandler.postDelayed(this::showFinishAndReviewDialog, 300);
+            } else {
+                showFinishAndReviewDialog();
+            }
+        });
+    }
+
+    // ✅ زر الاعتماد (كما هو)
+    if (btnCommitSession != null) {
+        btnCommitSession.setOnClickListener(v -> showCommitConfirmationDialog());
+    }
+
+    // ✅ باقي الأزرار كما هي
+    if (btnPowerControl != null) {
+        btnPowerControl.setOnClickListener(v -> showPowerControlSheet());
+    }
+    if (btnGenerateReport != null) {
+        btnGenerateReport.setOnClickListener(v -> printCurrentReport());
+    }
+    if (btnTakeSnapshot != null) {
+        btnTakeSnapshot.setOnClickListener(v -> takeSnapshot());
+    }
+    if (btnViewSnapshots != null) {
+        btnViewSnapshots.setOnClickListener(v -> openSnapshotsScreen());
+    }
+    if (btnArchiveReports != null) {
+        btnArchiveReports.setOnClickListener(v -> showArchiveReports());
+    }
+    if (btnOpenItemsList != null) {
+        btnOpenItemsList.setOnClickListener(v -> showItemsListDialog());
+    }
+    if (btnPowerControlCompact != null) {
+        btnPowerControlCompact.setOnClickListener(v -> showPowerControlSheet());
+    }
+    if (btnArchiveReportsCompact != null) {
+        btnArchiveReportsCompact.setOnClickListener(v -> showArchiveReports());
+    }
+
+    // زر الإغلاق
+    if (btnInventoryClose != null) {
+        btnInventoryClose.setOnClickListener(v -> {
+            try {
+                if (getActivity() != null) {
+                    android.view.inputmethod.InputMethodManager imm =
+                            (android.view.inputmethod.InputMethodManager)
+                            getActivity().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                    if (imm != null && etSearchItems != null) {
+                        imm.hideSoftInputFromWindow(etSearchItems.getWindowToken(), 0);
                     }
                 }
-            });
-        }
-
-        if (btnCommitSession != null) {
-            btnCommitSession.setOnClickListener(v -> showCommitConfirmationDialog());
-        }
-
-        if (btnPowerControl != null) {
-            btnPowerControl.setOnClickListener(v -> showPowerControlSheet());
-        }
-
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setOnClickListener(v -> printCurrentReport());
-        }
-
-        if (btnTakeSnapshot != null) {
-            btnTakeSnapshot.setOnClickListener(v -> takeSnapshot());
-        }
-        if (btnViewSnapshots != null) {
-            btnViewSnapshots.setOnClickListener(v -> openSnapshotsScreen());
-        }
-
-        if (btnArchiveReports != null) {
-            btnArchiveReports.setOnClickListener(v -> showArchiveReports());
-        }
-
-        if (btnOpenItemsList != null) {
-            btnOpenItemsList.setOnClickListener(v -> showItemsListDialog());
-        }
-        if (btnPowerControlCompact != null) {
-            btnPowerControlCompact.setOnClickListener(v -> showPowerControlSheet());
-        }
-        if (btnArchiveReportsCompact != null) {
-            btnArchiveReportsCompact.setOnClickListener(v -> showArchiveReports());
-        }
-
-        if (btnInventoryClose != null) {
-            btnInventoryClose.setOnClickListener(v -> {
-                try {
-                    if (getActivity() != null) {
-                        android.view.inputmethod.InputMethodManager imm =
-                                (android.view.inputmethod.InputMethodManager)
-                                getActivity().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-                        if (imm != null && etSearchItems != null) {
-                            imm.hideSoftInputFromWindow(etSearchItems.getWindowToken(), 0);
-                        }
-                    }
-                } catch (Exception ignored) {}
-                handleCustomBack();
-            });
-        }
+            } catch (Exception ignored) {}
+            handleCustomBack();
+        });
     }
+}
+
+/**
+ * ✅ [Stage-1] نافذة "إنهاء ومراجعة"
+ *             تُعرض قبل الاعتماد النهائي
+ */
+private void showFinishAndReviewDialog() {
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    try {
+        int scanned = scannedItemsDisplayList.size();
+        if (scanned == 0) {
+            showToast(isArabic ? "⚠️ لا توجد بيانات لمراجعتها"
+                               : "⚠️ No data to review");
+            return;
+        }
+
+        // حساب الإحصائيات
+        int registered = 0;
+        int unregistered = 0;
+        int totalReads = 0;
+
+        synchronized (scannedItemsDisplayList) {
+            for (ScannedItemDisplay item : scannedItemsDisplayList) {
+                if (item == null) continue;
+                totalReads += item.count;
+
+                if (catalogEpcs.contains(item.epc)) {
+                    registered++;
+                } else {
+                    unregistered++;
+                }
+            }
+        }
+
+        int missing = Math.max(0, expectedCount - registered);
+        int accuracy = expectedCount > 0
+                ? Math.min(100, (registered * 100) / expectedCount)
+                : 0;
+
+        long elapsedSeconds = getTotalElapsedSeconds();
+        String elapsed = formatElapsed(elapsedSeconds);
+
+        // بناء نص الرسالة
+        StringBuilder sb = new StringBuilder();
+        sb.append(isArabic
+                ? "📋 ملخص الجلسة قبل الاعتماد:\n\n"
+                : "📋 Session summary before commit:\n\n");
+
+        sb.append(isArabic ? "✅ مسجّل وممسوح: " : "✅ Registered & scanned: ")
+          .append(registered).append("\n");
+
+        sb.append(isArabic ? "⚠️ غير مسجّل: " : "⚠️ Unregistered: ")
+          .append(unregistered).append("\n");
+
+        if (expectedCount > 0) {
+            sb.append(isArabic ? "❌ مفقود: " : "❌ Missing: ")
+              .append(missing).append("\n");
+            sb.append(isArabic ? "📈 الدقة: " : "📈 Accuracy: ")
+              .append(accuracy).append("%\n");
+        }
+
+        sb.append(isArabic ? "🔁 إجمالي القراءات: " : "🔁 Total reads: ")
+          .append(totalReads).append("\n");
+
+        sb.append(isArabic ? "⏱️ المدة: " : "⏱️ Duration: ")
+          .append(elapsed).append("\n");
+
+        // عرض النافذة
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "🏁 إنهاء الجرد ومراجعته" : "🏁 Finish & Review")
+                .setMessage(sb.toString())
+                .setPositiveButton(isArabic ? "✅ اعتماد نهائي" : "✅ Commit",
+                        (d, w) -> {
+                            d.dismiss();
+                            showCommitConfirmationDialog();
+                        })
+                .setNeutralButton(isArabic ? "🔍 عرض القطع" : "🔍 Show Items",
+                        (d, w) -> {
+                            d.dismiss();
+                            showItemsListDialog();
+                        })
+                .setNegativeButton(isArabic ? "↩️ استئناف" : "↩️ Resume",
+                        (d, w) -> {
+                            d.dismiss();
+                            startScanning();
+                        })
+                .setCancelable(false)
+                .show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "showFinishAndReviewDialog error", e);
+    }
+}
+
+/** ✅ حساب الوقت الكلي (مع مراعاة الإيقاف المؤقت) */
+private long getTotalElapsedSeconds() {
+    long current = 0;
+    if (isScanning && scanStartTime > 0) {
+        current = (SystemClock.elapsedRealtime() - scanStartTime) / 1000;
+    }
+    return sessionElapsedBeforePause + current;
+}
+
+/** ✅ تنسيق المدة */
+private String formatElapsed(long seconds) {
+    long h = seconds / 3600;
+    long m = (seconds % 3600) / 60;
+    long s = seconds % 60;
+    return String.format(Locale.US, "%02d:%02d:%02d", h, m, s);
+}
 
     private void setupSearchBar() {
         if (etSearchItems == null) return;
@@ -921,26 +1066,36 @@ try {
     }
 
     private void handleCustomBack() {
-        try {
-            if (isScanning) {
-                Log.d(TAG, "⚠️ Back: scanning active → warning");
-                showExitWarning(this::navigateAwayFromInventory);
-                return;
-            }
-
-            if (scannedItemsDisplayList != null && !scannedItemsDisplayList.isEmpty()) {
-                Log.d(TAG, "⚠️ Back: " + scannedItemsDisplayList.size() + " items → confirming");
-                showExitConfirmation();
-                return;
-            }
-
-            Log.d(TAG, "🚪 Back: navigating away");
-            navigateAwayFromInventory();
-        } catch (Exception e) {
-            Log.e(TAG, "handleCustomBack error", e);
-            navigateAwayFromInventory();
+    try {
+        if (isScanning) {
+            // ✅ إيقاف مؤقت بدلاً من نهائي
+            pauseScanning();
+            mainHandler.postDelayed(this::checkAndExitAfterPause, 300);
+            return;
         }
+
+        if (scannedItemsDisplayList != null && !scannedItemsDisplayList.isEmpty()) {
+            showExitConfirmation();
+            return;
+        }
+
+        navigateAwayFromInventory();
+    } catch (Exception e) {
+        Log.e(TAG, "handleCustomBack error", e);
+        navigateAwayFromInventory();
     }
+}
+
+/** ✅ بعد الإيقاف المؤقت، أعد تقييم الخروج */
+private void checkAndExitAfterPause() {
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    if (scannedItemsDisplayList != null && !scannedItemsDisplayList.isEmpty()) {
+        showExitConfirmation();
+    } else {
+        navigateAwayFromInventory();
+    }
+}
 
     private void showExitConfirmation() {
         if (!isAdded() || isFragmentDestroyed) return;
@@ -1390,48 +1545,64 @@ public void onError(String error) {
     // ================================================================
 
     private void startScanning() {
-        if (!canEditInventory()) {
-            showAccessDenied();
-            return;
-        }
-        if (isScanning || isFragmentDestroyed) return;
+    if (!canEditInventory()) {
+        showAccessDenied();
+        return;
+    }
+    if (isScanning || isFragmentDestroyed) return;
 
-        Log.d(TAG, "▶️ startScanning (DIRECT C83)");
+    Log.d(TAG, "▶️ startScanning (STAGE-1)");
 
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setEnabled(true);
-            btnGenerateReport.setAlpha(1.0f);
-        }
-        if (btnCommitSession != null) {
-            btnCommitSession.setText(isArabic ? "اعتماد" : "Commit");
-            btnCommitSession.setAlpha(1.0f);
-        }
+    if (btnGenerateReport != null) {
+        btnGenerateReport.setEnabled(true);
+        btnGenerateReport.setAlpha(1.0f);
+    }
+    if (btnCommitSession != null) {
+        btnCommitSession.setText(isArabic ? "اعتماد" : "Commit");
+        btnCommitSession.setAlpha(1.0f);
+    }
 
+    // ✅ [Stage-1] الفرق الحاسم: نمسح فقط لو جلسة جديدة
+    //             لا نمسح عند الاستئناف
+    if (!isPaused && !hasUncommittedSession) {
+        // جلسة جديدة تماماً
+        Log.i(TAG, "🆕 New session — clearing lists");
         clearAllLists();
+        sessionElapsedBeforePause = 0;
+    } else {
+        // استئناف جلسة موجودة
+        Log.i(TAG, "🔄 Resuming session — preserving " + 
+                scannedItemsDisplayList.size() + " items");
+    }
 
-        if (scanController == null) {
-            showFatalErrorDialog(
-                    isArabic ? "⚠️ مدير المسح غير جاهز" : "⚠️ Scan controller not ready",
-                    isArabic ? "حاول إعادة فتح الشاشة" : "Try reopening the screen");
-            return;
-        }
+    isPaused = false;
+    hasUncommittedSession = true;
 
-        // ✅ ابدأ القارئ فوراً بكتالوج فارغ
-        final Map<String, InventoryItem> emptyCatalog = new ConcurrentHashMap<>();
+    if (scanController == null) {
+        showFatalErrorDialog(
+                isArabic ? "⚠️ مدير المسح غير جاهز" : "⚠️ Scan controller not ready",
+                isArabic ? "حاول إعادة فتح الشاشة" : "Try reopening the screen");
+        return;
+    }
 
-        boolean started = scanController.startScanning(emptyCatalog);
-        if (!started) {
-            showFatalErrorDialog(
-                    isArabic ? "❌ فشل بدء المسح" : "❌ Failed to start scanning",
-                    isArabic ? "تحقق من اتصال القارئ C83" : "Check C83 reader connection");
-            return;
-        }
+    // ✅ ابدأ القارئ
+    final Map<String, InventoryItem> emptyCatalog = new ConcurrentHashMap<>();
 
-        showToast(isArabic ? "📡 جاري المسح..." : "📡 Scanning...");
+    boolean started = scanController.startScanning(emptyCatalog);
+    if (!started) {
+        showFatalErrorDialog(
+                isArabic ? "❌ فشل بدء المسح" : "❌ Failed to start scanning",
+                isArabic ? "تحقق من اتصال القارئ" : "Check reader connection");
+        return;
+    }
 
-        // ✅ حمّل الكتالوج في الخلفية بالتوازي
+    // ✅ لا toast مزعج — الحالة تُعرض في الشريط
+
+    // ✅ حمّل الكتالوج في الخلفية فقط لو لم يكن موجوداً
+    if (catalogEpcs.isEmpty()) {
         loadCatalogInBackground();
     }
+}
 
     /**
      * ✅ تحميل الكتالوج في الخلفية (لا يمنع المسح)
@@ -1500,35 +1671,78 @@ private void loadCatalogInBackground() {
     /**
      * ✅ إيقاف فوري
      */
-    public void stopScanning() {
-        if (!isScanning) return;
+    /**
+ * ✅ [Stage-1] إيقاف مؤقت — لا يمسح البيانات
+ *             يمكن الاستئناف لاحقاً
+ */
+ public void pauseScanning() {
+    if (!isScanning) return;
 
-        Log.d(TAG, "⏹️ stopScanning (DIRECT C83)");
+    // ✅ احفظ الوقت المنقضي قبل الإيقاف
+    if (scanStartTime > 0) {
+        sessionElapsedBeforePause += 
+                (SystemClock.elapsedRealtime() - scanStartTime) / 1000;
+    }
 
-        if (scanController != null) {
-            scanController.stopScanning();
+    Log.d(TAG, "⏸️ pauseScanning (STAGE-1)");
+
+    if (scanController != null) {
+        scanController.stopScanning();
+    }
+
+    isScanning = false;
+    isPaused = true;
+    hasUncommittedSession = true;
+
+    mainHandler.post(() -> {
+        if (!isAdded() || isFragmentDestroyed) return;
+
+        updateMainToggleButton(false);
+        animateMainButton();
+
+        if (tvInventoryStatus != null) {
+            tvInventoryStatus.setText(isArabic
+                    ? "⏸️ الجرد موقوف مؤقتاً — يمكنك الاستئناف"
+                    : "⏸️ Inventory paused — you can resume");
         }
 
-        isScanning = false;
-        mainHandler.post(() -> {
-            if (!isAdded() || isFragmentDestroyed) return;
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setNavigationLocked(false);
+        }
 
-            updateMainToggleButton(false);
-            animateMainButton();
+        updateButtonsState();
+    });
+}
 
-            if (tvInventoryStatus != null) {
-                tvInventoryStatus.setText(isArabic
-                        ? "📡 جاهز للمسح التالي"
-                        : "📡 Ready for next scan");
-            }
+/**
+ * ✅ [Stage-1] إيقاف نهائي — يُبقي البيانات لكن لا يُتيح الاستئناف
+ *             (يُستدعى فقط عند الخروج من الشاشة أو الاعتماد)
+ */
+public void stopScanning() {
+    if (!isScanning) return;
 
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setNavigationLocked(false);
-            }
+    Log.d(TAG, "⏹️ stopScanning (FINAL)");
 
-            updateButtonsState();
-        });
+    if (scanController != null) {
+        scanController.stopScanning();
     }
+
+    isScanning = false;
+    isPaused = false;
+
+    mainHandler.post(() -> {
+        if (!isAdded() || isFragmentDestroyed) return;
+
+        updateMainToggleButton(false);
+        animateMainButton();
+
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setNavigationLocked(false);
+        }
+
+        updateButtonsState();
+    });
+}
 
     private void startBlindInventory() {
         if (!canEditInventory()) {
@@ -2100,49 +2314,54 @@ private void clearAllLists() {
     }
 
     private void updateButtonsState() {
-        if (!isAdded() || isFragmentDestroyed) return;
+    if (!isAdded() || isFragmentDestroyed) return;
 
-        int engineCount = (inventoryEngine != null)
-                ? inventoryEngine.getUniqueCount() : 0;
-        int listCount = (scannedItemsDisplayList != null)
-                ? scannedItemsDisplayList.size() : 0;
-        int scanned = Math.max(engineCount, listCount);
+    int engineCount = (inventoryEngine != null) ? inventoryEngine.getUniqueCount() : 0;
+    int listCount = (scannedItemsDisplayList != null) ? scannedItemsDisplayList.size() : 0;
+    int scanned = Math.max(engineCount, listCount);
 
-        boolean hasItems = scanned > 0;
-        boolean canEdit = canEditInventory();
-        boolean canView = canViewInventory();
+    boolean hasItems = scanned > 0;
+    boolean canEdit = canEditInventory();
+    boolean canView = canViewInventory();
 
-        if (btnMainToggleScan != null) {
-            btnMainToggleScan.setEnabled(canEdit);
-            btnMainToggleScan.setAlpha(canEdit ? 1.0f : 0.5f);
-        }
+    // ✅ زر Start/Pause
+    if (btnMainToggleScan != null) {
+        btnMainToggleScan.setEnabled(canEdit);
+        btnMainToggleScan.setAlpha(canEdit ? 1.0f : 0.5f);
+    }
 
-        if (btnCommitSession != null) {
-            boolean canCommit = hasItems && !isScanning && canEdit;
-            btnCommitSession.setEnabled(canCommit);
-            btnCommitSession.setAlpha(canCommit ? 1.0f : 0.5f);
-        }
+    // ✅ [جديد] زر "إنهاء ومراجعة"
+    if (btnFinishAndReview != null) {
+        boolean visible = hasItems && !isScanning;
+        btnFinishAndReview.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
 
-        if (btnGenerateReport != null) {
-            boolean canReport = hasItems && !isScanning;
-            btnGenerateReport.setEnabled(canReport);
-            btnGenerateReport.setAlpha(canReport ? 1.0f : 0.5f);
-        }
+    // ✅ باقي الأزرار
+    if (btnCommitSession != null) {
+        boolean canCommit = hasItems && !isScanning && canEdit;
+        btnCommitSession.setEnabled(canCommit);
+        btnCommitSession.setAlpha(canCommit ? 1.0f : 0.5f);
+    }
 
-        if (btnOpenItemsList != null) {
-            btnOpenItemsList.setEnabled(hasItems);
-            btnOpenItemsList.setAlpha(hasItems ? 1.0f : 0.5f);
-        }
+    if (btnGenerateReport != null) {
+        boolean canReport = hasItems && !isScanning;
+        btnGenerateReport.setEnabled(canReport);
+        btnGenerateReport.setAlpha(canReport ? 1.0f : 0.5f);
+    }
 
-        if (btnPowerControl != null) {
-            btnPowerControl.setEnabled(!isScanning && canEdit);
-            btnPowerControl.setAlpha((!isScanning && canEdit) ? 1.0f : 0.5f);
-        }
-        if (btnPowerControlCompact != null) {
-            btnPowerControlCompact.setEnabled(!isScanning && canEdit);
-            btnPowerControlCompact.setAlpha((!isScanning && canEdit) ? 1.0f : 0.5f);
-        }
+    if (btnOpenItemsList != null) {
+        btnOpenItemsList.setEnabled(hasItems);
+        btnOpenItemsList.setAlpha(hasItems ? 1.0f : 0.5f);
+    }
 
+    if (btnPowerControl != null) {
+        btnPowerControl.setEnabled(!isScanning && canEdit);
+        btnPowerControl.setAlpha((!isScanning && canEdit) ? 1.0f : 0.5f);
+    }
+    if (btnPowerControlCompact != null) {
+        btnPowerControlCompact.setEnabled(!isScanning && canEdit);
+        btnPowerControlCompact.setAlpha((!isScanning && canEdit) ? 1.0f : 0.5f);
+    }
         if (btnArchiveReports != null) {
             boolean canArchive = !isScanning && canView;
             btnArchiveReports.setEnabled(canArchive);
@@ -3982,35 +4201,95 @@ private void clearAllLists() {
         }
     }
 
-    private void silentRestoreSession() {
-        if (sessionManager == null || !isAdded() || isFragmentDestroyed) return;
+    /**
+ * ✅ [Stage-1] استئناف ذكي مع نافذة تأكيد
+ */
+private void silentRestoreSession() {
+    if (sessionManager == null || !isAdded() || isFragmentDestroyed) return;
 
-        try {
-            if (!sessionManager.hasValidSession()) {
-                Log.d(TAG, "silentRestore: no valid session");
-                return;
+    try {
+        if (!sessionManager.hasValidSession()) {
+            Log.d(TAG, "No valid session to restore");
+            return;
+        }
+
+        sessionManager.tryRestoreSession(new InventorySessionManager.SessionCallback() {
+            @Override
+            public void onSessionFound(JSONArray items, int expected,
+                                        String category, long timeAgoMillis) {
+                if (!isAdded() || isFragmentDestroyed) return;
+                if (items == null || items.length() == 0) return;
+
+                // ✅ استرجع البيانات صامتاً في الذاكرة
+                applyRestoredSessionSilent(items, expected, category);
+
+                // ✅ ثم اعرض نافذة الاستئناف
+                mainHandler.postDelayed(() -> showResumeDialog(items.length(),
+                        expected, timeAgoMillis), 500);
             }
 
-            sessionManager.tryRestoreSession(new InventorySessionManager.SessionCallback() {
-                @Override
-                public void onSessionFound(JSONArray items, int expectedCount,
-                                            String category, long timeAgoMillis) {
-                    if (!isAdded() || isFragmentDestroyed) return;
-                    if (items == null || items.length() == 0) return;
-
-                    Log.d(TAG, "🔄 Silent restoring " + items.length() + " items...");
-                    applyRestoredSessionSilent(items, expectedCount, category);
-                }
-
-                @Override
-                public void onNoSession() {
-                    Log.d(TAG, "silentRestore: no session");
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "silentRestoreSession error", e);
-        }
+            @Override
+            public void onNoSession() {
+                Log.d(TAG, "No session found");
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "silentRestoreSession error", e);
     }
+}
+
+/**
+ * ✅ [Stage-1] نافذة الاستئناف
+ */
+private void showResumeDialog(int itemCount, int expected, long timeAgoMs) {
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    String timeAgo;
+    if (timeAgoMs < 60 * 1000) {
+        timeAgo = isArabic ? "قبل لحظات" : "just now";
+    } else if (timeAgoMs < 60 * 60 * 1000) {
+        timeAgo = isArabic
+                ? "قبل " + (timeAgoMs / 60000) + " دقيقة"
+                : (timeAgoMs / 60000) + " min ago";
+    } else {
+        timeAgo = isArabic
+                ? "قبل " + (timeAgoMs / 3600000) + " ساعة"
+                : (timeAgoMs / 3600000) + " hours ago";
+    }
+
+    String message = isArabic
+            ? "📂 وجدنا جلسة جرد سابقة (" + timeAgo + ")\n\n"
+            + "• القطع الممسوحة: " + itemCount + "\n"
+            + "• العدد المتوقع: " + (expected > 0 ? expected : "—") + "\n\n"
+            + "هل تريد الاستئناف أم البدء من جديد؟"
+            : "📂 Previous inventory session found (" + timeAgo + ")\n\n"
+            + "• Scanned items: " + itemCount + "\n"
+            + "• Expected: " + (expected > 0 ? expected : "—") + "\n\n"
+            + "Resume or start new?";
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🔄 جلسة سابقة" : "🔄 Previous Session")
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "🔄 استئناف" : "🔄 Resume", (d, w) -> {
+                hasUncommittedSession = true;
+                isPaused = true;
+                Log.i(TAG, "✅ User chose: RESUME");
+                // الحالة جاهزة للاستئناف
+                updateButtonsState();
+            })
+            .setNegativeButton(isArabic ? "🆕 جلسة جديدة" : "🆕 New Session", (d, w) -> {
+                Log.i(TAG, "✅ User chose: NEW SESSION");
+                clearAllLists();
+                hasUncommittedSession = false;
+                isPaused = false;
+
+                if (sessionManager != null) {
+                    sessionManager.clearSession();
+                }
+            })
+            .setCancelable(false)
+            .show();
+}
 
     private void applyRestoredSessionSilent(JSONArray items, int expectedCount, String category) {
         try {
