@@ -54,6 +54,8 @@ public class MiraReaderControlFragment extends Fragment {
     private TextView tvPowerValue, tvSummary;
     private Spinner spFrequency, spRfLink, spSession, spTarget, spQValue;
     private MaterialSwitch swFastId, swTagFocus, swFastInventory;
+    private Spinner spReadMode;
+    private TextView tvReadModeHint;
     private MaterialButton btnApplyNow, btnReset, btnReadCurrent;
     private View loading;
 
@@ -118,6 +120,9 @@ public class MiraReaderControlFragment extends Fragment {
         tvLiveLastEpc     = v.findViewById(R.id.tvLiveLastEpc);
         tvLiveRssi        = v.findViewById(R.id.tvLiveRssi);
         btnLiveTestToggle = v.findViewById(R.id.btnLiveTestToggle);
+        
+        spReadMode     = v.findViewById(R.id.spReadMode);
+        tvReadModeHint = v.findViewById(R.id.tvReadModeHint);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -149,6 +154,10 @@ public class MiraReaderControlFragment extends Fragment {
         for (int i = 0; i < 16; i++) qValues[i] = String.valueOf(i);
         spQValue.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, qValues));
+                
+        spReadMode.setAdapter(new ArrayAdapter<>(requireContext(),
+        android.R.layout.simple_spinner_dropdown_item,
+        MiraReaderSettings.READ_MODE_LABELS));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -196,6 +205,13 @@ public class MiraReaderControlFragment extends Fragment {
             if (isUpdatingUi.get()) return;
             settings.setFastInventory(c); updateSummary();
         });
+        
+        // ═══ Read Mode ═══
+        spReadMode.setOnItemSelectedListener(spinnerListener(pos -> {
+    settings.setReadMode(pos);
+    if (tvReadModeHint != null) {
+        tvReadModeHint.setText(MiraReaderSettings.READ_MODE_HINTS[pos]);
+    }}));
 
         // ═══ Main Buttons ═══
         btnApplyNow.setOnClickListener(x -> applyNow());
@@ -246,6 +262,11 @@ public class MiraReaderControlFragment extends Fragment {
             swTagFocus.setChecked(settings.isTagFocus());
             swFastInventory.setChecked(settings.isFastInventory());
         } finally {
+        spReadMode.setSelection(settings.getReadMode());
+if (tvReadModeHint != null) {
+    tvReadModeHint.setText(
+        MiraReaderSettings.READ_MODE_HINTS[settings.getReadMode()]);
+}
             isUpdatingUi.set(false);
         }
     }
