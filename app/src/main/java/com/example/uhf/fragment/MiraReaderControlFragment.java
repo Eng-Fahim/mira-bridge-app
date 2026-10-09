@@ -17,7 +17,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-
+import com.google.android.material.appbar.MaterialToolbar;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.R;
 import com.example.uhf.MiraRfid.MiraReaderSettings;
 import com.example.uhf.activity.BaseTabFragmentActivity;
@@ -48,7 +49,7 @@ public class MiraReaderControlFragment extends Fragment {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final AtomicBoolean isUpdatingUi = new AtomicBoolean(false);
     private boolean isArabic = true;
-
+    private MaterialToolbar toolbar;
     // ═══ Views ═══
     private SeekBar seekPower;
     private TextView tvPowerValue, tvSummary;
@@ -97,6 +98,13 @@ public class MiraReaderControlFragment extends Fragment {
     //  Bind
     // ═══════════════════════════════════════════════════════════
     private void bindViews(View v) {
+    toolbar = v.findViewById(R.id.toolbarReaderControl);
+if (toolbar != null) {
+    toolbar.setNavigationOnClickListener(x -> {
+        Log.d(TAG, "🔙 Back pressed");
+        handleBack();
+    });
+}
         // Main
         seekPower         = v.findViewById(R.id.seekPower);
         tvPowerValue      = v.findViewById(R.id.tvPowerValue);
@@ -564,6 +572,40 @@ if (tvReadModeHint != null) {
             : "🛑 Test stopped — " + liveReadCount + " reads");
 }
 
+@Override
+public void onStart() {
+    super.onStart();
+    // ✅ إخفاء قائمة التنقل السفلية
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            activity.setBottomNavVisible(false);
+
+            View fab = activity.findViewById(R.id.fabActionCenter);
+            if (fab != null) fab.setVisibility(View.GONE);
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "onStart error: " + e.getMessage());
+    }
+}
+
+@Override
+public void onStop() {
+    super.onStop();
+    // ✅ إعادة إظهار قائمة التنقل السفلية
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            activity.setBottomNavVisible(true);
+
+            View fab = activity.findViewById(R.id.fabActionCenter);
+            if (fab != null) fab.setVisibility(View.VISIBLE);
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "onStop error: " + e.getMessage());
+    }
+}
+
     @Override
     public void onDestroyView() {
         if (isLiveTesting) {
@@ -581,4 +623,30 @@ if (tvReadModeHint != null) {
             Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
         }
     }
+    /**
+ * ✅ زر الرجوع — يعود لـ Dashboard
+ */
+private void handleBack() {
+    try {
+        if (isLiveTesting) {
+            stopLiveTest();
+        }
+
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            activity.setBottomNavVisible(true);
+
+            if (activity.getNavigationManager() != null) {
+                activity.getNavigationManager().goToDashboard();
+            } else {
+                activity.onBackPressed();
+            }
+        } else if (getActivity() != null) {
+            getActivity().onBackPressed();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "handleBack error: " + e.getMessage());
+    }
+}
+    
 }
