@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚙️ لوحة التحكم بالقارئ"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="هذه الإعدادات تُطبَّق على كل شاشات MIRA تلقائياً"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="12sp"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Power Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="⚡ قوة الإرسال"
+                        android:textStyle="bold"
+                        android:textSize="15sp"/>
+                    <TextView
+                        android:id="@+id/tvPowerValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="27 dBm"
+                        android:textColor="?attr/colorPrimary"
+                        android:textStyle="bold"
+                        android:textSize="16sp"/>
+                </LinearLayout>
+                <SeekBar
+                    android:id="@+id/seekPower"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:max="30"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Spinners Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="🌍 التردد" android:textStyle="bold" android:textSize="14sp"/>
+                <Spinner android:id="@+id/spFrequency" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginBottom="12dp"/>
+
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="📊 Session" android:textStyle="bold" android:textSize="14sp"/>
+                <Spinner android:id="@+id/spSession" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginBottom="12dp"/>
+
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="🎯 Target" android:textStyle="bold" android:textSize="14sp"/>
+                <Spinner android:id="@+id/spTarget" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginBottom="12dp"/>
+
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="🔢 Q Value" android:textStyle="bold" android:textSize="14sp"/>
+                <Spinner android:id="@+id/spQValue" android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Switches Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swFastId" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:text="🚀 FastID"
+                    android:layout_marginBottom="8dp"/>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swTagFocus" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:text="🎯 TagFocus"
+                    android:layout_marginBottom="8dp"/>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swDynamicPower" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:text="⚡ Dynamic Power"
+                    android:layout_marginBottom="8dp"/>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swBeep" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:text="🔊 الصوت"
+                    android:layout_marginBottom="8dp"/>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swVibration" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:text="📳 الاهتزاز"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Summary Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
+            <TextView
+                android:id="@+id/tvSettingsSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:fontFamily="monospace"
+                android:textSize="11sp"
+                android:textColor="?attr/colorOnSurface"/>
+        </com.google.android.material.card.MaterialCardView>
+
+        <ProgressBar
+            android:id="@+id/readerLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            android:layout_marginBottom="12dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnApplyNow"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="✅ تطبيق على القارئ الآن"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReadCurrent"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="📖 قراءة الحالة الحالية"
+            android:layout_marginBottom="8dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnResetDefaults"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="🔄 إعادة تعيين الافتراضيات"
+            android:textColor="?attr/colorError"/>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
