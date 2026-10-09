@@ -287,12 +287,8 @@ public class MiraReaderControlFragment extends Fragment {
             sb.append("RFLink (real): ?\n");
         }
 
-        // Fast Inventory
-        try {
-            int fi = reader.getFastInventoryMode();
-            sb.append("FastInv (real): ").append(fi == 1 ? "ON" : "OFF").append("\n");
-        } catch (Exception e) { /* ignore */ }
-
+        // Fast Inventory — ❌ معطّل مؤقتاً (SDK يستخدم FastInventoryEntity)
+// سيُعاد تفعيله في مرحلة لاحقة
         sb.append("\n── Saved in MIRA ──\n");
         sb.append("Power (saved): ").append(settings.getPowerDbm()).append(" dBm\n");
         sb.append("Frequency (saved): ").append(MiraReaderSettings.getFreqLabel(settings.getFreqMode())).append("\n");
