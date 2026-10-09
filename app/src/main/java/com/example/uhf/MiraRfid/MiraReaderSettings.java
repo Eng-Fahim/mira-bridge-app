@@ -12,40 +12,13 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraReaderSettings v2 — مبني على توثيق Chainway SDK الرسمي
+ *  MiraReaderSettings v3 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
  * ═══════════════════════════════════════════════════════════════════════════
- *
- *  ✅ كل الاستدعاءات مباشرة (بدون Reflection)
- *  ✅ قيم Working Mode الحقيقية (HEX)
- *  ✅ Session/Target/Q عبر Gen2Entity
- *  ✅ يطابق 100% التطبيق الرسمي
  */
 public class MiraReaderSettings {
 
     private static final String TAG = "MiraReaderSettings";
     private static final String PREFS = "mira_reader_settings_v2";
-    
-    // ═══════════════════════════════════════════════════════════════
-//  🔄 وضع القراءة (Read Mode)
-// ═══════════════════════════════════════════════════════════════
-public static final int READ_MODE_AUTO   = 0;  // مستمر (للجرد)
-public static final int READ_MODE_SINGLE = 1;  // مفرد (للبيع)
-
-public static final String[] READ_MODE_LABELS = {
-        "🔄 مستمر (للجرد)",
-        "🎯 مفرد (للبيع والتحقق)"
-};
-
-public static final String[] READ_MODE_HINTS = {
-        "يقرأ كل الوسوم القريبة باستمرار — مثالي للجرد السريع",
-        "يقرأ وسماً واحداً فقط لكل ضغطة — مثالي للبيع"
-};
-
-public static final int DEF_READ_MODE = READ_MODE_AUTO;
-
-public int  getReadMode() { return prefs.getInt("read_mode", DEF_READ_MODE); }
-public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)).commit(); }
-
 
     // ═══════════════════════════════════════════════════════════════
     //  📡 مناطق العمل (Working Mode) — القيم HEX الرسمية
@@ -70,49 +43,55 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
     public static final int FREQ_HK            = 0x41;
     public static final int FREQ_NEW_ZEALAND   = 0x42;
 
-    /** قائمة مناطق العمل مع أسمائها للعرض في الـ Spinner */
-    public static final String[] FREQ_LABELS = {
-        "🌍 الشرق الأوسط والخليج (اليمن، السعودية، الإمارات) — 865-868",
-        "🌎 أمريكا الشمالية (الولايات المتحدة، كندا) — 902-928",
-        "🇨🇳 الصين (840-845)",
-        "🇨🇳 الصين 2 (920-925)",
-        "🇿🇦 جنوب إفريقيا (915-919)",
-        "🇰🇷 كوريا (917-923)",
-        "🇯🇵 اليابان (916.8-920.8)",
-        "تايوان (920-928)",
-        "فيتنام (918-923)",
-        "بيرو (915-928)",
-        "روسيا (860-867.6)",
-        "ماليزيا (919-923)",
-        "البرازيل",
-        "أوروبا العليا (ETSI Upper)",
-        "أستراليا",
-        "إندونيسيا (920-923)",
-        "إسرائيل",
-        "هونغ كونغ",
-        "نيوزيلندا"
-};
+    /**
+     * ✅ مصفوفة [القيمة HEX][الفهرس]
+     *    الترتيب: الشرق الأوسط أولاً (الأكثر استخداماً)
+     */
+    public static final int[][] FREQ_MODES = {
+            {FREQ_ETSI,         0},
+            {FREQ_FCC,          1},
+            {FREQ_CHINA_840,    2},
+            {FREQ_CHINA_920,    3},
+            {FREQ_SOUTH_AFRICA, 4},
+            {FREQ_KOREA,        5},
+            {FREQ_JAPAN,        6},
+            {FREQ_TAIWAN,       7},
+            {FREQ_VIETNAM,      8},
+            {FREQ_PERU,         9},
+            {FREQ_RUSSIA,      10},
+            {FREQ_MALAYSIA,    11},
+            {FREQ_BRAZIL,      12},
+            {FREQ_ETSI_UPPER,  13},
+            {FREQ_AUSTRALIA,   14},
+            {FREQ_INDONESIA,   15},
+            {FREQ_ISRAEL,      16},
+            {FREQ_HK,          17},
+            {FREQ_NEW_ZEALAND, 18}
+    };
 
+    /**
+     * ✅ تسميات مفهومة للمستخدم — الشرق الأوسط أولاً
+     */
     public static final String[] FREQ_LABELS = {
-            "ETSI Standard (865-868)",
-            "United States (902-928)",
-            "China Standard (840-845)",
-            "China Standard 2 (920-925)",
-            "South Africa (915-919)",
-            "Korea (917-923)",
-            "Japan (916.8-920.8)",
-            "China Taiwan (920-928)",
-            "Vietnam (918-923)",
-            "Peru (915-928)",
-            "Russia (860-867.6)",
-            "Malaysia (919-923)",
-            "Brazil",
-            "ETSI Upper",
-            "Australia",
-            "Indonesia (920-923)",
-            "Israel",
-            "Hong Kong",
-            "New Zealand"
+            "🌍 الشرق الأوسط والخليج (اليمن، السعودية، الإمارات) — 865-868",
+            "🌎 أمريكا الشمالية (الولايات المتحدة، كندا) — 902-928",
+            "🇨🇳 الصين (840-845)",
+            "🇨🇳 الصين 2 (920-925)",
+            "🇿🇦 جنوب إفريقيا (915-919)",
+            "🇰🇷 كوريا (917-923)",
+            "🇯🇵 اليابان (916.8-920.8)",
+            "تايوان (920-928)",
+            "فيتنام (918-923)",
+            "بيرو (915-928)",
+            "روسيا (860-867.6)",
+            "ماليزيا (919-923)",
+            "البرازيل",
+            "أوروبا العليا (ETSI Upper)",
+            "أستراليا",
+            "إندونيسيا (920-923)",
+            "إسرائيل",
+            "هونغ كونغ",
+            "نيوزيلندا"
     };
 
     // ═══════════════════════════════════════════════════════════════
@@ -134,25 +113,42 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
     };
 
     // ═══════════════════════════════════════════════════════════════
+    //  🔄 وضع القراءة (Read Mode)
+    // ═══════════════════════════════════════════════════════════════
+    public static final int READ_MODE_AUTO   = 0;
+    public static final int READ_MODE_SINGLE = 1;
+
+    public static final String[] READ_MODE_LABELS = {
+            "🔄 مستمر (للجرد)",
+            "🎯 مفرد (للبيع والتحقق)"
+    };
+
+    public static final String[] READ_MODE_HINTS = {
+            "يقرأ كل الوسوم القريبة باستمرار — مثالي للجرد السريع",
+            "يقرأ وسماً واحداً فقط لكل ضغطة — مثالي للبيع"
+    };
+
+    // ═══════════════════════════════════════════════════════════════
     //  القيم الافتراضية
     // ═══════════════════════════════════════════════════════════════
-    public static final int  DEF_POWER_DBM      = 27;
-    public static final int  DEF_FREQ_MODE      = FREQ_ETSI;
-    public static final int  DEF_SESSION        = 1;    // S1
-    public static final int  DEF_TARGET         = 0;    // A
-    public static final int  DEF_Q_MODE         = 0;    // fixed Q
-    public static final int  DEF_Q_VALUE        = 4;    // StartQ
-    public static final int  DEF_MIN_Q          = 0;
-    public static final int  DEF_MAX_Q          = 15;
-    public static final int  DEF_DR             = 0;
-    public static final int  DEF_MILLER         = 1;    // Miller2
-    public static final int  DEF_LINK_FREQ      = 1;    // 160KHz
-    public static final int  DEF_RFLINK         = 1;    // PR-ASK/M4/250K
-    public static final boolean DEF_FAST_ID     = false;
-    public static final boolean DEF_TAG_FOCUS   = false;
-    public static final boolean DEF_FAST_INV    = false;
-    public static final int  DEF_RSSI_THRESHOLD = -75;
-    public static final int  DEF_SCAN_INTERVAL  = 100;
+    public static final int  DEF_POWER_DBM       = 27;
+    public static final int  DEF_FREQ_MODE       = FREQ_ETSI;
+    public static final int  DEF_READ_MODE       = READ_MODE_AUTO;
+    public static final int  DEF_SESSION         = 1;
+    public static final int  DEF_TARGET          = 0;
+    public static final int  DEF_Q_MODE          = 0;
+    public static final int  DEF_Q_VALUE         = 4;
+    public static final int  DEF_MIN_Q           = 0;
+    public static final int  DEF_MAX_Q           = 15;
+    public static final int  DEF_DR              = 0;
+    public static final int  DEF_MILLER          = 1;
+    public static final int  DEF_LINK_FREQ       = 1;
+    public static final int  DEF_RFLINK          = 1;
+    public static final boolean DEF_FAST_ID      = false;
+    public static final boolean DEF_TAG_FOCUS    = false;
+    public static final boolean DEF_FAST_INV     = false;
+    public static final int  DEF_RSSI_THRESHOLD  = -75;
+    public static final int  DEF_SCAN_INTERVAL   = 100;
 
     // ═══════════════════════════════════════════════════════════════
     //  Singleton
@@ -164,7 +160,7 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
     private MiraReaderSettings(Context ctx) {
         this.context = ctx.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.i(TAG, "✅ MiraReaderSettings v2 initialized");
+        Log.i(TAG, "✅ MiraReaderSettings v3 initialized");
     }
 
     public static MiraReaderSettings getInstance(Context ctx) {
@@ -181,6 +177,7 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
     // ═══════════════════════════════════════════════════════════════
     public int     getPowerDbm()      { return prefs.getInt("power", DEF_POWER_DBM); }
     public int     getFreqMode()      { return prefs.getInt("freq", DEF_FREQ_MODE); }
+    public int     getReadMode()      { return prefs.getInt("read_mode", DEF_READ_MODE); }
     public int     getSession()       { return prefs.getInt("sess", DEF_SESSION); }
     public int     getTarget()        { return prefs.getInt("target", DEF_TARGET); }
     public int     getQMode()         { return prefs.getInt("q_mode", DEF_Q_MODE); }
@@ -200,28 +197,29 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
     // ═══════════════════════════════════════════════════════════════
     //  Setters
     // ═══════════════════════════════════════════════════════════════
-    public void setPowerDbm(int v)      { prefs.edit().putInt("power", clamp(v, 5, 33)).commit(); }
-    public void setFreqMode(int v)      { prefs.edit().putInt("freq", v).commit(); }
-    public void setSession(int v)       { prefs.edit().putInt("sess", clamp(v, 0, 3)).commit(); }
-    public void setTarget(int v)        { prefs.edit().putInt("target", clamp(v, 0, 1)).commit(); }
-    public void setQMode(int v)         { prefs.edit().putInt("q_mode", clamp(v, 0, 1)).commit(); }
-    public void setQValue(int v)        { prefs.edit().putInt("q_val", clamp(v, 0, 15)).commit(); }
-    public void setMinQ(int v)          { prefs.edit().putInt("q_min", clamp(v, 0, 15)).commit(); }
-    public void setMaxQ(int v)          { prefs.edit().putInt("q_max", clamp(v, 0, 15)).commit(); }
-    public void setDR(int v)            { prefs.edit().putInt("dr", clamp(v, 0, 1)).commit(); }
-    public void setMiller(int v)        { prefs.edit().putInt("miller", clamp(v, 0, 3)).commit(); }
-    public void setLinkFreq(int v)      { prefs.edit().putInt("link_freq", clamp(v, 0, 7)).commit(); }
-    public void setRfLink(int v)        { prefs.edit().putInt("rflink", clamp(v, 0, 11)).commit(); }
-    public void setFastId(boolean v)    { prefs.edit().putBoolean("fast_id", v).commit(); }
-    public void setTagFocus(boolean v)  { prefs.edit().putBoolean("tag_focus", v).commit(); }
+    public void setPowerDbm(int v)          { prefs.edit().putInt("power", clamp(v, 5, 33)).commit(); }
+    public void setFreqMode(int v)          { prefs.edit().putInt("freq", v).commit(); }
+    public void setReadMode(int v)          { prefs.edit().putInt("read_mode", clamp(v, 0, 1)).commit(); }
+    public void setSession(int v)           { prefs.edit().putInt("sess", clamp(v, 0, 3)).commit(); }
+    public void setTarget(int v)            { prefs.edit().putInt("target", clamp(v, 0, 1)).commit(); }
+    public void setQMode(int v)             { prefs.edit().putInt("q_mode", clamp(v, 0, 1)).commit(); }
+    public void setQValue(int v)            { prefs.edit().putInt("q_val", clamp(v, 0, 15)).commit(); }
+    public void setMinQ(int v)              { prefs.edit().putInt("q_min", clamp(v, 0, 15)).commit(); }
+    public void setMaxQ(int v)              { prefs.edit().putInt("q_max", clamp(v, 0, 15)).commit(); }
+    public void setDR(int v)                { prefs.edit().putInt("dr", clamp(v, 0, 1)).commit(); }
+    public void setMiller(int v)            { prefs.edit().putInt("miller", clamp(v, 0, 3)).commit(); }
+    public void setLinkFreq(int v)          { prefs.edit().putInt("link_freq", clamp(v, 0, 7)).commit(); }
+    public void setRfLink(int v)            { prefs.edit().putInt("rflink", clamp(v, 0, 11)).commit(); }
+    public void setFastId(boolean v)        { prefs.edit().putBoolean("fast_id", v).commit(); }
+    public void setTagFocus(boolean v)      { prefs.edit().putBoolean("tag_focus", v).commit(); }
     public void setFastInventory(boolean v) { prefs.edit().putBoolean("fast_inv", v).commit(); }
-    public void setRssiThreshold(int v) { prefs.edit().putInt("rssi", clamp(v, -100, -30)).commit(); }
-    public void setScanInterval(int v)  { prefs.edit().putInt("interval", clamp(v, 50, 1000)).commit(); }
+    public void setRssiThreshold(int v)     { prefs.edit().putInt("rssi", clamp(v, -100, -30)).commit(); }
+    public void setScanInterval(int v)      { prefs.edit().putInt("interval", clamp(v, 50, 1000)).commit(); }
 
     private int clamp(int v, int min, int max) { return Math.max(min, Math.min(max, v)); }
 
     // ═══════════════════════════════════════════════════════════════
-    //  ✅ تطبيق الإعدادات على القارئ (استدعاءات مباشرة — بدون Reflection)
+    //  ✅ تطبيق الإعدادات على القارئ
     // ═══════════════════════════════════════════════════════════════
 
     public static class ApplyResult {
@@ -249,7 +247,7 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
             else { failed++; failedNames.add("setPower"); }
         } catch (Exception e) { failed++; failedNames.add("setPower"); }
 
-        // 2) Frequency Mode (HEX)
+        // 2) Frequency Mode
         try {
             boolean ok = reader.setFrequencyMode(getFreqMode());
             if (ok) { applied++; Log.i(TAG, "   ✅ setFrequencyMode(0x" + Integer.toHexString(getFreqMode()) + ")"); }
@@ -263,7 +261,7 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
             else { failed++; failedNames.add("setRFLink"); }
         } catch (Exception e) { failed++; failedNames.add("setRFLink"); }
 
-        // 4) FastID (لاحظ: ID كبيرة)
+        // 4) FastID
         try {
             boolean ok = reader.setFastID(isFastId());
             if (ok) { applied++; Log.i(TAG, "   ✅ setFastID(" + isFastId() + ")"); }
@@ -277,27 +275,25 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
             else { failed++; failedNames.add("setTagFocus"); }
         } catch (Exception e) { failed++; failedNames.add("setTagFocus"); }
 
-        // 6) FastInventoryMode — ❌ معطّل مؤقتاً
-// SDK يستخدم FastInventoryEntity (كائن) وليس boolean
-// سنُكمل هذا في مرحلة لاحقة بعد دراسة الـ API الفعلي
-Log.i(TAG, "   ⏭️ FastInventoryMode skipped (SDK uses FastInventoryEntity)");
+        // 6) FastInventory — معطّل مؤقتاً (SDK يستخدم FastInventoryEntity)
+        Log.i(TAG, "   ⏭️ FastInventoryMode skipped");
 
-        // 7) Gen2 (Session / Target / Q / DR / Miller / LinkFreq)
+        // 7) Gen2
         try {
             Gen2Entity gen2 = reader.getGen2();
             if (gen2 == null) gen2 = new Gen2Entity();
 
-            gen2.setQuerySession(getSession());      // 0-3
-            gen2.setQueryTarget(getTarget());        // 0-1
-            gen2.setQ(getQMode());                   // 0=fixed, 1=dynamic
-            gen2.setStartQ(getQValue());             // 0-15
+            gen2.setQuerySession(getSession());
+            gen2.setQueryTarget(getTarget());
+            gen2.setQ(getQMode());
+            gen2.setStartQ(getQValue());
             gen2.setMinQ(getMinQ());
             gen2.setMaxQ(getMaxQ());
-            gen2.setQueryDR(getDR());                // 0-1
-            gen2.setQueryM(getMiller());             // 0-3
-            gen2.setQueryTRext(1);                   // Use pilot
-            gen2.setQuerySel(0);                     // All
-            gen2.setLinkFrequency(getLinkFreq());    // 0-7
+            gen2.setQueryDR(getDR());
+            gen2.setQueryM(getMiller());
+            gen2.setQueryTRext(1);
+            gen2.setQuerySel(0);
+            gen2.setLinkFrequency(getLinkFreq());
 
             boolean ok = reader.setGen2(gen2);
             if (ok) { applied++; Log.i(TAG, "   ✅ setGen2(S=" + getSession()
@@ -308,7 +304,7 @@ Log.i(TAG, "   ⏭️ FastInventoryMode skipped (SDK uses FastInventoryEntity)")
             Log.e(TAG, "   ❌ setGen2", e);
         }
 
-        // 8) EPC Mode (وضع الجرد: EPC فقط)
+        // 8) EPC Mode
         try {
             reader.setEPCMode();
             applied++;
@@ -332,6 +328,7 @@ Log.i(TAG, "   ⏭️ FastInventoryMode skipped (SDK uses FastInventoryEntity)")
     public String getSummary() {
         return "⚡ Power: " + getPowerDbm() + " dBm\n"
              + "🌍 Freq: " + getFreqLabel(getFreqMode()) + "\n"
+             + "🎯 ReadMode: " + getReadModeLabel(getReadMode()) + "\n"
              + "📊 Session: S" + getSession() + "\n"
              + "🎯 Target: " + (getTarget() == 0 ? "A" : "B") + "\n"
              + "🔢 Q: " + getQValue() + " (" + (getQMode() == 0 ? "fixed" : "dynamic") + ")\n"
@@ -339,8 +336,7 @@ Log.i(TAG, "   ⏭️ FastInventoryMode skipped (SDK uses FastInventoryEntity)")
              + "🔗 RFLink: " + (getRfLink() < RFLINK_LABELS.length
                     ? RFLINK_LABELS[getRfLink()] : "?") + "\n"
              + "🚀 FastID: " + (isFastId() ? "ON" : "OFF") + "\n"
-             + "🎯 TagFocus: " + (isTagFocus() ? "ON" : "OFF") + "\n"
-             + "⚡ FastInv: " + (isFastInventory() ? "ON" : "OFF");
+             + "🎯 TagFocus: " + (isTagFocus() ? "ON" : "OFF");
     }
 
     public static String getFreqLabel(int mode) {
@@ -348,5 +344,10 @@ Log.i(TAG, "   ⏭️ FastInventoryMode skipped (SDK uses FastInventoryEntity)")
             if (FREQ_MODES[i][0] == mode) return FREQ_LABELS[i];
         }
         return "Unknown(0x" + Integer.toHexString(mode) + ")";
+    }
+
+    public static String getReadModeLabel(int mode) {
+        if (mode < 0 || mode >= READ_MODE_LABELS.length) return "?";
+        return READ_MODE_LABELS[mode];
     }
 }
