@@ -50,6 +50,7 @@ import com.example.uhf.utils.InventoryAnimationHelper;
 import com.example.uhf.utils.MiraExecutorService;
 import com.example.uhf.utils.SoundManager;
 import com.example.uhf.manager.inventory.InventorySnapshotManager;
+import com.example.uhf.MiraRfid.MiraReaderSettings;
 import com.example.uhf.fragment.MiraDashboardFragment;
 
 import com.google.android.material.button.MaterialButton;
