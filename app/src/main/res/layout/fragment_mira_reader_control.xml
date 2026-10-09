@@ -30,7 +30,7 @@
             android:textSize="12sp"
             android:layout_marginBottom="16dp"/>
 
-        <!-- Power Card -->
+        <!-- ═══════════ Power Card ═══════════ -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -69,11 +69,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:max="30"/>
+                    android:max="33"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Spinners Card -->
+        <!-- ═══════════ Radio Configuration Card ═══════════ -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -87,29 +87,74 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="🌍 التردد" android:textStyle="bold" android:textSize="14sp"/>
-                <Spinner android:id="@+id/spFrequency" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:layout_marginBottom="12dp"/>
 
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="📊 Session" android:textStyle="bold" android:textSize="14sp"/>
-                <Spinner android:id="@+id/spSession" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:layout_marginBottom="12dp"/>
+                <!-- Frequency -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🌍 Working Mode (التردد)"
+                    android:textStyle="bold"
+                    android:textSize="14sp"/>
+                <Spinner
+                    android:id="@+id/spFrequency"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"/>
 
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="🎯 Target" android:textStyle="bold" android:textSize="14sp"/>
-                <Spinner android:id="@+id/spTarget" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:layout_marginBottom="12dp"/>
+                <!-- ✅ RFLink (جديد) -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🔗 RFLink (Miller / Gen2X)"
+                    android:textStyle="bold"
+                    android:textSize="14sp"/>
+                <Spinner
+                    android:id="@+id/spRfLink"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"/>
 
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="🔢 Q Value" android:textStyle="bold" android:textSize="14sp"/>
-                <Spinner android:id="@+id/spQValue" android:layout_width="match_parent"
+                <!-- Session -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📊 Session"
+                    android:textStyle="bold"
+                    android:textSize="14sp"/>
+                <Spinner
+                    android:id="@+id/spSession"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"/>
+
+                <!-- Target -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🎯 Target"
+                    android:textStyle="bold"
+                    android:textSize="14sp"/>
+                <Spinner
+                    android:id="@+id/spTarget"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"/>
+
+                <!-- Q Value -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🔢 Q Value (StartQ)"
+                    android:textStyle="bold"
+                    android:textSize="14sp"/>
+                <Spinner
+                    android:id="@+id/spQValue"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Switches Card -->
+        <!-- ═══════════ Advanced Features Card ═══════════ -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -123,29 +168,32 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
+
                 <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/swFastId" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:text="🚀 FastID"
+                    android:id="@+id/swFastId"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🚀 FastID"
                     android:layout_marginBottom="8dp"/>
+
                 <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/swTagFocus" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:text="🎯 TagFocus"
+                    android:id="@+id/swTagFocus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🎯 TagFocus"
                     android:layout_marginBottom="8dp"/>
+
+                <!-- ✅ Fast Inventory (كان Dynamic Power) -->
                 <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/swDynamicPower" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:text="⚡ Dynamic Power"
-                    android:layout_marginBottom="8dp"/>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/swBeep" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:text="🔊 الصوت"
-                    android:layout_marginBottom="8dp"/>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/swVibration" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:text="📳 الاهتزاز"/>
+                    android:id="@+id/swFastInventory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="⚡ Fast Inventory"/>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Summary Card -->
+        <!-- ═══════════ Summary Card ═══════════ -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -171,6 +219,7 @@
             android:visibility="gone"
             android:layout_marginBottom="12dp"/>
 
+        <!-- ═══════════ Buttons ═══════════ -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnApplyNow"
             android:layout_width="match_parent"
@@ -184,7 +233,7 @@
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="📖 قراءة الحالة الحالية"
+            android:text="📖 قراءة الحالة الحالية من العتاد"
             android:layout_marginBottom="8dp"/>
 
         <com.google.android.material.button.MaterialButton
