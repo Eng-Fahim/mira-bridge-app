@@ -7,6 +7,7 @@ import android.util.Log;
 
 import com.example.uhf.MiraRfid.model.RFIDDevice;
 import com.example.uhf.MiraRfid.readers.ChainwayReader;
+import com.example.uhf.MiraRfid.MiraReaderSettings;
 import com.example.uhf.activity.BaseTabFragmentActivity;
 
 import org.json.JSONArray;
@@ -551,38 +552,54 @@ public class RFIDManager {
     // ==================== ⚡ Power Control ====================
 
     public boolean setPower(int dbm) {
-        try {
-            if (dbm < 5 || dbm > 30) {
-                Log.w(TAG, "⚠️ Power out of range: " + dbm + " (allowed: 5-30)");
-                return false;
-            }
-
-            MiraIRFIDReader reader = getActiveReader();
-            if (reader == null) {
-                Log.e(TAG, "❌ setPower: no active reader");
-                return false;
-            }
-
-            if (!reader.isConnected()) {
-                Log.e(TAG, "❌ setPower: reader not connected");
-                return false;
-            }
-
-            reader.setPower(dbm);
-            Log.i(TAG, "✅ Power set to " + dbm + " dBm");
-
-            if (activeDevice != null) {
-                activeDevice.setPowerDbm(dbm);
-                saveDevice(activeDevice);
-            }
-
-            return true;
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ setPower exception: " + e.getMessage(), e);
+    try {
+        if (dbm < 5 || dbm > 30) {
+            Log.w(TAG, "⚠️ Power out of range: " + dbm);
             return false;
         }
+
+        // ✅ احفظ في المصدر الموحد أولاً
+        MiraReaderSettings.getInstance(context).setPowerDbm(dbm);
+
+        MiraIRFIDReader reader = getActiveReader();
+        if (reader != null && reader.isConnected()) {
+            reader.setPower(dbm);
+            Log.i(TAG, "✅ Power set to " + dbm + " dBm (saved to MiraReaderSettings)");
+        } else {
+            Log.i(TAG, "ℹ️ Power saved to MiraReaderSettings — will apply on connect");
+        }
+
+        if (activeDevice != null) {
+            activeDevice.setPowerDbm(dbm);
+            saveDevice(activeDevice);
+        }
+        return true;
+
+    } catch (Exception e) {
+        Log.e(TAG, "❌ setPower exception", e);
+        return false;
     }
+}
+
+/**
+ * ✅ يطبّق كل إعدادات MiraReaderSettings على القارئ النشط.
+ * يُستدعى تلقائياً من ChainwayReader.startScan() — لا حاجة لاستدعاء يدوي.
+ */
+public void applyMiraReaderSettings() {
+    try {
+        MiraIRFIDReader reader = getActiveReader();
+        if (reader == null || !reader.isConnected()) {
+            Log.d(TAG, "applyMiraReaderSettings: reader not ready");
+            return;
+        }
+        RFIDWithUHFUART sdkReader = BaseTabFragmentActivity.getSharedReader();
+        if (sdkReader != null) {
+            MiraReaderSettings.getInstance(context).applyToReader(sdkReader);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "applyMiraReaderSettings error", e);
+    }
+}
 
     public int getPower() {
         try {
@@ -646,4 +663,4 @@ public class RFIDManager {
         Log.w(TAG, "⚠️ Reader not ready after " + timeoutMs + "ms");
         return false;
     }
-}
+        }
