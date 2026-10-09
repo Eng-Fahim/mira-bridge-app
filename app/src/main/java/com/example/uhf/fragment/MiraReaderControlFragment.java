@@ -3,6 +3,7 @@ package com.example.uhf.fragment;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,30 +30,45 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * ✅ MiraReaderControlFragment v2 — لوحة تحكم متوافقة مع Chainway SDK الرسمي
+ * ✅ MiraReaderControlFragment v3 — لوحة التحكم الكاملة
  *
- * يعرض الإعدادات الحقيقية من توثيق SDK:
+ * يعرض الإعدادات الحقيقية من توثيق Chainway SDK الرسمي:
  *   - 19 منطقة تردد (HEX)
  *   - RFLink بـ 12 وضعاً
- *   - Session/Target/Q
+ *   - Session / Target / Q
  *   - FastID / TagFocus / Fast Inventory
- *
- * ⚠️ الصوت والاهتزاز مُداران من MiraSoundSettingsFragment (ليس SDK).
+ *   - 📦 بيانات الوسم (EPC / TID / USER)
+ *   - 📡 اختبار القراءة المباشر
  */
 public class MiraReaderControlFragment extends Fragment {
+
+    private static final String TAG = "MiraReaderControl";
 
     private MiraReaderSettings settings;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final AtomicBoolean isUpdatingUi = new AtomicBoolean(false);
     private boolean isArabic = true;
 
-    // Views
+    // ═══ Views ═══
     private SeekBar seekPower;
     private TextView tvPowerValue, tvSummary;
     private Spinner spFrequency, spRfLink, spSession, spTarget, spQValue;
     private MaterialSwitch swFastId, swTagFocus, swFastInventory;
     private MaterialButton btnApplyNow, btnReset, btnReadCurrent;
     private View loading;
+
+    // ═══ Live Test ═══
+    private TextView tvLiveReadCount, tvLiveRate, tvLiveLastEpc, tvLiveRssi;
+    private MaterialButton btnLiveTestToggle;
+
+    private volatile boolean isLiveTesting = false;
+    private volatile int liveReadCount = 0;
+    private volatile long liveTestStartTime = 0;
+    private volatile String liveLastEpc = null;
+    private volatile int liveLastRssi = -100;
+    private Thread liveReadThread;
+    private final Handler liveUiHandler = new Handler(Looper.getMainLooper());
+    private Runnable liveRateUpdater;
 
     @Nullable
     @Override
@@ -75,7 +91,11 @@ public class MiraReaderControlFragment extends Fragment {
         updateSummary();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Bind
+    // ═══════════════════════════════════════════════════════════
     private void bindViews(View v) {
+        // Main
         seekPower         = v.findViewById(R.id.seekPower);
         tvPowerValue      = v.findViewById(R.id.tvPowerValue);
         tvSummary         = v.findViewById(R.id.tvSettingsSummary);
@@ -91,8 +111,18 @@ public class MiraReaderControlFragment extends Fragment {
         btnReset          = v.findViewById(R.id.btnResetDefaults);
         btnReadCurrent    = v.findViewById(R.id.btnReadCurrent);
         loading           = v.findViewById(R.id.readerLoading);
+
+        // Live Test
+        tvLiveReadCount   = v.findViewById(R.id.tvLiveReadCount);
+        tvLiveRate        = v.findViewById(R.id.tvLiveRate);
+        tvLiveLastEpc     = v.findViewById(R.id.tvLiveLastEpc);
+        tvLiveRssi        = v.findViewById(R.id.tvLiveRssi);
+        btnLiveTestToggle = v.findViewById(R.id.btnLiveTestToggle);
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Spinners
+    // ═══════════════════════════════════════════════════════════
     private void setupSpinners() {
         // ✅ 19 منطقة تردد
         spFrequency.setAdapter(new ArrayAdapter<>(requireContext(),
@@ -121,6 +151,9 @@ public class MiraReaderControlFragment extends Fragment {
                 android.R.layout.simple_spinner_dropdown_item, qValues));
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Listeners
+    // ═══════════════════════════════════════════════════════════
     private void setupListeners() {
         // ═══ Power ═══
         seekPower.setMax(33);
@@ -143,9 +176,7 @@ public class MiraReaderControlFragment extends Fragment {
         }));
 
         // ═══ RFLink ═══
-        spRfLink.setOnItemSelectedListener(spinnerListener(pos -> {
-            settings.setRfLink(pos);
-        }));
+        spRfLink.setOnItemSelectedListener(spinnerListener(pos -> settings.setRfLink(pos)));
 
         // ═══ Session / Target / Q ═══
         spSession.setOnItemSelectedListener(spinnerListener(pos -> settings.setSession(pos)));
@@ -166,10 +197,13 @@ public class MiraReaderControlFragment extends Fragment {
             settings.setFastInventory(c); updateSummary();
         });
 
-        // ═══ Buttons ═══
+        // ═══ Main Buttons ═══
         btnApplyNow.setOnClickListener(x -> applyNow());
         btnReset.setOnClickListener(x -> confirmReset());
         btnReadCurrent.setOnClickListener(x -> readCurrent());
+
+        // ═══ Live Test ═══ (✅ في المكان الصحيح)
+        btnLiveTestToggle.setOnClickListener(x -> toggleLiveTest());
     }
 
     private AdapterView.OnItemSelectedListener spinnerListener(IntConsumer onChange) {
@@ -185,14 +219,15 @@ public class MiraReaderControlFragment extends Fragment {
 
     private interface IntConsumer { void accept(int value); }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Load UI
+    // ═══════════════════════════════════════════════════════════
     private void loadSettingsToUi() {
         isUpdatingUi.set(true);
         try {
-            // Power
             seekPower.setProgress(settings.getPowerDbm());
             tvPowerValue.setText(settings.getPowerDbm() + " dBm");
 
-            // Frequency — ابحث عن الفهرس بالقيمة HEX
             int freqIdx = 0;
             for (int i = 0; i < MiraReaderSettings.FREQ_MODES.length; i++) {
                 if (MiraReaderSettings.FREQ_MODES[i][0] == settings.getFreqMode()) {
@@ -201,10 +236,8 @@ public class MiraReaderControlFragment extends Fragment {
             }
             spFrequency.setSelection(freqIdx);
 
-            spRfLink.setSelection(
-                    Math.min(settings.getRfLink(),
-                             MiraReaderSettings.RFLINK_LABELS.length - 1));
-
+            spRfLink.setSelection(Math.min(settings.getRfLink(),
+                    MiraReaderSettings.RFLINK_LABELS.length - 1));
             spSession.setSelection(settings.getSession());
             spTarget.setSelection(settings.getTarget());
             spQValue.setSelection(settings.getQValue());
@@ -212,7 +245,6 @@ public class MiraReaderControlFragment extends Fragment {
             swFastId.setChecked(settings.isFastId());
             swTagFocus.setChecked(settings.isTagFocus());
             swFastInventory.setChecked(settings.isFastInventory());
-
         } finally {
             isUpdatingUi.set(false);
         }
@@ -260,7 +292,6 @@ public class MiraReaderControlFragment extends Fragment {
 
         StringBuilder sb = new StringBuilder();
 
-        // Power — من العتاد فعلاً
         try {
             int p = reader.getPower();
             sb.append("Power (real): ").append(p).append(" dBm\n");
@@ -268,7 +299,6 @@ public class MiraReaderControlFragment extends Fragment {
             sb.append("Power (real): ?\n");
         }
 
-        // Frequency — من العتاد
         try {
             int fm = reader.getFrequencyMode();
             sb.append("Frequency (real): ").append(MiraReaderSettings.getFreqLabel(fm))
@@ -277,7 +307,6 @@ public class MiraReaderControlFragment extends Fragment {
             sb.append("Frequency (real): ?\n");
         }
 
-        // RFLink
         try {
             int rl = reader.getRFLink();
             String lbl = (rl >= 0 && rl < MiraReaderSettings.RFLINK_LABELS.length)
@@ -287,8 +316,6 @@ public class MiraReaderControlFragment extends Fragment {
             sb.append("RFLink (real): ?\n");
         }
 
-        // Fast Inventory — ❌ معطّل مؤقتاً (SDK يستخدم FastInventoryEntity)
-// سيُعاد تفعيله في مرحلة لاحقة
         sb.append("\n── Saved in MIRA ──\n");
         sb.append("Power (saved): ").append(settings.getPowerDbm()).append(" dBm\n");
         sb.append("Frequency (saved): ").append(MiraReaderSettings.getFreqLabel(settings.getFreqMode())).append("\n");
@@ -319,6 +346,210 @@ public class MiraReaderControlFragment extends Fragment {
             })
             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
             .show();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  📡 Live Test Operations
+    // ═══════════════════════════════════════════════════════════
+
+    private void toggleLiveTest() {
+        if (isLiveTesting) {
+            stopLiveTest();
+        } else {
+            startLiveTest();
+        }
+    }
+
+    private void startLiveTest() {
+        RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
+        if (reader == null) {
+            toast(isArabic ? "⚠️ القارئ غير متصل" : "⚠️ Reader not connected");
+            return;
+        }
+
+        // ═══ 1) طبّق الإعدادات الحالية ═══
+        try {
+            MiraReaderSettings.ApplyResult r = settings.applyToReader(reader);
+            Log.i(TAG, "Live test — settings applied: " + r);
+        } catch (Exception e) {
+            Log.e(TAG, "applyToReader failed", e);
+        }
+
+        // ═══ 2) ابدأ inventory ═══
+        try {
+            if (!reader.startInventoryTag()) {
+                toast(isArabic ? "❌ فشل بدء القراءة" : "❌ Failed to start");
+                return;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "startInventoryTag failed", e);
+            toast(isArabic ? "❌ خطأ في القارئ" : "❌ Reader error");
+            return;
+        }
+
+        // ═══ 3) حدّث الحالة ═══
+        isLiveTesting = true;
+        liveReadCount = 0;
+        liveLastEpc = null;
+        liveLastRssi = -100;
+        liveTestStartTime = System.currentTimeMillis();
+
+        if (btnLiveTestToggle != null) {
+            btnLiveTestToggle.setText(isArabic ? "⏹️ إيقاف الاختبار" : "⏹️ Stop Test");
+            btnLiveTestToggle.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(0xFFDC2626));
+        }
+
+        // ═══ 4) شغّل حلقة القراءة ═══
+        liveReadThread = new Thread(this::liveReadLoop, "LiveTest");
+        liveReadThread.setDaemon(true);
+        liveReadThread.start();
+
+        // ═══ 5) شغّل مُحدّث الواجهة ═══
+        startLiveRateUpdater();
+
+        Log.i(TAG, "✅ Live test started");
+    }
+
+    private void liveReadLoop() {
+        while (isLiveTesting && !Thread.currentThread().isInterrupted()) {
+            try {
+                RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
+                if (reader == null) { Thread.sleep(200); continue; }
+
+                com.rscja.deviceapi.entity.UHFTAGInfo tag =
+                        reader.readTagFromBuffer();
+
+                if (tag != null) {
+                    String epc = tag.getEPC();
+                    String rssiStr = tag.getRssi();
+                    int rssi = parseRssi(rssiStr);
+
+                    if (epc != null && !epc.isEmpty()) {
+                        liveReadCount++;
+                        liveLastEpc = epc;
+                        liveLastRssi = rssi;
+                    }
+                } else {
+                    Thread.sleep(40);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                Log.w(TAG, "liveReadLoop error: " + e.getMessage());
+                try { Thread.sleep(100); }
+                catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        Log.d(TAG, "Live read loop ended");
+    }
+
+    private int parseRssi(String rssiStr) {
+        if (rssiStr == null || rssiStr.isEmpty()) return -50;
+        try {
+            String cleaned = rssiStr.replace("dBm", "")
+                    .replace("dbm", "").replace("dB", "").trim();
+            int rssi = Integer.parseInt(cleaned);
+            return rssi > 0 ? -rssi : rssi;
+        } catch (NumberFormatException e) {
+            return -50;
+        }
+    }
+
+    private void startLiveRateUpdater() {
+        liveRateUpdater = new Runnable() {
+            @Override
+            public void run() {
+                if (!isLiveTesting) return;
+                updateLiveUi();
+                liveUiHandler.postDelayed(this, 250);
+            }
+        };
+        liveUiHandler.post(liveRateUpdater);
+    }
+
+    private void updateLiveUi() {
+        if (!isAdded()) return;
+        try {
+            long elapsed = System.currentTimeMillis() - liveTestStartTime;
+            double rate = elapsed > 0 ? (liveReadCount * 1000.0 / elapsed) : 0.0;
+
+            if (tvLiveReadCount != null)
+                tvLiveReadCount.setText(String.valueOf(liveReadCount));
+
+            if (tvLiveRate != null)
+                tvLiveRate.setText(String.format(Locale.US, "%.1f/s", rate));
+
+            if (tvLiveLastEpc != null)
+                tvLiveLastEpc.setText(liveLastEpc != null ? liveLastEpc : "—");
+
+            if (tvLiveRssi != null) {
+                if (liveLastEpc != null) {
+                    tvLiveRssi.setText(liveLastRssi + " dBm");
+
+                    int color;
+                    if (liveLastRssi >= -45) color = 0xFF16A34A;
+                    else if (liveLastRssi >= -65) color = 0xFFF59E0B;
+                    else color = 0xFFDC2626;
+                    tvLiveRssi.setTextColor(color);
+                } else {
+                    tvLiveRssi.setText("— dBm");
+                    tvLiveRssi.setTextColor(0xFF6B7280);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "updateLiveUi error: " + e.getMessage());
+        }
+    }
+
+    private void stopLiveTest() {
+        if (!isLiveTesting) return;
+        isLiveTesting = false;
+
+        // 1) أوقف الـ thread
+        if (liveReadThread != null) {
+            liveReadThread.interrupt();
+            liveReadThread = null;
+        }
+
+        // 2) أوقف مُحدّث الـ UI
+        if (liveUiHandler != null && liveRateUpdater != null) {
+            liveUiHandler.removeCallbacks(liveRateUpdater);
+            liveRateUpdater = null;
+        }
+
+        // 3) أوقف القارئ
+        try {
+            RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
+            if (reader != null) reader.stopInventory();
+        } catch (Exception e) {
+            Log.w(TAG, "stopInventory error: " + e.getMessage());
+        }
+
+        // 4) أعِد الزر لحالته
+        if (btnLiveTestToggle != null) {
+            btnLiveTestToggle.setText(isArabic
+                    ? "▶️ ابدأ اختبار القراءة"
+                    : "▶️ Start Test");
+            btnLiveTestToggle.setBackgroundTintList(null);
+        }
+
+        Log.i(TAG, "🛑 Live test stopped. Total reads: " + liveReadCount);
+        toast(isArabic
+                ? "🛑 تم إيقاف الاختبار — " + liveReadCount + " قراءة"
+                : "🛑 Test stopped — " + liveReadCount + " reads");
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (isLiveTesting) {
+            stopLiveTest();
+        }
+        super.onDestroyView();
     }
 
     private void showLoading(boolean show) {
