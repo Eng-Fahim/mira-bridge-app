@@ -24,6 +24,28 @@ public class MiraReaderSettings {
 
     private static final String TAG = "MiraReaderSettings";
     private static final String PREFS = "mira_reader_settings_v2";
+    
+    // ═══════════════════════════════════════════════════════════════
+//  🔄 وضع القراءة (Read Mode)
+// ═══════════════════════════════════════════════════════════════
+public static final int READ_MODE_AUTO   = 0;  // مستمر (للجرد)
+public static final int READ_MODE_SINGLE = 1;  // مفرد (للبيع)
+
+public static final String[] READ_MODE_LABELS = {
+        "🔄 مستمر (للجرد)",
+        "🎯 مفرد (للبيع والتحقق)"
+};
+
+public static final String[] READ_MODE_HINTS = {
+        "يقرأ كل الوسوم القريبة باستمرار — مثالي للجرد السريع",
+        "يقرأ وسماً واحداً فقط لكل ضغطة — مثالي للبيع"
+};
+
+public static final int DEF_READ_MODE = READ_MODE_AUTO;
+
+public int  getReadMode() { return prefs.getInt("read_mode", DEF_READ_MODE); }
+public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)).commit(); }
+
 
     // ═══════════════════════════════════════════════════════════════
     //  📡 مناطق العمل (Working Mode) — القيم HEX الرسمية
