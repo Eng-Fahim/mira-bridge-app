@@ -104,7 +104,52 @@ public class RFIDManager {
 
     private volatile MiraIRFIDReader activeReader;
     private volatile RFIDDevice activeDevice;
-    private volatile MiraIRFIDReader.OnTagReadListener tagReadListener;
+    
+    // ═══════════════════════════════════════════════════════════
+//  ✅ [v4.1] مستمعون متعددون — يُدارون عبر CompositeListener
+// ═══════════════════════════════════════════════════════════
+
+private final java.util.List<MiraIRFIDReader.OnTagReadListener> tagReadListeners =
+        new java.util.concurrent.CopyOnWriteArrayList<>();
+
+private final MiraIRFIDReader.OnTagReadListener compositeListener =
+        new MiraIRFIDReader.OnTagReadListener() {
+    @Override
+    public void onTagRead(String epc, int rssi) {
+        for (MiraIRFIDReader.OnTagReadListener l : tagReadListeners) {
+            try { l.onTagRead(epc, rssi); }
+            catch (Exception e) { Log.e(TAG, "listener.onTagRead error", e); }
+        }
+    }
+    @Override
+    public void onScanStarted() {
+        for (MiraIRFIDReader.OnTagReadListener l : tagReadListeners) {
+            try { l.onScanStarted(); }
+            catch (Exception ignored) {}
+        }
+    }
+    @Override
+    public void onScanStopped() {
+        for (MiraIRFIDReader.OnTagReadListener l : tagReadListeners) {
+            try { l.onScanStopped(); }
+            catch (Exception ignored) {}
+        }
+    }
+    @Override
+    public void onConnectionChanged(boolean connected) {
+        for (MiraIRFIDReader.OnTagReadListener l : tagReadListeners) {
+            try { l.onConnectionChanged(connected); }
+            catch (Exception ignored) {}
+        }
+    }
+    @Override
+    public void onError(String error) {
+        for (MiraIRFIDReader.OnTagReadListener l : tagReadListeners) {
+            try { l.onError(error); }
+            catch (Exception ignored) {}
+        }
+    }
+};
 
     private RFIDManager(Context context) {
         this.context = context;
@@ -287,9 +332,8 @@ public class RFIDManager {
             }
         }
 
-        if (tagReadListener != null) {
-            activeReader.setOnTagReadListener(tagReadListener);
-        }
+        // 4) اربط المستمع المركّب
+        activeReader.setOnTagReadListener(compositeListener);
 
         if (!activeReader.isConnected()) {
             Log.i(TAG, "🔧 Calling reader.initialize()...");
@@ -350,12 +394,37 @@ public class RFIDManager {
     //  📡 Scan API
     // ═══════════════════════════════════════════════════════════
 
-    public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
-        this.tagReadListener = listener;
-        if (activeReader != null) {
-            activeReader.setOnTagReadListener(listener);
-        }
+    /** ✅ [v4.1] إضافة مستمع — لا يستبدل الموجودين */
+public void addListener(@NonNull MiraIRFIDReader.OnTagReadListener listener) {
+    if (listener == null) return;
+    if (!tagReadListeners.contains(listener)) {
+        tagReadListeners.add(listener);
+        Log.d(TAG, "➕ Listener added. Total=" + tagReadListeners.size());
     }
+    ensureCompositeAttached();
+}
+
+/** ✅ [v4.1] إزالة مستمع */
+public void removeListener(@Nullable MiraIRFIDReader.OnTagReadListener listener) {
+    if (listener == null) return;
+    if (tagReadListeners.remove(listener)) {
+        Log.d(TAG, "➖ Listener removed. Total=" + tagReadListeners.size());
+    }
+}
+
+/** ✅ توافق عكسي — يستبدل كل المستمعين بمستمع واحد */
+@Deprecated
+public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
+    tagReadListeners.clear();
+    if (listener != null) tagReadListeners.add(listener);
+    ensureCompositeAttached();
+}
+
+private void ensureCompositeAttached() {
+    if (activeReader != null) {
+        activeReader.setOnTagReadListener(compositeListener);
+    }
+}
 
     /**
      * ✅ startScan — يضمن الجاهزية ثم يبدأ.
@@ -409,7 +478,7 @@ public class RFIDManager {
             activeReader = null;
         }
         activeDevice = null;
-        tagReadListener = null;
+        
         pendingReadyCallbacks.clear();
         state.set(State.UNINITIALIZED);
         notifyStateChanged(State.READY, State.UNINITIALIZED);
