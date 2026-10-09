@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;              // ✅ [جديد] مطلوب لـ myOnKeyDwon
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,19 +14,15 @@ import android.widget.EditText;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.fragment.app.Fragment;
 
 import com.example.uhf.tools.MiraDialogHelper;
 import com.example.uhf.tools.MiraLanguageHelper;
 
 /**
- * 🏗️ MiraBaseFragment - الفрагмент الأساسي لجميع صفحات التطبيق
- * يوفر:
- * - إخفاء لوحة المفاتيح تلقائياً
- * - دوال Dialog موحدة مع حماية من null
- * - دعم اللغة العربية مع اتجاه RTL/LTR
+ * 🏗️ MiraBaseFragment - يمتد من KeyDwonFragment
+ * لاستقبال الزناد الفيزيائي في جميع الفئات الفرعية
  */
-public abstract class MiraBaseFragment extends Fragment {
+public abstract class MiraBaseFragment extends KeyDwonFragment {
 
     private static final String TAG = "MiraBaseFragment";
 
@@ -35,18 +32,15 @@ public abstract class MiraBaseFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
-        // ✅ استخدام MiraLanguageHelper
+
         try {
             isArabic = MiraLanguageHelper.isArabic(requireContext());
         } catch (Exception e) {
             isArabic = java.util.Locale.getDefault().getLanguage().equals("ar");
         }
-        
-        // ✅ تطبيق اتجاه اللغة على الـ View
+
         applyLanguageDirection(view);
-        
-        // ✅ تهيئة آمنة لـ dialogHelper
+
         try {
             if (getContext() != null) {
                 dialogHelper = MiraDialogHelper.getInstance(getContext());
@@ -55,20 +49,15 @@ public abstract class MiraBaseFragment extends Fragment {
         } catch (Exception e) {
             Log.e(TAG, "dialogHelper init error: " + e.getMessage());
         }
-        
-        //setupAutoHideKeyboard(view);
     }
 
     // ==================== اتجاه اللغة ====================
 
-    /**
-     * تطبيق اتجاه اللغة على جميع العناصر
-     */
     protected void applyLanguageDirection(View view) {
         if (view == null) return;
-        
+
         view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        
+
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {
@@ -203,34 +192,33 @@ public abstract class MiraBaseFragment extends Fragment {
     // ==================== إخفاء لوحة المفاتيح ====================
 
     private void setupAutoHideKeyboard(View view) {
-    if (view == null) return;
+        if (view == null) return;
 
-    // ✅ فقط للأزرار والعناصر القابلة للنقر - ليس كل العناصر
-    if (view.isClickable() && !(view instanceof EditText)) {
-        view.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                hideKeyboard();
+        if (view.isClickable() && !(view instanceof EditText)) {
+            view.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    hideKeyboard();
+                }
+                return false;
+            });
+        }
+
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            int childCount = Math.min(group.getChildCount(), 20);
+            for (int i = 0; i < childCount; i++) {
+                setupAutoHideKeyboard(group.getChildAt(i));
             }
-            return false;
-        });
-    }
-
-    // ✅ تكرار فقط للمجموعات - مع حد أقصى للعمق
-    if (view instanceof ViewGroup) {
-        ViewGroup group = (ViewGroup) view;
-        int childCount = Math.min(group.getChildCount(), 20); // ✅ حد أقصى
-        for (int i = 0; i < childCount; i++) {
-            setupAutoHideKeyboard(group.getChildAt(i));
         }
     }
-}
+
     protected void hideKeyboard() {
         try {
             if (getActivity() == null) return;
             View view = getActivity().getCurrentFocus();
             if (view != null) {
-                InputMethodManager imm = (InputMethodManager) 
-                    getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+                InputMethodManager imm = (InputMethodManager)
+                        getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
                     view.clearFocus();
@@ -246,8 +234,8 @@ public abstract class MiraBaseFragment extends Fragment {
             if (editText == null) return;
             editText.requestFocus();
             editText.postDelayed(() -> {
-                InputMethodManager imm = (InputMethodManager) 
-                    editText.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+                InputMethodManager imm = (InputMethodManager)
+                        editText.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
                 }
@@ -255,6 +243,14 @@ public abstract class MiraBaseFragment extends Fragment {
         } catch (Exception e) {
             Log.e(TAG, "showKeyboard error: " + e.getMessage());
         }
+    }
+
+    /**
+     * ✅ تنفيذ افتراضي — الفئات الفرعية تُOverride عند الحاجة
+     */
+    @Override
+    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+        return false;
     }
 
     @Override
