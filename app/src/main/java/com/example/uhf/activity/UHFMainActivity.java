@@ -246,10 +246,10 @@ private volatile long setupCompletedAt = 0;
     public PermissionManager getPermissionManager() { return permissionManager; }
 
     public String getCurrentFragmentTag() {
-        return navigationManager != null
-                ? navigationManager.getCurrentFragmentTag()
-                : "Dashboard";
-    }
+    return navigationManager != null
+            ? navigationManager.getCurrentFragmentTag()
+            : "Dashboard";
+}
 
     public int getIncomingTransfersCount() { return incomingTransfersCount; }
 
@@ -720,10 +720,9 @@ private volatile long setupCompletedAt = 0;
             targetTag = NavigationManager.TAG_INVENTORY;
 
         } else if (permissionManager.isSecurity()
-                || permissionManager.isGateSecurity()) {
-            targetFragment = new MiraSecureGateFragment();
-            targetTag = NavigationManager.TAG_SECURE_GATE;
-
+        || permissionManager.isGateSecurity()) {
+    targetFragment = new MiraSecureGateFragment();
+    targetTag = NavigationManager.TAG_GATES;
         } else {
             targetFragment = new MiraDashboardFragment();
             targetTag = NavigationManager.TAG_DASHBOARD;
@@ -1460,32 +1459,38 @@ private void performConnectionTest() {
     //  دورة الحياة
     // ═══════════════════════════════════════════════════════
 
-    @Override
-    public void onResume() {
+@Override
+public void onResume() {
     super.onResume();
     loadingCounter = 0;
     forceHideLoadingImmediate();
 
-    // ⭐ تجاهل فحص Auto-Lock مباشرة بعد نجاح البصمة
     if (justUnlockedWithBiometric) {
         Log.d(TAG, "✅ Skipping Auto-Lock check (just unlocked with biometric)");
         justUnlockedWithBiometric = false;
-
-        // استمر بالمنطق العادي بدون فحص Auto-Lock
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
-        syncUIWithNavigation();
+
+        // ✅ [جديد] زامن cachedTag + currentFragment
+        if (navigationManager != null) {
+            navigationManager.notifyExternalChange();
+        }
+        syncCurrentFragment();   // ← ✅ أضف هذا السطر
+
         checkSetupStampOnResume();
         return;
     }
 
-    if (!checkAutoLock()) {
-        return;
-    }
+    if (!checkAutoLock()) return;
 
     updateToolbarTitle();
     if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
-    syncUIWithNavigation();
+
+    // ✅ [جديد] زامن cachedTag + currentFragment
+    if (navigationManager != null) {
+        navigationManager.notifyExternalChange();
+    }
+    syncCurrentFragment();   // ← ✅ أضف هذا السطر
 
     checkSetupStampOnResume();
 }
@@ -1827,24 +1832,24 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
     }
 
     @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
+protected void onSaveInstanceState(@NonNull Bundle outState) {
+    super.onSaveInstanceState(outState);
 
-        String tag = navigationManager != null
-                ? navigationManager.getCurrentFragmentTag()
-                : "Dashboard";
+    String tag = navigationManager != null
+            ? navigationManager.getCurrentFragmentTag()
+            : "Dashboard";
 
-        String cachedSetupStatus = getCachedSetupStatus();
-        boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
-                || SETUP_LOCKED.equals(cachedSetupStatus);
+    String cachedSetupStatus = getCachedSetupStatus();
+    boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
+            || SETUP_LOCKED.equals(cachedSetupStatus);
 
-        if (setupIsComplete) {
-            outState.putString("current_fragment", tag);
-            saveFragmentTagToPrefs(tag);
-        } else {
-            Log.d(TAG, "🔒 onSaveInstanceState: skipping save (setup pending)");
-        }
+    if (setupIsComplete) {
+        outState.putString("current_fragment", tag);
+        saveFragmentTagToPrefs(tag);
+    } else {
+        Log.d(TAG, "🔒 onSaveInstanceState: skipping save (setup pending)");
     }
+}
 
     // ═══════════════════════════════════════════════════════
     //  إعدادات
@@ -1923,42 +1928,52 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
     // ═══════════════════════════════════════════════════════
 
     public void loadFragment(Fragment fragment, String tag) {
-        loadFragment(fragment, tag, true);
-    }
+    loadFragment(fragment, tag, true);
+}
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed()) return;
-        if (navigationManager == null || fragment == null) return;
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    if (isFinishing() || isDestroyed()) return;
+    if (navigationManager == null || fragment == null) return;
+    if (!guardSetupAccess(tag)) return;
 
-        if (!guardSetupAccess(tag)) return;
+    navigationManager.loadFragment(fragment, tag, addToBackStack);
 
-        navigationManager.loadFragment(fragment, tag, addToBackStack);
-        this.currentFragment = fragment;
+    // ✅ زامن currentFragment من المصدر الحقيقي
+    syncCurrentFragment();
+    updateBottomNavSelectionByTag(navigationManager.getCurrentFragmentTag());
+    updateSecondaryToolbar(navigationManager.getCurrentFragmentTag());
+}
 
-        updateBottomNavSelectionByTag(tag);
-        updateSecondaryToolbar(tag);
-    }
+public void loadFragmentDirectly(Fragment fragment, String tag) {
+    if (isFinishing() || isDestroyed()) return;
+    if (fragment == null || tag == null) return;
 
-    public void loadFragmentDirectly(Fragment fragment, String tag) {
-        if (isFinishing() || isDestroyed()) return;
-        if (fragment == null) return;
+    // ✅ فحص navigationManager أولاً
+    if (navigationManager == null) return;
 
-        if (getSupportFragmentManager().isStateSaved()) {
-            mainHandler.post(() -> loadFragmentDirectly(fragment, tag));
-            return;
-        }
+    if (!guardSetupAccess(tag)) return;
 
-        if (navigationManager == null) return;
+    navigationManager.loadFragmentDirectly(fragment, tag);
 
-        if (!guardSetupAccess(tag)) return;
+    // ✅ زامن currentFragment من المصدر الحقيقي
+    syncCurrentFragment();
+    updateBottomNavSelectionByTag(navigationManager.getCurrentFragmentTag());
+    updateSecondaryToolbar(navigationManager.getCurrentFragmentTag());
+}
 
-        navigationManager.loadFragmentDirectly(fragment, tag);
-        this.currentFragment = fragment;
-
-        updateBottomNavSelectionByTag(tag);
-        updateSecondaryToolbar(tag);
-    }
-
+/**
+ * ✅ [v2.0] يزامن BaseTabFragmentActivity.currentFragment
+ *      مع المصدر الحقيقي (FragmentManager عبر NavigationManager).
+ *      public — لكي يستدعيها MiraPosFragment.navigateAwayFromPos().
+ */
+public void syncCurrentFragment() {
+    Fragment real = navigationManager != null
+            ? navigationManager.getCurrentFragment()
+            : null;
+    this.currentFragment = real;
+    Log.d(TAG, "🔄 currentFragment synced: "
+            + (real != null ? real.getTag() : "null"));
+}
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
     }
@@ -2134,32 +2149,31 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
     }
 
     private String getFragmentTagForNavItem(int itemId) {
-        if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
-        if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
-        if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
-        if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;
-        return "";
-    }
+    if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
+    if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
+    if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
+    if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;
+    return "";
+}
 
     private void updateBottomNavSelectionByTag(String tag) {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            if (quickNav == null || tag == null) return;
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        if (quickNav == null || tag == null) return;
 
-            if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
-                quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
-                quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_POS)) {
-                quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_GATES)
-                    || tag.equals(NavigationManager.TAG_SECURE_GATE)) {
-                quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
+        if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
+            quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
+            quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_POS)) {
+            quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_GATES)) {   // ✅ موحّد
+            quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
     }
+}
 
     private void updateBottomNavLanguage() {
         try {
@@ -2379,17 +2393,23 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
     }
 
     private void showSystemVersionDialog() {
-        String miraSystemVersion = "MIRA ID™ v1.4.8 (Enterprise)";
-        String hwVer = null;
-        String modelName = Build.MODEL;
+    String miraSystemVersion = "MIRA ID™ v1.4.8 (Enterprise)";
+    String hwVer = null;
+    String modelName = Build.MODEL;
 
-        if (BaseTabFragmentActivity.isRfidDevicePresent() && mReader != null) {
-            try {
-                hwVer = mReader.getHardwareVersion();
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
+    // ✅ استخدم RFIDManager بدلاً من mReader مباشرة
+    if (com.example.uhf.MiraRfid.RFIDManager.getInstance(getApplicationContext())
+            .isReady()) {
+        try {
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+            if (reader != null) {
+                hwVer = reader.getHardwareVersion();
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
         }
+    }
 
         StringBuilder message = new StringBuilder();
         message.append("MIRA Trust Architecture™\n");
@@ -3118,21 +3138,21 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
     // ═══════════════════════════════════════════════════════
 
     private void navigateToLogin() {
-        try {
-            forceHideLoadingImmediate();
-            if (mReader != null) {
-                mReader.free();
-                mReader = null;
-            }
+    try {
+        forceHideLoadingImmediate();
 
-            Intent intent = new Intent(this, LoginActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-        } catch (Exception e) {
-            Log.e(TAG, "Navigation to login error: " + e.getMessage());
-        }
+        // ✅ لا نُحرّر shared reader — RFIDManager يملكه
+        // أزل: mReader.free()
+
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    } catch (Exception e) {
+        Log.e(TAG, "Navigation to login error: " + e.getMessage());
     }
+}
 
     public void setNavigationLocked(boolean locked) {
         try {
