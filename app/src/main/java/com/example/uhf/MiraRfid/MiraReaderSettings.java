@@ -39,7 +39,6 @@ public class MiraReaderSettings {
     public static final int FREQ_ETSI_UPPER    = 0x3D;
     public static final int FREQ_AUSTRALIA     = 0x3E;
     public static final int FREQ_INDONESIA     = 0x3F;
-    public static final int FREQ_ISRAEL        = 0x40;
     public static final int FREQ_HK            = 0x41;
     public static final int FREQ_NEW_ZEALAND   = 0x42;
 
@@ -64,7 +63,6 @@ public class MiraReaderSettings {
             {FREQ_ETSI_UPPER,  13},
             {FREQ_AUSTRALIA,   14},
             {FREQ_INDONESIA,   15},
-            {FREQ_ISRAEL,      16},
             {FREQ_HK,          17},
             {FREQ_NEW_ZEALAND, 18}
     };
@@ -89,7 +87,6 @@ public class MiraReaderSettings {
             "أوروبا العليا (ETSI Upper)",
             "أستراليا",
             "إندونيسيا (920-923)",
-            "إسرائيل",
             "هونغ كونغ",
             "نيوزيلندا"
     };
