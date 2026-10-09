@@ -1236,6 +1236,12 @@ try {
             mainHandler.post(() -> processTagReadDirect(normalizedEpc, rssi));
         }
     }
+    
+    @Override
+public void onDuplicateTag(String epc) {
+    // ✅ الوسم المكرر — addScannedItemToDisplay يعالجه داخلياً
+    // لا نحتاج أي إجراء إضافي هنا
+}
 
     /**
      * ✅ معالجة مباشرة (بدون wrappers)
