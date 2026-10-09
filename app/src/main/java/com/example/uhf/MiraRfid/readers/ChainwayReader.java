@@ -356,22 +356,25 @@ public boolean connect() {
     // =========================================================================
     // 📡 المسح
     // =========================================================================
-    @Override
+   @Override
 public boolean startScan() {
     MiraFileLogger.log(TAG, "🚀 startScan() called");
 
+    // 1) تأكد من وجود العتاد
     if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
         Log.e(TAG, "❌ RFID device not present");
         if (listener != null) listener.onError("RFID device not present");
         return false;
     }
 
+    // 2) منع التشغيل المزدوج
     if (!isScanning.compareAndSet(false, true)) {
         Log.d(TAG, "Already scanning");
         return true;
     }
 
     try {
+        // 3) الاتصال إن لزم
         if (reader == null || !isConnected) {
             if (!connect()) {
                 Log.e(TAG, "❌ Cannot connect");
@@ -381,20 +384,22 @@ public boolean startScan() {
             }
         }
 
-        // ✅✅✅ الإصلاح الجذري: أعِد تطبيق كل الإعدادات قبل كل scan
-        // هذا يضمن عدم تلاعب UHF الرسمي مهما حدث.
+        // 4) ✅ إعادة تطبيق الإعدادات — مرة واحدة فقط
         applyAdvancedSettings();
 
-        boolean success = false;
-        try {
-            success = reader.startInventoryTag();
-        } catch (Exception e) {
-            Log.e(TAG, "startInventoryTag exception", e);
-            success = false;
+        // 5) ✅ تفرّع حسب وضع القراءة
+        MiraReaderSettings s = MiraReaderSettings.getInstance(context);
+        boolean success;
+
+        if (s.getReadMode() == MiraReaderSettings.READ_MODE_SINGLE) {
+            Log.i(TAG, "🎯 Starting in SINGLE mode");
+            success = startSingleTagLoop();
+        } else {
+            Log.i(TAG, "🔄 Starting in AUTO mode");
+            success = startAutoInventory();
         }
 
-        Log.i(TAG, "startInventoryTag result: " + success);
-
+        // 6) التحقق
         if (!success) {
             Log.e(TAG, "❌ Failed to start inventory");
             isScanning.set(false);
@@ -402,10 +407,8 @@ public boolean startScan() {
             return false;
         }
 
+        // 7) أبلغ المستمع
         if (listener != null) listener.onScanStarted();
-
-        ensureExecutor();
-        scanExecutor.execute(this::scanLoop);
 
         Log.i(TAG, "✅ Scan started successfully");
         return true;
@@ -414,6 +417,50 @@ public boolean startScan() {
         Log.e(TAG, "❌ startScan exception", e);
         isScanning.set(false);
         if (listener != null) listener.onError("Start error: " + e.getMessage());
+        return false;
+    }
+}
+private boolean startAutoInventory() {
+    try {
+        boolean ok = reader.startInventoryTag();
+        if (ok) {
+            ensureExecutor();
+            scanExecutor.execute(this::scanLoop);
+        }
+        return ok;
+    } catch (Exception e) {
+        Log.e(TAG, "startAutoInventory error", e);
+        return false;
+    }
+}
+
+private boolean startSingleTagLoop() {
+    try {
+        ensureExecutor();
+        scanExecutor.execute(() -> {
+            Log.d(TAG, "🎯 Single tag loop started");
+            while (isScanning.get() && !Thread.currentThread().isInterrupted()) {
+                try {
+                    UHFTAGInfo tag = reader.inventorySingleTag();
+                    if (tag != null && tag.getEPC() != null
+                            && !tag.getEPC().isEmpty()) {
+                        processTag(tag);
+                    }
+                    Thread.sleep(30);  // فاصل لمنع استهلاك CPU
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    Log.w(TAG, "single tag loop error", e);
+                    try { Thread.sleep(100); }
+                    catch (InterruptedException ie) { break; }
+                }
+            }
+            Log.d(TAG, "🎯 Single tag loop ended");
+        });
+        return true;
+    } catch (Exception e) {
+        Log.e(TAG, "startSingleTagLoop error", e);
         return false;
     }
 }
