@@ -19,7 +19,6 @@ import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.MiraRfid.MiraReaderSettings;
-import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -30,14 +29,17 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * ✅ MiraReaderControlFragment — لوحة التحكم المركزية بقارئ RFID
+ * ✅ MiraReaderControlFragment v2 — لوحة تحكم متوافقة مع Chainway SDK الرسمي
  *
- * ⚠️ المصدر الوحيد للتحكم بإعدادات القارئ داخل MIRA.
- *    أي تعديل هنا يُحفظ في MiraReaderSettings ويُطبَّق فوراً.
+ * يعرض الإعدادات الحقيقية من توثيق SDK:
+ *   - 19 منطقة تردد (HEX)
+ *   - RFLink بـ 12 وضعاً
+ *   - Session/Target/Q
+ *   - FastID / TagFocus / Fast Inventory
+ *
+ * ⚠️ الصوت والاهتزاز مُداران من MiraSoundSettingsFragment (ليس SDK).
  */
 public class MiraReaderControlFragment extends Fragment {
-
-    private static final String TAG = "MiraReaderControl";
 
     private MiraReaderSettings settings;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -47,9 +49,8 @@ public class MiraReaderControlFragment extends Fragment {
     // Views
     private SeekBar seekPower;
     private TextView tvPowerValue, tvSummary;
-    private Spinner spFrequency, spSession, spTarget, spQValue;
-    private MaterialSwitch swFastId, swTagFocus, swDynamicPower;
-    private MaterialSwitch swBeep, swVibration;
+    private Spinner spFrequency, spRfLink, spSession, spTarget, spQValue;
+    private MaterialSwitch swFastId, swTagFocus, swFastInventory;
     private MaterialButton btnApplyNow, btnReset, btnReadCurrent;
     private View loading;
 
@@ -75,38 +76,45 @@ public class MiraReaderControlFragment extends Fragment {
     }
 
     private void bindViews(View v) {
-        seekPower        = v.findViewById(R.id.seekPower);
-        tvPowerValue     = v.findViewById(R.id.tvPowerValue);
-        tvSummary        = v.findViewById(R.id.tvSettingsSummary);
-        spFrequency      = v.findViewById(R.id.spFrequency);
-        spSession        = v.findViewById(R.id.spSession);
-        spTarget         = v.findViewById(R.id.spTarget);
-        spQValue         = v.findViewById(R.id.spQValue);
-        swFastId         = v.findViewById(R.id.swFastId);
-        swTagFocus       = v.findViewById(R.id.swTagFocus);
-        swDynamicPower   = v.findViewById(R.id.swDynamicPower);
-        swBeep           = v.findViewById(R.id.swBeep);
-        swVibration      = v.findViewById(R.id.swVibration);
-        btnApplyNow      = v.findViewById(R.id.btnApplyNow);
-        btnReset         = v.findViewById(R.id.btnResetDefaults);
-        btnReadCurrent   = v.findViewById(R.id.btnReadCurrent);
-        loading          = v.findViewById(R.id.readerLoading);
+        seekPower         = v.findViewById(R.id.seekPower);
+        tvPowerValue      = v.findViewById(R.id.tvPowerValue);
+        tvSummary         = v.findViewById(R.id.tvSettingsSummary);
+        spFrequency       = v.findViewById(R.id.spFrequency);
+        spRfLink          = v.findViewById(R.id.spRfLink);
+        spSession         = v.findViewById(R.id.spSession);
+        spTarget          = v.findViewById(R.id.spTarget);
+        spQValue          = v.findViewById(R.id.spQValue);
+        swFastId          = v.findViewById(R.id.swFastId);
+        swTagFocus        = v.findViewById(R.id.swTagFocus);
+        swFastInventory   = v.findViewById(R.id.swFastInventory);
+        btnApplyNow       = v.findViewById(R.id.btnApplyNow);
+        btnReset          = v.findViewById(R.id.btnResetDefaults);
+        btnReadCurrent    = v.findViewById(R.id.btnReadCurrent);
+        loading           = v.findViewById(R.id.readerLoading);
     }
 
     private void setupSpinners() {
-        String[] freqs = {"FCC (902-928)", "FCC-A (902-928)",
-                "ETSI (865-868)", "China (920-925)", "Japan (916-921)"};
+        // ✅ 19 منطقة تردد
         spFrequency.setAdapter(new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_dropdown_item, freqs));
+                android.R.layout.simple_spinner_dropdown_item,
+                MiraReaderSettings.FREQ_LABELS));
 
+        // ✅ RFLink — 12 وضعاً
+        spRfLink.setAdapter(new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                MiraReaderSettings.RFLINK_LABELS));
+
+        // Session
         String[] sessions = {"S0", "S1", "S2", "S3"};
         spSession.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, sessions));
 
-        String[] targets = {"A", "B", "A/B"};
+        // Target
+        String[] targets = {"A", "B"};
         spTarget.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, targets));
 
+        // Q Value (0-15)
         String[] qValues = new String[16];
         for (int i = 0; i < 16; i++) qValues[i] = String.valueOf(i);
         spQValue.setAdapter(new ArrayAdapter<>(requireContext(),
@@ -114,7 +122,8 @@ public class MiraReaderControlFragment extends Fragment {
     }
 
     private void setupListeners() {
-        seekPower.setMax(30);
+        // ═══ Power ═══
+        seekPower.setMax(33);
         seekPower.setMin(5);
         seekPower.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
@@ -127,11 +136,23 @@ public class MiraReaderControlFragment extends Fragment {
             @Override public void onStopTrackingTouch(SeekBar s) {}
         });
 
-        spFrequency.setOnItemSelectedListener(spinnerListener(pos -> settings.setFrequencyMode(pos)));
+        // ═══ Frequency — القيمة HEX ═══
+        spFrequency.setOnItemSelectedListener(spinnerListener(pos -> {
+            int mode = MiraReaderSettings.FREQ_MODES[pos][0];
+            settings.setFreqMode(mode);
+        }));
+
+        // ═══ RFLink ═══
+        spRfLink.setOnItemSelectedListener(spinnerListener(pos -> {
+            settings.setRfLink(pos);
+        }));
+
+        // ═══ Session / Target / Q ═══
         spSession.setOnItemSelectedListener(spinnerListener(pos -> settings.setSession(pos)));
         spTarget.setOnItemSelectedListener(spinnerListener(pos -> settings.setTarget(pos)));
         spQValue.setOnItemSelectedListener(spinnerListener(pos -> settings.setQValue(pos)));
 
+        // ═══ Switches ═══
         swFastId.setOnCheckedChangeListener((b, c) -> {
             if (isUpdatingUi.get()) return;
             settings.setFastId(c); updateSummary();
@@ -140,19 +161,12 @@ public class MiraReaderControlFragment extends Fragment {
             if (isUpdatingUi.get()) return;
             settings.setTagFocus(c); updateSummary();
         });
-        swDynamicPower.setOnCheckedChangeListener((b, c) -> {
+        swFastInventory.setOnCheckedChangeListener((b, c) -> {
             if (isUpdatingUi.get()) return;
-            settings.setDynamicPower(c); updateSummary();
-        });
-        swBeep.setOnCheckedChangeListener((b, c) -> {
-            if (isUpdatingUi.get()) return;
-            settings.setBeepMode(c ? 1 : 0);
-        });
-        swVibration.setOnCheckedChangeListener((b, c) -> {
-            if (isUpdatingUi.get()) return;
-            settings.setVibrationMode(c ? 1 : 0);
+            settings.setFastInventory(c); updateSummary();
         });
 
+        // ═══ Buttons ═══
         btnApplyNow.setOnClickListener(x -> applyNow());
         btnReset.setOnClickListener(x -> confirmReset());
         btnReadCurrent.setOnClickListener(x -> readCurrent());
@@ -174,17 +188,31 @@ public class MiraReaderControlFragment extends Fragment {
     private void loadSettingsToUi() {
         isUpdatingUi.set(true);
         try {
+            // Power
             seekPower.setProgress(settings.getPowerDbm());
             tvPowerValue.setText(settings.getPowerDbm() + " dBm");
-            spFrequency.setSelection(settings.getFrequencyMode());
+
+            // Frequency — ابحث عن الفهرس بالقيمة HEX
+            int freqIdx = 0;
+            for (int i = 0; i < MiraReaderSettings.FREQ_MODES.length; i++) {
+                if (MiraReaderSettings.FREQ_MODES[i][0] == settings.getFreqMode()) {
+                    freqIdx = i; break;
+                }
+            }
+            spFrequency.setSelection(freqIdx);
+
+            spRfLink.setSelection(
+                    Math.min(settings.getRfLink(),
+                             MiraReaderSettings.RFLINK_LABELS.length - 1));
+
             spSession.setSelection(settings.getSession());
             spTarget.setSelection(settings.getTarget());
             spQValue.setSelection(settings.getQValue());
+
             swFastId.setChecked(settings.isFastId());
             swTagFocus.setChecked(settings.isTagFocus());
-            swDynamicPower.setChecked(settings.isDynamicPower());
-            swBeep.setChecked(settings.getBeepMode() > 0);
-            swVibration.setChecked(settings.getVibrationMode() > 0);
+            swFastInventory.setChecked(settings.isFastInventory());
+
         } finally {
             isUpdatingUi.set(false);
         }
@@ -194,6 +222,9 @@ public class MiraReaderControlFragment extends Fragment {
         if (tvSummary != null) tvSummary.setText(settings.getSummary());
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  ✅ تطبيق على القارئ الآن
+    // ═══════════════════════════════════════════════════════════
     private void applyNow() {
         RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
         if (reader == null) {
@@ -217,19 +248,59 @@ public class MiraReaderControlFragment extends Fragment {
         }, "ApplyMiraSettings").start();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  ✅ قراءة الحالة الحقيقية من العتاد
+    // ═══════════════════════════════════════════════════════════
     private void readCurrent() {
         RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
         if (reader == null) {
             toast(isArabic ? "⚠️ القارئ غير متصل" : "⚠️ Reader not connected");
             return;
         }
+
         StringBuilder sb = new StringBuilder();
-        try { sb.append("Power: ").append(reader.getPower()).append(" dBm\n"); }
-        catch (Exception e) { sb.append("Power: ?\n"); }
-        sb.append("Frequency: ").append(MiraReaderSettings.getFrequencyLabel(settings.getFrequencyMode())).append("\n");
-        sb.append("Session: S").append(settings.getSession()).append("\n");
-        sb.append("Target: ").append(MiraReaderSettings.getTargetLabel(settings.getTarget())).append("\n");
-        sb.append("Q: ").append(settings.getQValue()).append("\n");
+
+        // Power — من العتاد فعلاً
+        try {
+            int p = reader.getPower();
+            sb.append("Power (real): ").append(p).append(" dBm\n");
+        } catch (Exception e) {
+            sb.append("Power (real): ?\n");
+        }
+
+        // Frequency — من العتاد
+        try {
+            int fm = reader.getFrequencyMode();
+            sb.append("Frequency (real): ").append(MiraReaderSettings.getFreqLabel(fm))
+              .append("  [0x").append(Integer.toHexString(fm)).append("]\n");
+        } catch (Exception e) {
+            sb.append("Frequency (real): ?\n");
+        }
+
+        // RFLink
+        try {
+            int rl = reader.getRFLink();
+            String lbl = (rl >= 0 && rl < MiraReaderSettings.RFLINK_LABELS.length)
+                    ? MiraReaderSettings.RFLINK_LABELS[rl] : "?";
+            sb.append("RFLink (real): ").append(lbl).append("  [").append(rl).append("]\n");
+        } catch (Exception e) {
+            sb.append("RFLink (real): ?\n");
+        }
+
+        // Fast Inventory
+        try {
+            int fi = reader.getFastInventoryMode();
+            sb.append("FastInv (real): ").append(fi == 1 ? "ON" : "OFF").append("\n");
+        } catch (Exception e) { /* ignore */ }
+
+        sb.append("\n── Saved in MIRA ──\n");
+        sb.append("Power (saved): ").append(settings.getPowerDbm()).append(" dBm\n");
+        sb.append("Frequency (saved): ").append(MiraReaderSettings.getFreqLabel(settings.getFreqMode())).append("\n");
+        sb.append("Session (saved): S").append(settings.getSession()).append("\n");
+        sb.append("Target (saved): ").append(settings.getTarget() == 0 ? "A" : "B").append("\n");
+        sb.append("Q (saved): ").append(settings.getQValue()).append("\n");
+        sb.append("FastID (saved): ").append(settings.isFastId() ? "ON" : "OFF").append("\n");
+        sb.append("TagFocus (saved): ").append(settings.isTagFocus() ? "ON" : "OFF").append("\n");
 
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle(isArabic ? "📖 الحالة الحالية" : "📖 Current State")
