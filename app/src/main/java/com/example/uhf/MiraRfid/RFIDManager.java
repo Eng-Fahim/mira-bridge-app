@@ -554,30 +554,21 @@ public class RFIDManager {
 
     public boolean setPower(int dbm) {
     try {
-        if (dbm < 5 || dbm > 30) {
-            Log.w(TAG, "⚠️ Power out of range: " + dbm);
-            return false;
-        }
+        if (dbm < 5 || dbm > 33) return false;
 
-        // ✅ احفظ في المصدر الموحد أولاً
+        // ✅ [جديد] احفظ في المصدر الموحد
         MiraReaderSettings.getInstance(context).setPowerDbm(dbm);
 
         MiraIRFIDReader reader = getActiveReader();
-        if (reader != null && reader.isConnected()) {
-            reader.setPower(dbm);
-            Log.i(TAG, "✅ Power set to " + dbm + " dBm (saved to MiraReaderSettings)");
-        } else {
-            Log.i(TAG, "ℹ️ Power saved to MiraReaderSettings — will apply on connect");
+        if (reader == null || !reader.isConnected()) {
+            Log.i(TAG, "Power saved to MiraReaderSettings — will apply on connect");
+            return true;
         }
 
-        if (activeDevice != null) {
-            activeDevice.setPowerDbm(dbm);
-            saveDevice(activeDevice);
-        }
+        reader.setPower(dbm);
+        Log.i(TAG, "✅ Power set to " + dbm + " dBm");
         return true;
-
     } catch (Exception e) {
-        Log.e(TAG, "❌ setPower exception", e);
         return false;
     }
 }
