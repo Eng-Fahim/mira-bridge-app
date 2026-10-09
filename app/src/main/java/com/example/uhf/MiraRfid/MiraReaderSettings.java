@@ -71,18 +71,27 @@ public void setReadMode(int v) { prefs.edit().putInt("read_mode", clamp(v, 0, 1)
     public static final int FREQ_NEW_ZEALAND   = 0x42;
 
     /** قائمة مناطق العمل مع أسمائها للعرض في الـ Spinner */
-    public static final int[][] FREQ_MODES = {
-            {FREQ_ETSI,         0}, {FREQ_FCC,          1},
-            {FREQ_CHINA_840,    2}, {FREQ_CHINA_920,    3},
-            {FREQ_SOUTH_AFRICA, 4}, {FREQ_KOREA,        5},
-            {FREQ_JAPAN,        6}, {FREQ_TAIWAN,       7},
-            {FREQ_VIETNAM,      8}, {FREQ_PERU,         9},
-            {FREQ_RUSSIA,      10}, {FREQ_MALAYSIA,    11},
-            {FREQ_BRAZIL,      12}, {FREQ_ETSI_UPPER,  13},
-            {FREQ_AUSTRALIA,   14}, {FREQ_INDONESIA,   15},
-            {FREQ_ISRAEL,      16}, {FREQ_HK,          17},
-            {FREQ_NEW_ZEALAND, 18}
-    };
+    public static final String[] FREQ_LABELS = {
+        "🌍 الشرق الأوسط والخليج (اليمن، السعودية، الإمارات) — 865-868",
+        "🌎 أمريكا الشمالية (الولايات المتحدة، كندا) — 902-928",
+        "🇨🇳 الصين (840-845)",
+        "🇨🇳 الصين 2 (920-925)",
+        "🇿🇦 جنوب إفريقيا (915-919)",
+        "🇰🇷 كوريا (917-923)",
+        "🇯🇵 اليابان (916.8-920.8)",
+        "تايوان (920-928)",
+        "فيتنام (918-923)",
+        "بيرو (915-928)",
+        "روسيا (860-867.6)",
+        "ماليزيا (919-923)",
+        "البرازيل",
+        "أوروبا العليا (ETSI Upper)",
+        "أستراليا",
+        "إندونيسيا (920-923)",
+        "إسرائيل",
+        "هونغ كونغ",
+        "نيوزيلندا"
+};
 
     public static final String[] FREQ_LABELS = {
             "ETSI Standard (865-868)",
