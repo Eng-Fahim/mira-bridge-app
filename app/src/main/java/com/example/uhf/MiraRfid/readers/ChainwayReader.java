@@ -10,6 +10,8 @@ import com.example.uhf.utils.MiraFileLogger;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.example.uhf.MiraRfid.adaptive.AdaptiveConfigurator;
+import com.example.uhf.MiraRfid.MiraReaderSettings;
+
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
@@ -58,7 +60,6 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     private final AtomicBoolean isScanning = new AtomicBoolean(false);
     private volatile boolean isConnected = false;
-    private volatile boolean advancedSettingsApplied = false;
     
     // إعدادات ديناميكية
     private int powerDbm = DEFAULT_POWER_DBM;
@@ -216,50 +217,40 @@ public class ChainwayReader implements MiraIRFIDReader {
             return false;
         }
     }
-    
-    /**
-     * ✅ إعدادات خفيفة — تُستدعى عند كل Scan
-     * (فقط الطاقة لأنها الأسرع والأهم)
-     */
-    private void applySupportedSettings() {
-        if (reader == null) return;
-        try {
-            reader.setPower(powerDbm);
-            Log.d(TAG, "⚡ Power applied: " + powerDbm + " dBm");
-        } catch (Exception e) {
-            Log.w(TAG, "⚠️ Failed to apply power: " + e.getMessage());
-        }
+   /**
+ * ✅ إعدادات خفيفة — تُستدعى عند كل Scan (سريعة جداً، ~5ms)
+ * تطبّق الطاقة فقط.
+ */
+private void applySupportedSettings() {
+    if (reader == null) return;
+    try {
+        reader.setPower(MiraReaderSettings.getInstance(context).getPowerDbm());
+        MiraFileLogger.log(TAG, "⚡ Power applied: "
+                + MiraReaderSettings.getInstance(context).getPowerDbm() + " dBm");
+    } catch (Exception e) {
+        MiraFileLogger.logError(TAG, "applySupportedSettings error", e);
     }
-    
-    /**
-     * ✅ إعدادات متقدمة — تُستدعى مرة واحدة بعد الاتصال
-     * تضبط Session، Q Value، Target، Dynamic Power، إلخ
-     */
-    private void applyAdvancedSettings() {
+}
+
+/**
+ * ✅ إعدادات متقدمة — تُطبّق في كل connect وعند كل scan
+ * 🔴 هذا هو الإصلاح الجذري: لا يوجد فلتر "advancedSettingsApplied"
+ *     لأننا نريد إعادة التطبيق دائماً لضمان عدم تلاعب UHF الرسمي.
+ *
+ * السرعة: ~80-120ms إجمالي — مقبولة جداً قبل كل scan.
+ */
+private void applyAdvancedSettings() {
     if (reader == null || !isConnected) return;
-    if (advancedSettingsApplied) return;
 
-    MiraFileLogger.log(TAG, "⚙️ Applying ADAPTIVE settings...");
+    MiraFileLogger.log(TAG, "⚙️ Re-applying MIRA settings to reader (anti-UHF-guard)");
 
-    int freqMode = adaptiveConfigurator.getOptimalFrequencyMode();
-    invokeIntMethod("setFrequencyMode", freqMode);
-    MiraFileLogger.log(TAG, "   🌍 Frequency Mode: " + freqMode 
-            + " (" + adaptiveConfigurator.getReaderCapabilities().getFrequencyRangeText() + ")");
-
-    int sessionValue = adaptiveConfigurator.getOptimalSession();
-    invokeIntMethod("setSession", sessionValue);
-
-    int qValueDynamic = adaptiveConfigurator.getOptimalQValue();
-    invokeIntMethod("setQValue", qValueDynamic);
-
-    invokeIntMethod("setTarget", 2);
-
-    invokeBooleanMethod("setDynamicPower", true);
-    invokeBooleanMethod("setFastId", true);
-    invokeBooleanMethod("setTagFocus", true);
-
-    advancedSettingsApplied = true;
-    MiraFileLogger.log(TAG, "✅ Adaptive settings applied");
+    try {
+        MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
+        MiraReaderSettings.ApplyResult result = settings.applyToReader(reader);
+        MiraFileLogger.log(TAG, "✅ MIRA settings applied: " + result);
+    } catch (Exception e) {
+        MiraFileLogger.logError(TAG, "applyAdvancedSettings error", e);
+    }
 }
     
     /**
@@ -293,50 +284,45 @@ public class ChainwayReader implements MiraIRFIDReader {
             Log.e(TAG, "   ❌ " + methodName + " error: " + e.getMessage());
         }
     }
-    
+
     @Override
-    public boolean connect() {
-        try {
-            // ✅ تحقق من الحالة الديناميكية
-            if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-                Log.e(TAG, "❌ RFID device not present");
-                return false;
-            }
-            
-            if (reader == null) {
-                if (!initialize()) {
-                    return false;
-                }
-            }
-            
-            isConnected = (reader != null);
-            
-            if (isConnected) {
-                applySupportedSettings();
-                // ✅ الإعدادات المتقدمة — مرة واحدة فقط بعد الاتصال
-                if (!advancedSettingsApplied) {
-                    applyAdvancedSettings();
-                }
-                if (listener != null) {
-                    listener.onConnectionChanged(true);
-                }
-                Log.i(TAG, "✅ Connected");
-            }
-            
-            return isConnected;
-            
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Connection error", e);
-            isConnected = false;
+public boolean connect() {
+    try {
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            Log.e(TAG, "❌ RFID device not present");
             return false;
         }
+
+        if (reader == null) {
+            if (!initialize()) return false;
+        }
+
+        isConnected = (reader != null);
+
+        if (isConnected) {
+            applySupportedSettings();
+            // ✅ دائماً — بدون شرط
+            applyAdvancedSettings();
+
+            if (listener != null) {
+                listener.onConnectionChanged(true);
+            }
+            Log.i(TAG, "✅ Connected + settings applied");
+        }
+
+        return isConnected;
+
+    } catch (Exception e) {
+        Log.e(TAG, "❌ Connection error", e);
+        isConnected = false;
+        return false;
     }
+}
     
     @Override
     public void disconnect() {
         stopScan();
         isConnected = false;
-        advancedSettingsApplied = false;  // ✅ أعِد التعيين عند الفصل
         if (listener != null) {
             listener.onConnectionChanged(false);
         }
@@ -359,7 +345,7 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
         reader = null;
         listener = null;
-        advancedSettingsApplied = false;
+        
     }
     
     @Override
@@ -371,72 +357,66 @@ public class ChainwayReader implements MiraIRFIDReader {
     // 📡 المسح
     // =========================================================================
     @Override
-    public boolean startScan() {
-        MiraFileLogger.log(TAG, "🚀 startScan() called");
-        Log.i(TAG, "🚀 startScan() called");
-        
-        // ✅ 1. تحقق من الحالة الديناميكية
-        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-            Log.e(TAG, "❌ RFID device not present");
-            if (listener != null) listener.onError("RFID device not present");
-            return false;
-        }
-        
-        // ✅ 2. تحقق من عدم التشغيل المسبق
-        if (!isScanning.compareAndSet(false, true)) {
-            Log.d(TAG, "Already scanning");
-            return true;
-        }
-        
-        try {
-            // ✅ 3. تأكد من الاتصال
-            if (reader == null || !isConnected) {
-                if (!connect()) {
-                    Log.e(TAG, "❌ Cannot connect");
-                    isScanning.set(false);
-                    if (listener != null) listener.onError("Connection failed");
-                    return false;
-                }
-            }
-            
-            // ✅ 4. طبّق الإعدادات الخفيفة (الطاقة فقط)
-            applySupportedSettings();
-            
-            // ✅ 5. ابدأ القراءة
-            boolean success = false;
-            try {
-                success = reader.startInventoryTag();
-            } catch (Exception e) {
-                Log.e(TAG, "startInventoryTag exception", e);
-                success = false;
-            }
-            
-            Log.i(TAG, "startInventoryTag result: " + success);
-            
-            if (!success) {
-                Log.e(TAG, "❌ Failed to start inventory");
+public boolean startScan() {
+    MiraFileLogger.log(TAG, "🚀 startScan() called");
+
+    if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+        Log.e(TAG, "❌ RFID device not present");
+        if (listener != null) listener.onError("RFID device not present");
+        return false;
+    }
+
+    if (!isScanning.compareAndSet(false, true)) {
+        Log.d(TAG, "Already scanning");
+        return true;
+    }
+
+    try {
+        if (reader == null || !isConnected) {
+            if (!connect()) {
+                Log.e(TAG, "❌ Cannot connect");
                 isScanning.set(false);
-                if (listener != null) listener.onError("Failed to start inventory");
+                if (listener != null) listener.onError("Connection failed");
                 return false;
             }
-            
-            // ✅ 6. أبلغ المستمع
-            if (listener != null) listener.onScanStarted();
-            
-            // ✅ 7. ابدأ حلقة القراءة
-            ensureExecutor();
-            scanExecutor.execute(this::scanLoop);
-            
-            Log.i(TAG, "✅ Scan started successfully");
-            return true;
-            
+        }
+
+        // ✅✅✅ الإصلاح الجذري: أعِد تطبيق كل الإعدادات قبل كل scan
+        // هذا يضمن عدم تلاعب UHF الرسمي مهما حدث.
+        applyAdvancedSettings();
+
+        boolean success = false;
+        try {
+            success = reader.startInventoryTag();
         } catch (Exception e) {
-            Log.e(TAG, "❌ startScan exception", e);
+            Log.e(TAG, "startInventoryTag exception", e);
+            success = false;
+        }
+
+        Log.i(TAG, "startInventoryTag result: " + success);
+
+        if (!success) {
+            Log.e(TAG, "❌ Failed to start inventory");
             isScanning.set(false);
-            if (listener != null) listener.onError("Start error: " + e.getMessage());
+            if (listener != null) listener.onError("Failed to start inventory");
             return false;
         }
+
+        if (listener != null) listener.onScanStarted();
+
+        ensureExecutor();
+        scanExecutor.execute(this::scanLoop);
+
+        Log.i(TAG, "✅ Scan started successfully");
+        return true;
+
+    } catch (Exception e) {
+        Log.e(TAG, "❌ startScan exception", e);
+        isScanning.set(false);
+        if (listener != null) listener.onError("Start error: " + e.getMessage());
+        return false;
     }
+}
     
     private void scanLoop() {
         Log.d(TAG, "🔄 Scan loop started");
