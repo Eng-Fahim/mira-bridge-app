@@ -1241,29 +1241,31 @@ try {
      * ✅ معالجة مباشرة (بدون wrappers)
      */
     private void processTagReadDirect(String epc, int rssi) {
-        if (!isAdded() || isFragmentDestroyed || modernAdapter == null) return;
+    if (!isAdded() || isFragmentDestroyed || modernAdapter == null) return;
 
-        addScannedItemToDisplay(epc, rssi, null);
-        updateLastScan(epc, rssi);
-        scheduleUiUpdate();
-    }
+    // ✅ ابحث مرة واحدة فقط
+    InventoryItem catalogItem = catalogManager != null
+            ? catalogManager.getItemByEpc(epc) : null;
+
+    addScannedItemToDisplay(epc, rssi, catalogItem);
+    updateLastScan(epc, rssi);
+    scheduleUiUpdate();
+}
 
     @Override
-    public void onDuplicateTag(String epc) {
-        // addScannedItemToDisplay يعالج
-    }
-
-    @Override
-    public void onError(String error) {
-        Log.e(TAG, "📡 RFID Error: " + error);
-        mainHandler.post(() -> {
-            if (!isAdded() || isFragmentDestroyed) return;
-            showToast((isArabic ? "خطأ في قارئ RFID: " : "RFID Reader Error: ") + error);
-            if (soundManager != null) {
-                soundManager.playBeep(SoundManager.FeedbackType.ERROR);
-            }
-        });
-    }
+public void onError(String error) {
+    Log.e(TAG, "📡 RFID Error: " + error);
+    mainHandler.post(() -> {
+        if (!isAdded() || isFragmentDestroyed) return;
+        showToast((isArabic ? "⚠️ " : "⚠️ ") + error);
+        if (soundManager != null) {
+            soundManager.playBeep(SoundManager.FeedbackType.ERROR);
+        }
+        // ✅ أعِد الزر لحالته
+        isScanning = false;
+        updateMainToggleButton(false);
+    });
+}
 
     @Override
     public void onConnectionChanged(boolean isConnected) {
@@ -1752,106 +1754,124 @@ private void clearAllLists() {
     // ================================================================
 
     private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
-        if (!isAdded() || isFragmentDestroyed || modernAdapter == null) return;
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(() -> addScannedItemToDisplay(epc, rssi, item));
-            return;
-        }
+    if (!isAdded() || isFragmentDestroyed || modernAdapter == null) return;
+    if (Looper.myLooper() != Looper.getMainLooper()) {
+        mainHandler.post(() -> addScannedItemToDisplay(epc, rssi, item));
+        return;
+    }
 
-        ScannedItemDisplay currentDisplay = null;
-        SoundManager.FeedbackType feedbackType = SoundManager.FeedbackType.UNKNOWN_ITEM;
-        boolean isDuplicate = false;
+    ScannedItemDisplay currentDisplay = null;
+    SoundManager.FeedbackType feedbackType = SoundManager.FeedbackType.UNKNOWN_ITEM;
+    boolean isDuplicate = false;
 
-        boolean wasEmpty = scannedItemsDisplayList.isEmpty();
+    boolean wasEmpty = scannedItemsDisplayList.isEmpty();
 
-        for (ScannedItemDisplay display : scannedItemsDisplayList) {
-            if (display != null && epc.equals(display.epc)) {
-                display.count++;
-                display.rssi = rssi;
-                display.time = getCurrentTimeString();
+    // ═══════════════════════════════════════════════════════
+    //  1) ابحث عن القطعة في القائمة
+    // ═══════════════════════════════════════════════════════
+    for (ScannedItemDisplay display : scannedItemsDisplayList) {
+        if (display != null && epc.equals(display.epc)) {
+            display.count++;
+            display.rssi = rssi;
+            display.time = getCurrentTimeString();
 
-                aggregateTotalWeight += display.weight;
-                aggregateTotalValue += display.price;
-
-                currentDisplay = display;
-                isDuplicate = true;
-                break;
-            }
-        }
-
-        if (isDuplicate) {
-            feedbackType = SoundManager.FeedbackType.DUPLICATE_ITEM;
-        } else {
-            boolean isKnown = catalogEpcs.contains(epc);
-            feedbackType = isKnown
-                    ? SoundManager.FeedbackType.KNOWN_ITEM
-                    : SoundManager.FeedbackType.UNKNOWN_ITEM;
-
-            String title = isArabic ? "قطعة غير معروفة" : "Unknown item";
-            String karat = "—";
-            double weight = 0;
-            double price = 0;
-
-            InventoryItem catalogItem = catalogManager != null
-                    ? catalogManager.getItemByEpc(epc) : null;
-
-            if (catalogItem != null) {
-                title = catalogItem.getTitle() != null && !catalogItem.getTitle().isEmpty()
-                        ? catalogItem.getTitle()
-                        : (isArabic ? "قطعة ذهبية" : "Gold item");
-                karat = catalogItem.getKarat() != null && !catalogItem.getKarat().isEmpty()
-                        ? catalogItem.getKarat()
-                        : "—";
-                weight = catalogItem.getWeight();
-                price = catalogItem.getPrice();
-            } else if (item != null) {
-                title = item.getTitle() != null && !item.getTitle().isEmpty()
-                        ? item.getTitle()
-                        : (isArabic ? "قطعة ذهبية" : "Gold item");
-                karat = item.getKarat() != null && !item.getKarat().isEmpty()
-                        ? item.getKarat()
-                        : "—";
-                weight = item.getWeight();
-                price = item.getPrice();
-            } else if (isKnown) {
-                title = isArabic ? "مادة مسجلة بالكتالوج"
-                                 : "Catalog registered item";
-            }
-
-            ScannedItemDisplay display = new ScannedItemDisplay(
-                    epc, title, karat, 1, rssi, getCurrentTimeString());
-            display.weight = weight;
-            display.price = price;
-
-            synchronized (scannedItemsDisplayList) {
-                scannedItemsDisplayList.add(0, display);
-            }
+            // ✅ لا نلمس المجاميع هنا — سنحسبها لاحقاً دفعة واحدة
             currentDisplay = display;
+            isDuplicate = true;
+            break;
+        }
+    }
 
-            aggregateTotalWeight += weight;
-            aggregateTotalValue += price;
+    // ═══════════════════════════════════════════════════════
+    //  2) إذا كانت قطعة جديدة → أضفها
+    // ═══════════════════════════════════════════════════════
+    if (!isDuplicate) {
+        boolean isKnown = catalogEpcs.contains(epc);
+        feedbackType = isKnown
+                ? SoundManager.FeedbackType.KNOWN_ITEM
+                : SoundManager.FeedbackType.UNKNOWN_ITEM;
 
-            if (rvInventoryItems != null) {
-                rvInventoryItems.scrollToPosition(0);
-            }
+        String title = isArabic ? "قطعة غير معروفة" : "Unknown item";
+        String karat = "—";
+        double weight = 0;
+        double price = 0;
 
-            if (tvEmptyState != null) {
-                tvEmptyState.setVisibility(View.GONE);
-            }
+        InventoryItem catalogItem = catalogManager != null
+                ? catalogManager.getItemByEpc(epc) : null;
+
+        if (catalogItem != null) {
+            title = catalogItem.getTitle() != null && !catalogItem.getTitle().isEmpty()
+                    ? catalogItem.getTitle()
+                    : (isArabic ? "قطعة ذهبية" : "Gold item");
+            karat = catalogItem.getKarat() != null && !catalogItem.getKarat().isEmpty()
+                    ? catalogItem.getKarat()
+                    : "—";
+            weight = catalogItem.getWeight();
+            price = catalogItem.getPrice();
+        } else if (item != null) {
+            title = item.getTitle() != null && !item.getTitle().isEmpty()
+                    ? item.getTitle()
+                    : (isArabic ? "قطعة ذهبية" : "Gold item");
+            karat = item.getKarat() != null && !item.getKarat().isEmpty()
+                    ? item.getKarat()
+                    : "—";
+            weight = item.getWeight();
+            price = item.getPrice();
+        } else if (isKnown) {
+            title = isArabic ? "مادة مسجلة بالكتالوج"
+                             : "Catalog registered item";
         }
 
-            if (wasEmpty && !scannedItemsDisplayList.isEmpty()) {
+        ScannedItemDisplay display = new ScannedItemDisplay(
+                epc, title, karat, 1, rssi, getCurrentTimeString());
+        display.weight = weight;
+        display.price = price;
+
+        synchronized (scannedItemsDisplayList) {
+            scannedItemsDisplayList.add(0, display);
+        }
+        currentDisplay = display;
+
+        if (rvInventoryItems != null) {
+            rvInventoryItems.scrollToPosition(0);
+        }
+
+        if (tvEmptyState != null) {
+            tvEmptyState.setVisibility(View.GONE);
+        }
+    } else {
+        feedbackType = SoundManager.FeedbackType.DUPLICATE_ITEM;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  3) ✅ الحل: احسب المجاميع دفعة واحدة (source of truth)
+    // ═══════════════════════════════════════════════════════
+    recalculateAggregates();
+    updateTotalWeightAndValue();
+
+    // ═══════════════════════════════════════════════════════
+    //  4) الانتقال إلى الحالة النشطة
+    // ═══════════════════════════════════════════════════════
+    if (wasEmpty && !scannedItemsDisplayList.isEmpty()) {
         switchToActiveState(true);
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  5) الأصوات والاهتزاز
+    // ═══════════════════════════════════════════════════════
     if (soundManager != null) soundManager.playBeep(feedbackType);
     if (feedbackHelper != null) feedbackHelper.feedback(feedbackType);
 
+    // ═══════════════════════════════════════════════════════
+    //  6) بطاقة آخر مسح
+    // ═══════════════════════════════════════════════════════
     if (currentDisplay != null) {
         updateLastScanCard(currentDisplay, isDuplicate);
     }
 
-    // ✅ حدّث القائمة فقط عند إضافة قطعة جديدة (ليس عند تكرار قراءة)
+    // ═══════════════════════════════════════════════════════
+    //  7) تحديث القائمة (فقط للقطعة الجديدة)
+    // ═══════════════════════════════════════════════════════
     if (!isDuplicate) {
         updateAdapterList();
     }
@@ -2261,7 +2281,7 @@ private void clearAllLists() {
             }
         } else {
             // ✅ إعادة التعيين عند العودة تحت العدد المتوقع (بعد حذف أو مسح جديد)
-            hasCelebrated = false;
+            //hasCelebrated = false;
         }
 
     } else {
@@ -2307,16 +2327,19 @@ private void clearAllLists() {
     }
 
     private void recalculateAggregates() {
-        double w = 0, v = 0;
-        for (ScannedItemDisplay item : scannedItemsDisplayList) {
-            if (item != null) {
-                w += item.weight * item.count;
-                v += item.price * item.count;
-            }
+    double w = 0, v = 0;
+    for (ScannedItemDisplay item : scannedItemsDisplayList) {
+        if (item != null) {
+            // ✅ الحل: لا نضرب بـ count
+            //    كل EPC = قطعة فيزيائية واحدة
+            //    count = عدد القراءات (للعرض فقط)
+            w += item.weight;
+            v += item.price;
         }
-        aggregateTotalWeight = w;
-        aggregateTotalValue = v;
     }
+    aggregateTotalWeight = w;
+    aggregateTotalValue = v;
+}
 
     private void updateElapsedTime() {
         if (tvElapsedTime != null && scanStartTime > 0) {
