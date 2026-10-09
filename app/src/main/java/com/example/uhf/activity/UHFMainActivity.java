@@ -39,7 +39,6 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.utils.DiagTracer;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraAccountingSetupFragment;
@@ -63,6 +62,7 @@ import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
 import com.example.uhf.manager.SecondaryToolbarManager;
+import com.example.uhf.fragment.MiraReaderControlFragment;
 
 import androidx.lifecycle.ProcessLifecycleOwner;
 import com.example.uhf.application.AppLifecycleObserver;
@@ -1205,7 +1205,10 @@ private void showHardwareOptionsDialog() {
     PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
     List<String> optionsList = new ArrayList<>();
     List<Runnable> actionsList = new ArrayList<>();
-
+    if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
+    optionsList.add(isArabic ? "⚙️ لوحة التحكم بالقارئ" : "⚙️ Reader Control Panel");
+    actionsList.add(() -> loadFragment(new MiraReaderControlFragment(), "ReaderControl"));
+    }
     if (pm.isAdmin() || pm.isInventoryManager() || pm.isSystemAdmin()) {
         optionsList.add(isArabic ? "📡 إعدادات قارئ RFID" : "📡 RFID Reader Setup");
         actionsList.add(() -> loadFragment(new MiraReaderSetupFragment(), "ReaderSetup"));
@@ -3400,4 +3403,4 @@ public void onAuthenticationError(int code, @NonNull CharSequence msg) {
             return 0;
         }
     }
-        }
+                    }
