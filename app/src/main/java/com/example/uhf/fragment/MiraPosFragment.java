@@ -20,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -89,6 +90,9 @@ public class MiraPosFragment extends MiraBaseFragment {
     /** ✅ [جديد] حماية ذرّية لوضع One Shot */
     private final java.util.concurrent.atomic.AtomicBoolean oneShotConsumed 
         = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final int KEYCODE_RFID_TRIGGER_1 = 139;
+    private static final int KEYCODE_RFID_TRIGGER_2 = 280;
+    private static final int KEYCODE_RFID_TRIGGER_3 = 293;
     /** ✅ [جديد] منفّذ واحد لعمليات SDK — لا ننشئ Threads جديدة */
     private final java.util.concurrent.ExecutorService sdkExecutor 
         = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
@@ -332,62 +336,75 @@ public void onResume() {
         }
         if (scaleManager != null) scaleManager.connect();
         updateCartSummary();
-
-        // ✅ [جديد] كشف ذكي + بدء تلقائي على أجهزة RFID
-        scheduleAutoStartRfid();
+// ✅ تقليل الطاقة في وضع POS لمنع القراءة الزائدة
+applyLowPowerForPos();
 
     } catch (Exception e) {
         Log.e(TAG, "onResume error: " + e.getMessage());
     }
 }
+/**
+ * ✅ يقلل قوة الإرسال في وضع POS لمنع قراءة القطع المجاورة
+ *    يُستدعى عند فتح POS
+ *    يُعاد التعيين عند الإغلاق (onDestroyView)
+ */
+private void applyLowPowerForPos() {
+    sdkExecutor.execute(() -> {
+        try {
+            com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                    com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(requireContext());
+
+            // ✅ احفظ قيمة Power الأصلية للاستعادة لاحقاً
+            int originalPower = settings.getPowerDbm();
+
+            // ✅ Power منخفض لـ POS = 15 dBm (مدى ~10-15 سم فقط)
+            int posPower = 15;
+
+            if (originalPower != posPower) {
+                settings.setPowerDbm(posPower);
+
+                // طبّق على القارئ
+                com.rscja.deviceapi.RFIDWithUHFUART reader =
+                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+                if (reader != null) {
+                    try {
+                        reader.setPower(posPower);
+                        Log.i(TAG, "⚡ POS Low-Power applied: " + posPower + " dBm");
+                    } catch (Exception e) {
+                        Log.w(TAG, "setPower failed", e);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyLowPowerForPos error", e);
+        }
+    });
+}
 
 /**
- * ✅ جدولة بدء RFID التلقائي — على أجهزة RFID فقط
- *
- * المنطق:
- *   1) هل الجهاز فيه RFID مدمج؟
- *      → نعم: انتظر 800ms وأبدأ
- *      → لا:  لا تفعل شيئاً
- *
- *   2) خلال الـ 800ms، لو ضغط المستخدم أي زر آخر
- *      → ألغِ البدء التلقائي (يحترم نية المستخدم)
+ * ✅ استعادة قوة الإرسال الأصلية عند إغلاق POS
  */
-private void scheduleAutoStartRfid() {
-    try {
-        if (!isAdded() || isRemoving() || isDetached()) return;
-        if (isCheckoutDialogShowing) return;
-        if (currentScanMode != ScanMode.NONE) return;
-        if (cartManager != null && !cartManager.isEmpty()) return;
-        if (!hasPosPermission()) return;
-        if (rfidManager == null) return;
+private void restoreOriginalPower() {
+    sdkExecutor.execute(() -> {
+        try {
+            com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                    com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(requireContext());
 
-        // ✅ افحص العتاد المدمج
-        if (!com.example.uhf.tools.DeviceDetector.isRfidHardwareSupported()) {
-            Log.d(TAG, "🚫 No RFID hardware → skip auto-start (phone mode)");
-            return;
-        }
+            // ✅ استعادة 27 dBm
+            settings.setPowerDbm(27);
 
-        Log.i(TAG, "🛒 Scheduling auto-start RFID in 800ms...");
-
-        mainHandler.postDelayed(() -> {
-            if (!isAdded() || isRemoving()) return;
-
-            // ✅ هل غيّر المستخدم رأيه خلال الـ 800ms؟
-            if (currentScanMode != ScanMode.NONE) {
-                Log.i(TAG, "🛒 Auto-start cancelled — user chose another mode");
-                return;
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+            if (reader != null) {
+                try {
+                    reader.setPower(27);
+                    Log.i(TAG, "⚡ Original power restored: 27 dBm");
+                } catch (Exception ignored) {}
             }
-            if (isCheckoutDialogShowing) return;
-            if (cartManager != null && !cartManager.isEmpty()) return;
-
-            Log.i(TAG, "🛒 Auto-start RFID: EXECUTING");
-            switchScanMode(ScanMode.RFID);
-
-        }, 800);
-
-    } catch (Exception e) {
-        Log.e(TAG, "scheduleAutoStartRfid error: " + e.getMessage());
-    }
+        } catch (Exception e) {
+            Log.e(TAG, "restoreOriginalPower error", e);
+        }
+    });
 }
 @Override
 public void onPause() {
@@ -474,6 +491,7 @@ if (backPressedCallback != null) {
             pendingEpcs.clear();
             lastScannedTimes.clear();
             selectedRefundItem.set(null);
+            restoreOriginalPower();
 // ⭐ تصفير الحالة
 currentScanMode = ScanMode.NONE;
 isRFIDModeActive = false;
@@ -576,15 +594,30 @@ try {
 
         cartManager.setListener(new PosCartManager.OnCartChangedListener() {
             @Override
-            public void onCartChanged(int count, double totalUsd, boolean hasUnavailable) {
-                updateCartSummaryFromManager(count, totalUsd, hasUnavailable);
-            }
+public void onCartChanged(int count, double totalUsd, boolean hasUnavailable) {
+    updateCartSummaryFromManager(count, totalUsd, hasUnavailable);
+
+    // ✅ [إصلاح] أعِد فرض ظهور القائمة
+    safeRun(() -> {
+        if (rvCartItems != null && count > 0) {
+            rvCartItems.setVisibility(View.VISIBLE);
+        }
+        if (posFooterSticky != null && count > 0) {
+            posFooterSticky.setVisibility(View.VISIBLE);
+            posFooterSticky.setAlpha(1f);
+            posFooterSticky.setTranslationY(0f);
+        }
+    });
+}
 
             @Override
-            public void onItemAdded(int position) {
-                if (cartAdapter != null) cartAdapter.notifyItemInserted(position);
-                if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-            }
+public void onItemAdded(int position) {
+    if (cartAdapter != null) cartAdapter.notifyItemInserted(position);
+    if (rvCartItems != null) rvCartItems.scrollToPosition(0);
+
+    // ✅ [إصلاح] حدّث الملخص فوراً — يُظهر السلة
+    updateCartSummary();
+}
 
             @Override
             public void onItemRemoved(int position) {
@@ -1851,42 +1884,33 @@ private void setupBackPressedHandler() {
  */
 private void handleCustomBack() {
     try {
-        // 1. نافذة الدفع
-        if (isCheckoutDialogShowing) {
-            Log.d(TAG, "⏭️ Back: checkout dialog showing");
+        // 1. حوار الدفع
+        if (isCheckoutDialogShowing) return;
+
+        // 2. RFID نشط → أوقفه فقط (لا تخرج)
+        if (currentScanMode == ScanMode.RFID) {
+            switchScanMode(ScanMode.NONE);
             return;
         }
 
-        // 2. RFID نشط → أوقفه
-if (currentScanMode == ScanMode.RFID) {
-    Log.d(TAG, "⏹️ Back: stopping RFID scan");
-    switchScanMode(ScanMode.NONE);
-    return;
-}
+        // 3. Manual نشط → أغلقه
+        if (currentScanMode == ScanMode.MANUAL) {
+            switchScanMode(ScanMode.NONE);
+            return;
+        }
 
-        // 3. الإدخال اليدوي
-if (currentScanMode == ScanMode.MANUAL) {
-    Log.d(TAG, "⬇️ Back: closing manual input");
-    switchScanMode(ScanMode.NONE);
-    return;
-}
-
-        // 4. السلة غير فارغة → تأكيد
+        // 4. السلة فيها عناصر → تأكيد
         if (cartManager != null && !cartManager.isEmpty()) {
-            Log.d(TAG, "⚠️ Back: cart not empty → confirming");
             showExitConfirmation();
             return;
         }
 
-        // 5. اذهب للشاشة السابقة
-        Log.d(TAG, "🚪 Back: navigating away");
+        // 5. ✅ اخرج فقط عند كل هذه الشروط
         navigateAwayFromPos();
     } catch (Exception e) {
-        Log.e(TAG, "handleCustomBack error: " + e.getMessage());
-        navigateAwayFromPos();
+        Log.e(TAG, "handleCustomBack error", e);
     }
 }
-
 /**
  * ✅ تأكيد المغادرة عند وجود عناصر في السلة
  */
@@ -1912,31 +1936,84 @@ private void showExitConfirmation() {
  */
 private void navigateAwayFromPos() {
     try {
-        // أوقف كل الأنشطة أولاً
+        // ═══════════════════════════════════════════════
+        //  1) أوقف كل شيء أولاً
+        // ═══════════════════════════════════════════════
         try { stopRFIDScan(); } catch (Exception ignored) {}
-        try { UIHelper.hideKeyboard(getActivity()); } catch (Exception ignored) {}
+        try { UIKeyboardHide(); } catch (Exception ignored) {}
 
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
+        currentScanMode = ScanMode.NONE;
+        isRFIDModeActive = false;
+        isRFIDScanActive = false;
 
-            // فعّل الـBottomNav وأظهره
-            activity.setBottomNavVisible(true);
+        // ═══════════════════════════════════════════════
+        //  2) تحقق من صحة النشاط
+        // ═══════════════════════════════════════════════
+        if (!isAdded() || isRemoving() || isDetached()) {
+            Log.w(TAG, "navigateAwayFromPos: fragment not attached");
+            return;
+        }
 
-            // انتقل للـDashboard عبر NavigationManager
-            if (activity.getNavigationManager() != null) {
-                activity.getNavigationManager().goToDashboard();
-                Log.d(TAG, "✅ Navigated to Dashboard");
-            } else {
-                // احتياط: انتقل بـ Fragment مباشرة
+        if (getActivity() == null || getActivity().isFinishing()
+                || getActivity().isDestroyed()) {
+            Log.w(TAG, "navigateAwayFromPos: activity not valid");
+            return;
+        }
+
+        if (!(getActivity() instanceof UHFMainActivity)) {
+            Log.w(TAG, "navigateAwayFromPos: not in UHFMainActivity");
+            try {
+                getActivity().onBackPressed();
+            } catch (Exception ignored) {}
+            return;
+        }
+
+        UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+        // ═══════════════════════════════════════════════
+        //  3) فعّل التنقل أولاً
+        // ═══════════════════════════════════════════════
+        activity.setBottomNavVisible(true);
+        activity.setNavigationLocked(false);
+        activity.clearActiveListeners();
+
+        // ═══════════════════════════════════════════════
+        //  4) انتقل للـ Dashboard بأمان
+        // ═══════════════════════════════════════════════
+        if (activity.getNavigationManager() != null) {
+            activity.getNavigationManager().goToDashboard();
+            Log.i(TAG, "✅ Navigated to Dashboard");
+        } else {
+            Log.w(TAG, "NavigationManager null — using fallback");
+            try {
                 activity.loadFragmentDirectly(
                         new MiraDashboardFragment(),
                         NavigationManager.TAG_DASHBOARD);
-                Log.d(TAG, "✅ Navigated to Dashboard (fallback)");
+                Log.i(TAG, "✅ Navigated to Dashboard (fallback)");
+            } catch (Exception e) {
+                Log.e(TAG, "Fallback navigation failed", e);
+                // ⚠️ لا تستدعي onBackPressed — قد يُظهر الشاشة البيضاء
             }
         }
+
     } catch (Exception e) {
-        Log.e(TAG, "navigateAwayFromPos error: " + e.getMessage());
+        Log.e(TAG, "navigateAwayFromPos error", e);
     }
+}
+
+/** ✅ إخفاء لوحة المفاتيح بأمان */
+private void UIKeyboardHide() {
+    try {
+        if (getActivity() != null) {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager)
+                    getActivity().getSystemService(
+                            android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null && getView() != null) {
+                imm.hideSoftInputFromWindow(getView().getWindowToken(), 0);
+            }
+        }
+    } catch (Exception ignored) {}
 }
     // ═══════════════════════════════════════════════════════
     // RFID & Barcode
@@ -2429,4 +2506,52 @@ private void switchScanMode(ScanMode target) {
         Log.d(TAG, "showDiscountDialog: redirecting to checkout dialog");
         processCheckoutAndStockUpdate();
     }
+    
+    // ═══════════════════════════════════════════════════════
+//  🎯 معالج الزناد الفيزيائي (RFID Trigger)
+// ═══════════════════════════════════════════════════════
+
+@Override
+public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+    boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
+            || keyCode == KEYCODE_RFID_TRIGGER_2
+            || keyCode == KEYCODE_RFID_TRIGGER_3);
+
+    if (!isTrigger) return false;
+
+    // ✅ ACTION_DOWN — ابدأ المسح
+    if (event.getAction() == KeyEvent.ACTION_DOWN
+            && event.getRepeatCount() == 0) {
+
+        if (!hasPosPermission()) {
+            showToast(getString(R.string.pos_msg_no_permission));
+            return true;
+        }
+
+        // ✅ لا تبدأ إذا القارئ غير مدعوم
+        try {
+            if (!com.example.uhf.tools.DeviceDetector.isRfidHardwareSupported()) {
+                return true;
+            }
+        } catch (Exception ignored) {}
+
+        // ✅ ابدأ RFID في وضع One Shot
+        if (currentScanMode != ScanMode.RFID) {
+            Log.i(TAG, "🎯 Trigger DOWN → starting RFID One-Shot");
+            switchScanMode(ScanMode.RFID);
+        }
+        return true;
+    }
+
+    // ✅ ACTION_UP — أوقف المسح
+    if (event.getAction() == KeyEvent.ACTION_UP) {
+        if (currentScanMode == ScanMode.RFID) {
+            Log.i(TAG, "🎯 Trigger UP → stopping RFID");
+            switchScanMode(ScanMode.NONE);
+        }
+        return true;
+    }
+
+    return false;
+}
                 }
