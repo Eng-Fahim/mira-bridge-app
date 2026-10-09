@@ -211,7 +211,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private volatile boolean isFragmentDestroyed = false;
     private volatile boolean isArabic = true;
     private volatile int expectedCount = 0;
-    private volatile int currentPowerDbm = 26;
+    // ✅ جديد
+    private volatile int currentPowerDbm = 27;  // fallback فقط — يُستبدل فوراً
     private volatile String selectedCategoryFilter = null;
     private volatile int currentLiveFilter = 0;
     private volatile int lastScannedForAnimation = 0;
@@ -358,7 +359,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         } catch (Exception e) {
             Log.e(TAG, "DialogsManager error", e);
         }
-
+        
+        // ✅ [جديد] زامن القيمة الحالية مع MiraReaderSettings
+        try {
+        MiraReaderSettings settings = MiraReaderSettings.getInstance(requireContext());
+        currentPowerDbm = settings.getPowerDbm();
+        Log.d(TAG, "✅ Power synced from MiraReaderSettings: " + currentPowerDbm + " dBm");
+        } catch (Exception e) {
+        Log.w(TAG, "Sync power error: " + e.getMessage());
+        }
         // 10) PersistenceManager
         try {
             persistenceManager = new InventoryPersistenceManager(
