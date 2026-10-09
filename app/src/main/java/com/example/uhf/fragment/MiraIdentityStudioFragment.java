@@ -785,15 +785,19 @@ private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
             return;
         }
     }
-    
+
     if (appContext == null) {
         safeRun(() -> {
             playErrorSound();
-            showErrorDialog(...);
+            showErrorDialog(
+                    isArabic ? "❌ خطأ داخلي" : "❌ Internal Error",
+                    isArabic ? "لم يتم تهيئة السياق" : "Context not initialized"
+            );
             stopRfidScanningMode();
         });
         return;
     }
+
     miraExecutor.getBackgroundExecutor().execute(() -> {
         try {
             MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
@@ -892,6 +896,8 @@ private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
                 if (binding.tvStatusBadge != null) {
                     binding.tvStatusBadge.setText("BOUND");
                 }
+
+                isEpcBound = true;  // ✅ علّم الربط
 
                 Log.i(TAG, "✅ Tag verified: TID=" + normalizedTid);
                 playSuccessSound();
