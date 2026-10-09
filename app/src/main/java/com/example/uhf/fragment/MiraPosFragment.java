@@ -1045,6 +1045,12 @@ resetHeroAfterDelay();
  * ✅ [إصلاح] فرض عرض السلة فوراً بعد إضافة قطعة
  *            لا يعتمد على callbacks
  */
+/**
+ * ✅ [إصلاح جذري] فرض عرض السلة فوراً بعد إضافة قطعة
+ *
+ * السبب: cartAdapter يحمل نسخة قديمة من List
+ * الحل: نُعيد بناء adapter بالقائمة المحدّثة
+ */
 private void forceShowCart() {
     safeRun(() -> {
         try {
@@ -1052,40 +1058,44 @@ private void forceShowCart() {
             int count = cartManager.size();
             if (count <= 0) return;
 
-            // إخفاء Hero
+            // ✅ 1) إخفاء Hero
             if (posHeroContainer != null) {
                 posHeroContainer.setVisibility(View.GONE);
             }
 
-            // إظهار القائمة
+            // ✅ 2) إعادة بناء الـ Adapter بالقائمة المحدّثة
             if (rvCartItems != null) {
                 rvCartItems.setVisibility(View.VISIBLE);
-                if (cartAdapter != null) {
-                    cartAdapter.notifyDataSetChanged();
-                }
+
+                // ⭐ الحل: أنشئ adapter جديد بالقائمة الفعلية
+                cartAdapter = new CartAdapter(
+                        cartManager.getItems(),
+                        position -> cartManager.removeItemAt(position),
+                        isArabic,
+                        priceManager
+                );
+                rvCartItems.setAdapter(cartAdapter);
             }
 
-            // إظهار Footer
+            // ✅ 3) إظهار Footer
             if (posFooterSticky != null) {
-                if (posFooterSticky.getVisibility() != View.VISIBLE) {
-                    posFooterSticky.setVisibility(View.VISIBLE);
-                    posFooterSticky.setAlpha(0f);
-                    posFooterSticky.setTranslationY(300f);
-                    posFooterSticky.animate()
-                            .alpha(1f)
-                            .translationY(0f)
-                            .setDuration(300)
-                            .start();
-                } else {
-                    posFooterSticky.setAlpha(1f);
-                    posFooterSticky.setTranslationY(0f);
-                }
+                posFooterSticky.setVisibility(View.VISIBLE);
+                posFooterSticky.setAlpha(0f);
+                posFooterSticky.setTranslationY(
+                        posFooterSticky.getHeight() > 0
+                                ? posFooterSticky.getHeight() : 300f);
+                posFooterSticky.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(300)
+                        .start();
             }
 
-            // تحديث الملخص
+            // ✅ 4) تحديث الملخص
             updateCartSummary();
 
-            Log.i(TAG, "✅ forceShowCart: count=" + count);
+            Log.i(TAG, "✅ forceShowCart: rebuilt adapter, count=" + count);
+
         } catch (Exception e) {
             Log.e(TAG, "forceShowCart error", e);
         }
@@ -1988,6 +1998,14 @@ private void showExitConfirmation() {
 /**
  * ✅ الانتقال للشاشة السابقة (Dashboard)
  */
+/**
+ * ✅ [إصلاح جذري] زر الرجوع — استبدال مباشر عبر FragmentManager
+ *
+ * لا يعتمد على:
+ *   - NavigationManager (قد يرفض)
+ *   - guardSetupAccess (قد يفشل صامتاً)
+ *   - loadFragmentDirectly (قد يتجاهل الطلب)
+ */
 private void navigateAwayFromPos() {
     try {
         // ═══════════════════════════════════════════════
@@ -2001,46 +2019,100 @@ private void navigateAwayFromPos() {
         isRFIDScanActive = false;
 
         // ═══════════════════════════════════════════════
-        //  2) تحقق من صحة النشاط
+        //  2) تحقق من الصحة
         // ═══════════════════════════════════════════════
         if (!isAdded() || isRemoving() || isDetached()) return;
         if (getActivity() == null || getActivity().isFinishing()
                 || getActivity().isDestroyed()) return;
-        if (!(getActivity() instanceof UHFMainActivity)) return;
 
         UHFMainActivity activity = (UHFMainActivity) getActivity();
+        if (activity == null) return;
 
         // ═══════════════════════════════════════════════
-        //  3) فعّل التنقل
+        //  3) أظهر BottomNav + فعّل التنقل
         // ═══════════════════════════════════════════════
         activity.setBottomNavVisible(true);
         activity.setNavigationLocked(false);
         activity.clearActiveListeners();
 
         // ═══════════════════════════════════════════════
-        //  4) ✅ الحل: loadFragmentDirectly مباشرة (لا goToDashboard)
+        //  4) ✅ الحل الجذري: استبدال مباشر
         // ═══════════════════════════════════════════════
-        try {
-            MiraDashboardFragment dashboard = new MiraDashboardFragment();
-            activity.loadFragmentDirectly(
-                    dashboard,
-                    NavigationManager.TAG_DASHBOARD);
-            Log.i(TAG, "✅ Navigated to Dashboard (direct)");
-        } catch (Exception e) {
-            Log.e(TAG, "Direct navigation failed, trying NavigationManager", e);
+        androidx.fragment.app.FragmentManager fm = activity.getSupportFragmentManager();
 
-            // fallback: جرّب NavigationManager
-            try {
-                if (activity.getNavigationManager() != null) {
-                    activity.getNavigationManager().goToDashboard();
-                }
-            } catch (Exception e2) {
-                Log.e(TAG, "NavigationManager also failed", e2);
-            }
+        if (fm == null) {
+            Log.e(TAG, "FragmentManager null — forcing activity restart");
+            forceRestartActivity(activity);
+            return;
         }
+
+        MiraDashboardFragment dashboard = new MiraDashboardFragment();
+
+        // ⭐ إذا كان الـ state محفوظاً، استخدم commitAllowingStateLoss
+        if (fm.isStateSaved()) {
+            Log.w(TAG, "State saved — using commitAllowingStateLoss");
+            fm.beginTransaction()
+                    .replace(R.id.fragment_container, dashboard,
+                            NavigationManager.TAG_DASHBOARD)
+                    .commitAllowingStateLoss();
+        } else {
+            // ⭐ الحالة العادية — استخدام commitNowAllowingStateLoss للتنفيذ الفوري
+            fm.beginTransaction()
+                    .replace(R.id.fragment_container, dashboard,
+                            NavigationManager.TAG_DASHBOARD)
+                    .commitNowAllowingStateLoss();
+        }
+
+        // ⭐ حدّث BottomNav يدوياً
+        updateBottomNavToHome(activity);
+
+        Log.i(TAG, "✅ Navigated to Dashboard (direct replace)");
 
     } catch (Exception e) {
         Log.e(TAG, "navigateAwayFromPos error", e);
+        // 🛡️ الملاذ الأخير
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                forceRestartActivity((UHFMainActivity) getActivity());
+            }
+        } catch (Exception ignored) {}
+    }
+}
+
+/**
+ * ✅ تحديث BottomNav يدوياً
+ */
+private void updateBottomNavToHome(UHFMainActivity activity) {
+    try {
+        android.view.View navView = activity.findViewById(R.id.bottomNavigationView);
+        if (navView instanceof com.google.android.material.bottomnavigation.BottomNavigationView) {
+            com.google.android.material.bottomnavigation.BottomNavigationView nav =
+                    (com.google.android.material.bottomnavigation.BottomNavigationView) navView;
+            if (nav.getMenu() != null) {
+                android.view.MenuItem homeItem = nav.getMenu().findItem(R.id.nav_home);
+                if (homeItem != null) homeItem.setChecked(true);
+            }
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "updateBottomNavToHome error", e);
+    }
+}
+
+/**
+ * 🛡️ الملاذ الأخير — إعادة تشغيل الـ Activity
+ */
+private void forceRestartActivity(UHFMainActivity activity) {
+    try {
+        Log.w(TAG, "🛡️ Force restart activity");
+        android.content.Intent intent = new android.content.Intent(
+                activity, UHFMainActivity.class);
+        intent.addFlags(
+                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        activity.startActivity(intent);
+        activity.finish();
+    } catch (Exception e) {
+        Log.e(TAG, "forceRestartActivity error", e);
     }
 }
 
