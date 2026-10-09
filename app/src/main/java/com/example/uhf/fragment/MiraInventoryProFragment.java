@@ -247,7 +247,7 @@ private volatile boolean hasUncommittedSession = false;
 private volatile long sessionElapsedBeforePause = 0;
 
 /** زر الإيقاف المؤقت */
-private MaterialButton btnPauseScan;
+
 
 /** زر الإنهاء والمراجعة */
 private MaterialButton btnFinishAndReview;
@@ -607,7 +607,7 @@ try {
         rowSerialTime = view.findViewById(R.id.rowSerialTime);
         
         // ✅ [Stage-1] ربط الأزرار الجديدة
-btnPauseScan = view.findViewById(R.id.btnPauseScan);
+
 btnFinishAndReview = view.findViewById(R.id.btnFinishAndReview);
 
         setupRecyclerView();
