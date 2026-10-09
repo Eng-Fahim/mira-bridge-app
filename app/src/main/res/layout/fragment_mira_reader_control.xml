@@ -151,6 +151,29 @@
                     android:id="@+id/spQValue"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"/>
+                <TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="🎯 وضع القراءة"
+    android:textStyle="bold"
+    android:textSize="14sp"
+    android:layout_marginTop="4dp"/>
+
+<Spinner
+    android:id="@+id/spReadMode"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"/>
+
+<TextView
+    android:id="@+id/tvReadModeHint"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="🔄 يقرأ كل الوسوم القريبة — مثالي للجرد"
+    android:textSize="12sp"
+    android:textColor="?attr/colorOnSurfaceVariant"
+    android:padding="8dp"
+    android:background="?attr/colorSurfaceVariant"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
