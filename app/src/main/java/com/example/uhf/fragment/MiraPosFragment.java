@@ -86,7 +86,16 @@ public class MiraPosFragment extends MiraBaseFragment {
     
     /** ✅ عندما true — يتوقف تلقائياً بعد أول قراءة ناجحة */
     private volatile boolean stopAfterFirstRead = false;
-
+    /** ✅ [جديد] حماية ذرّية لوضع One Shot */
+    private final java.util.concurrent.atomic.AtomicBoolean oneShotConsumed 
+        = new java.util.concurrent.atomic.AtomicBoolean(false);
+    /** ✅ [جديد] منفّذ واحد لعمليات SDK — لا ننشئ Threads جديدة */
+    private final java.util.concurrent.ExecutorService sdkExecutor 
+        = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "POS-SDK");
+            t.setDaemon(true);
+            return t;
+        });
     private static final long SCAN_COOLDOWN_MS = 1500;
     private static final long REFUND_MAX_DAYS = 30;
     private static final long LAST_SALE_VALIDITY_MS = 5 * 60 * 1000;
@@ -408,6 +417,12 @@ isRFIDModeActive = false;
         } catch (Exception e) {
             Log.e(TAG, "onDestroyView error: " + e.getMessage());
         }
+        // ✅ [جديد] أوقف منفّذ SDK
+try {
+    if (sdkExecutor != null && !sdkExecutor.isShutdown()) {
+        sdkExecutor.shutdown();
+    }
+} catch (Exception ignored) {}
     }
 
     @Override
@@ -1958,9 +1973,21 @@ private void switchScanMode(ScanMode target) {
     private void startRFIDScan() {
     try {
         if (rfidManager == null) return;
+        
+        oneShotConsumed.set(false);
         isRFIDScanActive = true;
-        stopAfterFirstRead = true;  // ← جديد: اقرأ مرة واحدة فقط
-        rfidManager.startScan();
+        stopAfterFirstRead = true;
+        
+        // ✅ نفّذ start أيضاً على نفس المنفّذ — يضمن التسلسل
+        sdkExecutor.execute(() -> {
+            try {
+                rfidManager.startScan();
+                Log.d(TAG, "✅ RFID started (bg)");
+            } catch (Exception e) {
+                Log.e(TAG, "startScan bg error: " + e.getMessage());
+                isRFIDScanActive = false;
+            }
+        });
     } catch (Exception e) {
         Log.e(TAG, "startRFIDScan error: " + e.getMessage());
         isRFIDScanActive = false;
@@ -1968,38 +1995,76 @@ private void switchScanMode(ScanMode target) {
 }
 
     private void stopRFIDScan() {
-        try {
-            if (rfidManager == null) return;
-            isRFIDScanActive = false;
-            rfidManager.stopScan();
-        } catch (Exception e) {
-            Log.e(TAG, "stopRFIDScan error: " + e.getMessage());
-        }
+    try {
+        if (rfidManager == null) return;
+        
+        // ✅ علّم الحالة فوراً — لا انتظار
+        isRFIDScanActive = false;
+        
+        // ✅ نفّذ stop على منفّذ واحد (Serialized)
+        sdkExecutor.execute(() -> {
+            try {
+                rfidManager.stopScan();
+                Log.d(TAG, "✅ RFID stopped (bg)");
+            } catch (Exception e) {
+                Log.e(TAG, "stopScan bg error: " + e.getMessage());
+            }
+        });
+
+    } catch (Exception e) {
+        Log.e(TAG, "stopRFIDScan error: " + e.getMessage());
     }
+}
 
     public void onRingScanned(String epc) {
     try {
+        // ═══════════════════════════════════════════════
+        //  1) فحوصات أساسية
+        // ═══════════════════════════════════════════════
         if (epc == null || epc.trim().isEmpty()) return;
         if (!isRFIDScanActive) return;
 
+        // ═══════════════════════════════════════════════
+        //  2) Debounce — تجاهل نفس الوسم خلال فترة قصيرة
+        // ═══════════════════════════════════════════════
         long now = System.currentTimeMillis();
         Long lastTime = lastScannedTimes.get(epc);
         if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
         lastScannedTimes.put(epc, now);
 
-        // إذا كانت القطعة في السلة → تجاهل (لا تُوقف)
+        // ═══════════════════════════════════════════════
+        //  3) ✅ [حرج] One Shot — مع حماية ذرّية كاملة
+        // ═══════════════════════════════════════════════
+        if (stopAfterFirstRead) {
+
+            // 3.1) فحص ذرّي: أول خيط فقط سينجح
+            if (!oneShotConsumed.compareAndSet(false, true)) {
+                Log.i(TAG, "🎯 One-shot: ignoring extra tag " + epc);
+                return;
+            }
+
+            // 3.2) ✅ [إصلاح حرج] أغلق كل الأعلام فوراً
+            //      هذا يمنع أي قراءة إضافية من الدخول للوضع المستمر
+            isRFIDScanActive = false;
+            stopAfterFirstRead = false;
+
+            Log.i(TAG, "🎯 One-shot: accepted first tag " + epc);
+
+            // 3.3) أوقف القارئ وأعد الوضع لـ IDLE
+            switchScanMode(ScanMode.NONE);
+
+            // 3.4) عالج الوسم (سيُضاف للسلة)
+            processRingEpc(epc, "rfid");
+            return;
+        }
+
+        // ═══════════════════════════════════════════════
+        //  4) الوضع المستمر — كل القراءات مقبولة
+        // ═══════════════════════════════════════════════
         if (cartManager != null && cartManager.isIdScanned(epc)) {
             showToast(getString(R.string.pos_msg_already_in_cart));
             playAlertSound(2);
             return;
-        }
-
-        // ✅ جديد: إذا كان الوضع "اقرأ مرة واحدة"
-        // → أوقف القارئ فوراً بعد قبول أول قراءة
-        if (stopAfterFirstRead) {
-            stopAfterFirstRead = false;
-            switchScanMode(ScanMode.NONE);  // يُوقف + يُرجع الحالة لـ IDLE
-            Log.i(TAG, "🎯 One-shot: RFID stopped after reading " + epc);
         }
 
         processRingEpc(epc, "rfid");
@@ -2008,7 +2073,6 @@ private void switchScanMode(ScanMode target) {
         Log.e(TAG, "onRingScanned error: " + e.getMessage());
     }
 }
-
     public void onBarcodeScanned(String data) {
         try {
             if (data == null || data.trim().isEmpty()) return;
