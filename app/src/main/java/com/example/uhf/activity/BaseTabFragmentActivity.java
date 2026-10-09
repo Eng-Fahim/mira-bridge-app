@@ -84,22 +84,8 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
      * على إعدادات MIRA.
      */
     public static RFIDWithUHFUART getSharedReader() {
-        RFIDWithUHFUART reader = sSharedReader.get();
-
-        // ✅ حاجز وقائي: أعِد تطبيق الإعدادات مرة كل 500ms على الأكثر
-        if (reader != null && sAppContext != null) {
-            long now = System.currentTimeMillis();
-            if (now - sLastSettingsApplied > SETTINGS_GUARD_INTERVAL_MS) {
-                sLastSettingsApplied = now;
-                try {
-                    MiraReaderSettings.getInstance(sAppContext).applyToReader(reader);
-                } catch (Exception e) {
-                    Log.w(TAG, "Guard applyToReader error: " + e.getMessage());
-                }
-            }
-        }
-        return reader;
-    }
+    return sSharedReader.get();
+}
 
     /**
      * ✅ إعادة تعيين الحالة (للاختبارات فقط)
