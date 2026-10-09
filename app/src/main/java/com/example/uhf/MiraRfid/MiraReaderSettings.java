@@ -246,12 +246,10 @@ public class MiraReaderSettings {
             else { failed++; failedNames.add("setTagFocus"); }
         } catch (Exception e) { failed++; failedNames.add("setTagFocus"); }
 
-        // 6) FastInventoryMode
-        try {
-            boolean ok = reader.setFastInventoryMode(isFastInventory());
-            if (ok) { applied++; Log.i(TAG, "   ✅ setFastInventoryMode(" + isFastInventory() + ")"); }
-            else { failed++; failedNames.add("setFastInventoryMode"); }
-        } catch (Exception e) { failed++; failedNames.add("setFastInventoryMode"); }
+        // 6) FastInventoryMode — ❌ معطّل مؤقتاً
+// SDK يستخدم FastInventoryEntity (كائن) وليس boolean
+// سنُكمل هذا في مرحلة لاحقة بعد دراسة الـ API الفعلي
+Log.i(TAG, "   ⏭️ FastInventoryMode skipped (SDK uses FastInventoryEntity)");
 
         // 7) Gen2 (Session / Target / Q / DR / Miller / LinkFreq)
         try {
