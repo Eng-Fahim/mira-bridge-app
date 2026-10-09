@@ -528,42 +528,41 @@ if (tvReadModeHint != null) {
     }
 
     private void stopLiveTest() {
-        if (!isLiveTesting) return;
-        isLiveTesting = false;
+    if (!isLiveTesting) return;
+    isLiveTesting = false;
 
-        // 1) أوقف الـ thread
-        if (liveReadThread != null) {
-            liveReadThread.interrupt();
-            liveReadThread = null;
-        }
+    if (liveReadThread != null) {
+        liveReadThread.interrupt();
+        liveReadThread = null;
+    }
 
-        // 2) أوقف مُحدّث الـ UI
-        if (liveUiHandler != null && liveRateUpdater != null) {
-            liveUiHandler.removeCallbacks(liveRateUpdater);
-            liveRateUpdater = null;
-        }
+    if (liveUiHandler != null && liveRateUpdater != null) {
+        liveUiHandler.removeCallbacks(liveRateUpdater);
+        liveRateUpdater = null;
+    }
 
-        // 3) أوقف القارئ
+    // ✅ جديد: شغّل SDK في خيط خلفي — لا يوقف UI
+    new Thread(() -> {
         try {
             RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
             if (reader != null) reader.stopInventory();
         } catch (Exception e) {
             Log.w(TAG, "stopInventory error: " + e.getMessage());
         }
+    }, "StopLiveTest").start();
 
-        // 4) أعِد الزر لحالته
-        if (btnLiveTestToggle != null) {
-            btnLiveTestToggle.setText(isArabic
-                    ? "▶️ ابدأ اختبار القراءة"
-                    : "▶️ Start Test");
-            btnLiveTestToggle.setBackgroundTintList(null);
-        }
-
-        Log.i(TAG, "🛑 Live test stopped. Total reads: " + liveReadCount);
-        toast(isArabic
-                ? "🛑 تم إيقاف الاختبار — " + liveReadCount + " قراءة"
-                : "🛑 Test stopped — " + liveReadCount + " reads");
+    if (btnLiveTestToggle != null) {
+        btnLiveTestToggle.setText(isArabic
+                ? "▶️ ابدأ اختبار القراءة"
+                : "▶️ Start Test");
+        btnLiveTestToggle.setBackgroundTintList(null);
     }
+
+    Log.i(TAG, "🛑 Live test stopped. Total reads: " + liveReadCount);
+    toast(isArabic
+            ? "🛑 تم إيقاف الاختبار — " + liveReadCount + " قراءة"
+            : "🛑 Test stopped — " + liveReadCount + " reads");
+}
 
     @Override
     public void onDestroyView() {
