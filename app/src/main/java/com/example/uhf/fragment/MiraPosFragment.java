@@ -83,6 +83,9 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
     private static final String REFUND_DEBUG = "REFUND_DEBUG";
+    
+    /** ✅ عندما true — يتوقف تلقائياً بعد أول قراءة ناجحة */
+    private volatile boolean stopAfterFirstRead = false;
 
     private static final long SCAN_COOLDOWN_MS = 1500;
     private static final long REFUND_MAX_DAYS = 30;
@@ -599,10 +602,13 @@ if (btnPosScanGs1 != null) {
 if (btnPosScanRfid != null) {
     btnPosScanRfid.setOnClickListener(v -> {
         UIHelper.hideKeyboard(getActivity());
-        // إذا RFID نشط → أوقفه | وإلا → ابدأه
+
+        // ✅ السلوك الجديد: زر واحد = قطعة واحدة
         if (currentScanMode == ScanMode.RFID) {
+            // المستخدم ضغط الزر أثناء المسح → أوقف
             switchScanMode(ScanMode.NONE);
         } else {
+            // ابدأ وضع "اقرأ مرة واحدة"
             switchScanMode(ScanMode.RFID);
         }
     });
@@ -1950,15 +1956,16 @@ private void switchScanMode(ScanMode target) {
     
 
     private void startRFIDScan() {
-        try {
-            if (rfidManager == null) return;
-            isRFIDScanActive = true;
-            rfidManager.startScan();
-        } catch (Exception e) {
-            Log.e(TAG, "startRFIDScan error: " + e.getMessage());
-            isRFIDScanActive = false;
-        }
+    try {
+        if (rfidManager == null) return;
+        isRFIDScanActive = true;
+        stopAfterFirstRead = true;  // ← جديد: اقرأ مرة واحدة فقط
+        rfidManager.startScan();
+    } catch (Exception e) {
+        Log.e(TAG, "startRFIDScan error: " + e.getMessage());
+        isRFIDScanActive = false;
     }
+}
 
     private void stopRFIDScan() {
         try {
@@ -1971,25 +1978,36 @@ private void switchScanMode(ScanMode target) {
     }
 
     public void onRingScanned(String epc) {
-        try {
-            if (epc == null || epc.trim().isEmpty()) return;
-            if (!isRFIDScanActive) return;
+    try {
+        if (epc == null || epc.trim().isEmpty()) return;
+        if (!isRFIDScanActive) return;
 
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(epc);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-            lastScannedTimes.put(epc, now);
+        long now = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(epc);
+        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
+        lastScannedTimes.put(epc, now);
 
-            if (cartManager != null && cartManager.isIdScanned(epc)) {
-                showToast(getString(R.string.pos_msg_already_in_cart));
-                playAlertSound(2);
-                return;
-            }
-            processRingEpc(epc, "rfid");
-        } catch (Exception e) {
-            Log.e(TAG, "onRingScanned error: " + e.getMessage());
+        // إذا كانت القطعة في السلة → تجاهل (لا تُوقف)
+        if (cartManager != null && cartManager.isIdScanned(epc)) {
+            showToast(getString(R.string.pos_msg_already_in_cart));
+            playAlertSound(2);
+            return;
         }
+
+        // ✅ جديد: إذا كان الوضع "اقرأ مرة واحدة"
+        // → أوقف القارئ فوراً بعد قبول أول قراءة
+        if (stopAfterFirstRead) {
+            stopAfterFirstRead = false;
+            switchScanMode(ScanMode.NONE);  // يُوقف + يُرجع الحالة لـ IDLE
+            Log.i(TAG, "🎯 One-shot: RFID stopped after reading " + epc);
+        }
+
+        processRingEpc(epc, "rfid");
+
+    } catch (Exception e) {
+        Log.e(TAG, "onRingScanned error: " + e.getMessage());
     }
+}
 
     public void onBarcodeScanned(String data) {
         try {
