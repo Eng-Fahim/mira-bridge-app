@@ -294,6 +294,19 @@ public class MiraPosFragment extends MiraBaseFragment {
             setupRecyclerView();
             setupListeners();
             applyPermissions();
+            // ✅ [جديد] إخفاء زر RFID على الأجهزة التي لا تحتوي على قارئ مدمج
+try {
+    boolean hasRfid = com.example.uhf.tools.DeviceDetector.isRfidHardwareSupported();
+    if (!hasRfid && btnPosScanRfid != null) {
+        btnPosScanRfid.setVisibility(View.GONE);
+        Log.i(TAG, "📱 Phone mode: RFID button hidden");
+    } else if (hasRfid && btnPosScanRfid != null) {
+        btnPosScanRfid.setVisibility(View.VISIBLE);
+        Log.i(TAG, "📡 Reader mode: RFID button visible");
+    }
+} catch (Exception e) {
+    Log.w(TAG, "RFID button visibility error: " + e.getMessage());
+}
             initSmartScale();
             updateCartSummary();
 
@@ -305,24 +318,77 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-                View fab = getActivity().findViewById(R.id.fabActionCenter);
-                if (fab != null) {
-                    fab.setVisibility(View.GONE);
-                    Log.d(TAG, "🙈 FAB hidden in POS");
-                }
+   @Override
+public void onResume() {
+    super.onResume();
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) {
+                fab.setVisibility(View.GONE);
+                Log.d(TAG, "🙈 FAB hidden in POS");
             }
-            if (scaleManager != null) scaleManager.connect();
-            updateCartSummary();
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error: " + e.getMessage());
         }
+        if (scaleManager != null) scaleManager.connect();
+        updateCartSummary();
+
+        // ✅ [جديد] كشف ذكي + بدء تلقائي على أجهزة RFID
+        scheduleAutoStartRfid();
+
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage());
     }
+}
+
+/**
+ * ✅ جدولة بدء RFID التلقائي — على أجهزة RFID فقط
+ *
+ * المنطق:
+ *   1) هل الجهاز فيه RFID مدمج؟
+ *      → نعم: انتظر 800ms وأبدأ
+ *      → لا:  لا تفعل شيئاً
+ *
+ *   2) خلال الـ 800ms، لو ضغط المستخدم أي زر آخر
+ *      → ألغِ البدء التلقائي (يحترم نية المستخدم)
+ */
+private void scheduleAutoStartRfid() {
+    try {
+        if (!isAdded() || isRemoving() || isDetached()) return;
+        if (isCheckoutDialogShowing) return;
+        if (currentScanMode != ScanMode.NONE) return;
+        if (cartManager != null && !cartManager.isEmpty()) return;
+        if (!hasPosPermission()) return;
+        if (rfidManager == null) return;
+
+        // ✅ افحص العتاد المدمج
+        if (!com.example.uhf.tools.DeviceDetector.isRfidHardwareSupported()) {
+            Log.d(TAG, "🚫 No RFID hardware → skip auto-start (phone mode)");
+            return;
+        }
+
+        Log.i(TAG, "🛒 Scheduling auto-start RFID in 800ms...");
+
+        mainHandler.postDelayed(() -> {
+            if (!isAdded() || isRemoving()) return;
+
+            // ✅ هل غيّر المستخدم رأيه خلال الـ 800ms؟
+            if (currentScanMode != ScanMode.NONE) {
+                Log.i(TAG, "🛒 Auto-start cancelled — user chose another mode");
+                return;
+            }
+            if (isCheckoutDialogShowing) return;
+            if (cartManager != null && !cartManager.isEmpty()) return;
+
+            Log.i(TAG, "🛒 Auto-start RFID: EXECUTING");
+            switchScanMode(ScanMode.RFID);
+
+        }, 800);
+
+    } catch (Exception e) {
+        Log.e(TAG, "scheduleAutoStartRfid error: " + e.getMessage());
+    }
+}
 @Override
 public void onPause() {
     super.onPause();
@@ -618,17 +684,13 @@ if (btnPosScanRfid != null) {
     btnPosScanRfid.setOnClickListener(v -> {
         UIHelper.hideKeyboard(getActivity());
 
-        // ✅ السلوك الجديد: زر واحد = قطعة واحدة
         if (currentScanMode == ScanMode.RFID) {
-            // المستخدم ضغط الزر أثناء المسح → أوقف
             switchScanMode(ScanMode.NONE);
         } else {
-            // ابدأ وضع "اقرأ مرة واحدة"
             switchScanMode(ScanMode.RFID);
         }
     });
 }
-
 // ⭐ Manual
 if (btnPosScanManual != null) {
     btnPosScanManual.setOnClickListener(v -> {
