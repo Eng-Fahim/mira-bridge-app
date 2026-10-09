@@ -233,6 +233,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private MaterialButton btnTakeSnapshot;
     private InventorySnapshotManager snapshotManager;
     
+    /** ✅ [Stage-1] لمنع الاسترجاع المزدوج */
+private volatile boolean hasRestoredThisSession = false;
+    
     // ═══════════════════════════════════════════════════════
 //  ✅ [جديد - Stage 1] حالة الجلسة
 // ═══════════════════════════════════════════════════════
@@ -1666,6 +1669,55 @@ private void loadCatalogInBackground() {
                     }
                 });
     });
+}
+
+/**
+ * ✅ [Stage-1] نافذة الاستئناف الذكية
+ */
+private void showResumeDialog(int itemCount, int expected, long timeAgoMs) {
+    if (!isAdded() || isFragmentDestroyed) return;
+    if (itemCount < 1) return;
+
+    String timeAgo;
+    if (timeAgoMs < 60 * 1000) {
+        timeAgo = isArabic ? "قبل لحظات" : "just now";
+    } else if (timeAgoMs < 60 * 60 * 1000) {
+        timeAgo = isArabic
+                ? "قبل " + (timeAgoMs / 60000) + " دقيقة"
+                : (timeAgoMs / 60000) + " min ago";
+    } else {
+        timeAgo = isArabic
+                ? "قبل " + (timeAgoMs / 3600000) + " ساعة"
+                : (timeAgoMs / 3600000) + " hours ago";
+    }
+
+    String message = isArabic
+            ? "📂 وجدنا جلسة سابقة (" + timeAgo + ")\n\n"
+            + "• القطع: " + itemCount + "\n"
+            + "• المتوقع: " + (expected > 0 ? expected : "—") + "\n\n"
+            + "هل تريد الاستئناف؟"
+            : "📂 Previous session (" + timeAgo + ")\n\n"
+            + "• Items: " + itemCount + "\n"
+            + "• Expected: " + (expected > 0 ? expected : "—") + "\n\n"
+            + "Resume?";
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🔄 جلسة سابقة" : "🔄 Previous Session")
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "🔄 استئناف" : "🔄 Resume", (d, w) -> {
+                hasUncommittedSession = true;
+                isPaused = true;
+                switchToActiveState(false);
+                updateButtonsState();
+            })
+            .setNegativeButton(isArabic ? "🆕 جديدة" : "🆕 New", (d, w) -> {
+                clearAllLists();
+                hasUncommittedSession = false;
+                isPaused = false;
+                if (sessionManager != null) sessionManager.clearSession();
+            })
+            .setCancelable(false)
+            .show();
 }
 
     /**
@@ -3648,12 +3700,13 @@ private void clearAllLists() {
                                 itemObj.optString("time", ""));
 
                         item.weight = itemObj.optDouble("weight", 0);
-                        item.price = itemObj.optDouble("price", 0);
+item.price = itemObj.optDouble("price", 0);
 
-                        totalWeight += item.weight * item.count;
-                        totalValue += item.price * item.count;
+// ✅ [إصلاح حرج]
+totalWeight += item.weight;
+totalValue += item.price;
 
-                        scannedItemsDisplayList.add(item);
+scannedItemsDisplayList.add(item);
                     } catch (Exception e) {
                         Log.w(TAG, "Item parse error at " + i, e);
                     }
@@ -4205,11 +4258,18 @@ private void clearAllLists() {
  * ✅ [Stage-1] استئناف ذكي مع نافذة تأكيد
  */
 private void silentRestoreSession() {
+    // ✅ [Stage-1] منع الاسترجاع المزدوج
+    if (hasRestoredThisSession) {
+        Log.d(TAG, "⏭️ Session already restored — skip");
+        return;
+    }
+    hasRestoredThisSession = true;
+
     if (sessionManager == null || !isAdded() || isFragmentDestroyed) return;
 
     try {
         if (!sessionManager.hasValidSession()) {
-            Log.d(TAG, "No valid session to restore");
+            Log.d(TAG, "silentRestore: no valid session");
             return;
         }
 
@@ -4220,113 +4280,64 @@ private void silentRestoreSession() {
                 if (!isAdded() || isFragmentDestroyed) return;
                 if (items == null || items.length() == 0) return;
 
-                // ✅ استرجع البيانات صامتاً في الذاكرة
+                Log.i(TAG, "🔄 Restoring " + items.length() + " items");
                 applyRestoredSessionSilent(items, expected, category);
 
-                // ✅ ثم اعرض نافذة الاستئناف
-                mainHandler.postDelayed(() -> showResumeDialog(items.length(),
-                        expected, timeAgoMillis), 500);
+                // ✅ عرض نافذة الاستئناف
+                mainHandler.postDelayed(() ->
+                        showResumeDialog(items.length(), expected, timeAgoMillis), 500);
             }
 
             @Override
             public void onNoSession() {
-                Log.d(TAG, "No session found");
+                Log.d(TAG, "silentRestore: no session");
             }
         });
     } catch (Exception e) {
         Log.e(TAG, "silentRestoreSession error", e);
     }
 }
+private void applyRestoredSessionSilent(JSONArray items, int expectedCount, String category) {
+    try {
+        if (items == null) return;
 
-/**
- * ✅ [Stage-1] نافذة الاستئناف
- */
-private void showResumeDialog(int itemCount, int expected, long timeAgoMs) {
-    if (!isAdded() || isFragmentDestroyed) return;
-
-    String timeAgo;
-    if (timeAgoMs < 60 * 1000) {
-        timeAgo = isArabic ? "قبل لحظات" : "just now";
-    } else if (timeAgoMs < 60 * 60 * 1000) {
-        timeAgo = isArabic
-                ? "قبل " + (timeAgoMs / 60000) + " دقيقة"
-                : (timeAgoMs / 60000) + " min ago";
-    } else {
-        timeAgo = isArabic
-                ? "قبل " + (timeAgoMs / 3600000) + " ساعة"
-                : (timeAgoMs / 3600000) + " hours ago";
-    }
-
-    String message = isArabic
-            ? "📂 وجدنا جلسة جرد سابقة (" + timeAgo + ")\n\n"
-            + "• القطع الممسوحة: " + itemCount + "\n"
-            + "• العدد المتوقع: " + (expected > 0 ? expected : "—") + "\n\n"
-            + "هل تريد الاستئناف أم البدء من جديد؟"
-            : "📂 Previous inventory session found (" + timeAgo + ")\n\n"
-            + "• Scanned items: " + itemCount + "\n"
-            + "• Expected: " + (expected > 0 ? expected : "—") + "\n\n"
-            + "Resume or start new?";
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "🔄 جلسة سابقة" : "🔄 Previous Session")
-            .setMessage(message)
-            .setPositiveButton(isArabic ? "🔄 استئناف" : "🔄 Resume", (d, w) -> {
-                hasUncommittedSession = true;
-                isPaused = true;
-                Log.i(TAG, "✅ User chose: RESUME");
-                // الحالة جاهزة للاستئناف
-                updateButtonsState();
-            })
-            .setNegativeButton(isArabic ? "🆕 جلسة جديدة" : "🆕 New Session", (d, w) -> {
-                Log.i(TAG, "✅ User chose: NEW SESSION");
-                clearAllLists();
-                hasUncommittedSession = false;
-                isPaused = false;
-
-                if (sessionManager != null) {
-                    sessionManager.clearSession();
-                }
-            })
-            .setCancelable(false)
-            .show();
-}
-
-    private void applyRestoredSessionSilent(JSONArray items, int expectedCount, String category) {
-        try {
-            if (items == null) return;
-
-            synchronized (scannedItemsDisplayList) {
-                scannedItemsDisplayList.clear();
-            }
+        // ✅ [إصلاح حرج] امسح القائمة أولاً
+        synchronized (scannedItemsDisplayList) {
+            scannedItemsDisplayList.clear();
+        }
+        aggregateTotalWeight = 0;
+        aggregateTotalValue = 0;
+        catalogEpcs.clear();
 
             double totalWeight = 0;
             double totalValue = 0;
 
             synchronized (scannedItemsDisplayList) {
-                for (int i = 0; i < items.length(); i++) {
-                    try {
-                        JSONObject itemObj = items.getJSONObject(i);
+    for (int i = 0; i < items.length(); i++) {
+        try {
+            JSONObject itemObj = items.getJSONObject(i);
 
-                        ScannedItemDisplay item = new ScannedItemDisplay(
-                                itemObj.optString("epc", ""),
-                                itemObj.optString("title", ""),
-                                itemObj.optString("karat", "—"),
-                                Math.max(1, itemObj.optInt("count", 1)),
-                                itemObj.optInt("rssi", -50),
-                                itemObj.optString("time", ""));
+            ScannedItemDisplay item = new ScannedItemDisplay(
+                    itemObj.optString("epc", ""),
+                    itemObj.optString("title", ""),
+                    itemObj.optString("karat", "—"),
+                    Math.max(1, itemObj.optInt("count", 1)),
+                    itemObj.optInt("rssi", -50),
+                    itemObj.optString("time", ""));
 
-                        item.weight = itemObj.optDouble("weight", 0);
-                        item.price = itemObj.optDouble("price", 0);
+            item.weight = itemObj.optDouble("weight", 0);
+            item.price  = itemObj.optDouble("price", 0);
 
-                        totalWeight += item.weight * item.count;
-                        totalValue += item.price * item.count;
+            // ✅ [إصلاح حرج] لا نضرب بـ count — القطعة الفيزيائية واحدة
+            totalWeight += item.weight;
+            totalValue  += item.price;
 
-                        scannedItemsDisplayList.add(item);
-                    } catch (Exception e) {
-                        Log.w(TAG, "Silent restore parse error at " + i, e);
-                    }
-                }
-            }
+            scannedItemsDisplayList.add(item);
+        } catch (Exception e) {
+            Log.w(TAG, "Silent restore parse error at " + i, e);
+        }
+    }
+}
 
             aggregateTotalWeight = totalWeight;
             aggregateTotalValue = totalValue;
