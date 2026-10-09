@@ -13,9 +13,7 @@ import com.example.uhf.model.InventoryItem;
 import com.example.uhf.utils.RFIDCodeUtils;
 import com.example.uhf.utils.SoundManager;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,7 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * ✅ InventoryScanController v3.0 — النسخة النهائية الكاملة
+ * ✅ InventoryScanController v3.1 — Direct C83 Reader
  *
  * ✅ تُطبّق كامل OnTagReadListener (5 دوال):
  *    - onTagRead(String, int)         ← القراءة الأساسية
@@ -32,14 +30,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  *    - onScanStopped()                ← إشعار توقف
  *    - onConnectionChanged(boolean)   ← إشعار اتصال
  *    - onError(String)                ← إشعار خطأ
+ *
+ * 🚫 لا يوجد وضع محاكاة — إما قارئ حقيقي أو خطأ واضح
  */
 public class InventoryScanController implements MiraIRFIDReader.OnTagReadListener {
 
     private static final String TAG = "InventoryScanCtrl";
 
-    private static final long SIMULATION_INITIAL_DELAY_MS = 500;
-    private static final long SIMULATION_MIN_DELAY_MS = 150;
-    private static final long SIMULATION_MAX_ADDITIONAL_DELAY_MS = 350;
     private static final long TAG_READ_DEBOUNCE_MS = 500;
     private static final int MAX_CACHE_ITEMS = 5000;
 
@@ -48,7 +45,6 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     private final ExecutorService processingExecutor;
     private final ExecutorService ioExecutor;
     private final Handler mainHandler;
-    private final Handler simulationHandler;
 
     // ✅ المكونات
     private RFIDManager rfidManager;
@@ -60,15 +56,7 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     private final AtomicBoolean isScanning = new AtomicBoolean(false);
     private final AtomicInteger scanGeneration = new AtomicInteger(0);
     private volatile long scanStartTime = 0;
-    private volatile int currentPowerDbm = 26;
-
-    // ✅ Simulation
-    private Runnable simulationRunnable;
-    private int simulationIndex = 0;
-    private final String[] simulationTags = {
-        "A000001", "A000002", "A000003", "A000004", "A000005",
-        "A000006", "A000007", "A000008", "A000009", "A000010"
-    };
+    private volatile int currentPowerDbm = 27;  // مطابق لـ MiraReaderSettings
 
     // ✅ Caches
     private final Set<String> catalogEpcs =
@@ -101,7 +89,6 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         this.processingExecutor = processingExecutor;
         this.ioExecutor = ioExecutor;
         this.mainHandler = new Handler(Looper.getMainLooper());
-        this.simulationHandler = new Handler(Looper.getMainLooper());
     }
 
     public void setCallback(ScanCallback callback) { this.callback = callback; }
@@ -185,8 +172,6 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         Log.d(TAG, "⏹️ Stop scanning [gen=" + generation + "]");
 
         try {
-            stopSimulationLoop();
-
             if (rfidManager != null) {
                 try { rfidManager.stopScan(); }
                 catch (Exception e) { Log.e(TAG, "stopScan error", e); }
@@ -218,118 +203,119 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     // ==================== Reading Source ====================
 
     private void startReadingSource(int generation) {
-    boolean hardwareStarted = false;
+        boolean hardwareStarted = false;
 
-    if (rfidManager != null) {
-        // ✅ [إصلاح حرج] انتظر جهوزية القارئ (بحد أقصى 3 ثواني)
-        Log.d(TAG, "⏳ Waiting for reader to be ready...");
-        boolean ready = rfidManager.waitForReaderReady(3000);
+        if (rfidManager != null) {
+            Log.d(TAG, "⏳ Waiting for reader to be ready...");
+            boolean ready = rfidManager.waitForReaderReady(3000);
 
-        if (ready) {
-            Log.d(TAG, "✅ Reader ready — starting hardware scan");
-            try {
-                hardwareStarted = rfidManager.startScan();
-            } catch (Exception e) {
-                Log.e(TAG, "hardware start error", e);
+            if (ready) {
+                Log.d(TAG, "✅ Reader ready — starting hardware scan");
+                try {
+                    hardwareStarted = rfidManager.startScan();
+                } catch (Exception e) {
+                    Log.e(TAG, "hardware start error", e);
+                }
+            } else {
+                Log.w(TAG, "⚠️ Reader not ready after 3s");
             }
         } else {
-            Log.w(TAG, "⚠️ Reader not ready after 3s — falling back to simulation");
+            Log.e(TAG, "❌ rfidManager is null — cannot start");
         }
-    }
 
-    if (!hardwareStarted) {
-        startSimulationLoop(generation);
-        Log.d(TAG, "🎯 Simulation mode started");
-    }
+        // ═══════════════════════════════════════════════════════
+        //  ✅ أبلِغ عن الفشل بوضوح — لا محاكاة صامتة
+        // ═══════════════════════════════════════════════════════
+        if (!hardwareStarted) {
+            Log.e(TAG, "❌ Hardware reader failed to start — aborting scan");
 
-    if (soundManager != null) {
-        soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
-    }
-}
+            isScanning.set(false);
 
-    // ============================================================
-    // ✅ RFID Listener Overrides — كل الدوال الخمس
-    // ============================================================
-
-    /**
-     * ✅ 1) onTagRead — القراءة الأساسية
-     */
-    @Override
-public void onTagRead(String rawEpc, int rssi) {
-    if (!isScanning.get() || rawEpc == null || rawEpc.isEmpty()) return;
-
-    final int generation = scanGeneration.get();
-
-    if (processingExecutor == null || processingExecutor.isShutdown()) return;
-
-    processingExecutor.execute(() -> {
-        if (generation != scanGeneration.get()) return;
-
-        final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(
-                rawEpc, barcodeToEpcMap);
-
-        // ✅ إصلاح حرج: لا تفلتر القطع غير المعروفة!
-        // كانت المشكلة: القطع غير المعروفة لا تظهر أبداً في الجرد
-        // الحل: مررها للـ callback — والواجهة تقرر كيف تعرضها
-
-        long now = System.currentTimeMillis();
-        Long last = recentTagReads.get(normalizedEpc);
-        if (last != null && (now - last) < TAG_READ_DEBOUNCE_MS) {
             if (callback != null) {
                 mainHandler.post(() -> {
-                    if (generation == scanGeneration.get()) {
-                        callback.onTagDebounced(normalizedEpc);
+                    try {
+                        callback.onError(isArabic
+                                ? "فشل بدء القارئ — تحقق من الاتصال"
+                                : "Reader failed to start — check connection");
+                        callback.onScanStopped();
+                    } catch (Exception e) {
+                        Log.e(TAG, "callback error notification failed", e);
                     }
                 });
             }
             return;
         }
-        recentTagReads.put(normalizedEpc, now);
 
-        if (recentTagReads.size() > MAX_CACHE_ITEMS) {
-            cleanOldTagReads(now);
+        if (soundManager != null) {
+            soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
         }
+    }
 
-        try {
-            if (inventoryEngine != null) {
-                inventoryEngine.onTagScanned(normalizedEpc, rssi);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "engine error", e);
-        }
+    // ============================================================
+    // ✅ RFID Listener Overrides — كل الدوال الخمس
+    // ============================================================
 
-        if (callback != null) {
-            final int finalRssi = rssi;
-            mainHandler.post(() -> {
-                if (generation == scanGeneration.get()) {
-                    callback.onTagRead(normalizedEpc, finalRssi);
+    @Override
+    public void onTagRead(String rawEpc, int rssi) {
+        if (!isScanning.get() || rawEpc == null || rawEpc.isEmpty()) return;
+
+        final int generation = scanGeneration.get();
+
+        if (processingExecutor == null || processingExecutor.isShutdown()) return;
+
+        processingExecutor.execute(() -> {
+            if (generation != scanGeneration.get()) return;
+
+            final String normalizedEpc = RFIDCodeUtils.normalizeCodeToEpc(
+                    rawEpc, barcodeToEpcMap);
+
+            long now = System.currentTimeMillis();
+            Long last = recentTagReads.get(normalizedEpc);
+            if (last != null && (now - last) < TAG_READ_DEBOUNCE_MS) {
+                if (callback != null) {
+                    mainHandler.post(() -> {
+                        if (generation == scanGeneration.get()) {
+                            callback.onTagDebounced(normalizedEpc);
+                        }
+                    });
                 }
-            });
-        }
-    });
-}
-    /**
-     * ✅ 2) onScanStarted — إشعار بدء المسح من القارئ
-     */
+                return;
+            }
+            recentTagReads.put(normalizedEpc, now);
+
+            if (recentTagReads.size() > MAX_CACHE_ITEMS) {
+                cleanOldTagReads(now);
+            }
+
+            try {
+                if (inventoryEngine != null) {
+                    inventoryEngine.onTagScanned(normalizedEpc, rssi);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "engine error", e);
+            }
+
+            if (callback != null) {
+                final int finalRssi = rssi;
+                mainHandler.post(() -> {
+                    if (generation == scanGeneration.get()) {
+                        callback.onTagRead(normalizedEpc, finalRssi);
+                    }
+                });
+            }
+        });
+    }
+
     @Override
     public void onScanStarted() {
         Log.d(TAG, "📡 RFID onScanStarted");
-        // لا نفعل شيء — ScanController يدير البدء
-        // الـ RFID Reader يعلمنا، لكن لا نحتاج رد فعل
     }
 
-    /**
-     * ✅ 3) onScanStopped — إشعار توقف المسح من القارئ
-     */
     @Override
     public void onScanStopped() {
         Log.d(TAG, "📡 RFID onScanStopped");
-        // لا نفعل شيء — Fragment يدير التوقف عبر stopScanning()
     }
 
-    /**
-     * ✅ 4) onConnectionChanged — إشعار تغيّر حالة الاتصال
-     */
     @Override
     public void onConnectionChanged(boolean connected) {
         Log.d(TAG, "📡 RFID Connection: " + connected);
@@ -344,9 +330,6 @@ public void onTagRead(String rawEpc, int rssi) {
         }
     }
 
-    /**
-     * ✅ 5) onError — إشعار خطأ من القارئ
-     */
     @Override
     public void onError(String error) {
         Log.e(TAG, "📡 RFID Error: " + error);
@@ -374,50 +357,6 @@ public void onTagRead(String rawEpc, int rssi) {
         } catch (Exception ignored) {}
     }
 
-    // ==================== Simulation ====================
-
-    private void startSimulationLoop(int generation) {
-        simulationIndex = 0;
-
-        simulationRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (generation != scanGeneration.get() || !isScanning.get()) return;
-
-                String epc;
-                if (!catalogEpcs.isEmpty()) {
-                    List<String> list = new ArrayList<>(catalogEpcs);
-                    epc = list.get(simulationIndex % list.size());
-                } else {
-                    epc = simulationTags[simulationIndex % simulationTags.length];
-                }
-
-                int rssi = -40 - (int) (Math.random() * 40);
-
-                onTagRead(epc, rssi);
-
-                simulationIndex++;
-                long delay = SIMULATION_MIN_DELAY_MS +
-                        (long) (Math.random() * SIMULATION_MAX_ADDITIONAL_DELAY_MS);
-
-                if (isScanning.get() && generation == scanGeneration.get()) {
-                    simulationHandler.postDelayed(this, delay);
-                }
-            }
-        };
-
-        simulationHandler.postDelayed(simulationRunnable, SIMULATION_INITIAL_DELAY_MS);
-    }
-
-    private void stopSimulationLoop() {
-        try {
-            if (simulationHandler != null && simulationRunnable != null) {
-                simulationHandler.removeCallbacks(simulationRunnable);
-                simulationRunnable = null;
-            }
-        } catch (Exception ignored) {}
-    }
-
     // ==================== Notifications ====================
 
     public void notifyConnectionChanged(boolean isConnected) {
@@ -438,7 +377,6 @@ public void onTagRead(String rawEpc, int rssi) {
         try {
             stopScanning();
             detachRfidManager();
-            if (simulationHandler != null) simulationHandler.removeCallbacksAndMessages(null);
             if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
             recentTagReads.clear();
             catalogEpcs.clear();
