@@ -15,6 +15,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.rscja.deviceapi.RFIDWithUHFUART;
 
 /**
  * ✅ RFIDManager v3.2 — إضافة دعم VH-C83
