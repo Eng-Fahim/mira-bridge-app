@@ -1,6 +1,8 @@
 package com.example.uhf.manager;
 
 import android.animation.ObjectAnimator;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.Animation;
@@ -13,37 +15,41 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
-import androidx.interpolator.view.animation.FastOutSlowInInterpolator;
 
 import com.example.uhf.R;
 
 /**
- * PosHeroController — مدير حالات الـ Hero في شاشة البيع
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  PosHeroController v2.0 — Thread-safe State Machine
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * ✅ State Machine كامل: IDLE / GS1 / RFID / MANUAL / ADDED / ERROR
- * ✅ حركات تلقائية (Pulse, Bounce, Sparkle)
- * ✅ تحديث الأزرار الثلاثة حسب الحالة النشطة
- * ✅ Thread-safe (يستخدم mainHandler داخلياً عند الحاجة)
+ * التغييرات الجوهرية عن v1.0:
+ *
+ *   1. ✅ setState() thread-safe — كل التعديلات على main thread.
+ *   2. ✅ refresh() جديد لإعادة تطبيق visuals دون تغيير الحالة.
+ *   3. ✅ حماية ضد setState المتكرر بنفس الحالة (لا تراكم animations).
+ *   4. ✅ cleanup() آمن ضد الاستدعاء المتكرر.
+ *   5. ✅ عرض الحالة الحالية في السجل عند الطلب.
  */
 public final class PosHeroController {
 
     private static final String TAG = "PosHeroController";
 
     // ═══════════════════════════════════════════════════════
-    // الحالات
+    //  الحالات
     // ═══════════════════════════════════════════════════════
 
     public enum State {
-        IDLE,               // فتح الشاشة — جاهز للمسح
-        GS1_SCANNING,       // الكاميرا نشطة
-        RFID_LISTENING,     // القارئ يستمع
-        MANUAL_ENTRY,       // الإدخال اليدوي
-        ITEM_ADDED,         // تمت الإضافة (transient)
-        ERROR               // فشل المسح (transient)
+        IDLE,
+        GS1_SCANNING,
+        RFID_LISTENING,
+        MANUAL_ENTRY,
+        ITEM_ADDED,
+        ERROR
     }
 
     // ═══════════════════════════════════════════════════════
-    // Views
+    //  Views
     // ═══════════════════════════════════════════════════════
 
     private final View glowCircle;
@@ -58,7 +64,6 @@ public final class PosHeroController {
     private final TextView hint;
     private final TextView rfidCount;
 
-    // Scan buttons
     private final View btnGs1;
     private final View btnRfid;
     private final View btnManual;
@@ -70,25 +75,25 @@ public final class PosHeroController {
     private final TextView labelManual;
 
     // ═══════════════════════════════════════════════════════
-    // Animations
+    //  Animations
     // ═══════════════════════════════════════════════════════
 
     @Nullable private Animation animGlowPulse;
     @Nullable private Animation animCartBounce;
     @Nullable private Animation animSparkleFade;
-    @Nullable private ObjectAnimator rippleAnimator;
-
     private boolean animationsInitialized = false;
 
     // ═══════════════════════════════════════════════════════
-    // الحالة
+    //  الحالة
     // ═══════════════════════════════════════════════════════
 
-    private State currentState = State.IDLE;
-    private int rfidScanCount = 0;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private volatile State currentState = State.IDLE;
+    private volatile int rfidScanCount = 0;
+    private volatile boolean cleanedUp = false;
 
     // ═══════════════════════════════════════════════════════
-    // Constructor
+    //  Constructor
     // ═══════════════════════════════════════════════════════
 
     public PosHeroController(
@@ -135,7 +140,7 @@ public final class PosHeroController {
     }
 
     // ═══════════════════════════════════════════════════════
-    // الواجهة الرئيسية
+    //  Public API
     // ═══════════════════════════════════════════════════════
 
     public State getState() {
@@ -147,10 +152,88 @@ public final class PosHeroController {
     }
 
     /**
-     * الانتقال إلى حالة جديدة
+     * ✅ الانتقال إلى حالة جديدة — thread-safe.
+     * كل التعديلات تُنفَّذ على main thread.
      */
-    public void setState(@NonNull State newState) {
-        if (currentState == newState) return;
+    public void setState(@NonNull final State newState) {
+        if (cleanedUp) return;
+
+        // ✅ إذا كنا على main thread — نفّذ فوراً
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            applyStateInternal(newState);
+        } else {
+            mainHandler.post(() -> applyStateInternal(newState));
+        }
+    }
+
+    /**
+     * ✅ إعادة تطبيق visuals الحالة الحالية (دون تغييرها).
+     * مفيد بعد تغييرات خارجية (مثل scale updates).
+     */
+    public void refresh() {
+        if (cleanedUp) return;
+        final State s = currentState;
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            applyStateInternal(s);
+        } else {
+            mainHandler.post(() -> applyStateInternal(s));
+        }
+    }
+
+    /**
+     * زيادة عدّاد RFID.
+     */
+    public void incrementRfidCount() {
+        if (cleanedUp) return;
+        rfidScanCount++;
+        updateRfidCountVisibilityOnMain();
+    }
+
+    /**
+     * إعادة تعيين عدّاد RFID.
+     */
+    public void resetRfidCount() {
+        if (cleanedUp) return;
+        rfidScanCount = 0;
+        updateRfidCountVisibilityOnMain();
+    }
+
+    /**
+     * إيقاف كل الحركات — idempotent.
+     */
+    public void cleanup() {
+        cleanedUp = true;
+        Runnable cleanupTask = () -> {
+            try {
+                if (glowCircle != null) glowCircle.clearAnimation();
+                if (heroIcon != null) heroIcon.clearAnimation();
+                if (sparkleTop != null) sparkleTop.clearAnimation();
+                if (sparkleBottom != null) sparkleBottom.clearAnimation();
+                if (ring != null) ring.clearAnimation();
+            } catch (Exception e) {
+                Log.e(TAG, "cleanup error: " + e.getMessage());
+            }
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            cleanupTask.run();
+        } else {
+            mainHandler.post(cleanupTask);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Internal — التطبيق الذرّي
+    // ═══════════════════════════════════════════════════════
+
+    private void applyStateInternal(@NonNull State newState) {
+        if (cleanedUp) return;
+
+        if (currentState == newState) {
+            // ✅ الحالة نفسها — فقط حدّث visuals (لمنع الشاشة الفارغة)
+            applyStateVisuals(newState);
+            applyStateButtons(newState);
+            return;
+        }
 
         Log.d(TAG, "🔄 State: " + currentState + " → " + newState);
         currentState = newState;
@@ -164,43 +247,8 @@ public final class PosHeroController {
         applyStateAnimations(newState);
     }
 
-    /**
-     * زيادة عدّاد RFID (يُستدعى عند كل مسح ناجح في وضع RFID)
-     */
-    public void incrementRfidCount() {
-        rfidScanCount++;
-        updateRfidCountVisibility();
-    }
-
-    /**
-     * إعادة تعيين عدّاد RFID
-     */
-    public void resetRfidCount() {
-        rfidScanCount = 0;
-        updateRfidCountVisibility();
-    }
-
-    /**
-     * إيقاف كل الحركات (يُستدعى في onDestroyView)
-     */
-    public void cleanup() {
-        try {
-            if (glowCircle != null) glowCircle.clearAnimation();
-            if (heroIcon != null) heroIcon.clearAnimation();
-            if (sparkleTop != null) sparkleTop.clearAnimation();
-            if (sparkleBottom != null) sparkleBottom.clearAnimation();
-            if (ring != null) ring.clearAnimation();
-            if (rippleAnimator != null) {
-                rippleAnimator.cancel();
-                rippleAnimator = null;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "cleanup error: " + e.getMessage());
-        }
-    }
-
     // ═══════════════════════════════════════════════════════
-    // تطبيق العناصر البصرية
+    //  تطبيق العناصر البصرية
     // ═══════════════════════════════════════════════════════
 
     private void applyStateVisuals(@NonNull State state) {
@@ -218,7 +266,7 @@ public final class PosHeroController {
                 setText(titleAr, R.string.pos_hero_gs1_title);
                 setText(titleEn, R.string.pos_hero_gs1_subtitle);
                 setText(message, R.string.pos_hero_gs1_hint);
-                setText(hint, "");   // لا حاجة لتلميح
+                setText(hint, "");
                 break;
 
             case RFID_LISTENING:
@@ -256,11 +304,10 @@ public final class PosHeroController {
     }
 
     // ═══════════════════════════════════════════════════════
-    // تطبيق حالة الأزرار
+    //  تطبيق حالة الأزرار
     // ═══════════════════════════════════════════════════════
 
     private void applyStateButtons(@NonNull State state) {
-        // إعادة تعيين الكل إلى الوضع الخامل
         resetButton(btnGs1, iconGs1, labelGs1,
                 R.drawable.bg_pos_scan_button_outlined, R.color.pos_gold_primary);
         resetButton(btnRfid, iconRfid, labelRfid,
@@ -268,14 +315,8 @@ public final class PosHeroController {
         resetButton(btnManual, iconManual, labelManual,
                 R.drawable.bg_pos_scan_button_outlined, R.color.pos_gold_primary);
 
-        // تعطيل الكل أثناء فحص نشط
-        boolean anyActive = state == State.GS1_SCANNING
-                || state == State.RFID_LISTENING
-                || state == State.MANUAL_ENTRY;
-
         switch (state) {
             case IDLE:
-                // GS1 هو الزر الأساسي افتراضياً
                 activatePrimary(btnGs1, iconGs1, labelGs1);
                 setEnabled(btnGs1, true);
                 setEnabled(btnRfid, true);
@@ -297,7 +338,8 @@ public final class PosHeroController {
                 break;
 
             case MANUAL_ENTRY:
-                setActiveButton(btnManual, iconManual, labelManual, R.string.pos_btn_manual_active);
+                setActiveButton(btnManual, iconManual, labelManual,
+                        R.string.pos_btn_manual_active);
                 setEnabled(btnGs1, false);
                 setEnabled(btnRfid, false);
                 setEnabled(btnManual, true);
@@ -305,7 +347,6 @@ public final class PosHeroController {
 
             case ITEM_ADDED:
             case ERROR:
-                // أثناء الحالة المؤقتة — الكل معطّل
                 setEnabled(btnGs1, false);
                 setEnabled(btnRfid, false);
                 setEnabled(btnManual, false);
@@ -378,7 +419,7 @@ public final class PosHeroController {
     }
 
     // ═══════════════════════════════════════════════════════
-    // تطبيق الحركات
+    //  الحركات
     // ═══════════════════════════════════════════════════════
 
     private void initAnimations() {
@@ -402,7 +443,6 @@ public final class PosHeroController {
     }
 
     private void applyStateAnimations(@NonNull State state) {
-        // أوقف كل الحركات أولاً
         stopAllAnimations();
 
         switch (state) {
@@ -410,18 +450,15 @@ public final class PosHeroController {
                 startIdleAnimations();
                 break;
             case GS1_SCANNING:
-                startGlowPulseOnly();
-                break;
             case RFID_LISTENING:
                 startGlowPulseOnly();
-                break;
-            case MANUAL_ENTRY:
-                // لا حركات
                 break;
             case ITEM_ADDED:
                 startSparklesOnly();
                 break;
+            case MANUAL_ENTRY:
             case ERROR:
+            default:
                 // لا حركات
                 break;
         }
@@ -482,14 +519,12 @@ public final class PosHeroController {
     }
 
     // ═══════════════════════════════════════════════════════
-    // أدوات
+    //  أدوات
     // ═══════════════════════════════════════════════════════
 
     private void setIcon(@DrawableRes int resId) {
         try {
-            if (heroIcon != null) {
-                heroIcon.setImageResource(resId);
-            }
+            if (heroIcon != null) heroIcon.setImageResource(resId);
         } catch (Exception e) {
             Log.e(TAG, "setIcon error: " + e.getMessage());
         }
@@ -511,14 +546,21 @@ public final class PosHeroController {
         }
     }
 
-    private void updateRfidCountVisibility() {
+    private void updateRfidCountVisibilityOnMain() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            updateRfidCountVisibilityInternal();
+        } else {
+            mainHandler.post(this::updateRfidCountVisibilityInternal);
+        }
+    }
+
+    private void updateRfidCountVisibilityInternal() {
         try {
             if (rfidCount == null) return;
             if (rfidScanCount > 0) {
                 rfidCount.setVisibility(View.VISIBLE);
-                rfidCount.setText(
-                        rfidCount.getContext().getString(
-                                R.string.pos_hero_rfid_count, rfidScanCount));
+                rfidCount.setText(rfidCount.getContext().getString(
+                        R.string.pos_hero_rfid_count, rfidScanCount));
             } else {
                 rfidCount.setVisibility(View.GONE);
             }
