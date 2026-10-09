@@ -5,7 +5,6 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
-
 import com.example.uhf.utils.MiraFileLogger;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.activity.BaseTabFragmentActivity;
@@ -21,46 +20,56 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * ✅ ChainwayReader v3.1 — نسخة محسّنة للمعادن (الذهب والمجوهرات)
- * 
- * متوافق مع: DeviceAPI_ver20251103_release.aar
- * 
- * التغييرات في v3.1:
- * - الطاقة الافتراضية 30 dBm (الحد الأقصى لـ C72)
- * - إعدادات متقدمة مطبقة فعلياً على العتاد عبر Reflection
- * - Dynamic Power + FastID + TagFocus (ضرورية للمعادن)
- * - فصل applySupportedSettings (خفيفة) عن applyAdvancedSettings (ثقيلة)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  ChainwayReader v4.0 — متوافق مع RFIDManager v4.0
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * التغييرات الجوهرية عن v3.1:
+ *
+ *   1. ✅ initialize() — لا يدّعي الجاهزية عند العثور على shared reader.
+ *      يتحقق فعلياً عبر getVersion() قبل القبول. هذا يمنع السيناريو
+ *      الذي كان يسبب "فشل بدء القارئ" عند الدخول المباشر للجرد.
+ *
+ *   2. ✅ initialize() — ينشر القارئ عبر
+ *      BaseTabFragmentActivity.publishSharedReader() بعد نجاح التهيئة
+ *      الفيزيائية. هذا يجعل القارئ متاحاً لبقية النظام.
+ *
+ *   3. ✅ applySupportedSettings() — فحص null صريح لـ context وsettings.
+ *
+ *   4. ✅ release() — موثّق: لا يُحرّر shared reader (يملكه RFIDManager).
+ *
+ * كل ما تبقى (scan loop، read/write، settings، listeners) محفوظ حرفياً.
  */
 public class ChainwayReader implements MiraIRFIDReader {
-    
+
     private AdaptiveConfigurator adaptiveConfigurator;
-    
+
     private static final String TAG = "ChainwayReader";
     private static final String PREFS_NAME = "mira_rfid_dynamic_settings";
-    
+
     private static final String DEFAULT_PWD = "00000000";
-    
+
     // ═══════════════════════════════════════════════════════════════
     //  القيم الافتراضية المُحسّنة للمعادن (الذهب والمجوهرات)
     // ═══════════════════════════════════════════════════════════════
     private static final int DEFAULT_POWER_DBM       = 30;   // الحد الأقصى لـ C72
-    private static final int DEFAULT_RSSI_THRESHOLD  = -75;  // أخفض قليلاً
-    private static final int DEFAULT_SCAN_INTERVAL   = 100;  // أسرع قليلاً
+    private static final int DEFAULT_RSSI_THRESHOLD  = -75;
+    private static final int DEFAULT_SCAN_INTERVAL   = 100;
     private static final int DEFAULT_BEEP_MODE       = 1;
     private static final int DEFAULT_VIBRATION_MODE  = 1;
     private static final int DEFAULT_CONTINUOUS_MODE = 1;
     private static final int DEFAULT_SESSION         = 1;    // S1 أفضل للمعادن
     private static final int DEFAULT_TARGET          = 2;    // A/B
     private static final int DEFAULT_Q_VALUE         = 4;    // متوازن
-    //private static final int DEFAULT_FREQUENCY_MODE  = 1;    // FCC 902-928
-    private static final int DEFAULT_FREQUENCY_MODE  = 2;    // ✅ ETSI 865-868 (مطابق لوسومك)
+    private static final int DEFAULT_FREQUENCY_MODE  = 2;    // ✅ ETSI 865-868
+
     private Context context;
     private RFIDWithUHFUART reader;
     private OnTagReadListener listener;
-    
+
     private final AtomicBoolean isScanning = new AtomicBoolean(false);
     private volatile boolean isConnected = false;
-    
+
     // إعدادات ديناميكية
     private int powerDbm = DEFAULT_POWER_DBM;
     private int rssiThreshold = DEFAULT_RSSI_THRESHOLD;
@@ -72,22 +81,27 @@ public class ChainwayReader implements MiraIRFIDReader {
     private int target = DEFAULT_TARGET;
     private int qValue = DEFAULT_Q_VALUE;
     private int frequencyMode = DEFAULT_FREQUENCY_MODE;
-    
+
     private ExecutorService scanExecutor;
     private SharedPreferences prefs;
-    
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Constructor
+    // ═══════════════════════════════════════════════════════════════
     public ChainwayReader(Context context) {
-    if (context != null) {
-        this.context = context.getApplicationContext();
-        this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        this.adaptiveConfigurator = new AdaptiveConfigurator(this.context);
-        this.adaptiveConfigurator.initializeReader();
-        loadSettings();
+        if (context != null) {
+            this.context = context.getApplicationContext();
+            this.prefs = this.context.getSharedPreferences(
+                    PREFS_NAME, Context.MODE_PRIVATE);
+            this.adaptiveConfigurator = new AdaptiveConfigurator(this.context);
+            this.adaptiveConfigurator.initializeReader();
+            loadSettings();
+        }
     }
-}
 
     private synchronized void ensureExecutor() {
-        if (scanExecutor == null || scanExecutor.isShutdown() || scanExecutor.isTerminated()) {
+        if (scanExecutor == null || scanExecutor.isShutdown()
+                || scanExecutor.isTerminated()) {
             scanExecutor = Executors.newSingleThreadExecutor(r -> {
                 Thread t = new Thread(r, "Chainway-ScanLoop");
                 t.setDaemon(true);
@@ -95,7 +109,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             });
         }
     }
-    
+
     private void loadSettings() {
         if (prefs == null) return;
         powerDbm       = prefs.getInt("power_dbm",       DEFAULT_POWER_DBM);
@@ -109,66 +123,82 @@ public class ChainwayReader implements MiraIRFIDReader {
         qValue         = prefs.getInt("q_value",         DEFAULT_Q_VALUE);
         frequencyMode  = prefs.getInt("frequency_mode",  DEFAULT_FREQUENCY_MODE);
     }
-    
+
     private void saveSettings() {
         if (prefs == null) return;
         prefs.edit()
-            .putInt("power_dbm",       powerDbm)
-            .putInt("rssi_threshold",  rssiThreshold)
-            .putInt("scan_interval_ms", scanIntervalMs)
-            .putInt("beep_mode",       beepMode)
-            .putInt("vibration_mode",  vibrationMode)
-            .putInt("continuous_mode", continuousMode)
-            .putInt("session",         session)
-            .putInt("target",          target)
-            .putInt("q_value",         qValue)
-            .putInt("frequency_mode",  frequencyMode)
-            .apply();
+                .putInt("power_dbm",        powerDbm)
+                .putInt("rssi_threshold",   rssiThreshold)
+                .putInt("scan_interval_ms", scanIntervalMs)
+                .putInt("beep_mode",        beepMode)
+                .putInt("vibration_mode",   vibrationMode)
+                .putInt("continuous_mode",  continuousMode)
+                .putInt("session",          session)
+                .putInt("target",           target)
+                .putInt("q_value",          qValue)
+                .putInt("frequency_mode",   frequencyMode)
+                .apply();
     }
-    
+
     private String normalizePwd(String pwdStr) {
         if (pwdStr == null || pwdStr.trim().isEmpty()) {
             return DEFAULT_PWD;
         }
         return pwdStr.trim().toUpperCase();
     }
-    
+
     // =========================================================================
     // 🔌 التهيئة والاتصال
     // =========================================================================
-    
+
+    /**
+     * ✅ [إصلاح جوهري v4.0]
+     *
+     * التغييرات:
+     *   1. إذا وُجد shared reader، نتحقق فعلياً من عمله عبر getVersion()
+     *      قبل اعتباره جاهزاً. هذا يمنع الادعاء الكاذب الذي كان يحدث
+     *      عندما ينشر ChainwayReader مرجعاً غير مكتمل التهيئة.
+     *
+     *   2. بعد نجاح التهيئة الفيزيائية، ننشر القارئ عبر
+     *      BaseTabFragmentActivity.publishSharedReader() ليصبح
+     *      متاحاً لبقية النظام.
+     */
     @Override
     public boolean initialize() {
         if (context == null) {
             Log.e(TAG, "❌ Context is null");
             return false;
         }
-        
+
         try {
-            // ✅ استخدم القارئ المشترك إذا كان متاحاً
+            // ═══════════════════════════════════════════════════════
+            // 1) هل يوجد shared reader مُتحقَّق منه؟
+            // ═══════════════════════════════════════════════════════
             RFIDWithUHFUART sharedReader = BaseTabFragmentActivity.getSharedReader();
-            if (sharedReader != null) {
-                Log.i(TAG, "✅ Using shared reader instance");
+            if (sharedReader != null && verifySharedReader(sharedReader)) {
+                Log.i(TAG, "✅ Using VERIFIED shared reader instance");
                 this.reader = sharedReader;
                 this.isConnected = true;
                 applySupportedSettings();
                 return true;
             }
-            
-            // ✅ أنشئ قارئ جديد
+
+            // ═══════════════════════════════════════════════════════
+            // 2) تهيئة قارئ جديد
+            // ═══════════════════════════════════════════════════════
             if (reader == null) {
                 reader = RFIDWithUHFUART.getInstance();
             }
-            
+
             if (reader == null) {
                 Log.e(TAG, "❌ RFIDWithUHFUART.getInstance() returned null");
                 return false;
             }
-            
+
             // ✅ init مع timeout
             final boolean[] initResult = new boolean[1];
             final Object initLock = new Object();
-            
+
             Thread initThread = new Thread(() -> {
                 try {
                     initResult[0] = reader.init(context);
@@ -183,7 +213,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             }, "Chainway-Init");
             initThread.setDaemon(true);
             initThread.start();
-            
+
             synchronized (initLock) {
                 try {
                     initLock.wait(8000);
@@ -192,83 +222,112 @@ public class ChainwayReader implements MiraIRFIDReader {
                     return false;
                 }
             }
-            
+
             if (initThread.isAlive()) {
-                Log.e(TAG, "❌ Init timeout");
+                Log.e(TAG, "❌ Init timeout (8000ms)");
                 return false;
             }
-            
+
             boolean success = initResult[0];
-            
+
             if (success) {
                 isConnected = true;
+
+                // ✅ [جديد v4.0] انشر القارئ للاستخدام المشترك
+                BaseTabFragmentActivity.publishSharedReader(reader);
+                Log.i(TAG, "📢 Reader published to shared slot");
+
                 applySupportedSettings();
                 Log.i(TAG, "✅ Chainway initialized successfully");
             } else {
                 isConnected = false;
                 Log.e(TAG, "❌ Chainway init failed");
             }
-            
+
             return success;
-            
+
         } catch (Exception e) {
             Log.e(TAG, "❌ Init exception", e);
             isConnected = false;
             return false;
         }
     }
-   /**
- * ✅ إعدادات خفيفة — تُستدعى عند كل Scan (سريعة جداً، ~5ms)
- * تطبّق الطاقة فقط.
- */
-private void applySupportedSettings() {
-    if (reader == null) return;
-    try {
-        reader.setPower(MiraReaderSettings.getInstance(context).getPowerDbm());
-        MiraFileLogger.log(TAG, "⚡ Power applied: "
-                + MiraReaderSettings.getInstance(context).getPowerDbm() + " dBm");
-    } catch (Exception e) {
-        MiraFileLogger.logError(TAG, "applySupportedSettings error", e);
+
+    /**
+     * ✅ [جديد v4.0] يتحقق من أن shared reader يعمل فعلاً
+     *            قبل قبوله. يمنع ادعاء الجاهزية الكاذب.
+     */
+    private boolean verifySharedReader(RFIDWithUHFUART sdk) {
+        if (sdk == null) return false;
+        try {
+            String ver = sdk.getVersion();
+            boolean ok = (ver != null && !ver.isEmpty());
+            if (ok) {
+                Log.d(TAG, "   └─ Shared reader version: " + ver);
+            } else {
+                Log.w(TAG, "   └─ Shared reader returned empty version");
+            }
+            return ok;
+        } catch (Exception e) {
+            Log.w(TAG, "   └─ Shared reader unresponsive: " + e.getMessage());
+            return false;
+        }
     }
-}
 
-/**
- * ✅ إعدادات متقدمة — تُطبّق في كل connect وعند كل scan
- * 🔴 هذا هو الإصلاح الجذري: لا يوجد فلتر "advancedSettingsApplied"
- *     لأننا نريد إعادة التطبيق دائماً لضمان عدم تلاعب UHF الرسمي.
- *
- * السرعة: ~80-120ms إجمالي — مقبولة جداً قبل كل scan.
- */
-private void applyAdvancedSettings() {
-    if (reader == null || !isConnected) return;
+    /**
+     * ✅ إعدادات خفيفة — الطاقة فقط. سريعة جداً.
+     */
+    private void applySupportedSettings() {
+        if (reader == null || context == null) return;
+        try {
+            MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
+            if (settings == null) return;
 
-    MiraFileLogger.log(TAG, "⚙️ Re-applying MIRA settings to reader (anti-UHF-guard)");
+            int power = settings.getPowerDbm();
+            reader.setPower(power);
 
-    try {
-        MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
-        MiraReaderSettings.ApplyResult result = settings.applyToReader(reader);
-        MiraFileLogger.log(TAG, "✅ MIRA settings applied: " + result);
-    } catch (Exception e) {
-        MiraFileLogger.logError(TAG, "applyAdvancedSettings error", e);
+            MiraFileLogger.log(TAG, "⚡ Power applied: " + power + " dBm");
+        } catch (Exception e) {
+            MiraFileLogger.logError(TAG, "applySupportedSettings error", e);
+        }
     }
-}
-    
+
+    /**
+     * ✅ إعدادات متقدمة — تُطبّق قبل كل scan
+     *    لمنع تطبيق UHF الرسمي من الكتابة فوق إعدادات MIRA.
+     */
+    private void applyAdvancedSettings() {
+        if (reader == null || !isConnected || context == null) return;
+
+        MiraFileLogger.log(TAG, "⚙️ Re-applying MIRA settings to reader (anti-UHF-guard)");
+
+        try {
+            MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
+            if (settings == null) return;
+
+            MiraReaderSettings.ApplyResult result = settings.applyToReader(reader);
+            MiraFileLogger.log(TAG, "✅ MIRA settings applied: " + result);
+        } catch (Exception e) {
+            MiraFileLogger.logError(TAG, "applyAdvancedSettings error", e);
+        }
+    }
+
     /**
      * ✅ استدعاء دالة SDK مع int عبر Reflection
      */
     private void invokeIntMethod(String methodName, int value) {
-    if (reader == null) return;
-    try {
-        Method m = reader.getClass().getMethod(methodName, int.class);
-        m.invoke(reader, value);
-        MiraFileLogger.log(TAG, "   ✅ " + methodName + "(" + value + ")");
-    } catch (NoSuchMethodException e) {
-        MiraFileLogger.logWarn(TAG, "   ⚠️ " + methodName + " NOT FOUND in SDK");
-    } catch (Exception e) {
-        MiraFileLogger.logError(TAG, "   ❌ " + methodName + " error: " + e.getMessage());
+        if (reader == null) return;
+        try {
+            Method m = reader.getClass().getMethod(methodName, int.class);
+            m.invoke(reader, value);
+            MiraFileLogger.log(TAG, "   ✅ " + methodName + "(" + value + ")");
+        } catch (NoSuchMethodException e) {
+            MiraFileLogger.logWarn(TAG, "   ⚠️ " + methodName + " NOT FOUND in SDK");
+        } catch (Exception e) {
+            MiraFileLogger.logError(TAG, "   ❌ " + methodName + " error: " + e.getMessage());
+        }
     }
-}
-    
+
     /**
      * ✅ استدعاء دالة SDK مع boolean عبر Reflection
      */
@@ -286,39 +345,38 @@ private void applyAdvancedSettings() {
     }
 
     @Override
-public boolean connect() {
-    try {
-        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-            Log.e(TAG, "❌ RFID device not present");
+    public boolean connect() {
+        try {
+            if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+                Log.e(TAG, "❌ RFID device not present");
+                return false;
+            }
+
+            if (reader == null) {
+                if (!initialize()) return false;
+            }
+
+            isConnected = (reader != null);
+
+            if (isConnected) {
+                applySupportedSettings();
+                applyAdvancedSettings();
+
+                if (listener != null) {
+                    listener.onConnectionChanged(true);
+                }
+                Log.i(TAG, "✅ Connected + settings applied");
+            }
+
+            return isConnected;
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Connection error", e);
+            isConnected = false;
             return false;
         }
-
-        if (reader == null) {
-            if (!initialize()) return false;
-        }
-
-        isConnected = (reader != null);
-
-        if (isConnected) {
-            applySupportedSettings();
-            // ✅ دائماً — بدون شرط
-            applyAdvancedSettings();
-
-            if (listener != null) {
-                listener.onConnectionChanged(true);
-            }
-            Log.i(TAG, "✅ Connected + settings applied");
-        }
-
-        return isConnected;
-
-    } catch (Exception e) {
-        Log.e(TAG, "❌ Connection error", e);
-        isConnected = false;
-        return false;
     }
-}
-    
+
     @Override
     public void disconnect() {
         stopScan();
@@ -327,165 +385,173 @@ public boolean connect() {
             listener.onConnectionChanged(false);
         }
     }
-    
+
     @Override
     public synchronized void release() {
         disconnect();
+
         if (scanExecutor != null && !scanExecutor.isShutdown()) {
             scanExecutor.shutdownNow();
             scanExecutor = null;
         }
-        // ✅ لا نحرر reader إذا كان مشتركاً
+
+        // ✅ لا نُحرّر shared reader — RFIDManager يملكه
+        //    نُحرّر فقط إذا كان هذا القارئ خاصاً ولم يُنشر
         if (reader != null && reader != BaseTabFragmentActivity.getSharedReader()) {
             try {
                 reader.free();
+                Log.d(TAG, "🔓 Reader freed (private instance)");
             } catch (Exception e) {
                 Log.e(TAG, "Release error", e);
             }
+        } else if (reader != null) {
+            Log.d(TAG, "⏭️ Skipping free() — reader is the shared instance");
         }
+
         reader = null;
         listener = null;
-        
     }
-    
+
     @Override
     public boolean isConnected() {
         return isConnected && reader != null;
     }
-    
+
     // =========================================================================
     // 📡 المسح
     // =========================================================================
-   @Override
-public boolean startScan() {
-    MiraFileLogger.log(TAG, "🚀 startScan() called");
 
-    // 1) تأكد من وجود العتاد
-    if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
-        Log.e(TAG, "❌ RFID device not present");
-        if (listener != null) listener.onError("RFID device not present");
-        return false;
-    }
+    @Override
+    public boolean startScan() {
+        MiraFileLogger.log(TAG, "🚀 startScan() called");
 
-    // 2) منع التشغيل المزدوج
-    if (!isScanning.compareAndSet(false, true)) {
-        Log.d(TAG, "Already scanning");
-        return true;
-    }
-
-    try {
-        // 3) الاتصال إن لزم
-        if (reader == null || !isConnected) {
-            if (!connect()) {
-                Log.e(TAG, "❌ Cannot connect");
-                isScanning.set(false);
-                if (listener != null) listener.onError("Connection failed");
-                return false;
-            }
-        }
-
-        // 4) ✅ إعادة تطبيق الإعدادات — مرة واحدة فقط
-        applyAdvancedSettings();
-
-        // 5) ✅ تفرّع حسب وضع القراءة
-        MiraReaderSettings s = MiraReaderSettings.getInstance(context);
-        boolean success;
-
-        if (s.getReadMode() == MiraReaderSettings.READ_MODE_SINGLE) {
-            Log.i(TAG, "🎯 Starting in SINGLE mode");
-            success = startSingleTagLoop();
-        } else {
-            Log.i(TAG, "🔄 Starting in AUTO mode");
-            success = startAutoInventory();
-        }
-
-        // 6) التحقق
-        if (!success) {
-            Log.e(TAG, "❌ Failed to start inventory");
-            isScanning.set(false);
-            if (listener != null) listener.onError("Failed to start inventory");
+        // 1) تأكد من وجود العتاد
+        if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
+            Log.e(TAG, "❌ RFID device not present");
+            if (listener != null) listener.onError("RFID device not present");
             return false;
         }
 
-        // 7) أبلغ المستمع
-        if (listener != null) listener.onScanStarted();
-
-        Log.i(TAG, "✅ Scan started successfully");
-        return true;
-
-    } catch (Exception e) {
-        Log.e(TAG, "❌ startScan exception", e);
-        isScanning.set(false);
-        if (listener != null) listener.onError("Start error: " + e.getMessage());
-        return false;
-    }
-}
-private boolean startAutoInventory() {
-    try {
-        boolean ok = reader.startInventoryTag();
-        if (ok) {
-            ensureExecutor();
-            scanExecutor.execute(this::scanLoop);
+        // 2) منع التشغيل المزدوج
+        if (!isScanning.compareAndSet(false, true)) {
+            Log.d(TAG, "Already scanning");
+            return true;
         }
-        return ok;
-    } catch (Exception e) {
-        Log.e(TAG, "startAutoInventory error", e);
-        return false;
-    }
-}
 
-private boolean startSingleTagLoop() {
-    try {
-        ensureExecutor();
-        scanExecutor.execute(() -> {
-            Log.d(TAG, "🎯 Single tag loop started");
-            while (isScanning.get() && !Thread.currentThread().isInterrupted()) {
-                try {
-                    UHFTAGInfo tag = reader.inventorySingleTag();
-                    if (tag != null && tag.getEPC() != null
-                            && !tag.getEPC().isEmpty()) {
-                        processTag(tag);
-                    }
-                    Thread.sleep(30);  // فاصل لمنع استهلاك CPU
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    Log.w(TAG, "single tag loop error", e);
-                    try { Thread.sleep(100); }
-                    catch (InterruptedException ie) { break; }
+        try {
+            // 3) الاتصال إن لزم
+            if (reader == null || !isConnected) {
+                if (!connect()) {
+                    Log.e(TAG, "❌ Cannot connect");
+                    isScanning.set(false);
+                    if (listener != null) listener.onError("Connection failed");
+                    return false;
                 }
             }
-            Log.d(TAG, "🎯 Single tag loop ended");
-        });
-        return true;
-    } catch (Exception e) {
-        Log.e(TAG, "startSingleTagLoop error", e);
-        return false;
+
+            // 4) إعادة تطبيق الإعدادات
+            applyAdvancedSettings();
+
+            // 5) تفرّع حسب وضع القراءة
+            MiraReaderSettings s = MiraReaderSettings.getInstance(context);
+            boolean success;
+
+            if (s.getReadMode() == MiraReaderSettings.READ_MODE_SINGLE) {
+                Log.i(TAG, "🎯 Starting in SINGLE mode");
+                success = startSingleTagLoop();
+            } else {
+                Log.i(TAG, "🔄 Starting in AUTO mode");
+                success = startAutoInventory();
+            }
+
+            // 6) التحقق
+            if (!success) {
+                Log.e(TAG, "❌ Failed to start inventory");
+                isScanning.set(false);
+                if (listener != null) listener.onError("Failed to start inventory");
+                return false;
+            }
+
+            // 7) أبلغ المستمع
+            if (listener != null) listener.onScanStarted();
+
+            Log.i(TAG, "✅ Scan started successfully");
+            return true;
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ startScan exception", e);
+            isScanning.set(false);
+            if (listener != null) listener.onError("Start error: " + e.getMessage());
+            return false;
+        }
     }
-}
-    
+
+    private boolean startAutoInventory() {
+        try {
+            boolean ok = reader.startInventoryTag();
+            if (ok) {
+                ensureExecutor();
+                scanExecutor.execute(this::scanLoop);
+            }
+            return ok;
+        } catch (Exception e) {
+            Log.e(TAG, "startAutoInventory error", e);
+            return false;
+        }
+    }
+
+    private boolean startSingleTagLoop() {
+        try {
+            ensureExecutor();
+            scanExecutor.execute(() -> {
+                Log.d(TAG, "🎯 Single tag loop started");
+                while (isScanning.get() && !Thread.currentThread().isInterrupted()) {
+                    try {
+                        UHFTAGInfo tag = reader.inventorySingleTag();
+                        if (tag != null && tag.getEPC() != null
+                                && !tag.getEPC().isEmpty()) {
+                            processTag(tag);
+                        }
+                        Thread.sleep(30);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    } catch (Exception e) {
+                        Log.w(TAG, "single tag loop error", e);
+                        try { Thread.sleep(100); }
+                        catch (InterruptedException ie) { break; }
+                    }
+                }
+                Log.d(TAG, "🎯 Single tag loop ended");
+            });
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "startSingleTagLoop error", e);
+            return false;
+        }
+    }
+
     private void scanLoop() {
         Log.d(TAG, "🔄 Scan loop started");
-        
+
         while (isScanning.get() && !Thread.currentThread().isInterrupted()) {
             try {
                 UHFTAGInfo tag;
                 int tagsRead = 0;
-                
+
                 if (reader != null) {
                     while (isScanning.get() && (tag = reader.readTagFromBuffer()) != null) {
                         processTag(tag);
                         tagsRead++;
-                        
+
                         if (tagsRead % 50 == 0) {
                             Thread.sleep(1);
                         }
                     }
                 }
-                
+
                 Thread.sleep(scanIntervalMs);
-                
+
             } catch (InterruptedException e) {
                 Log.d(TAG, "Scan loop interrupted");
                 Thread.currentThread().interrupt();
@@ -503,83 +569,81 @@ private boolean startSingleTagLoop() {
                 }
             }
         }
-        
+
         Log.d(TAG, "🔄 Scan loop ended");
     }
-    
+
     private void processTag(UHFTAGInfo tag) {
-    if (tag == null) return;
-    try {
-        String epc = tag.getEPC();
-        int rssi = parseRssi(tag.getRssi());
+        if (tag == null) return;
+        try {
+            String epc = tag.getEPC();
+            int rssi = parseRssi(tag.getRssi());
 
-        if (rssi < rssiThreshold) return;
+            if (rssi < rssiThreshold) return;
 
-        adaptiveConfigurator.updateLastTag(epc, rssi);
-        adaptiveConfigurator.recordSuccess("read", "auto");
+            adaptiveConfigurator.updateLastTag(epc, rssi);
+            adaptiveConfigurator.recordSuccess("read", "auto");
 
-        MiraFileLogger.log(TAG, "📡 Tag read: EPC=" + epc + " RSSI=" + rssi);
+            MiraFileLogger.log(TAG, "📡 Tag read: EPC=" + epc + " RSSI=" + rssi);
 
-        if (epc != null && !epc.isEmpty() && listener != null) {
-            listener.onTagRead(epc, rssi);
+            if (epc != null && !epc.isEmpty() && listener != null) {
+                listener.onTagRead(epc, rssi);
+            }
+        } catch (Exception e) {
+            MiraFileLogger.logError(TAG, "processTag error", e);
         }
-    } catch (Exception e) {
-        MiraFileLogger.logError(TAG, "processTag error", e);
     }
-    }
-    
+
     private int parseRssi(String rssiStr) {
         if (rssiStr == null || rssiStr.isEmpty()) return -50;
         try {
             String cleaned = rssiStr.replace("dBm", "")
-                                    .replace("dbm", "")
-                                    .replace("dB", "")
-                                    .trim();
+                    .replace("dbm", "")
+                    .replace("dB", "")
+                    .trim();
             int rssi = Integer.parseInt(cleaned);
             return rssi > 0 ? -rssi : rssi;
         } catch (NumberFormatException e) {
             return -50;
         }
     }
-    
+
     @Override
     public void stopScan() {
-    // ✅ AtomicBoolean.getAndSet() — ذرّي وآمن
-    if (!isScanning.getAndSet(false)) {
-        MiraFileLogger.log(TAG, "⏹️ stopScan() skipped — already stopped");
-        return;
-    }
-    
-    MiraFileLogger.log(TAG, "⏹️ stopScan() executing...");
-    
-    try {
-        if (reader != null) {
-            reader.stopInventory();
-            MiraFileLogger.log(TAG, "   └─ reader.stopInventory() OK");
+        if (!isScanning.getAndSet(false)) {
+            MiraFileLogger.log(TAG, "⏹️ stopScan() skipped — already stopped");
+            return;
         }
-    } catch (Exception e) {
-        MiraFileLogger.logError(TAG, "   └─ reader.stopInventory() error: " + e.getMessage());
-    }
-    
-    // ✅ أبلغ المستمع مرة واحدة فقط
-    if (listener != null) {
+
+        MiraFileLogger.log(TAG, "⏹️ stopScan() executing...");
+
         try {
-            listener.onScanStopped();
+            if (reader != null) {
+                reader.stopInventory();
+                MiraFileLogger.log(TAG, "   └─ reader.stopInventory() OK");
+            }
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "onScanStopped callback error", e);
+            MiraFileLogger.logError(TAG, "   └─ reader.stopInventory() error: " + e.getMessage());
+        }
+
+        if (listener != null) {
+            try {
+                listener.onScanStopped();
+            } catch (Exception e) {
+                MiraFileLogger.logError(TAG, "onScanStopped callback error", e);
+            }
         }
     }
-}
-    
+
     @Override
     public boolean isScanning() {
         return isScanning.get();
     }
-    
+
     // =========================================================================
-    // ⚙️ الإعدادات — مع تطبيق فعلي على العتاد
+    // ⚙️ الإعدادات
     // =========================================================================
-    
+
     @Override
     public void setPower(int powerDbm) {
         this.powerDbm = powerDbm;
@@ -593,80 +657,78 @@ private boolean startSingleTagLoop() {
             Log.e(TAG, "Set power error", e);
         }
     }
-    
+
     @Override
     public void setRssiThreshold(int threshold) {
         this.rssiThreshold = threshold;
         saveSettings();
-        // لا يحتاج SDK — يُطبّق في processTag()
     }
-    
+
     @Override
     public void setScanInterval(int intervalMs) {
         this.scanIntervalMs = Math.max(50, intervalMs);
         saveSettings();
-        // لا يحتاج SDK — يُطبّق في scanLoop()
     }
-    
+
     public void setBeepMode(int mode) {
         this.beepMode = mode;
         saveSettings();
         invokeIntMethod("setBeepMode", mode);
     }
-    
+
     public void setVibrationMode(int mode) {
         this.vibrationMode = mode;
         saveSettings();
         invokeIntMethod("setVibrationMode", mode);
     }
-    
+
     public void setContinuousMode(int mode) {
         this.continuousMode = mode;
         saveSettings();
         invokeIntMethod("setContinuousMode", mode);
     }
-    
+
     public void setSession(int session) {
         this.session = session;
         saveSettings();
         invokeIntMethod("setSession", session);
     }
-    
+
     public void setTarget(int target) {
         this.target = target;
         saveSettings();
         invokeIntMethod("setTarget", target);
     }
-    
+
     public void setQValue(int qValue) {
         this.qValue = qValue;
         saveSettings();
         invokeIntMethod("setQValue", qValue);
     }
-    
+
     public void setFrequencyMode(int mode) {
         this.frequencyMode = mode;
         saveSettings();
         invokeIntMethod("setFrequencyMode", mode);
     }
-    
+
     // ==================== Getters ====================
-    public int getPowerDbm() { return powerDbm; }
-    public int getRssiThreshold() { return rssiThreshold; }
+    public int getPowerDbm()       { return powerDbm; }
+    public int getRssiThreshold()  { return rssiThreshold; }
     public int getScanIntervalMs() { return scanIntervalMs; }
-    public int getBeepMode() { return beepMode; }
-    public int getVibrationMode() { return vibrationMode; }
+    public int getBeepMode()       { return beepMode; }
+    public int getVibrationMode()  { return vibrationMode; }
     public int getContinuousMode() { return continuousMode; }
-    public int getSession() { return session; }
-    public int getTarget() { return target; }
-    public int getQValue() { return qValue; }
-    public int getFrequencyMode() { return frequencyMode; }
-    
+    public int getSession()        { return session; }
+    public int getTarget()         { return target; }
+    public int getQValue()         { return qValue; }
+    public int getFrequencyMode()  { return frequencyMode; }
+
     @Override
-    public String getDeviceName() { 
-        return "Chainway " + Build.MODEL + " / UHF Terminal"; 
+    public String getDeviceName() {
+        return "Chainway " + Build.MODEL + " / UHF Terminal";
     }
-    
+
     @Override
     public String getFirmwareVersion() {
         try {
@@ -674,10 +736,10 @@ private boolean startSingleTagLoop() {
         } catch (Exception ignored) {}
         return "Unknown";
     }
-    
+
     @Override
     public int getBatteryLevel() { return -1; }
-    
+
     @Override
     public void setOnTagReadListener(OnTagReadListener listener) {
         this.listener = listener;
@@ -693,24 +755,24 @@ private boolean startSingleTagLoop() {
             Log.w(TAG, "writeData: invalid args");
             return false;
         }
-        
+
         String safePwd = normalizePwd(pwdStr);
-        
+
         try {
             int hexLen = data.length();
             int wordCount = (hexLen + 3) / 4;
-            
+
             StringBuilder paddedData = new StringBuilder(data.toUpperCase());
             while (paddedData.length() < wordCount * 4) {
                 paddedData.append("0");
             }
-            
-            Log.i(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr + 
-                  " words=" + wordCount);
-            
-            boolean result = reader.writeData(safePwd, bank, ptr, wordCount, 
-                paddedData.toString());
-            
+
+            Log.i(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr
+                    + " words=" + wordCount);
+
+            boolean result = reader.writeData(safePwd, bank, ptr, wordCount,
+                    paddedData.toString());
+
             if (result) {
                 Log.i(TAG, "✅ writeData OK");
             } else {
@@ -729,13 +791,13 @@ private boolean startSingleTagLoop() {
             Log.w(TAG, "readData: reader is null");
             return null;
         }
-        
+
         String safePwd = normalizePwd(pwdStr);
-        
+
         try {
             Log.d(TAG, "📖 readData: bank=" + bank + " ptr=" + ptr + " len=" + len);
             String result = reader.readData(safePwd, bank, ptr, len);
-            
+
             if (result != null && !result.isEmpty()) {
                 Log.d(TAG, "✅ readData OK: " + result);
             } else {
@@ -751,9 +813,9 @@ private boolean startSingleTagLoop() {
     @Override
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         if (reader == null) return false;
-        
+
         String safePwd = normalizePwd(pwdStr);
-        
+
         String lockCode;
         switch (bank) {
             case 0: lockCode = shouldLock ? "C000" : "0000"; break;
@@ -764,7 +826,7 @@ private boolean startSingleTagLoop() {
             case 3: lockCode = shouldLock ? "00C0" : "0000"; break;
             default: return false;
         }
-        
+
         try {
             Log.i(TAG, "🔐 setTagLockState: bank=" + bank + " code=" + lockCode);
             boolean result = reader.lockMem(safePwd, lockCode);
@@ -789,13 +851,13 @@ private boolean startSingleTagLoop() {
         String safePwd = normalizePwd(accessPassword);
         return writeData(safePwd, RFIDWithUHFUART.Bank_EPC, 2, newEpc);
     }
-    
+
     @Override
     public boolean writeUserMemory(int address, String data, String accessPassword) {
-        return writeData(normalizePwd(accessPassword), 
-                         RFIDWithUHFUART.Bank_USER, address, data);
+        return writeData(normalizePwd(accessPassword),
+                RFIDWithUHFUART.Bank_USER, address, data);
     }
-    
+
     @Override
     public String readTid() {
         for (int words : new int[]{6, 5, 4}) {
@@ -816,24 +878,24 @@ private boolean startSingleTagLoop() {
         Log.e(TAG, "❌ TID read FAILED");
         return null;
     }
-    
+
     @Override
     public String readUserMemory(int address, int length) {
         return readData(DEFAULT_PWD, RFIDWithUHFUART.Bank_USER, address, length);
     }
-    
+
     @Override
     public boolean lockTag(String accessPassword) {
-        return setTagLockState(normalizePwd(accessPassword), 
-                               RFIDWithUHFUART.Bank_EPC, true);
+        return setTagLockState(normalizePwd(accessPassword),
+                RFIDWithUHFUART.Bank_EPC, true);
     }
-    
+
     @Override
     public boolean unlockTag(String accessPassword) {
-        return setTagLockState(normalizePwd(accessPassword), 
-                               RFIDWithUHFUART.Bank_EPC, false);
+        return setTagLockState(normalizePwd(accessPassword),
+                RFIDWithUHFUART.Bank_EPC, false);
     }
-    
+
     @Override
     public boolean killTag(String accessPassword) {
         if (reader == null) return false;
