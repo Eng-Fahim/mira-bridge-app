@@ -1,5 +1,7 @@
 package com.example.uhf.navigation;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.activity.OnBackPressedCallback;
@@ -19,18 +21,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * NavigationManager — النسخة النهائية المستقرة
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  NavigationManager v2.0 — Single Source of Truth
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * ✅ يستخدم replace() بدلاً من hide/show
- * ✅ يمسح Back Stack عند الانتقال بين التبويبات الرئيسية
- * ✅ يقرأ الحالة الحقيقية من FragmentManager
- * ✅ يحفظ lastRootTag للرجوع الصحيح
- * ✅ logs تفصيلية للتشخيص
- * ✅ آمن ضد Process Death و Configuration Change
- * ✅ يدعم BackPressInterceptor (للجرد النشط)
+ * التغييرات الجوهرية عن v1.0:
  *
- * ✅ جديد في هذه النسخة:
- * - TAG_GATES (شاشة البوابات من التنقل السفلي)
+ *   1. ✅ FragmentManager = المصدر الوحيد للحقيقة.
+ *      getCurrentFragmentTag() يقرأ منه مباشرة، لا من متغير محلي.
+ *
+ *   2. ✅ إلغاء TAG_SECURE_GATE المكرر — يُستخدَم TAG_GATES فقط،
+ *      مع normalizeTag() لتحويل القديم.
+ *
+ *   3. ✅ getCurrentFragment() يتحقق من isAdded قبل الإرجاع.
+ *
+ *   4. ✅ commitNow() بدلاً من commit() — التنفيذ فوري،
+ *      لا race مع FragmentManager.isStateSaved.
+ *
+ *   5. ✅ notifyExternalChange() — دالة جديدة يُستدعيها المستهلكون
+ *      بعد أي تغيير خارجي في FM (مثل navigation مباشر من fragment).
+ *
+ *   6. ✅ حذف public Fragment currentFragment — قراءة فقط عبر getter.
+ *
+ *   7. ✅ معالجة deferral بذكاء: commitAllowingStateLoss بدلاً من
+ *      إعادة post لا نهائية.
  */
 public class NavigationManager {
 
@@ -43,8 +57,8 @@ public class NavigationManager {
     public static final String TAG_TRANSFERS         = "Transfers";
     public static final String TAG_IDENTITY_STUDIO   = "IdentityStudio";
     public static final String TAG_RADAR             = "Radar";
-    public static final String TAG_SECURE_GATE       = "SecureGate";
-    public static final String TAG_GATES             = "Gates";   // ✅ جديد
+    public static final String TAG_SECURE_GATE       = "SecureGate";  // ← يبقى للتوافق العكسي
+    public static final String TAG_GATES             = "Gates";        // ✅ الرسمي
     public static final String TAG_REPORTS           = "Reports";
     public static final String TAG_ACCOUNTING        = "Accounting";
     public static final String TAG_ADMIN_HUB         = "AdminHub";
@@ -65,7 +79,7 @@ public class NavigationManager {
     // ==================== قائمة التبويبات الرئيسية ====================
     private static final String[] ROOT_TAGS = {
             TAG_DASHBOARD, TAG_INVENTORY, TAG_POS,
-            TAG_GATES, TAG_RADAR, TAG_SECURE_GATE,       // ✅ TAG_GATES بدل TAG_TRANSFERS
+            TAG_GATES, TAG_RADAR,                      // ✅ TAG_GATES فقط (لا SECURE_GATE)
             TAG_REPORTS, TAG_ACCOUNTING, TAG_ADMIN_HUB
     };
 
@@ -73,23 +87,20 @@ public class NavigationManager {
     private final FragmentManager fragmentManager;
     private final PermissionManager permissionManager;
     private final int containerId;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    private String currentFragmentTag = TAG_DASHBOARD;
+    /** ⚠️ cache — لكن getCurrentFragmentTag() لا يعتمد عليه */
+    private String cachedTag = TAG_DASHBOARD;
+
     private String lastRootTag = TAG_DASHBOARD;
     private boolean loggingEnabled = true;
 
-    // ✅ مرجع الـ Fragment الحالي (للتوافق مع UHFMainActivity)
-    public Fragment currentFragment;
-
-    // ✅ مرجع الـ Activity (للـ OnBackPressedDispatcher)
     private FragmentActivity activityRef;
+    private BackPressInterceptor backPressInterceptor;
 
-    // ✅ Interceptor لمعالجة حدث الرجوع (مثل الجرد النشط)
     public interface BackPressInterceptor {
         boolean onBackPressed();
     }
-
-    private BackPressInterceptor backPressInterceptor;
 
     // ==================== Constructor ====================
 
@@ -100,8 +111,6 @@ public class NavigationManager {
         this.permissionManager = permissionManager;
         this.containerId = containerId;
     }
-
-    // ==================== Attach ====================
 
     public void attachToActivity(@NonNull FragmentActivity activity) {
         this.activityRef = activity;
@@ -115,7 +124,65 @@ public class NavigationManager {
         return activityRef;
     }
 
-    // ==================== التنقل الرئيسي ====================
+    // ═══════════════════════════════════════════════════════════════
+    //  🎯 Public API — التزامن
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ [v2.0] يُستدعى بعد أي تغيير خارجي في FragmentManager.
+     *            المستهلك (UHFMainActivity / MiraPosFragment) يستدعيه
+     *            عندما يتلاعب بـ FM مباشرة.
+     */
+    public void notifyExternalChange() {
+        String tag = readTagFromFM();
+        if (tag != null) {
+            cachedTag = tag;
+            if (isRootTag(tag)) lastRootTag = tag;
+            log("🔄 External change → tag=" + tag);
+        }
+    }
+
+    /**
+     * ✅ [v2.0] المصدر الحقيقي — FragmentManager.
+     */
+    @NonNull
+    public String getCurrentFragmentTag() {
+        String tag = readTagFromFM();
+        if (tag != null) {
+            cachedTag = tag;
+            return tag;
+        }
+        return cachedTag;
+    }
+
+    /**
+     * ✅ [v2.0] المصدر الحقيقي — FragmentManager.
+     */
+    @Nullable
+    public Fragment getCurrentFragment() {
+        try {
+            Fragment active = fragmentManager.findFragmentById(containerId);
+            if (active != null && active.isAdded() && !active.isRemoving()) {
+                return active;
+            }
+        } catch (Exception e) {
+            log("getCurrentFragment error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public String getLastRootTag() {
+        // ✅ زامنه مع الواقع
+        String current = getCurrentFragmentTag();
+        if (isRootTag(current)) {
+            lastRootTag = current;
+        }
+        return lastRootTag;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  التنقل الرئيسي
+    // ═══════════════════════════════════════════════════════════════
 
     public void loadFragment(@NonNull Fragment fragment,
                              @NonNull String tag,
@@ -124,159 +191,135 @@ public class NavigationManager {
     }
 
     public void loadFragment(@NonNull Fragment fragment,
-                         @NonNull String tag,
-                         boolean addToBackStack,
-                         boolean forceReload) {
+                             @NonNull String tag,
+                             boolean addToBackStack,
+                             boolean forceReload) {
+        if (fragment == null || tag == null) return;
+        tag = normalizeTag(tag);
 
-    // ✅ إذا كان الـ FM في حالة saved → أجّل التنفيذ
-    if (fragmentManager.isStateSaved()) {
-        log("⏳ FM state saved — deferring loadFragment: " + tag);
-
-        FragmentActivity activity = getActivity();
-        if (activity != null) {
-            activity.getSupportFragmentManager().executePendingTransactions();
-
-            new android.os.Handler(android.os.Looper.getMainLooper())
-                    .post(() -> {
-                        if (fragmentManager.isStateSaved()) {
-                            log("❌ Still saved after defer — aborting: " + tag);
-                            return;
-                        }
-                        loadFragment(fragment, tag, addToBackStack, forceReload);
-                    });
-        } else {
-            log("❌ No activity — cannot defer: " + tag);
-        }
-        return;
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // منطقك الأصلي من هنا — لا تغيير
-    // ═══════════════════════════════════════════════════════
-
-    // 1) نفس الـ Fragment
-    if (!forceReload && tag.equals(currentFragmentTag)) {
-        Fragment existing = fragmentManager.findFragmentByTag(tag);
-        if (existing != null && existing.isVisible()) {
-            log("Already on " + tag + ", skipping");
-            return;
-        }
-    }
-
-    // 2) root tag → امسح الـ Back Stack
-    if (isRootTag(tag)) {
-        lastRootTag = tag;
-        if (!addToBackStack) {
-            clearBackStackInternal();
-        }
-    }
-
-    // 3) أعد استخدام Fragment موجود
-    Fragment existing = fragmentManager.findFragmentByTag(tag);
-    Fragment target = (existing != null) ? existing : fragment;
-
-    // 4) تنفيذ
-    try {
-        logState("BEFORE loadFragment: " + tag);
-
-        FragmentTransaction tx = fragmentManager.beginTransaction();
-        tx.setReorderingAllowed(true);
-        tx.setCustomAnimations(0, 0, 0, 0);
-        tx.replace(containerId, target, tag);
-        tx.setPrimaryNavigationFragment(target);
-
-        if (addToBackStack) {
-            tx.addToBackStack(tag);
+        // 1) نفس الـ Fragment؟
+        if (!forceReload && tag.equals(cachedTag)) {
+            Fragment existing = fragmentManager.findFragmentByTag(tag);
+            if (existing != null && existing.isAdded() && existing.isVisible()) {
+                log("Already on " + tag + ", skipping");
+                return;
+            }
         }
 
-        tx.commit();
-
-        currentFragmentTag = tag;
-        currentFragment = target;
-
-        log("✅ Navigated to: " + tag + " (backStack=" + addToBackStack + ")");
-
-    } catch (IllegalStateException e) {
-        log("loadFragment commit failed: " + e.getMessage());
-    } catch (Exception e) {
-        log("loadFragment error: " + e.getMessage());
-    }
-}
-
-    public void loadFragmentDirectly(@NonNull Fragment fragment, @NonNull String tag) {
-
-    // ✅ defer إذا الـ FM مشغول
-    if (fragmentManager.isStateSaved()) {
-        log("⏳ FM state saved — deferring loadFragmentDirectly: " + tag);
-
-        FragmentActivity activity = getActivity();
-        if (activity != null) {
-            activity.getSupportFragmentManager().executePendingTransactions();
-
-            new android.os.Handler(android.os.Looper.getMainLooper())
-                    .post(() -> {
-                        if (fragmentManager.isStateSaved()) {
-                            log("❌ Still saved after defer — aborting");
-                            return;
-                        }
-                        loadFragmentDirectly(fragment, tag);
-                    });
-        }
-        return;
-    }
-
-        try {
-        logState("BEFORE loadFragmentDirectly: " + tag);
-        clearBackStackInternal();
-
+        // 2) root tag → امسح الـ Back Stack
         if (isRootTag(tag)) {
             lastRootTag = tag;
+            if (!addToBackStack) {
+                clearBackStackInternal();
+            }
         }
 
-        FragmentTransaction tx = fragmentManager.beginTransaction();
-        tx.setReorderingAllowed(true);
-        tx.setCustomAnimations(0, 0, 0, 0);
-        tx.replace(containerId, fragment, tag);
-        tx.setPrimaryNavigationFragment(fragment);
-        tx.commit();
+        // 3) أعد استخدام Fragment موجود
+        Fragment existing = fragmentManager.findFragmentByTag(tag);
+        Fragment target = (existing != null && existing.isAdded())
+                ? existing : fragment;
 
-        currentFragmentTag = tag;
-        currentFragment = fragment;
+        // 4) تنفيذ — مع commitNow
+        try {
+            logState("BEFORE loadFragment: " + tag);
 
-        log("✅ Direct load: " + tag);
+            FragmentTransaction tx = fragmentManager.beginTransaction()
+                    .setReorderingAllowed(true)
+                    .setCustomAnimations(0, 0, 0, 0)
+                    .replace(containerId, target, tag)
+                    .setPrimaryNavigationFragment(target);
 
-    } catch (IllegalStateException e) {
-        log("loadFragmentDirectly commit failed: " + e.getMessage());
-    } catch (Exception e) {
-        log("loadFragmentDirectly error: " + e.getMessage());
+            if (addToBackStack) {
+                tx.addToBackStack(tag);
+            }
+
+            // ✅ commitNow — فوري، لا يبقى في الطابور
+            if (fragmentManager.isStateSaved()) {
+                tx.commitNowAllowingStateLoss();
+                log("⚠️ State saved → used commitNowAllowingStateLoss");
+            } else {
+                tx.commitNow();
+            }
+
+            cachedTag = tag;
+            log("✅ Navigated to: " + tag + " (backStack=" + addToBackStack + ")");
+
+        } catch (IllegalStateException e) {
+            log("loadFragment commit failed: " + e.getMessage());
+        } catch (Exception e) {
+            log("loadFragment error: " + e.getMessage());
+        }
     }
-}
 
-    // ==================== الرجوع ====================
+    public void loadFragmentDirectly(@NonNull Fragment fragment, @NonNull String tag) {
+        if (fragment == null || tag == null) return;
+        tag = normalizeTag(tag);
+
+        try {
+            logState("BEFORE loadFragmentDirectly: " + tag);
+            clearBackStackInternal();
+
+            if (isRootTag(tag)) {
+                lastRootTag = tag;
+            }
+
+            FragmentTransaction tx = fragmentManager.beginTransaction()
+                    .setReorderingAllowed(true)
+                    .setCustomAnimations(0, 0, 0, 0)
+                    .replace(containerId, fragment, tag)
+                    .setPrimaryNavigationFragment(fragment);
+
+            if (fragmentManager.isStateSaved()) {
+                tx.commitNowAllowingStateLoss();
+                log("⚠️ State saved → used commitNowAllowingStateLoss");
+            } else {
+                tx.commitNow();
+            }
+
+            cachedTag = tag;
+            log("✅ Direct load: " + tag);
+
+        } catch (IllegalStateException e) {
+            log("loadFragmentDirectly commit failed: " + e.getMessage());
+        } catch (Exception e) {
+            log("loadFragmentDirectly error: " + e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  الرجوع
+    // ═══════════════════════════════════════════════════════════════
 
     public boolean handleBackPress() {
-        // ✅ 0) استدعِ الـ Interceptor أولاً (للجرد النشط مثلاً)
+        // 0) Interceptor
         if (backPressInterceptor != null && backPressInterceptor.onBackPressed()) {
             return true;
         }
 
-        // ✅ 1) هناك Back Stack → ارجع خطوة واحدة
+        // 1) Back Stack → pop
         if (fragmentManager.getBackStackEntryCount() > 0) {
-            fragmentManager.popBackStackImmediate();
-            updateCurrentTagFromBackStack();
-            log("⬅️ Back pressed → now at: " + currentFragmentTag);
-            return true;
+            try {
+                fragmentManager.popBackStackImmediate();
+                notifyExternalChange();   // ✅ زامن
+                log("⬅️ Back → now at: " + cachedTag);
+                return true;
+            } catch (Exception e) {
+                log("popBackStack error: " + e.getMessage());
+            }
         }
 
-        // ✅ 2) لسنا على آخر root tag → اذهب إليه
-        if (!lastRootTag.equals(currentFragmentTag)) {
+        // 2) لسنا على lastRootTag → اذهب إليه
+        String current = getCurrentFragmentTag();
+        if (!lastRootTag.equals(current)) {
             log("⬅️ Going back to last root: " + lastRootTag);
             Fragment rootFragment = createFragmentByTag(lastRootTag);
-            loadFragmentDirectly(rootFragment, lastRootTag);
-            return true;
+            if (rootFragment != null) {
+                loadFragmentDirectly(rootFragment, lastRootTag);
+                return true;
+            }
         }
 
-        // ✅ 3) نحن على root tag ولا يوجد Back Stack → اترك النظام يقرر
+        // 3) على root — اترك النظام يقرر
         return false;
     }
 
@@ -287,8 +330,9 @@ public class NavigationManager {
             public void handleOnBackPressed() {
                 if (!handleBackPress()) {
                     setEnabled(false);
-                    if (getActivity() != null) {
-                        getActivity().getOnBackPressedDispatcher().onBackPressed();
+                    FragmentActivity activity = getActivity();
+                    if (activity != null) {
+                        activity.getOnBackPressedDispatcher().onBackPressed();
                     }
                 }
             }
@@ -299,7 +343,9 @@ public class NavigationManager {
         loadFragmentDirectly(createFragmentByTag(TAG_DASHBOARD), TAG_DASHBOARD);
     }
 
-    // ==================== دوال مساعدة ====================
+    // ═══════════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════════
 
     private void clearBackStackInternal() {
         if (fragmentManager.getBackStackEntryCount() > 0) {
@@ -313,35 +359,57 @@ public class NavigationManager {
         }
     }
 
-    private void updateCurrentTagFromBackStack() {
-        int count = fragmentManager.getBackStackEntryCount();
-        if (count > 0) {
-            FragmentManager.BackStackEntry entry = fragmentManager.getBackStackEntryAt(count - 1);
-            currentFragmentTag = entry.getName();
-        } else {
-            currentFragmentTag = lastRootTag;
-        }
-
-        // ✅ حدّث currentFragment أيضاً
-        Fragment f = fragmentManager.findFragmentByTag(currentFragmentTag);
-        if (f != null) {
-            currentFragment = f;
-        }
-    }
-
     public boolean isRootTag(String tag) {
         if (tag == null) return false;
+        tag = normalizeTag(tag);
         for (String rootTag : ROOT_TAGS) {
             if (rootTag.equals(tag)) return true;
         }
         return false;
     }
 
-    // ==================== Factory ====================
+    /**
+     * ✅ [v2.0] توحيد الأسماء المتقادمة
+     */
+    private String normalizeTag(String tag) {
+        if (TAG_SECURE_GATE.equals(tag)) return TAG_GATES;
+        return tag;
+    }
+
+    /**
+     * ✅ [v2.0] قراءة حقيقية من FM — لا تُعدِّل أي متغير
+     */
+    @Nullable
+    private String readTagFromFM() {
+        try {
+            // 1) back stack
+            int count = fragmentManager.getBackStackEntryCount();
+            if (count > 0) {
+                String topTag = fragmentManager.getBackStackEntryAt(count - 1).getName();
+                if (topTag != null && !topTag.isEmpty()) {
+                    return normalizeTag(topTag);
+                }
+            }
+
+            // 2) الـ container
+            Fragment active = fragmentManager.findFragmentById(containerId);
+            if (active != null && active.isAdded() && active.getTag() != null) {
+                return normalizeTag(active.getTag());
+            }
+        } catch (Exception e) {
+            log("readTagFromFM error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Factory
+    // ═══════════════════════════════════════════════════════════════
 
     @NonNull
     public Fragment createFragmentByTag(@Nullable String tag) {
         if (tag == null) return new MiraDashboardFragment();
+        tag = normalizeTag(tag);
 
         switch (tag) {
             case TAG_DASHBOARD:         return new MiraDashboardFragment();
@@ -350,8 +418,7 @@ public class NavigationManager {
             case TAG_TRANSFERS:         return new MiraTransferFragment();
             case TAG_IDENTITY_STUDIO:   return new MiraIdentityStudioFragment();
             case TAG_RADAR:             return new MiraUHFRadarLocationFragment();
-            case TAG_SECURE_GATE:       return new MiraSecureGateFragment();
-            case TAG_GATES:             return new MiraSecureGateFragment();  // ✅ جديد
+            case TAG_GATES:             return new MiraSecureGateFragment();  // ✅ موحّد
             case TAG_REPORTS:           return new MiraReportsProFragment();
             case TAG_ACCOUNTING:        return new MiraAccountingFragment();
             case TAG_ADMIN_HUB:         return new MiraAdminHubFragment();
@@ -369,49 +436,21 @@ public class NavigationManager {
             case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
             case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
             default:
-                log("Unknown tag: " + tag + ", falling back to Dashboard");
+                log("Unknown tag: " + tag + " → Dashboard");
                 return new MiraDashboardFragment();
         }
     }
 
-    // ==================== Getters ====================
-
-    public String getCurrentFragmentTag() {
-        int count = fragmentManager.getBackStackEntryCount();
-        if (count > 0) {
-            return fragmentManager.getBackStackEntryAt(count - 1).getName();
-        }
-        return currentFragmentTag;
-    }
-
-    @Nullable
-    public Fragment getCurrentFragment() {
-        if (fragmentManager == null) return currentFragment;
-
-        // أولاً: ابحث بالـ tag الحالي
-        Fragment f = fragmentManager.findFragmentByTag(currentFragmentTag);
-        if (f != null && f.isAdded()) {
-            return f;
-        }
-
-        // ثانياً: fallback
-        return currentFragment;
-    }
-
-    public String getLastRootTag() {
-        return lastRootTag;
-    }
-
-    // ==================== Logging ====================
+    // ═══════════════════════════════════════════════════════════════
+    //  Logging
+    // ═══════════════════════════════════════════════════════════════
 
     public void setLoggingEnabled(boolean enabled) {
         this.loggingEnabled = enabled;
     }
 
     private void log(String message) {
-        if (loggingEnabled) {
-            Log.d(TAG, message);
-        }
+        if (loggingEnabled) Log.d(TAG, message);
     }
 
     private void logState(String operation) {
@@ -420,21 +459,11 @@ public class NavigationManager {
         StringBuilder sb = new StringBuilder();
         sb.append("═══════════════════════════════════════\n");
         sb.append("Operation: ").append(operation).append("\n");
-        sb.append("currentTag: ").append(currentFragmentTag).append("\n");
-        sb.append("lastRootTag: ").append(lastRootTag).append("\n");
-        sb.append("BackStack Count: ").append(fragmentManager.getBackStackEntryCount()).append("\n");
-        sb.append("Fragments in FM: ").append(fragmentManager.getFragments().size()).append("\n");
-
-        List<Fragment> fragments = new ArrayList<>(fragmentManager.getFragments());
-        for (Fragment f : fragments) {
-            if (f != null && f.isAdded()) {
-                sb.append("  - ").append(f.getTag())
-                  .append(" | visible=").append(f.isVisible())
-                  .append(" | hidden=").append(f.isHidden())
-                  .append(" | added=").append(f.isAdded())
-                  .append("\n");
-            }
-        }
+        sb.append("cachedTag: ").append(cachedTag).append("\n");
+        sb.append("realTag:   ").append(readTagFromFM()).append("\n");
+        sb.append("lastRoot:  ").append(lastRootTag).append("\n");
+        sb.append("BackStack: ").append(fragmentManager.getBackStackEntryCount()).append("\n");
+        sb.append("Fragments: ").append(fragmentManager.getFragments().size()).append("\n");
         sb.append("═══════════════════════════════════════");
 
         Log.d(TAG, sb.toString());
