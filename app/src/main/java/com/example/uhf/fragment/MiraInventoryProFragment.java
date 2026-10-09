@@ -464,8 +464,7 @@ try {
     if (rfidManager != null && scanController != null) {
         scanController.attachRfidManager(rfidManager);
 
-        Log.d(TAG, "✅ RFID attached EARLY: "
-                + (rfidManager.getActiveReader() != null ? "READY" : "NOT_READY"));
+        Log.d(TAG, "✅ RFID attached EARLY: state=" + rfidManager.getState());
     }
 } catch (Exception e) {
     Log.e(TAG, "Early RFID init error", e);
@@ -1354,8 +1353,7 @@ private void checkAndExitAfterPause() {
                 try {
                     com.example.uhf.MiraRfid.RFIDManager rfidManager =
                             com.example.uhf.MiraRfid.RFIDManager.getInstance(requireContext());
-                    isConnected = rfidManager != null
-                            && rfidManager.getActiveDevice() != null;
+                    isConnected = rfidManager != null && rfidManager.isReady();
                 } catch (Exception ignored) {}
                 animationHelper.updateStatusBarBackground(statusBar, isConnected, false);
             }
