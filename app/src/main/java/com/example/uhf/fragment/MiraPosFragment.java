@@ -993,22 +993,25 @@ if (btnPosClose != null) {
                 }
 
                 int pos = cartManager.addItem(cartItem);
-                if (pos < 0) {
-                    showToast(getString(R.string.pos_msg_already_in_cart));
-                    resetHeroAfterDelay();
-                    return;
-                }
+if (pos < 0) {
+    showToast(getString(R.string.pos_msg_already_in_cart));
+    resetHeroAfterDelay();
+    return;
+}
 
-                playAlertSound(1);
-                showToast(getString(R.string.pos_msg_added, title));
+playAlertSound(1);
+showToast(getString(R.string.pos_msg_added, title));
 
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.ITEM_ADDED);
-                    if (source != null && source.equals("rfid")) {
-                        heroController.incrementRfidCount();
-                    }
-                }
-                resetHeroAfterDelay();
+// ✅ [إصلاح حرج] فرض تحديث الواجهة فوراً
+forceShowCart();
+
+if (heroController != null) {
+    heroController.setState(PosHeroController.State.ITEM_ADDED);
+    if (source != null && source.equals("rfid")) {
+        heroController.incrementRfidCount();
+    }
+}
+resetHeroAfterDelay();
             });
 
         } catch (Exception e) {
@@ -1037,6 +1040,57 @@ if (btnPosClose != null) {
             }
         }, ITEM_ADDED_DISPLAY_MS);
     }
+    
+    /**
+ * ✅ [إصلاح] فرض عرض السلة فوراً بعد إضافة قطعة
+ *            لا يعتمد على callbacks
+ */
+private void forceShowCart() {
+    safeRun(() -> {
+        try {
+            if (cartManager == null) return;
+            int count = cartManager.size();
+            if (count <= 0) return;
+
+            // إخفاء Hero
+            if (posHeroContainer != null) {
+                posHeroContainer.setVisibility(View.GONE);
+            }
+
+            // إظهار القائمة
+            if (rvCartItems != null) {
+                rvCartItems.setVisibility(View.VISIBLE);
+                if (cartAdapter != null) {
+                    cartAdapter.notifyDataSetChanged();
+                }
+            }
+
+            // إظهار Footer
+            if (posFooterSticky != null) {
+                if (posFooterSticky.getVisibility() != View.VISIBLE) {
+                    posFooterSticky.setVisibility(View.VISIBLE);
+                    posFooterSticky.setAlpha(0f);
+                    posFooterSticky.setTranslationY(300f);
+                    posFooterSticky.animate()
+                            .alpha(1f)
+                            .translationY(0f)
+                            .setDuration(300)
+                            .start();
+                } else {
+                    posFooterSticky.setAlpha(1f);
+                    posFooterSticky.setTranslationY(0f);
+                }
+            }
+
+            // تحديث الملخص
+            updateCartSummary();
+
+            Log.i(TAG, "✅ forceShowCart: count=" + count);
+        } catch (Exception e) {
+            Log.e(TAG, "forceShowCart error", e);
+        }
+    });
+}
 
     // ═══════════════════════════════════════════════════════
     // Cart Summary
@@ -1937,7 +1991,7 @@ private void showExitConfirmation() {
 private void navigateAwayFromPos() {
     try {
         // ═══════════════════════════════════════════════
-        //  1) أوقف كل شيء أولاً
+        //  1) أوقف كل شيء
         // ═══════════════════════════════════════════════
         try { stopRFIDScan(); } catch (Exception ignored) {}
         try { UIKeyboardHide(); } catch (Exception ignored) {}
@@ -1949,50 +2003,39 @@ private void navigateAwayFromPos() {
         // ═══════════════════════════════════════════════
         //  2) تحقق من صحة النشاط
         // ═══════════════════════════════════════════════
-        if (!isAdded() || isRemoving() || isDetached()) {
-            Log.w(TAG, "navigateAwayFromPos: fragment not attached");
-            return;
-        }
-
+        if (!isAdded() || isRemoving() || isDetached()) return;
         if (getActivity() == null || getActivity().isFinishing()
-                || getActivity().isDestroyed()) {
-            Log.w(TAG, "navigateAwayFromPos: activity not valid");
-            return;
-        }
-
-        if (!(getActivity() instanceof UHFMainActivity)) {
-            Log.w(TAG, "navigateAwayFromPos: not in UHFMainActivity");
-            try {
-                getActivity().onBackPressed();
-            } catch (Exception ignored) {}
-            return;
-        }
+                || getActivity().isDestroyed()) return;
+        if (!(getActivity() instanceof UHFMainActivity)) return;
 
         UHFMainActivity activity = (UHFMainActivity) getActivity();
 
         // ═══════════════════════════════════════════════
-        //  3) فعّل التنقل أولاً
+        //  3) فعّل التنقل
         // ═══════════════════════════════════════════════
         activity.setBottomNavVisible(true);
         activity.setNavigationLocked(false);
         activity.clearActiveListeners();
 
         // ═══════════════════════════════════════════════
-        //  4) انتقل للـ Dashboard بأمان
+        //  4) ✅ الحل: loadFragmentDirectly مباشرة (لا goToDashboard)
         // ═══════════════════════════════════════════════
-        if (activity.getNavigationManager() != null) {
-            activity.getNavigationManager().goToDashboard();
-            Log.i(TAG, "✅ Navigated to Dashboard");
-        } else {
-            Log.w(TAG, "NavigationManager null — using fallback");
+        try {
+            MiraDashboardFragment dashboard = new MiraDashboardFragment();
+            activity.loadFragmentDirectly(
+                    dashboard,
+                    NavigationManager.TAG_DASHBOARD);
+            Log.i(TAG, "✅ Navigated to Dashboard (direct)");
+        } catch (Exception e) {
+            Log.e(TAG, "Direct navigation failed, trying NavigationManager", e);
+
+            // fallback: جرّب NavigationManager
             try {
-                activity.loadFragmentDirectly(
-                        new MiraDashboardFragment(),
-                        NavigationManager.TAG_DASHBOARD);
-                Log.i(TAG, "✅ Navigated to Dashboard (fallback)");
-            } catch (Exception e) {
-                Log.e(TAG, "Fallback navigation failed", e);
-                // ⚠️ لا تستدعي onBackPressed — قد يُظهر الشاشة البيضاء
+                if (activity.getNavigationManager() != null) {
+                    activity.getNavigationManager().goToDashboard();
+                }
+            } catch (Exception e2) {
+                Log.e(TAG, "NavigationManager also failed", e2);
             }
         }
 
