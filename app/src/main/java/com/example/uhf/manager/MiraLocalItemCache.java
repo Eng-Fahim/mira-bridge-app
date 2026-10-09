@@ -14,12 +14,6 @@ import java.util.Map;
 
 /**
  * ✅ MiraLocalItemCache v2.0 — مخزن محلي للقطع
- *
- * الإصلاحات:
- *   1. cacheItem: يسجّل بكل المعرّفات (epc, serial, gtin, barcode, id)
- *   2. saveCache: يخزّن العناصر الفريدة فقط (بدون تكرار)
- *   3. loadCache: يعيد بناء الفهرسة كاملة بعد إعادة التشغيل
- *   4. getAllItems: بدون تكرار
  */
 public class MiraLocalItemCache {
 
@@ -67,7 +61,6 @@ public class MiraLocalItemCache {
                 String key = keys.next();
                 JSONObject item = allItems.optJSONObject(key);
                 if (item != null) {
-                    // ✅ أعِد تسجيل العنصر بكل معرّفاته
                     registerItem(item);
                 }
             }
@@ -83,14 +76,10 @@ public class MiraLocalItemCache {
 
     // ==================== Register Item ====================
 
-    /**
-     * ✅ [الإصلاح] يُسجّل العنصر بكل معرّفاته في الفهرس
-     */
     private void registerItem(JSONObject item) {
         if (item == null) return;
 
         try {
-            // استخراج كل المعرّفات الممكنة
             String epc = item.optString("epc", "");
             String rfidEpc = item.optString("rfid_epc", "");
             String serial = item.optString("serial",
@@ -101,16 +90,13 @@ public class MiraLocalItemCache {
             String id = item.optString("id",
                     item.optString("item_id", ""));
 
-            // ✅ المفتاح الأساسي (للتفريد)
             String primaryKey = !epc.isEmpty() ? epc
                     : (!serial.isEmpty() ? "SN:" + serial
                     : (!id.isEmpty() ? "ID:" + id
                     : "UNKNOWN:" + System.identityHashCode(item)));
 
-            // ✅ سجّل في فهرس التفريد
             uniqueItems.put(primaryKey, item);
 
-            // ✅ سجّل في فهرس البحث بكل المعرّفات
             if (!epc.isEmpty()) itemCache.put(epc, item);
             if (!rfidEpc.isEmpty() && !rfidEpc.equals(epc)) {
                 itemCache.put(rfidEpc, item);
@@ -127,23 +113,14 @@ public class MiraLocalItemCache {
 
     // ==================== Cache Operations ====================
 
-    /**
-     * ✅ [الإصلاح] cacheItem — يسجّل بكل المعرّفات
-     *     متوافق مع cacheAllItems
-     */
     public void cacheItem(String code, JSONObject item) {
         if (item == null) return;
 
         try {
-            // ✅ إذا كان الـ code يمثّل معرّفاً إضافياً، سجّله
             if (code != null && !code.isEmpty()) {
                 itemCache.put(code, item);
             }
-
-            // ✅ سجّل بكل المعرّفات الأخرى
             registerItem(item);
-
-            // ✅ احفظ
             saveCache();
 
         } catch (Exception e) {
@@ -151,10 +128,6 @@ public class MiraLocalItemCache {
         }
     }
 
-    /**
-     * ✅ [الإصلاح] cacheAllItems — يحفظ العناصر الفريدة
-     *     ويعيد بناء الفهرس
-     */
     public void cacheAllItems(JSONArray items) {
         if (items == null) return;
 
@@ -178,23 +151,18 @@ public class MiraLocalItemCache {
 
     // ==================== Lookup ====================
 
-    /**
-     * ✅ findItemComprehensive — بحث شامل
-     */
     public JSONObject findItemComprehensive(String code) {
         try {
             if (code == null || code.isEmpty()) return null;
 
             String cleanCode = code.trim();
 
-            // ✅ 1. بحث مباشر
             JSONObject direct = itemCache.get(cleanCode);
             if (direct != null) {
                 Log.d(TAG, "✅ Direct match: " + cleanCode);
                 return direct;
             }
 
-            // ✅ 2. بحث مباشر (case-insensitive)
             for (Map.Entry<String, JSONObject> entry : itemCache.entrySet()) {
                 if (entry.getKey().equalsIgnoreCase(cleanCode)) {
                     Log.d(TAG, "✅ Case-insensitive match: " + cleanCode);
@@ -202,7 +170,6 @@ public class MiraLocalItemCache {
                 }
             }
 
-            // ✅ 3. بحث في الحقول (احتياطي)
             for (JSONObject item : uniqueItems.values()) {
                 if (matchesAnyField(item, cleanCode)) {
                     Log.d(TAG, "✅ Field match: " + cleanCode);
@@ -219,9 +186,6 @@ public class MiraLocalItemCache {
         }
     }
 
-    /**
-     * ✅ [مساعد] هل يطابق العنصر أياً من حقوله؟
-     */
     private boolean matchesAnyField(JSONObject item, String code) {
         try {
             String epc = item.optString("epc", "");
@@ -246,9 +210,6 @@ public class MiraLocalItemCache {
         }
     }
 
-    /**
-     * ✅ findItem — التوافق مع الكود القديم
-     */
     public JSONObject findItem(String code) {
         return findItemComprehensive(code);
     }
@@ -259,7 +220,6 @@ public class MiraLocalItemCache {
         if (epc == null || epc.isEmpty()) return null;
         JSONObject item = itemCache.get(epc);
         if (item != null) return item;
-        // case-insensitive fallback
         for (Map.Entry<String, JSONObject> e : itemCache.entrySet()) {
             if (e.getKey().equalsIgnoreCase(epc)) return e.getValue();
         }
@@ -350,14 +310,10 @@ public class MiraLocalItemCache {
 
     // ==================== Save ====================
 
-    /**
-     * ✅ [الإصلاح] saveCache — يخزّن العناصر الفريدة فقط
-     */
     private void saveCache() {
         try {
             JSONObject allItems = new JSONObject();
 
-            // ✅ خزّن العناصر الفريدة فقط
             for (Map.Entry<String, JSONObject> entry : uniqueItems.entrySet()) {
                 allItems.put(entry.getKey(), entry.getValue());
             }
@@ -373,7 +329,6 @@ public class MiraLocalItemCache {
     // ==================== Utility ====================
 
     public List<JSONObject> getAllItems(int branchId) {
-        // ✅ بدون تكرار — نستخدم uniqueItems
         return new ArrayList<>(uniqueItems.values());
     }
 
@@ -394,119 +349,5 @@ public class MiraLocalItemCache {
         uniqueItems.clear();
         prefs.edit().remove(ITEMS_KEY).apply();
         Log.d(TAG, "🗑️ Cache cleared");
-    }
-                }كود
-     */
-    public JSONObject findByBarcode(String barcode, int branchId) {
-        try {
-            if (barcode == null || barcode.isEmpty()) return null;
-            
-            for (JSONObject item : itemCache.values()) {
-                String itemBarcode = item.optString("barcode", "");
-                if (itemBarcode.equalsIgnoreCase(barcode)) {
-                    return item;
-                }
-            }
-            return null;
-        } catch (Exception e) {
-            Log.e(TAG, "findByBarcode error: " + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * ✅ البحث الشامل - يبحث في جميع الحقول
-     */
-    public JSONObject findItemComprehensive(String code) {
-        try {
-            if (code == null || code.isEmpty()) return null;
-            
-            // ✅ 1. البحث المباشر في المفتاح
-            JSONObject directMatch = itemCache.get(code);
-            if (directMatch != null) {
-                Log.d(TAG, "✅ Direct match: " + code);
-                return directMatch;
-            }
-            
-            // ✅ 2. البحث في جميع الحقول
-            for (JSONObject item : itemCache.values()) {
-                String epc = item.optString("epc", "");
-                String serial = item.optString("serial", item.optString("serial_number", ""));
-                String gtin = item.optString("gtin", item.optString("gtin13", ""));
-                String barcode = item.optString("barcode", "");
-                String rfidEpc = item.optString("rfid_epc", "");
-                String itemId = item.optString("id", item.optString("item_id", ""));
-                
-                if (code.equalsIgnoreCase(epc) || 
-                    code.equalsIgnoreCase(serial) || 
-                    code.equalsIgnoreCase(gtin) || 
-                    code.equalsIgnoreCase(barcode) || 
-                    code.equalsIgnoreCase(rfidEpc) ||
-                    code.equalsIgnoreCase(itemId)) {
-                    Log.d(TAG, "✅ Found in field search: " + code);
-                    return item;
-                }
-            }
-            
-            Log.d(TAG, "❌ Not found: " + code);
-            return null;
-        } catch (Exception e) {
-            Log.e(TAG, "findItemComprehensive error: " + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * ✅ الحصول على جميع العناصر لفرع معين
-     */
-    public java.util.List<JSONObject> getAllItems(int branchId) {
-        java.util.List<JSONObject> items = new java.util.ArrayList<>();
-        try {
-            for (JSONObject item : itemCache.values()) {
-                // ✅ تجنب التكرار
-                boolean exists = false;
-                for (JSONObject existing : items) {
-                    if (existing == item) {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (!exists) {
-                    items.add(item);
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "getAllItems error: " + e.getMessage());
-        }
-        return items;
-    }
-    
-    private void saveCache() {
-        try {
-            JSONObject allItems = new JSONObject();
-            for (Map.Entry<String, JSONObject> entry : itemCache.entrySet()) {
-                allItems.put(entry.getKey(), entry.getValue());
-            }
-            prefs.edit().putString(ITEMS_KEY, allItems.toString()).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "saveCache error: " + e.getMessage());
-        }
-    }
-    
-    public void updateLastSyncTime() {
-        prefs.edit().putLong(LAST_SYNC_KEY, System.currentTimeMillis()).apply();
-    }
-    
-    public long getLastSyncTime() {
-        return prefs.getLong(LAST_SYNC_KEY, 0);
-    }
-    
-    public int getCachedItemCount() {
-        return itemCache.size();
-    }
-    
-    public void clearCache() {
-        itemCache.clear();
-        prefs.edit().remove(ITEMS_KEY).apply();
     }
 }
