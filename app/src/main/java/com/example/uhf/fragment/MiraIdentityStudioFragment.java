@@ -83,6 +83,9 @@ private static final long RFID_TIMEOUT_MS = 30000;
 private static final int MIN_TID_LENGTH = 12;
 private static final int MAX_TID_LENGTH = 32;
 private static final int MAX_PHOTOS = 5;
+/** ✅ [جديد] هل EPC مربوط حالياً؟ (يمنع إعادة المسح التلقائي) */
+private volatile boolean isEpcBound = false;
+
 
 // ⚠️ مؤقت: تعطيل فحص طول TID لدعم شرائح ذات TID قصير (مثل "2020")
 //    أعد القيمة إلى true لتفعيل الفحص مجدداً
@@ -706,6 +709,22 @@ private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
                     showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
                 }
             });
+            
+            // ✅ [جديد] عند تغيير EPC يدوياً، أعِد تعيين الربط
+if (binding.etEpc != null) {
+    binding.etEpc.addTextChangedListener(new TextWatcher() {
+        @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+        @Override public void afterTextChanged(Editable s) {}
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+            // إذا المستخدم حذف الحقل، أعِد تعيين الربط
+            if (s.length() == 0 && isEpcBound) {
+                isEpcBound = false;
+                Log.d(TAG, "🔓 EPC unbound (field cleared)");
+            }
+        }
+    });
+}
 
             binding.btnSaveIdentity.setOnClickListener(v -> {
                 if (isFormLocked) {
@@ -754,20 +773,27 @@ private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
     }
 
     // ==================== RFID ====================
-
-    private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
+private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
+    // ✅ [إصلاح] لا تعالج إذا كان EPC مربوطاً مسبقاً
+    if (isEpcBound && binding != null && binding.etEpc != null) {
+        String existing = binding.etEpc.getText() != null
+                ? binding.etEpc.getText().toString().trim() : "";
+        if (!existing.isEmpty()) {
+            Log.d(TAG, "⏭️ processRfidTagAsync: EPC already bound (" 
+                    + existing + ") — skipping re-read");
+            safeRun(() -> stopRfidScanningMode());
+            return;
+        }
+    }
+    
     if (appContext == null) {
         safeRun(() -> {
             playErrorSound();
-            showErrorDialog(
-                    isArabic ? "❌ خطأ داخلي" : "❌ Internal Error",
-                    isArabic ? "لم يتم تهيئة السياق" : "Context not initialized"
-            );
+            showErrorDialog(...);
             stopRfidScanningMode();
         });
         return;
     }
-
     miraExecutor.getBackgroundExecutor().execute(() -> {
         try {
             MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
@@ -1007,13 +1033,26 @@ private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
                     return;
                 }
 
-                if (binding.etEpc != null) {
-                    binding.etEpc.setText(epc);
-                    binding.etEpc.setTag(epc);
-                }
-                if (binding.tvStatusBadge != null) {
-                    binding.tvStatusBadge.setText("BOUND");
-                }
+                // ✅ [إصلاح] لا تستبدل EPC إذا كان مربوطاً
+if (isEpcBound && binding.etEpc != null) {
+    String existing = binding.etEpc.getText() != null
+            ? binding.etEpc.getText().toString().trim() : "";
+    if (!existing.isEmpty() && !existing.equals(epc)) {
+        Log.w(TAG, "⚠️ Ignoring new EPC (" + epc +
+                ") because field is already bound to: " + existing);
+        return;
+    }
+}
+
+if (binding.etEpc != null) {
+    binding.etEpc.setText(epc);
+    binding.etEpc.setTag(epc);
+    isEpcBound = true;  // ✅ علّم الربط
+}
+if (binding.tvStatusBadge != null) {
+    binding.tvStatusBadge.setText("BOUND");
+}
+
 
                 Log.i(TAG, "✅ Tag accepted: " + epc);
                 playSuccessSound();
@@ -1063,14 +1102,20 @@ private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
     }
 
     public void onRfidScanned(String epc) {
-        if (!isAdded() || getActivity() == null) return;
+    if (!isAdded() || getActivity() == null) return;
 
-        final String scannedEpc = epc != null ?
-                epc.trim().toUpperCase(Locale.US) : "";
-        Log.i(TAG, "📡 onRfidScanned (EPC ignored: " + scannedEpc + ")");
-
-        processRfidTagAsync(false);
+    // ✅ [إصلاح] لا تعالج إذا EPC مربوط
+    if (isEpcBound) {
+        Log.d(TAG, "⏭️ onRfidScanned: EPC already bound — ignoring trigger");
+        return;
     }
+
+    final String scannedEpc = epc != null ?
+            epc.trim().toUpperCase(Locale.US) : "";
+    Log.i(TAG, "📡 onRfidScanned (EPC ignored: " + scannedEpc + ")");
+
+    processRfidTagAsync(false);
+}
 
     // ==================== الاقتراحات ====================
 
@@ -1254,6 +1299,7 @@ private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
                                     binding.tvStatusBadge.setText("BOUND");
                                 }
                             }
+                            isEpcBound = true;  // ✅ علّم الربط
                             playSuccessSound();
                             Log.i(TAG, "✅ Barcode accepted: " + scannedCode);
                         }
@@ -2127,6 +2173,7 @@ if (ENABLE_TID_LENGTH_VALIDATION) {
     // ==================== إعادة تعيين النموذج ====================
 
     private void resetFormForNextScan() {
+    isEpcBound = false;  // ✅ أعِد التعيين
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post(this::resetFormForNextScan);
             return;
@@ -2447,9 +2494,13 @@ if (ENABLE_TID_LENGTH_VALIDATION) {
             handler.postDelayed(() -> {
                 if (!isAdded() || binding == null || isRemoving()) return;
                 performOnResumeSetup();
-                if (!isRfidScanning && !isFormLocked && !stoppingReader.get()) {
-                    autoStartRfidScanning();
-                }
+
+// ✅ [إصلاح] لا تبدأ المسح التلقائي إذا EPC مربوط بالفعل
+if (!isRfidScanning && !isFormLocked && !stoppingReader.get() && !isEpcBound) {
+    autoStartRfidScanning();
+} else if (isEpcBound) {
+    Log.d(TAG, "⏭️ Auto-scan skipped: EPC is already bound");
+}
             }, 100);
             return;
         }
@@ -2461,22 +2512,47 @@ if (ENABLE_TID_LENGTH_VALIDATION) {
     }
 
     private void autoStartRfidScanning() {
+    if (isDestroyed() || !isAdded() || binding == null) return;
+    if (isFormLocked || isRfidScanning || stoppingReader.get()) return;
+
+    // ✅ [إصلاح] لا تبدأ إذا EPC مربوط
+    if (isEpcBound) {
+        Log.d(TAG, "⏭️ autoStartRfidScanning: EPC already bound — skip");
+        return;
+    }
+
+    // ✅ [إصلاح] لا تبدأ إذا الحقل يحتوي على قيمة
+    if (binding.etEpc != null) {
+        String currentText = binding.etEpc.getText() != null
+                ? binding.etEpc.getText().toString().trim() : "";
+        if (!currentText.isEmpty()) {
+            Log.d(TAG, "⏭️ autoStartRfidScanning: etEpc has value (" +
+                    currentText + ") — skip");
+            return;
+        }
+    }
+
+    handler.postDelayed(() -> {
         if (isDestroyed() || !isAdded() || binding == null) return;
         if (isFormLocked || isRfidScanning || stoppingReader.get()) return;
+        if (isEpcBound) return;
+        if (getActivity() == null || getActivity().isFinishing()) return;
 
-        handler.postDelayed(() -> {
-            if (isDestroyed() || !isAdded() || binding == null) return;
-            if (isFormLocked || isRfidScanning || stoppingReader.get()) return;
-            if (getActivity() == null || getActivity().isFinishing()) return;
+        // ✅ [إصلاح] فحص أخير: الحقل ما زال فارغاً
+        if (binding.etEpc != null) {
+            String currentText = binding.etEpc.getText() != null
+                    ? binding.etEpc.getText().toString().trim() : "";
+            if (!currentText.isEmpty()) return;
+        }
 
-            try {
-                Log.i(TAG, "🚀 Auto-starting RFID scan for encoding");
-                activateRFIDModeForEncoding();
-            } catch (Exception e) {
-                Log.e(TAG, "autoStartRfidScanning error: " + e.getMessage());
-            }
-        }, 800);
-    }
+        try {
+            Log.i(TAG, "🚀 Auto-starting RFID scan for encoding");
+            activateRFIDModeForEncoding();
+        } catch (Exception e) {
+            Log.e(TAG, "autoStartRfidScanning error: " + e.getMessage());
+        }
+    }, 800);
+}
 
     private boolean isDestroyed() {
         return isRemoving() || isDetached() || !isAdded();
