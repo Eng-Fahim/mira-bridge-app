@@ -7,7 +7,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-// ✅ [v4.0.1] استيرادات مطلوبة لـ addListener/removeListener
+// ✅ استيرادات مطلوبة لـ addListener/removeListener
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -28,22 +28,17 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  RFIDManager v4.0.1 — State Machine + Backward Compatibility
+ *  RFIDManager v4.0.2 — State Machine + Backward Compatibility (Fixed)
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * التغييرات الجوهرية عن v3.2:
- *
- *   1. ✅ State Machine صريح (UNINITIALIZED/INITIALIZING/READY/SCANNING/ERROR)
- *   2. ✅ ensureReady(callback) — نقطة دخول وحيدة، idempotent، غير حاجبة
- *   3. ✅ getActiveReader() لا يُعيد قارئاً غير متصل أبداً
- *   4. ✅ تزامن كامل بين كل الـ consumers عبر StateListeners
- *   5. ✅ addListener / removeListener متعددون (CompositeListener)
- *   6. ✅ لا static flags من BaseTabFragmentActivity تُقرأ مباشرة
+ * [v4.0.2] إصلاحات:
+ *   ✅ startScan() no-arg — تُعيد boolean (للتوافق مع HardwareManager)
  *
  * [v4.0.1] طبقة التوافق العكسي:
- *   ✅ startScan() no-arg — تُفوّض إلى startScan(callback)
- *   ✅ release() — تُفوّض إلى reset()
- *   ✅ testConnection(RFIDDevice) — تفحص جاهزية القارئ الحالي
+ *   ✅ addListener / removeListener
+ *   ✅ startScan(ReadyCallback) / startScan() / stopScan()
+ *   ✅ release() / reset()
+ *   ✅ testConnection / waitForReaderReady / isRealReaderConnected
  */
 public class RFIDManager {
 
@@ -112,11 +107,11 @@ public class RFIDManager {
     private final List<StateListener> stateListeners =
             new CopyOnWriteArrayList<>();
 
-    // ✅ [v4.0.1] مستمعون متعددون
+    // ✅ مستمعون متعددون
     private final List<MiraIRFIDReader.OnTagReadListener> tagReadListeners =
             new CopyOnWriteArrayList<>();
 
-    // ✅ [v4.0.1] مستمع مركّب — يُوزّع الأحداث على كل المستمعين
+    // ✅ مستمع مركّب — يُوزّع الأحداث على كل المستمعين
     private final MiraIRFIDReader.OnTagReadListener compositeListener =
             new MiraIRFIDReader.OnTagReadListener() {
         @Override
@@ -195,7 +190,6 @@ public class RFIDManager {
                 mainHandler.post(() -> safeOnReady(callback, reader));
                 return;
             }
-            // حالة غير متسقة
             Log.w(TAG, "⚠️ State=" + current + " but reader=null — resetting");
             state.set(State.UNINITIALIZED);
             current = State.UNINITIALIZED;
@@ -395,7 +389,7 @@ public class RFIDManager {
     //  📡 Scan API
     // ═══════════════════════════════════════════════════════════
 
-    /** ✅ [v4.0.1] إضافة مستمع — لا يستبدل الموجودين */
+    /** ✅ إضافة مستمع — لا يستبدل الموجودين */
     public void addListener(@NonNull MiraIRFIDReader.OnTagReadListener listener) {
         if (listener == null) return;
         if (!tagReadListeners.contains(listener)) {
@@ -405,7 +399,7 @@ public class RFIDManager {
         ensureCompositeAttached();
     }
 
-    /** ✅ [v4.0.1] إزالة مستمع */
+    /** ✅ إزالة مستمع */
     public void removeListener(@Nullable MiraIRFIDReader.OnTagReadListener listener) {
         if (listener == null) return;
         if (tagReadListeners.remove(listener)) {
@@ -431,7 +425,8 @@ public class RFIDManager {
     }
 
     /**
-     * ✅ startScan — يضمن الجاهزية ثم يبدأ.
+     * ✅ startScan — النسخة الحديثة (callback-based).
+     *    يضمن الجاهزية ثم يبدأ المسح.
      */
     public void startScan(final ReadyCallback callback) {
         if (callback == null) return;
@@ -459,6 +454,33 @@ public class RFIDManager {
                 safeOnError(callback, reason);
             }
         });
+    }
+
+    /**
+     * ✅ [v4.0.2] startScan() — النسخة القديمة.
+     *
+     * تُعيد:
+     *   - true  → القارئ كان جاهزاً، وبدأ المسح.
+     *   - false → لم يكن جاهزاً (سيبدأ تلقائياً عند الجاهزية).
+     *
+     * @deprecated استخدم startScan(ReadyCallback)
+     */
+    @Deprecated
+    public boolean startScan() {
+        boolean wasReady = isReady();
+
+        startScan(new ReadyCallback() {
+            @Override
+            public void onReady(MiraIRFIDReader reader) {
+                Log.d(TAG, "✅ [legacy startScan] reader ready");
+            }
+            @Override
+            public void onError(String reason) {
+                Log.w(TAG, "⚠️ [legacy startScan] failed: " + reason);
+            }
+        });
+
+        return wasReady;
     }
 
     public void stopScan() {
@@ -705,27 +727,8 @@ public class RFIDManager {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ [v4.0.1] Backward-Compatibility Layer
-    //  لتجنب تعديل MiraUHFReadTagFragment + GateSecurityService
+    //  ✅ [v4.0.2] Backward-Compatibility Layer
     // ═══════════════════════════════════════════════════════════
-
-    /**
-     * ✅ نسخة قديمة من startScan — بدون callback.
-     * @deprecated استخدم startScan(ReadyCallback)
-     */
-    @Deprecated
-    public void startScan() {
-        startScan(new ReadyCallback() {
-            @Override
-            public void onReady(MiraIRFIDReader reader) {
-                Log.d(TAG, "✅ [legacy startScan] reader ready");
-            }
-            @Override
-            public void onError(String reason) {
-                Log.w(TAG, "⚠️ [legacy startScan] failed: " + reason);
-            }
-        });
-    }
 
     /**
      * ✅ نسخة قديمة من release — استُبدلت بـ reset().
