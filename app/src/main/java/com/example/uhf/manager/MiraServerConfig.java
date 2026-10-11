@@ -18,7 +18,7 @@ public class MiraServerConfig {
     private static final String KEY_AUTH_TOKEN = "auth_token";
     
     // ✅ إضافة العنوان الافتراضي كـ constant
-    private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json/";
+    private static final String DEFAULT_BASE_URL = "https://id.ibreg.org/wp-json/";
     
     private static MiraServerConfig instance;
     private final SharedPreferences prefs;
