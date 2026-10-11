@@ -632,7 +632,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         } catch (Exception ignored) {}
         return null;
     }
-}
+
 
 // ═══════════════════════════════════════════════════════════════════
 //  Views Binding
@@ -2806,73 +2806,45 @@ private void applyPermissions() {
      *   - الاستبدال المباشر مضمون — نتحكم في كل الخطوات.
      */
     private void navigateAwayFromPos() {
-        try {
-            // ═══════════════════════════════════════════════════════
-            //  1) أوقف كل شيء
-            // ═══════════════════════════════════════════════════════
-            try { stopRFIDScan(); } catch (Exception ignored) {}
-            try { UIKeyboardHide(); } catch (Exception ignored) {}
+    try {
+        try { stopRFIDScan(); } catch (Exception ignored) {}
+        try { UIKeyboardHide(); } catch (Exception ignored) {}
 
-            currentScanMode = ScanMode.NONE;
-            stopAfterFirstRead = false;
-            oneShotConsumed.set(false);
+        currentScanMode = ScanMode.NONE;
+        stopAfterFirstRead = false;
+        oneShotConsumed.set(false);
 
-            // ═══════════════════════════════════════════════════════
-            //  2) تحقق من الصحة
-            // ═══════════════════════════════════════════════════════
-            if (!isAdded() || isRemoving() || isDetached()) return;
-            if (getActivity() == null || getActivity().isFinishing()
-                    || getActivity().isDestroyed()) return;
+        if (!isAdded() || isRemoving() || isDetached()) return;
+        if (getActivity() == null || getActivity().isFinishing()
+                || getActivity().isDestroyed()) return;
 
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
+        UHFMainActivity activity = (UHFMainActivity) getActivity();
 
-            // ═══════════════════════════════════════════════════════
-            //  3) أظهر BottomNav + فعّل التنقل
-            // ═══════════════════════════════════════════════════════
-            activity.setBottomNavVisible(true);
-            activity.setNavigationLocked(false);
-            activity.clearActiveListeners();
+        activity.setBottomNavVisible(true);
+        activity.setNavigationLocked(false);
+        activity.clearActiveListeners();
 
-            // ═══════════════════════════════════════════════════════
-            //  4) استبدال مباشر
-            // ═══════════════════════════════════════════════════════
-            androidx.fragment.app.FragmentManager fm =
-                    activity.getSupportFragmentManager();
+        // ✅ [v6.1] فوّض التنقل لـ NavigationManager
+        NavigationManager nav = activity.getNavigationManager();
 
-            if (fm == null) {
-                Log.e(TAG, "FragmentManager null — forcing activity restart");
-                forceRestartActivity(activity);
-                return;
-            }
-
-            MiraDashboardFragment dashboard = new MiraDashboardFragment();
-
-            if (fm.isStateSaved()) {
-                fm.beginTransaction()
-                        .replace(R.id.fragment_container, dashboard,
-                                NavigationManager.TAG_DASHBOARD)
-                        .commitAllowingStateLoss();
-            } else {
-                fm.beginTransaction()
-                        .replace(R.id.fragment_container, dashboard,
-                                NavigationManager.TAG_DASHBOARD)
-                        .commitNowAllowingStateLoss();
-            }
-
-            updateBottomNavToHome(activity);
-
-            Log.i(TAG, "✅ Navigated to Dashboard (direct replace)");
-
-        } catch (Exception e) {
-            Log.e(TAG, "navigateAwayFromPos error", e);
-            // 🛡️ الملاذ الأخير
-            try {
-                if (getActivity() instanceof UHFMainActivity) {
-                    forceRestartActivity((UHFMainActivity) getActivity());
-                }
-            } catch (Exception ignored) {}
+        if (nav != null) {
+            nav.goToDashboard();
+            activity.syncCurrentFragment();   // ← نُضيفها public في UHFMainActivity
+            Log.i(TAG, "✅ Navigated to Dashboard via NavigationManager");
+        } else {
+            // fallback (نادر)
+            Log.w(TAG, "⚠️ NavigationManager null — direct replace");
+            forceRestartActivity(activity);
         }
+    } catch (Exception e) {
+        Log.e(TAG, "navigateAwayFromPos error", e);
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                forceRestartActivity((UHFMainActivity) getActivity());
+            }
+        } catch (Exception ignored) {}
     }
+}
 
     private void updateBottomNavToHome(UHFMainActivity activity) {
         try {
