@@ -22,29 +22,27 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  NavigationManager v2.0 — Single Source of Truth
+ *  NavigationManager v2.1 — Single Source of Truth (Fixed)
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * التغييرات الجوهرية عن v1.0:
+ * التغيير الجوهري في v2.1:
  *
- *   1. ✅ FragmentManager = المصدر الوحيد للحقيقة.
- *      getCurrentFragmentTag() يقرأ منه مباشرة، لا من متغير محلي.
+ *   🔴 [FIX] loadFragment() كان يستدعي commitNow() حتى مع addToBackStack=true.
+ *            وهذا يرمي IllegalStateException دائماً:
+ *            "This transaction is already being added to the back stack"
  *
- *   2. ✅ إلغاء TAG_SECURE_GATE المكرر — يُستخدَم TAG_GATES فقط،
- *      مع normalizeTag() لتحويل القديم.
+ *            النتيجة: جميع عناصر الهيدر لم تعمل (GoldRates, Profile, ReaderControl,...).
  *
- *   3. ✅ getCurrentFragment() يتحقق من isAdded قبل الإرجاع.
+ *            الحل: التفريق بين الحالتين:
+ *              - مع backStack → commit() / commitAllowingStateLoss()
+ *              - بدون backStack → commitNow() / commitNowAllowingStateLoss()
  *
- *   4. ✅ commitNow() بدلاً من commit() — التنفيذ فوري،
- *      لا race مع FragmentManager.isStateSaved.
- *
- *   5. ✅ notifyExternalChange() — دالة جديدة يُستدعيها المستهلكون
- *      بعد أي تغيير خارجي في FM (مثل navigation مباشر من fragment).
- *
- *   6. ✅ حذف public Fragment currentFragment — قراءة فقط عبر getter.
- *
- *   7. ✅ معالجة deferral بذكاء: commitAllowingStateLoss بدلاً من
- *      إعادة post لا نهائية.
+ * باقي الميزات من v2.0:
+ *   ✅ FragmentManager = المصدر الوحيد للحقيقة
+ *   ✅ TAG_GATES موحّد
+ *   ✅ getCurrentFragment() يتحقق من isAdded
+ *   ✅ notifyExternalChange()
+ *   ✅ لا public Fragment currentFragment
  */
 public class NavigationManager {
 
@@ -57,8 +55,8 @@ public class NavigationManager {
     public static final String TAG_TRANSFERS         = "Transfers";
     public static final String TAG_IDENTITY_STUDIO   = "IdentityStudio";
     public static final String TAG_RADAR             = "Radar";
-    public static final String TAG_SECURE_GATE       = "SecureGate";  // ← يبقى للتوافق العكسي
-    public static final String TAG_GATES             = "Gates";        // ✅ الرسمي
+    public static final String TAG_SECURE_GATE       = "SecureGate";
+    public static final String TAG_GATES             = "Gates";
     public static final String TAG_REPORTS           = "Reports";
     public static final String TAG_ACCOUNTING        = "Accounting";
     public static final String TAG_ADMIN_HUB         = "AdminHub";
@@ -79,7 +77,7 @@ public class NavigationManager {
     // ==================== قائمة التبويبات الرئيسية ====================
     private static final String[] ROOT_TAGS = {
             TAG_DASHBOARD, TAG_INVENTORY, TAG_POS,
-            TAG_GATES, TAG_RADAR,                      // ✅ TAG_GATES فقط (لا SECURE_GATE)
+            TAG_GATES, TAG_RADAR,
             TAG_REPORTS, TAG_ACCOUNTING, TAG_ADMIN_HUB
     };
 
@@ -89,9 +87,7 @@ public class NavigationManager {
     private final int containerId;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    /** ⚠️ cache — لكن getCurrentFragmentTag() لا يعتمد عليه */
     private String cachedTag = TAG_DASHBOARD;
-
     private String lastRootTag = TAG_DASHBOARD;
     private boolean loggingEnabled = true;
 
@@ -128,11 +124,6 @@ public class NavigationManager {
     //  🎯 Public API — التزامن
     // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * ✅ [v2.0] يُستدعى بعد أي تغيير خارجي في FragmentManager.
-     *            المستهلك (UHFMainActivity / MiraPosFragment) يستدعيه
-     *            عندما يتلاعب بـ FM مباشرة.
-     */
     public void notifyExternalChange() {
         String tag = readTagFromFM();
         if (tag != null) {
@@ -142,9 +133,6 @@ public class NavigationManager {
         }
     }
 
-    /**
-     * ✅ [v2.0] المصدر الحقيقي — FragmentManager.
-     */
     @NonNull
     public String getCurrentFragmentTag() {
         String tag = readTagFromFM();
@@ -155,9 +143,6 @@ public class NavigationManager {
         return cachedTag;
     }
 
-    /**
-     * ✅ [v2.0] المصدر الحقيقي — FragmentManager.
-     */
     @Nullable
     public Fragment getCurrentFragment() {
         try {
@@ -172,7 +157,6 @@ public class NavigationManager {
     }
 
     public String getLastRootTag() {
-        // ✅ زامنه مع الواقع
         String current = getCurrentFragmentTag();
         if (isRootTag(current)) {
             lastRootTag = current;
@@ -219,7 +203,7 @@ public class NavigationManager {
         Fragment target = (existing != null && existing.isAdded())
                 ? existing : fragment;
 
-        // 4) تنفيذ — مع commitNow
+        // 4) تنفيذ
         try {
             logState("BEFORE loadFragment: " + tag);
 
@@ -233,21 +217,40 @@ public class NavigationManager {
                 tx.addToBackStack(tag);
             }
 
-            // ✅ commitNow — فوري، لا يبقى في الطابور
-            if (fragmentManager.isStateSaved()) {
-                tx.commitNowAllowingStateLoss();
-                log("⚠️ State saved → used commitNowAllowingStateLoss");
+            // ✅✅✅ [v2.1 CRITICAL FIX]
+            //    commitNow() و commitNowAllowingStateLoss() لا يمكن استخدامهما
+            //    عندما يكون addToBackStack=true (يرمي IllegalStateException).
+            //
+            //    لذلك نختار الدالة المناسبة حسب addToBackStack:
+            //      - مع backStack → commit() / commitAllowingStateLoss()
+            //      - بدون backStack → commitNow() / commitNowAllowingStateLoss()
+            if (addToBackStack) {
+                // لا commitNow — استخدم commit
+                if (fragmentManager.isStateSaved()) {
+                    tx.commitAllowingStateLoss();
+                    log("✅ commitAllowingStateLoss (hasBackStack)");
+                } else {
+                    tx.commit();
+                    log("✅ commit (hasBackStack)");
+                }
             } else {
-                tx.commitNow();
+                // بدون backStack — commitNow آمن
+                if (fragmentManager.isStateSaved()) {
+                    tx.commitNowAllowingStateLoss();
+                    log("✅ commitNowAllowingStateLoss (noBackStack)");
+                } else {
+                    tx.commitNow();
+                    log("✅ commitNow (noBackStack)");
+                }
             }
 
             cachedTag = tag;
             log("✅ Navigated to: " + tag + " (backStack=" + addToBackStack + ")");
 
         } catch (IllegalStateException e) {
-            log("loadFragment commit failed: " + e.getMessage());
+            Log.e(TAG, "❌ loadFragment FAILED: " + e.getMessage(), e);
         } catch (Exception e) {
-            log("loadFragment error: " + e.getMessage());
+            Log.e(TAG, "❌ loadFragment error: " + e.getMessage(), e);
         }
     }
 
@@ -269,20 +272,22 @@ public class NavigationManager {
                     .replace(containerId, fragment, tag)
                     .setPrimaryNavigationFragment(fragment);
 
+            // لا backStack هنا → commitNow آمن
             if (fragmentManager.isStateSaved()) {
                 tx.commitNowAllowingStateLoss();
-                log("⚠️ State saved → used commitNowAllowingStateLoss");
+                log("✅ commitNowAllowingStateLoss (direct)");
             } else {
                 tx.commitNow();
+                log("✅ commitNow (direct)");
             }
 
             cachedTag = tag;
             log("✅ Direct load: " + tag);
 
         } catch (IllegalStateException e) {
-            log("loadFragmentDirectly commit failed: " + e.getMessage());
+            Log.e(TAG, "❌ loadFragmentDirectly FAILED: " + e.getMessage(), e);
         } catch (Exception e) {
-            log("loadFragmentDirectly error: " + e.getMessage());
+            Log.e(TAG, "❌ loadFragmentDirectly error: " + e.getMessage(), e);
         }
     }
 
@@ -291,16 +296,14 @@ public class NavigationManager {
     // ═══════════════════════════════════════════════════════════════
 
     public boolean handleBackPress() {
-        // 0) Interceptor
         if (backPressInterceptor != null && backPressInterceptor.onBackPressed()) {
             return true;
         }
 
-        // 1) Back Stack → pop
         if (fragmentManager.getBackStackEntryCount() > 0) {
             try {
                 fragmentManager.popBackStackImmediate();
-                notifyExternalChange();   // ✅ زامن
+                notifyExternalChange();
                 log("⬅️ Back → now at: " + cachedTag);
                 return true;
             } catch (Exception e) {
@@ -308,7 +311,6 @@ public class NavigationManager {
             }
         }
 
-        // 2) لسنا على lastRootTag → اذهب إليه
         String current = getCurrentFragmentTag();
         if (!lastRootTag.equals(current)) {
             log("⬅️ Going back to last root: " + lastRootTag);
@@ -319,7 +321,6 @@ public class NavigationManager {
             }
         }
 
-        // 3) على root — اترك النظام يقرر
         return false;
     }
 
@@ -368,21 +369,14 @@ public class NavigationManager {
         return false;
     }
 
-    /**
-     * ✅ [v2.0] توحيد الأسماء المتقادمة
-     */
     private String normalizeTag(String tag) {
         if (TAG_SECURE_GATE.equals(tag)) return TAG_GATES;
         return tag;
     }
 
-    /**
-     * ✅ [v2.0] قراءة حقيقية من FM — لا تُعدِّل أي متغير
-     */
     @Nullable
     private String readTagFromFM() {
         try {
-            // 1) back stack
             int count = fragmentManager.getBackStackEntryCount();
             if (count > 0) {
                 String topTag = fragmentManager.getBackStackEntryAt(count - 1).getName();
@@ -391,7 +385,6 @@ public class NavigationManager {
                 }
             }
 
-            // 2) الـ container
             Fragment active = fragmentManager.findFragmentById(containerId);
             if (active != null && active.isAdded() && active.getTag() != null) {
                 return normalizeTag(active.getTag());
@@ -418,7 +411,7 @@ public class NavigationManager {
             case TAG_TRANSFERS:         return new MiraTransferFragment();
             case TAG_IDENTITY_STUDIO:   return new MiraIdentityStudioFragment();
             case TAG_RADAR:             return new MiraUHFRadarLocationFragment();
-            case TAG_GATES:             return new MiraSecureGateFragment();  // ✅ موحّد
+            case TAG_GATES:             return new MiraSecureGateFragment();
             case TAG_REPORTS:           return new MiraReportsProFragment();
             case TAG_ACCOUNTING:        return new MiraAccountingFragment();
             case TAG_ADMIN_HUB:         return new MiraAdminHubFragment();
