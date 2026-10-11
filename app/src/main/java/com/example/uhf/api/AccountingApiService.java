@@ -9,7 +9,7 @@ import retrofit2.http.*;
 
 /**
  * ✅ خدمة API المحاسبة
- * Base URL: https://sa.mirabarcode.com/wp-json/mira/v2/
+ * Base URL: https://id.ibreg.org/wp-json/mira/v2/
  *
  * @version 2.1.0 (FINAL)
  */
