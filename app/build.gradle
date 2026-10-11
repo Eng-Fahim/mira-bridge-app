@@ -16,9 +16,9 @@ android {
         buildConfigField "boolean", "Test", "false"
         buildConfigField "boolean", "ENABLE_LOGGING", "false"
 
-        buildConfigField "String", "DEFAULT_SERVER_URL", '"https://sa.mirabarcode.com/wp-json"'
+        buildConfigField "String", "DEFAULT_SERVER_URL", '"https://id.ibreg.org/wp-json"'
         buildConfigField "String", "API_NAMESPACE", '"mira/v2"'
-        buildConfigField "String", "API_BASE_URL", '"https://sa.mirabarcode.com/wp-json/mira/v2/"'
+        buildConfigField "String", "API_BASE_URL", '"https://id.ibreg.org/wp-json/mira/v2/"'
         buildConfigField "boolean", "ALLOW_SIMULATOR", "true"
         buildConfigField "String", "DEFAULT_CURRENCY", '"YER"'
         buildConfigField "String", "DEFAULT_USD_RATE", '"535.0"'
