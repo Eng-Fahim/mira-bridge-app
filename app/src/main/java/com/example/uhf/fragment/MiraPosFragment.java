@@ -13,8 +13,13 @@ import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.graphics.Typeface;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import com.google.android.material.card.MaterialCardView;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -114,7 +119,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final long ITEM_ADDED_DISPLAY_MS     = 1000;
     private static final long AUTO_ADD_DELAY_MS         = 350;
     private static final int  AUTO_ADD_MIN_LEN          = 6;
-    private static final int  POS_LOW_POWER_DBM         = 15;
+   // private static final int  POS_LOW_POWER_DBM         = 15;
 
     // ═══════════════════════════════════════════════════════════════════
     //  وضع المسح الموحّد (علم واحد فقط)
@@ -213,6 +218,18 @@ public class MiraPosFragment extends MiraBaseFragment {
     private View btnPosScanManual;
 
     private CartAdapter cartAdapter;
+    
+// ═══════════════════════════════════════════════════════════════════
+//  Scan Feedback Card — بطاقة تأكيد مؤقتة
+// ═══════════════════════════════════════════════════════════════════
+@Nullable private View scanFeedbackOverlay;
+@Nullable private MaterialCardView scanFeedbackCard;
+@Nullable private ImageView ivFeedbackIcon;
+@Nullable private TextView tvFeedbackTitle;
+@Nullable private TextView tvFeedbackDetails;
+@Nullable private TextView tvFeedbackPrice;
+@Nullable private View vFeedbackAccent;
+@Nullable private Runnable pendingHideFeedback;
 
     // ═══════════════════════════════════════════════════════════════════
     //  Helper Classes
@@ -346,6 +363,7 @@ public class MiraPosFragment extends MiraBaseFragment {
             // ═══════════════════════════════════════════════════════
             bindViews(view);
             setupHeroController(view);
+            initScanFeedbackCard(view);   // ✅ [v6.2]
             setupRecyclerView();
             setupCartListener();       // ← يربط PosCartManager listener
             setupListeners();
@@ -491,9 +509,25 @@ public class MiraPosFragment extends MiraBaseFragment {
             cartAdapter = null;
 
             // ═══════════════════════════════════════════════════════
-            //  7) تصفير الحالة
-            // ═══════════════════════════════════════════════════════
-            pendingEpcs.clear();
+           // ═══════════════════════════════════════════════════════
+//  6.5) تنظيف بطاقة التأكيد [v6.2]
+// ═══════════════════════════════════════════════════════
+if (pendingHideFeedback != null && mainHandler != null) {
+    mainHandler.removeCallbacks(pendingHideFeedback);
+    pendingHideFeedback = null;
+}
+scanFeedbackOverlay = null;
+scanFeedbackCard = null;
+ivFeedbackIcon = null;
+tvFeedbackTitle = null;
+tvFeedbackDetails = null;
+tvFeedbackPrice = null;
+vFeedbackAccent = null;
+
+// ═══════════════════════════════════════════════════════
+//  7) تصفير الحالة
+// ═══════════════════════════════════════════════════════
+pendingEpcs.clear();
             lastScannedTimes.clear();
             selectedRefundItem.set(null);
             currentScanMode = ScanMode.NONE;
@@ -532,49 +566,77 @@ public class MiraPosFragment extends MiraBaseFragment {
     //  Power Management — Dynamic Save/Restore
     // ═══════════════════════════════════════════════════════════════════
 
-    /**
-     * ✅ يقلل قوة الإرسال في POS — مع حفظ القيمة الفعلية
-     *    (لا يفترض 27 dBm).
-     */
-    private void applyLowPowerForPos() {
-        if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
+  /**
+ * ✅ [v6.1] يقلل قوة الإرسال في POS — يقرأ القيمة من MiraReaderSettings.
+ *    المستخدم يتحكم بها من واجهة الإعداد (Long-press على زر RFID).
+ */
+private void applyLowPowerForPos() {
+    if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
 
-        sdkExecutor.execute(() -> {
-            try {
-                Context appCtx = getSafeAppContext();
-                if (appCtx == null) return;
+    sdkExecutor.execute(() -> {
+        try {
+            Context appCtx = getSafeAppContext();
+            if (appCtx == null) return;
 
-                com.example.uhf.MiraRfid.MiraReaderSettings settings =
-                        com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appCtx);
+            com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                    com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appCtx);
 
-                // ✅ احفظ القيمة الفعلية
-                savedPowerBeforePos = settings.getPowerDbm();
+            // ✅ احفظ القيمة الفعلية قبل التغيير (للاستعادة لاحقاً)
+            savedPowerBeforePos = settings.getPowerDbm();
 
-                if (savedPowerBeforePos == POS_LOW_POWER_DBM) {
-                    Log.d(TAG, "⚡ POS power already at " + POS_LOW_POWER_DBM);
-                    return;
-                }
+            // ✅ اقرأ قوة POS من الإعدادات
+            int posPower = settings.getPosPowerDbm();
 
-                settings.setPowerDbm(POS_LOW_POWER_DBM);
-
-                com.rscja.deviceapi.RFIDWithUHFUART reader =
-                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
-                if (reader != null) {
-                    try {
-                        reader.setPower(POS_LOW_POWER_DBM);
-                        Log.i(TAG, "⚡ POS Low-Power applied: "
-                                + POS_LOW_POWER_DBM
-                                + " dBm (saved=" + savedPowerBeforePos + ")");
-                    } catch (Exception e) {
-                        Log.w(TAG, "setPower failed", e);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "applyLowPowerForPos error", e);
+            if (savedPowerBeforePos == posPower) {
+                Log.d(TAG, "⚡ POS power already at " + posPower);
+                return;
             }
-        });
-    }
 
+            settings.setPowerDbm(posPower);
+
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+            if (reader != null) {
+                try {
+                    reader.setPower(posPower);
+                    Log.i(TAG, "⚡ POS Low-Power applied: "
+                            + posPower
+                            + " dBm (saved=" + savedPowerBeforePos + ")");
+                } catch (Exception e) {
+                    Log.w(TAG, "setPower failed", e);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyLowPowerForPos error", e);
+        }
+    });
+}
+
+
+/**
+ * ✅ [v6.1] يُستدعى من Dialog عند تغيير المستخدم لقوة POS.
+ *    يُطبّق القيمة الجديدة على القارئ فوراً (بدون إعادة فتح POS).
+ */
+private void applyPosPowerImmediate(int newPowerDbm) {
+    if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
+
+    sdkExecutor.execute(() -> {
+        try {
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+            if (reader != null) {
+                try {
+                    reader.setPower(newPowerDbm);
+                    Log.i(TAG, "⚡ POS power updated immediately: " + newPowerDbm);
+                } catch (Exception e) {
+                    Log.w(TAG, "setPower failed", e);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyPosPowerImmediate error", e);
+        }
+    });
+}
     /**
      * ✅ استعادة القيمة الأصلية — ديناميكياً.
      *    إذا لم تُحفظ → لا تُغيَّر (منع الكتابة فوق إعداد المستخدم).
@@ -1069,7 +1131,7 @@ private void setupManualInputListeners() {
 }
 
 private void setupScanButtonListeners() {
-    // ⭐ GS1
+    // ⭐ GS1 — ماسح الباركود
     if (btnPosScanGs1 != null) {
         btnPosScanGs1.setOnClickListener(v -> {
             UIHelper.hideKeyboard(getActivity());
@@ -1077,12 +1139,21 @@ private void setupScanButtonListeners() {
         });
     }
 
-    // ⭐ RFID — Toggle
+    // ⭐ RFID — إعلامي فقط + Long-press للإعدادات
     if (btnPosScanRfid != null) {
+        // ✅ ضغطة عادية → رسالة توجيه
         btnPosScanRfid.setOnClickListener(v -> {
             UIHelper.hideKeyboard(getActivity());
-            switchScanMode(currentScanMode == ScanMode.RFID
-                    ? ScanMode.NONE : ScanMode.RFID);
+            showToast(isArabic
+                    ? "🎯 استخدم زر الزناد في القارئ للمسح"
+                    : "🎯 Use the physical trigger to scan");
+        });
+
+        // ✅ ضغطة مطوّلة → إعدادات قوة POS
+        btnPosScanRfid.setOnLongClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
+            openPosPowerSettings();
+            return true;
         });
     }
 
@@ -1095,6 +1166,42 @@ private void setupScanButtonListeners() {
         });
     }
 }
+
+
+/**
+ * ✅ [v6.1] فتح نافذة إعداد قوة قراءة POS.
+ *    عند الحفظ، تُطبّق القيمة الجديدة فوراً على القارئ.
+ */
+private void openPosPowerSettings() {
+    if (!isFragmentAlive()) return;
+
+    try {
+        Context ctx = getSafeAppContext();
+        if (ctx == null) return;
+
+        com.example.uhf.dialog.PosPowerSettingsDialog.show(
+                ctx,
+                isArabic,
+                newPowerDbm -> {
+                    Log.i(TAG, "⚡ User set POS power → " + newPowerDbm + " dBm");
+
+                    // ✅ طبّق القيمة الجديدة فوراً
+                    applyPosPowerImmediate(newPowerDbm);
+
+                    // ✅ أبلغ المستخدم
+                    showToast(isArabic
+                            ? "✅ تم تحديث قوة القراءة إلى " + newPowerDbm + " dBm"
+                            : "✅ Power updated to " + newPowerDbm + " dBm");
+                }
+        );
+    } catch (Exception e) {
+        Log.e(TAG, "openPosPowerSettings error", e);
+        showToast(isArabic
+                ? "⚠️ تعذر فتح الإعدادات"
+                : "⚠️ Could not open settings");
+    }
+}
+
 
 private void setupActionButtonListeners() {
     if (btnClearCart != null) {
@@ -1254,15 +1361,24 @@ private void processRingEpc(final String code, final String source) {
                     }
 
                     @Override
-                    public void onItemNotFound() {
-                        safeRun(() -> {
-                            if (!isFragmentAlive()) return;
-                            showToast(getString(R.string.pos_msg_not_found));
-                            playAlertSound(2);
-                            setHeroError();
-                            resetHeroAfterDelay();
-                        });
-                    }
+public void onItemNotFound() {
+    safeRun(() -> {
+        if (!isFragmentAlive()) return;
+        showToast(getString(R.string.pos_msg_not_found));
+        playAlertSound(2);
+        setHeroError();
+        resetHeroAfterDelay();
+
+        // ✅ [v6.2] بطاقة "غير موجود"
+        showScanFeedback(
+                isArabic ? "❌ لم يتم العثور" : "❌ Not Found",
+                cleanCode,
+                null,
+                android.R.drawable.ic_dialog_alert,
+                0xFFDC2626   // أحمر
+        );
+    });
+}
                 });
             } catch (Exception e) {
                 Log.e(TAG, "processRingEpc network error", e);
@@ -1301,12 +1417,21 @@ private void parseItemResponse(String code, JSONObject data, String source) {
                 item.optString("vault_status", "")).toLowerCase();
 
         if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
-            showToast(getString(R.string.pos_msg_already_sold));
-            playAlertSound(2);
-            setHeroError();
-            resetHeroAfterDelay();
-            return;
-        }
+    showToast(getString(R.string.pos_msg_already_sold));
+    playAlertSound(2);
+    setHeroError();
+    resetHeroAfterDelay();
+
+    // ✅ [v6.2] بطاقة رفض
+    showScanFeedback(
+            isArabic ? "❌ القطعة مباعة" : "❌ Already Sold",
+            extractString(item, "title", "item_title"),
+            null,
+            android.R.drawable.ic_delete,
+            0xFFDC2626   // أحمر
+    );
+    return;
+}
 
         boolean isAvailable = !vaultStatus.equals("sold")
                 && !vaultStatus.equals("reserved");
@@ -1370,17 +1495,35 @@ private void parseItemResponse(String code, JSONObject data, String source) {
                 cartItem.serialNo, cartItem.gtin);
 
         if (alreadyInCart) {
-            showToast(getString(R.string.pos_msg_already_in_cart));
-            playAlertSound(2);
-            resetHeroAfterDelay();
-            return;
-        }
+    showToast(getString(R.string.pos_msg_already_in_cart));
+    playAlertSound(2);
+    resetHeroAfterDelay();
+
+    // ✅ [v6.2] بطاقة تحذير
+    showScanFeedback(
+            isArabic ? "⚠️ مكررة في السلة" : "⚠️ Already in Cart",
+            title,
+            null,
+            android.R.drawable.ic_dialog_alert,
+            0xFF3B82F6   // أزرق
+    );
+    return;
+}
 
         if (!isAvailable) {
-            showToast(getString(R.string.pos_msg_unavailable));
-            resetHeroAfterDelay();
-            return;
-        }
+    showToast(getString(R.string.pos_msg_unavailable));
+    resetHeroAfterDelay();
+
+    // ✅ [v6.2] بطاقة تحذير
+    showScanFeedback(
+            isArabic ? "⚠️ القطعة غير متاحة" : "⚠️ Item Unavailable",
+            title,
+            null,
+            android.R.drawable.ic_dialog_alert,
+            0xFFF59E0B   // كهرماني
+    );
+    return;
+}
 
         // ═══════════════════════════════════════════════════
         //  ✅ الإضافة — كل UI يتحدّث تلقائياً عبر renderCart
@@ -1393,8 +1536,17 @@ private void parseItemResponse(String code, JSONObject data, String source) {
         }
 
         // ✅ الأصوات والـ toast
-        playAlertSound(1);
-        showToast(getString(R.string.pos_msg_added, title));
+playAlertSound(1);
+showToast(getString(R.string.pos_msg_added, title));
+
+// ✅ [v6.2] بطاقة تأكيد احترافية
+showScanFeedback(
+        title,
+        karat + " • " + String.format(Locale.US, "%.2fg", weight),
+        buildTotalText(1, price),
+        R.drawable.ic_pos_cart_gold,
+        0xFF22C55E   // أخضر
+);
 
         // ✅ Hero state
         if (heroController != null) {
@@ -1526,6 +1678,235 @@ private void updateTopCartItemScaleWeight(double currentScaleWeight) {
 
     } catch (Exception e) {
         Log.e(TAG, "updateTopCartItemScaleWeight error", e);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Scan Feedback Card — التنفيذ [v6.2]
+// ═══════════════════════════════════════════════════════════════════
+
+/** تحويل dp → pixels */
+private int dp(int value) {
+    try {
+        return Math.round(value * getResources()
+                .getDisplayMetrics().density);
+    } catch (Exception e) {
+        return value;
+    }
+}
+
+/**
+ * ✅ [v6.2] إنشاء بطاقة التأكيد برمجياً.
+ *    تُضاف إلى الجزء العلوي من الشاشة وتظهر عند كل مسح.
+ */
+private void initScanFeedbackCard(@NonNull View fragmentRoot) {
+    try {
+        if (!(fragmentRoot instanceof ViewGroup)) return;
+        ViewGroup root = (ViewGroup) fragmentRoot;
+
+        // ═══════════════════════════════════════════════════
+        //  الحاوية (تملأ الشاشة، للتمركز)
+        // ═══════════════════════════════════════════════════
+        FrameLayout overlay = new FrameLayout(requireContext());
+        overlay.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        overlay.setClickable(false);
+        overlay.setFocusable(false);
+        overlay.setVisibility(View.GONE);
+
+        // ═══════════════════════════════════════════════════
+        //  البطاقة
+        // ═══════════════════════════════════════════════════
+        MaterialCardView card = new MaterialCardView(requireContext());
+        FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(dp(16), dp(72), dp(16), 0);
+        cardParams.gravity = android.view.Gravity.TOP;
+        card.setLayoutParams(cardParams);
+        card.setRadius(dp(16));
+        card.setCardElevation(dp(8));
+        card.setCardBackgroundColor(0xFFFFFFFF);
+        card.setClickable(false);
+
+        // ═══════════════════════════════════════════════════
+        //  صف المحتوى
+        // ═══════════════════════════════════════════════════
+        LinearLayout row = new LinearLayout(requireContext());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(dp(16), dp(14), dp(16), dp(14));
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        // أيقونة
+        ImageView icon = new ImageView(requireContext());
+        LinearLayout.LayoutParams iconParams =
+                new LinearLayout.LayoutParams(dp(44), dp(44));
+        icon.setLayoutParams(iconParams);
+        icon.setImageResource(R.drawable.ic_pos_cart_gold);
+        row.addView(icon);
+
+        // عمود النصوص
+        LinearLayout textCol = new LinearLayout(requireContext());
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        textParams.setMargins(dp(14), 0, dp(14), 0);
+        textCol.setLayoutParams(textParams);
+
+        TextView title = new TextView(requireContext());
+        title.setTextSize(15);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(0xFF1A1A1A);
+        title.setMaxLines(1);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        textCol.addView(title);
+
+        TextView details = new TextView(requireContext());
+        details.setTextSize(12);
+        details.setTextColor(0xFF666666);
+        details.setMaxLines(1);
+        details.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams detParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        detParams.topMargin = dp(3);
+        details.setLayoutParams(detParams);
+        textCol.addView(details);
+
+        TextView price = new TextView(requireContext());
+        price.setTextSize(17);
+        price.setTypeface(null, Typeface.BOLD);
+        price.setTextColor(0xFFB89456);
+        LinearLayout.LayoutParams priceParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        priceParams.topMargin = dp(4);
+        price.setLayoutParams(priceParams);
+        textCol.addView(price);
+
+        row.addView(textCol);
+
+        // شريط جانبي ملوّن
+        View accent = new View(requireContext());
+        LinearLayout.LayoutParams accentParams = new LinearLayout.LayoutParams(
+                dp(4), ViewGroup.LayoutParams.MATCH_PARENT);
+        accent.setLayoutParams(accentParams);
+        accent.setBackgroundColor(0xFF22C55E);
+        row.addView(accent);
+
+        card.addView(row);
+        overlay.addView(card);
+        root.addView(overlay);
+
+        // ✅ حفظ المراجع
+        this.scanFeedbackOverlay = overlay;
+        this.scanFeedbackCard = card;
+        this.ivFeedbackIcon = icon;
+        this.tvFeedbackTitle = title;
+        this.tvFeedbackDetails = details;
+        this.tvFeedbackPrice = price;
+        this.vFeedbackAccent = accent;
+
+        Log.d(TAG, "✅ Scan feedback card initialized");
+
+    } catch (Exception e) {
+        Log.e(TAG, "initScanFeedbackCard error", e);
+    }
+}
+
+/**
+ * ✅ [v6.2] عرض بطاقة تأكيد مؤقتة.
+ *
+ * @param title       العنوان (اسم القطعة أو الرسالة)
+ * @param details     التفاصيل (العيار • الوزن)
+ * @param price       السعر (null = لا يُعرض)
+ * @param iconRes     أيقونة
+ * @param accentColor لون الشريط الجانبي والأيقونة
+ */
+private void showScanFeedback(@NonNull String title,
+                              @Nullable String details,
+                              @Nullable String price,
+                              int iconRes,
+                              int accentColor) {
+    if (!isFragmentAlive() || scanFeedbackOverlay == null) return;
+
+    try {
+        // إلغاء الإخفاء السابق
+        if (pendingHideFeedback != null) {
+            mainHandler.removeCallbacks(pendingHideFeedback);
+            pendingHideFeedback = null;
+        }
+
+        // تحديث المحتوى
+        if (tvFeedbackTitle != null) {
+            tvFeedbackTitle.setText(title);
+        }
+
+        if (tvFeedbackDetails != null) {
+            if (details == null || details.isEmpty()) {
+                tvFeedbackDetails.setVisibility(View.GONE);
+            } else {
+                tvFeedbackDetails.setVisibility(View.VISIBLE);
+                tvFeedbackDetails.setText(details);
+            }
+        }
+
+        if (tvFeedbackPrice != null) {
+            if (price == null || price.isEmpty()) {
+                tvFeedbackPrice.setVisibility(View.GONE);
+            } else {
+                tvFeedbackPrice.setVisibility(View.VISIBLE);
+                tvFeedbackPrice.setText(price);
+                tvFeedbackPrice.setTextColor(accentColor);
+            }
+        }
+
+        if (ivFeedbackIcon != null) {
+            ivFeedbackIcon.setImageResource(iconRes);
+            ivFeedbackIcon.setColorFilter(accentColor);
+        }
+
+        if (vFeedbackAccent != null) {
+            vFeedbackAccent.setBackgroundColor(accentColor);
+        }
+
+        // إظهار بأنيميشن
+        final View card = scanFeedbackCard;
+        final View overlay = scanFeedbackOverlay;
+
+        overlay.setVisibility(View.VISIBLE);
+        if (card != null) {
+            card.setAlpha(0f);
+            card.setTranslationY(-dp(20));
+            card.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(250)
+                    .setInterpolator(
+                            new android.view.animation.DecelerateInterpolator())
+                    .start();
+        }
+
+        // إخفاء تلقائي بعد 2.5 ثانية
+        pendingHideFeedback = () -> {
+            if (card == null || overlay == null) return;
+            card.animate()
+                    .alpha(0f)
+                    .translationY(-dp(20))
+                    .setDuration(200)
+                    .withEndAction(() -> {
+                        if (overlay != null) {
+                            overlay.setVisibility(View.GONE);
+                        }
+                    })
+                    .start();
+            pendingHideFeedback = null;
+        };
+        mainHandler.postDelayed(pendingHideFeedback, 2500);
+
+    } catch (Exception e) {
+        Log.e(TAG, "showScanFeedback error", e);
     }
 }
 
