@@ -1,5 +1,7 @@
 package com.example.uhf.MiraRfid;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Build;
