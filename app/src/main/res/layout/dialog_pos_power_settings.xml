@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- عنوان القيمة الحالية -->
+    <TextView
+        android:id="@+id/tvPowerValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="8 dBm"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:textColor="#B89456" />
+
+    <!-- المدى التقريبي -->
+    <TextView
+        android:id="@+id/tvPowerRange"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="المدى التقريبي: ~5-8 cm"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:layout_marginTop="4dp"
+        android:textColor="#666666" />
+
+    <!-- شريط التمرير -->
+    <SeekBar
+        android:id="@+id/seekPower"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- تسميات الحدود -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="5 dBm"
+            android:textSize="11sp"
+            android:textColor="#999999" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="30 dBm"
+            android:textSize="11sp"
+            android:textColor="#999999"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <!-- نص التلميح -->
+    <TextView
+        android:id="@+id/tvPowerHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚖️ توازن — مدى قصير وموثوق"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
+        android:padding="10dp"
+        android:background="#F5F5F5"
+        android:textColor="#444444" />
+
+    <!-- زر الافتراضي -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPowerReset"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="استعادة الافتراضي (8 dBm)" />
+
+</LinearLayout>
