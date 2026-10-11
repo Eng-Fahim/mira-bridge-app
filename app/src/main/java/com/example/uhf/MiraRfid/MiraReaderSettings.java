@@ -12,8 +12,12 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraReaderSettings v3 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
+ *  MiraReaderSettings v3.1 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
  * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * [v3.1] إضافات:
+ *   ✅ POS Power — قوة قراءة خاصة بوضع البيع (يحددها المستخدم)
+ *   ✅ getPosRangeLabel() — ترجمة القوة إلى مدى تقريبي
  */
 public class MiraReaderSettings {
 
@@ -148,6 +152,19 @@ public class MiraReaderSettings {
     public static final int  DEF_SCAN_INTERVAL   = 100;
 
     // ═══════════════════════════════════════════════════════════════
+    //  ⚡ POS Power — قوة قراءة خاصة بوضع البيع
+    // ═══════════════════════════════════════════════════════════════
+    /**
+     * القيمة الافتراضية: 8 dBm (توازن بين الأمان والموثوقية).
+     *
+     * المستخدم يتحكم بها من واجهة POS.
+     * تُطبَّق تلقائياً عند فتح POS، وتُستعاد عند إغلاقه.
+     */
+    public static final int  DEF_POS_POWER_DBM = 8;
+    public static final int  MIN_POS_POWER_DBM = 5;
+    public static final int  MAX_POS_POWER_DBM = 30;
+
+    // ═══════════════════════════════════════════════════════════════
     //  Singleton
     // ═══════════════════════════════════════════════════════════════
     private static volatile MiraReaderSettings instance;
@@ -157,7 +174,7 @@ public class MiraReaderSettings {
     private MiraReaderSettings(Context ctx) {
         this.context = ctx.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.i(TAG, "✅ MiraReaderSettings v3 initialized");
+        Log.i(TAG, "✅ MiraReaderSettings v3.1 initialized");
     }
 
     public static MiraReaderSettings getInstance(Context ctx) {
@@ -212,6 +229,40 @@ public class MiraReaderSettings {
     public void setFastInventory(boolean v) { prefs.edit().putBoolean("fast_inv", v).commit(); }
     public void setRssiThreshold(int v)     { prefs.edit().putInt("rssi", clamp(v, -100, -30)).commit(); }
     public void setScanInterval(int v)      { prefs.edit().putInt("interval", clamp(v, 50, 1000)).commit(); }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ⚡ POS Power — Getters / Setters
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ قوة POS المحفوظة.
+     *    يقرأها MiraPosFragment عند فتح شاشة البيع.
+     */
+    public int getPosPowerDbm() {
+        return prefs.getInt("pos_power", DEF_POS_POWER_DBM);
+    }
+
+    /**
+     * ✅ يُحفظ من واجهة إعدادات POS.
+     *    القيمة محصورة بين 5 و 30 dBm.
+     */
+    public void setPosPowerDbm(int v) {
+        int safe = clamp(v, MIN_POS_POWER_DBM, MAX_POS_POWER_DBM);
+        prefs.edit().putInt("pos_power", safe).commit();
+        Log.i(TAG, "⚡ POS Power saved: " + safe + " dBm");
+    }
+
+    /**
+     * ✅ ترجمة القوة إلى مدى تقريبي — للعرض في الواجهة.
+     */
+    public static String getPosRangeLabel(int dbm) {
+        if (dbm <= 5)  return "~3-5 cm";
+        if (dbm <= 8)  return "~5-8 cm";
+        if (dbm <= 12) return "~8-12 cm";
+        if (dbm <= 18) return "~10-18 cm";
+        if (dbm <= 25) return "~18-30 cm";
+        return "~30+ cm";
+    }
 
     private int clamp(int v, int min, int max) { return Math.max(min, Math.min(max, v)); }
 
@@ -324,6 +375,7 @@ public class MiraReaderSettings {
     // ═══════════════════════════════════════════════════════════════
     public String getSummary() {
         return "⚡ Power: " + getPowerDbm() + " dBm\n"
+             + "⚡ POS Power: " + getPosPowerDbm() + " dBm\n"
              + "🌍 Freq: " + getFreqLabel(getFreqMode()) + "\n"
              + "🎯 ReadMode: " + getReadModeLabel(getReadMode()) + "\n"
              + "📊 Session: S" + getSession() + "\n"
