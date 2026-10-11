@@ -5,9 +5,11 @@ import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.util.Log;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,22 +35,38 @@ import com.google.android.material.textfield.TextInputLayout;
 import com.google.gson.Gson;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * POSCheckoutDialog v2.3 — Dynamic Payment Methods Edition
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  POSCheckoutDialog v2.4 — Dynamic Payment Methods Edition
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * ✅ الميزات الجديدة:
- *  1. تحميل طرق الدفع من السيرفر (endpoint: /pos/payment-methods)
- *  2. عرض الحساب المرتبط بكل طريقة
- *  3. Fallback محلي عند فشل السيرفر
+ * إصلاحات v2.4:
+ *   ✅ حذف التكرار في `paymentWatcherAttached`.
+ *   ✅ إصلاح `applyPaymentMethods` (كانت مقطوعة).
+ *   ✅ استخدام `addTextChangedListener` بدلاً من
+ *      `setOnItemClickListener` (الأخير يُعطّل dropdown الخاص بـ Material).
+ *   ✅ استيراد `JSONObject`.
+ *   ✅ Logs تشخيصية لعدد الطرق المستلمة من السيرفر.
+ *
+ * الميزات الأساسية:
+ *   ✅ تحميل طرق الدفع من السيرفر (`/pos/payment-methods`).
+ *   ✅ عرض الحساب المرتبط بكل طريقة.
+ *   ✅ Fallback محلي عند فشل السيرفر.
  */
 public class POSCheckoutDialog extends DialogFragment {
 
     private static final String TAG = "POSCheckoutDialog";
+
+    // ═══════════════════════════════════════════════════════════
+    //  Callbacks
+    // ═══════════════════════════════════════════════════════════
 
     public interface OnCheckoutListener {
         void onCheckout(POSCheckoutData data);
@@ -57,6 +75,10 @@ public class POSCheckoutDialog extends DialogFragment {
     public interface OnDialogDismissListener {
         void onDialogDismissed();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Data Model
+    // ═══════════════════════════════════════════════════════════
 
     public static class POSCheckoutData {
         public String customerName = "";
@@ -73,8 +95,16 @@ public class POSCheckoutDialog extends DialogFragment {
         public double finalAmount = 0.0;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Arguments
+    // ═══════════════════════════════════════════════════════════
+
     private static final String ARG_TOTAL_AMOUNT = "total_amount";
     private static final String ARG_ITEM_COUNT = "item_count";
+
+    // ═══════════════════════════════════════════════════════════
+    //  State
+    // ═══════════════════════════════════════════════════════════
 
     private double totalAmount = 0.0;
     private int itemCount = 0;
@@ -83,6 +113,10 @@ public class POSCheckoutDialog extends DialogFragment {
     private boolean isArabic;
     private MiraOrgProfileManager orgProfile;
     private MiraPriceManager priceManager;
+
+    // ═══════════════════════════════════════════════════════════
+    //  Views
+    // ═══════════════════════════════════════════════════════════
 
     private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount,
             tvFinalTotal, tvAccountNumber;
@@ -93,17 +127,20 @@ public class POSCheckoutDialog extends DialogFragment {
     private Button btnConfirmCheckout, btnCancelCheckout;
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ Payment Methods — ديناميكي من السيرفر
+    //  Payment Methods
     // ═══════════════════════════════════════════════════════════
+
     private final List<PaymentMethodDto> paymentMethods = new ArrayList<>();
     private PaymentMethodDto selectedMethod = null;
-    private final android.os.Handler mainHandler =
-            new android.os.Handler(android.os.Looper.getMainLooper());
-            
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    /** ✅ لمنع إضافة TextWatcher أكثر من مرة عند إعادة فتح الـ Dialog */
     private boolean paymentWatcherAttached = false;
+
     // ═══════════════════════════════════════════════════════════
-    // newInstance
+    //  Factory
     // ═══════════════════════════════════════════════════════════
+
     public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
         DiagTracer.mark("D.newInstance START",
                 "total=" + totalAmount + ", count=" + itemCount);
@@ -141,8 +178,9 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // onCreate
+    //  Lifecycle
     // ═══════════════════════════════════════════════════════════
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         DiagTracer.mark("D.onCreate START");
@@ -232,6 +270,10 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Views Binding
+    // ═══════════════════════════════════════════════════════════
+
     private void bindViews(View view) {
         tvDialogTitle    = view.findViewById(R.id.tvDialogTitle);
         tvItemCount      = view.findViewById(R.id.tvItemCount);
@@ -289,7 +331,7 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ✅ Payment Methods — Dynamic Loading
+    //  Payment Methods — Spinner Initialization
     // ═══════════════════════════════════════════════════════════
 
     private void setupSpinner() {
@@ -302,7 +344,7 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     /**
-     * ✅ تحميل طرق الدفع من السيرفر (background thread)
+     * ✅ تحميل طرق الدفع من السيرفر على خيط خلفي.
      */
     private void loadPaymentMethodsFromServer() {
         new Thread(() -> {
@@ -319,29 +361,47 @@ public class POSCheckoutDialog extends DialogFragment {
                         if (arr == null) arr = response.data.optJSONArray("methods");
 
                         if (arr != null && arr.length() > 0) {
+                            Log.i(TAG, "📥 Server returned " + arr.length() + " items");
                             Gson gson = new Gson();
                             loaded = new ArrayList<>();
+
                             for (int i = 0; i < arr.length(); i++) {
                                 try {
+                                    JSONObject obj = arr.getJSONObject(i);
+                                    Log.d(TAG, "   item[" + i + "]: " + obj.toString());
+
                                     PaymentMethodDto m = gson.fromJson(
-                                            arr.getJSONObject(i).toString(),
+                                            obj.toString(),
                                             PaymentMethodDto.class);
-                                    if (m != null
-                                            && m.code != null
-                                            && !m.code.isEmpty()) {
+
+                                    if (m != null && m.code != null && !m.code.isEmpty()) {
                                         loaded.add(m);
+                                        Log.d(TAG, "   ✅ Accepted: " + m.code);
+                                    } else {
+                                        Log.w(TAG, "   ⚠️ Rejected item[" + i + "]: code=" +
+                                                (m != null ? m.code : "null"));
                                     }
-                                } catch (Exception ignored) {}
+                                } catch (Exception e) {
+                                    Log.e(TAG, "   ❌ item[" + i + "] parse error: "
+                                            + e.getMessage());
+                                }
                             }
+                            Log.i(TAG, "✅ Accepted " + loaded.size()
+                                    + " methods after filtering");
+                        } else {
+                            Log.w(TAG, "⚠️ Server returned empty or no array");
                         }
+                    } else {
+                        Log.w(TAG, "⚠️ Server response invalid or unsuccessful");
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "loadPaymentMethodsFromServer error: " + e.getMessage());
+                Log.e(TAG, "loadPaymentMethodsFromServer error: " + e.getMessage(), e);
             }
 
             final List<PaymentMethodDto> finalList =
-                    (loaded != null && !loaded.isEmpty()) ? loaded : getFallbackMethods();
+                    (loaded != null && !loaded.isEmpty())
+                            ? loaded : getFallbackMethods();
             final boolean isFallback = (loaded == null || loaded.isEmpty());
 
             mainHandler.post(() -> applyPaymentMethods(finalList, isFallback));
@@ -349,7 +409,7 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     /**
-     * ✅ قائمة احتياطية عند فشل السيرفر
+     * ✅ قائمة احتياطية عند فشل السيرفر.
      */
     private List<PaymentMethodDto> getFallbackMethods() {
         List<PaymentMethodDto> list = new ArrayList<>();
@@ -381,78 +441,79 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     /**
-     * ✅ تطبيق القائمة على الواجهة
+     * ✅ تطبيق القائمة على الواجهة — يستخدم `addTextChangedListener`
+     *    بدل `setOnItemClickListener` (الأخير يُعطّل dropdown الخاص
+     *    بـ `MaterialAutoCompleteTextView`).
      */
     private void applyPaymentMethods(List<PaymentMethodDto> methods,
-                                 boolean isFallback) {
-    if (spPaymentMethod == null || !isAdded()) return;
+                                     boolean isFallback) {
+        if (spPaymentMethod == null || !isAdded()) return;
 
-    paymentMethods.clear();
-    paymentMethods.addAll(methods);
+        paymentMethods.clear();
+        paymentMethods.addAll(methods);
 
-    String[] displayNames = new String[methods.size()];
-    for (int i = 0; i < methods.size(); i++) {
-        displayNames[i] = methods.get(i).getDisplayName(isArabic);
-    }
+        String[] displayNames = new String[methods.size()];
+        for (int i = 0; i < methods.size(); i++) {
+            displayNames[i] = methods.get(i).getDisplayName(isArabic);
+        }
 
-    // ✅ Log للتشخيص — سيُظهر عدد الطرق المستلمة
-    Log.i(TAG, "📋 applyPaymentMethods: " + methods.size() + " methods"
-            + " → " + java.util.Arrays.toString(displayNames));
+        Log.i(TAG, "📋 applyPaymentMethods: " + methods.size() + " methods"
+                + " → " + Arrays.toString(displayNames));
 
-    spPaymentMethod.setEnabled(true);
-    spPaymentMethod.setHint(isArabic ? "طريقة الدفع" : "Payment Method");
+        spPaymentMethod.setEnabled(true);
+        spPaymentMethod.setHint(isArabic ? "طريقة الدفع" : "Payment Method");
 
-    // ✅ 1) امسح المستمع القديم (لتفادي التكرار عند إعادة الفتح)
-    //    لا يمكن إزالة TextWatcher قديم بدون مرجع، لذا نتجنب الإضافة المتكررة
-    //    عبر flag
-    if (!paymentWatcherAttached) {
-        paymentWatcherAttached = true;
-        spPaymentMethod.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                String text = s != null ? s.toString().trim() : "";
-                if (text.isEmpty()) return;
+        // ✅ 1) TextWatcher — لا يُضاف مرتين
+        if (!paymentWatcherAttached) {
+            paymentWatcherAttached = true;
+            spPaymentMethod.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override
+                public void onTextChanged(CharSequence s, int a, int b, int c) {}
 
-                // ابحث عن الطريقة المطابقة
-                for (PaymentMethodDto m : paymentMethods) {
-                    if (m.getDisplayName(isArabic).equals(text)) {
-                        selectedMethod = m;
-                        updateAccountNumberFromMethod(m);
-                        Log.d(TAG, "💳 Selected payment: " + m.code);
-                        break;
+                @Override
+                public void afterTextChanged(Editable s) {
+                    String text = s != null ? s.toString().trim() : "";
+                    if (text.isEmpty()) return;
+
+                    for (PaymentMethodDto m : paymentMethods) {
+                        if (m.getDisplayName(isArabic).equals(text)) {
+                            selectedMethod = m;
+                            updateAccountNumberFromMethod(m);
+                            Log.d(TAG, "💳 Selected: " + m.code);
+                            break;
+                        }
                     }
                 }
+            });
+        }
+
+        // ✅ 2) ضبط القائمة
+        spPaymentMethod.setSimpleItems(displayNames);
+
+        // ✅ 3) اختيار الطريقة الافتراضية
+        if (!methods.isEmpty()) {
+            spPaymentMethod.setText(displayNames[0], false);
+            selectedMethod = methods.get(0);
+            updateAccountNumberFromMethod(selectedMethod);
+        } else {
+            spPaymentMethod.setText("", false);
+            selectedMethod = null;
+            if (tvAccountNumber != null) {
+                tvAccountNumber.setVisibility(View.GONE);
             }
-        });
-    }
+        }
 
-    // ✅ 2) ضبط القائمة (بدون setOnItemClickListener)
-    spPaymentMethod.setSimpleItems(displayNames);
-
-    // ✅ 3) اختيار الطريقة الافتراضية
-    if (!methods.isEmpty()) {
-        spPaymentMethod.setText(displayNames[0], false);
-        selectedMethod = methods.get(0);
-        updateAccountNumberFromMethod(selectedMethod);
-    } else {
-        spPaymentMethod.setText("", false);
-        selectedMethod = null;
-        if (tvAccountNumber != null) {
-            tvAccountNumber.setVisibility(View.GONE);
+        if (isFallback) {
+            Log.w(TAG, "⚠️ Using FALLBACK payment methods");
+        } else {
+            Log.d(TAG, "✅ Loaded " + methods.size() + " methods from server");
         }
     }
 
-    if (isFallback) {
-        Log.w(TAG, "⚠️ Using fallback payment methods (server may be down)");
-    } else {
-        Log.d(TAG, "✅ Loaded " + methods.size() + " payment methods from server");
-    }
-}
-
     /**
-     * ✅ عرض بيانات الحساب المرتبط
+     * ✅ عرض بيانات الحساب المرتبط بالطريقة المختارة.
      */
     private void updateAccountNumberFromMethod(PaymentMethodDto method) {
         if (tvAccountNumber == null) return;
@@ -482,7 +543,7 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     /**
-     * ✅ الطريقة المختارة
+     * ✅ رمز الطريقة المختارة.
      */
     private String getCurrentPaymentMethod() {
         if (selectedMethod != null
@@ -491,10 +552,11 @@ public class POSCheckoutDialog extends DialogFragment {
             return selectedMethod.code;
         }
 
-        // fallback: parse من النص
+        // Fallback: parse من النص
         if (spPaymentMethod == null || spPaymentMethod.getText() == null) {
             return "CASH";
         }
+
         String text = spPaymentMethod.getText().toString();
         if (text.contains("تحويل") || text.contains("Bank")) return "BANK_TRANSFER";
         if (text.contains("بطاق") || text.contains("Card")) return "CARD";
@@ -502,6 +564,9 @@ public class POSCheckoutDialog extends DialogFragment {
         return "CASH";
     }
 
+    /**
+     * ✅ رمز الحساب المرتبط بالطريقة المختارة.
+     */
     private String getCurrentAccountCode() {
         if (selectedMethod != null
                 && selectedMethod.accountCode != null
@@ -512,7 +577,7 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // Data
+    //  Setup Data
     // ═══════════════════════════════════════════════════════════
 
     private void setupData() {
@@ -525,6 +590,10 @@ public class POSCheckoutDialog extends DialogFragment {
 
         updateFinalAmount();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Validation
+    // ═══════════════════════════════════════════════════════════
 
     private boolean validateInputs() {
         boolean isValid = true;
@@ -560,15 +629,21 @@ public class POSCheckoutDialog extends DialogFragment {
         return isValid;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Setup Listeners
+    // ═══════════════════════════════════════════════════════════
+
     private void setupListeners() {
         if (etDiscount != null) {
             etDiscount.addTextChangedListener(new TextWatcher() {
                 @Override
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
                     updateFinalAmount();
                 }
+
                 @Override
                 public void afterTextChanged(Editable s) {}
             });
@@ -623,6 +698,10 @@ public class POSCheckoutDialog extends DialogFragment {
             });
         }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Total Calculation
+    // ═══════════════════════════════════════════════════════════
 
     private void updateFinalAmount() {
         if (priceManager == null) return;
