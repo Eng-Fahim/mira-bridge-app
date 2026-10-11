@@ -99,7 +99,8 @@ public class POSCheckoutDialog extends DialogFragment {
     private PaymentMethodDto selectedMethod = null;
     private final android.os.Handler mainHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
-
+            
+    private boolean paymentWatcherAttached = false;
     // ═══════════════════════════════════════════════════════════
     // newInstance
     // ═══════════════════════════════════════════════════════════
@@ -383,40 +384,72 @@ public class POSCheckoutDialog extends DialogFragment {
      * ✅ تطبيق القائمة على الواجهة
      */
     private void applyPaymentMethods(List<PaymentMethodDto> methods,
-                                     boolean isFallback) {
-        if (spPaymentMethod == null || !isAdded()) return;
+                                 boolean isFallback) {
+    if (spPaymentMethod == null || !isAdded()) return;
 
-        paymentMethods.clear();
-        paymentMethods.addAll(methods);
+    paymentMethods.clear();
+    paymentMethods.addAll(methods);
 
-        String[] displayNames = new String[methods.size()];
-        for (int i = 0; i < methods.size(); i++) {
-            displayNames[i] = methods.get(i).getDisplayName(isArabic);
-        }
+    String[] displayNames = new String[methods.size()];
+    for (int i = 0; i < methods.size(); i++) {
+        displayNames[i] = methods.get(i).getDisplayName(isArabic);
+    }
 
-        spPaymentMethod.setEnabled(true);
-        spPaymentMethod.setHint(isArabic ? "طريقة الدفع" : "Payment Method");
-        spPaymentMethod.setSimpleItems(displayNames);
+    // ✅ Log للتشخيص — سيُظهر عدد الطرق المستلمة
+    Log.i(TAG, "📋 applyPaymentMethods: " + methods.size() + " methods"
+            + " → " + java.util.Arrays.toString(displayNames));
 
-        spPaymentMethod.setOnItemClickListener((parent, view, position, id) -> {
-            if (position >= 0 && position < paymentMethods.size()) {
-                selectedMethod = paymentMethods.get(position);
-                updateAccountNumberFromMethod(selectedMethod);
+    spPaymentMethod.setEnabled(true);
+    spPaymentMethod.setHint(isArabic ? "طريقة الدفع" : "Payment Method");
+
+    // ✅ 1) امسح المستمع القديم (لتفادي التكرار عند إعادة الفتح)
+    //    لا يمكن إزالة TextWatcher قديم بدون مرجع، لذا نتجنب الإضافة المتكررة
+    //    عبر flag
+    if (!paymentWatcherAttached) {
+        paymentWatcherAttached = true;
+        spPaymentMethod.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                String text = s != null ? s.toString().trim() : "";
+                if (text.isEmpty()) return;
+
+                // ابحث عن الطريقة المطابقة
+                for (PaymentMethodDto m : paymentMethods) {
+                    if (m.getDisplayName(isArabic).equals(text)) {
+                        selectedMethod = m;
+                        updateAccountNumberFromMethod(m);
+                        Log.d(TAG, "💳 Selected payment: " + m.code);
+                        break;
+                    }
+                }
             }
         });
+    }
 
-        if (!methods.isEmpty()) {
-            spPaymentMethod.setText(displayNames[0], false);
-            selectedMethod = methods.get(0);
-            updateAccountNumberFromMethod(selectedMethod);
-        }
+    // ✅ 2) ضبط القائمة (بدون setOnItemClickListener)
+    spPaymentMethod.setSimpleItems(displayNames);
 
-        if (isFallback) {
-            Log.w(TAG, "⚠️ Using fallback payment methods");
-        } else {
-            Log.d(TAG, "✅ Loaded " + methods.size() + " payment methods");
+    // ✅ 3) اختيار الطريقة الافتراضية
+    if (!methods.isEmpty()) {
+        spPaymentMethod.setText(displayNames[0], false);
+        selectedMethod = methods.get(0);
+        updateAccountNumberFromMethod(selectedMethod);
+    } else {
+        spPaymentMethod.setText("", false);
+        selectedMethod = null;
+        if (tvAccountNumber != null) {
+            tvAccountNumber.setVisibility(View.GONE);
         }
     }
+
+    if (isFallback) {
+        Log.w(TAG, "⚠️ Using fallback payment methods (server may be down)");
+    } else {
+        Log.d(TAG, "✅ Loaded " + methods.size() + " payment methods from server");
+    }
+}
 
     /**
      * ✅ عرض بيانات الحساب المرتبط
