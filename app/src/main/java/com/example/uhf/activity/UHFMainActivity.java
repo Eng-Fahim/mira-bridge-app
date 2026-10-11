@@ -1938,10 +1938,15 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
 
     navigationManager.loadFragment(fragment, tag, addToBackStack);
 
-    // ✅ زامن currentFragment من المصدر الحقيقي
-    syncCurrentFragment();
+    // ✅ [v2.1] تعيين فوري لـ currentFragment
+    //    (لأن commit() أصبح async مع addToBackStack)
+    this.currentFragment = fragment;
+
     updateBottomNavSelectionByTag(navigationManager.getCurrentFragmentTag());
     updateSecondaryToolbar(navigationManager.getCurrentFragmentTag());
+
+    // ✅ [v2.1] إعادة المزامنة بعد اكتمال commit
+    mainHandler.post(this::syncCurrentFragment);
 }
 
 public void loadFragmentDirectly(Fragment fragment, String tag) {
