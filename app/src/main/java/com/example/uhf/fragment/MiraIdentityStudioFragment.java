@@ -22,6 +22,7 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.view.KeyEvent;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -125,7 +126,66 @@ private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private Uri photoUri;
     private String currentPhotoPath;
+    
+    // ✅ [v6.3] قوة التكويد المنخفضة
+private volatile int savedPowerBeforeEncoding = -1;
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ✅ [v6.3] معالج الزناد الفيزيائي
+// ═══════════════════════════════════════════════════════════════════
+private static final int KEYCODE_TRIGGER_1 = 139;
+private static final int KEYCODE_TRIGGER_2 = 280;
+private static final int KEYCODE_TRIGGER_3 = 293;
+
+@Override
+public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+    boolean isTrigger = (keyCode == KEYCODE_TRIGGER_1
+            || keyCode == KEYCODE_TRIGGER_2
+            || keyCode == KEYCODE_TRIGGER_3);
+
+    if (!isTrigger) return false;
+
+    // ✅ ACTION_DOWN → ابدأ المسح
+    if (event.getAction() == KeyEvent.ACTION_DOWN
+            && event.getRepeatCount() == 0) {
+
+        if (!permissionManager.canEdit("identity")
+                && !permissionManager.isManager()) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return true;
+        }
+
+        if (isFormLocked) {
+            showToast(isArabic
+                    ? "⛔ العملية قيد التنفيذ"
+                    : "⛔ Operation in progress");
+            return true;
+        }
+
+        if (isEpcBound) {
+            Log.d(TAG, "⏭️ Trigger ignored: EPC already bound");
+            return true;
+        }
+
+        if (!isRfidScanning) {
+            Log.i(TAG, "🎯 Encoding trigger DOWN");
+            activateRFIDModeForEncoding();
+        }
+        return true;
+    }
+
+    // ✅ ACTION_UP → أوقف المسح
+    if (event.getAction() == KeyEvent.ACTION_UP) {
+        if (isRfidScanning) {
+            Log.i(TAG, "🎯 Encoding trigger UP");
+            stopRfidScanningMode();
+        }
+        return true;
+    }
+
+    return false;
+}
     // ==================== Lifecycle ====================
 
     @Nullable
@@ -637,18 +697,17 @@ private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
                 binding.tilEpc.setEndIconOnClickListener(v -> openBarcodeScannerForEPC());
             }
 
-            binding.btnScanRfid.setOnClickListener(v -> {
-                if (isFormLocked) {
-                    showToast(isArabic ? "⛔ العملية قيد التنفيذ..." : "⛔ Operation in progress...");
-                    return;
-                }
-                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
-                    if (isRfidScanning) stopRfidScanningMode();
-                    else activateRFIDModeForEncoding();
-                } else {
-                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-                }
-            });
+            // ✅ [v6.3] زر RFID — إعلامي + Long-press للإعدادات
+binding.btnScanRfid.setOnClickListener(v -> {
+    showToast(isArabic
+            ? "🎯 اضغط زر الزناد في القارئ للمسح"
+            : "🎯 Press the reader trigger to scan");
+});
+
+binding.btnScanRfid.setOnLongClickListener(v -> {
+    openEncodingPowerSettings();
+    return true;
+});
 
             View stonesContainer = binding.getRoot().findViewById(R.id.layoutStonesContainer);
             if (stonesContainer != null) {
@@ -919,77 +978,105 @@ private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
     });
 }
 
-    private void activateRFIDModeForEncoding() {
-        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+    // ═══════════════════════════════════════════════════════════════════
+//  ✅ [v6.3] مستمع RFID مركزي — عبر RFIDManager
+// ═══════════════════════════════════════════════════════════════════
+@Nullable private MiraIRFIDReader.OnTagReadListener encodingRfidListener;
+
+private void activateRFIDModeForEncoding() {
+    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
+    }
+
+    try {
+        if (appContext == null) {
+            Log.e(TAG, "appContext is null");
             return;
         }
 
-        try {
-            if (!(getActivity() instanceof UHFMainActivity)) return;
-
-            if (appContext == null) {
-                Log.e(TAG, "appContext is null");
-                return;
-            }
-
-            isRfidScanning = true;
-            if (binding != null) {
-                binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
-                binding.tvStatusBadge.setText("SCANNING...");
-            }
-
-            MiraIRFIDReader reader = RFIDManager.getInstance(appContext).getActiveReader();
-            if (reader == null) {
-                Log.e(TAG, "❌ No active reader");
-                stopRfidScanningMode();
-                return;
-            }
-
-            reader.setOnTagReadListener(new MiraIRFIDReader.OnTagReadListener() {
-                @Override
-                public void onTagRead(String epc, int rssi) {
-                    if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
-
-                    final String receivedEpc = epc.trim().toUpperCase(Locale.US);
-                    Log.i(TAG, "📡 EPC received: " + receivedEpc);
-
-                    handler.post(() -> stopRfidScanningMode());
-                    handler.post(() -> processReceivedTag(receivedEpc));
-                }
-
-                @Override public void onScanStarted() {}
-                @Override public void onScanStopped() {}
-                @Override public void onConnectionChanged(boolean connected) {}
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "RFID error: " + error);
-                }
-            });
-
-            boolean ok = reader.startScan();
-            Log.i(TAG, "startScan result: " + ok);
-
-            if (!ok) {
-                stopRfidScanningMode();
-                showErrorDialog(
-                        isArabic ? "❌ فشل بدء المسح" : "❌ Scan start failed",
-                        isArabic ? "تعذر تشغيل القارئ" : "Could not start reader"
-                );
-                return;
-            }
-
-            showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
-
-            if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
-            rfidTimeoutRunnable = this::stopRfidScanningMode;
-            handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
-
-        } catch (Exception e) {
-            Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
-            stopRfidScanningMode();
+        // ✅ إذا كان EPC مربوطاً — تجاهل
+        if (isEpcBound) {
+            Log.d(TAG, "⏭️ EPC already bound — skip");
+            return;
         }
+
+        // ✅ إذا المسح نشط بالفعل — تجاهل
+        if (isRfidScanning) {
+            Log.d(TAG, "⏭️ Scanning already active");
+            return;
+        }
+
+        isRfidScanning = true;
+        updateScanningUI(true);
+
+        // ✅ استخدم RFIDManager.addListener بدلاً من setOnTagReadListener
+        RFIDManager mgr = RFIDManager.getInstance(appContext);
+        if (mgr == null) {
+            Log.e(TAG, "❌ RFIDManager null");
+            stopRfidScanningMode();
+            return;
+        }
+
+        // ✅ أنشئ مستمعاً مؤقتاً (سيُزال عند الإيقاف)
+        encodingRfidListener = new MiraIRFIDReader.OnTagReadListener() {
+            @Override
+            public void onTagRead(String epc, int rssi) {
+                if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
+
+                final String receivedEpc = epc.trim().toUpperCase(Locale.US);
+                Log.i(TAG, "📡 EPC received (trigger): " + receivedEpc);
+
+                // ✅ أوقف المسح فوراً
+                handler.post(() -> stopRfidScanningMode());
+                // ✅ عالج الوسم
+                handler.post(() -> processReceivedTag(receivedEpc));
+            }
+
+            @Override public void onScanStarted() {}
+            @Override public void onScanStopped() {}
+            @Override public void onConnectionChanged(boolean c) {}
+            @Override public void onError(String error) {
+                Log.e(TAG, "RFID error: " + error);
+            }
+        };
+
+        mgr.addListener(encodingRfidListener);
+
+        // ✅ ابدأ المسح عبر RFIDManager (غير حاجب)
+        mgr.startScan(new RFIDManager.ReadyCallback() {
+            @Override
+            public void onReady(MiraIRFIDReader reader) {
+                Log.i(TAG, "✅ Encoding scan started");
+            }
+
+            @Override
+            public void onError(String reason) {
+                Log.e(TAG, "❌ Encoding scan failed: " + reason);
+                safeRun(() -> {
+                    stopRfidScanningMode();
+                    showErrorDialog(
+                            isArabic ? "❌ فشل بدء المسح" : "❌ Scan start failed",
+                            reason != null ? reason : "Reader not ready"
+                    );
+                });
+            }
+        });
+
+        showToast(isArabic
+                ? "📡 جاري البحث عن شريحة RFID..."
+                : "📡 Searching for RFID tag...");
+
+        // ✅ Timeout احتياطي
+        if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
+        rfidTimeoutRunnable = this::stopRfidScanningMode;
+        handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
+
+    } catch (Exception e) {
+        Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
+        stopRfidScanningMode();
     }
+}
 
     private void processReceivedTag(String epc) {
         if (epc == null || epc.isEmpty()) return;
@@ -1067,45 +1154,68 @@ if (binding.tvStatusBadge != null) {
     }
 
     private void stopRfidScanningMode() {
-        if (!stoppingReader.compareAndSet(false, true)) {
-            return;
-        }
-
-        isRfidScanning = false;
-
-        if (rfidTimeoutRunnable != null) {
-            handler.removeCallbacks(rfidTimeoutRunnable);
-            rfidTimeoutRunnable = null;
-        }
-
-        safeRun(() -> {
-            if (binding != null && binding.btnScanRfid != null) {
-                binding.btnScanRfid.setText(isArabic ? "مسح رمز RFID" : "Scan RFID Tag");
-                if (binding.tvStatusBadge != null &&
-                        "SCANNING...".equals(binding.tvStatusBadge.getText().toString())) {
-                    binding.tvStatusBadge.setText("WAITING");
-                }
-            }
-        });
-
-        if (appContext == null || miraExecutor == null) {
-            stoppingReader.set(false);
-            return;
-        }
-
-        miraExecutor.getBackgroundExecutor().execute(() -> {
-            try {
-                MiraIRFIDReader reader = RFIDManager.getInstance(appContext).getActiveReader();
-                if (reader != null) {
-                    try { reader.setOnTagReadListener(null); } catch (Exception ignored) {}
-                    try { reader.stopScan(); } catch (Exception ignored) {}
-                    Log.d(TAG, "✅ Reader stopped on background");
-                }
-            } finally {
-                stoppingReader.set(false);
-            }
-        });
+    if (!stoppingReader.compareAndSet(false, true)) {
+        return;
     }
+
+    isRfidScanning = false;
+
+    if (rfidTimeoutRunnable != null) {
+        handler.removeCallbacks(rfidTimeoutRunnable);
+        rfidTimeoutRunnable = null;
+    }
+
+    updateScanningUI(false);
+
+    if (appContext == null || miraExecutor == null) {
+        stoppingReader.set(false);
+        return;
+    }
+
+    // ✅ أزل المستمع أولاً — عبر RFIDManager (ليس مباشرة)
+    final MiraIRFIDReader.OnTagReadListener listenerToRemove = encodingRfidListener;
+    encodingRfidListener = null;
+
+    miraExecutor.getBackgroundExecutor().execute(() -> {
+        try {
+            RFIDManager mgr = RFIDManager.getInstance(appContext);
+            if (mgr == null) return;
+
+            // ✅ أزل المستمع
+            if (listenerToRemove != null) {
+                try { mgr.removeListener(listenerToRemove); }
+                catch (Exception ignored) {}
+            }
+
+            // ✅ أوقف المسح
+            try { mgr.stopScan(); }
+            catch (Exception ignored) {}
+
+            Log.d(TAG, "✅ RFID stopped via manager");
+
+        } finally {
+            stoppingReader.set(false);
+        }
+    });
+}
+
+private void updateScanningUI(boolean scanning) {
+    safeRun(() -> {
+        if (binding == null) return;
+        if (binding.btnScanRfid != null) {
+            binding.btnScanRfid.setText(scanning
+                    ? (isArabic ? "جاري المسح..." : "Scanning...")
+                    : (isArabic ? "مسح رمز RFID" : "Scan RFID Tag"));
+        }
+        if (binding.tvStatusBadge != null) {
+            if (scanning) {
+                binding.tvStatusBadge.setText("SCANNING...");
+            } else if (!isEpcBound) {
+                binding.tvStatusBadge.setText("WAITING");
+            }
+        }
+    });
+}
 
     public void onRfidScanned(String epc) {
     if (!isAdded() || getActivity() == null) return;
@@ -2256,14 +2366,8 @@ private JSONObject buildPayload(
             }
 
             // ✅ ابدأ المسح فقط بعد تحقق صريح من أن الشاشة ما زالت نشِطة
-            if (isResumed() && !isRemoving() && !isDetached() && binding != null) {
-                binding.btnScanRfid.postDelayed(() -> {
-                    if (isAdded() && isResumed() && !isRemoving()
-                            && !isRfidScanning && !isFormLocked && !stoppingReader.get()) {
-                        activateRFIDModeForEncoding();
-                    }
-                }, 500);
-            }
+            // ✅ [v6.3] لا مسح تلقائي — المستخدم يضغط الزناد
+Log.d(TAG, "✅ Form reset — waiting for physical trigger");
 
         } catch (Exception e) {
             Log.e(TAG, "resetFormForNextScan error: " + e.getMessage(), e);
@@ -2499,6 +2603,113 @@ private JSONObject buildPayload(
         }
     }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ✅ [v6.3] Power Management — قوة منخفضة للتكويد
+// ═══════════════════════════════════════════════════════════════════
+
+private void applyLowPowerForEncoding() {
+    if (appContext == null || miraExecutor == null) return;
+
+    miraExecutor.getSingleThreadExecutor().execute(() -> {
+        try {
+            com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                    com.example.uhf.MiraRfid.MiraReaderSettings
+                            .getInstance(appContext);
+
+            // احفظ القيمة الأصلية
+            savedPowerBeforeEncoding = settings.getPowerDbm();
+
+            int encodingPower = settings.getPosPowerDbm();  // نفس قيمة POS
+            if (savedPowerBeforeEncoding == encodingPower) {
+                Log.d(TAG, "⚡ Encoding power already at " + encodingPower);
+                return;
+            }
+
+            settings.setPowerDbm(encodingPower);
+
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+                    com.example.uhf.activity.BaseTabFragmentActivity
+                            .getSharedReader();
+            if (reader != null) {
+                try {
+                    reader.setPower(encodingPower);
+                    Log.i(TAG, "⚡ Encoding Low-Power: " + encodingPower
+                            + " dBm (saved=" + savedPowerBeforeEncoding + ")");
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyLowPowerForEncoding error", e);
+        }
+    });
+}
+
+private void restoreOriginalPowerEncoding() {
+    if (savedPowerBeforeEncoding <= 0) return;
+    if (appContext == null || miraExecutor == null) return;
+
+    final int target = savedPowerBeforeEncoding;
+    savedPowerBeforeEncoding = -1;
+
+    miraExecutor.getSingleThreadExecutor().execute(() -> {
+        try {
+            com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                    com.example.uhf.MiraRfid.MiraReaderSettings
+                            .getInstance(appContext);
+
+            settings.setPowerDbm(target);
+
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+        com.example.uhf.activity.BaseTabFragmentActivity
+                .getSharedReader();
+            if (reader != null) {
+                try {
+                    reader.setPower(target);
+                    Log.i(TAG, "⚡ Encoding power restored: " + target);
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "restoreOriginalPowerEncoding error", e);
+        }
+    });
+}
+
+/**
+ * ✅ [v6.3] إعدادات قوة التكويد — Long-press على زر RFID.
+ */
+private void openEncodingPowerSettings() {
+    if (!isAdded() || getContext() == null) return;
+
+    try {
+        com.example.uhf.dialog.PosPowerSettingsDialog.show(
+                requireContext().getApplicationContext(),
+                isArabic,
+                newPowerDbm -> {
+                    Log.i(TAG, "⚡ Encoding power set to: " + newPowerDbm);
+
+                    // ✅ طبّق فوراً
+                    if (appContext != null && miraExecutor != null) {
+                        miraExecutor.getSingleThreadExecutor().execute(() -> {
+                            try {
+                                com.rscja.deviceapi.RFIDWithUHFUART reader =
+                                        com.example.uhf.activity.BaseTabFragmentActivity
+                                                .getSharedReader();
+                                if (reader != null) {
+                                    reader.setPower(newPowerDbm);
+                                }
+                            } catch (Exception ignored) {}
+                        });
+                    }
+
+                    showToast(isArabic
+                            ? "✅ تم تحديث قوة القراءة إلى " + newPowerDbm + " dBm"
+                            : "✅ Power updated to " + newPowerDbm + " dBm");
+                }
+        );
+    } catch (Exception e) {
+        Log.e(TAG, "openEncodingPowerSettings error", e);
+    }
+}
     private void safeRun(Runnable r) {
         try {
             if (isAdded() && getActivity() != null && !isRemoving() && !isDetached()) {
@@ -2521,36 +2732,32 @@ private JSONObject buildPayload(
     // ==================== دورة الحياة ====================
 
     @Override
-    public void onResume() {
-        super.onResume();
+public void onResume() {
+    super.onResume();
 
-        if (!isAdded() || getActivity() == null) return;
+    if (!isAdded() || getActivity() == null) return;
 
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-        }
-
-        if (binding == null || getView() == null) {
-            handler.postDelayed(() -> {
-                if (!isAdded() || binding == null || isRemoving()) return;
-                performOnResumeSetup();
-
-// ✅ [إصلاح] لا تبدأ المسح التلقائي إذا EPC مربوط بالفعل
-if (!isRfidScanning && !isFormLocked && !stoppingReader.get() && !isEpcBound) {
-    autoStartRfidScanning();
-} else if (isEpcBound) {
-    Log.d(TAG, "⏭️ Auto-scan skipped: EPC is already bound");
-}
-            }, 100);
-            return;
-        }
-
-        performOnResumeSetup();
-        if (!isRfidScanning && !isFormLocked && !stoppingReader.get()) {
-            autoStartRfidScanning();
-        }
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
     }
+
+    // ✅ [v6.3] قوة منخفضة للتكويد
+    applyLowPowerForEncoding();
+
+    if (binding == null || getView() == null) {
+        handler.postDelayed(() -> {
+            if (!isAdded() || binding == null || isRemoving()) return;
+            performOnResumeSetup();
+        }, 100);
+        return;
+    }
+
+    performOnResumeSetup();
+
+    // ✅ [v6.3] لا مسح تلقائي — الزناد الفيزيائي فقط
+    Log.d(TAG, "⏸️ Auto-scan disabled — use physical trigger");
+}
 
     private void autoStartRfidScanning() {
     if (isDestroyed() || !isAdded() || binding == null) return;
@@ -2650,6 +2857,9 @@ if (!isRfidScanning && !isFormLocked && !stoppingReader.get() && !isEpcBound) {
         if (handler != null) {
             handler.removeCallbacksAndMessages(null);
         }
+        // ✅ [v6.3] استعادة القوة
+restoreOriginalPowerEncoding();
+
 
         stopRfidScanningMode();
         saveCurrentDraftAsync();
