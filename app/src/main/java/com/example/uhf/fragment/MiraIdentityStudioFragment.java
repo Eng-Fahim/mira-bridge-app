@@ -146,7 +146,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     /** ✅ منع إعادة الدخول في stopRfidScanningMode */
     private final AtomicBoolean stoppingReader = new AtomicBoolean(false);
-
+    
+    /** ✅ منع معالجة أكثر من شريحة في نفس وقت المسح */
+    private final AtomicBoolean isProcessingTag = new AtomicBoolean(false);
     /** ✅ هل EPC مربوط حالياً؟ */
     private volatile boolean isEpcBound = false;
 
@@ -1190,6 +1192,9 @@ private void activateRFIDModeForEncoding() {
             return;
         }
 
+        // ✅ إعادة تعيين قفل المعالجة عند بدء مسح جديد
+        isProcessingTag.set(false);
+
         isRfidScanning = true;
         updateScanningUI(true);
 
@@ -1199,19 +1204,23 @@ private void activateRFIDModeForEncoding() {
             stopRfidScanningMode();
             return;
         }
-
         encodingRfidListener = new MiraIRFIDReader.OnTagReadListener() {
-            @Override
-            public void onTagRead(String epc, int rssi) {
-                if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
+    @Override
+    public void onTagRead(String epc, int rssi) {
+        if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
 
-                final String receivedEpc = epc.trim().toUpperCase(Locale.US);
-                Log.i(TAG, "📡 EPC received (trigger): " + receivedEpc);
+        // ✅ الحماية من القراءات المتعددة: إذا كنا نعالج شريحة بالفعل، تجاهل الباقي
+        if (!isProcessingTag.compareAndSet(false, true)) {
+            Log.d(TAG, "⏭️ Ignoring extra tag (already processing): " + epc);
+            return;
+        }
 
-                handler.post(() -> stopRfidScanningMode());
-                handler.post(() -> processReceivedTag(receivedEpc));
-            }
+        final String receivedEpc = epc.trim().toUpperCase(Locale.US);
+        Log.i(TAG, "📡 EPC received (trigger): " + receivedEpc);
 
+        handler.post(() -> stopRfidScanningMode());
+        handler.post(() -> processReceivedTag(receivedEpc));
+    }
             @Override public void onScanStarted() {}
             @Override public void onScanStopped() {}
             @Override public void onConnectionChanged(boolean c) {}
@@ -2685,10 +2694,11 @@ Log.i(TAG, "══════════════════════�
     // ═══════════════════════════════════════════════════════════════════
     //  Reset for next scan
     // ═══════════════════════════════════════════════════════════════════
-
-    private void resetFormForNextScan() {
-        isEpcBound = false;
-
+private void resetFormForNextScan() {
+    isEpcBound = false;
+    
+    // ✅ إعادة تعيين قفل المعالجة
+    isProcessingTag.set(false);
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post(this::resetFormForNextScan);
             return;
@@ -3382,7 +3392,7 @@ Log.i(TAG, "══════════════════════�
         if (handler != null) {
             handler.removeCallbacksAndMessages(null);
         }
-
+        isProcessingTag.set(false); 
         stopRfidScanningMode();
         saveCurrentDraftAsync();
     }
@@ -3443,7 +3453,7 @@ Log.i(TAG, "══════════════════════�
 
         // 7) ألغِ binding
         binding = null;
-
+        isProcessingTag.set(false); 
         super.onDestroyView();
     }
 
