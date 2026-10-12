@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:background="?attr/colorSurface">
 
-    <!-- ═══════════ 🔙 HEADER (زر الرجوع) ═══════════ -->
+    <!-- ═══════════ 🔙 HEADER ═══════════ -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbarReaderControl"
         android:layout_width="match_parent"
@@ -24,7 +24,6 @@
         android:layout_height="1dp"
         android:background="?attr/colorOutlineVariant"/>
 
-    <!-- ═══════════ 📜 Content ═══════════ -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -37,7 +36,6 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- 📖 شرح مبسط -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -46,7 +44,9 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:layout_marginBottom="16dp"/>
 
-            <!-- ═══════════ ⚡ Power Card ═══════════ -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- ⚡ Power Card (كما هي) -->
+            <!-- ═══════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -101,7 +101,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ═══════════ 🌍 Radio Card ═══════════ -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- 🌍 Radio Card (كما هي) -->
+            <!-- ═══════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -116,18 +118,16 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <!-- منطقة العمل -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="🌍 منطقتك الجغرافية"
                         android:textStyle="bold"
-                        android:textSize="15sp"
-                        android:textColor="?attr/colorOnSurface"/>
+                        android:textSize="15sp"/>
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="اختر المنطقة الأقرب لك — لا تغيّرها إلا إذا كنت خارج اليمن/الخليج"
+                        android:text="اختر المنطقة الأقرب لك"
                         android:textSize="12sp"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:layout_marginBottom="8dp"/>
@@ -137,14 +137,12 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="16dp"/>
 
-                    <!-- وضع القراءة -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="🎯 كيف يقرأ القارئ؟"
                         android:textStyle="bold"
-                        android:textSize="15sp"
-                        android:textColor="?attr/colorOnSurface"/>
+                        android:textSize="15sp"/>
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -168,21 +166,12 @@
                         android:background="?attr/colorSurfaceVariant"
                         android:layout_marginBottom="16dp"/>
 
-                    <!-- RFLink -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="🔗 جودة الإشارة"
                         android:textStyle="bold"
-                        android:textSize="15sp"
-                        android:textColor="?attr/colorOnSurface"/>
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="لا تغيّرها إلا إذا واجهت مشاكل في القراءة"
-                        android:textSize="12sp"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:layout_marginBottom="8dp"/>
+                        android:textSize="15sp"/>
                     <Spinner
                         android:id="@+id/spRfLink"
                         android:layout_width="match_parent"
@@ -190,7 +179,225 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ═══════════ 🎚️ Advanced Settings Card ═══════════ -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- 🔊 NEW v4.0 — Sound & Vibration Card              -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🔊 الأصوات والاهتزاز"
+                            android:textStyle="bold"
+                            android:textSize="15sp"
+                            android:textColor="?attr/colorOnSurface"/>
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/swSoundEnabled"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="نغمة تأكيد عند قراءة كل قطعة — مفيدة جداً أثناء البيع"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:layout_marginBottom="12dp"/>
+
+                    <LinearLayout
+                        android:id="@+id/groupSoundSettings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <!-- Volume -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="🔉 مستوى الصوت"
+                                android:textStyle="bold"
+                                android:textSize="13sp"/>
+                            <TextView
+                                android:id="@+id/tvVolumeValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="80%"
+                                android:textColor="?attr/colorPrimary"
+                                android:textStyle="bold"
+                                android:textSize="14sp"/>
+                        </LinearLayout>
+                        <SeekBar
+                            android:id="@+id/seekVolume"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="100"
+                            android:layout_marginBottom="12dp"/>
+
+                        <!-- Tone New Tag -->
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="🔔 نغمة القطعة الجديدة"
+                            android:textStyle="bold"
+                            android:textSize="13sp"/>
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+                            <Spinner
+                                android:id="@+id/spToneNew"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnTestToneNew"
+                                style="@style/Widget.Material3.Button.IconButton"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                app:icon="@android:drawable/ic_lock_silent_mode_off"
+                                app:iconTint="?attr/colorPrimary"/>
+                        </LinearLayout>
+
+                        <!-- Tone Duplicate -->
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="🔁 نغمة القطعة المكررة"
+                            android:textStyle="bold"
+                            android:textSize="13sp"
+                            android:layout_marginTop="4dp"/>
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+                            <Spinner
+                                android:id="@+id/spToneDuplicate"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnTestToneDuplicate"
+                                style="@style/Widget.Material3.Button.IconButton"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                app:icon="@android:drawable/ic_lock_silent_mode_off"
+                                app:iconTint="?attr/colorPrimary"/>
+                        </LinearLayout>
+
+                        <!-- Tone Error -->
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="❌ نغمة الخطأ"
+                            android:textStyle="bold"
+                            android:textSize="13sp"
+                            android:layout_marginTop="4dp"/>
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+                            <Spinner
+                                android:id="@+id/spToneError"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"/>
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnTestToneError"
+                                style="@style/Widget.Material3.Button.IconButton"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                app:icon="@android:drawable/ic_lock_silent_mode_off"
+                                app:iconTint="?attr/colorPrimary"/>
+                        </LinearLayout>
+
+                        <!-- Sound scope -->
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/swSoundOnPos"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="💰 تفعيل الصوت في وضع البيع"/>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/swSoundOnInventory"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="📦 تفعيل الصوت في وضع الجرد"/>
+
+                        <!-- Vibrate -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="?attr/colorOutlineVariant"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"/>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/swVibrateEnabled"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="📳 تفعيل الاهتزاز"/>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="⏱️ مدة الاهتزاز"
+                                android:textStyle="bold"
+                                android:textSize="13sp"/>
+                            <TextView
+                                android:id="@+id/tvVibrateMsValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="40 ms"
+                                android:textColor="?attr/colorPrimary"
+                                android:textStyle="bold"
+                                android:textSize="14sp"/>
+                        </LinearLayout>
+                        <SeekBar
+                            android:id="@+id/seekVibrateMs"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="500"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- 🎯 NEW v4.0 — Advanced Reading Card                -->
+            <!-- ═══════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -208,21 +415,200 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="⚙️ إعدادات متقدمة"
+                        android:text="🎯 قراءة متقدمة"
                         android:textStyle="bold"
-                        android:textSize="15sp"
-                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="15sp"/>
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="تحكم دقيق في سلوك القراءة — مفيد للجرد الكبير"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:layout_marginBottom="12dp"/>
+
+                    <!-- Duplicate Filter -->
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swFilterDuplicates"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="🚫 تجاهل القطع المكررة"
                         android:layout_marginBottom="4dp"/>
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="غيّرها فقط إذا طلب منك الدعم الفني"
-                        android:textSize="12sp"
+                        android:text="يمنع احتساب نفس القطعة أكثر من مرة خلال نافذة زمنية"
+                        android:textSize="11sp"
                         android:textColor="?attr/colorOnSurfaceVariant"
+                        android:layout_marginBottom="8dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="⏱️ نافذة التجاهل"
+                            android:textStyle="bold"
+                            android:textSize="13sp"/>
+                        <TextView
+                            android:id="@+id/tvDupFilterValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="2000 ms"
+                            android:textColor="?attr/colorPrimary"
+                            android:textStyle="bold"
+                            android:textSize="14sp"/>
+                    </LinearLayout>
+                    <SeekBar
+                        android:id="@+id/seekDupFilter"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="10000"
                         android:layout_marginBottom="12dp"/>
 
-                    <!-- Session -->
+                    <!-- Single Timeout -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🎯 مهلة القراءة المفردة"
+                            android:textStyle="bold"
+                            android:textSize="13sp"/>
+                        <TextView
+                            android:id="@+id/tvSingleTimeoutValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="1500 ms"
+                            android:textColor="?attr/colorPrimary"
+                            android:textStyle="bold"
+                            android:textSize="14sp"/>
+                    </LinearLayout>
+                    <SeekBar
+                        android:id="@+id/seekSingleTimeout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="10000"
+                        android:layout_marginBottom="12dp"/>
+
+                    <!-- Max Tags -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="📊 الحد الأقصى للوسوم في الجلسة (0 = بلا حد)"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_marginBottom="8dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etMaxTags"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:text="0"/>
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Auto Stop -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="⏹️ الإيقاف التلقائي بعد (ms، 0 = معطّل)"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_marginBottom="4dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etAutoStop"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:text="0"/>
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- 🌐 NEW v4.0 — Global Settings Card                 -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="🌐 خيارات عامة"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="12dp"/>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swKeepScreenOn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="💡 إبقاء الشاشة مضاءة أثناء القراءة"
+                        android:layout_marginBottom="8dp"/>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swLedFlash"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="🔦 وميض LED عند كل قراءة"
+                        android:layout_marginBottom="8dp"/>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swToastEnabled"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="💬 إظهار تنبيهات Toast"
+                        android:layout_marginBottom="8dp"/>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swAutoSaveLog"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="💾 حفظ سجل القراءات تلقائياً"
+                        android:layout_marginBottom="8dp"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- 🎚️ Advanced Settings Card (الموجودة) -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="⚙️ إعدادات متقدمة (للدعم الفني)"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="12dp"/>
+
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -235,7 +621,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"/>
 
-                    <!-- Target -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -248,7 +633,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"/>
 
-                    <!-- Q Value -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -283,7 +667,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ═══════════ 📡 Live Test Card ═══════════ -->
+            <!-- ═══════════ 📡 Live Test Card (كما هي) ═══════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -310,12 +694,11 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="قرّب قطعة ذهبية وشاهد قوة القراءة قبل الاستخدام"
+                        android:text="قرّب قطعة وشاهد قوة القراءة + اسمع النغمة قبل الاستخدام"
                         android:textSize="12sp"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:layout_marginBottom="12dp"/>
 
-                    <!-- Stats -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -333,8 +716,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="📊 القراءات"
-                                android:textSize="10sp"
-                                android:textColor="?attr/colorOnSurfaceVariant"/>
+                                android:textSize="10sp"/>
                             <TextView
                                 android:id="@+id/tvLiveReadCount"
                                 android:layout_width="wrap_content"
@@ -357,8 +739,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="⚡ المعدل"
-                                android:textSize="10sp"
-                                android:textColor="?attr/colorOnSurfaceVariant"/>
+                                android:textSize="10sp"/>
                             <TextView
                                 android:id="@+id/tvLiveRate"
                                 android:layout_width="wrap_content"
@@ -445,7 +826,6 @@
                 android:visibility="gone"
                 android:layout_marginBottom="12dp"/>
 
-            <!-- ═══════════ أزرار ═══════════ -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnApplyNow"
                 android:layout_width="match_parent"
