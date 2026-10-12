@@ -1264,25 +1264,34 @@ private void activateRFIDModeForEncoding() {
 private void processReceivedTag(String epc) {
     if (epc == null || epc.isEmpty()) return;
 
-    if (!isAdded() || binding == null || isRemoving() || isDetached()) {
-        Log.d(TAG, "processReceivedTag skipped: fragment not attached");
-        return;
-    }
+    if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
 
-    Log.i(TAG, "🎯 Processing received EPC: " + epc);
+    Log.i(TAG, "🎯 Processing received tag: " + epc);
 
     miraExecutor.getBackgroundExecutor().execute(() -> {
         boolean isTagAllowed = false, isDuplicate = false;
+        String actualTid = epc; // القيمة الافتراضية
+        
         try {
             MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
+            
+            // ✅ الحل: اقرأ الـ TID الحقيقي من الشريحة
+            String tidFromTag = rfidService.readTid(null);
+            if (tidFromTag != null && !tidFromTag.trim().isEmpty()) {
+                actualTid = tidFromTag.trim().toUpperCase(Locale.US);
+            }
+            
             boolean isSim = rfidService.isSimulationMode();
-            isTagAllowed = isSim || rfidService.verifyTagAllowed(epc);
-            isDuplicate = syncManager.isEpcDuplicateLocally(epc);
+            // ✅ التحقق باستخدام الـ TID وليس الـ EPC
+            isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+            isDuplicate = syncManager.isEpcDuplicateLocally(actualTid);
+            
         } catch (Exception e) {
             Log.e(TAG, "processReceivedTag checks error: " + e.getMessage(), e);
             return;
         }
 
+        final String finalTid = actualTid; // المتغير النهائي للاستخدام داخل safeRun
         final boolean fAllowed = isTagAllowed;
         final boolean fDuplicate = isDuplicate;
 
@@ -1298,9 +1307,9 @@ private void processReceivedTag(String epc) {
                 showScanFeedback(
                         isArabic ? "❌ شريحة غير معتمدة"
                                  : "❌ Unauthorized Tag",
-                        isArabic ? "TID: " + epc
+                        isArabic ? "TID: " + finalTid // ✅ تم التعديل هنا
                                     + "\nليست من الموردين المعتمدين"
-                                 : "TID: " + epc
+                                 : "TID: " + finalTid // ✅ تم التعديل هنا
                                     + "\nNot from approved suppliers",
                         null,
                         android.R.drawable.ic_delete,
@@ -1310,11 +1319,11 @@ private void processReceivedTag(String epc) {
                         isArabic ? "⛔ شريحة غير معتمدة"
                                  : "⛔ Unauthorized Tag",
                         isArabic ? "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n"
-                                    + "🔹 TID: " + epc + "\n"
+                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
                                     + "🔹 الموردون المعتمدون: SunlandRFID\n\n"
                                     + "💡 استخدم شريحة من مورد معتمد."
                                  : "This tag is not from approved inventory:\n\n"
-                                    + "🔹 TID: " + epc + "\n"
+                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
                                     + "🔹 Approved: SunlandRFID\n\n"
                                     + "💡 Use a tag from an approved supplier.");
                 return;
@@ -1329,9 +1338,9 @@ private void processReceivedTag(String epc) {
                 showScanFeedback(
                         isArabic ? "⚠️ شريحة مكررة"
                                  : "⚠️ Duplicate Tag",
-                        isArabic ? "TID: " + epc
+                        isArabic ? "TID: " + finalTid // ✅ تم التعديل هنا
                                     + "\nمسجلة بالفعل في النظام"
-                                 : "TID: " + epc
+                                 : "TID: " + finalTid // ✅ تم التعديل هنا
                                     + "\nAlready registered",
                         null,
                         android.R.drawable.ic_dialog_alert,
@@ -1340,11 +1349,11 @@ private void processReceivedTag(String epc) {
                 showErrorDialog(
                         isArabic ? "شريحة مكررة" : "Duplicate Tag",
                         isArabic ? "هذه الشريحة مسجلة بالفعل في النظام:\n\n"
-                                    + "🔹 TID: " + epc + "\n"
+                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
                                     + "🔹 لا يمكن استخدامها مرتين.\n\n"
                                     + "💡 استخدم شريحة جديدة."
                                  : "This tag is already registered:\n\n"
-                                    + "🔹 TID: " + epc + "\n"
+                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
                                     + "🔹 Cannot be reused.\n\n"
                                     + "💡 Use a new tag.");
                 return;
@@ -1358,15 +1367,15 @@ private void processReceivedTag(String epc) {
                 String existing = binding.etEpc.getText() != null
                         ? binding.etEpc.getText().toString().trim() : "";
 
-                if (!existing.isEmpty() && !existing.equals(epc)) {
+                if (!existing.isEmpty() && !existing.equals(finalTid)) { // ✅ تم التعديل هنا
                     wasReplacing = true;
-                    Log.i(TAG, "🔄 Replacing bound tag: " + existing + " → " + epc);
+                    Log.i(TAG, "🔄 Replacing bound tag: " + existing + " → " + finalTid);
                 }
             }
 
             if (binding.etEpc != null) {
-                binding.etEpc.setText(epc);
-                binding.etEpc.setTag(epc);
+                binding.etEpc.setText(finalTid); // ✅ تم التعديل هنا
+                binding.etEpc.setTag(finalTid);  // ✅ تم التعديل هنا
                 isEpcBound = true;
             }
             if (binding.tvStatusBadge != null) {
@@ -1379,10 +1388,10 @@ private void processReceivedTag(String epc) {
                     : (isArabic ? "✅ شريحة صالحة" : "✅ Valid Tag");
 
             String detailsText = wasReplacing
-                    ? (isArabic ? "TID جديد: " + epc + "\nجاهز للتكويد"
-                                : "New TID: " + epc + "\nReady for encoding")
-                    : (isArabic ? "TID: " + epc + "\nجاهزة للتكويد"
-                                : "TID: " + epc + "\nReady for encoding");
+                    ? (isArabic ? "TID جديد: " + finalTid + "\nجاهز للتكويد" // ✅ تم التعديل هنا
+                                : "New TID: " + finalTid + "\nReady for encoding")
+                    : (isArabic ? "TID: " + finalTid + "\nجاهزة للتكويد" // ✅ تم التعديل هنا
+                                : "TID: " + finalTid + "\nReady for encoding");
 
             showScanFeedback(
                     titleText,
@@ -1391,7 +1400,7 @@ private void processReceivedTag(String epc) {
                     R.drawable.ic_pos_cart_gold,
                     0xFF22C55E);
 
-            Log.i(TAG, "✅ Tag accepted: " + epc
+            Log.i(TAG, "✅ Tag accepted: " + finalTid // ✅ تم التعديل هنا
                     + (wasReplacing ? " (replaced)" : ""));
             playSuccessSound();
         });
