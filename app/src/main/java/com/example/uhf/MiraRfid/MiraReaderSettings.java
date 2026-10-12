@@ -14,17 +14,21 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraReaderSettings v4.0 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
+ *  MiraReaderSettings v5.0 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * [v4.0] إضافات عالمية:
- *   🔊 نظام الأصوات الكامل (نجاح / مكرر / خطأ / مسح مستمر)
+ * [v5.0] إضافات حرجة لليمن/الخليج + المجوهرات:
+ *   ✅ قيم افتراضية محسّنة (Power=24، TagFocus=ON، Filter=ON، Toggle)
+ *   ✅ دالة applyYemenJewelryDefaults() — تطبيق بضغطة واحدة
+ *   ✅ TONE_UNKNOWN_ITEM — تمييز صوتي للقطع غير المعروفة
+ *   ✅ Trigger Mode (Hold/Toggle)
+ *
+ * [v4.0] الأساس:
+ *   🔊 نظام الأصوات الكامل
  *   📳 الاهتزاز القابل للتخصيص
- *   🎯 وضع القراءة المتقدم (مفرد/مستمر + مهلة + حد أقصى)
- *   🔇 فلترة التكرار (Duplicate Filter)
- *   💡 وميض LED وإبقاء الشاشة مضاءة
- *   📊 حدود الجلسة (Max Tags / Timeout)
- *   🌐 دعم لغات متعددة (AR / EN)
+ *   🎯 القراءة المتقدمة (مهلة + حد أقصى + إيقاف تلقائي)
+ *   🚫 فلترة التكرار
+ *   💡 وميض LED + إبقاء الشاشة مضاءة
  */
 public class MiraReaderSettings {
 
@@ -99,85 +103,143 @@ public class MiraReaderSettings {
             "يقرأ كل الوسوم القريبة باستمرار — مثالي للجرد السريع",
             "يقرأ وسماً واحداً فقط لكل ضغطة — مثالي للبيع"
     };
-    
-    // ═══════════════════════════════════════════════════════════════
-//  🎯 وضع الزناد الفيزيائي (Trigger Mode)
-// ═══════════════════════════════════════════════════════════════
-public static final int TRIGGER_MODE_HOLD   = 0;  // اضغط باستمرار
-public static final int TRIGGER_MODE_TOGGLE = 1;  // ضغطة تبدّل
-
-public static final String[] TRIGGER_MODE_LABELS = {
-        "⏸️ اضغط باستمرار (Hold)",
-        "🔄 ضغطة للبدء/الإيقاف (Toggle)"
-};
-
-public static final String[] TRIGGER_MODE_HINTS = {
-        "المسح يعمل طوال فترة ضغط الزناد — مثالي للفحص السريع والبيع",
-        "ضغطة واحدة تبدأ المسح، وضغطة أخرى توقفه — مثالي للجرد الشامل"
-};
-
-public static final int DEF_TRIGGER_MODE = TRIGGER_MODE_HOLD;  // افتراضي: Hold
 
     // ═══════════════════════════════════════════════════════════════
-    //  🔊 نغمات التغذية الراجعة (Feedback Tones)
+    //  🎯 وضع الزناد الفيزيائي (Trigger Mode)
     // ═══════════════════════════════════════════════════════════════
-    /** نوع النغمة لكل حدث */
-    public static final int TONE_BEEP_SHORT   = 0; // بيب قصير (وسم جديد)
-    public static final int TONE_BEEP_DOUBLE  = 1; // بيب مزدوج (نجاح)
-    public static final int TONE_BEEP_LONG    = 2; // بيب طويل (خطأ)
-    public static final int TONE_CLICK        = 3; // كليك (مكرر)
-    public static final int TONE_SUCCESS      = 4; // نجاح (نجاح كامل)
-    public static final int TONE_ERROR        = 5; // خطأ
-    public static final int TONE_NONE         = 6; // صامت
+    public static final int TRIGGER_MODE_HOLD   = 0;  // اضغط باستمرار
+    public static final int TRIGGER_MODE_TOGGLE = 1;  // ضغطة تبدّل
 
-    public static final String[] TONE_LABELS = {
-            "🔔 بيب قصير", "🔔🔔 بيب مزدوج", "🔔 بيب طويل",
-            "🖱️ كليك", "✅ نجاح", "❌ خطأ", "🔇 صامت"
+    public static final String[] TRIGGER_MODE_LABELS = {
+            "⏸️ اضغط باستمرار (Hold)",
+            "🔄 ضغطة للبدء/الإيقاف (Toggle)"
+    };
+
+    public static final String[] TRIGGER_MODE_HINTS = {
+            "المسح يعمل طوال فترة ضغط الزناد — مثالي للفحص السريع والبيع",
+            "ضغطة واحدة تبدأ المسح، وضغطة أخرى توقفه — مثالي للجرد الشامل"
     };
 
     // ═══════════════════════════════════════════════════════════════
-    //  القيم الافتراضية
+    //  🔊 نغمات التغذية الراجعة
     // ═══════════════════════════════════════════════════════════════
-    public static final int  DEF_POWER_DBM       = 27;
+    public static final int TONE_BEEP_SHORT   = 0; // بيب قصير
+    public static final int TONE_BEEP_DOUBLE  = 1; // بيب مزدوج
+    public static final int TONE_BEEP_LONG    = 2; // بيب طويل
+    public static final int TONE_CLICK        = 3; // كليك
+    public static final int TONE_SUCCESS      = 4; // نجاح
+    public static final int TONE_ERROR        = 5; // خطأ
+    public static final int TONE_NONE         = 6; // صامت
+    public static final int TONE_UNKNOWN_ITEM = 7; // ⚠️ [v5.0] قطعة غير معروفة
+
+    public static final String[] TONE_LABELS = {
+            "🔔 بيب قصير",
+            "🔔🔔 بيب مزدوج",
+            "🔔 بيب طويل",
+            "🖱️ كليك",
+            "✅ نغمة نجاح",
+            "❌ نغمة خطأ",
+            "🔇 صامت",
+            "⚠️ تنبيه (غير معروف)"
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    //  🎯 القيم الافتراضية — محسّنة لجرد المجوهرات في اليمن/الخليج
+    // ═══════════════════════════════════════════════════════════════
+
+    // ────────────── القارئ (Reader) ──────────────
+
+    /** ⚡ قوة الإرسال: 24 dBm — توازن مثالي (لا يقرأ الصواني المجاورة) */
+    public static final int  DEF_POWER_DBM       = 24;
+
+    /** 🌍 المنطقة: ETSI (865-868 MHz) — الأنسب لليمن/الخليج */
     public static final int  DEF_FREQ_MODE       = FREQ_ETSI;
+
+    /** 🔄 وضع القراءة: مستمر (للجرد) */
     public static final int  DEF_READ_MODE       = READ_MODE_AUTO;
+
+    /** 📊 Session 1 — يبقي الوسوم نشطة بين الدورات */
     public static final int  DEF_SESSION         = 1;
+
+    /** 🎯 Target A — يستهدف الوسوم غير المقروءة */
     public static final int  DEF_TARGET          = 0;
+
+    /** 🔢 Q Mode: ثابت (Fixed) */
     public static final int  DEF_Q_MODE          = 0;
+
+    /** 🔢 Q Value: 4 (16 فتحة) — مثالي لـ 10-30 قطعة */
     public static final int  DEF_Q_VALUE         = 4;
+
     public static final int  DEF_MIN_Q           = 0;
     public static final int  DEF_MAX_Q           = 15;
     public static final int  DEF_DR              = 0;
-    public static final int  DEF_MILLER          = 1;
+
+    /** 🎵 Miller: 4 — دقة أعلى في البيئة المزدوجة بالمعادن */
+    public static final int  DEF_MILLER          = 3;
+
+    /** 🔗 Link Frequency: 250 KHz — توازن سرعة/دقة */
     public static final int  DEF_LINK_FREQ       = 1;
+
+    /** 🔗 RFLink: PR-ASK / Miller4 / 250KHz — مثالي للمجوهرات */
     public static final int  DEF_RFLINK          = 1;
+
+    /** 🚀 FastID: OFF — للدقة */
     public static final boolean DEF_FAST_ID      = false;
-    public static final boolean DEF_TAG_FOCUS    = false;
+
+    /** ✅ TagFocus: ON — حرج للمعادن */
+    public static final boolean DEF_TAG_FOCUS    = true;
+
+    /** ⚡ Fast Inventory: OFF — للدقة */
     public static final boolean DEF_FAST_INV     = false;
+
     public static final int  DEF_RSSI_THRESHOLD  = -75;
     public static final int  DEF_SCAN_INTERVAL   = 100;
 
-    public static final int  DEF_POS_POWER_DBM = 8;
+    // ────────────── ⚡ POS Power (للبيع) ──────────────
+
+    /** 7 dBm — يقرأ القطعة أمامك فقط */
+    public static final int  DEF_POS_POWER_DBM = 7;
     public static final int  MIN_POS_POWER_DBM = 5;
     public static final int  MAX_POS_POWER_DBM = 30;
 
-    // 🆕 v4.0 الافتراضيات
+    // ────────────── 🔊 الأصوات والاهتزاز ──────────────
+
     public static final boolean DEF_SOUND_ENABLED     = true;
-    public static final int     DEF_SOUND_VOLUME      = 80;   // 0-100
+    public static final int     DEF_SOUND_VOLUME      = 85;   // 85%
     public static final boolean DEF_VIBRATE_ENABLED   = true;
-    public static final int     DEF_VIBRATE_MS        = 40;
-    public static final int     DEF_TONE_NEW_TAG      = TONE_BEEP_SHORT;
+    public static final int     DEF_VIBRATE_MS        = 45;   // 45ms
+
+    /** 🔔 قطعة جديدة: بيب مزدوج — واضح لا يمكن تفويته */
+    public static final int     DEF_TONE_NEW_TAG      = TONE_BEEP_DOUBLE;
+
+    /** 🖱️ قطعة مكررة: كليك خفيف — يعرف أنها مكررة */
     public static final int     DEF_TONE_DUPLICATE    = TONE_CLICK;
+
+    /** ❌ خطأ: بيب طويل — تحذير واضح */
     public static final int     DEF_TONE_ERROR        = TONE_BEEP_LONG;
-    public static final int     DEF_TONE_SUCCESS      = TONE_BEEP_DOUBLE;
+
+    /** ✅ نجاح البيع: نغمة نجاح مميزة */
+    public static final int     DEF_TONE_SUCCESS      = TONE_SUCCESS;
+
+    /** ⚠️ [v5.0] قطعة غير معروفة: تنبيه — يميّزها عن القطعة المعروفة */
+    public static final int     DEF_TONE_UNKNOWN_ITEM = TONE_UNKNOWN_ITEM;
+
     public static final boolean DEF_SOUND_ON_POS      = true;
     public static final boolean DEF_SOUND_ON_INVENTORY= true;
 
+    // ────────────── 🎯 القراءة المتقدمة ──────────────
+
     public static final int     DEF_SINGLE_TIMEOUT_MS = 1500;
-    public static final int     DEF_AUTO_STOP_MS      = 0;   // 0 = بلا إيقاف
-    public static final int     DEF_MAX_TAGS_SESSION  = 0;   // 0 = بلا حد
-    public static final int     DEF_DUPLICATE_FILTER_MS = 2000;
-    public static final boolean DEF_FILTER_DUPLICATES = false;
+    public static final int     DEF_AUTO_STOP_MS      = 0;
+    public static final int     DEF_MAX_TAGS_SESSION  = 0;
+
+    /** ✅ فلتر التكرار: ON افتراضياً — مهم جداً للمجوهرات */
+    public static final boolean DEF_FILTER_DUPLICATES = true;
+
+    /** نافذة التجاهل: 2500ms */
+    public static final int     DEF_DUPLICATE_FILTER_MS = 2500;
+
+    // ────────────── 🌐 إعدادات عامة ──────────────
 
     public static final boolean DEF_LED_FLASH         = false;
     public static final boolean DEF_KEEP_SCREEN_ON    = true;
@@ -185,6 +247,11 @@ public static final int DEF_TRIGGER_MODE = TRIGGER_MODE_HOLD;  // افتراضي
     public static final boolean DEF_AUTO_SAVE_LOG     = false;
 
     public static final int     DEF_LANGUAGE          = 0; // 0=AR, 1=EN
+
+    // ────────────── 🎯 وضع الزناد ──────────────
+
+    /** Toggle — الأنسب للجرد الشامل */
+    public static final int DEF_TRIGGER_MODE = TRIGGER_MODE_TOGGLE;
 
     // ═══════════════════════════════════════════════════════════════
     //  Singleton
@@ -199,7 +266,7 @@ public static final int DEF_TRIGGER_MODE = TRIGGER_MODE_HOLD;  // افتراضي
     private MiraReaderSettings(Context ctx) {
         this.context = ctx.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.i(TAG, "✅ MiraReaderSettings v4.0 initialized");
+        Log.i(TAG, "✅ MiraReaderSettings v5.0 initialized");
     }
 
     public static MiraReaderSettings getInstance(Context ctx) {
@@ -210,13 +277,6 @@ public static final int DEF_TRIGGER_MODE = TRIGGER_MODE_HOLD;  // افتراضي
         }
         return instance;
     }
-    
-    public int  getTriggerMode() { return prefs.getInt("trigger_mode", DEF_TRIGGER_MODE); }
-
-public void setTriggerMode(int v) {
-    prefs.edit().putInt("trigger_mode", clamp(v, 0, 1)).commit();
-    notifyChanged();
-}
 
     // ═══════════════════════════════════════════════════════════════
     //  🆕 نظام مراقبة التغييرات
@@ -249,6 +309,60 @@ public void setTriggerMode(int v) {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  🎯 v5.0 — تطبيق الإعدادات المثالية لليمن/المجوهرات
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * ✅ يُطبّق الإعدادات المثالية لجرد المجوهرات في اليمن/الخليج بضغطة واحدة.
+     *
+     * يُستخدم عند:
+     *   • أول تثبيت
+     *   • الترقية من إصدار قديم
+     *   • إعادة الضبط بعد تغييرات غير موفقة
+     *
+     * ملاحظة: لا يمس إعدادات الصوت/الاهتزاز (لأنها شخصية).
+     */
+    public void applyYemenJewelryDefaults() {
+        Log.i(TAG, "🎯 Applying Yemen/Jewelry optimal defaults");
+
+        SharedPreferences.Editor e = prefs.edit();
+
+        // ⚡ القارئ
+        e.putInt("power",         DEF_POWER_DBM);        // 24 dBm
+        e.putInt("freq",          DEF_FREQ_MODE);        // ETSI
+        e.putInt("rflink",        DEF_RFLINK);           // Miller4/250KHz
+        e.putInt("miller",        DEF_MILLER);           // 4
+        e.putInt("link_freq",     DEF_LINK_FREQ);        // 250KHz
+        e.putInt("sess",          DEF_SESSION);          // S1
+        e.putInt("target",        DEF_TARGET);           // A
+        e.putInt("q_mode",        DEF_Q_MODE);           // Fixed
+        e.putInt("q_val",         DEF_Q_VALUE);          // 4
+        e.putBoolean("tag_focus", DEF_TAG_FOCUS);        // ✅ ON
+        e.putBoolean("fast_id",   DEF_FAST_ID);          // OFF
+        e.putBoolean("fast_inv",  DEF_FAST_INV);         // OFF
+
+        // 🎯 القراءة المتقدمة
+        e.putBoolean("flt_dup", DEF_FILTER_DUPLICATES);  // ✅ ON
+        e.putInt("dup_flt",     DEF_DUPLICATE_FILTER_MS);// 2500ms
+        e.putInt("max_tags",    DEF_MAX_TAGS_SESSION);   // 0 = بلا حد
+        e.putInt("auto_stop",   DEF_AUTO_STOP_MS);       // 0 = بلا إيقاف
+
+        // 🌐 عام
+        e.putBoolean("keep_screen", DEF_KEEP_SCREEN_ON); // ON
+
+        // 🎯 وضع الزناد
+        e.putInt("trigger_mode", DEF_TRIGGER_MODE);      // Toggle
+
+        // ⚡ POS
+        e.putInt("pos_power", DEF_POS_POWER_DBM);        // 7 dBm
+
+        e.commit();
+        notifyChanged();
+
+        Log.i(TAG, "✅ Yemen/Jewelry defaults applied successfully");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  📡 Get / Set — الإعدادات الأساسية
     // ═══════════════════════════════════════════════════════════════
     public int     getPowerDbm()      { return prefs.getInt("power", DEF_POWER_DBM); }
@@ -270,6 +384,7 @@ public void setTriggerMode(int v) {
     public int     getRssiThreshold() { return prefs.getInt("rssi", DEF_RSSI_THRESHOLD); }
     public int     getScanInterval()  { return prefs.getInt("interval", DEF_SCAN_INTERVAL); }
     public int     getPosPowerDbm()   { return prefs.getInt("pos_power", DEF_POS_POWER_DBM); }
+    public int     getTriggerMode()   { return prefs.getInt("trigger_mode", DEF_TRIGGER_MODE); }
 
     public void setPowerDbm(int v)      { prefs.edit().putInt("power", clamp(v, 5, 33)).commit(); notifyChanged(); }
     public void setFreqMode(int v)      { prefs.edit().putInt("freq", v).commit(); notifyChanged(); }
@@ -293,21 +408,25 @@ public void setTriggerMode(int v) {
         prefs.edit().putInt("pos_power", clamp(v, MIN_POS_POWER_DBM, MAX_POS_POWER_DBM)).commit();
         notifyChanged();
     }
+    public void setTriggerMode(int v)   {
+        prefs.edit().putInt("trigger_mode", clamp(v, 0, 1)).commit();
+        notifyChanged();
+    }
 
     // ═══════════════════════════════════════════════════════════════
-    //  🔊 v4.0 — إعدادات الأصوات والاهتزاز
+    //  🔊 إعدادات الأصوات والاهتزاز
     // ═══════════════════════════════════════════════════════════════
-    public boolean isSoundEnabled()      { return prefs.getBoolean("snd_en", DEF_SOUND_ENABLED); }
-    public int     getSoundVolume()      { return prefs.getInt("snd_vol", DEF_SOUND_VOLUME); }
-    public int     getToneNewTag()       { return prefs.getInt("tone_new", DEF_TONE_NEW_TAG); }
-    public int     getToneDuplicate()    { return prefs.getInt("tone_dup", DEF_TONE_DUPLICATE); }
-    public int     getToneError()        { return prefs.getInt("tone_err", DEF_TONE_ERROR); }
-    public int     getToneSuccess()      { return prefs.getInt("tone_succ", DEF_TONE_SUCCESS); }
-    public boolean isSoundOnPos()        { return prefs.getBoolean("snd_pos", DEF_SOUND_ON_POS); }
-    public boolean isSoundOnInventory()  { return prefs.getBoolean("snd_inv", DEF_SOUND_ON_INVENTORY); }
-
-    public boolean isVibrateEnabled()    { return prefs.getBoolean("vib_en", DEF_VIBRATE_ENABLED); }
-    public int     getVibrateMs()        { return prefs.getInt("vib_ms", DEF_VIBRATE_MS); }
+    public boolean isSoundEnabled()        { return prefs.getBoolean("snd_en", DEF_SOUND_ENABLED); }
+    public int     getSoundVolume()        { return prefs.getInt("snd_vol", DEF_SOUND_VOLUME); }
+    public int     getToneNewTag()         { return prefs.getInt("tone_new", DEF_TONE_NEW_TAG); }
+    public int     getToneDuplicate()      { return prefs.getInt("tone_dup", DEF_TONE_DUPLICATE); }
+    public int     getToneError()          { return prefs.getInt("tone_err", DEF_TONE_ERROR); }
+    public int     getToneSuccess()        { return prefs.getInt("tone_succ", DEF_TONE_SUCCESS); }
+    public int     getToneUnknownItem()    { return prefs.getInt("tone_unk", DEF_TONE_UNKNOWN_ITEM); }
+    public boolean isSoundOnPos()          { return prefs.getBoolean("snd_pos", DEF_SOUND_ON_POS); }
+    public boolean isSoundOnInventory()    { return prefs.getBoolean("snd_inv", DEF_SOUND_ON_INVENTORY); }
+    public boolean isVibrateEnabled()      { return prefs.getBoolean("vib_en", DEF_VIBRATE_ENABLED); }
+    public int     getVibrateMs()          { return prefs.getInt("vib_ms", DEF_VIBRATE_MS); }
 
     public void setSoundEnabled(boolean v)      { prefs.edit().putBoolean("snd_en", v).commit(); notifyChanged(); }
     public void setSoundVolume(int v)           { prefs.edit().putInt("snd_vol", clamp(v, 0, 100)).commit(); notifyChanged(); }
@@ -315,13 +434,14 @@ public void setTriggerMode(int v) {
     public void setToneDuplicate(int v)         { prefs.edit().putInt("tone_dup", v).commit(); notifyChanged(); }
     public void setToneError(int v)             { prefs.edit().putInt("tone_err", v).commit(); notifyChanged(); }
     public void setToneSuccess(int v)           { prefs.edit().putInt("tone_succ", v).commit(); notifyChanged(); }
+    public void setToneUnknownItem(int v)       { prefs.edit().putInt("tone_unk", v).commit(); notifyChanged(); }
     public void setSoundOnPos(boolean v)        { prefs.edit().putBoolean("snd_pos", v).commit(); notifyChanged(); }
     public void setSoundOnInventory(boolean v)  { prefs.edit().putBoolean("snd_inv", v).commit(); notifyChanged(); }
     public void setVibrateEnabled(boolean v)    { prefs.edit().putBoolean("vib_en", v).commit(); notifyChanged(); }
     public void setVibrateMs(int v)             { prefs.edit().putInt("vib_ms", clamp(v, 10, 500)).commit(); notifyChanged(); }
 
     // ═══════════════════════════════════════════════════════════════
-    //  🎯 v4.0 — إعدادات القراءة المتقدمة
+    //  🎯 إعدادات القراءة المتقدمة
     // ═══════════════════════════════════════════════════════════════
     public int     getSingleTimeoutMs()      { return prefs.getInt("sin_to", DEF_SINGLE_TIMEOUT_MS); }
     public int     getAutoStopMs()           { return prefs.getInt("auto_stop", DEF_AUTO_STOP_MS); }
@@ -336,7 +456,7 @@ public void setTriggerMode(int v) {
     public void setFilterDuplicates(boolean v){ prefs.edit().putBoolean("flt_dup", v).commit(); notifyChanged(); }
 
     // ═══════════════════════════════════════════════════════════════
-    //  🌐 v4.0 — إعدادات عالمية (LED, Screen, Toast, Log)
+    //  🌐 إعدادات عامة (LED, Screen, Toast, Log)
     // ═══════════════════════════════════════════════════════════════
     public boolean isLedFlashEnabled()   { return prefs.getBoolean("led_flash", DEF_LED_FLASH); }
     public boolean isKeepScreenOn()      { return prefs.getBoolean("keep_screen", DEF_KEEP_SCREEN_ON); }
@@ -412,6 +532,7 @@ public void setTriggerMode(int v) {
     public void resetToDefaults() {
         prefs.edit().clear().commit();
         notifyChanged();
+        Log.i(TAG, "🔄 Reset to factory defaults");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -437,6 +558,11 @@ public void setTriggerMode(int v) {
         return READ_MODE_LABELS[mode];
     }
 
+    public static String getTriggerModeLabel(int mode) {
+        if (mode < 0 || mode >= TRIGGER_MODE_LABELS.length) return "?";
+        return TRIGGER_MODE_LABELS[mode];
+    }
+
     public static String getToneLabel(int tone) {
         if (tone < 0 || tone >= TONE_LABELS.length) return "?";
         return TONE_LABELS[tone];
@@ -449,6 +575,7 @@ public void setTriggerMode(int v) {
              + "⚡ POS Power: " + getPosPowerDbm() + " dBm\n"
              + "🌍 Freq: " + getFreqLabel(getFreqMode()) + "\n"
              + "🎯 ReadMode: " + getReadModeLabel(getReadMode()) + "\n"
+             + "🎯 Trigger: " + getTriggerModeLabel(getTriggerMode()) + "\n"
              + "🔊 Sound: " + (isSoundEnabled() ? "ON (" + getSoundVolume() + "%)" : "OFF") + "\n"
              + "📳 Vibrate: " + (isVibrateEnabled() ? "ON (" + getVibrateMs() + "ms)" : "OFF") + "\n"
              + "🚫 Filter Dup: " + (isFilterDuplicates() ? getDuplicateFilterMs() + "ms" : "OFF") + "\n"
