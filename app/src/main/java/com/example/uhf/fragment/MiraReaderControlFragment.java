@@ -78,6 +78,7 @@ public class MiraReaderControlFragment extends Fragment {
     private Spinner spReadMode;
     private TextView tvReadModeHint;
     private MaterialButton btnApplyNow, btnReset, btnReadCurrent;
+    private MaterialButton btnYemenDefaults;   // 🇾🇪 [v5.0]
     private View loading;
 
     // ═══════════════ 🔊 Sound & Vibration [v4.0] ═══════════════
@@ -176,6 +177,7 @@ public class MiraReaderControlFragment extends Fragment {
         btnApplyNow       = v.findViewById(R.id.btnApplyNow);
         btnReset          = v.findViewById(R.id.btnResetDefaults);
         btnReadCurrent    = v.findViewById(R.id.btnReadCurrent);
+        btnYemenDefaults = v.findViewById(R.id.btnYemenDefaults);   
         loading           = v.findViewById(R.id.readerLoading);
 
         spReadMode        = v.findViewById(R.id.spReadMode);
@@ -357,6 +359,12 @@ public class MiraReaderControlFragment extends Fragment {
         btnApplyNow.setOnClickListener(x -> applyNow());
         btnReset.setOnClickListener(x -> confirmReset());
         btnReadCurrent.setOnClickListener(x -> readCurrent());
+        // ═══════════════════════════════════════════════════════
+        //  🇾🇪 الإعدادات المثالية لليمن [v5.0]
+        // ═══════════════════════════════════════════════════════
+        if (btnYemenDefaults != null) {
+        btnYemenDefaults.setOnClickListener(x -> confirmYemenDefaults());
+        }
 
         // ═══════════════════════════════════════════════════════
         //  Live Test
@@ -786,7 +794,67 @@ public class MiraReaderControlFragment extends Fragment {
                 .setPositiveButton(isArabic ? "موافق" : "OK", null)
                 .show();
     }
+// ═══════════════════════════════════════════════════════════
+//  🇾🇪 الإعدادات المثالية لليمن/المجوهرات [v5.0]
+// ═══════════════════════════════════════════════════════════
 
+/**
+ * ✅ يُطبّق الإعدادات المثالية لجرد المجوهرات في اليمن/الخليج.
+ *    محسّنة من الخبرة الميدانية:
+ *      • Power: 24 dBm (يمنع قراءة الصواني المجاورة)
+ *      • TagFocus: ON (للمعادن)
+ *      • فلتر التكرار: ON (2.5s)
+ *      • وضع الزناد: Toggle
+ *      • Miller 4 (دقة أعلى)
+ */
+private void confirmYemenDefaults() {
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic
+                    ? "🇾🇪 الإعدادات المثالية لجرد المجوهرات"
+                    : "🇾🇪 Optimal Jewelry Inventory Settings")
+            .setMessage(isArabic
+                    ? "سيتم تطبيق الإعدادات التالية:\n\n"
+                      + "⚡ قوة الإرسال: 24 dBm\n"
+                      + "🌍 المنطقة: الشرق الأوسط (ETSI 865-868)\n"
+                      + "🎯 TagFocus: مفعّل (للمعادن)\n"
+                      + "🎵 Miller: 4 (دقة أعلى)\n"
+                      + "🚫 فلتر التكرار: مفعّل (2.5 ثانية)\n"
+                      + "🔄 وضع الزناد: ضغطة للبدء/الإيقاف\n"
+                      + "💡 إبقاء الشاشة مضاءة: مفعّل\n"
+                      + "⚡ POS Power: 7 dBm\n\n"
+                      + "ملاحظة: لن تمس إعدادات الصوت/الاهتزاز الشخصية.\n\n"
+                      + "هل تريد المتابعة؟"
+                    : "Apply optimal settings for jewelry inventory?\n\n"
+                      + "Will NOT touch personal sound/vibrate settings.")
+            .setPositiveButton(isArabic ? "✅ تطبيق" : "✅ Apply", (d, w) -> {
+                try {
+                    // 1) طبّق الإعدادات
+                    settings.applyYemenJewelryDefaults();
+
+                    // 2) أعِد تحميل الواجهة
+                    loadSettingsToUi();
+                    updateSummary();
+
+                    // 3) طبّق على القارئ
+                    applyNow();
+
+                    // 4) أبلغ المستخدم
+                    toast(isArabic
+                            ? "✅ تم تطبيق الإعدادات المثالية لليمن"
+                            : "✅ Yemen optimal defaults applied");
+
+                    Log.i(TAG, "🇾🇪 Yemen jewelry defaults applied");
+
+                } catch (Exception e) {
+                    Log.e(TAG, "confirmYemenDefaults error", e);
+                    toast(isArabic
+                            ? "❌ فشل تطبيق الإعدادات"
+                            : "❌ Failed to apply settings");
+                }
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+}
     private void confirmReset() {
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "🔄 إعادة تعيين" : "🔄 Reset")
