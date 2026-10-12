@@ -7,17 +7,24 @@ import android.util.Log;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.Gen2Entity;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraReaderSettings v3.1 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
+ *  MiraReaderSettings v3.2 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * [v3.1] إضافات:
  *   ✅ POS Power — قوة قراءة خاصة بوضع البيع (يحددها المستخدم)
  *   ✅ getPosRangeLabel() — ترجمة القوة إلى مدى تقريبي
+ *
+ * [v3.2] إضافات:
+ *   ✅ نظام OnSettingsChangedListener — إبلاغ كل القارئات النشطة
+ *      بأي تغيير في الإعدادات لتطبيقه فوراً (خاصة الجرد).
+ *   ✅ notifyChanged() — تُستدعى من كل setter.
  */
 public class MiraReaderSettings {
 
@@ -154,12 +161,6 @@ public class MiraReaderSettings {
     // ═══════════════════════════════════════════════════════════════
     //  ⚡ POS Power — قوة قراءة خاصة بوضع البيع
     // ═══════════════════════════════════════════════════════════════
-    /**
-     * القيمة الافتراضية: 8 dBm (توازن بين الأمان والموثوقية).
-     *
-     * المستخدم يتحكم بها من واجهة POS.
-     * تُطبَّق تلقائياً عند فتح POS، وتُستعاد عند إغلاقه.
-     */
     public static final int  DEF_POS_POWER_DBM = 8;
     public static final int  MIN_POS_POWER_DBM = 5;
     public static final int  MAX_POS_POWER_DBM = 30;
@@ -171,10 +172,14 @@ public class MiraReaderSettings {
     private final Context context;
     private final SharedPreferences prefs;
 
+    // 🆕 v3.2 — قائمة المستمعين (WeakReference لمنع التسريبات)
+    private final CopyOnWriteArrayList<WeakReference<OnSettingsChangedListener>> listeners
+            = new CopyOnWriteArrayList<>();
+
     private MiraReaderSettings(Context ctx) {
         this.context = ctx.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.i(TAG, "✅ MiraReaderSettings v3.1 initialized");
+        Log.i(TAG, "✅ MiraReaderSettings v3.2 initialized");
     }
 
     public static MiraReaderSettings getInstance(Context ctx) {
@@ -184,6 +189,62 @@ public class MiraReaderSettings {
             }
         }
         return instance;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  🆕 v3.2 — نظام مراقبة التغييرات
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * واجهة يستمع بها القارئ (أو أي مكوّن) لتغيّر الإعدادات.
+     */
+    public interface OnSettingsChangedListener {
+        void onSettingsChanged();
+    }
+
+    /**
+     * ✅ تسجيل مستمع جديد (آمن ضد التسجيل المكرر).
+     */
+    public void addListener(OnSettingsChangedListener l) {
+        if (l == null) return;
+        // تنظيف المراجع الميتة أولاً
+        listeners.removeIf(ref -> ref.get() == null);
+        // منع التسجيل المكرر
+        for (WeakReference<OnSettingsChangedListener> ref : listeners) {
+            if (ref.get() == l) return;
+        }
+        listeners.add(new WeakReference<>(l));
+        Log.d(TAG, "➕ Listener added (total=" + listeners.size() + ")");
+    }
+
+    /**
+     * ✅ إلغاء تسجيل مستمع.
+     */
+    public void removeListener(OnSettingsChangedListener l) {
+        if (l == null) return;
+        listeners.removeIf(ref -> ref.get() == null || ref.get() == l);
+        Log.d(TAG, "➖ Listener removed (total=" + listeners.size() + ")");
+    }
+
+    /**
+     * ✅ إبلاغ كل المستمعين — تُستدعى من كل setter.
+     */
+    private void notifyChanged() {
+        int count = 0;
+        for (WeakReference<OnSettingsChangedListener> ref : listeners) {
+            OnSettingsChangedListener l = ref.get();
+            if (l != null) {
+                try {
+                    l.onSettingsChanged();
+                    count++;
+                } catch (Exception e) {
+                    Log.e(TAG, "notify error", e);
+                }
+            }
+        }
+        if (count > 0) {
+            Log.d(TAG, "🔔 Notified " + count + " listener(s)");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -209,52 +270,95 @@ public class MiraReaderSettings {
     public int     getScanInterval()  { return prefs.getInt("interval", DEF_SCAN_INTERVAL); }
 
     // ═══════════════════════════════════════════════════════════════
-    //  Setters
+    //  Setters — كل واحد يستدعي notifyChanged()
     // ═══════════════════════════════════════════════════════════════
-    public void setPowerDbm(int v)          { prefs.edit().putInt("power", clamp(v, 5, 33)).commit(); }
-    public void setFreqMode(int v)          { prefs.edit().putInt("freq", v).commit(); }
-    public void setReadMode(int v)          { prefs.edit().putInt("read_mode", clamp(v, 0, 1)).commit(); }
-    public void setSession(int v)           { prefs.edit().putInt("sess", clamp(v, 0, 3)).commit(); }
-    public void setTarget(int v)            { prefs.edit().putInt("target", clamp(v, 0, 1)).commit(); }
-    public void setQMode(int v)             { prefs.edit().putInt("q_mode", clamp(v, 0, 1)).commit(); }
-    public void setQValue(int v)            { prefs.edit().putInt("q_val", clamp(v, 0, 15)).commit(); }
-    public void setMinQ(int v)              { prefs.edit().putInt("q_min", clamp(v, 0, 15)).commit(); }
-    public void setMaxQ(int v)              { prefs.edit().putInt("q_max", clamp(v, 0, 15)).commit(); }
-    public void setDR(int v)                { prefs.edit().putInt("dr", clamp(v, 0, 1)).commit(); }
-    public void setMiller(int v)            { prefs.edit().putInt("miller", clamp(v, 0, 3)).commit(); }
-    public void setLinkFreq(int v)          { prefs.edit().putInt("link_freq", clamp(v, 0, 7)).commit(); }
-    public void setRfLink(int v)            { prefs.edit().putInt("rflink", clamp(v, 0, 11)).commit(); }
-    public void setFastId(boolean v)        { prefs.edit().putBoolean("fast_id", v).commit(); }
-    public void setTagFocus(boolean v)      { prefs.edit().putBoolean("tag_focus", v).commit(); }
-    public void setFastInventory(boolean v) { prefs.edit().putBoolean("fast_inv", v).commit(); }
-    public void setRssiThreshold(int v)     { prefs.edit().putInt("rssi", clamp(v, -100, -30)).commit(); }
-    public void setScanInterval(int v)      { prefs.edit().putInt("interval", clamp(v, 50, 1000)).commit(); }
+    public void setPowerDbm(int v) {
+        prefs.edit().putInt("power", clamp(v, 5, 33)).commit();
+        notifyChanged();
+    }
+    public void setFreqMode(int v) {
+        prefs.edit().putInt("freq", v).commit();
+        notifyChanged();
+    }
+    public void setReadMode(int v) {
+        prefs.edit().putInt("read_mode", clamp(v, 0, 1)).commit();
+        notifyChanged();
+    }
+    public void setSession(int v) {
+        prefs.edit().putInt("sess", clamp(v, 0, 3)).commit();
+        notifyChanged();
+    }
+    public void setTarget(int v) {
+        prefs.edit().putInt("target", clamp(v, 0, 1)).commit();
+        notifyChanged();
+    }
+    public void setQMode(int v) {
+        prefs.edit().putInt("q_mode", clamp(v, 0, 1)).commit();
+        notifyChanged();
+    }
+    public void setQValue(int v) {
+        prefs.edit().putInt("q_val", clamp(v, 0, 15)).commit();
+        notifyChanged();
+    }
+    public void setMinQ(int v) {
+        prefs.edit().putInt("q_min", clamp(v, 0, 15)).commit();
+        notifyChanged();
+    }
+    public void setMaxQ(int v) {
+        prefs.edit().putInt("q_max", clamp(v, 0, 15)).commit();
+        notifyChanged();
+    }
+    public void setDR(int v) {
+        prefs.edit().putInt("dr", clamp(v, 0, 1)).commit();
+        notifyChanged();
+    }
+    public void setMiller(int v) {
+        prefs.edit().putInt("miller", clamp(v, 0, 3)).commit();
+        notifyChanged();
+    }
+    public void setLinkFreq(int v) {
+        prefs.edit().putInt("link_freq", clamp(v, 0, 7)).commit();
+        notifyChanged();
+    }
+    public void setRfLink(int v) {
+        prefs.edit().putInt("rflink", clamp(v, 0, 11)).commit();
+        notifyChanged();
+    }
+    public void setFastId(boolean v) {
+        prefs.edit().putBoolean("fast_id", v).commit();
+        notifyChanged();
+    }
+    public void setTagFocus(boolean v) {
+        prefs.edit().putBoolean("tag_focus", v).commit();
+        notifyChanged();
+    }
+    public void setFastInventory(boolean v) {
+        prefs.edit().putBoolean("fast_inv", v).commit();
+        notifyChanged();
+    }
+    public void setRssiThreshold(int v) {
+        prefs.edit().putInt("rssi", clamp(v, -100, -30)).commit();
+        notifyChanged();
+    }
+    public void setScanInterval(int v) {
+        prefs.edit().putInt("interval", clamp(v, 50, 1000)).commit();
+        notifyChanged();
+    }
 
     // ═══════════════════════════════════════════════════════════════
     //  ⚡ POS Power — Getters / Setters
     // ═══════════════════════════════════════════════════════════════
-
-    /**
-     * ✅ قوة POS المحفوظة.
-     *    يقرأها MiraPosFragment عند فتح شاشة البيع.
-     */
     public int getPosPowerDbm() {
         return prefs.getInt("pos_power", DEF_POS_POWER_DBM);
     }
 
-    /**
-     * ✅ يُحفظ من واجهة إعدادات POS.
-     *    القيمة محصورة بين 5 و 30 dBm.
-     */
     public void setPosPowerDbm(int v) {
         int safe = clamp(v, MIN_POS_POWER_DBM, MAX_POS_POWER_DBM);
         prefs.edit().putInt("pos_power", safe).commit();
         Log.i(TAG, "⚡ POS Power saved: " + safe + " dBm");
+        notifyChanged();
     }
 
-    /**
-     * ✅ ترجمة القوة إلى مدى تقريبي — للعرض في الواجهة.
-     */
     public static String getPosRangeLabel(int dbm) {
         if (dbm <= 5)  return "~3-5 cm";
         if (dbm <= 8)  return "~5-8 cm";
@@ -264,7 +368,9 @@ public class MiraReaderSettings {
         return "~30+ cm";
     }
 
-    private int clamp(int v, int min, int max) { return Math.max(min, Math.min(max, v)); }
+    private int clamp(int v, int min, int max) {
+        return Math.max(min, Math.min(max, v));
+    }
 
     // ═══════════════════════════════════════════════════════════════
     //  ✅ تطبيق الإعدادات على القارئ
@@ -368,6 +474,7 @@ public class MiraReaderSettings {
     public void resetToDefaults() {
         prefs.edit().clear().commit();
         Log.i(TAG, "🔄 Reset to defaults");
+        notifyChanged();
     }
 
     // ═══════════════════════════════════════════════════════════════
