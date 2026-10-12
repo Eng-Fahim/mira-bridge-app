@@ -1460,7 +1460,7 @@ public void onDuplicateTag(String epc) {
     /**
      * ✅ معالجة مباشرة (بدون wrappers)
      */
-    private void processTagReadDirect(String epc, int rssi) {
+        private void processTagReadDirect(String epc, int rssi) {
     if (!isAdded() || isFragmentDestroyed || modernAdapter == null) return;
 
     InventoryItem catalogItem = catalogManager != null
@@ -1470,9 +1470,10 @@ public void onDuplicateTag(String epc) {
     updateLastScan(epc, rssi);
     scheduleUiUpdate();
 
-    // ✅ الصوت بعد إضافة القطعة فعلياً
+    // ✅ [v1.2] الصوت مع تمييز المعروف/المجهول
     if (scanSession != null) {
-        scanSession.confirmTagAccepted();
+        boolean isKnown = catalogEpcs.contains(epc);
+        scanSession.confirmTagAccepted(isKnown);
         scanSession.scheduleSingleModeStop();
     }
 }
