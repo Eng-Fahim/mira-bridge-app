@@ -1854,38 +1854,56 @@ public void onRfidScanned(String epc) {
                                          : new ArrayList<>());
             final int currentUserId = getCurrentUserId();
 
-            String tidFromTag = "";
-            String epcFromTag = "";
+            // ═══════════════════════════════════════════════════════
+//  ✅ [v6.5] قراءة معرّفات الشريحة بشكل قياسي عالمي
+//
+//  - TID: معرّف فيزيائي فريد (factory-programmed) — يُقرأ دائماً.
+//  - EPC: معرّف تجاري (writable) — قد يكون فارغاً للشرائح الجديدة.
+//  - GTIN: لا يُقرأ من الشريحة، يُجلب من قاعدة البيانات بالسيرفر.
+// ═══════════════════════════════════════════════════════
+String tidFromTag = "";
+String epcFromTag = "";
 
-            try {
-                MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
-                tidFromTag = rfidSvc.readTid(null);
-                epcFromTag = rfidSvc.readEpc(null);
+try {
+    MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
+    tidFromTag = rfidSvc.readTid(null);
+    epcFromTag = rfidSvc.readEpc(null);
 
-                if (tidFromTag != null)
-                    tidFromTag = tidFromTag.trim().toUpperCase(Locale.US);
-                if (epcFromTag != null)
-                    epcFromTag = epcFromTag.trim().toUpperCase(Locale.US);
-            } catch (Exception e) {
-                Log.e(TAG, "Read TID/EPC error", e);
-            }
+    if (tidFromTag != null)
+        tidFromTag = tidFromTag.trim().toUpperCase(Locale.US);
+    if (epcFromTag != null)
+        epcFromTag = epcFromTag.trim().toUpperCase(Locale.US);
+} catch (Exception e) {
+    Log.e(TAG, "Read TID/EPC error", e);
+}
 
-            if (tidFromTag == null || tidFromTag.isEmpty()) {
-                tidFromTag = binding.etEpc.getText() != null
-                        ? binding.etEpc.getText().toString().trim()
-                                .toUpperCase(Locale.US)
-                        : "";
-            }
-            if (epcFromTag == null || epcFromTag.isEmpty()) {
-                epcFromTag = tidFromTag;
-            }
+// ✅ Fallback: TID من حقل EPC إن فشلت القراءة من الشريحة
+if (tidFromTag == null || tidFromTag.isEmpty()) {
+    tidFromTag = binding.etEpc.getText() != null
+            ? binding.etEpc.getText().toString().trim()
+                    .toUpperCase(Locale.US)
+            : "";
+}
 
-            final String tid = tidFromTag;
-            final String gtin = tidFromTag;
-            final String originalEpc = epcFromTag;
+// ✅ [v6.5] لا نستبدل EPC بـ TID — نتركه فارغاً
+//    السيرفر يستخدم TID كمعرّف أساسي عند غياب EPC.
+if (epcFromTag == null) {
+    epcFromTag = "";
+}
 
-            Log.i(TAG, "✅ Identifiers | TID=" + tid + " | EPC=" + originalEpc);
+// ✅ [v6.5] GTIN فارغ دائماً — السيرفر يجلب GTIN من DB
+final String tid         = tidFromTag;
+final String gtin        = "";
+final String originalEpc = epcFromTag;
 
+// ✅ [v6.5] Log تشخيصي كامل
+Log.i(TAG, "════════ IDENTIFIERS TO SEND ════════");
+Log.i(TAG, "   TID      = '" + tid + "' (len=" + tid.length() + ")");
+Log.i(TAG, "   EPC      = '" + originalEpc + "' (len="
+        + originalEpc.length() + ")");
+Log.i(TAG, "   GTIN     = '" + gtin + "' (empty → server auto-fetch)");
+Log.i(TAG, "═════════════════════════════════════");
+            
             if (tid.isEmpty()) {
                 safeRun(() -> {
                     dismissDialog(activeLoadingDialog);
