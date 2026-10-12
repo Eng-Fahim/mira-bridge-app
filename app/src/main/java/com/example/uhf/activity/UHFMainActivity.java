@@ -122,7 +122,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final String TAG = "UHFMainActivity";
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
+/** ✅ علم: هل عُرضت رسالة ترحيب الإعداد في هذه الجلسة؟ */
+private volatile boolean setupWelcomeShownThisSession = false;
 
+/** ✅ علم: هل تجاوزنا شاشة الإعداد في هذه الجلسة؟ */
+private volatile boolean setupCompletedThisSession = false;
     // ═══════════════════════════════════════════════════════
     //  ثوابت حالة الإعداد المحاسبي
     // ═══════════════════════════════════════════════════════
@@ -184,7 +188,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final long INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 
 // ⭐ فترة سماح بعد اكتمال الإعداد (السيرفر يحتاج وقتاً للتحديث)
-private static final long SETUP_GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 دقائق
+
+// بعد: 30 دقيقة — السيرفر في اليمن قد يكون بطيئاً
+private static final long SETUP_GRACE_PERIOD_MS = 30 * 60 * 1000; // 30 دقيقة
 private volatile long setupCompletedAt = 0;
 
     private AppLifecycleObserver appLifecycleObserver;
@@ -664,40 +670,39 @@ private volatile long setupCompletedAt = 0;
             + ", isFinanceMgr=" + isFinanceMgr
             + ", isAccountant=" + isAccountant);
 
-    if (isSetupPending) {
-        if (canPerformSetup) {
-            enableNavigationAfterSetup();
-            setBottomNavVisible(false);
+    ifif (stampMismatch) {
+    Log.w(TAG, "🔄 Stamp mismatch in onResume!");
 
-            loadFragmentDirectly(
-                    new MiraAccountingSetupFragment(),
-                    "AccountingSetup"
-            );
-
-            // ⭐ رسالة الترحيب — تظهر مرة واحدة فقط
-            String welcomeMsg;
-            if (isSystemAdmin) {
-                welcomeMsg = isArabic ? "🔧 مرحباً مهندس النظام — يرجى إكمال الإعداد"
-                                      : "🔧 Welcome Engineer — Please complete setup";
-            } else if (isOrgAdmin) {
-                welcomeMsg = isArabic ? "🏢 مرحباً مدير الجهة — يرجى إعداد النظام المحاسبي"
-                                      : "🏢 Welcome Org Admin — Please configure accounting";
-            } else if (isFinanceMgr) {
-                welcomeMsg = isArabic ? "💰 مرحباً المدير المالي — يرجى إعداد النظام المحاسبي"
-                                      : "💰 Welcome Finance Manager — Please configure accounting";
-            } else {
-                welcomeMsg = isArabic ? "📊 مرحباً المحاسب — يرجى إكمال الإعداد"
-                                      : "📊 Welcome Accountant — Please complete setup";
-            }
-            Toast.makeText(this, welcomeMsg, Toast.LENGTH_LONG).show();
-
-        } else {
-            showSetupBlockedScreen();
-        }
-    } else {
-        enableNavigationAfterSetup();
-        navigateByRole();
+    // ⭐✅ حماية حاسمة: إذا كنا completed محلياً
+    //    والسيرفر يقول pending/in_progress → السيرفر متأخر، احتفظ بـ completed
+    if (SETUP_COMPLETED.equals(localStatus)
+            && (SETUP_PENDING.equals(serverStatus)
+                || SETUP_IN_PROGRESS.equals(serverStatus))) {
+        Log.w(TAG, "🛡️ Server lag detected → keeping COMPLETED");
+        cacheSetupStatus(SETUP_COMPLETED, serverStamp);
+        return;
     }
+
+    // ⭐✅ حماية إضافية: خلال فترة الجلسة، لا ترجع إلى pending
+    if (SETUP_COMPLETED.equals(localStatus)
+            && !SETUP_COMPLETED.equals(serverStatus)
+            && !SETUP_LOCKED.equals(serverStatus)
+            && setupCompletedThisSession) {
+        Log.w(TAG, "🛡️ Session-level protection → keeping COMPLETED");
+        return;
+    }
+
+    invalidateSetupCache();
+    cacheSetupStatus(serverStatus, serverStamp);
+
+    mainHandler.post(() -> {
+        if (isActivityAlive()) {
+            Log.w(TAG, "🔄 Re-navigating after stamp mismatch");
+            enableNavigationAfterSetup();
+            navigateBySetupStatus(serverStatus);
+        }
+    });
+}
 }
 
     /**
@@ -896,21 +901,36 @@ private volatile long setupCompletedAt = 0;
     }
 
     private String getCachedSetupStatus() {
-        try {
-            SharedPreferences prefs = getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE);
-            long cachedAt = prefs.getLong(KEY_SETUP_CACHED_AT, 0);
-            long now = System.currentTimeMillis();
+    try {
+        SharedPreferences prefs = getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE);
+        long cachedAt = prefs.getLong(KEY_SETUP_CACHED_AT, 0);
+        String status  = prefs.getString(KEY_SETUP_STATUS, null);
+        long now = System.currentTimeMillis();
 
-            if (now - cachedAt > SETUP_CACHE_TTL_MS) {
+        if (status == null) return null;
+
+        // ✅ الحالات المكتملة: TTL طويل (24 ساعة)
+        //    السبب: لا معنى لإعادة فحص حالة اكتملت — إلا إذا تغيّر stamp فعلياً
+        if (SETUP_COMPLETED.equals(status) || SETUP_LOCKED.equals(status)) {
+            long completedTtl = 24 * 60 * 60 * 1000L; // 24 ساعة
+            if (now - cachedAt > completedTtl) {
+                Log.d(TAG, "🕐 Completed status expired (24h) → will refresh");
                 return null;
             }
+            return status;
+        }
 
-            return prefs.getString(KEY_SETUP_STATUS, null);
-        } catch (Exception e) {
-            Log.w(TAG, "getCachedSetupStatus error: " + e.getMessage());
+        // ✅ الحالات المعلّقة: TTL قصير (5 دقائق) — لأنها ستتغير قريباً
+        if (now - cachedAt > SETUP_CACHE_TTL_MS) {
             return null;
         }
+        return status;
+
+    } catch (Exception e) {
+        Log.w(TAG, "getCachedSetupStatus error: " + e.getMessage());
+        return null;
     }
+}
 
     /**
      * ⭐ يُستدعى من MiraAccountingSetupFragment عند اكتمال الإعداد
