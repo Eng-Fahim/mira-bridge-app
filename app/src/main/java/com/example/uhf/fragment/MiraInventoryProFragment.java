@@ -70,7 +70,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
-
+import com.example.uhf.MiraRfid.MiraScanSessionController;
 /**
  * MiraInventoryProFragment - الإصدار 4.0 (DIRECT C83 READER)
  *
@@ -85,10 +85,10 @@ import java.util.concurrent.ExecutorService;
  *  8. processTagReadDirect (جديد)
  *  9. reclassifyScannedItems (جديد)
  */
-public class MiraInventoryProFragment extends KeyDwonFragment
+ public class MiraInventoryProFragment extends KeyDwonFragment
         implements InventoryScanController.ScanCallback,
-                   InventoryDialogsManager.DialogsCallback {
-
+                   InventoryDialogsManager.DialogsCallback,
+                   MiraScanSessionController.Host {  
     private static final String TAG = "MiraInventoryPro";
 
     // ==================== ثوابت ====================
@@ -98,6 +98,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
     private static final int ITEMS_COUNT_SMALL = 200;
     private static final int ITEMS_COUNT_MEDIUM = 800;
+    
+    
 
     // ==================== Refs ====================
     private View welcomeState;
@@ -191,6 +193,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private InventoryPersistenceManager persistenceManager;
     private InventoryPrintManager printManager;
     private InventoryScanController scanController;
+    private MiraScanSessionController scanSession;
 
     // ==================== Core ====================
     private MiraInventoryEngine inventoryEngine;
@@ -242,7 +245,8 @@ private volatile boolean hasRestoredThisSession = false;
 
 /** هل الجلسة مُوقفة مؤقتاً (يمكن الاستئناف)؟ */
 private volatile boolean isPaused = false;
-
+/** ✅ v4.0 — هل بدء المسح القادم استئناف لجلسة سابقة؟ */
+private volatile boolean nextScanIsResume = false;
 /** هل هناك جلسة محفوظة لم تُعتمد بعد؟ */
 private volatile boolean hasUncommittedSession = false;
 
@@ -338,6 +342,9 @@ private MaterialButton btnFinishAndReview;
         } catch (Exception e) {
             Log.e(TAG, "SoundManager error", e);
         }
+        
+        scanSession = new MiraScanSessionController(this);
+
 
         // 5) FeedbackHelper + AnimationHelper
         try {
@@ -1238,12 +1245,11 @@ private void checkAndExitAfterPause() {
     }
 
     private void showAccessDenied() {
-        if (!isAdded() || isFragmentDestroyed) return;
-        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access denied");
-        if (soundManager != null) {
-            soundManager.playBeep(SoundManager.FeedbackType.ERROR);
-        }
-    }
+    if (!isAdded() || isFragmentDestroyed) return;
+    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access denied");
+    // ✅ استخدم MiraFeedback بدل SoundManager
+    if (scanSession != null) scanSession.notifyError();
+}
 
     // ==================== RFID Trigger (✅ إصلاح رئيسي) ====================
 
@@ -1292,17 +1298,20 @@ private void checkAndExitAfterPause() {
     // ================================================================
     //  ScanController.ScanCallback Implementation
     // ================================================================
+@Override
+public void onScanStarted() {
+    Log.d(TAG, "📡 onScanStarted");
 
-    @Override
-    public void onScanStarted() {
-        Log.d(TAG, "📡 onScanStarted");
+    mainHandler.post(() -> {
+        if (!isAdded() || isFragmentDestroyed) return;
 
-        mainHandler.post(() -> {
-            if (!isAdded() || isFragmentDestroyed) return;
+        // ✅ مرّر الحالة الحقيقية بدل false المُثبّتة
+        scanSession.onScanStarted(nextScanIsResume);
+        nextScanIsResume = false;  // أعِد التعيين بعد الاستخدام
 
-            isScanning = true;
-            updateMainToggleButton(true);
-            animateMainButton();
+        isScanning = true;
+        updateMainToggleButton(true);
+        animateMainButton();
 
             if (animationHelper != null && statusBar != null) {
                 animationHelper.updateStatusBarBackground(statusBar, true, true);
@@ -1321,11 +1330,6 @@ private void checkAndExitAfterPause() {
                     feedbackHelper.hapticFeedback(SoundManager.FeedbackType.KNOWN_ITEM);
                 } catch (Exception ignored) {}
             }
-
-            if (soundManager != null) {
-                soundManager.playBeep(SoundManager.FeedbackType.KNOWN_ITEM);
-            }
-
             scanStartTime = SystemClock.elapsedRealtime();
             mainHandler.post(timerRunnable);
 
@@ -1338,15 +1342,18 @@ private void checkAndExitAfterPause() {
     }
 
     @Override
-    public void onScanStopped() {
-        Log.d(TAG, "📡 onScanStopped");
-
-        mainHandler.post(() -> {
-            if (!isAdded() || isFragmentDestroyed) return;
-
-            isScanning = false;
-            updateMainToggleButton(false);
-            animateMainButton();
+public void onScanStopped() {
+    Log.d(TAG, "📡 onScanStopped");
+    
+    mainHandler.post(() -> {
+        if (!isAdded() || isFragmentDestroyed) return;
+        
+        // ✅ انقلها هنا
+        scanSession.onScanStopped();
+        
+        isScanning = false;
+        updateMainToggleButton(false);
+        animateMainButton();
 
             if (animationHelper != null && statusBar != null) {
                 boolean isConnected = false;
@@ -1379,39 +1386,59 @@ private void checkAndExitAfterPause() {
 
     // ✅ إصلاح: onTagRead بدون posting مزدوج
     @Override
-    public void onTagRead(String normalizedEpc, int rssi) {
-        if (selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty()) {
-            if (!catalogEpcs.contains(normalizedEpc)) {
-                return;
-            }
-        }
-
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            processTagReadDirect(normalizedEpc, rssi);
-        } else {
-            mainHandler.post(() -> processTagReadDirect(normalizedEpc, rssi));
-        }
+public void onTagRead(String normalizedEpc, int rssi) {
+    // فلتر الفئة
+    if (selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty()) {
+        if (!catalogEpcs.contains(normalizedEpc)) return;
     }
-    
-    @Override
-public void onDuplicateTag(String epc) {
-    // ✅ الوسم المكرر — addScannedItemToDisplay يعالجه داخلياً
-    // لا نحتاج أي إجراء إضافي هنا
-}
 
+    // ✅ قرار موحّد من Controller
+    MiraScanSessionController.Decision d = scanSession.evaluateTag(normalizedEpc);
+
+    switch (d) {
+        case REJECT_SESSION_OFF:
+            return;
+
+        case REJECT_LIMIT:
+            scanSession.confirmLimitReached();
+            return;
+
+        case ACCEPT_DUPLICATE:
+            scanSession.confirmTagDuplicate();
+            return;
+case ACCEPT_NEW:
+    if (Looper.myLooper() == Looper.getMainLooper()) {
+        processTagReadDirect(normalizedEpc, rssi);
+    } else {
+        mainHandler.post(() -> processTagReadDirect(normalizedEpc, rssi));
+    }
+    return;
+    }
+}
+    
+@Override
+public void onDuplicateTag(String epc) {
+    // ✅ v4.0 — الفلتر الجديد في MiraScanSessionController يعالج المكررات
+    //             قبل وصولها هنا. لا حاجة لإجراء إضافي.
+}
     /**
      * ✅ معالجة مباشرة (بدون wrappers)
      */
     private void processTagReadDirect(String epc, int rssi) {
     if (!isAdded() || isFragmentDestroyed || modernAdapter == null) return;
 
-    // ✅ ابحث مرة واحدة فقط
     InventoryItem catalogItem = catalogManager != null
             ? catalogManager.getItemByEpc(epc) : null;
 
     addScannedItemToDisplay(epc, rssi, catalogItem);
     updateLastScan(epc, rssi);
     scheduleUiUpdate();
+
+    // ✅ الصوت بعد إضافة القطعة فعلياً
+    if (scanSession != null) {
+        scanSession.confirmTagAccepted();
+        scanSession.scheduleSingleModeStop();
+    }
 }
 
     @Override
@@ -1420,9 +1447,7 @@ public void onError(String error) {
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
         showToast((isArabic ? "⚠️ " : "⚠️ ") + error);
-        if (soundManager != null) {
-            soundManager.playBeep(SoundManager.FeedbackType.ERROR);
-        }
+        
         // ✅ أعِد الزر لحالته
         isScanning = false;
         updateMainToggleButton(false);
@@ -1449,11 +1474,7 @@ public void onError(String error) {
                 } catch (Exception ignored) {}
             }
 
-            if (soundManager != null) {
-                soundManager.playBeep(isConnected
-                        ? SoundManager.FeedbackType.COMPLETED
-                        : SoundManager.FeedbackType.ERROR);
-            }
+            
 
             if (animationHelper != null && statusBar != null) {
                 animationHelper.updateStatusBarBackground(
@@ -1578,7 +1599,9 @@ public void onError(String error) {
 
     isPaused = false;
     hasUncommittedSession = true;
-
+    // ✅ [v4.0] حدّد نوع المسح قبل استدعاء الـ Controller
+nextScanIsResume = isPaused || hasUncommittedSession;
+Log.d(TAG, "▶️ nextScanIsResume = " + nextScanIsResume);
     if (scanController == null) {
         showFatalErrorDialog(
                 isArabic ? "⚠️ مدير المسح غير جاهز" : "⚠️ Scan controller not ready",
@@ -2129,9 +2152,7 @@ private void clearAllLists() {
     // ═══════════════════════════════════════════════════════
     //  5) الأصوات والاهتزاز
     // ═══════════════════════════════════════════════════════
-    if (soundManager != null) soundManager.playBeep(feedbackType);
-    if (feedbackHelper != null) feedbackHelper.feedback(feedbackType);
-
+    
     // ═══════════════════════════════════════════════════════
     //  6) بطاقة آخر مسح
     // ═══════════════════════════════════════════════════════
@@ -2543,9 +2564,7 @@ private void clearAllLists() {
             if (!hasCelebrated) {
                 hasCelebrated = true;
 
-                if (soundManager != null) {
-                    soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-                }
+                
                 if (animationHelper != null) {
                     animationHelper.celebrateCompletion(
                             tvProgressPercent, progressScanned, tvScannedCount);
@@ -4458,6 +4477,11 @@ private void applyRestoredSessionSilent(JSONArray items, int expectedCount, Stri
         } catch (Exception e) {
             Log.e(TAG, "save on destroy error", e);
         }
+        
+        if (scanSession != null) {
+        scanSession.release();
+        scanSession = null;
+        }
 
         if (backPressedCallback != null) {
             backPressedCallback.remove();
@@ -4564,5 +4588,30 @@ private void applyRestoredSessionSilent(JSONArray items, int expectedCount, Stri
             Log.e(TAG, "animateWelcomeLogo error", e);
         }
     }
+@Override public Context getHostContext()  { return getContext(); }
+@Override public Activity getHostActivity(){ return getActivity(); }
+@Override public boolean isHostAlive() {
+    return isAdded() && !isFragmentDestroyed;
+}
 
+@Override
+public void onSessionTagAccepted(String epc, int rssi) {
+    // لا شيء — نعالج في processTagReadDirect
+}
+
+@Override
+public void onSessionLimitReached(int max) {
+    showToast(isArabic
+            ? "📊 وصلت للحد الأقصى (" + max + ")"
+            : "📊 Max tags reached (" + max + ")");
+    if (isScanning) pauseScanning();
+}
+
+@Override
+public void onSessionShouldStop(String reason) {
+    if ("single-mode".equals(reason)) {
+        showToast(isArabic ? "🎯 تم" : "🎯 Done");
+    }
+    if (isScanning) pauseScanning();
+}
 } // ✅ نهاية الكلاس MiraInventoryProFragment
