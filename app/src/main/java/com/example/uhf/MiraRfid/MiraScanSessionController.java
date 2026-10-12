@@ -11,7 +11,7 @@ import java.lang.ref.WeakReference;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  MiraScanSessionController v1.1
+ *  MiraScanSessionController v1.2
  * ═══════════════════════════════════════════════════════════════════════
  *
  *  🎯 الدور: مفوّض (Delegate) لكل منطق "الجلسة" في شاشة الجرد
@@ -23,15 +23,20 @@ import java.lang.ref.WeakReference;
  *
  *  ✅ يستمع تلقائياً لتغييرات MiraReaderSettings عبر WeakReference
  *
- *  [v1.1] إصلاح: تهيئة autoStopRunnable و settingsListener في constructor
- *               لتفادي خطأ "hostRef might not have been initialized"
+ *  [v1.2] إضافات:
+ *    ✅ confirmTagAccepted(boolean isKnownItem) — تمييز المعروف/المجهول
+ *    ✅ notifyUnknownTag() — صوت تنبيه للقطع غير المسجّلة
+ *
+ *  [v1.1] إصلاح:
+ *    ✅ تهيئة autoStopRunnable و settingsListener في constructor
+ *       لتفادي خطأ "hostRef might not have been initialized"
  */
 public class MiraScanSessionController {
 
     private static final String TAG = "MiraScanSession";
 
     // ═══════════════════════════════════════════════════════════════
-    //  واجهة المضيف (Fragment) — 6 دوال فقط
+    //  واجهة المضيف (Fragment)
     // ═══════════════════════════════════════════════════════════════
     public interface Host {
         Context getHostContext();
@@ -103,7 +108,7 @@ public class MiraScanSessionController {
         // ✅ استمع لأي تغيير في الإعدادات
         settings.addListener(settingsListener);
 
-        Log.i(TAG, "✅ MiraScanSessionController v1.1 created");
+        Log.i(TAG, "✅ MiraScanSessionController v1.2 created");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -192,10 +197,35 @@ public class MiraScanSessionController {
         return Decision.ACCEPT_NEW;
     }
 
-    /** يُستدعى من Host بعد قبول وسم جديد */
-    public void confirmTagAccepted() {
+    // ═══════════════════════════════════════════════════════════════
+    //  ✅ Confirm Tag Accepted — [v1.2]
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * 🆕 [v1.2] يُستدعى من Host بعد قبول وسم جديد — مع تمييز المعروف/المجهول.
+     *
+     * @param isKnownItem  true = موجود في الكتالوج، false = غير مسجّل
+     *
+     * سلوك الصوت:
+     *   • معروف    → onNewTag()      — بيب مزدوج
+     *   • غير معروف → onUnknownTag() — تنبيه ثلاثي + اهتزاز مزدوج
+     */
+    public void confirmTagAccepted(boolean isKnownItem) {
         sessionTagCount++;
-        feedback.onNewTag();
+        feedback.onNewTag(isKnownItem);
+
+        Log.d(TAG, "✅ Tag accepted (count=" + sessionTagCount
+                + ", known=" + isKnownItem + ")");
+    }
+
+    /**
+     * ✅ نسخة قديمة للتوافق — تتعامل مع الوسم كـ "معروف".
+     *
+     * @deprecated استخدم confirmTagAccepted(boolean isKnownItem)
+     */
+    @Deprecated
+    public void confirmTagAccepted() {
+        confirmTagAccepted(true);
     }
 
     /** يُستدعى من Host عند وسم مكرر */
@@ -235,10 +265,14 @@ public class MiraScanSessionController {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  Success / Error (للـ Commit)
+    //  Success / Error / Unknown
     // ═══════════════════════════════════════════════════════════════
+
     public void notifySuccess() { feedback.onSuccess(); }
     public void notifyError()   { feedback.onError(); }
+
+    /** 🆕 [v1.2] صوت تنبيه للقطع غير المسجّلة */
+    public void notifyUnknownTag() { feedback.onUnknownTag(); }
 
     // ═══════════════════════════════════════════════════════════════
     //  Getters
@@ -256,13 +290,14 @@ public class MiraScanSessionController {
         Host h = hostRef.get();
         if (h == null || !h.isHostAlive()) return;
 
-        // نُعيد التقييم في الـ main thread
         mainHandler.post(() -> {
             if (released) return;
             try {
                 applyKeepScreenOn(settings.isKeepScreenOn() && active);
-                // ملاحظة: لا نُعيد جدولة auto-stop عند التغيير
-                // (لتجنّب إيقاف مفاجئ أثناء الجلسة)
+
+                // ✅ حدّث حجم الصوت في ToneGenerator فوراً
+                feedback.refreshVolume();
+
                 Log.d(TAG, "🔔 Settings re-applied (active=" + active + ")");
             } catch (Exception e) {
                 Log.e(TAG, "onSettingsChanged error", e);
