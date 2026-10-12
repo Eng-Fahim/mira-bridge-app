@@ -1255,47 +1255,81 @@ private void checkAndExitAfterPause() {
 
     // ==================== RFID Trigger (✅ إصلاح رئيسي) ====================
 
-    @Override
-    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
-        boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
-                || keyCode == KEYCODE_RFID_TRIGGER_2
-                || keyCode == KEYCODE_RFID_TRIGGER_3);
+    // ==================== RFID Trigger (v4.1 — Dual Mode) ====================
 
-        if (!isTrigger) return false;
+@Override
+public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+    boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
+            || keyCode == KEYCODE_RFID_TRIGGER_2
+            || keyCode == KEYCODE_RFID_TRIGGER_3);
 
-        // ✅ ACTION_DOWN — ابدأ فوراً
-        if (event.getAction() == KeyEvent.ACTION_DOWN
-                && event.getRepeatCount() == 0) {
+    if (!isTrigger) return false;
 
-            if (!canEditInventory()) {
-                showAccessDenied();
-                return true;
-            }
+    // ═══════════════════════════════════════════════════════════
+    //  اقرأ وضع الزناد من الإعدادات
+    // ═══════════════════════════════════════════════════════════
+    int triggerMode = MiraReaderSettings.TRIGGER_MODE_HOLD;
+    try {
+        MiraReaderSettings settings = MiraReaderSettings.getInstance(requireContext());
+        if (settings != null) triggerMode = settings.getTriggerMode();
+    } catch (Exception ignored) {}
 
-            if (feedbackHelper != null) {
-                try {
-                    feedbackHelper.hapticFeedback(
-                            isScanning ? SoundManager.FeedbackType.ERROR
-                                       : SoundManager.FeedbackType.KNOWN_ITEM);
-                } catch (Exception ignored) {}
-            }
+    // ═══════════════════════════════════════════════════════════
+    //  ACTION_DOWN
+    // ═══════════════════════════════════════════════════════════
+    if (event.getAction() == KeyEvent.ACTION_DOWN
+            && event.getRepeatCount() == 0) {
 
-            if (!isScanning) {
+        if (!canEditInventory()) {
+            showAccessDenied();
+            return true;
+        }
+
+        // تأكيد لمسي فوري
+        if (feedbackHelper != null) {
+            try {
+                feedbackHelper.hapticFeedback(
+                        isScanning ? SoundManager.FeedbackType.ERROR
+                                   : SoundManager.FeedbackType.KNOWN_ITEM);
+            } catch (Exception ignored) {}
+        }
+
+        if (triggerMode == MiraReaderSettings.TRIGGER_MODE_TOGGLE) {
+            // ✅ [Toggle] ضغطة تبدّل الحالة
+            if (isScanning) {
+                Log.i(TAG, "🎯 Trigger [TOGGLE]: pause");
+                pauseScanning();
+            } else {
+                Log.i(TAG, "🎯 Trigger [TOGGLE]: start");
                 startScanning();
             }
-            return true;
+        } else {
+            // ✅ [Hold] ابدأ فقط إذا لم يكن يعمل
+            if (!isScanning) {
+                Log.i(TAG, "🎯 Trigger [HOLD]: start");
+                startScanning();
+            }
         }
+        return true;
+    }
 
-        // ✅ ACTION_UP — أوقف فوراً
-        if (event.getAction() == KeyEvent.ACTION_UP) {
+    // ═══════════════════════════════════════════════════════════
+    //  ACTION_UP
+    // ═══════════════════════════════════════════════════════════
+    if (event.getAction() == KeyEvent.ACTION_UP) {
+        if (triggerMode == MiraReaderSettings.TRIGGER_MODE_HOLD) {
+            // ✅ [Hold] أوقف عند رفع الإصبع
             if (isScanning) {
+                Log.i(TAG, "🎯 Trigger [HOLD]: stop");
                 stopScanning();
             }
-            return true;
         }
-
-        return false;
+        // ✅ [Toggle] لا تفعل شيئاً — الحدث استُهلك في ACTION_DOWN
+        return true;
     }
+
+    return false;
+}
 
     // ================================================================
     //  ScanController.ScanCallback Implementation
