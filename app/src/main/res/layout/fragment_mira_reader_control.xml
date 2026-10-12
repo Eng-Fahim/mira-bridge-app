@@ -585,6 +585,56 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- ═══════════════════════════════════════════════════ -->
+<!-- 🎯 NEW v4.1 — Trigger Mode Card                    -->
+<!-- ═══════════════════════════════════════════════════ -->
+<com.google.android.material.card.MaterialCardView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="0dp"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🎯 سلوك زر الزناد"
+            android:textStyle="bold"
+            android:textSize="15sp"
+            android:textColor="?attr/colorOnSurface"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="اختر كيف يستجيب الزناد الفيزيائي في القارئ"
+            android:textSize="12sp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginBottom="12dp"/>
+
+        <Spinner
+            android:id="@+id/spTriggerMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvTriggerModeHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⏸️ المسح يعمل طوال فترة ضغط الزناد — مثالي للفحص السريع"
+            android:textSize="12sp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
+            <!-- ═══════════════════════════════════════════════════ -->
             <!-- 🎚️ Advanced Settings Card (الموجودة) -->
             <!-- ═══════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
