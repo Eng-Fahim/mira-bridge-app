@@ -891,6 +891,20 @@
                 android:layout_height="48dp"
                 android:text="📖 عرض القيم الحالية"
                 android:layout_marginBottom="8dp"/>
+                <!-- ═══════════════════════════════════════════════════ -->
+<!-- 🇾🇪 NEW v5.0 — Yemen Jewelry Defaults Button        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/btnYemenDefaults"
+    style="@style/Widget.Material3.Button.TonalButton"
+    android:layout_width="match_parent"
+    android:layout_height="52dp"
+    android:layout_marginBottom="8dp"
+    android:text="🇾🇪 الإعدادات المثالية لجرد المجوهرات (اليمن)"
+    android:textStyle="bold"
+    app:icon="@android:drawable/ic_menu_compass"
+    app:iconGravity="textStart" />
+
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnResetDefaults"
