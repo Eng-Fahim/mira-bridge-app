@@ -11,7 +11,7 @@ import java.lang.ref.WeakReference;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  MiraScanSessionController v1.0
+ *  MiraScanSessionController v1.1
  * ═══════════════════════════════════════════════════════════════════════
  *
  *  🎯 الدور: مفوّض (Delegate) لكل منطق "الجلسة" في شاشة الجرد
@@ -21,9 +21,10 @@ import java.lang.ref.WeakReference;
  *      • Logic (هذا الكلاس — يقرر فقط)
  *      • Data  (Settings + Feedback — Singleton)
  *
- *  ✅ يجعل Fragment أنحف بـ ~200 سطر لكل شاشة تستخدمه
- *
  *  ✅ يستمع تلقائياً لتغييرات MiraReaderSettings عبر WeakReference
+ *
+ *  [v1.1] إصلاح: تهيئة autoStopRunnable و settingsListener في constructor
+ *               لتفادي خطأ "hostRef might not have been initialized"
  */
 public class MiraScanSessionController {
 
@@ -59,7 +60,7 @@ public class MiraScanSessionController {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  State
+    //  State — الحقول المُرتبطة بـ Host
     // ═══════════════════════════════════════════════════════════════
     private final WeakReference<Host> hostRef;
     private final MiraReaderSettings settings;
@@ -70,19 +71,9 @@ public class MiraScanSessionController {
     private volatile boolean active = false;
     private volatile boolean released = false;
 
-    // ✅ مرجع للـ Listener لإمكانية الإلغاء
-    private final MiraReaderSettings.OnSettingsChangedListener settingsListener
-            = this::onSettingsChanged;
-
-    private final Runnable autoStopRunnable = () -> {
-        if (active && !released) {
-            Log.i(TAG, "⏹️ Auto-stop fired");
-            Host h = hostRef.get();
-            if (h != null && h.isHostAlive()) {
-                h.onSessionShouldStop("auto-stop");
-            }
-        }
-    };
+    // ✅ [v1.1] بدون final — تُهيَّأ في الـ constructor
+    private MiraReaderSettings.OnSettingsChangedListener settingsListener;
+    private Runnable autoStopRunnable;
 
     // ═══════════════════════════════════════════════════════════════
     //  Constructor
@@ -96,10 +87,23 @@ public class MiraScanSessionController {
         this.settings = MiraReaderSettings.getInstance(ctx);
         this.feedback = MiraFeedback.getInstance(ctx);
 
+        // ✅ [v1.1] تهيئة الحقول التي تعتمد على hostRef
+        this.autoStopRunnable = () -> {
+            if (active && !released) {
+                Log.i(TAG, "⏹️ Auto-stop fired");
+                Host h = hostRef.get();
+                if (h != null && h.isHostAlive()) {
+                    h.onSessionShouldStop("auto-stop");
+                }
+            }
+        };
+
+        this.settingsListener = this::onSettingsChanged;
+
         // ✅ استمع لأي تغيير في الإعدادات
         settings.addListener(settingsListener);
 
-        Log.i(TAG, "✅ MiraScanSessionController created");
+        Log.i(TAG, "✅ MiraScanSessionController v1.1 created");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -154,7 +158,9 @@ public class MiraScanSessionController {
         active = false;
         mainHandler.removeCallbacks(autoStopRunnable);
         try {
-            settings.removeListener(settingsListener);
+            if (settingsListener != null) {
+                settings.removeListener(settingsListener);
+            }
         } catch (Exception ignored) {}
         Log.i(TAG, "🛑 Controller released");
     }
