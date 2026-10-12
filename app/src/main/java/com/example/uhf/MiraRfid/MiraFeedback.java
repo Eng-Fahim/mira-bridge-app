@@ -13,16 +13,20 @@ import android.util.Log;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraFeedback v1.1 — إدارة الأصوات والاهتزاز في MIRA
+ *  MiraFeedback v1.2 — إدارة الأصوات والاهتزاز في MIRA
  * ═══════════════════════════════════════════════════════════════════════════
  *
  *  🎯 الدور: تنفيذ فعلي للأصوات والاهتزاز بناءً على MiraReaderSettings
  *
- *  ✅ Singleton آمن للخيوط (Thread-safe)
- *  ✅ يقرأ الإعدادات من MiraReaderSettings تلقائياً عند كل نداء
- *  ✅ لا يُشغّل صوت "المكرر" داخلياً — القرار للمستدعي
- *  ✅ يعمل من API 21+
- *  ✅ آمن ضد التسرّب — يُستخدم WeakReference من الداخل
+ *  [v1.2] إضافات:
+ *    ✅ onNewTag(boolean isKnown) — يُميّز القطعة المعروفة عن المجهولة
+ *    ✅ onUnknownTag() — نغمة + اهتزاز مميز للقطع غير المسجّلة
+ *    ✅ دعم TONE_UNKNOWN_ITEM في playTone()
+ *
+ *  [v1.1] الأساس:
+ *    ✅ shouldAcceptTag() بدون صوت (القرار للمستدعي)
+ *    ✅ refreshVolume() لتحديث الحجم فوراً
+ *    ✅ حماية كاملة ضد الاستدعاء بعد release()
  *
  *  ═══════════════════════════════════════════════════════════════════════
  *  📖 مثال الاستخدام:
@@ -30,10 +34,14 @@ import android.util.Log;
  *
  *      MiraFeedback fb = MiraFeedback.getInstance(context);
  *
- *      // وسم جديد
- *      fb.onNewTag();
+ *      // وسم جديد — مع تمييز المعروف/المجهول
+ *      fb.onNewTag(true);   // ✅ معروف في الكتالوج
+ *      fb.onNewTag(false);  // 🆕 غير مسجّل
  *
- *      // وسم مكرر (المستدعي يقرر)
+ *      // أو مباشرة
+ *      fb.onUnknownTag();   // ⚠️ نغمة + اهتزاز مميز
+ *
+ *      // مكرر (المستدعي يقرر)
  *      if (!fb.shouldAcceptTag(epc)) {
  *          fb.onDuplicateTag();
  *      }
@@ -66,7 +74,7 @@ public class MiraFeedback {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private ToneGenerator toneGen;
-    private int currentToneVolume = -1;  // لتجنّب إعادة الإنشاء بلا داع
+    private int currentToneVolume = -1;
     private volatile boolean released = false;
 
     /** آخر وقت قبولنا فيه وسماً (لفلتر التكرار) */
@@ -80,7 +88,7 @@ public class MiraFeedback {
         this.context = ctx.getApplicationContext();
         this.settings = MiraReaderSettings.getInstance(this.context);
         ensureToneGenerator();
-        Log.i(TAG, "✅ MiraFeedback v1.1 initialized");
+        Log.i(TAG, "✅ MiraFeedback v1.2 initialized");
     }
 
     public static MiraFeedback getInstance(Context ctx) {
@@ -93,12 +101,25 @@ public class MiraFeedback {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  🔊 Public API — أحداث جاهزة (High-level)
+    //  🔊 Public API — أحداث جاهزة
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * وسم جديد تم قراءته (غير مكرر).
-     * ✅ يُشغّل النغمة المخصصة + اهتزاز
+     * 🆕 [v1.2] وسم جديد مع تمييز المعروف/المجهول.
+     *
+     * @param isKnown true = موجود في الكتالوج، false = غير مسجّل
+     */
+    public void onNewTag(boolean isKnown) {
+        if (isKnown) {
+            onNewTag();
+        } else {
+            onUnknownTag();
+        }
+    }
+
+    /**
+     * وسم جديد تم قراءته (معروف في الكتالوج).
+     * ✅ يُشغّل نغمة "قطعة جديدة" + اهتزاز
      */
     public void onNewTag() {
         if (released) return;
@@ -109,8 +130,25 @@ public class MiraFeedback {
     }
 
     /**
+     * 🆕 [v1.2] وسم غير معروف (غير مسجّل في الكتالوج).
+     *
+     * نغمة تنبيه مميزة + اهتزاز مزدوج، حتى يُميّزها المستخدم
+     * عن القطعة المعروفة بدون النظر إلى الشاشة.
+     */
+    public void onUnknownTag() {
+        if (released) return;
+        if (!settings.isSoundEnabled()) return;
+
+        // 🎵 نغمة التنبيه (قابلة للتخصيص)
+        playTone(settings.getToneUnknownItem());
+
+        // 📳 اهتزاز مميز: نمط "اهتزاز-توقف-اهتزاز-توقف-اهتزاز"
+        vibratePattern(new long[]{0, 60, 50, 60, 50, 60});
+    }
+
+    /**
      * وسم مكرر — **يجب أن يستدعيه المستدعي صراحةً**.
-     * ✅ يُشغّل نغمة المكرر (بدون اهتزاز)
+     * ✅ يُشغّل نغمة المكرر (بدون اهتزاز — لأن المستخدم يعرف)
      */
     public void onDuplicateTag() {
         if (released) return;
@@ -165,7 +203,7 @@ public class MiraFeedback {
     }
 
     /**
-     * 🆕 v1.1 — وسم "قسري" (تجاوز كل الفلاتر).
+     * 🆕 وسم "قسري" (تجاوز كل الفلاتر).
      * مفيد لسيناريوهات مثل: مسح إجباري، تخطّي التحقق.
      */
     public void onTagForced() {
@@ -188,11 +226,14 @@ public class MiraFeedback {
         if (released || toneGen == null) return;
 
         switch (toneType) {
+
             case MiraReaderSettings.TONE_BEEP_SHORT:
+                // 🔔 بيب واحد قصير
                 safeStartTone(ToneGenerator.TONE_PROP_BEEP, 60);
                 break;
 
             case MiraReaderSettings.TONE_BEEP_DOUBLE:
+                // 🔔🔔 بيب + بيب (بعد 100ms)
                 safeStartTone(ToneGenerator.TONE_PROP_BEEP, 60);
                 handler.postDelayed(
                         () -> safeStartTone(ToneGenerator.TONE_PROP_BEEP, 60),
@@ -200,24 +241,38 @@ public class MiraFeedback {
                 break;
 
             case MiraReaderSettings.TONE_BEEP_LONG:
+                // 🔔 بيب طويل منخفض
                 safeStartTone(ToneGenerator.TONE_PROP_BEEP2, 300);
                 break;
 
             case MiraReaderSettings.TONE_CLICK:
+                // 🖱️ كليك خفيف
                 safeStartTone(ToneGenerator.TONE_PROP_ACK, 40);
                 break;
 
             case MiraReaderSettings.TONE_SUCCESS:
+                // ✅ نغمة نجاح (CDMA alert)
                 safeStartTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
                 break;
 
             case MiraReaderSettings.TONE_ERROR:
+                // ❌ نغمة خطأ
                 safeStartTone(ToneGenerator.TONE_SUP_ERROR, 400);
+                break;
+
+            case MiraReaderSettings.TONE_UNKNOWN_ITEM:
+                // 🆕 [v1.2] تنبيه "غير معروف"
+                //     نمط: بيب + بيب أسرع + بيب (ثلاث بيبات متتابعة)
+                safeStartTone(ToneGenerator.TONE_PROP_BEEP, 50);
+                handler.postDelayed(
+                        () -> safeStartTone(ToneGenerator.TONE_PROP_BEEP, 50), 80);
+                handler.postDelayed(
+                        () -> safeStartTone(ToneGenerator.TONE_PROP_BEEP, 50), 160);
                 break;
 
             case MiraReaderSettings.TONE_NONE:
             default:
-                // صامت — لا شيء
+                // صامت
                 break;
         }
     }
@@ -238,16 +293,13 @@ public class MiraFeedback {
 
     /**
      * إعادة إنشاء ToneGenerator بالحجم الحالي.
-     * يُستدعى تلقائياً عند الحاجة فقط.
      */
     private void ensureToneGenerator() {
         try {
             int vol = Math.max(1, Math.min(100, settings.getSoundVolume()));
 
-            // لا حاجة لإعادة الإنشاء لو نفس الحجم
             if (toneGen != null && currentToneVolume == vol) return;
 
-            // أفرغ القديم
             if (toneGen != null) {
                 try { toneGen.release(); } catch (Exception ignored) {}
                 toneGen = null;
@@ -264,8 +316,7 @@ public class MiraFeedback {
     }
 
     /**
-     * 🆕 v1.1 — يُستدعى عند تغيير الحجم من الإعدادات.
-     * يُعيد إنشاء ToneGenerator بالحجم الجديد.
+     * يُستدعى عند تغيير الحجم من الإعدادات.
      */
     public void refreshVolume() {
         if (released) return;
@@ -344,7 +395,6 @@ public class MiraFeedback {
      * هل يجب قبول الوسم؟
      *
      * ⚠️ **مهم**: هذه الدالة **لا تُشغّل أي صوت**.
-     *             القرار للـ Controller/المستدعي.
      *
      * @param epc الوسم القادم
      * @return true = اقبله (جديد) | false = مكرر (تجاهله)
@@ -352,14 +402,12 @@ public class MiraFeedback {
     public boolean shouldAcceptTag(String epc) {
         if (released) return false;
 
-        // لو الفلتر معطّل → اقبل الكل
         if (!settings.isFilterDuplicates()) return true;
 
         long now = System.currentTimeMillis();
         long threshold = settings.getDuplicateFilterMs();
 
         if (now - lastTagAt < threshold) {
-            // ✅ مكرر — لا صوت هنا (المستدعي يقرر)
             return false;
         }
 
@@ -369,7 +417,6 @@ public class MiraFeedback {
 
     /**
      * إعادة تعيين فلتر التكرار.
-     * يُستدعى عند بدء جلسة جديدة.
      */
     public void resetDuplicateFilter() {
         lastTagAt = 0L;
@@ -381,13 +428,12 @@ public class MiraFeedback {
 
     /**
      * تحرير كل الموارد.
-     * ⚠️ استدعِها فقط عند إغلاق التطبيق كاملاً — لا في onDestroyView.
+     * ⚠️ استدعِها فقط عند إغلاق التطبيق كاملاً.
      */
     public void release() {
         if (released) return;
         released = true;
 
-        // أوقف أي نغمات مؤجّلة
         try { handler.removeCallbacksAndMessages(null); } catch (Exception ignored) {}
 
         if (toneGen != null) {
