@@ -17,6 +17,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
 import com.google.android.material.appbar.MaterialToolbar;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.R;
@@ -31,7 +32,16 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * ✅ MiraReaderControlFragment v3 — لوحة التحكم الكاملة
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  MiraReaderControlFragment v4.0 — لوحة التحكم الكاملة
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * [v4.0] إضافات:
+ *   ✅ 🔊 الأصوات والاهتزاز (Sound & Vibration)
+ *   ✅ 🚫 فلترة التكرار (Advanced Reading)
+ *   ✅ 🌐 إعدادات عالمية (LED, Screen, Toast, Log)
+ *   ✅ 🎯 وضع الزناد (Trigger Mode — Hold/Toggle)
+ *   ✅ إصلاح مشكلة عدم حفظ الإعدادات (ربط كامل)
  *
  * يعرض الإعدادات الحقيقية من توثيق Chainway SDK الرسمي:
  *   - 19 منطقة تردد (HEX)
@@ -50,7 +60,8 @@ public class MiraReaderControlFragment extends Fragment {
     private final AtomicBoolean isUpdatingUi = new AtomicBoolean(false);
     private boolean isArabic = true;
     private MaterialToolbar toolbar;
-    // ═══ Views ═══
+
+    // ═══════════════ Views — Main ═══════════════
     private SeekBar seekPower;
     private TextView tvPowerValue, tvSummary;
     private Spinner spFrequency, spRfLink, spSession, spTarget, spQValue;
@@ -60,7 +71,24 @@ public class MiraReaderControlFragment extends Fragment {
     private MaterialButton btnApplyNow, btnReset, btnReadCurrent;
     private View loading;
 
-    // ═══ Live Test ═══
+    // ═══════════════ 🔊 Sound & Vibration [v4.0] ═══════════════
+    private MaterialSwitch swSoundEnabled, swVibrateEnabled;
+    private SeekBar        seekVolume, seekVibrateMs, seekDupFilter;
+    private Spinner        spToneNew, spToneDuplicate, spToneError;
+    private MaterialSwitch swSoundOnPos, swSoundOnInventory;
+
+    // ═══════════════ 🚫 Advanced Reading [v4.0] ═══════════════
+    private MaterialSwitch swFilterDuplicates;
+    private TextView       tvVolumeValue, tvVibrateMsValue, tvDupFilterValue;
+
+    // ═══════════════ 🌐 Global [v4.0] ═══════════════
+    private MaterialSwitch swKeepScreenOn, swLedFlash, swToastEnabled, swAutoSaveLog;
+
+    // ═══════════════ 🎯 Trigger Mode [v4.1] ═══════════════
+    private Spinner  spTriggerMode;
+    private TextView tvTriggerModeHint;
+
+    // ═══════════════ Live Test ═══════════════
     private TextView tvLiveReadCount, tvLiveRate, tvLiveLastEpc, tvLiveRssi;
     private MaterialButton btnLiveTestToggle;
 
@@ -72,6 +100,10 @@ public class MiraReaderControlFragment extends Fragment {
     private Thread liveReadThread;
     private final Handler liveUiHandler = new Handler(Looper.getMainLooper());
     private Runnable liveRateUpdater;
+
+    // ═══════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════
 
     @Nullable
     @Override
@@ -95,17 +127,21 @@ public class MiraReaderControlFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Bind
+    //  Bind Views
     // ═══════════════════════════════════════════════════════════
+
     private void bindViews(View v) {
-    toolbar = v.findViewById(R.id.toolbarReaderControl);
-if (toolbar != null) {
-    toolbar.setNavigationOnClickListener(x -> {
-        Log.d(TAG, "🔙 Back pressed");
-        handleBack();
-    });
-}
-        // Main
+
+        // ═══ Toolbar ═══
+        toolbar = v.findViewById(R.id.toolbarReaderControl);
+        if (toolbar != null) {
+            toolbar.setNavigationOnClickListener(x -> {
+                Log.d(TAG, "🔙 Back pressed");
+                handleBack();
+            });
+        }
+
+        // ═══ Main Controls ═══
         seekPower         = v.findViewById(R.id.seekPower);
         tvPowerValue      = v.findViewById(R.id.tvPowerValue);
         tvSummary         = v.findViewById(R.id.tvSettingsSummary);
@@ -122,20 +158,51 @@ if (toolbar != null) {
         btnReadCurrent    = v.findViewById(R.id.btnReadCurrent);
         loading           = v.findViewById(R.id.readerLoading);
 
-        // Live Test
+        spReadMode        = v.findViewById(R.id.spReadMode);
+        tvReadModeHint    = v.findViewById(R.id.tvReadModeHint);
+
+        // ═══ 🔊 Sound & Vibration [v4.0] ═══
+        swSoundEnabled      = v.findViewById(R.id.swSoundEnabled);
+        seekVolume          = v.findViewById(R.id.seekVolume);
+        tvVolumeValue       = v.findViewById(R.id.tvVolumeValue);
+        swVibrateEnabled    = v.findViewById(R.id.swVibrateEnabled);
+        seekVibrateMs       = v.findViewById(R.id.seekVibrateMs);
+        tvVibrateMsValue    = v.findViewById(R.id.tvVibrateMsValue);
+
+        spToneNew           = v.findViewById(R.id.spToneNew);
+        spToneDuplicate     = v.findViewById(R.id.spToneDuplicate);
+        spToneError         = v.findViewById(R.id.spToneError);
+
+        swSoundOnPos        = v.findViewById(R.id.swSoundOnPos);
+        swSoundOnInventory  = v.findViewById(R.id.swSoundOnInventory);
+
+        // ═══ 🚫 Advanced Reading [v4.0] ═══
+        swFilterDuplicates  = v.findViewById(R.id.swFilterDuplicates);
+        seekDupFilter       = v.findViewById(R.id.seekDupFilter);
+        tvDupFilterValue    = v.findViewById(R.id.tvDupFilterValue);
+
+        // ═══ 🌐 Global [v4.0] ═══
+        swKeepScreenOn      = v.findViewById(R.id.swKeepScreenOn);
+        swLedFlash          = v.findViewById(R.id.swLedFlash);
+        swToastEnabled      = v.findViewById(R.id.swToastEnabled);
+        swAutoSaveLog       = v.findViewById(R.id.swAutoSaveLog);
+
+        // ═══ 🎯 Trigger Mode [v4.1] ═══
+        spTriggerMode       = v.findViewById(R.id.spTriggerMode);
+        tvTriggerModeHint   = v.findViewById(R.id.tvTriggerModeHint);
+
+        // ═══ Live Test ═══
         tvLiveReadCount   = v.findViewById(R.id.tvLiveReadCount);
         tvLiveRate        = v.findViewById(R.id.tvLiveRate);
         tvLiveLastEpc     = v.findViewById(R.id.tvLiveLastEpc);
         tvLiveRssi        = v.findViewById(R.id.tvLiveRssi);
         btnLiveTestToggle = v.findViewById(R.id.btnLiveTestToggle);
-        
-        spReadMode     = v.findViewById(R.id.spReadMode);
-        tvReadModeHint = v.findViewById(R.id.tvReadModeHint);
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Spinners
+    //  Setup Spinners
     // ═══════════════════════════════════════════════════════════
+
     private void setupSpinners() {
         // ✅ 19 منطقة تردد
         spFrequency.setAdapter(new ArrayAdapter<>(requireContext(),
@@ -147,32 +214,57 @@ if (toolbar != null) {
                 android.R.layout.simple_spinner_dropdown_item,
                 MiraReaderSettings.RFLINK_LABELS));
 
-        // Session
+        // ✅ Session
         String[] sessions = {"S0", "S1", "S2", "S3"};
         spSession.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, sessions));
 
-        // Target
+        // ✅ Target
         String[] targets = {"A", "B"};
         spTarget.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, targets));
 
-        // Q Value (0-15)
+        // ✅ Q Value (0-15)
         String[] qValues = new String[16];
         for (int i = 0; i < 16; i++) qValues[i] = String.valueOf(i);
         spQValue.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, qValues));
-                
+
+        // ✅ Read Mode
         spReadMode.setAdapter(new ArrayAdapter<>(requireContext(),
-        android.R.layout.simple_spinner_dropdown_item,
-        MiraReaderSettings.READ_MODE_LABELS));
+                android.R.layout.simple_spinner_dropdown_item,
+                MiraReaderSettings.READ_MODE_LABELS));
+
+        // ═══════════════════════════════════════════════════════
+        //  🔊 نغمات — نفس المحول للثلاثة [v4.0]
+        // ═══════════════════════════════════════════════════════
+        ArrayAdapter<String> toneAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                MiraReaderSettings.TONE_LABELS);
+
+        if (spToneNew != null)       spToneNew.setAdapter(toneAdapter);
+        if (spToneDuplicate != null) spToneDuplicate.setAdapter(toneAdapter);
+        if (spToneError != null)     spToneError.setAdapter(toneAdapter);
+
+        // ═══════════════════════════════════════════════════════
+        //  🎯 Trigger Mode [v4.1]
+        // ═══════════════════════════════════════════════════════
+        if (spTriggerMode != null) {
+            spTriggerMode.setAdapter(new ArrayAdapter<>(requireContext(),
+                    android.R.layout.simple_spinner_dropdown_item,
+                    MiraReaderSettings.TRIGGER_MODE_LABELS));
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Listeners
+    //  Setup Listeners
     // ═══════════════════════════════════════════════════════════
+
     private void setupListeners() {
-        // ═══ Power ═══
+
+        // ═══════════════════════════════════════════════════════
+        //  Power
+        // ═══════════════════════════════════════════════════════
         seekPower.setMax(33);
         seekPower.setMin(5);
         seekPower.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -186,21 +278,25 @@ if (toolbar != null) {
             @Override public void onStopTrackingTouch(SeekBar s) {}
         });
 
-        // ═══ Frequency — القيمة HEX ═══
+        // ═══════════════════════════════════════════════════════
+        //  Frequency
+        // ═══════════════════════════════════════════════════════
         spFrequency.setOnItemSelectedListener(spinnerListener(pos -> {
             int mode = MiraReaderSettings.FREQ_MODES[pos][0];
             settings.setFreqMode(mode);
         }));
 
-        // ═══ RFLink ═══
+        // ═══════════════════════════════════════════════════════
+        //  RFLink / Session / Target / Q
+        // ═══════════════════════════════════════════════════════
         spRfLink.setOnItemSelectedListener(spinnerListener(pos -> settings.setRfLink(pos)));
-
-        // ═══ Session / Target / Q ═══
         spSession.setOnItemSelectedListener(spinnerListener(pos -> settings.setSession(pos)));
         spTarget.setOnItemSelectedListener(spinnerListener(pos -> settings.setTarget(pos)));
         spQValue.setOnItemSelectedListener(spinnerListener(pos -> settings.setQValue(pos)));
 
-        // ═══ Switches ═══
+        // ═══════════════════════════════════════════════════════
+        //  Switches — Main
+        // ═══════════════════════════════════════════════════════
         swFastId.setOnCheckedChangeListener((b, c) -> {
             if (isUpdatingUi.get()) return;
             settings.setFastId(c); updateSummary();
@@ -213,22 +309,151 @@ if (toolbar != null) {
             if (isUpdatingUi.get()) return;
             settings.setFastInventory(c); updateSummary();
         });
-        
-        // ═══ Read Mode ═══
-        spReadMode.setOnItemSelectedListener(spinnerListener(pos -> {
-    settings.setReadMode(pos);
-    if (tvReadModeHint != null) {
-        tvReadModeHint.setText(MiraReaderSettings.READ_MODE_HINTS[pos]);
-    }}));
 
-        // ═══ Main Buttons ═══
+        // ═══════════════════════════════════════════════════════
+        //  Read Mode
+        // ═══════════════════════════════════════════════════════
+        spReadMode.setOnItemSelectedListener(spinnerListener(pos -> {
+            settings.setReadMode(pos);
+            if (tvReadModeHint != null) {
+                tvReadModeHint.setText(MiraReaderSettings.READ_MODE_HINTS[pos]);
+            }
+        }));
+
+        // ═══════════════════════════════════════════════════════
+        //  Main Buttons
+        // ═══════════════════════════════════════════════════════
         btnApplyNow.setOnClickListener(x -> applyNow());
         btnReset.setOnClickListener(x -> confirmReset());
         btnReadCurrent.setOnClickListener(x -> readCurrent());
 
-        // ═══ Live Test ═══ (✅ في المكان الصحيح)
+        // ═══════════════════════════════════════════════════════
+        //  Live Test
+        // ═══════════════════════════════════════════════════════
         btnLiveTestToggle.setOnClickListener(x -> toggleLiveTest());
+
+        // ═══════════════════════════════════════════════════════
+        //  🔊 Sound & Vibration [v4.0]
+        // ═══════════════════════════════════════════════════════
+        if (swSoundEnabled != null) {
+            swSoundEnabled.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setSoundEnabled(c);
+            });
+        }
+
+        if (seekVolume != null) {
+            seekVolume.setMax(100);
+            seekVolume.setOnSeekBarChangeListener(simpleSeek((sb, p) -> {
+                settings.setSoundVolume(p);
+                if (tvVolumeValue != null) tvVolumeValue.setText(p + "%");
+            }));
+        }
+
+        if (swVibrateEnabled != null) {
+            swVibrateEnabled.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setVibrateEnabled(c);
+            });
+        }
+
+        if (seekVibrateMs != null) {
+            seekVibrateMs.setMax(500);
+            seekVibrateMs.setOnSeekBarChangeListener(simpleSeek((sb, p) -> {
+                settings.setVibrateMs(p);
+                if (tvVibrateMsValue != null) tvVibrateMsValue.setText(p + " ms");
+            }));
+        }
+
+        if (spToneNew != null) {
+            spToneNew.setOnItemSelectedListener(spinnerListener(pos ->
+                    settings.setToneNewTag(pos)));
+        }
+        if (spToneDuplicate != null) {
+            spToneDuplicate.setOnItemSelectedListener(spinnerListener(pos ->
+                    settings.setToneDuplicate(pos)));
+        }
+        if (spToneError != null) {
+            spToneError.setOnItemSelectedListener(spinnerListener(pos ->
+                    settings.setToneError(pos)));
+        }
+
+        if (swSoundOnPos != null) {
+            swSoundOnPos.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setSoundOnPos(c);
+            });
+        }
+        if (swSoundOnInventory != null) {
+            swSoundOnInventory.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setSoundOnInventory(c);
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  🚫 Advanced Reading [v4.0]
+        // ═══════════════════════════════════════════════════════
+        if (swFilterDuplicates != null) {
+            swFilterDuplicates.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setFilterDuplicates(c);
+            });
+        }
+
+        if (seekDupFilter != null) {
+            seekDupFilter.setMax(10000);
+            seekDupFilter.setOnSeekBarChangeListener(simpleSeek((sb, p) -> {
+                settings.setDuplicateFilterMs(p);
+                if (tvDupFilterValue != null) tvDupFilterValue.setText(p + " ms");
+            }));
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  🌐 Global [v4.0]
+        // ═══════════════════════════════════════════════════════
+        if (swKeepScreenOn != null) {
+            swKeepScreenOn.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setKeepScreenOn(c);
+            });
+        }
+        if (swLedFlash != null) {
+            swLedFlash.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setLedFlashEnabled(c);
+            });
+        }
+        if (swToastEnabled != null) {
+            swToastEnabled.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setToastEnabled(c);
+            });
+        }
+        if (swAutoSaveLog != null) {
+            swAutoSaveLog.setOnCheckedChangeListener((b, c) -> {
+                if (isUpdatingUi.get()) return;
+                settings.setAutoSaveLog(c);
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  🎯 Trigger Mode [v4.1]
+        // ═══════════════════════════════════════════════════════
+        if (spTriggerMode != null) {
+            spTriggerMode.setOnItemSelectedListener(spinnerListener(pos -> {
+                settings.setTriggerMode(pos);
+                if (tvTriggerModeHint != null) {
+                    tvTriggerModeHint.setText(
+                            MiraReaderSettings.TRIGGER_MODE_HINTS[pos]);
+                }
+            }));
+        }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Listener Helpers
+    // ═══════════════════════════════════════════════════════════
 
     private AdapterView.OnItemSelectedListener spinnerListener(IntConsumer onChange) {
         return new AdapterView.OnItemSelectedListener() {
@@ -241,21 +466,41 @@ if (toolbar != null) {
         };
     }
 
+    /**
+     * ✅ Listener مبسّط للـ SeekBar — يُستدعى فقط من المستخدم.
+     */
+    private SeekBar.OnSeekBarChangeListener simpleSeek(BiIntConsumer onChange) {
+        return new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
+                if (!fromUser || isUpdatingUi.get()) return;
+                onChange.accept(s, p);
+            }
+            @Override public void onStartTrackingTouch(SeekBar s) {}
+            @Override public void onStopTrackingTouch(SeekBar s) {}
+        };
+    }
+
     private interface IntConsumer { void accept(int value); }
+    private interface BiIntConsumer { void accept(SeekBar s, int value); }
 
     // ═══════════════════════════════════════════════════════════
-    //  Load UI
+    //  ✅ Load Settings → UI (الإصلاح الحرِج)
     // ═══════════════════════════════════════════════════════════
+
     private void loadSettingsToUi() {
         isUpdatingUi.set(true);
         try {
+            // ═══════════════════════════════════════════════════
+            //  Main
+            // ═══════════════════════════════════════════════════
             seekPower.setProgress(settings.getPowerDbm());
             tvPowerValue.setText(settings.getPowerDbm() + " dBm");
 
             int freqIdx = 0;
             for (int i = 0; i < MiraReaderSettings.FREQ_MODES.length; i++) {
                 if (MiraReaderSettings.FREQ_MODES[i][0] == settings.getFreqMode()) {
-                    freqIdx = i; break;
+                    freqIdx = i;
+                    break;
                 }
             }
             spFrequency.setSelection(freqIdx);
@@ -269,12 +514,72 @@ if (toolbar != null) {
             swFastId.setChecked(settings.isFastId());
             swTagFocus.setChecked(settings.isTagFocus());
             swFastInventory.setChecked(settings.isFastInventory());
+
+            spReadMode.setSelection(settings.getReadMode());
+            if (tvReadModeHint != null) {
+                tvReadModeHint.setText(
+                        MiraReaderSettings.READ_MODE_HINTS[settings.getReadMode()]);
+            }
+
+            // ═══════════════════════════════════════════════════
+            //  🔊 Sound & Vibration [v4.0]
+            // ═══════════════════════════════════════════════════
+            if (swSoundEnabled != null) {
+                swSoundEnabled.setChecked(settings.isSoundEnabled());
+            }
+            if (seekVolume != null) {
+                int vol = settings.getSoundVolume();
+                seekVolume.setProgress(vol);
+                if (tvVolumeValue != null) tvVolumeValue.setText(vol + "%");
+            }
+            if (swVibrateEnabled != null) {
+                swVibrateEnabled.setChecked(settings.isVibrateEnabled());
+            }
+            if (seekVibrateMs != null) {
+                int vib = settings.getVibrateMs();
+                seekVibrateMs.setProgress(vib);
+                if (tvVibrateMsValue != null) tvVibrateMsValue.setText(vib + " ms");
+            }
+
+            if (spToneNew != null)       spToneNew.setSelection(settings.getToneNewTag());
+            if (spToneDuplicate != null) spToneDuplicate.setSelection(settings.getToneDuplicate());
+            if (spToneError != null)     spToneError.setSelection(settings.getToneError());
+
+            if (swSoundOnPos != null)       swSoundOnPos.setChecked(settings.isSoundOnPos());
+            if (swSoundOnInventory != null) swSoundOnInventory.setChecked(settings.isSoundOnInventory());
+
+            // ═══════════════════════════════════════════════════
+            //  🚫 Advanced Reading [v4.0]
+            // ═══════════════════════════════════════════════════
+            if (swFilterDuplicates != null) {
+                swFilterDuplicates.setChecked(settings.isFilterDuplicates());
+            }
+            if (seekDupFilter != null) {
+                int flt = settings.getDuplicateFilterMs();
+                seekDupFilter.setProgress(flt);
+                if (tvDupFilterValue != null) tvDupFilterValue.setText(flt + " ms");
+            }
+
+            // ═══════════════════════════════════════════════════
+            //  🌐 Global [v4.0]
+            // ═══════════════════════════════════════════════════
+            if (swKeepScreenOn != null) swKeepScreenOn.setChecked(settings.isKeepScreenOn());
+            if (swLedFlash != null)     swLedFlash.setChecked(settings.isLedFlashEnabled());
+            if (swToastEnabled != null) swToastEnabled.setChecked(settings.isToastEnabled());
+            if (swAutoSaveLog != null)  swAutoSaveLog.setChecked(settings.isAutoSaveLog());
+
+            // ═══════════════════════════════════════════════════
+            //  🎯 Trigger Mode [v4.1]
+            // ═══════════════════════════════════════════════════
+            if (spTriggerMode != null) {
+                int tm = settings.getTriggerMode();
+                spTriggerMode.setSelection(tm);
+                if (tvTriggerModeHint != null) {
+                    tvTriggerModeHint.setText(MiraReaderSettings.TRIGGER_MODE_HINTS[tm]);
+                }
+            }
+
         } finally {
-        spReadMode.setSelection(settings.getReadMode());
-if (tvReadModeHint != null) {
-    tvReadModeHint.setText(
-        MiraReaderSettings.READ_MODE_HINTS[settings.getReadMode()]);
-}
             isUpdatingUi.set(false);
         }
     }
@@ -284,8 +589,9 @@ if (tvReadModeHint != null) {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ تطبيق على القارئ الآن
+    //  ✅ تطبيق على القارئ
     // ═══════════════════════════════════════════════════════════
+
     private void applyNow() {
         RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
         if (reader == null) {
@@ -300,10 +606,10 @@ if (tvReadModeHint != null) {
             ui.post(() -> {
                 showLoading(false);
                 String msg = r.isSuccess()
-                    ? (isArabic ? "✅ تم تطبيق " + r.applied + " إعداد"
-                                : "✅ Applied " + r.applied + " settings")
-                    : (isArabic ? "⚠️ نجح " + r.applied + " / فشل " + r.failed
-                                : "⚠️ OK " + r.applied + " / Failed " + r.failed);
+                        ? (isArabic ? "✅ تم تطبيق " + r.applied + " إعداد"
+                                    : "✅ Applied " + r.applied + " settings")
+                        : (isArabic ? "⚠️ نجح " + r.applied + " / فشل " + r.failed
+                                    : "⚠️ OK " + r.applied + " / Failed " + r.failed);
                 toast(msg);
             });
         }, "ApplyMiraSettings").start();
@@ -312,6 +618,7 @@ if (tvReadModeHint != null) {
     // ═══════════════════════════════════════════════════════════
     //  ✅ قراءة الحالة الحقيقية من العتاد
     // ═══════════════════════════════════════════════════════════
+
     private void readCurrent() {
         RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
         if (reader == null) {
@@ -347,34 +654,37 @@ if (tvReadModeHint != null) {
 
         sb.append("\n── Saved in MIRA ──\n");
         sb.append("Power (saved): ").append(settings.getPowerDbm()).append(" dBm\n");
-        sb.append("Frequency (saved): ").append(MiraReaderSettings.getFreqLabel(settings.getFreqMode())).append("\n");
+        sb.append("Frequency (saved): ")
+          .append(MiraReaderSettings.getFreqLabel(settings.getFreqMode())).append("\n");
         sb.append("Session (saved): S").append(settings.getSession()).append("\n");
-        sb.append("Target (saved): ").append(settings.getTarget() == 0 ? "A" : "B").append("\n");
+        sb.append("Target (saved): ")
+          .append(settings.getTarget() == 0 ? "A" : "B").append("\n");
         sb.append("Q (saved): ").append(settings.getQValue()).append("\n");
         sb.append("FastID (saved): ").append(settings.isFastId() ? "ON" : "OFF").append("\n");
-        sb.append("TagFocus (saved): ").append(settings.isTagFocus() ? "ON" : "OFF").append("\n");
+        sb.append("TagFocus (saved): ")
+          .append(settings.isTagFocus() ? "ON" : "OFF").append("\n");
 
         new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "📖 الحالة الحالية" : "📖 Current State")
-            .setMessage(sb.toString())
-            .setPositiveButton(isArabic ? "موافق" : "OK", null)
-            .show();
+                .setTitle(isArabic ? "📖 الحالة الحالية" : "📖 Current State")
+                .setMessage(sb.toString())
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .show();
     }
 
     private void confirmReset() {
         new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "🔄 إعادة تعيين" : "🔄 Reset")
-            .setMessage(isArabic
-                ? "سيتم إرجاع كل الإعدادات للقيم الافتراضية.\nهل أنت متأكد؟"
-                : "All settings will reset to defaults.\nContinue?")
-            .setPositiveButton(isArabic ? "نعم" : "Yes", (d, w) -> {
-                settings.resetToDefaults();
-                loadSettingsToUi();
-                updateSummary();
-                applyNow();
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-            .show();
+                .setTitle(isArabic ? "🔄 إعادة تعيين" : "🔄 Reset")
+                .setMessage(isArabic
+                        ? "سيتم إرجاع كل الإعدادات للقيم الافتراضية.\nهل أنت متأكد؟"
+                        : "All settings will reset to defaults.\nContinue?")
+                .setPositiveButton(isArabic ? "نعم" : "Yes", (d, w) -> {
+                    settings.resetToDefaults();
+                    loadSettingsToUi();
+                    updateSummary();
+                    applyNow();
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -536,75 +846,77 @@ if (tvReadModeHint != null) {
     }
 
     private void stopLiveTest() {
-    if (!isLiveTesting) return;
-    isLiveTesting = false;
+        if (!isLiveTesting) return;
+        isLiveTesting = false;
 
-    if (liveReadThread != null) {
-        liveReadThread.interrupt();
-        liveReadThread = null;
+        if (liveReadThread != null) {
+            liveReadThread.interrupt();
+            liveReadThread = null;
+        }
+
+        if (liveUiHandler != null && liveRateUpdater != null) {
+            liveUiHandler.removeCallbacks(liveRateUpdater);
+            liveRateUpdater = null;
+        }
+
+        // ✅ شغّل SDK في خيط خلفي — لا يوقف UI
+        new Thread(() -> {
+            try {
+                RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
+                if (reader != null) reader.stopInventory();
+            } catch (Exception e) {
+                Log.w(TAG, "stopInventory error: " + e.getMessage());
+            }
+        }, "StopLiveTest").start();
+
+        if (btnLiveTestToggle != null) {
+            btnLiveTestToggle.setText(isArabic
+                    ? "▶️ ابدأ اختبار القراءة"
+                    : "▶️ Start Test");
+            btnLiveTestToggle.setBackgroundTintList(null);
+        }
+
+        Log.i(TAG, "🛑 Live test stopped. Total reads: " + liveReadCount);
+        toast(isArabic
+                ? "🛑 تم إيقاف الاختبار — " + liveReadCount + " قراءة"
+                : "🛑 Test stopped — " + liveReadCount + " reads");
     }
 
-    if (liveUiHandler != null && liveRateUpdater != null) {
-        liveUiHandler.removeCallbacks(liveRateUpdater);
-        liveRateUpdater = null;
-    }
+    // ═══════════════════════════════════════════════════════════
+    //  Lifecycle — BottomNav / FAB
+    // ═══════════════════════════════════════════════════════════
 
-    // ✅ جديد: شغّل SDK في خيط خلفي — لا يوقف UI
-    new Thread(() -> {
+    @Override
+    public void onStart() {
+        super.onStart();
         try {
-            RFIDWithUHFUART reader = BaseTabFragmentActivity.getSharedReader();
-            if (reader != null) reader.stopInventory();
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                activity.setBottomNavVisible(false);
+
+                View fab = activity.findViewById(R.id.fabActionCenter);
+                if (fab != null) fab.setVisibility(View.GONE);
+            }
         } catch (Exception e) {
-            Log.w(TAG, "stopInventory error: " + e.getMessage());
+            Log.w(TAG, "onStart error: " + e.getMessage());
         }
-    }, "StopLiveTest").start();
-
-    if (btnLiveTestToggle != null) {
-        btnLiveTestToggle.setText(isArabic
-                ? "▶️ ابدأ اختبار القراءة"
-                : "▶️ Start Test");
-        btnLiveTestToggle.setBackgroundTintList(null);
     }
 
-    Log.i(TAG, "🛑 Live test stopped. Total reads: " + liveReadCount);
-    toast(isArabic
-            ? "🛑 تم إيقاف الاختبار — " + liveReadCount + " قراءة"
-            : "🛑 Test stopped — " + liveReadCount + " reads");
-}
+    @Override
+    public void onStop() {
+        super.onStop();
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                activity.setBottomNavVisible(true);
 
-@Override
-public void onStart() {
-    super.onStart();
-    // ✅ إخفاء قائمة التنقل السفلية
-    try {
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-            activity.setBottomNavVisible(false);
-
-            View fab = activity.findViewById(R.id.fabActionCenter);
-            if (fab != null) fab.setVisibility(View.GONE);
+                View fab = activity.findViewById(R.id.fabActionCenter);
+                if (fab != null) fab.setVisibility(View.VISIBLE);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "onStop error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.w(TAG, "onStart error: " + e.getMessage());
     }
-}
-
-@Override
-public void onStop() {
-    super.onStop();
-    // ✅ إعادة إظهار قائمة التنقل السفلية
-    try {
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-            activity.setBottomNavVisible(true);
-
-            View fab = activity.findViewById(R.id.fabActionCenter);
-            if (fab != null) fab.setVisibility(View.VISIBLE);
-        }
-    } catch (Exception e) {
-        Log.w(TAG, "onStop error: " + e.getMessage());
-    }
-}
 
     @Override
     public void onDestroyView() {
@@ -613,6 +925,10 @@ public void onStop() {
         }
         super.onDestroyView();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════
 
     private void showLoading(boolean show) {
         if (loading != null) loading.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -623,30 +939,30 @@ public void onStop() {
             Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
         }
     }
+
     /**
- * ✅ زر الرجوع — يعود لـ Dashboard
- */
-private void handleBack() {
-    try {
-        if (isLiveTesting) {
-            stopLiveTest();
-        }
-
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-            activity.setBottomNavVisible(true);
-
-            if (activity.getNavigationManager() != null) {
-                activity.getNavigationManager().goToDashboard();
-            } else {
-                activity.onBackPressed();
+     * ✅ زر الرجوع — يعود لـ Dashboard
+     */
+    private void handleBack() {
+        try {
+            if (isLiveTesting) {
+                stopLiveTest();
             }
-        } else if (getActivity() != null) {
-            getActivity().onBackPressed();
+
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                activity.setBottomNavVisible(true);
+
+                if (activity.getNavigationManager() != null) {
+                    activity.getNavigationManager().goToDashboard();
+                } else {
+                    activity.onBackPressed();
+                }
+            } else if (getActivity() != null) {
+                getActivity().onBackPressed();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "handleBack error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "handleBack error: " + e.getMessage());
     }
-}
-    
 }
