@@ -956,6 +956,10 @@ private void navigateBySetupStatus(String setupStatus) {
     public void onSetupCompleted() {
     Log.d(TAG, "🎉 onSetupCompleted");
 
+    // ✅ [v5.1] علّم أن الجلسة مكتملة
+    setupCompletedThisSession = true;
+    setupWelcomeShownThisSession = true;   // ← لكي لا تظهر رسالة الترحيب بعدها
+
     // ⭐ 1. سجّل وقت الاكتمال لبدء فترة السماح
     setupCompletedAt = System.currentTimeMillis();
 
