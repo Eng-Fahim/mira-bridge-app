@@ -99,6 +99,24 @@ public class MiraReaderSettings {
             "يقرأ كل الوسوم القريبة باستمرار — مثالي للجرد السريع",
             "يقرأ وسماً واحداً فقط لكل ضغطة — مثالي للبيع"
     };
+    
+    // ═══════════════════════════════════════════════════════════════
+//  🎯 وضع الزناد الفيزيائي (Trigger Mode)
+// ═══════════════════════════════════════════════════════════════
+public static final int TRIGGER_MODE_HOLD   = 0;  // اضغط باستمرار
+public static final int TRIGGER_MODE_TOGGLE = 1;  // ضغطة تبدّل
+
+public static final String[] TRIGGER_MODE_LABELS = {
+        "⏸️ اضغط باستمرار (Hold)",
+        "🔄 ضغطة للبدء/الإيقاف (Toggle)"
+};
+
+public static final String[] TRIGGER_MODE_HINTS = {
+        "المسح يعمل طوال فترة ضغط الزناد — مثالي للفحص السريع والبيع",
+        "ضغطة واحدة تبدأ المسح، وضغطة أخرى توقفه — مثالي للجرد الشامل"
+};
+
+public static final int DEF_TRIGGER_MODE = TRIGGER_MODE_HOLD;  // افتراضي: Hold
 
     // ═══════════════════════════════════════════════════════════════
     //  🔊 نغمات التغذية الراجعة (Feedback Tones)
@@ -192,6 +210,13 @@ public class MiraReaderSettings {
         }
         return instance;
     }
+    
+    public int  getTriggerMode() { return prefs.getInt("trigger_mode", DEF_TRIGGER_MODE); }
+
+public void setTriggerMode(int v) {
+    prefs.edit().putInt("trigger_mode", clamp(v, 0, 1)).commit();
+    notifyChanged();
+}
 
     // ═══════════════════════════════════════════════════════════════
     //  🆕 نظام مراقبة التغييرات
