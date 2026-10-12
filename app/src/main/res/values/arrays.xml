@@ -229,4 +229,14 @@
         <item>محجوز</item>
     </string-array>
 
+<string-array name="tone_labels">
+        <item>🔔 بيب قصير (وسم جديد)</item>
+        <item>🔔🔔 بيب مزدوج (نجاح)</item>
+        <item>🔔 بيب طويل (خطأ)</item>
+        <item>🖱️ كليك (مكرر)</item>
+        <item>✅ نغمة نجاح</item>
+        <item>❌ نغمة خطأ</item>
+        <item>🔇 صامت</item>
+    </string-array>
+    
 </resources>
