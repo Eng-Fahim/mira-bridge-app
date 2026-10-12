@@ -31,7 +31,6 @@ import com.example.uhf.utils.MiraDialogHelper;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.MiraReaderSettings;
-import com.example.uhf.MiraRfid.readers.ChainwayReader;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.utility.StringUtility;
 
@@ -106,18 +105,17 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     //  🆕 v4.1 — تطبيق الإعدادات على القارئ المشترك
     // ═══════════════════════════════════════════════════════════
     /**
-     * ✅ تُطبّق أحدث إعدادات MIRA على القارئ المشترك.
+     * ✅ تُطبّق أحدث إعدادات MIRA مباشرة على SDK القارئ المشترك.
      *
-     * تُستدعى تلقائياً من onResume() — وتُتيح استدعاءها يدوياً
-     * من أي مكان في التطبيق عند الحاجة.
+     * ملاحظة: ChainwayReader يسجّل نفسه كمستمع لـ MiraReaderSettings
+     * في Constructor، لذلك أي تغيير إعدادات يُطبَّق تلقائياً.
+     * هذه الدالة تضمن التطبيق عند onResume كطبقة أمان إضافية.
      *
      * @return true إذا تم التطبيق أو كان القارئ غير جاهز
      */
     public static boolean applyReaderSettingsToSharedReader() {
-        // 1) هل لدينا سياق وقارئ؟
-        if (sAppContext == null) {
-            return false;
-        }
+        // 1) هل لدينا سياق؟
+        if (sAppContext == null) return false;
 
         // 2) throttle — منع التطبيق المتكرر السريع
         long now = System.currentTimeMillis();
@@ -126,22 +124,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         }
         sLastSettingsApplyTime = now;
 
-        // 3) مرّ عبر RFIDManager (المسار المُفضّل — v4.1 مع المستمع)
-        try {
-            RFIDManager mgr = RFIDManager.getInstance(sAppContext);
-            if (mgr != null && mgr.isReady()) {
-                MiraIRFIDReader reader = mgr.getReader();
-                if (reader instanceof ChainwayReader) {
-                    boolean ok = ((ChainwayReader) reader).applySettingsNow();
-                    Log.d(TAG, "🔧 Settings applied via ChainwayReader: " + ok);
-                    return ok;
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "applyReaderSettings (ChainwayReader path) error", e);
-        }
-
-        // 4) Fallback — تطبيق مباشر على SDK
+        // 3) تطبيق مباشر على SDK المشترك
         RFIDWithUHFUART sdk = getSharedReader();
         if (sdk == null) {
             Log.d(TAG, "applyReaderSettings: no shared reader yet");
@@ -152,11 +135,11 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
             MiraReaderSettings settings = MiraReaderSettings.getInstance(sAppContext);
             if (settings != null) {
                 MiraReaderSettings.ApplyResult r = settings.applyToReader(sdk);
-                Log.i(TAG, "🔧 Settings applied (direct SDK): " + r);
+                Log.i(TAG, "🔧 Settings applied on resume: " + r);
                 return r.isSuccess();
             }
         } catch (Exception e) {
-            Log.e(TAG, "applyReaderSettings (direct SDK) error", e);
+            Log.e(TAG, "applyReaderSettings error", e);
         }
         return false;
     }
@@ -208,14 +191,6 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     // ═══════════════════════════════════════════════════════════
     //  🆕 v4.1 — onResume: إعادة تطبيق الإعدادات تلقائياً
     // ═══════════════════════════════════════════════════════════
-    /**
-     * ✅ عند عودة النشاط للمقدمة، نُعيد تطبيق أحدث إعدادات MIRA
-     *    على القارئ المشترك. هذا يضمن أن شاشة الجرد تحصل على
-     *    أحدث إعدادات حتى لو تم تغييرها من شاشة أخرى.
-     *
-     * ملاحظة: هذا يتم على الـ main thread لكن العملية سريعة جداً
-     * (كلها استدعاءات SDK خفيفة) — لا تحتاج Executor.
-     */
     @Override
     protected void onResume() {
         super.onResume();
@@ -306,7 +281,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Permissions (unchanged)
+    //  Permissions
     // ═══════════════════════════════════════════════════════════
     private void checkStoragePermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -358,7 +333,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Key Handling (unchanged)
+    //  Key Handling
     // ═══════════════════════════════════════════════════════════
 
     private boolean isScanKey(int keyCode) {
@@ -430,7 +405,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Menus (unchanged)
+    //  Menus
     // ═══════════════════════════════════════════════════════════
 
     @Override
@@ -481,7 +456,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  UHF Version (unchanged)
+    //  UHF Version
     // ═══════════════════════════════════════════════════════════
     public void getUHFVersion() {
         final RFIDWithUHFUART reader = getReader();
