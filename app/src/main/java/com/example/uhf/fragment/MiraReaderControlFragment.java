@@ -3,12 +3,15 @@ package com.example.uhf.fragment;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -22,6 +25,7 @@ import com.google.android.material.appbar.MaterialToolbar;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.R;
 import com.example.uhf.MiraRfid.MiraReaderSettings;
+import com.example.uhf.MiraRfid.MiraFeedback;
 import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -33,22 +37,27 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraReaderControlFragment v4.0 — لوحة التحكم الكاملة
+ *  MiraReaderControlFragment v4.1 — لوحة التحكم الكاملة
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * [v4.0] إضافات:
- *   ✅ 🔊 الأصوات والاهتزاز (Sound & Vibration)
- *   ✅ 🚫 فلترة التكرار (Advanced Reading)
- *   ✅ 🌐 إعدادات عالمية (LED, Screen, Toast, Log)
+ * [v4.1] إضافات:
  *   ✅ 🎯 وضع الزناد (Trigger Mode — Hold/Toggle)
- *   ✅ إصلاح مشكلة عدم حفظ الإعدادات (ربط كامل)
+ *   ✅ 🎯 مهلة القراءة المفردة (Single Timeout)
+ *   ✅ 📊 الحد الأقصى للوسوم (Max Tags)
+ *   ✅ ⏹️ الإيقاف التلقائي (Auto Stop)
+ *   ✅ 🔊 أزرار تجربة النغمات (Tone Preview Buttons)
  *
- * يعرض الإعدادات الحقيقية من توثيق Chainway SDK الرسمي:
+ * [v4.0] الأساس:
+ *   ✅ 🔊 الأصوات والاهتزاز
+ *   ✅ 🚫 فلترة التكرار
+ *   ✅ 🌐 إعدادات عالمية (LED, Screen, Toast, Log)
+ *   ✅ إصلاح مشكلة عدم حفظ الإعدادات
+ *
+ * يعرض الإعدادات الحقيقية من توثيق Chainway SDK:
  *   - 19 منطقة تردد (HEX)
  *   - RFLink بـ 12 وضعاً
  *   - Session / Target / Q
  *   - FastID / TagFocus / Fast Inventory
- *   - 📦 بيانات الوسم (EPC / TID / USER)
  *   - 📡 اختبار القراءة المباشر
  */
 public class MiraReaderControlFragment extends Fragment {
@@ -80,6 +89,17 @@ public class MiraReaderControlFragment extends Fragment {
     // ═══════════════ 🚫 Advanced Reading [v4.0] ═══════════════
     private MaterialSwitch swFilterDuplicates;
     private TextView       tvVolumeValue, tvVibrateMsValue, tvDupFilterValue;
+
+    // ═══════════════ 🎯 Advanced Reading — إضافات [v4.1] ═══════════════
+    private SeekBar    seekSingleTimeout;
+    private TextView   tvSingleTimeoutValue;
+    private EditText   etMaxTags;
+    private EditText   etAutoStop;
+
+    // ═══════════════ 🔊 أزرار تجربة النغمات [v4.1] ═══════════════
+    private MaterialButton btnTestToneNew;
+    private MaterialButton btnTestToneDuplicate;
+    private MaterialButton btnTestToneError;
 
     // ═══════════════ 🌐 Global [v4.0] ═══════════════
     private MaterialSwitch swKeepScreenOn, swLedFlash, swToastEnabled, swAutoSaveLog;
@@ -180,6 +200,17 @@ public class MiraReaderControlFragment extends Fragment {
         swFilterDuplicates  = v.findViewById(R.id.swFilterDuplicates);
         seekDupFilter       = v.findViewById(R.id.seekDupFilter);
         tvDupFilterValue    = v.findViewById(R.id.tvDupFilterValue);
+
+        // ═══ 🎯 Advanced Reading — إضافات [v4.1] ═══
+        seekSingleTimeout      = v.findViewById(R.id.seekSingleTimeout);
+        tvSingleTimeoutValue   = v.findViewById(R.id.tvSingleTimeoutValue);
+        etMaxTags              = v.findViewById(R.id.etMaxTags);
+        etAutoStop             = v.findViewById(R.id.etAutoStop);
+
+        // ═══ 🔊 أزرار تجربة النغمات [v4.1] ═══
+        btnTestToneNew         = v.findViewById(R.id.btnTestToneNew);
+        btnTestToneDuplicate   = v.findViewById(R.id.btnTestToneDuplicate);
+        btnTestToneError       = v.findViewById(R.id.btnTestToneError);
 
         // ═══ 🌐 Global [v4.0] ═══
         swKeepScreenOn      = v.findViewById(R.id.swKeepScreenOn);
@@ -410,6 +441,53 @@ public class MiraReaderControlFragment extends Fragment {
         }
 
         // ═══════════════════════════════════════════════════════
+        //  🎯 Single Timeout [v4.1]
+        // ═══════════════════════════════════════════════════════
+        if (seekSingleTimeout != null) {
+            seekSingleTimeout.setMax(10000);
+            seekSingleTimeout.setOnSeekBarChangeListener(simpleSeek((sb, p) -> {
+                settings.setSingleTimeoutMs(p);
+                if (tvSingleTimeoutValue != null) {
+                    tvSingleTimeoutValue.setText(p + " ms");
+                }
+            }));
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  📊 Max Tags [v4.1]
+        // ═══════════════════════════════════════════════════════
+        if (etMaxTags != null) {
+            etMaxTags.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void afterTextChanged(Editable s) {
+                    if (isUpdatingUi.get()) return;
+                    try {
+                        int val = Integer.parseInt(s.toString().trim());
+                        settings.setMaxTagsPerSession(val);
+                    } catch (NumberFormatException ignored) {}
+                }
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  ⏹️ Auto Stop [v4.1]
+        // ═══════════════════════════════════════════════════════
+        if (etAutoStop != null) {
+            etAutoStop.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void afterTextChanged(Editable s) {
+                    if (isUpdatingUi.get()) return;
+                    try {
+                        int val = Integer.parseInt(s.toString().trim());
+                        settings.setAutoStopMs(val);
+                    } catch (NumberFormatException ignored) {}
+                }
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════
         //  🌐 Global [v4.0]
         // ═══════════════════════════════════════════════════════
         if (swKeepScreenOn != null) {
@@ -449,6 +527,25 @@ public class MiraReaderControlFragment extends Fragment {
                 }
             }));
         }
+
+        // ═══════════════════════════════════════════════════════
+        //  🔊 أزرار تجربة النغمات [v4.1]
+        // ═══════════════════════════════════════════════════════
+        if (btnTestToneNew != null) {
+            btnTestToneNew.setOnClickListener(v -> playTonePreview(
+                    settings.getToneNewTag(),
+                    isArabic ? "🔔 نغمة القطعة الجديدة" : "🔔 New Tag Tone"));
+        }
+        if (btnTestToneDuplicate != null) {
+            btnTestToneDuplicate.setOnClickListener(v -> playTonePreview(
+                    settings.getToneDuplicate(),
+                    isArabic ? "🔁 نغمة المكررة" : "🔁 Duplicate Tone"));
+        }
+        if (btnTestToneError != null) {
+            btnTestToneError.setOnClickListener(v -> playTonePreview(
+                    settings.getToneError(),
+                    isArabic ? "❌ نغمة الخطأ" : "❌ Error Tone"));
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -484,7 +581,7 @@ public class MiraReaderControlFragment extends Fragment {
     private interface BiIntConsumer { void accept(SeekBar s, int value); }
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ Load Settings → UI (الإصلاح الحرِج)
+    //  ✅ Load Settings → UI
     // ═══════════════════════════════════════════════════════════
 
     private void loadSettingsToUi() {
@@ -558,6 +655,25 @@ public class MiraReaderControlFragment extends Fragment {
                 int flt = settings.getDuplicateFilterMs();
                 seekDupFilter.setProgress(flt);
                 if (tvDupFilterValue != null) tvDupFilterValue.setText(flt + " ms");
+            }
+
+            // 🎯 Single Timeout [v4.1]
+            if (seekSingleTimeout != null) {
+                int sto = settings.getSingleTimeoutMs();
+                seekSingleTimeout.setProgress(sto);
+                if (tvSingleTimeoutValue != null) {
+                    tvSingleTimeoutValue.setText(sto + " ms");
+                }
+            }
+
+            // 📊 Max Tags [v4.1]
+            if (etMaxTags != null) {
+                etMaxTags.setText(String.valueOf(settings.getMaxTagsPerSession()));
+            }
+
+            // ⏹️ Auto Stop [v4.1]
+            if (etAutoStop != null) {
+                etAutoStop.setText(String.valueOf(settings.getAutoStopMs()));
             }
 
             // ═══════════════════════════════════════════════════
@@ -685,6 +801,26 @@ public class MiraReaderControlFragment extends Fragment {
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                 .show();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  🔊 تجربة النغمات [v4.1]
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * ✅ تجربة نغمة قبل الحفظ.
+     */
+    private void playTonePreview(int toneType, String label) {
+        try {
+            MiraFeedback feedback = MiraFeedback.getInstance(requireContext());
+            if (feedback != null) {
+                feedback.playTone(toneType);
+                feedback.vibrate(settings.getVibrateMs());
+                toast("▶️ " + label);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "playTonePreview error", e);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
