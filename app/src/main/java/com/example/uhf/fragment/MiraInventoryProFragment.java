@@ -805,11 +805,12 @@ private void showFinishAndReviewDialog() {
                             d.dismiss();
                             showItemsListDialog();
                         })
-                .setNegativeButton(isArabic ? "↩️ استئناف" : "↩️ Resume",
-                        (d, w) -> {
-                            d.dismiss();
-                            startScanning();
-                        })
+                .setNegativeButton(isArabic ? "↩️ العودة للشاشة" : "↩️ Back to Screen", (d, w) -> {
+    d.dismiss();
+    // ✅ لا تبدأ المسح — دع المستخدم يضغط الزر بنفسه
+    switchToActiveState(false);
+    updateButtonsState();
+})
                 .setCancelable(false)
                 .show();
 
@@ -1585,24 +1586,26 @@ public void onError(String error) {
         btnCommitSession.setAlpha(1.0f);
     }
 
-    // ✅ [Stage-1] الفرق الحاسم: نمسح فقط لو جلسة جديدة
-    //             لا نمسح عند الاستئناف
-    if (!isPaused && !hasUncommittedSession) {
+    // ✅ [v4.0] احسب النوع الحقيقي قبل أي تعديل على الحالة
+    nextScanIsResume = isPaused || hasUncommittedSession;
+
+    if (!nextScanIsResume) {
         // جلسة جديدة تماماً
         Log.i(TAG, "🆕 New session — clearing lists");
         clearAllLists();
         sessionElapsedBeforePause = 0;
     } else {
         // استئناف جلسة موجودة
-        Log.i(TAG, "🔄 Resuming session — preserving " + 
+        Log.i(TAG, "🔄 Resuming session — preserving " +
                 scannedItemsDisplayList.size() + " items");
     }
 
+    // ✅ الآن عدّل الحالة بعد حساب nextScanIsResume
     isPaused = false;
     hasUncommittedSession = true;
-    // ✅ [v4.0] حدّد نوع المسح قبل استدعاء الـ Controller
-nextScanIsResume = isPaused || hasUncommittedSession;
-Log.d(TAG, "▶️ nextScanIsResume = " + nextScanIsResume);
+
+    Log.d(TAG, "▶️ nextScanIsResume = " + nextScanIsResume);
+
     if (scanController == null) {
         showFatalErrorDialog(
                 isArabic ? "⚠️ مدير المسح غير جاهز" : "⚠️ Scan controller not ready",
@@ -1620,8 +1623,6 @@ Log.d(TAG, "▶️ nextScanIsResume = " + nextScanIsResume);
                 isArabic ? "تحقق من اتصال القارئ" : "Check reader connection");
         return;
     }
-
-    // ✅ لا toast مزعج — الحالة تُعرض في الشريط
 
     // ✅ حمّل الكتالوج في الخلفية فقط لو لم يكن موجوداً
     if (catalogEpcs.isEmpty()) {
@@ -1733,11 +1734,18 @@ private void showResumeDialog(int itemCount, int expected, long timeAgoMs) {
                 updateButtonsState();
             })
             .setNegativeButton(isArabic ? "🆕 جديدة" : "🆕 New", (d, w) -> {
-                clearAllLists();
-                hasUncommittedSession = false;
-                isPaused = false;
-                if (sessionManager != null) sessionManager.clearSession();
-            })
+    clearAllLists();
+
+    // ✅ أعِد تعيين الحالة كاملة
+    hasUncommittedSession = false;
+    isPaused = false;
+    nextScanIsResume = false;
+    expectedCount = 0;
+    sessionElapsedBeforePause = 0;
+
+    if (tvExpectedCount != null) tvExpectedCount.setText("0");
+    if (sessionManager != null) sessionManager.clearSession();
+})
             .setCancelable(false)
             .show();
 }
@@ -1802,7 +1810,6 @@ public void stopScanning() {
     }
 
     isScanning = false;
-    isPaused = false;
 
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
@@ -2706,86 +2713,108 @@ private void clearAllLists() {
     }
 
     private void commitInventoryToServer() {
-        if (!isAdded() || isFragmentDestroyed) return;
+    if (!isAdded() || isFragmentDestroyed) return;
 
-        if (persistenceManager == null || inventoryEngine == null || apiClient == null) {
-            showToast("⚠️ غير جاهز");
-            return;
-        }
-
-        if (persistenceManager.isCommittingNow()) {
-            showToast(isArabic ? "⏳ جاري الإرسال بالفعل..." : "⏳ Already sending...");
-            return;
-        }
-
-        showToast(isArabic ? "⏳ جاري إرسال البيانات..." : "⏳ Sending...");
-
-        int scanned = inventoryEngine.getUniqueCount();
-        int totalReads = inventoryEngine.getTotalReads();
-        int branchId = getActiveBranchId();
-
-        persistenceManager.commitInventory(
-                inventoryEngine.getClientSessionId(),
-                branchId,
-                expectedCount,
-                totalReads,
-                scanned,
-                scannedItemsDisplayList,
-                apiClient,
-                new InventoryPersistenceManager.CommitCallback() {
-                    @Override
-                    public void onCommitSuccess(JSONObject report) {
-                        mainHandler.post(() -> {
-                            if (!isAdded() || isFragmentDestroyed) return;
-
-                            final JSONObject finalReport;
-
-                            if (report == null || report.length() == 0) {
-                                Log.w(TAG, "⚠️ Empty report from server — building local summary");
-                                finalReport = buildLocalCommitSummary();
-                            } else {
-                                finalReport = report;
-                            }
-
-                            lastServerReport = finalReport;
-
-                            showToast(isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير"
-                                               : "✅ Inventory committed successfully");
-
-                            if (feedbackHelper != null) {
-                                try {
-                                    feedbackHelper.hapticFeedback(SoundManager.FeedbackType.COMPLETED);
-                                } catch (Exception ignored) {}
-                            }
-                            if (soundManager != null) {
-                                soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
-                            }
-
-                            if (btnGenerateReport != null) {
-                                btnGenerateReport.setEnabled(false);
-                                btnGenerateReport.setAlpha(0.5f);
-                            }
-                            if (btnCommitSession != null) {
-                                btnCommitSession.setEnabled(false);
-                                btnCommitSession.setText(isArabic ? "✅ معتمد" : "✅ Committed");
-                                btnCommitSession.setAlpha(0.7f);
-                            }
-
-                            autoSaveSnapshotAfterCommit(finalReport);
-                            showCommitSuccessDialog(finalReport);
-                        });
-                    }
-
-                    @Override
-                    public void onCommitError(String error) {
-                        mainHandler.post(() -> {
-                            if (!isAdded() || isFragmentDestroyed) return;
-                            Log.e(TAG, "Commit failed: " + error);
-                            showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + error);
-                        });
-                    }
-                });
+    if (persistenceManager == null || inventoryEngine == null || apiClient == null) {
+        showToast("⚠️ غير جاهز");
+        return;
     }
+
+    if (persistenceManager.isCommittingNow()) {
+        showToast(isArabic ? "⏳ جاري الإرسال بالفعل..." : "⏳ Already sending...");
+        return;
+    }
+
+    showToast(isArabic ? "⏳ جاري إرسال البيانات..." : "⏳ Sending...");
+
+    int scanned = inventoryEngine.getUniqueCount();
+    int totalReads = inventoryEngine.getTotalReads();
+    int branchId = getActiveBranchId();
+
+    persistenceManager.commitInventory(
+            inventoryEngine.getClientSessionId(),
+            branchId,
+            expectedCount,
+            totalReads,
+            scanned,
+            scannedItemsDisplayList,
+            apiClient,
+            new InventoryPersistenceManager.CommitCallback() {
+                @Override
+                public void onCommitSuccess(JSONObject report) {
+                    mainHandler.post(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+
+                        final JSONObject finalReport;
+
+                        if (report == null || report.length() == 0) {
+                            Log.w(TAG, "⚠️ Empty report from server — building local summary");
+                            finalReport = buildLocalCommitSummary();
+                        } else {
+                            finalReport = report;
+                        }
+
+                        lastServerReport = finalReport;
+
+                        showToast(isArabic ? "✅ تم اعتماد الجرد وحفظ التقرير"
+                                           : "✅ Inventory committed successfully");
+
+                        // ✅ [v4.0] صوت النجاح عبر Controller
+                        if (scanSession != null) {
+                            scanSession.notifySuccess();
+                        } else if (soundManager != null) {
+                            // Fallback للقديم
+                            soundManager.playBeep(SoundManager.FeedbackType.COMPLETED);
+                        }
+
+                        // ✅ [v4.0] اعتبر الجلسة منتهية — الجلسة التالية ستكون جديدة
+                        //              لكن لا تمسح القطع المعروضة (للطباعة والمراجعة)
+                        isPaused = false;
+                        hasUncommittedSession = false;
+                        nextScanIsResume = false;
+                        sessionElapsedBeforePause = 0;
+                        hasCelebrated = false;
+
+                        if (sessionManager != null) {
+                            try {
+                                sessionManager.clearSession();
+                                Log.d(TAG, "🧹 Session cleared after commit");
+                            } catch (Exception e) {
+                                Log.w(TAG, "Failed to clear session after commit", e);
+                            }
+                        }
+
+                        // ✅ تحديث الأزرار
+                        if (btnGenerateReport != null) {
+                            btnGenerateReport.setEnabled(false);
+                            btnGenerateReport.setAlpha(0.5f);
+                        }
+                        if (btnCommitSession != null) {
+                            btnCommitSession.setEnabled(false);
+                            btnCommitSession.setText(isArabic ? "✅ معتمد" : "✅ Committed");
+                            btnCommitSession.setAlpha(0.7f);
+                        }
+
+                        autoSaveSnapshotAfterCommit(finalReport);
+                        showCommitSuccessDialog(finalReport);
+                    });
+                }
+
+                @Override
+                public void onCommitError(String error) {
+                    mainHandler.post(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+                        Log.e(TAG, "Commit failed: " + error);
+                        showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + error);
+
+                        // ✅ [v4.0] صوت الخطأ
+                        if (scanSession != null) {
+                            scanSession.notifyError();
+                        }
+                    });
+                }
+            });
+}
 
     private void showCommitSuccessDialog(JSONObject report) {
         if (!isAdded() || isFragmentDestroyed) return;
@@ -3812,62 +3841,69 @@ scannedItemsDisplayList.add(item);
     }
 
     private void confirmResetSession() {
-        if (!isAdded() || isFragmentDestroyed) return;
+    if (!isAdded() || isFragmentDestroyed) return;
 
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "⚠️ تأكيد" : "⚠️ Confirm")
-                .setMessage(isArabic ?
-                        "هل أنت متأكد من إعادة تعيين الجلسة؟\nسيتم حذف كل البيانات غير المعتمدة." :
-                        "Are you sure you want to reset the session?\nAll uncommitted data will be lost.")
-                .setPositiveButton(isArabic ? "إعادة تعيين" : "Reset",
-                        (dialog, which) -> {
-                            try {
-                                if (inventoryEngine != null) {
-                                    inventoryEngine.clearSession();
-                                }
-
-                                clearAllLists();
-
-                                if (sessionManager != null) {
-                                    sessionManager.clearSession();
-                                }
-
-                                expectedCount = 0;
-                                selectedCategoryFilter = null;
-                                lastScannedForAnimation = 0;
-
-                                if (tvExpectedCount != null) {
-                                    tvExpectedCount.setText("0");
-                                }
-
-                                if (btnCommitSession != null) {
-                                    btnCommitSession.setText(isArabic ? "اعتماد" : "Commit");
-                                }
-                                if (btnGenerateReport != null) {
-                                    btnGenerateReport.setText(isArabic ? "📋 تقرير" : "📋 Report");
-                                }
-
-                                mainHandler.postDelayed(() -> {
-                                    if (isAdded() && !isFragmentDestroyed) {
-                                        updateUI();
-                                        updateTotalWeightAndValue();
-                                        updateButtonsState();
-                                    }
-                                }, 100);
-
-                                showToast(isArabic ? "✅ تم إعادة التعيين"
-                                                   : "✅ Reset successfully");
-
-                                switchToWelcomeState();
-                            } catch (Exception e) {
-                                Log.e(TAG, "Reset error", e);
-                                showToast(isArabic ? "❌ خطأ في إعادة التعيين"
-                                                   : "❌ Reset error");
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "⚠️ تأكيد" : "⚠️ Confirm")
+            .setMessage(isArabic ?
+                    "هل أنت متأكد من إعادة تعيين الجلسة؟\nسيتم حذف كل البيانات غير المعتمدة." :
+                    "Are you sure you want to reset the session?\nAll uncommitted data will be lost.")
+            .setPositiveButton(isArabic ? "إعادة تعيين" : "Reset",
+                    (dialog, which) -> {
+                        try {
+                            if (inventoryEngine != null) {
+                                inventoryEngine.clearSession();
                             }
-                        })
-                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                .show();
-    }
+
+                            clearAllLists();
+
+                            // ✅ [v4.0] أعِد تعيين حالة الجلسة
+                            isPaused = false;
+                            hasUncommittedSession = false;
+                            nextScanIsResume = false;
+                            sessionElapsedBeforePause = 0;
+                            hasCelebrated = false;
+
+                            if (sessionManager != null) {
+                                sessionManager.clearSession();
+                            }
+
+                            expectedCount = 0;
+                            selectedCategoryFilter = null;
+                            lastScannedForAnimation = 0;
+
+                            if (tvExpectedCount != null) {
+                                tvExpectedCount.setText("0");
+                            }
+
+                            if (btnCommitSession != null) {
+                                btnCommitSession.setText(isArabic ? "اعتماد" : "Commit");
+                            }
+                            if (btnGenerateReport != null) {
+                                btnGenerateReport.setText(isArabic ? "📋 تقرير" : "📋 Report");
+                            }
+
+                            mainHandler.postDelayed(() -> {
+                                if (isAdded() && !isFragmentDestroyed) {
+                                    updateUI();
+                                    updateTotalWeightAndValue();
+                                    updateButtonsState();
+                                }
+                            }, 100);
+
+                            showToast(isArabic ? "✅ تم إعادة التعيين"
+                                               : "✅ Reset successfully");
+
+                            switchToWelcomeState();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Reset error", e);
+                            showToast(isArabic ? "❌ خطأ في إعادة التعيين"
+                                               : "❌ Reset error");
+                        }
+                    })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+}
 
     // ================================================================
     //  Utilities
