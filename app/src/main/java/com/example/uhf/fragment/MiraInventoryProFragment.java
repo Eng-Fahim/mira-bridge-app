@@ -463,6 +463,36 @@ private MaterialButton btnFinishAndReview;
         } catch (Exception e) {
             Log.e(TAG, "ScanController error", e);
         }
+        
+        // ✅ عرض حالة القارئ
+try {
+    com.example.uhf.MiraRfid.RFIDManager rfidManager =
+            com.example.uhf.MiraRfid.RFIDManager.getInstance(requireContext());
+
+    if (rfidManager != null) {
+        rfidManager.ensureReady(new com.example.uhf.MiraRfid.RFIDManager.ReadyCallback() {
+            @Override
+            public void onReady(com.example.uhf.MiraRfid.MiraIRFIDReader reader) {
+                mainHandler.post(() -> {
+                    if (tvInventoryStatus != null && isAdded()) {
+                        tvInventoryStatus.setText(isArabic
+                                ? "📡 القارئ جاهز" : "📡 Reader ready");
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String reason) {
+                mainHandler.post(() -> {
+                    if (tvInventoryStatus != null && isAdded()) {
+                        tvInventoryStatus.setText(isArabic
+                                ? "📡 القارئ غير متصل" : "📡 Reader not connected");
+                    }
+                });
+            }
+        });
+    }
+} catch (Exception ignored) {}
 
         // ✅✅✅ 15) RFID Manager — تهيئة فورية (قبل initViews)
 try {
@@ -1610,7 +1640,91 @@ public void onError(String error) {
     }
     if (isScanning || isFragmentDestroyed) return;
 
-    Log.d(TAG, "▶️ startScanning (STAGE-1)");
+    // ═══════════════════════════════════════════════════════════
+    //  ✅ فحص جاهزية القارئ أولاً
+    // ═══════════════════════════════════════════════════════════
+    try {
+        com.example.uhf.MiraRfid.RFIDManager rfidManager =
+                com.example.uhf.MiraRfid.RFIDManager.getInstance(requireContext());
+
+        if (rfidManager == null) {
+            showToast(isArabic ? "⚠️ مدير القارئ غير جاهز"
+                               : "⚠️ Reader manager not ready");
+            return;
+        }
+
+        // إذا كان يعمل بالفعل → تابع
+        if (rfidManager.isReady()) {
+            // ✅ جاهز — تابع مباشرة
+            proceedWithScanning();
+            return;
+        }
+
+        // إذا كان في INITIALIZING → انتظر
+        if (rfidManager.getState()
+                == com.example.uhf.MiraRfid.RFIDManager.State.INITIALIZING) {
+
+            showToast(isArabic ? "⏳ جاري تهيئة القارئ..."
+                               : "⏳ Initializing reader...");
+
+            // ✅ اطلب التهيئة — callback سيُستدعى عند الجاهزية
+            rfidManager.ensureReady(new com.example.uhf.MiraRfid.RFIDManager.ReadyCallback() {
+                @Override
+                public void onReady(com.example.uhf.MiraRfid.MiraIRFIDReader reader) {
+                    // ✅ عاد للـ main thread ثم ابدأ المسح
+                    mainHandler.post(() -> {
+                        if (isAdded() && !isFragmentDestroyed) {
+                            proceedWithScanning();
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        if (!isAdded() || isFragmentDestroyed) return;
+                        showToast(isArabic
+                                ? "❌ فشل تهيئة القارئ: " + reason
+                                : "❌ Reader init failed: " + reason);
+                    });
+                }
+            });
+            return;
+        }
+
+        // أي حالة أخرى — حاول تهيئة عادية
+        rfidManager.ensureReady(new com.example.uhf.MiraRfid.RFIDManager.ReadyCallback() {
+            @Override
+            public void onReady(com.example.uhf.MiraRfid.MiraIRFIDReader reader) {
+                mainHandler.post(() -> {
+                    if (isAdded() && !isFragmentDestroyed) {
+                        proceedWithScanning();
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String reason) {
+                mainHandler.post(() -> {
+                    if (!isAdded() || isFragmentDestroyed) return;
+                    showFatalErrorDialog(
+                            isArabic ? "⚠️ القارئ غير متصل" : "⚠️ Reader not connected",
+                            reason);
+                });
+            }
+        });
+
+    } catch (Exception e) {
+        Log.e(TAG, "Reader readiness check error", e);
+        showToast(isArabic ? "⚠️ خطأ في القارئ" : "⚠️ Reader error");
+    }
+}
+
+/**
+ * ✅ [جديد] ينفّذ بدء المسح الفعلي — يُستدعى بعد التأكد من جاهزية القارئ
+ */
+private void proceedWithScanning() {
+    Log.d(TAG, "▶️ proceedWithScanning (STAGE-1)");
 
     if (btnGenerateReport != null) {
         btnGenerateReport.setEnabled(true);
@@ -1621,21 +1735,18 @@ public void onError(String error) {
         btnCommitSession.setAlpha(1.0f);
     }
 
-    // ✅ [v4.0] احسب النوع الحقيقي قبل أي تعديل على الحالة
+    // ✅ احسب النوع الحقيقي قبل أي تعديل على الحالة
     nextScanIsResume = isPaused || hasUncommittedSession;
 
     if (!nextScanIsResume) {
-        // جلسة جديدة تماماً
         Log.i(TAG, "🆕 New session — clearing lists");
         clearAllLists();
         sessionElapsedBeforePause = 0;
     } else {
-        // استئناف جلسة موجودة
         Log.i(TAG, "🔄 Resuming session — preserving " +
                 scannedItemsDisplayList.size() + " items");
     }
 
-    // ✅ الآن عدّل الحالة بعد حساب nextScanIsResume
     isPaused = false;
     hasUncommittedSession = true;
 
@@ -1648,7 +1759,6 @@ public void onError(String error) {
         return;
     }
 
-    // ✅ ابدأ القارئ
     final Map<String, InventoryItem> emptyCatalog = new ConcurrentHashMap<>();
 
     boolean started = scanController.startScanning(emptyCatalog);
@@ -1659,7 +1769,6 @@ public void onError(String error) {
         return;
     }
 
-    // ✅ حمّل الكتالوج في الخلفية فقط لو لم يكن موجوداً
     if (catalogEpcs.isEmpty()) {
         loadCatalogInBackground();
     }
