@@ -23,28 +23,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  InventoryScanController v4.0 — Async-first, non-blocking
+ *  InventoryScanController v4.1 — Async-first + Suspend/Resume for TID read
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * التغيير الجوهري عن v3.1:
+ * [v4.1] إضافات:
+ *   ✅ isSuspended — علم إيقاف مؤقت لقراءة TID بدون إيقاف الجلسة
+ *   ✅ suspendForDirectRead() — يوقف Inventory مؤقتاً (بدون callbacks)
+ *   ✅ resumeAfterDirectRead() — يستأنف Inventory (بدون callbacks)
+ *   ✅ onTagRead() — يتجاهل الوسوم أثناء الإيقاف المؤقت
+ *   ✅ stopScanning() / cleanup() — يُصفّران isSuspended
  *
- *   ❌ v3.1: startReadingSource() كان يستدعي
- *            rfidManager.waitForReaderReady(3000) — وهي دالة
- *            تحجب الخيط الحالي (Thread.sleep) لمدة تصل إلى 3 ثوانٍ.
- *            وبما أن startReadingSource() تُستدعى من startScanning()
- *            التي تُستدعى من UI thread → UI مجمّد + ANR محتمل.
- *
- *   ✅ v4.0: startReadingSource() يستدعي
- *            rfidManager.startScan(callback) — وهي دالة
- *            غير حاجبة، تُفرّغ الطابور عبر mainHandler.post()
- *            بعد اكتمال ensureReady في initExecutor.
- *
- * كل ما عدا ذلك محفوظ حرفياً من v3.1:
- *   ✅ ScanCallback interface بلا تغيير
- *   ✅ startScanning/stopScanning بلا تغيير في التوقيع
- *   ✅ Debounce + generation tracking بلا تغيير
- *   ✅ OnTagReadListener implementations بلا تغيير
- *   ✅ cleanup() بلا تغيير
+ * [v4.0] الأساس:
+ *   ✅ startScanning/stopScanning غير حاجبَين
+ *   ✅ Async-first عبر RFIDManager.startScan(cb)
+ *   ✅ Debounce + generation tracking
  */
 public class InventoryScanController implements MiraIRFIDReader.OnTagReadListener {
 
@@ -70,6 +62,9 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     private final AtomicInteger scanGeneration = new AtomicInteger(0);
     private volatile long scanStartTime = 0;
     private volatile int currentPowerDbm = 27;
+
+    // ✅ [v4.1] علم الإيقاف المؤقت لقراءة TID
+    private final AtomicBoolean isSuspended = new AtomicBoolean(false);
 
     // ✅ Caches
     private final Set<String> catalogEpcs =
@@ -136,13 +131,16 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     public int getCurrentPowerDbm() { return currentPowerDbm; }
     public void setCurrentPowerDbm(int p) { this.currentPowerDbm = p; }
 
+    /** ✅ [v4.1] هل الـ Inventory مُوقف مؤقتاً؟ */
+    public boolean isSuspended() { return isSuspended.get(); }
+
     // ==================== Start ====================
 
     /**
      * ✅ بدء جلسة المسح.
      *
      * ملاحظة على قيمة الإرجاع:
-     *   - true  = الطلب قُبل وسيبدأ المسح لا حقاً (عبر callback.onScanStarted).
+     *   - true  = الطلب قُبل وسيبدأ المسح لاحقاً (عبر callback.onScanStarted).
      *   - false = فشل فوري (مسح جارٍ مسبقاً، أو rfidManager غير مُرفق).
      *
      * النجاح/الفشل الفعلي للعتاد يأتي عبر:
@@ -161,6 +159,7 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         try {
             scanStartTime = SystemClock.elapsedRealtime();
             recentTagReads.clear();
+            isSuspended.set(false);   // ✅ [v4.1] تصفير علم الإيقاف
 
             catalogEpcs.clear();
             if (catalog != null && !catalog.isEmpty()) {
@@ -204,6 +203,9 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         final int generation = scanGeneration.incrementAndGet();
         Log.d(TAG, "⏹️ Stop scanning [gen=" + generation + "]");
 
+        // ✅ [v4.1] أعد تعيين علم الإيقاف المؤقت
+        isSuspended.set(false);
+
         try {
             if (rfidManager != null) {
                 try { rfidManager.stopScan(); }
@@ -234,23 +236,11 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     }
 
     // ================================================================
-    //  ⚙️ Reading Source — الإصلاح الجوهري
+    //  ⚙️ Reading Source — غير حاجب
     // ================================================================
 
     /**
      * ✅ [v4.0] بدء العتاد بشكل غير حاجب (non-blocking).
-     *
-     * التسلسل:
-     *   1. rfidManager.startScan(cb) — تُفوّض المهمة لـ RFIDManager
-     *   2. RFIDManager يستدعي ensureReady(cb) داخلياً
-     *   3. ensureReady:
-     *      - إذا كان جاهزاً → mainHandler.post(cb.onReady)
-     *      - إذا كان يُهيّأ → تُضاف cb للطابور
-     *      - إذا كان UNINITIALIZED/ERROR → تبدأ تهيئة على initExecutor
-     *   4. عندما يصبح القارئ جاهزاً، cb.onReady() يُستدعى
-     *   5. cb.onReady يستدعي reader.startScan()
-     *
-     * لا يوجد Thread.sleep()، لا حجب على UI thread.
      */
     private void startReadingSource(int generation) {
         if (rfidManager == null) {
@@ -266,7 +256,6 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         rfidManager.startScan(new RFIDManager.ReadyCallback() {
             @Override
             public void onReady(MiraIRFIDReader reader) {
-                // تم بدء العتاد بنجاح
                 if (generation != scanGeneration.get()) {
                     Log.d(TAG, "⏭️ Ignoring onReady for stale generation="
                             + generation + " (current=" + scanGeneration.get() + ")");
@@ -286,7 +275,6 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
 
             @Override
             public void onError(String reason) {
-                // فشل بدء العتاد
                 if (generation != scanGeneration.get()) {
                     Log.d(TAG, "⏭️ Ignoring onError for stale generation="
                             + generation);
@@ -324,13 +312,93 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
         }
     }
 
+    // ================================================================
+    //  ✅ [v4.1] إيقاف/استئناف صامت لقراءة TID
+    // ================================================================
+
+    /**
+     * ✅ إيقاف مؤقت للـ Inventory — بدون callbacks، بدون تغيير حالة.
+     *
+     * الاستخدام:
+     *   عندما نحتاج reader.readData() (قراءة TID)، نُوقف الـ Inventory
+     *   لأن startInventoryTag() و readData() يتعارضان على نفس القارئ.
+     *
+     * مضمون:
+     *   - isScanning تبقى true (المستخدم لا يرى تغيير)
+     *   - لا onScanStopped callback
+     *   - لا زيادة في scanGeneration
+     */
+    public void suspendForDirectRead() {
+        if (!isScanning.get()) {
+            Log.d(TAG, "suspendForDirectRead: not scanning, skip");
+            return;
+        }
+
+        if (!isSuspended.compareAndSet(false, true)) {
+            Log.d(TAG, "suspendForDirectRead: already suspended");
+            return;
+        }
+
+        Log.i(TAG, "⏸️ Suspending inventory for direct read");
+
+        try {
+            if (rfidManager != null) {
+                rfidManager.stopScan();
+                Log.d(TAG, "   └─ rfidManager.stopScan() called");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "suspendForDirectRead error", e);
+        }
+    }
+
+    /**
+     * ✅ استئناف الـ Inventory — بدون onScanStarted callback.
+     *
+     * يُستدعى بعد readTid() — يُعيد القارئ لوضع Inventory.
+     */
+    public void resumeAfterDirectRead() {
+        if (!isSuspended.compareAndSet(true, false)) {
+            Log.d(TAG, "resumeAfterDirectRead: not suspended, skip");
+            return;
+        }
+
+        if (!isScanning.get()) {
+            Log.d(TAG, "resumeAfterDirectRead: isScanning=false — no resume");
+            return;
+        }
+
+        Log.i(TAG, "▶️ Resuming inventory after direct read");
+
+        try {
+            if (rfidManager != null) {
+                final int generation = scanGeneration.get();
+                rfidManager.startScan(new RFIDManager.ReadyCallback() {
+                    @Override
+                    public void onReady(MiraIRFIDReader reader) {
+                        Log.i(TAG, "✅ Inventory resumed [gen=" + generation + "]");
+                    }
+
+                    @Override
+                    public void onError(String reason) {
+                        Log.e(TAG, "❌ Inventory resume failed: " + reason);
+                        // لا نُطلق onError — الجرد استمر بالفعل من منظور UI
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "resumeAfterDirectRead error", e);
+        }
+    }
+
     // ============================================================
-    // ✅ RFID Listener Overrides — كل الدوال الخمس (بلا تغيير)
+    // ✅ RFID Listener Overrides
     // ============================================================
 
     @Override
     public void onTagRead(String rawEpc, int rssi) {
-        if (!isScanning.get() || rawEpc == null || rawEpc.isEmpty()) return;
+        // ✅ [v4.1] تجاهل الوسوم أثناء الإيقاف المؤقت
+        if (!isScanning.get() || isSuspended.get()
+                || rawEpc == null || rawEpc.isEmpty()) return;
 
         final int generation = scanGeneration.get();
 
@@ -450,6 +518,7 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
 
     public void cleanup() {
         try {
+            isSuspended.set(false);   // ✅ [v4.1]
             stopScanning();
             detachRfidManager();
             if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
