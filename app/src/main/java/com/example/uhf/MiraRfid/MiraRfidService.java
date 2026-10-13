@@ -415,89 +415,59 @@ public class MiraRfidService {
     // ==================== High-level Operations ====================
 
     /**
-     * ═══════════════════════════════════════════════════════════════════════
-     *  ✅ [v5.3] readEpc — الإصلاح الجذري
-     * ═══════════════════════════════════════════════════════════════════════
-     *
-     *  المشكلة سابقاً:
-     *    - readEpc تعتمد على readData
-     *    - readData تعتمد على normalizePwd
-     *    - normalizePwd ترجع null إذا لم تُضبط كلمة السر
-     *    - → readEpc ترجع NULL دائماً
-     *
-     *  الحل:
-     *    - محاولة reader.readEpc() مباشرة (بدون كلمة سر)
-     *    - تجربة 3 كلمات سر افتراضية
-     *    - لا تعتمد على pwdManager
-     */
-    @Nullable
-    public String readEpc(@Nullable String accessPassword) {
-        currentState.set(OperationState.READING);
+ * ═══════════════════════════════════════════════════════════════════════
+ *  ✅ [v5.3] readEpc — لا تعتمد على pwdManager
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ *  - تستخدم readData مباشرة مع 3 كلمات سر افتراضية
+ *  - لا تستدعي reader.readEpc() (غير موجودة في MiraIRFIDReader)
+ *  - لا تعتمد على resolvePassword (تستخدم كلمات سر ثابتة)
+ */
+@Nullable
+public String readEpc(@Nullable String accessPassword) {
+    currentState.set(OperationState.READING);
 
-        MiraIRFIDReader reader = getConnectedReader();
-        if (reader == null) {
-            currentState.set(OperationState.FAILED);
-            Log.e(TAG, "❌ readEpc: no reader");
-            return null;
-        }
+    MiraIRFIDReader reader = getConnectedReader();
+    if (reader == null) {
+        currentState.set(OperationState.FAILED);
+        Log.e(TAG, "❌ readEpc: no reader");
+        return null;
+    }
 
-        // ═══════════════════════════════════════════════════════
-        //  ✅ المحاولة 1: reader.readEpc() مباشرة
-        // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
+    //  ✅ تجربة 3 كلمات سر — لا شيء غير readData
+    // ═══════════════════════════════════════════════════════
+    for (String pwd : DEFAULT_PASSWORDS) {
         try {
-            Log.d(TAG, "🔄 readEpc: trying reader.readEpc() direct...");
-            String epc = reader.readEpc();
+            Log.d(TAG, "🔄 readEpc: trying readData (pwd='"
+                    + (pwd.isEmpty() ? "empty" : "****") + "')...");
+            String epc = reader.readData(pwd, EPC_BANK,
+                    EPC_START_WORD, EPC_READ_LENGTH_WORDS);
             if (epc != null && !epc.isEmpty()) {
                 String normalized = normalizeEpc(epc);
                 if (normalized.length() >= 8) {
                     lastReadEpc.set(normalized);
                     currentState.set(OperationState.COMPLETED);
-                    Log.i(TAG, "✅ readEpc OK (direct): " + normalized
-                            + " (len=" + normalized.length() + ")");
+                    Log.i(TAG, "✅ readEpc OK (readData pwd='"
+                            + (pwd.isEmpty() ? "empty" : "****") + "'): "
+                            + normalized + " (len=" + normalized.length() + ")");
                     return normalized;
                 } else {
-                    Log.w(TAG, "⚠️ readEpc direct returned short value: '"
+                    Log.w(TAG, "⚠️ readEpc readData returned short: '"
                             + normalized + "' (len=" + normalized.length() + ")");
                 }
             }
         } catch (Throwable t) {
-            Log.w(TAG, "readEpc direct call failed: " + t.getMessage());
+            Log.w(TAG, "readEpc readData failed (pwd='"
+                    + (pwd.isEmpty() ? "empty" : "****") + "'): "
+                    + t.getMessage());
         }
-
-        // ═══════════════════════════════════════════════════════
-        //  ✅ المحاولة 2-4: readData بكلمات سر افتراضية
-        // ═══════════════════════════════════════════════════════
-        for (String pwd : DEFAULT_PASSWORDS) {
-            try {
-                Log.d(TAG, "🔄 readEpc: trying readData (pwd='"
-                        + (pwd.isEmpty() ? "empty" : "****") + "')...");
-                String epc = reader.readData(pwd, EPC_BANK,
-                        EPC_START_WORD, EPC_READ_LENGTH_WORDS);
-                if (epc != null && !epc.isEmpty()) {
-                    String normalized = normalizeEpc(epc);
-                    if (normalized.length() >= 8) {
-                        lastReadEpc.set(normalized);
-                        currentState.set(OperationState.COMPLETED);
-                        Log.i(TAG, "✅ readEpc OK (readData pwd='"
-                                + (pwd.isEmpty() ? "empty" : "****") + "'): "
-                                + normalized + " (len=" + normalized.length() + ")");
-                        return normalized;
-                    } else {
-                        Log.w(TAG, "⚠️ readEpc readData returned short: '"
-                                + normalized + "' (len=" + normalized.length() + ")");
-                    }
-                }
-            } catch (Throwable t) {
-                Log.w(TAG, "readEpc readData failed (pwd='"
-                        + (pwd.isEmpty() ? "empty" : "****") + "'): "
-                        + t.getMessage());
-            }
-        }
-
-        currentState.set(OperationState.FAILED);
-        Log.e(TAG, "❌ readEpc FAILED after all attempts (direct + 3 passwords)");
-        return null;
     }
+
+    currentState.set(OperationState.FAILED);
+    Log.e(TAG, "❌ readEpc FAILED after 3 attempts (readData only)");
+    return null;
+}
 
     /**
      * ✅ [v5.2] قراءة TID صارمة — 24 حرف بالضبط، مع 5 محاولات + fallback
