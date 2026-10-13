@@ -2121,37 +2121,19 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                             ? "ℹ️ تم استخدام EPC الموجود على الشريحة"
                             : "ℹ️ Using existing EPC on tag"));
 
-                } else {
-                    // ❌ حالة B: EPC مشوّه → يجب الكتابة
-                    Log.i(TAG, "⚠️ Hybrid: EPC invalid → generating new one");
+} else {
+    // ✅ [Demo] EPC مشوّه → استخدم TID كمعرّف بدون كتابة
+    Log.i(TAG, "⚠️ Hybrid: EPC invalid → DEMO mode, using TID as identifier");
 
-                    String generatedEpc = rfidService.generateEpcFromMiraId(miraId);
+    // TID هو المعرّف الفعلي (24 حرف Hex يبدأ بـ E2 أو غيره)
+    finalNewEpc = tid;   // TID كـ EPC مؤقتاً
+    writeOk = true;      // تجاوز فشل الكتابة
+    wasWritten = false;  // لم نكتب على الشريحة
 
-                    if (generatedEpc == null
-                            || !generatedEpc.matches("^[0-9A-Fa-f]{24}$")) {
-                        Log.e(TAG, "❌ INVALID EPC generated: '" + generatedEpc + "'");
-                        final String badEpc = generatedEpc;
-                        safeRun(() -> {
-                            dismissDialog(activeLoadingDialog);
-                            activeLoadingDialog = null;
-                            unlockFormFast();
-                            setFormEnabled(true);
-                            showErrorDialog(
-                                    isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
-                                    isArabic
-                                        ? "تم إنشاء EPC غير صالح من mira_id='"
-                                            + miraId + "'\n\nالقيمة: " + badEpc
-                                        : "Invalid EPC generated");
-                        });
-                        return;
-                    }
-
-                    finalNewEpc = generatedEpc.toUpperCase(Locale.US);
-                    Log.i(TAG, "🎯 Generated new EPC: " + finalNewEpc);
-
-                    writeOk = rfidService.writeEpc(finalNewEpc, null);
-                    wasWritten = true;
-                }
+    safeRun(() -> showToast(isArabic
+            ? "ℹ️ وضع العرض: سيتم استخدام TID كمعرّف"
+            : "ℹ️ Demo mode: using TID as identifier"));
+}
 
                 // ═══════════════════════════════════════════════════════
                 //  (4) التحقق — فقط إذا كُتب EPC جديد
@@ -2226,9 +2208,11 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                         return;
                     }
                 } else {
-                    verifyOk = true;
-                    Log.i(TAG, "✅ Skipping write — using existing EPC");
-                }
+    verifyOk = true;
+    Log.i(TAG, wasWritten 
+            ? "✅ Skipping write — using existing EPC"
+            : "✅ Demo mode — TID used as EPC");
+}
 
                 // ═══════════════════════════════════════════════════════
                 //  (5) القفل — فقط إذا كُتب EPC جديد
