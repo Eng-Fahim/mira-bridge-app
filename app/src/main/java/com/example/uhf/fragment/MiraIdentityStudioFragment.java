@@ -149,8 +149,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     
     /** ✅ منع معالجة أكثر من شريحة في نفس وقت المسح */
     private final AtomicBoolean isProcessingTag = new AtomicBoolean(false);
-    /** ✅ هل EPC مربوط حالياً؟ */
-    private volatile boolean isEpcBound = false;
+   /** ✅ هل EPC مربوط حالياً؟ */
+private volatile boolean isEpcBound = false;
+
+/** ✅ [v8.3] EPC الحقيقي المحفوظ من المسح */
+private volatile String lastScannedEpc = "";
+
 
     // ═══════════════════════════════════════════════════════════════════
     //  RFID Listener Reference
@@ -1270,12 +1274,14 @@ private void activateRFIDModeForEncoding() {
 /**
  * ✅ [v6.4] استبدال ذكي — لا حبس المستخدم مع وسم قديم.
  */
-private void processReceivedTag(String epc) {
+ private void processReceivedTag(String epc) {
     if (epc == null || epc.isEmpty()) return;
-
     if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
-
-    Log.i(TAG, "🎯 Processing received tag: " + epc);
+    
+    // ✅ [v8.3] احفظ EPC الحقيقي المقروء من القارئ
+    final String cleanEpc = epc.trim().toUpperCase(Locale.US);
+    lastScannedEpc = cleanEpc;
+    Log.i(TAG, "🎯 Processing received tag EPC: " + cleanEpc);
 
     miraExecutor.getBackgroundExecutor().execute(() -> {
         boolean isTagAllowed = false, isDuplicate = false;
@@ -1879,18 +1885,19 @@ public void onRfidScanned(String epc) {
         String epcFromTagWorking = "";
 
         try {
-            MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
-            tidFromTagWorking = rfidSvc.readTid(null);
-            epcFromTagWorking = rfidSvc.readEpc(null);
-
-            if (tidFromTagWorking != null)
-                tidFromTagWorking = tidFromTagWorking.trim().toUpperCase(Locale.US);
-            if (epcFromTagWorking != null)
-                epcFromTagWorking = epcFromTagWorking.trim().toUpperCase(Locale.US);
-        } catch (Exception e) {
-            Log.e(TAG, "Read TID/EPC error", e);
-        }
-
+    MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
+    tidFromTagWorking = rfidSvc.readTid(null);
+    epcFromTagWorking = lastScannedEpc;
+    Log.i(TAG, "📡 Using SAVED EPC: '" + epcFromTagWorking + "'");
+    
+    // ✅ fallback فقط إذا لم يكن محفوظاً
+    if (epcFromTagWorking == null || epcFromTagWorking.isEmpty()) {
+        Log.w(TAG, "⚠️ No saved EPC — fallback to readEpc()");
+        epcFromTagWorking = rfidSvc.readEpc(null);
+    }                                    // ← قوس إغلاق if
+} catch (Exception e) {                  // ← قوس إغلاق try ثم catch
+    Log.e(TAG, "Read TID/EPC error", e);
+}
         // ✅ Fallback: TID من حقل EPC
         if (tidFromTagWorking == null || tidFromTagWorking.isEmpty()) {
             tidFromTagWorking = binding.etEpc.getText() != null
@@ -2087,11 +2094,10 @@ public void onRfidScanned(String epc) {
                 }
                 final String miraId = miraIdWorking;
 
-                // (2) اقرأ EPC الحالي من الشريحة
-                String existingEpc = rfidService.readEpc(null);
-                if (existingEpc != null) {
-                    existingEpc = existingEpc.trim().toUpperCase(Locale.US);
-                }
+                // ✅ [v8.3] استخدم EPC المحفوظ — لا نعيد القراءة من الشريحة
+String existingEpc = lastScannedEpc;
+if (existingEpc == null) existingEpc = "";
+existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                 Log.i(TAG, "🔍 Existing EPC on tag: '" + existingEpc + "'");
 
                 // (3) تحقق: هل EPC الحالي صالح للاستخدام؟
@@ -2808,6 +2814,7 @@ public void onRfidScanned(String epc) {
     // ═══════════════════════════════════════════════════════════════════
 private void resetFormForNextScan() {
     isEpcBound = false;
+    lastScannedEpc = "";   // ✅ [v8.3] صفّر EPC المحفوظ
     
     // ✅ إعادة تعيين قفل المعالجة
     isProcessingTag.set(false);
