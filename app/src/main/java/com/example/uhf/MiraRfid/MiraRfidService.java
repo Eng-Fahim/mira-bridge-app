@@ -23,21 +23,26 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  ✅ MiraRfidService v5.2 — Thin Wrapper over RFIDManager
+ *  ✅ MiraRfidService v5.3 — Thin Wrapper over RFIDManager
  * ═══════════════════════════════════════════════════════════════════════════
  *
- *  v5.2 (2026-10-13):
+ *  v5.3 (2026-10-13):
+ *  ─────────────────────────────────────────────────────────────────────────
+ *  ✅ readEpc() لا تعتمد على pwdManager — تستدعي reader.readEpc() مباشرة
+ *  ✅ readEpc() تُجرب 3 كلمات سر افتراضية (00000000, FFFFFFFF, فارغة)
+ *  ✅ readData() لا تُفشل عند غياب كلمة السر — تستخدم قيمة افتراضية
+ *  ✅ إصلاح جذري لمشكلة "readEpc returns NULL دائماً"
+ *
+ *  v5.2:
  *  ─────────────────────────────────────────────────────────────────────────
  *  ✅ readTid() صارم — 24 حرف فقط، مع 5 محاولات + fallback
- *  ✅ منع إرسال TID مقطوع (20 حرف) — كان سبب فشل "شريحة غير معتمدة"
- *  ✅ TID_READ_ATTEMPTS_WORDS → TID_READ_LENGTH_WORDS (6 words ثابت)
+ *  ✅ منع إرسال TID مقطوع (20 حرف)
  *
  *  v5.0:
  *  ─────────────────────────────────────────────────────────────────────────
- *  ❌ إزالة detectThread الذي كان يُنشئ ChainwayReader مكرراً
  *  ✅ كل العمليات تُفوَّض إلى RFIDManager.getActiveReader()
  *
- *  المعمارية الجديدة:
+ *  المعمارية:
  *  ─────────────────────────────────────────────────────────────────────────
  *     BaseTabFragmentActivity  → initUHF (تهيئة SDK مرة واحدة)
  *     RFIDManager              → إدارة القارئ النشط (Singleton)
@@ -63,6 +68,14 @@ public class MiraRfidService {
     private static final int TID_READ_MAX_ATTEMPTS = 5;
     /** ✅ [v5.2] فاصل بين محاولات القراءة (ms) */
     private static final long TID_RETRY_DELAY_MS = 80;
+
+    /** ✅ [v5.3] كلمات سر افتراضية للقراءة/الكتابة */
+    private static final String[] DEFAULT_PASSWORDS = {
+            "00000000", "FFFFFFFF", ""
+    };
+
+    /** ✅ [v5.3] كلمة سر افتراضية للاستخدام الفوري */
+    private static final String FALLBACK_PASSWORD = "00000000";
 
     /** مهلة انتظار جهوزية RFIDManager */
     private static final long READER_DETECT_TIMEOUT_SEC = 8;
@@ -112,7 +125,6 @@ public class MiraRfidService {
         }
         this.pwdManager = tempPwd;
 
-        // ✅ خيط خفيف فقط ينتظر جهوزية RFIDManager (لا يُنشئ قارئاً)
         startWaitingForReaderReady();
     }
 
@@ -176,7 +188,7 @@ public class MiraRfidService {
         waitThread.start();
     }
 
-    // ==================== Reader Access (Delegation to RFIDManager) ====================
+    // ==================== Reader Access ====================
 
     @Nullable
     private MiraIRFIDReader getReader() {
@@ -258,11 +270,17 @@ public class MiraRfidService {
 
     // ==================== Password ====================
 
-    @Nullable
-    private String normalizePwd(@Nullable String pwdStr) {
+    /**
+     * ✅ [v5.3] إرجاع كلمة سر صالحة — لا تُعيد null أبداً
+     */
+    @NonNull
+    private String resolvePassword(@Nullable String pwdStr, boolean forWrite) {
+        // 1) الأولوية: المُرسل صراحةً
         if (pwdStr != null && !pwdStr.trim().isEmpty()) {
             return pwdStr.trim().toUpperCase(Locale.US);
         }
+
+        // 2) من pwdManager
         if (pwdManager != null) {
             try {
                 String managed = pwdManager.getPasswordForTag(lastReadTid.get());
@@ -272,19 +290,18 @@ public class MiraRfidService {
                     return managed;
                 }
             } catch (Throwable t) {
-                Log.e(TAG, "normalizePwd error", t);
+                Log.e(TAG, "resolvePassword error", t);
             }
         }
-        Log.w(TAG, "⚠️ No password available — please configure in Settings");
-        return null;
-    }
 
-    private boolean canProceedWithPwd(@Nullable String pwd, String opName) {
-        if (pwd == null || pwd.isEmpty()) {
-            Log.e(TAG, opName + ": no password available");
-            return false;
+        // 3) fallback
+        if (forWrite) {
+            Log.w(TAG, "⚠️ No password from manager — using fallback '"
+                    + FALLBACK_PASSWORD + "' for write operation");
+        } else {
+            Log.d(TAG, "ℹ️ No password available — using fallback for read");
         }
-        return true;
+        return FALLBACK_PASSWORD;
     }
 
     // ==================== Low-level Operations ====================
@@ -301,8 +318,7 @@ public class MiraRfidService {
             return false;
         }
 
-        String safePwd = normalizePwd(pwdStr);
-        if (!canProceedWithPwd(safePwd, "writeData")) return false;
+        String safePwd = resolvePassword(pwdStr, true);
 
         Log.d(TAG, "📝 writeData: bank=" + bank + " ptr=" + ptr
                 + " len=" + data.length() + " pwd=****");
@@ -315,6 +331,9 @@ public class MiraRfidService {
         }
     }
 
+    /**
+     * ✅ [v5.3] readData — لا تُفشل عند غياب كلمة السر
+     */
     @Nullable
     public String readData(@Nullable String pwdStr, int bank, int ptr, int len) {
         MiraIRFIDReader reader = getConnectedReader();
@@ -323,8 +342,7 @@ public class MiraRfidService {
             return null;
         }
 
-        String safePwd = normalizePwd(pwdStr);
-        if (!canProceedWithPwd(safePwd, "readData")) return null;
+        String safePwd = resolvePassword(pwdStr, false);
 
         Log.d(TAG, "📖 readData: bank=" + bank + " ptr=" + ptr + " len=" + len);
 
@@ -341,8 +359,7 @@ public class MiraRfidService {
         MiraIRFIDReader reader = getConnectedReader();
         if (reader == null) return false;
 
-        String safePwd = normalizePwd(pwdStr);
-        if (!canProceedWithPwd(safePwd, "setTagLockState")) return false;
+        String safePwd = resolvePassword(pwdStr, true);
 
         Log.i(TAG, "🔐 setTagLockState: bank=" + bank
                 + " lock=" + shouldLock + " pwd=****");
@@ -397,34 +414,93 @@ public class MiraRfidService {
 
     // ==================== High-level Operations ====================
 
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     *  ✅ [v5.3] readEpc — الإصلاح الجذري
+     * ═══════════════════════════════════════════════════════════════════════
+     *
+     *  المشكلة سابقاً:
+     *    - readEpc تعتمد على readData
+     *    - readData تعتمد على normalizePwd
+     *    - normalizePwd ترجع null إذا لم تُضبط كلمة السر
+     *    - → readEpc ترجع NULL دائماً
+     *
+     *  الحل:
+     *    - محاولة reader.readEpc() مباشرة (بدون كلمة سر)
+     *    - تجربة 3 كلمات سر افتراضية
+     *    - لا تعتمد على pwdManager
+     */
     @Nullable
     public String readEpc(@Nullable String accessPassword) {
         currentState.set(OperationState.READING);
 
-        // ✅ قراءة جديدة كاملة — لا تستخدم lastReadEpc أبداً
-        String epc = readData(accessPassword, EPC_BANK,
-                EPC_START_WORD, EPC_READ_LENGTH_WORDS);
+        MiraIRFIDReader reader = getConnectedReader();
+        if (reader == null) {
+            currentState.set(OperationState.FAILED);
+            Log.e(TAG, "❌ readEpc: no reader");
+            return null;
+        }
 
-        if (epc != null && !epc.isEmpty()) {
-            String normalized = normalizeEpc(epc);
-            if (normalized.length() >= 8) {
-                lastReadEpc.set(normalized);
-                currentState.set(OperationState.COMPLETED);
-                Log.i(TAG, "✅ readEpc OK: " + normalized
-                        + " (len=" + normalized.length() + ")");
-                return normalized;
+        // ═══════════════════════════════════════════════════════
+        //  ✅ المحاولة 1: reader.readEpc() مباشرة
+        // ═══════════════════════════════════════════════════════
+        try {
+            Log.d(TAG, "🔄 readEpc: trying reader.readEpc() direct...");
+            String epc = reader.readEpc();
+            if (epc != null && !epc.isEmpty()) {
+                String normalized = normalizeEpc(epc);
+                if (normalized.length() >= 8) {
+                    lastReadEpc.set(normalized);
+                    currentState.set(OperationState.COMPLETED);
+                    Log.i(TAG, "✅ readEpc OK (direct): " + normalized
+                            + " (len=" + normalized.length() + ")");
+                    return normalized;
+                } else {
+                    Log.w(TAG, "⚠️ readEpc direct returned short value: '"
+                            + normalized + "' (len=" + normalized.length() + ")");
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "readEpc direct call failed: " + t.getMessage());
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  ✅ المحاولة 2-4: readData بكلمات سر افتراضية
+        // ═══════════════════════════════════════════════════════
+        for (String pwd : DEFAULT_PASSWORDS) {
+            try {
+                Log.d(TAG, "🔄 readEpc: trying readData (pwd='"
+                        + (pwd.isEmpty() ? "empty" : "****") + "')...");
+                String epc = reader.readData(pwd, EPC_BANK,
+                        EPC_START_WORD, EPC_READ_LENGTH_WORDS);
+                if (epc != null && !epc.isEmpty()) {
+                    String normalized = normalizeEpc(epc);
+                    if (normalized.length() >= 8) {
+                        lastReadEpc.set(normalized);
+                        currentState.set(OperationState.COMPLETED);
+                        Log.i(TAG, "✅ readEpc OK (readData pwd='"
+                                + (pwd.isEmpty() ? "empty" : "****") + "'): "
+                                + normalized + " (len=" + normalized.length() + ")");
+                        return normalized;
+                    } else {
+                        Log.w(TAG, "⚠️ readEpc readData returned short: '"
+                                + normalized + "' (len=" + normalized.length() + ")");
+                    }
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "readEpc readData failed (pwd='"
+                        + (pwd.isEmpty() ? "empty" : "****") + "'): "
+                        + t.getMessage());
             }
         }
 
         currentState.set(OperationState.FAILED);
-        Log.e(TAG, "❌ readEpc FAILED");
+        Log.e(TAG, "❌ readEpc FAILED after all attempts (direct + 3 passwords)");
         return null;
     }
 
     /**
      * ✅ [v5.2] قراءة TID صارمة — 24 حرف بالضبط، مع 5 محاولات + fallback
-     *
-     * ⛔️ لا نُعيد TID مقطوعاً (20 حرف) أبداً — السيرفر سيرفضه
      */
     @Nullable
     public String readTid(@Nullable String accessPassword) {
@@ -445,7 +521,6 @@ public class MiraRfidService {
                 String rawTid = reader.readTid();
                 if (rawTid != null && !rawTid.isEmpty()) {
                     String cleaned = normalizeTid(rawTid);
-                    // ✅ نقبل فقط TID بطول 24 حرف (96 bits)
                     if (cleaned.length() == 24
                             && cleaned.matches("^[0-9A-F]{24}$")) {
                         lastReadTid.set(cleaned);
@@ -467,7 +542,6 @@ public class MiraRfidService {
                         + " error: " + t.getMessage());
             }
 
-            // ✅ انتظر قليلاً قبل المحاولة التالية
             if (attempt < TID_READ_MAX_ATTEMPTS) {
                 try {
                     Thread.sleep(TID_RETRY_DELAY_MS);
@@ -481,29 +555,32 @@ public class MiraRfidService {
         // ═══════════════════════════════════════════════════════
         //  ✅ محاولة أخيرة عبر readData (6 words = 24 حرف)
         // ═══════════════════════════════════════════════════════
-        try {
-            Log.d(TAG, "🔄 readTid fallback via readData ("
-                    + TID_READ_LENGTH_WORDS + " words)...");
-            String rawTid = reader.readData(accessPassword,
-                    TID_BANK, TID_START_WORD, TID_READ_LENGTH_WORDS);
-            if (rawTid != null && !rawTid.isEmpty()) {
-                String cleaned = normalizeTid(rawTid);
-                if (cleaned.length() == 24
-                        && cleaned.matches("^[0-9A-F]{24}$")) {
-                    lastReadTid.set(cleaned);
-                    currentState.set(OperationState.COMPLETED);
-                    Log.i(TAG, "✅ readTid fallback OK: " + cleaned);
-                    return cleaned;
-                } else {
-                    Log.w(TAG, "⚠️ readTid fallback wrong length="
-                            + cleaned.length() + " value=" + cleaned);
+        for (String pwd : DEFAULT_PASSWORDS) {
+            try {
+                Log.d(TAG, "🔄 readTid fallback via readData (pwd='"
+                        + (pwd.isEmpty() ? "empty" : "****") + "')...");
+                String rawTid = reader.readData(pwd,
+                        TID_BANK, TID_START_WORD, TID_READ_LENGTH_WORDS);
+                if (rawTid != null && !rawTid.isEmpty()) {
+                    String cleaned = normalizeTid(rawTid);
+                    if (cleaned.length() == 24
+                            && cleaned.matches("^[0-9A-F]{24}$")) {
+                        lastReadTid.set(cleaned);
+                        currentState.set(OperationState.COMPLETED);
+                        Log.i(TAG, "✅ readTid fallback OK: " + cleaned);
+                        return cleaned;
+                    } else {
+                        Log.w(TAG, "⚠️ readTid fallback wrong length="
+                                + cleaned.length() + " value=" + cleaned);
+                    }
                 }
+            } catch (Throwable t) {
+                Log.w(TAG, "readTid fallback (pwd='"
+                        + (pwd.isEmpty() ? "empty" : "****") + "') failed: "
+                        + t.getMessage());
             }
-        } catch (Throwable t) {
-            Log.w(TAG, "readTid fallback failed: " + t.getMessage());
         }
 
-        // ❌ فشل كل المحاولات — لا نُعيد TID مقطوعاً
         currentState.set(OperationState.FAILED);
         Log.e(TAG, "❌ readTid FAILED after " + TID_READ_MAX_ATTEMPTS
                 + " attempts + fallback — no valid TID (24 chars) obtained");
@@ -513,7 +590,6 @@ public class MiraRfidService {
     @NonNull
     private String normalizeTid(@NonNull String raw) {
         String tid = raw.trim().toUpperCase(Locale.US);
-        // ✅ لا نحذف أي شيء — يجب أن يبقى الطول 24
         return tid;
     }
 
@@ -529,7 +605,6 @@ public class MiraRfidService {
         String normalizedEpc = newEpc.trim().toUpperCase(Locale.US)
                 .replaceAll("[^0-9A-F]", "");
 
-        // ✅ يجب أن يكون 24 حرف بالضبط
         if (normalizedEpc.length() != 24) {
             Log.e(TAG, "writeEpc: INVALID LENGTH=" + normalizedEpc.length()
                     + " (must be exactly 24), value='" + normalizedEpc + "'");
@@ -537,14 +612,12 @@ public class MiraRfidService {
             return false;
         }
 
-        // ✅ منع بادئة TID
         if (normalizedEpc.startsWith("3008")) {
             Log.e(TAG, "writeEpc: REFUSED — EPC starts with TID prefix '3008'");
             currentState.set(OperationState.FAILED);
             return false;
         }
 
-        // ✅ EPC يجب أن يبدأ بـ E2 (تحذير فقط)
         if (!normalizedEpc.startsWith("E2")) {
             Log.w(TAG, "writeEpc: EPC doesn't start with E2 (warning only)");
         }
@@ -606,9 +679,6 @@ public class MiraRfidService {
 
     /**
      * ✅ [v5.1] توليد EPC صحيح 24 حرف Hex (96 bit) من mira_id
-     *
-     * المعيار المُتبع: EPC Gen2 (GS1 SGTIN-96 مبسط)
-     * البنية:  E2 + 34 + Company(5) + Item(4) + Serial(11) = 24 حرف
      */
     @NonNull
     public String generateEpcFromMiraId(@Nullable String miraId) {
@@ -618,7 +688,6 @@ public class MiraRfidService {
                     "generateEpcFromMiraId: miraId cannot be null or empty");
         }
 
-        // (1) استخراج الرقم التسلسلي من mira_id
         String numericPart = miraId.replaceAll("[^0-9]", "");
         if (numericPart.isEmpty()) {
             numericPart = String.valueOf(
@@ -632,7 +701,6 @@ public class MiraRfidService {
             serialValue = Math.abs(miraId.hashCode()) & 0xFFFFFFFFFFL;
         }
 
-        // (2) بناء الأجزاء الست عشرية
         final String header = "E2";
         final String filterPartition = "34";
         final String companyHex = "0A1B2";
@@ -643,7 +711,6 @@ public class MiraRfidService {
         long serialLong = serialValue & 0xFFFFFFFFFFFL;
         String serialHex = String.format(Locale.US, "%011X", serialLong);
 
-        // (3) تجميع EPC = 2 + 2 + 5 + 4 + 11 = 24
         String epc = header
                 + filterPartition
                 + companyHex
@@ -652,7 +719,6 @@ public class MiraRfidService {
 
         epc = epc.toUpperCase(Locale.US);
 
-        // (4) التحقق النهائي الصارم
         if (epc.length() != 24) {
             throw new IllegalStateException(
                     "generateEpcFromMiraId: generated EPC has wrong length="
