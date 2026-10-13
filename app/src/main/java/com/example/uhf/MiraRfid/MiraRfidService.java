@@ -405,24 +405,28 @@ public class MiraRfidService {
     // ==================== High-level Operations ====================
 
     @Nullable
-    public String readEpc(@Nullable String accessPassword) {
-        currentState.set(OperationState.READING);
+public String readEpc(@Nullable String accessPassword) {
+    currentState.set(OperationState.READING);
 
-        String epc = readData(accessPassword, EPC_BANK,
-                EPC_START_WORD, EPC_READ_LENGTH_WORDS);
+    // ✅ قراءة جديدة كاملة — لا تستخدم lastReadEpc أبداً
+    String epc = readData(accessPassword, EPC_BANK,
+            EPC_START_WORD, EPC_READ_LENGTH_WORDS);
 
-        if (epc != null && !epc.isEmpty()) {
-            String normalized = normalizeEpc(epc);
+    if (epc != null && !epc.isEmpty()) {
+        String normalized = normalizeEpc(epc);
+        if (normalized.length() >= 8) {  // على الأقل 8 أحرف Hex
             lastReadEpc.set(normalized);
             currentState.set(OperationState.COMPLETED);
-            Log.i(TAG, "✅ readEpc OK: " + normalized);
+            Log.i(TAG, "✅ readEpc OK: " + normalized
+                    + " (len=" + normalized.length() + ")");
             return normalized;
         }
-
-        currentState.set(OperationState.FAILED);
-        Log.e(TAG, "❌ readEpc FAILED");
-        return null;
     }
+
+    currentState.set(OperationState.FAILED);
+    Log.e(TAG, "❌ readEpc FAILED");
+    return null;
+}
 
     /**
      * ✅ قراءة TID — يستخدم reader.readTid() أولاً ثم readData كاحتياط
@@ -499,42 +503,59 @@ public class MiraRfidService {
     }
 
     public boolean writeEpc(@Nullable String newEpc, @Nullable String accessPassword) {
-        currentState.set(OperationState.WRITING);
+    currentState.set(OperationState.WRITING);
 
-        if (newEpc == null || newEpc.isEmpty()) {
-            Log.w(TAG, "writeEpc: empty EPC");
-            currentState.set(OperationState.FAILED);
-            return false;
-        }
-        if (getReader() == null) {
-            Log.w(TAG, "writeEpc: no reader");
-            currentState.set(OperationState.FAILED);
-            return false;
-        }
-
-        String normalizedEpc = normalizeEpc(newEpc);
-        if (normalizedEpc.length() < 8 || normalizedEpc.length() > 24) {
-            Log.w(TAG, "writeEpc: invalid EPC length: " + normalizedEpc.length());
-            currentState.set(OperationState.FAILED);
-            return false;
-        }
-
-        Log.i(TAG, "📝 writeEpc: epc=" + normalizedEpc + " pwd=****");
-
-        boolean success = writeData(accessPassword, EPC_BANK,
-                EPC_START_WORD, normalizedEpc);
-
-        if (success) {
-            lastReadEpc.set(normalizedEpc);
-            currentState.set(OperationState.COMPLETED);
-            Log.i(TAG, "✅ writeEpc OK");
-        } else {
-            currentState.set(OperationState.FAILED);
-            Log.e(TAG, "❌ writeEpc FAILED");
-        }
-        return success;
+    if (newEpc == null || newEpc.isEmpty()) {
+        Log.w(TAG, "writeEpc: empty EPC");
+        currentState.set(OperationState.FAILED);
+        return false;
     }
 
+    String normalizedEpc = newEpc.trim().toUpperCase(Locale.US)
+            .replaceAll("[^0-9A-F]", "");
+
+    // ✅ [v5.1] يجب أن يكون 24 حرف بالضبط
+    if (normalizedEpc.length() != 24) {
+        Log.e(TAG, "writeEpc: INVALID LENGTH=" + normalizedEpc.length()
+                + " (must be exactly 24), value='" + normalizedEpc + "'");
+        currentState.set(OperationState.FAILED);
+        return false;
+    }
+
+    // ✅ [v5.1] منع بادئة TID
+    if (normalizedEpc.startsWith("3008")) {
+        Log.e(TAG, "writeEpc: REFUSED — EPC starts with TID prefix '3008'");
+        currentState.set(OperationState.FAILED);
+        return false;
+    }
+
+    // ✅ [v5.1] EPC يجب أن يبدأ بـ E2 (GS1 Header)
+    if (!normalizedEpc.startsWith("E2")) {
+        Log.w(TAG, "writeEpc: EPC doesn't start with E2 (warning only)");
+    }
+
+    MiraIRFIDReader reader = getConnectedReader();
+    if (reader == null) {
+        Log.w(TAG, "writeEpc: no reader");
+        currentState.set(OperationState.FAILED);
+        return false;
+    }
+
+    Log.i(TAG, "📝 writeEpc: epc=" + normalizedEpc + " pwd=****");
+
+    boolean success = writeData(accessPassword, EPC_BANK,
+            EPC_START_WORD, normalizedEpc);
+
+    if (success) {
+        lastReadEpc.set(normalizedEpc);
+        currentState.set(OperationState.COMPLETED);
+        Log.i(TAG, "✅ writeEpc OK");
+    } else {
+        currentState.set(OperationState.FAILED);
+        Log.e(TAG, "❌ writeEpc FAILED");
+    }
+    return success;
+}
     public boolean verifyWrite(@Nullable String expectedEpc,
                                 @Nullable String accessPassword) {
         currentState.set(OperationState.VERIFYING);
@@ -567,23 +588,101 @@ public class MiraRfidService {
         }
     }
 
-    @NonNull
-    public String generateEpcFromMiraId(@Nullable String miraId) {
-        if (miraId == null || miraId.isEmpty()) {
-            return "3008" + String.format(Locale.US, "%012d",
-                    System.currentTimeMillis() % 1_000_000_000_000L);
-        }
+    /**
+ * ✅ [v5.1] توليد EPC صحيح 24 حرف Hex (96 bit) من mira_id
+ *
+ * المعيار المُتبع: EPC Gen2 (GS1 SGTIN-96 مبسط)
+ * البنية:  E2 + 34 + Company(5) + Item(4) + Serial(11) = 24 حرف
+ *          └┬┘  └┬┘   └────┬────┘  └──┬──┘   └────┬────┘
+ *           │    │         │          │           │
+ *         Header F+P    ثابت MIRA  من miraId  من miraId
+ *
+ * ⛔️ ممنوع تماماً استخدام بادئة TID (مثل "3008") في EPC
+ */
+@NonNull
+public String generateEpcFromMiraId(@Nullable String miraId) {
 
-        StringBuilder epc = new StringBuilder("3008");
-        String cleanId = miraId.replaceAll("[^0-9A-Fa-f]", "")
-                .toUpperCase(Locale.US);
-
-        while (cleanId.length() < 12) cleanId = "0" + cleanId;
-        epc.append(cleanId, 0, 12);
-        while (epc.length() < 24) epc.append("0");
-
-        return epc.substring(0, 24).toUpperCase(Locale.US);
+    // ═══════════════════════════════════════════════════════════
+    // (1) التحقق من المدخلات
+    // ═══════════════════════════════════════════════════════════
+    if (miraId == null || miraId.trim().isEmpty()) {
+        throw new IllegalArgumentException(
+                "generateEpcFromMiraId: miraId cannot be null or empty");
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // (2) استخراج الرقم التسلسلي من mira_id
+    //     مثال: "MIRA-SN-1001" → "1001"
+    // ═══════════════════════════════════════════════════════════
+    String numericPart = miraId.replaceAll("[^0-9]", "");
+    if (numericPart.isEmpty()) {
+        numericPart = String.valueOf(
+                System.currentTimeMillis() % 1_000_000_000L);
+    }
+
+    long serialValue;
+    try {
+        serialValue = Long.parseLong(numericPart);
+    } catch (NumberFormatException e) {
+        serialValue = Math.abs(miraId.hashCode()) & 0xFFFFFFFFFFL;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // (3) بناء الأجزاء الست عشرية
+    // ═══════════════════════════════════════════════════════════
+
+    // ✅ (أ) Header ثابت: E2 = EPC Gen2 Class 1 (96-bit)
+    final String header = "E2";
+
+    // ✅ (ب) Filter + Partition ثابت: 34
+    //     Filter = 3 (Item) | Partition = 4 (Company 5 hex + Item 4 hex)
+    final String filterPartition = "34";
+
+    // ✅ (ج) Company Prefix ثابت لـ MIRA: 5 أحرف Hex
+    final String companyHex = "0A1B2"; // 20 bit = 0x0A1B2
+
+    // ✅ (د) Item Reference: من hash الـ mira_id (4 أحرف = 16 bit)
+    long itemCode = Math.abs(miraId.hashCode()) & 0xFFFFL;
+    String itemHex = String.format(Locale.US, "%04X", itemCode);
+
+    // ✅ (هـ) Serial Number: من mira_id (11 حرف = 44 bit)
+    long serialLong = serialValue & 0xFFFFFFFFFFFL; // 44 bits
+    String serialHex = String.format(Locale.US, "%011X", serialLong);
+
+    // ═══════════════════════════════════════════════════════════
+    // (4) تجميع EPC
+    // ═══════════════════════════════════════════════════════════
+    String epc = header
+            + filterPartition    // 2
+            + companyHex         // 5
+            + itemHex            // 4
+            + serialHex;         // 11
+    // المجموع = 2 + 2 + 5 + 4 + 11 = 24 ✅
+
+    epc = epc.toUpperCase(Locale.US);
+
+    // ═══════════════════════════════════════════════════════════
+    // (5) التحقق النهائي الصارم
+    // ═══════════════════════════════════════════════════════════
+    if (epc.length() != 24) {
+        throw new IllegalStateException(
+                "generateEpcFromMiraId: generated EPC has wrong length="
+                        + epc.length() + " value='" + epc + "'");
+    }
+    if (!epc.matches("^[0-9A-F]{24}$")) {
+        throw new IllegalStateException(
+                "generateEpcFromMiraId: generated EPC contains invalid chars='"
+                        + epc + "'");
+    }
+    if (epc.startsWith("3008")) {
+        throw new IllegalStateException(
+                "generateEpcFromMiraId: FATAL — generated EPC starts with TID prefix '3008'");
+    }
+
+    Log.i(TAG, "✅ Generated valid EPC: " + epc
+            + " (from mira_id='" + miraId + "')");
+    return epc;
+}
 
     @NonNull
     public String getDeviceName() {
