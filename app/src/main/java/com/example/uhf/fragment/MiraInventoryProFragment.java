@@ -261,12 +261,14 @@ private volatile long sessionElapsedBeforePause = 0;
 private MaterialButton btnFinishAndReview;
 
     // ==================== Collections ====================
-    private final List<ScannedItemDisplay> scannedItemsDisplayList =
-            new CopyOnWriteArrayList<>();
+private final List<ScannedItemDisplay> scannedItemsDisplayList =
+        new CopyOnWriteArrayList<>();
 
-    private final Set<String> catalogEpcs =
-            Collections.newSetFromMap(new ConcurrentHashMap<>());
+private final Set<String> catalogEpcs =
+        Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+// ✅ [Demo] ذاكرة مؤقتة: EPC مشوّه → TID المُقروء
+private final Map<String, String> tidCache = new ConcurrentHashMap<>();
     // ==================== Back Press ====================
     private OnBackPressedCallback backPressedCallback;
 
@@ -1449,17 +1451,101 @@ public void onScanStopped() {
             updateButtonsState();
         });
     }
-
-    // ✅ إصلاح: onTagRead بدون posting مزدوج
-    @Override
+// ✅ [Demo v4.1] onTagRead مع قراءة TID عند EPC مشوّه
+@Override
 public void onTagRead(String normalizedEpc, int rssi) {
+    if (normalizedEpc == null || normalizedEpc.isEmpty()) return;
+
+    // ═══════════════════════════════════════════════════════
+    //  ✅ [Demo] فحص صحة EPC
+    //  EPC صالح: 24 hex يبدأ بـ E2
+    //  EPC مشوّه: 3008... → اقرأ TID
+    // ═══════════════════════════════════════════════════════
+    if (!normalizedEpc.matches("^E2[0-9A-F]{22}$")) {
+        Log.w(TAG, "⚠️ Inventory: Invalid EPC '" + normalizedEpc
+                + "' → reading TID");
+        readTidThenProcess(normalizedEpc, rssi);
+        return;
+    }
+
+    // ✅ EPC صالح — مسار عادي
+    processValidEpc(normalizedEpc, rssi);
+}
+
+/**
+ * ✅ [Demo v4.1] اقرأ TID عندما يكون EPC مشوّهاً
+ */
+private void readTidThenProcess(final String originalEpc, final int rssi) {
+    // ═══════════════════════════════════════════════════════
+    //  ذاكرة مؤقتة — تجنّب القراءة المتكررة لنفس الشريحة
+    // ═══════════════════════════════════════════════════════
+    String cached = tidCache.get(originalEpc);
+    if (cached != null) {
+        Log.d(TAG, "♻️ Reusing cached TID: " + originalEpc
+                + " → " + cached);
+        processValidEpc(cached, rssi);
+        return;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  اقرأ TID في الخلفية
+    // ═══════════════════════════════════════════════════════
+    if (backgroundExecutor == null) {
+        Log.w(TAG, "readTidThenProcess: no executor");
+        processValidEpc(originalEpc, rssi);
+        return;
+    }
+
+    backgroundExecutor.execute(() -> {
+        String tid = null;
+        try {
+            com.example.uhf.MiraRfid.MiraRfidService svc =
+                    com.example.uhf.MiraRfid.MiraRfidService
+                            .getInstance(requireContext().getApplicationContext());
+            tid = svc.readTid(null);
+        } catch (Exception e) {
+            Log.e(TAG, "readTid error", e);
+        }
+
+        final String finalTid = (tid != null && !tid.trim().isEmpty())
+                ? tid.trim().toUpperCase(Locale.US) : null;
+
+        mainHandler.post(() -> {
+            if (!isAdded() || isFragmentDestroyed) return;
+
+            if (finalTid != null
+                    && finalTid.matches("^[0-9A-F]{24}$")) {
+                // ✅ نجحت القراءة — خزّنها في الذاكرة
+                tidCache.put(originalEpc, finalTid);
+                Log.i(TAG, "✅ TID resolved: " + originalEpc
+                        + " → " + finalTid);
+
+                processValidEpc(finalTid, rssi);
+            } else {
+                // ⚠️ فشلت القراءة — استخدم EPC الأصلي
+                //     (سيُصنَّف كـ unknown، لكن أفضل من لا شيء)
+                Log.w(TAG, "⚠️ TID read failed for '" + originalEpc
+                        + "' → falling back to raw EPC");
+                processValidEpc(originalEpc, rssi);
+            }
+        });
+    });
+}
+
+/**
+ * ✅ [Demo v4.1] المعالجة الفعلية — كانت داخل onTagRead
+ */
+private void processValidEpc(String epc, int rssi) {
+    if (epc == null || epc.isEmpty()) return;
+
     // فلتر الفئة
-    if (selectedCategoryFilter != null && !selectedCategoryFilter.isEmpty()) {
-        if (!catalogEpcs.contains(normalizedEpc)) return;
+    if (selectedCategoryFilter != null
+            && !selectedCategoryFilter.isEmpty()) {
+        if (!catalogEpcs.contains(epc)) return;
     }
 
     // ✅ قرار موحّد من Controller
-    MiraScanSessionController.Decision d = scanSession.evaluateTag(normalizedEpc);
+    MiraScanSessionController.Decision d = scanSession.evaluateTag(epc);
 
     switch (d) {
         case REJECT_SESSION_OFF:
@@ -1472,13 +1558,14 @@ public void onTagRead(String normalizedEpc, int rssi) {
         case ACCEPT_DUPLICATE:
             scanSession.confirmTagDuplicate();
             return;
-case ACCEPT_NEW:
-    if (Looper.myLooper() == Looper.getMainLooper()) {
-        processTagReadDirect(normalizedEpc, rssi);
-    } else {
-        mainHandler.post(() -> processTagReadDirect(normalizedEpc, rssi));
-    }
-    return;
+
+        case ACCEPT_NEW:
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                processTagReadDirect(epc, rssi);
+            } else {
+                mainHandler.post(() -> processTagReadDirect(epc, rssi));
+            }
+            return;
     }
 }
     
@@ -2062,8 +2149,12 @@ public void stopScanning() {
             });
         });
     }
+    
 private void clearAllLists() {
     try {
+        // ✅ [Demo] امسح ذاكرة TID
+        tidCache.clear();
+        
         synchronized (scannedItemsDisplayList) {
             scannedItemsDisplayList.clear();
         }
