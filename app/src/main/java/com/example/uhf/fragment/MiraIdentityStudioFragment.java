@@ -2078,8 +2078,9 @@ public void onRfidScanned(String epc) {
 
                 // (1) استخراج mira_id
                 String miraIdWorking = (finalResponseData != null)
-                        ? finalResponseData.optString("mira_id", finalIdentifier)
-                        : finalIdentifier;
+        ? finalResponseData.optString("mira_id",
+              finalResponseData.optString("serial_number", finalIdentifier))
+        : finalIdentifier;
 
                 if (miraIdWorking == null || miraIdWorking.trim().isEmpty()) {
                     miraIdWorking = finalIdentifier;
