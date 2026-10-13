@@ -2949,60 +2949,149 @@ private void applyPermissions() {
     // ═══════════════════════════════════════════════════════════════════
 
     /**
-     * ✅ معالجة وسم RFID — علم واحد للتحقق.
-     */
-    public void onRingScanned(String epc) {
-        try {
-            if (epc == null || epc.trim().isEmpty()) return;
+ * ✅ معالجة وسم RFID — علم واحد للتحقق.
+ * [Demo v6.3] يقبل EPC مشوّه (3008...) ويقرأ TID كبديل.
+ */
+public void onRingScanned(String epc) {
+    try {
+        if (epc == null || epc.trim().isEmpty()) return;
 
-            // ✅ العلم الوحيد
-            if (currentScanMode != ScanMode.RFID) return;
+        // ✅ العلم الوحيد
+        if (currentScanMode != ScanMode.RFID) return;
 
-            // ═══════════════════════════════════════════════════════
-            //  Debounce — تجاهل نفس الوسم خلال فترة قصيرة
-            // ═══════════════════════════════════════════════════════
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(epc);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-            lastScannedTimes.put(epc, now);
+        // ═══════════════════════════════════════════════════════
+        //  Debounce — تجاهل نفس الوسم خلال فترة قصيرة
+        // ═══════════════════════════════════════════════════════
+        final String cleanEpc = epc.trim().toUpperCase(Locale.US);
 
-            // ═══════════════════════════════════════════════════════
-            //  One Shot — حماية ذرّية كاملة
-            // ═══════════════════════════════════════════════════════
-            if (stopAfterFirstRead) {
-                // فحص ذرّي: أول خيط فقط سينجح
-                if (!oneShotConsumed.compareAndSet(false, true)) {
-                    Log.i(TAG, "🎯 One-shot: ignoring extra tag " + epc);
-                    return;
-                }
+        long now = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(cleanEpc);
+        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
+        lastScannedTimes.put(cleanEpc, now);
 
-                stopAfterFirstRead = false;
-                Log.i(TAG, "🎯 One-shot: accepted first tag " + epc);
-
-                // ✅ أغلق الوضع — switchScanMode سيتولّى stopRFIDScan
-                switchScanMode(ScanMode.NONE);
-
-                // ✅ عالج الوسم
-                processRingEpc(epc, "rfid");
+        // ═══════════════════════════════════════════════════════
+        //  One Shot — حماية ذرّية كاملة
+        // ═══════════════════════════════════════════════════════
+        if (stopAfterFirstRead) {
+            // فحص ذرّي: أول خيط فقط سينجح
+            if (!oneShotConsumed.compareAndSet(false, true)) {
+                Log.i(TAG, "🎯 One-shot: ignoring extra tag " + cleanEpc);
                 return;
             }
 
-            // ═══════════════════════════════════════════════════════
-            //  الوضع المستمر
-            // ═══════════════════════════════════════════════════════
-            if (cartManager != null && cartManager.isIdScanned(epc)) {
+            stopAfterFirstRead = false;
+            Log.i(TAG, "🎯 One-shot: accepted first tag " + cleanEpc);
+
+            // ✅ أغلق الوضع — switchScanMode سيتولّى stopRFIDScan
+            switchScanMode(ScanMode.NONE);
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  ✅ [Demo] فحص صحة EPC
+        //  EPC الصالح في هذا النظام: 24 hex يبدأ بـ E2
+        //  EPC المشوّه (3008...): غير صالح → اقرأ TID
+        // ═══════════════════════════════════════════════════════
+        boolean isValidEpc = cleanEpc.matches("^E2[0-9A-F]{22}$");
+
+        if (!isValidEpc) {
+            Log.w(TAG, "⚠️ POS: Invalid EPC '" + cleanEpc
+                    + "' → reading TID as fallback");
+            readTidAndProcess(cleanEpc, "rfid");
+            return;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  ✅ EPC صالح — مسار عادي
+        // ═══════════════════════════════════════════════════════
+        if (cartManager != null && cartManager.isIdScanned(cleanEpc)) {
+            showToast(getString(R.string.pos_msg_already_in_cart));
+            playAlertSound(2);
+            return;
+        }
+
+        processRingEpc(cleanEpc, "rfid");
+
+    } catch (Exception e) {
+        Log.e(TAG, "onRingScanned error", e);
+    }
+}
+
+
+/**
+ * ✅ [Demo v6.3] قراءة TID عندما يكون EPC مشوّهاً.
+ *
+ *  السياق:
+ *   - EPC على الشريحة = "3008..." (لم يُكتب بعد)
+ *   - التطبيق (التكويد) خزّن TID في حقل rfid_epc
+ *   - لذلك نقرأ TID من الشريحة ونسأل به
+ *
+ *  التسلسل:
+ *   - switchScanMode(NONE) → sdkExecutor.execute(stopScan)
+ *   - readTidAndProcess     → sdkExecutor.execute(readTid)
+ *   - FIFO: stopScan ينفّذ قبل readTid (القارئ جاهز)
+ */
+private void readTidAndProcess(final String originalEpc, final String source) {
+    if (sdkExecutor == null || sdkExecutor.isShutdown()) {
+        Log.w(TAG, "readTidAndProcess: sdkExecutor unavailable → fallback to EPC");
+        processRingEpc(originalEpc, source);
+        return;
+    }
+
+    // ✅ مؤشر البحث للمستخدم
+    safeRun(() -> {
+        if (tvCartStatus != null) {
+            tvCartStatus.setText(getString(R.string.pos_msg_searching));
+        }
+    });
+
+    // ✅ استخدم sdkExecutor — FIFO مع stopScan
+    sdkExecutor.execute(() -> {
+        String tidRead = null;
+        try {
+            Context ctx = getSafeAppContext();
+            if (ctx != null) {
+                com.example.uhf.MiraRfid.MiraRfidService rfidService =
+                        com.example.uhf.MiraRfid.MiraRfidService.getInstance(ctx);
+                tidRead = rfidService.readTid(null);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "readTidAndProcess: readTid error", e);
+        }
+
+        final String cleanTid = (tidRead != null && !tidRead.trim().isEmpty())
+                ? tidRead.trim().toUpperCase(Locale.US)
+                : null;
+
+        safeRun(() -> {
+            if (!isFragmentAlive()) return;
+
+            // ═══════════════════════════════════════════════════
+            //  فشل قراءة TID → fallback إلى EPC الأصلي
+            // ═══════════════════════════════════════════════════
+            if (cleanTid == null) {
+                Log.w(TAG, "⚠️ POS: TID read failed → fallback to EPC");
+                processRingEpc(originalEpc, source);
+                return;
+            }
+
+            Log.i(TAG, "✅ POS: Using TID identifier: " + cleanTid);
+
+            // ═══════════════════════════════════════════════════
+            //  فحص السلة بالـ TID
+            // ═══════════════════════════════════════════════════
+            if (cartManager != null && cartManager.isIdScanned(cleanTid)) {
                 showToast(getString(R.string.pos_msg_already_in_cart));
                 playAlertSound(2);
                 return;
             }
 
-            processRingEpc(epc, "rfid");
-
-        } catch (Exception e) {
-            Log.e(TAG, "onRingScanned error", e);
-        }
-    }
-
+            // ═══════════════════════════════════════════════════
+            //  المعالجة بالـ TID
+            // ═══════════════════════════════════════════════════
+            processRingEpc(cleanTid, source);
+        });
+    });
+}
     /**
      * ✅ معالجة باركود — مسار مستقل عن RFID.
      */
