@@ -3117,68 +3117,178 @@ private void readTidAndProcess(final String originalEpc, final String source) {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Barcode Scanner Fragment
-    // ═══════════════════════════════════════════════════════════════════
+//  Launcher الجديد لمسح GS1/QR (لا يستبدل الـ Fragment)
+// ═══════════════════════════════════════════════════════════════════
+private final ActivityResultLauncher<ScanOptions> posBarcodeLauncher =
+        registerForActivityResult(new ScanContract(), result -> {
+    try {
+        // ✅ أعِد الوضع دائماً
+        currentScanMode = ScanMode.NONE;
+        if (heroController != null) {
+            heroController.setState(PosHeroController.State.IDLE);
+        }
 
-    private void openBarcodeScanner() {
+        if (result == null) return;
+
+        String raw = result.getContents();
+        if (raw == null || raw.trim().isEmpty()) {
+            Log.w(TAG, "POS barcode: empty result");
+            return;
+        }
+
+        Log.i(TAG, "📷 POS scanned: " + raw);
+
+        // ✅ حلّل GS1 / QR ثم أرسل
+        String[] parsed = parseGs1OrQr(raw);
+        String code = parsed[0];
+        String format = parsed[1];
+
+        Log.i(TAG, "📷 Parsed code=" + code + " format=" + format);
+
+        onBarcodeScanned(code);
+
+    } catch (Exception e) {
+        Log.e(TAG, "posBarcodeLauncher error", e);
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  فتح الماسح — بواسطة ScanContract (لا يحذف POS Fragment)
+// ═══════════════════════════════════════════════════════════════════
+public void onBarcodeScanned(String data) {
+    try {
+        if (data == null || data.trim().isEmpty()) {
+            Log.w(TAG, "onBarcodeScanned: empty");
+            return;
+        }
+        final String code = data.trim();
+
+        Log.i(TAG, "🔍 onBarcodeScanned: " + code);
+
+        // Debounce
+        long now = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(code);
+        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) {
+            Log.d(TAG, "⏭️ debounce skip");
+            return;
+        }
+        lastScannedTimes.put(code, now);
+
+        // فحص السلة
+        if (cartManager != null && cartManager.isIdScanned(code)) {
+            showToast(getString(R.string.pos_msg_already_in_cart));
+            playAlertSound(2);
+            return;
+        }
+
+        // ✅ أرسل — الـ source = barcode
+        processRingEpc(code, "barcode");
+
+    } catch (Exception e) {
+        Log.e(TAG, "onBarcodeScanned error", e);
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  parseGs1OrQr — يستخرج الكود الصالح من أي صيغة
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * يدعم:
+ *  - GS1-128:  "010761234567890421MIRA-SN-1004"
+ *  - GS1 DataMatrix (مع FNC1 = \u001D أو (#))
+ *  - QR خام:   "MIRA-SN-1004" أو "07612345678904"
+ *  - QR JSON:  {"serial":"...", "gtin":"..."}
+ *  - QR URL:   https://...?serial=MIRA-SN-1004
+ *
+ * @return [code, format] — code = السلسلة التي ستُرسل للسيرفر
+ */
+private String[] parseGs1OrQr(String raw) {
+    if (raw == null) return new String[]{"", "empty"};
+    String data = raw.trim();
+    if (data.isEmpty()) return new String[]{"", "empty"};
+
+    // ────────────────────────────────────────────────────────
+    // 1) QR JSON
+    // ────────────────────────────────────────────────────────
+    if (data.startsWith("{")) {
         try {
-            if (!isFragmentAlive()) return;
+            JSONObject json = new JSONObject(data);
+            String serial = json.optString("serial",
+                    json.optString("serial_number",
+                            json.optString("sn", "")));
+            if (!serial.isEmpty()) return new String[]{serial, "qr_json"};
 
-            FragmentManager fm = getParentFragmentManager();
-            if (fm == null || fm.isStateSaved()) {
-                // ✅ إذا كان state saved — أعِد الحالة
-                currentScanMode = ScanMode.NONE;
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.IDLE);
-                }
-                return;
+            String gtin = json.optString("gtin",
+                    json.optString("gtin13", ""));
+            if (!gtin.isEmpty()) return new String[]{gtin, "qr_json"};
+
+            String epc = json.optString("epc", "");
+            if (!epc.isEmpty()) return new String[]{epc, "qr_json"};
+        } catch (Exception ignored) {}
+    }
+
+    // ────────────────────────────────────────────────────────
+    // 2) QR URL
+    // ────────────────────────────────────────────────────────
+    if (data.startsWith("http://") || data.startsWith("https://")) {
+        try {
+            android.net.Uri uri = android.net.Uri.parse(data);
+            String serial = uri.getQueryParameter("serial");
+            if (serial == null) serial = uri.getQueryParameter("sn");
+            if (serial != null && !serial.isEmpty()) {
+                return new String[]{serial, "qr_url"};
             }
-
-            MiraBarcodeScannerFragment scannerFragment =
-                    new MiraBarcodeScannerFragment();
-
-            scannerFragment.setOnBarcodeScannedListener((data, format) -> {
-                try {
-                    // ✅ معالجة الباركود
-                    if (isFragmentAlive() && data != null && !data.isEmpty()) {
-                        onBarcodeScanned(data);
-                    }
-
-                    // ✅ إعادة الوضع إلى NONE
-                    currentScanMode = ScanMode.NONE;
-                    if (heroController != null) {
-                        heroController.setState(PosHeroController.State.IDLE);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Barcode callback error", e);
-                }
-            });
-
-            // احسب containerId
-            int containerId = android.R.id.content;
-            try {
-                View view = getView();
-                if (view != null && view.getParent() instanceof View) {
-                    int parentId = ((View) view.getParent()).getId();
-                    if (parentId != View.NO_ID) containerId = parentId;
-                }
-            } catch (Exception ignored) {}
-
-            fm.beginTransaction()
-                    .replace(containerId, scannerFragment)
-                    .addToBackStack("barcode_scanner")
-                    .commit();
-
-        } catch (Exception e) {
-            Log.e(TAG, "openBarcodeScanner error", e);
-            showToast(isArabic
-                    ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
+            String gtin = uri.getQueryParameter("gtin");
+            if (gtin != null && !gtin.isEmpty()) {
+                return new String[]{gtin, "qr_url"};
             }
-            currentScanMode = ScanMode.NONE;
+            // آخر جزء من الرابط
+            String last = uri.getLastPathSegment();
+            if (last != null && !last.isEmpty()) {
+                return new String[]{last, "qr_url"};
+            }
+        } catch (Exception ignored) {}
+    }
+
+    // ────────────────────────────────────────────────────────
+    // 3) GS1 — استبدل FNC1 ثم ابحث عن AIs
+    //    (01) GTIN-14
+    //    (21) Serial
+    //    (10) Batch
+    // ────────────────────────────────────────────────────────
+    String gs1 = data
+            .replace('\u001D', '|')       // FNC1 الحقيقي
+            .replace("(#)", "|");          // تمثيل بديل
+
+    // ابحث عن (21) serial — الأفضل للبحث
+    java.util.regex.Matcher mSerial =
+            java.util.regex.Pattern.compile("21([A-Za-z0-9\\-_.]+)")
+                    .matcher(gs1);
+    if (mSerial.find()) {
+        String serial = mSerial.group(1);
+        if (serial != null && !serial.isEmpty()) {
+            return new String[]{serial, "gs1_serial"};
         }
     }
+
+    // ابحث عن (01) GTIN — 14 رقم
+    java.util.regex.Matcher mGtin =
+            java.util.regex.Pattern.compile("01(\\d{14})")
+                    .matcher(gs1);
+    if (mGtin.find()) {
+        String gtin = mGtin.group(1);
+        if (gtin != null && !gtin.isEmpty()) {
+            return new String[]{gtin, "gs1_gtin"};
+        }
+    }
+
+    // ────────────────────────────────────────────────────────
+    // 4) خام — أرجعه كما هو
+    // ────────────────────────────────────────────────────────
+    return new String[]{data, "raw"};
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Back Press Handler
