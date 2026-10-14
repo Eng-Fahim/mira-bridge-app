@@ -3092,29 +3092,6 @@ private void readTidAndProcess(final String originalEpc, final String source) {
         });
     });
 }
-    /**
-     * ✅ معالجة باركود — مسار مستقل عن RFID.
-     */
-    public void onBarcodeScanned(String data) {
-        try {
-            if (data == null || data.trim().isEmpty()) return;
-
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(data);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-            lastScannedTimes.put(data, now);
-
-            if (cartManager != null && cartManager.isIdScanned(data)) {
-                showToast(getString(R.string.pos_msg_already_in_cart));
-                playAlertSound(2);
-                return;
-            }
-
-            processRingEpc(data, "barcode");
-        } catch (Exception e) {
-            Log.e(TAG, "onBarcodeScanned error", e);
-        }
-    }
 
     // ═══════════════════════════════════════════════════════════════════
 //  Launcher الجديد لمسح GS1/QR (لا يستبدل الـ Fragment)
@@ -3151,6 +3128,36 @@ private final ActivityResultLauncher<ScanOptions> posBarcodeLauncher =
         Log.e(TAG, "posBarcodeLauncher error", e);
     }
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  فتح الماسح — بواسطة ScanContract (لا يحذف POS Fragment)
+// ═══════════════════════════════════════════════════════════════════
+private void openBarcodeScanner() {
+    try {
+        if (!isFragmentAlive()) return;
+
+        ScanOptions options = new ScanOptions();
+        options.setPrompt(isArabic
+                ? "وجّه الكاميرا نحو باركود GS1 أو QR"
+                : "Aim at GS1 or QR barcode");
+        options.setBeepEnabled(false);
+        options.setOrientationLocked(true);
+        options.setBarcodeImageEnabled(false);
+        // ✅ يدعم كل الأنواع (GS1-128, GS1 DataMatrix, QR, EAN, Code128...)
+        options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES);
+
+        posBarcodeLauncher.launch(options);
+
+    } catch (Exception e) {
+        Log.e(TAG, "openBarcodeScanner error", e);
+        showToast(isArabic ? "⚠️ تعذر فتح الماسح"
+                           : "⚠️ Unable to open scanner");
+        currentScanMode = ScanMode.NONE;
+        if (heroController != null) {
+            heroController.setState(PosHeroController.State.IDLE);
+        }
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  فتح الماسح — بواسطة ScanContract (لا يحذف POS Fragment)
