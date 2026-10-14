@@ -40,6 +40,7 @@ import com.example.uhf.utils.DiagTracer;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.fragment.MiraDashboardFragment;
+import com.example.uhf.fragment.MiraInventoryFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraAccountingSetupFragment;
 
@@ -2292,6 +2293,16 @@ public void syncCurrentFragment() {
         if (branches != null) {
             branches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
         }
+        
+        MenuItem miraInventory = menu.findItem(R.id.action_mira_inventory);
+if (miraInventory != null) {
+    miraInventory.setVisible(
+        pm.isAdmin()
+        || pm.isSystemAdmin()
+        || pm.isInventoryManager()
+        || pm.isManager()
+    );
+}
 
         MenuItem exportData = menu.findItem(R.id.action_export_data);
         if (exportData != null) exportData.setVisible(pm.canExportReports());
@@ -2357,6 +2368,9 @@ public void syncCurrentFragment() {
         if (id == R.id.action_gold_rates) {
             loadFragment(new MiraGoldCurrencyFragment(), "GoldRates");
             return true;
+        } else if (id == R.id.action_mira_inventory) {
+    loadFragment(new MiraInventoryFragment(), "MiraInventory");
+    return true;
         } else if (id == R.id.action_profile) {
             loadFragment(new MiraProfileFragment(), "Profile");
             return true;
