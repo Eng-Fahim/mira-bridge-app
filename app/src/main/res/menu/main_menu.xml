@@ -9,6 +9,12 @@
         android:title="@string/menu_gold_rates"
         app:showAsAction="always" />
 
+    <!-- 📦 جرد MIRA (النسخة الجديدة) -->
+<item
+    android:id="@+id/action_mira_inventory"
+    android:icon="@drawable/ic_inventory"
+    android:title="جرد MIRA"
+    app:showAsAction="never" />
     <item
         android:id="@+id/action_profile"
         android:icon="@drawable/ic_profile"
