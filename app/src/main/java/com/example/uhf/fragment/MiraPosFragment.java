@@ -455,6 +455,18 @@ public void onResume() {
         } catch (Exception ignored) {}
     }
 
+
+@Override
+public void onHiddenChanged(boolean hidden) {
+    super.onHiddenChanged(hidden);
+
+    showToast("👁️ DEBUG onHiddenChanged: hidden=" + hidden);
+    Log.d(TAG, "👁️ onHiddenChanged: hidden=" + hidden);
+
+    if (!hidden) {
+        processPendingBarcodeIfAny();
+    }
+}
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -1319,12 +1331,17 @@ private void submitManualEpc() {
 // ═══════════════════════════════════════════════════════════════════
 //  Process Item — Lookup + Parse
 // ═══════════════════════════════════════════════════════════════════
-
 private void processRingEpc(final String code, final String source) {
     if (code == null || code.trim().isEmpty() || !isFragmentAlive()) return;
     final String cleanCode = code.trim();
 
-    if (!pendingEpcs.add(cleanCode)) return;
+    // ✅ DEBUG
+    showToast("📡 DEBUG processRingEpc: [" + cleanCode + "] src=" + source);
+
+    if (!pendingEpcs.add(cleanCode)) {
+        showToast("⏭️ DEBUG: already pending");
+        return;
+    }
 
     playAlertSound(1);
 
@@ -3098,25 +3115,35 @@ private void readTidAndProcess(final String originalEpc, final String source) {
      * ✅ معالجة باركود — مسار مستقل عن RFID.
      */
     public void onBarcodeScanned(String data) {
-        try {
-            if (data == null || data.trim().isEmpty()) return;
+    try {
+        showToast("🟠 DEBUG onBarcodeScanned: [" + data + "]");
 
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(data);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-            lastScannedTimes.put(data, now);
-
-            if (cartManager != null && cartManager.isIdScanned(data)) {
-                showToast(getString(R.string.pos_msg_already_in_cart));
-                playAlertSound(2);
-                return;
-            }
-
-            processRingEpc(data, "barcode");
-        } catch (Exception e) {
-            Log.e(TAG, "onBarcodeScanned error", e);
+        if (data == null || data.trim().isEmpty()) {
+            showToast("❌ DEBUG: data empty");
+            return;
         }
+
+        long now = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(data);
+        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) {
+            showToast("⏭️ DEBUG: cooldown skip");
+            return;
+        }
+        lastScannedTimes.put(data, now);
+
+        if (cartManager != null && cartManager.isIdScanned(data)) {
+            showToast("⚠️ DEBUG: already in cart");
+            playAlertSound(2);
+            return;
+        }
+
+        showToast("🚀 DEBUG: calling processRingEpc");
+        processRingEpc(data, "barcode");
+    } catch (Exception e) {
+        showToast("❌ DEBUG onBarcode: " + e.getMessage());
+        Log.e(TAG, "onBarcodeScanned error", e);
     }
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Barcode Scanner Fragment
@@ -3126,12 +3153,15 @@ private void readTidAndProcess(final String originalEpc, final String source) {
     try {
         if (!isFragmentAlive()) return;
 
+        showToast("🔵 DEBUG: openBarcodeScanner called");
+
         FragmentManager fm = getParentFragmentManager();
         if (fm == null || fm.isStateSaved()) {
             currentScanMode = ScanMode.NONE;
             if (heroController != null) {
                 heroController.setState(PosHeroController.State.IDLE);
             }
+            showToast("❌ DEBUG: fm null/stateSaved");
             return;
         }
 
@@ -3140,12 +3170,15 @@ private void readTidAndProcess(final String originalEpc, final String source) {
 
         scannerFragment.setOnBarcodeScannedListener((data, format) -> {
             try {
+                // ✅ DEBUG: أخبر المستخدم فوراً
+                showToast("📷 DEBUG callback: " + data);
                 Log.i(TAG, "📷 Scanner callback: " + data);
+
                 if (data != null && !data.isEmpty()) {
-                    // ✅ احفظ الكود — سنعالجه عند العودة
                     pendingBarcodeFromScanner = data;
                 }
             } catch (Exception e) {
+                showToast("❌ DEBUG cb error: " + e.getMessage());
                 Log.e(TAG, "Barcode callback error", e);
             }
         });
@@ -3159,16 +3192,17 @@ private void readTidAndProcess(final String originalEpc, final String source) {
             }
         } catch (Exception ignored) {}
 
-        // ✅✅✅ الإصلاح: hide بدل replace
         fm.beginTransaction()
-                .hide(this)                                     // ← الإصلاح
+                .hide(this)
                 .add(containerId, scannerFragment, "barcode_scanner")
                 .addToBackStack("barcode_scanner")
                 .commit();
 
+        showToast("✅ DEBUG: Scanner opened");
+
     } catch (Exception e) {
+        showToast("❌ DEBUG open: " + e.getMessage());
         Log.e(TAG, "openBarcodeScanner error", e);
-        showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
         if (heroController != null) {
             heroController.setState(PosHeroController.State.IDLE);
         }
@@ -3176,12 +3210,17 @@ private void readTidAndProcess(final String originalEpc, final String source) {
     }
 }
 
-
 private void processPendingBarcodeIfAny() {
     final String code = pendingBarcodeFromScanner;
-    if (code == null || code.isEmpty()) return;
 
-    pendingBarcodeFromScanner = null;   // امسحه فوراً
+    showToast("🟡 DEBUG processPending: [" + code + "]");
+
+    if (code == null || code.isEmpty()) {
+        showToast("⚠️ DEBUG: pending is empty");
+        return;
+    }
+
+    pendingBarcodeFromScanner = null;
 
     Log.i(TAG, "📷 Processing pending barcode: " + code);
 
@@ -3191,10 +3230,14 @@ private void processPendingBarcodeIfAny() {
     }
 
     mainHandler.postDelayed(() -> {
-        if (!isFragmentAlive()) return;
+        if (!isFragmentAlive()) {
+            showToast("❌ DEBUG: fragment not alive");
+            return;
+        }
 
         String[] parsed = parseGs1OrQr(code);
         String finalCode = parsed[0];
+        showToast("🟢 DEBUG Parsed: [" + finalCode + "] fmt=" + parsed[1]);
         Log.i(TAG, "📷 Parsed: " + finalCode + " format=" + parsed[1]);
 
         onBarcodeScanned(finalCode);
