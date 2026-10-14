@@ -565,11 +565,11 @@ Log.d(TAG, "Camera started successfully");
 
         UHFMainActivity activity = (UHFMainActivity) getActivity();
 
-        // ✅ [إصلاح جوهري] استخدم TAG_POS الصحيح
         Fragment pos = activity.getSupportFragmentManager()
                 .findFragmentByTag(NavigationManager.TAG_POS);
 
-        if (pos instanceof MiraPosFragment && pos.isVisible()) {
+        // ✅ أزل شرط isVisible() — لأن POS مخفي الآن
+        if (pos instanceof MiraPosFragment) {
             try {
                 ((MiraPosFragment) pos).onBarcodeScanned(data);
             } catch (Exception e) {
@@ -577,7 +577,6 @@ Log.d(TAG, "Camera started successfully");
                 activity.onTagRead(data);
             }
         } else {
-            // fallback — أبلغ النشاط
             activity.onTagRead(data);
         }
     } catch (Exception e) {
@@ -877,4 +876,4 @@ private void fallbackClose() {
         // تنظيف appContext
         appContext = null;
     }
-                  }
+}
