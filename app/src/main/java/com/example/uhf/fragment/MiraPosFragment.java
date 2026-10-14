@@ -1364,7 +1364,8 @@ private void processRingEpc(final String code, final String source) {
                 syncManager.findItem(cleanCode, branchId,
                         new MiraItemSyncManager.ItemLookupCallback() {
                     @Override
-                    public void onItemFound(JSONObject item, boolean fromServer) {
+public void onItemFound(JSONObject item, boolean fromServer) {
+    showToast("✅ DEBUG ItemFound from " + (fromServer ? "server" : "cache"));
                         safeRun(() -> {
                             if (!isFragmentAlive()) return;
 
@@ -1381,6 +1382,7 @@ private void processRingEpc(final String code, final String source) {
 
                     @Override
 public void onItemNotFound() {
+    showToast("❌ DEBUG ItemNotFound");
     safeRun(() -> {
         if (!isFragmentAlive()) return;
         showToast(getString(R.string.pos_msg_not_found));
