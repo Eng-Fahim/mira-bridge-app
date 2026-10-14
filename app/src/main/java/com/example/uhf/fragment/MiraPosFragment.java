@@ -112,6 +112,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final int  KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int  KEYCODE_RFID_TRIGGER_2 = 280;
     private static final int  KEYCODE_RFID_TRIGGER_3 = 293;
+    private static final long PENDING_EPC_TIMEOUT_MS = 10_000;  // 10 ثوانٍ
 
     private static final long SCAN_COOLDOWN_MS          = 1500;
     private static final long REFUND_MAX_DAYS           = 30;
@@ -232,6 +233,12 @@ public class MiraPosFragment extends MiraBaseFragment {
 @Nullable private Runnable pendingHideFeedback;
 // ✅ حقل لتخزين الباركود القادم من الماسح
 @Nullable private volatile String pendingBarcodeFromScanner = null;
+
+// ═══════════════════════════════════════════════════════════
+//  ⏱️ Trigger Grace Period — حل مشكلة "ضغط ثم ضع الشريحة"
+// ═══════════════════════════════════════════════════════════
+private static final long TRIGGER_GRACE_MS = 2000;
+@Nullable private Runnable pendingStopRfid = null;
     // ═══════════════════════════════════════════════════════════════════
     //  Helper Classes
     // ═══════════════════════════════════════════════════════════════════
@@ -335,11 +342,11 @@ public class MiraPosFragment extends MiraBaseFragment {
                 rfidListener = new MiraIRFIDReader.OnTagReadListener() {
                     @Override
                     public void onTagRead(String epc, int rssi) {
-                        // ✅ علم واحد فقط
-                        if (currentScanMode == ScanMode.RFID) {
-                            onRingScanned(epc);
-                        }
-                    }
+    if (currentScanMode == ScanMode.RFID) {
+        // ✅ تأكد من main thread
+        safeRun(() -> onRingScanned(epc));
+    }
+}
                     @Override public void onScanStarted() {}
                     @Override public void onScanStopped() {}
                     @Override
@@ -420,30 +427,33 @@ public void onResume() {
         } catch (Exception ignored) {}
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        try {
-            // ✅ إغلاق كل الأوضاع
-            if (currentScanMode != ScanMode.NONE) {
-                switchScanMode(ScanMode.NONE);
-            }
+   @Override
+public void onPause() {
+    super.onPause();
+    try {
+        // ✅ [جديد] ألغِ أي مؤقت Grace معلّق قبل إيقاف المسح
+        cancelPendingStopIfAny();
 
-            isCheckoutDialogShowing = false;
-
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-                View fab = getActivity().findViewById(R.id.fabActionCenter);
-                if (fab != null) fab.setVisibility(View.VISIBLE);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onPause error", e);
+        // ✅ إغلاق كل الأوضاع
+        if (currentScanMode != ScanMode.NONE) {
+            switchScanMode(ScanMode.NONE);
         }
+
+        isCheckoutDialogShowing = false;
+
+        if (heroController != null) {
+            heroController.setState(PosHeroController.State.IDLE);
+        }
+
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) fab.setVisibility(View.VISIBLE);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onPause error", e);
     }
+}
 
     @Override
     public void onStop() {
@@ -530,6 +540,8 @@ if (pendingHideFeedback != null && mainHandler != null) {
     mainHandler.removeCallbacks(pendingHideFeedback);
     pendingHideFeedback = null;
 }
+// ✅ تنظيف مؤقت الزناد المعلّق
+cancelPendingStopIfAny();
 scanFeedbackOverlay = null;
 scanFeedbackCard = null;
 ivFeedbackIcon = null;
@@ -1339,10 +1351,19 @@ private void processRingEpc(final String code, final String source) {
     showToast("📡 DEBUG processRingEpc: [" + cleanCode + "] src=" + source);
 
     if (!pendingEpcs.add(cleanCode)) {
-        showToast("⏭️ DEBUG: already pending");
-        return;
-    }
+    showToast("⏭️ DEBUG: already pending");
+    return;
+}
 
+// ✅ شبكة أمان: احذف EPC تلقائياً بعد 10 ثوانٍ مهما حدث
+final String epcToClean = cleanCode;
+mainHandler.postDelayed(() -> {
+    boolean removed = pendingEpcs.remove(epcToClean);
+    if (removed) {
+        Log.w(TAG, "⚠️ Pending EPC timed out and removed: " + epcToClean);
+    }
+}, PENDING_EPC_TIMEOUT_MS);
+    
     playAlertSound(1);
 
     safeRun(() -> {
@@ -2850,99 +2871,118 @@ private void applyPermissions() {
      *    idempotent: إذا كان الوضع المطلوب = الحالي → لا يفعل شيئاً.
      */
     private void switchScanMode(ScanMode target) {
-        if (!isFragmentAlive() || heroController == null) return;
-        if (currentScanMode == target) return;
+    // ✅ حماية مزدوجة
+    if (!isFragmentAlive()) return;
 
-        Log.d(TAG, "🔄 Scan mode: " + currentScanMode + " → " + target);
-
-        // ═══════════════════════════════════════════════════════════
-        //  1) تنظيف الوضع الحالي
-        // ═══════════════════════════════════════════════════════════
-        switch (currentScanMode) {
-            case RFID:
-                stopRFIDScan();
-                break;
-            case MANUAL:
-                hideManualInput();
-                break;
-            case GS1:
-                // لا شيء — الماسح Fragment مؤقت
-                break;
-            case NONE:
-            default:
-                break;
-        }
-
-        // ═══════════════════════════════════════════════════════════
-        //  2) تفعيل الوضع الجديد
-        // ═══════════════════════════════════════════════════════════
+    if (heroController == null) {
+        // ✅ heroController معدوم لكننا ما زلنا نريد تحديث الحالة
+        Log.w(TAG, "⚠️ switchScanMode: heroController null — forcing state update");
+        cancelPendingStopIfAny();
         currentScanMode = target;
 
+        // نفّذ المطلوب بدون heroController
         switch (target) {
-            case GS1:
-                heroController.setState(PosHeroController.State.GS1_SCANNING);
-                openBarcodeScanner();
-                // ملاحظة: بعد الإغلاق، onBarcodeScannerResult سيعيد NONE
-                break;
-
             case RFID:
-                heroController.setState(PosHeroController.State.RFID_LISTENING);
-                heroController.resetRfidCount();
                 startRFIDScan();
                 break;
-
-            case MANUAL:
-                heroController.setState(PosHeroController.State.MANUAL_ENTRY);
-                showManualInput();
-                break;
-
             case NONE:
             default:
-                heroController.setState(PosHeroController.State.IDLE);
+                stopRFIDScan();
                 break;
         }
+        return;
     }
+
+    if (currentScanMode == target) return;
+
+    Log.d(TAG, "🔄 Scan mode: " + currentScanMode + " → " + target);
+
+    // ✅ 1) تنظيف الوضع الحالي
+    switch (currentScanMode) {
+        case RFID:
+            cancelPendingStopIfAny();   // ← إضافة
+            stopRFIDScan();
+            break;
+        case MANUAL:
+            hideManualInput();
+            break;
+        case GS1:
+            break;
+        case NONE:
+        default:
+            break;
+    }
+
+    // ✅ 2) تفعيل الوضع الجديد
+    currentScanMode = target;
+
+    switch (target) {
+        case GS1:
+            heroController.setState(PosHeroController.State.GS1_SCANNING);
+            openBarcodeScanner();
+            break;
+        case RFID:
+            heroController.setState(PosHeroController.State.RFID_LISTENING);
+            heroController.resetRfidCount();
+            startRFIDScan();
+            break;
+        case MANUAL:
+            heroController.setState(PosHeroController.State.MANUAL_ENTRY);
+            showManualInput();
+            break;
+        case NONE:
+        default:
+            heroController.setState(PosHeroController.State.IDLE);
+            break;
+    }
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  RFID Scan — Start/Stop
     // ═══════════════════════════════════════════════════════════════════
 
     private void startRFIDScan() {
-        try {
-            if (rfidManager == null) return;
+    try {
+        if (rfidManager == null) return;
 
-            oneShotConsumed.set(false);
-            stopAfterFirstRead = true;
-
-            sdkExecutor.execute(() -> {
-                try {
-                    rfidManager.startScan(new RFIDManager.ReadyCallback() {
-                        @Override
-                        public void onReady(MiraIRFIDReader reader) {
-                            Log.d(TAG, "✅ RFID started (async)");
-                        }
-
-                        @Override
-                        public void onError(String reason) {
-                            Log.w(TAG, "RFID start failed: " + reason);
-                            safeRun(() -> {
-                                if (!isFragmentAlive()) return;
-                                currentScanMode = ScanMode.NONE;
-                                if (heroController != null) {
-                                    heroController.setState(
-                                            PosHeroController.State.IDLE);
-                                }
-                            });
-                        }
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "startScan bg error", e);
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "startRFIDScan error", e);
+        // ✅ [جديد] حماية من sdkExecutor المُغلق
+        if (sdkExecutor == null || sdkExecutor.isShutdown()) {
+            Log.e(TAG, "startRFIDScan: sdkExecutor unavailable — skip");
+            return;
         }
+
+        oneShotConsumed.set(false);
+        stopAfterFirstRead = true;
+
+        sdkExecutor.execute(() -> {
+            try {
+                rfidManager.startScan(new RFIDManager.ReadyCallback() {
+                    @Override
+                    public void onReady(MiraIRFIDReader reader) {
+                        Log.d(TAG, "✅ RFID started (async)");
+                    }
+
+                    @Override
+                    public void onError(String reason) {
+                        Log.w(TAG, "RFID start failed: " + reason);
+                        safeRun(() -> {
+                            if (!isFragmentAlive()) return;
+                            currentScanMode = ScanMode.NONE;
+                            if (heroController != null) {
+                                heroController.setState(
+                                        PosHeroController.State.IDLE);
+                            }
+                        });
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "startScan bg error", e);
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "startRFIDScan error", e);
     }
+}
 
     private void stopRFIDScan() {
         try {
@@ -3002,6 +3042,8 @@ public void onRingScanned(String epc) {
 
             stopAfterFirstRead = false;
             Log.i(TAG, "🎯 One-shot: accepted first tag " + cleanEpc);
+            // ✅ ألغِ الإيقاف المعلّق (وصل الوسم قبل انتهاء المهلة)
+            cancelPendingStopIfAny();
 
             // ✅ أغلق الوضع — switchScanMode سيتولّى stopRFIDScan
             switchScanMode(ScanMode.NONE);
@@ -3324,41 +3366,42 @@ private String[] parseGs1OrQr(String raw) {
      *   5. خلاف ذلك → انتقل للـ Dashboard
      */
     private void handleCustomBack() {
-        try {
-            // 1. حوار الدفع
-            if (isCheckoutDialogShowing) return;
+    try {
+        // 1. حوار الدفع
+        if (isCheckoutDialogShowing) return;
 
-            // 2. RFID نشط → أوقفه فقط
-            if (currentScanMode == ScanMode.RFID) {
-                switchScanMode(ScanMode.NONE);
-                return;
-            }
-
-            // 3. Manual نشط → أغلقه
-            if (currentScanMode == ScanMode.MANUAL) {
-                switchScanMode(ScanMode.NONE);
-                return;
-            }
-
-            // 4. GS1 نشط → أغلقه
-            if (currentScanMode == ScanMode.GS1) {
-                switchScanMode(ScanMode.NONE);
-                return;
-            }
-
-            // 5. السلة فيها عناصر → تأكيد
-            if (cartManager != null && !cartManager.isEmpty()) {
-                showExitConfirmation();
-                return;
-            }
-
-            // 6. اخرج
-            navigateAwayFromPos();
-
-        } catch (Exception e) {
-            Log.e(TAG, "handleCustomBack error", e);
+        // 2. RFID نشط → أوقفه فقط
+        if (currentScanMode == ScanMode.RFID) {
+            cancelPendingStopIfAny();   // ✅ [جديد] ألغِ المؤقت أولاً
+            switchScanMode(ScanMode.NONE);
+            return;
         }
+
+        // 3. Manual نشط → أغلقه
+        if (currentScanMode == ScanMode.MANUAL) {
+            switchScanMode(ScanMode.NONE);
+            return;
+        }
+
+        // 4. GS1 نشط → أغلقه
+        if (currentScanMode == ScanMode.GS1) {
+            switchScanMode(ScanMode.NONE);
+            return;
+        }
+
+        // 5. السلة فيها عناصر → تأكيد
+        if (cartManager != null && !cartManager.isEmpty()) {
+            showExitConfirmation();
+            return;
+        }
+
+        // 6. اخرج
+        navigateAwayFromPos();
+
+    } catch (Exception e) {
+        Log.e(TAG, "handleCustomBack error", e);
     }
+}
 
     private void showExitConfirmation() {
         if (!isFragmentAlive()) return;
@@ -3392,6 +3435,9 @@ private String[] parseGs1OrQr(String raw) {
      */
     private void navigateAwayFromPos() {
     try {
+        // ✅ [جديد] ألغِ المؤقت قبل أي شيء
+        cancelPendingStopIfAny();
+
         try { stopRFIDScan(); } catch (Exception ignored) {}
         try { UIKeyboardHide(); } catch (Exception ignored) {}
 
@@ -3414,7 +3460,7 @@ private String[] parseGs1OrQr(String raw) {
 
         if (nav != null) {
             nav.goToDashboard();
-            activity.syncCurrentFragment();   // ← نُضيفها public في UHFMainActivity
+            activity.syncCurrentFragment();
             Log.i(TAG, "✅ Navigated to Dashboard via NavigationManager");
         } else {
             // fallback (نادر)
@@ -3483,51 +3529,91 @@ private String[] parseGs1OrQr(String raw) {
     // ═══════════════════════════════════════════════════════════════════
 
     @Override
-    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
-        boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
-                || keyCode == KEYCODE_RFID_TRIGGER_2
-                || keyCode == KEYCODE_RFID_TRIGGER_3);
+public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+    boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
+            || keyCode == KEYCODE_RFID_TRIGGER_2
+            || keyCode == KEYCODE_RFID_TRIGGER_3);
 
-        if (!isTrigger) return false;
+    if (!isTrigger) return false;
 
-        // ═══════════════════════════════════════════════════════════
-        //  ACTION_DOWN — ابدأ المسح
-        // ═══════════════════════════════════════════════════════════
-        if (event.getAction() == KeyEvent.ACTION_DOWN
-                && event.getRepeatCount() == 0) {
+    // ═══════════════════════════════════════════════════════════
+    //  ACTION_DOWN — ابدأ المسح + إلغاء أي إيقاف معلّق
+    // ═══════════════════════════════════════════════════════════
+    if (event.getAction() == KeyEvent.ACTION_DOWN
+            && event.getRepeatCount() == 0) {
 
-            if (!hasPosPermission()) {
-                showToast(getString(R.string.pos_msg_no_permission));
+        // ✅ ضغطة جديدة = تجديد المسح (إلغاء الإيقاف المعلّق)
+        cancelPendingStopIfAny();
+
+        if (!hasPosPermission()) {
+            showToast(getString(R.string.pos_msg_no_permission));
+            return true;
+        }
+
+        try {
+            if (!com.example.uhf.tools.DeviceDetector
+                    .isRfidHardwareSupported()) {
                 return true;
             }
+        } catch (Exception ignored) {}
 
-            try {
-                if (!com.example.uhf.tools.DeviceDetector
-                        .isRfidHardwareSupported()) {
-                    return true;
-                }
-            } catch (Exception ignored) {}
-
-            if (currentScanMode != ScanMode.RFID) {
-                Log.i(TAG, "🎯 Trigger DOWN → starting RFID One-Shot");
-                switchScanMode(ScanMode.RFID);
-            }
-            return true;
+        if (currentScanMode != ScanMode.RFID) {
+            Log.i(TAG, "🎯 Trigger DOWN → starting RFID One-Shot");
+            switchScanMode(ScanMode.RFID);
+        } else {
+            // ✅ ضغطة جديدة أثناء RFID نشط → أعد ضبط one-shot
+            Log.i(TAG, "🎯 Trigger DOWN (already RFID) → refresh one-shot");
+            oneShotConsumed.set(false);
+            stopAfterFirstRead = true;
         }
-
-        // ═══════════════════════════════════════════════════════════
-        //  ACTION_UP — أوقف المسح
-        // ═══════════════════════════════════════════════════════════
-        if (event.getAction() == KeyEvent.ACTION_UP) {
-            if (currentScanMode == ScanMode.RFID) {
-                Log.i(TAG, "🎯 Trigger UP → stopping RFID");
-                switchScanMode(ScanMode.NONE);
-            }
-            return true;
-        }
-
-        return false;
+        return true;
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  ACTION_UP — لا تُوقف فوراً — امنح مهلة سماح
+    // ═══════════════════════════════════════════════════════════
+    if (event.getAction() == KeyEvent.ACTION_UP) {
+        if (currentScanMode == ScanMode.RFID) {
+            Log.i(TAG, "🎯 Trigger UP → grace period (" + TRIGGER_GRACE_MS + "ms)");
+            scheduleDelayedStopIfNeeded();
+        }
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * ⏱️ يمنح مهلة بعد رفع الإصبع — إذا وصل وسم خلالها يُقرأ، وإلا يتوقف.
+ */
+private void scheduleDelayedStopIfNeeded() {
+    cancelPendingStopIfAny();
+
+    pendingStopRfid = () -> {
+        pendingStopRfid = null;
+
+        if (currentScanMode == ScanMode.RFID && stopAfterFirstRead) {
+            Log.i(TAG, "⏱️ Grace expired → stopping RFID (no tag received)");
+            switchScanMode(ScanMode.NONE);
+        } else {
+            Log.d(TAG, "⏱️ Grace expired — scan already stopped or tag read");
+        }
+    };
+
+    mainHandler.postDelayed(pendingStopRfid, TRIGGER_GRACE_MS);
+}
+
+/**
+ * ✅ إلغاء الإيقاف المعلّق (عند ضغطة جديدة أو قراءة ناجحة).
+ */
+private void cancelPendingStopIfAny() {
+    if (pendingStopRfid != null) {
+        mainHandler.removeCallbacks(pendingStopRfid);
+        pendingStopRfid = null;
+        Log.d(TAG, "⏱️ Pending stop cancelled");
+    }
+}
+
 
     // ═══════════════════════════════════════════════════════════════════
     //  Backward Compatibility
