@@ -100,7 +100,34 @@ import com.example.uhf.MiraRfid.MiraScanSessionController;
     private static final int ITEMS_COUNT_SMALL = 200;
     private static final int ITEMS_COUNT_MEDIUM = 800;
     
-    
+    // ✅ [Debug] لوحة تشخيص مرئية — للتشغيل بدون Logcat
+private android.widget.TextView debugOverlay;
+private final StringBuilder debugLog = new StringBuilder();
+private static final int DEBUG_MAX_LINES = 12;
+
+private void addDebugLine(String line) {
+    if (!isAdded() || getActivity() == null) return;
+    getActivity().runOnUiThread(() -> {
+        try {
+            String time = new java.text.SimpleDateFormat("HH:mm:ss", Locale.US)
+                    .format(new java.util.Date());
+            debugLog.insert(0, time + "  " + line + "\n");
+            
+            // احتفظ بآخر N أسطر فقط
+            String[] lines = debugLog.toString().split("\n");
+            if (lines.length > DEBUG_MAX_LINES) {
+                debugLog.setLength(0);
+                for (int i = 0; i < DEBUG_MAX_LINES; i++) {
+                    debugLog.append(lines[i]).append("\n");
+                }
+            }
+            
+            if (debugOverlay != null) {
+                debugOverlay.setText(debugLog.toString());
+            }
+        } catch (Exception ignored) {}
+    });
+}
 
     // ==================== Refs ====================
     private View welcomeState;
@@ -253,6 +280,47 @@ private volatile boolean hasUncommittedSession = false;
 
 /** متى بدأت الجلسة الفعلية (لا يتصفّر عند الإيقاف) */
 private volatile long sessionElapsedBeforePause = 0;
+
+private void createDebugOverlay() {
+    if (getActivity() == null) return;
+    
+    // احذف اللوحة القديمة إن وُجدت
+    if (debugOverlay != null && debugOverlay.getParent() != null) {
+        ((android.view.ViewGroup) debugOverlay.getParent()).removeView(debugOverlay);
+    }
+    
+    debugOverlay = new android.widget.TextView(getActivity());
+    debugOverlay.setTextSize(9f);
+    debugOverlay.setTextColor(0xFF00FF00);
+    debugOverlay.setBackgroundColor(0xCC000000);
+    debugOverlay.setPadding(12, 12, 12, 12);
+    debugOverlay.setTypeface(android.graphics.Typeface.MONOSPACE);
+    debugOverlay.setText("🔍 Debug Ready\n");
+    
+    android.widget.FrameLayout.LayoutParams params =
+            new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+    params.gravity = android.view.Gravity.BOTTOM;
+    
+    debugOverlay.setLayoutParams(params);
+    
+    // أضف اللوحة فوق كل شيء
+    android.view.ViewGroup rootView =
+            (android.view.ViewGroup) getActivity().getWindow().getDecorView();
+    rootView.addView(debugOverlay);
+    
+    // اجعلها قابلة للنقر لإخفائها/إظهارها
+    debugOverlay.setOnClickListener(v -> {
+        debugOverlay.setVisibility(
+                debugOverlay.getVisibility() == android.view.View.VISIBLE
+                        ? android.view.View.GONE
+                        : android.view.View.VISIBLE);
+    });
+    
+    addDebugLine("🎬 Overlay ready");
+}
 
 /** زر الإيقاف المؤقت */
 
@@ -507,6 +575,13 @@ try {
     }
 } catch (Exception e) {
     Log.e(TAG, "Early RFID init error", e);
+}
+
+// 16.5) إنشاء لوحة التشخيص
+try {
+    createDebugOverlay();
+} catch (Exception e) {
+    Log.e(TAG, "createDebugOverlay error", e);
 }
 
         // 16) Views
@@ -1368,7 +1443,7 @@ public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
 @Override
 public void onScanStarted() {
     Log.d(TAG, "📡 onScanStarted");
-
+    addDebugLine("✅ onScanStarted");
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
 
@@ -1411,7 +1486,7 @@ public void onScanStarted() {
     @Override
 public void onScanStopped() {
     Log.d(TAG, "📡 onScanStopped");
-    
+    addDebugLine("⏹️ onScanStopped");
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
         
@@ -1453,6 +1528,7 @@ public void onScanStopped() {
 // ✅ [Demo v4.1] onTagRead مع قراءة TID عند EPC مشوّه
 @Override
 public void onTagRead(String normalizedEpc, int rssi) {
+addDebugLine("📡 " + normalizedEpc + " / " + rssi);
     if (normalizedEpc == null || normalizedEpc.isEmpty()) return;
 
     // ✅ [v4.3] أُزيل readTidThenProcess — كان يُوقف القارئ ~760ms لكل شريحة
@@ -1542,8 +1618,8 @@ public void onError(String error) {
     public void onConnectionChanged(boolean isConnected) {
         Log.i(TAG, "📡 RFID Connection: " + isConnected);
         mainHandler.post(() -> {
-            if (!isAdded() || isFragmentDestroyed) return;
-
+    addDebugLine("🔌 Connection: " + isConnected);   // ← أضف هنا
+    if (!isAdded() || isFragmentDestroyed) return;
             if (tvInventoryStatus != null) {
                 tvInventoryStatus.setText(isConnected
                         ? (isArabic ? "📡 متصل" : "📡 Connected")
@@ -1651,6 +1727,7 @@ public void onError(String error) {
     // ================================================================
 
     private void startScanning() {
+    addDebugLine("▶️ startScanning()");        // ← دائماً يُطبع
     if (!canEditInventory()) {
         showAccessDenied();
         return;
@@ -1818,7 +1895,10 @@ private void loadCatalogInBackground() {
                             }
 
                             // ✅ 2) حدّث العدد المتوقع
-                            expectedCount = catalog != null ? catalog.size() : 0;
+                            // داخل onCatalogLoaded → mainHandler.post
+expectedCount = catalog != null ? catalog.size() : 0;
+addDebugLine("📚 Catalog: " + expectedCount + " items");   // ← أضف هنا
+                            
 
                             if (tvExpectedCount != null) {
                                 tvExpectedCount.setText(
@@ -1841,6 +1921,7 @@ private void loadCatalogInBackground() {
                     public void onError(String error) {
                         Log.w(TAG, "⚠️ Catalog load failed (blind mode active): " + error);
                         mainHandler.post(() -> {
+                        addDebugLine("❌ Catalog FAILED");   
                             if (!isAdded() || isFragmentDestroyed) return;
 
                             // ✅ الجرد يعمل أصلاً (blind) — لا نوقف شيء
@@ -2250,11 +2331,12 @@ private void clearAllLists() {
     //  2) إذا كانت قطعة جديدة → أضفها
     // ═══════════════════════════════════════════════════════
     if (!isDuplicate) {
-        boolean isKnown = catalogEpcs.contains(epc);
-        feedbackType = isKnown
-                ? SoundManager.FeedbackType.KNOWN_ITEM
-                : SoundManager.FeedbackType.UNKNOWN_ITEM;
-
+    boolean isKnown = catalogEpcs.contains(epc);           // ← أولاً
+    addDebugLine("➕ NEW: " + epc.substring(Math.max(0, epc.length()-6)) 
+                 + " | known=" + isKnown);                  // ← ثانياً
+    feedbackType = isKnown
+            ? SoundManager.FeedbackType.KNOWN_ITEM
+            : SoundManager.FeedbackType.UNKNOWN_ITEM;
         String title = isArabic ? "قطعة غير معروفة" : "Unknown item";
         String karat = "—";
         double weight = 0;
@@ -2305,6 +2387,8 @@ private void clearAllLists() {
         }
     } else {
         feedbackType = SoundManager.FeedbackType.DUPLICATE_ITEM;
+    addDebugLine("🔁 DUP: " + epc.substring(Math.max(0, epc.length()-6))); 
+        
     }
 
     // ═══════════════════════════════════════════════════════
@@ -3654,6 +3738,8 @@ private void clearAllLists() {
             }
 
             boolean success = rfidManager.setPower(dbm);
+            addDebugLine("⚡ setPower " + dbm + " → " + success);   // ← أضف هنا
+            
 
             if (success) {
                 Log.i(TAG, "✅ Power applied: " + dbm + " dBm");
@@ -4454,6 +4540,7 @@ scannedItemsDisplayList.add(item);
     @Override
     public void onResume() {
         super.onResume();
+        addDebugLine("▶️ onResume");
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActiveInventoryFragment(this);
