@@ -267,8 +267,7 @@ private final List<ScannedItemDisplay> scannedItemsDisplayList =
 private final Set<String> catalogEpcs =
         Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-// ✅ [Demo] ذاكرة مؤقتة: EPC مشوّه → TID المُقروء
-private final Map<String, String> tidCache = new ConcurrentHashMap<>();
+
     // ==================== Back Press ====================
     private OnBackPressedCallback backPressedCallback;
 
@@ -1456,123 +1455,12 @@ public void onScanStopped() {
 public void onTagRead(String normalizedEpc, int rssi) {
     if (normalizedEpc == null || normalizedEpc.isEmpty()) return;
 
-    // ═══════════════════════════════════════════════════════
-    //  ✅ [Demo] فحص صحة EPC
-    //  EPC صالح: 24 hex يبدأ بـ E2
-    //  EPC مشوّه: 3008... → اقرأ TID
-    // ═══════════════════════════════════════════════════════
-    if (!normalizedEpc.matches("^E2[0-9A-F]{22}$")) {
-        Log.w(TAG, "⚠️ Inventory: Invalid EPC '" + normalizedEpc
-                + "' → reading TID");
-        readTidThenProcess(normalizedEpc, rssi);
-        return;
-    }
-
-    // ✅ EPC صالح — مسار عادي
+    // ✅ [v4.3] أُزيل readTidThenProcess — كان يُوقف القارئ ~760ms لكل شريحة
+    //    EPC المشوّه يُعامل كـ "غير معروف" — لا نحتاج قراءة TID في الجرد
     processValidEpc(normalizedEpc, rssi);
 }
 
-/**
- * ✅ [Demo v4.2] اقرأ TID مع إيقاف/استئناف Inventory
- *    السبب: reader.readData() يتعارض مع startInventoryTag()
- */
-private void readTidThenProcess(final String originalEpc, final int rssi) {
-    if (originalEpc == null || originalEpc.isEmpty()) return;
 
-    Log.i(TAG, "🔍 readTidThenProcess START: " + originalEpc);
-
-    // ═══════════════════════════════════════════════════════
-    //  اقرأ TID في الخلفية — بعد إيقاف مؤقت للمسح
-    // ═══════════════════════════════════════════════════════
-    if (backgroundExecutor == null) {
-        Log.w(TAG, "readTidThenProcess: no executor");
-        processValidEpc(originalEpc, rssi);
-        return;
-    }
-
-    backgroundExecutor.execute(() -> {
-        String tid = null;
-        try {
-            Context appCtx = getContext() != null
-                    ? getContext().getApplicationContext() : null;
-            if (appCtx == null) {
-                Log.w(TAG, "readTid: no context");
-                return;
-            }
-
-            // ═══════════════════════════════════════════════════
-            //  1️⃣ أوقف Inventory مؤقتاً (مهم!)
-            // ═══════════════════════════════════════════════════
-            boolean wasScanning = false;
-            try {
-                if (scanController != null) {
-                    scanController.suspendForDirectRead();
-                    wasScanning = true;
-                    Log.d(TAG, "⏸️ Inventory suspended for TID read");
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Suspend error", e);
-            }
-
-            // ═══════════════════════════════════════════════════
-            //  2️⃣ مهلة صغيرة ليتحرر القارئ
-            // ═══════════════════════════════════════════════════
-            try { Thread.sleep(80); } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-            }
-
-            // ═══════════════════════════════════════════════════
-            //  3️⃣ اقرأ TID
-            // ═══════════════════════════════════════════════════
-            try {
-                com.example.uhf.MiraRfid.MiraRfidService svc =
-                        com.example.uhf.MiraRfid.MiraRfidService.getInstance(appCtx);
-                tid = svc.readTid(null);
-                Log.d(TAG, "📖 readTid result: " + tid);
-            } catch (Exception e) {
-                Log.e(TAG, "readTid error", e);
-            }
-
-            // ═══════════════════════════════════════════════════
-            //  4️⃣ استأنف Inventory
-            // ═══════════════════════════════════════════════════
-            if (wasScanning) {
-                try {
-                    if (scanController != null) {
-                        scanController.resumeAfterDirectRead();
-                        Log.d(TAG, "▶️ Inventory resumed");
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "Resume error", e);
-                }
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "readTidThenProcess background error", e);
-        }
-
-        // ═══════════════════════════════════════════════════════
-        //  5️⃣ عالج على main thread
-        // ═══════════════════════════════════════════════════════
-        final String finalTid = (tid != null && !tid.trim().isEmpty())
-                ? tid.trim().toUpperCase(Locale.US) : null;
-
-        mainHandler.post(() -> {
-            if (!isAdded() || isFragmentDestroyed) return;
-
-            if (finalTid != null
-                    && finalTid.matches("^[0-9A-F]{24}$")) {
-                Log.i(TAG, "✅ TID resolved: " + originalEpc
-                        + " → " + finalTid);
-                processValidEpc(finalTid, rssi);
-            } else {
-                Log.w(TAG, "⚠️ TID read failed for '" + originalEpc
-                        + "' → falling back to raw EPC");
-                processValidEpc(originalEpc, rssi);
-            }
-        });
-    });
-}
 
 /**
  * ✅ [Demo v4.1] المعالجة الفعلية — كانت داخل onTagRead
@@ -2194,9 +2082,7 @@ public void stopScanning() {
     
 private void clearAllLists() {
     try {
-        // ✅ [Demo] امسح ذاكرة TID
-        tidCache.clear();
-        
+       
         synchronized (scannedItemsDisplayList) {
             scannedItemsDisplayList.clear();
         }
