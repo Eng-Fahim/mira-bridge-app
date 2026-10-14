@@ -957,223 +957,7 @@ private void toggleStonesDetails(boolean show) {
                 .start();
     }
 }
-// ═══════════════════════════════════════════════════════════════════
-//  RFID Core
-// ═══════════════════════════════════════════════════════════════════
 
-/**
- * ✅ [v6.4] أصبحت تقبل إعادة المسح — لا يوجد تجاهل عند isEpcBound.
- */
-private void processRfidTagAsync(final boolean closeScannerAfterSuccess) {
-    if (appContext == null) {
-        safeRun(() -> {
-            playErrorSound();
-            showErrorDialog(
-                    isArabic ? "❌ خطأ داخلي" : "❌ Internal Error",
-                    isArabic ? "لم يتم تهيئة السياق" : "Context not initialized");
-            stopRfidScanningMode();
-        });
-        return;
-    }
-
-    miraExecutor.getBackgroundExecutor().execute(() -> {
-        try {
-            MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
-
-            final String tid = rfidService.readTid(null);
-            final boolean isSim = rfidService.isSimulationMode();
-
-            if (tid == null || tid.trim().isEmpty()) {
-                safeRun(() -> {
-                    playErrorSound();
-
-                    // ✅ [v6.4] بطاقة فشل
-                    showScanFeedback(
-                            isArabic ? "❌ فشل القراءة" : "❌ Read Failed",
-                            isArabic ? "تعذّر قراءة TID الشريحة"
-                                     : "Could not read tag TID",
-                            null,
-                            android.R.drawable.ic_dialog_alert,
-                            0xFFDC2626);
-
-                    showErrorDialog(
-                            isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
-                            isArabic ? "تعذّر قراءة TID الشريحة. يرجى إعادة المسح."
-                                     : "Failed to read tag TID. Please re-scan.");
-                    stopRfidScanningMode();
-                });
-                return;
-            }
-
-            final String normalizedTid = tid.trim().toUpperCase(Locale.US);
-
-            // ✅ فحص الطول (اختياري)
-            if (ENABLE_TID_LENGTH_VALIDATION) {
-                if (normalizedTid.length() < MIN_TID_LENGTH) {
-                    safeRun(() -> {
-                        playErrorSound();
-                        showScanFeedback(
-                                isArabic ? "❌ TID قصير" : "❌ TID Too Short",
-                                isArabic ? "الطول: " + normalizedTid.length()
-                                            + " حرف (الحد الأدنى " + MIN_TID_LENGTH + ")"
-                                         : "Length: " + normalizedTid.length()
-                                            + " (min " + MIN_TID_LENGTH + ")",
-                                null,
-                                android.R.drawable.ic_dialog_alert,
-                                0xFFDC2626);
-                        showErrorDialog(
-                                isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
-                                isArabic ? "طول TID غير كافٍ (" + normalizedTid.length()
-                                            + " حرف، الحد الأدنى " + MIN_TID_LENGTH + ")"
-                                         : "TID length too short (" + normalizedTid.length()
-                                            + " chars, min " + MIN_TID_LENGTH + ")");
-                        stopRfidScanningMode();
-                    });
-                    return;
-                }
-
-                if (normalizedTid.length() > MAX_TID_LENGTH) {
-                    safeRun(() -> {
-                        playErrorSound();
-                        showScanFeedback(
-                                isArabic ? "❌ TID طويل" : "❌ TID Too Long",
-                                isArabic ? "الطول: " + normalizedTid.length()
-                                         : "Length: " + normalizedTid.length(),
-                                null,
-                                android.R.drawable.ic_dialog_alert,
-                                0xFFDC2626);
-                        showErrorDialog(
-                                isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
-                                isArabic ? "طول TID أكبر من المتوقع ("
-                                            + normalizedTid.length() + ")"
-                                         : "TID length exceeds expected ("
-                                            + normalizedTid.length() + ")");
-                        stopRfidScanningMode();
-                    });
-                    return;
-                }
-            } else {
-                Log.d(TAG, "⏭️ TID length validation DISABLED — TID: "
-                        + normalizedTid + " (len=" + normalizedTid.length() + ")");
-            }
-
-            final boolean isTagAllowed = isSim
-                    || rfidService.verifyTagAllowed(normalizedTid);
-            final boolean isDuplicate = syncManager.isEpcDuplicateLocally(normalizedTid);
-
-            safeRun(() -> {
-                if (binding == null) {
-                    stopRfidScanningMode();
-                    return;
-                }
-
-                // ═════════════════════════════════════════════
-                //  1) شريحة غير معتمدة
-                // ═════════════════════════════════════════════
-                if (!isTagAllowed) {
-                    playErrorSound();
-
-                    showScanFeedback(
-                            isArabic ? "❌ شريحة غير معتمدة"
-                                     : "❌ Unauthorized Tag",
-                            isArabic ? "TID: " + normalizedTid
-                                        + "\nليست من الموردين المعتمدين"
-                                     : "TID: " + normalizedTid
-                                        + "\nNot from approved suppliers",
-                            null,
-                            android.R.drawable.ic_delete,
-                            0xFFDC2626);
-
-                    showErrorDialog(
-                            isArabic ? "⛔ شريحة غير معتمدة"
-                                     : "⛔ Unauthorized Tag",
-                            isArabic ? "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n"
-                                        + "🔹 TID: " + normalizedTid + "\n"
-                                        + "🔹 الموردون المعتمدون: SunlandRFID\n\n"
-                                        + "💡 استخدم شريحة من مورد معتمد."
-                                     : "This tag is not from approved inventory:\n\n"
-                                        + "🔹 TID: " + normalizedTid + "\n"
-                                        + "🔹 Approved: SunlandRFID\n\n"
-                                        + "💡 Use a tag from an approved supplier.");
-                    stopRfidScanningMode();
-                    return;
-                }
-
-                // ═════════════════════════════════════════════
-                //  2) شريحة مكررة
-                // ═════════════════════════════════════════════
-                if (isDuplicate) {
-                    playErrorSound();
-
-                    showScanFeedback(
-                            isArabic ? "⚠️ شريحة مكررة"
-                                     : "⚠️ Duplicate Tag",
-                            isArabic ? "TID: " + normalizedTid
-                                        + "\nمسجلة بالفعل في النظام"
-                                     : "TID: " + normalizedTid
-                                        + "\nAlready registered",
-                            null,
-                            android.R.drawable.ic_dialog_alert,
-                            0xFF3B82F6);
-
-                    showErrorDialog(
-                            isArabic ? "شريحة مكررة" : "Duplicate Tag",
-                            isArabic ? "هذه الشريحة مسجلة بالفعل في النظام:\n\n"
-                                        + "🔹 TID: " + normalizedTid + "\n"
-                                        + "🔹 لا يمكن استخدامها مرتين.\n\n"
-                                        + "💡 استخدم شريحة جديدة."
-                                     : "This tag is already registered:\n\n"
-                                        + "🔹 TID: " + normalizedTid + "\n"
-                                        + "🔹 Cannot be reused.\n\n"
-                                        + "💡 Use a new tag.");
-                    stopRfidScanningMode();
-                    return;
-                }
-
-                // ═════════════════════════════════════════════
-                //  3) شريحة صالحة ✅
-                // ═════════════════════════════════════════════
-                if (binding.etEpc != null) {
-                    binding.etEpc.setText(normalizedTid);
-                    binding.etEpc.setTag(normalizedTid);
-                }
-                if (binding.tvStatusBadge != null) {
-                    binding.tvStatusBadge.setText("BOUND");
-                }
-
-                isEpcBound = true;
-
-                // ✅ [v6.4] بطاقة نجاح خضراء
-                showScanFeedback(
-                        isArabic ? "✅ شريحة صالحة" : "✅ Valid Tag",
-                        isArabic ? "TID: " + normalizedTid
-                                    + "\nجاهزة للتكويد"
-                                 : "TID: " + normalizedTid
-                                    + "\nReady for encoding",
-                        null,
-                        R.drawable.ic_pos_cart_gold,
-                        0xFF22C55E);
-
-                Log.i(TAG, "✅ Tag verified: TID=" + normalizedTid);
-                playSuccessSound();
-                stopRfidScanningMode();
-            });
-
-        } catch (Exception e) {
-            Log.e(TAG, "processRfidTagAsync error: " + e.getMessage(), e);
-            safeRun(() -> {
-                playErrorSound();
-                showErrorDialog(
-                        isArabic ? "❌ خطأ في قراءة الشريحة"
-                                 : "❌ Tag Read Error",
-                        e.getMessage() != null ? e.getMessage()
-                                : (isArabic ? "حدث خطأ غير متوقع"
-                                            : "Unexpected error"));
-                stopRfidScanningMode();
-            });
-        }
-    });
-}
 
 /**
  * ✅ [v6.4] يستخدم RFIDManager.addListener.
@@ -1213,26 +997,44 @@ private void activateRFIDModeForEncoding() {
     public void onTagRead(String epc, int rssi) {
         if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
 
-        // ✅ الحماية من القراءات المتعددة: إذا كنا نعالج شريحة بالفعل، تجاهل الباقي
+        // ✅ الحماية من القراءات المتعددة
         if (!isProcessingTag.compareAndSet(false, true)) {
             Log.d(TAG, "⏭️ Ignoring extra tag (already processing): " + epc);
             return;
         }
 
-        final String receivedEpc = epc.trim().toUpperCase(Locale.US);
-        Log.i(TAG, "📡 EPC received (trigger): " + receivedEpc);
+        try {
+            final String receivedEpc = epc.trim().toUpperCase(Locale.US);
+            Log.i(TAG, "📡 EPC received (trigger): " + receivedEpc);
 
-        handler.post(() -> stopRfidScanningMode());
-        handler.post(() -> processReceivedTag(receivedEpc));
+miraExecutor.getBackgroundExecutor().execute(() -> {
+    // اقرأ TID الآن بينما القارئ نشط
+    String tid = null;
+    try {
+        tid = MiraRfidService.getInstance(appContext).readTid(null);
+    } catch (Exception ignored) {}
+    final String finalTid = tid;
+    
+    safeRun(() -> {
+        stopRfidScanningMode();
+        processReceivedTagWithTid(receivedEpc, finalTid);
+    });
+});
+            
+        } catch (Exception e) {
+            // ✅ [FIX-5] أعد تعيين العلم عند أي خطأ
+            isProcessingTag.set(false);
+            Log.e(TAG, "onTagRead error", e);
+        }
     }
-            @Override public void onScanStarted() {}
-            @Override public void onScanStopped() {}
-            @Override public void onConnectionChanged(boolean c) {}
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, "RFID error: " + error);
-            }
-        };
+    @Override public void onScanStarted() {}
+    @Override public void onScanStopped() {}
+    @Override public void onConnectionChanged(boolean c) {}
+    @Override
+    public void onError(String error) {
+        Log.e(TAG, "RFID error: " + error);
+    }
+};
 
         mgr.addListener(encodingRfidListener);
 
@@ -1423,6 +1225,165 @@ private void activateRFIDModeForEncoding() {
 }
 
 /**
+ * ✅ [FIX-3] نسخة جديدة تستقبل TID جاهزاً — تُستخدم عندما نقرأ TID
+ *     بينما القارئ لا يزال نشطاً (قبل stopScan).
+ */
+private void processReceivedTagWithTid(final String epc, @Nullable final String preReadTid) {
+    if (epc == null || epc.isEmpty()) return;
+    if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
+
+    // ✅ احفظ EPC الحقيقي المقروء من القارئ
+    final String cleanEpc = epc.trim().toUpperCase(Locale.US);
+    lastScannedEpc = cleanEpc;
+    Log.i(TAG, "🎯 Processing received tag EPC: " + cleanEpc
+            + " | preReadTid=" + preReadTid);
+
+    miraExecutor.getBackgroundExecutor().execute(() -> {
+        boolean isTagAllowed = false, isDuplicate = false;
+        String actualTid = cleanEpc;
+
+        try {
+            MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
+
+            // ✅ استخدم TID المُمرّر إن وُجد، وإلا اقرأ مرة أخرى
+            if (preReadTid != null && !preReadTid.trim().isEmpty()) {
+                actualTid = preReadTid.trim().toUpperCase(Locale.US);
+                Log.i(TAG, "✅ Using pre-read TID: " + actualTid);
+            } else {
+                String tidFromTag = rfidService.readTid(null);
+                if (tidFromTag != null && !tidFromTag.trim().isEmpty()) {
+                    actualTid = tidFromTag.trim().toUpperCase(Locale.US);
+                }
+            }
+
+            boolean isSim = rfidService.isSimulationMode();
+            isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+            isDuplicate = syncManager.isEpcDuplicateLocally(actualTid);
+
+        } catch (Exception e) {
+            Log.e(TAG, "processReceivedTagWithTid checks error: " + e.getMessage(), e);
+            safeRun(() -> isProcessingTag.set(false));
+            return;
+        }
+
+        final String finalTid = actualTid;
+        final boolean fAllowed = isTagAllowed;
+        final boolean fDuplicate = isDuplicate;
+
+        safeRun(() -> {
+            try {
+                if (binding == null || !isAdded()) return;
+
+                // ═════════════════════════════════════════════
+                //  1) غير معتمدة
+                // ═════════════════════════════════════════════
+                if (!fAllowed) {
+                    playErrorSound();
+
+                    showScanFeedback(
+                            isArabic ? "❌ شريحة غير معتمدة" : "❌ Unauthorized Tag",
+                            isArabic ? "TID: " + finalTid
+                                        + "\nليست من الموردين المعتمدين"
+                                     : "TID: " + finalTid
+                                        + "\nNot from approved suppliers",
+                            null,
+                            android.R.drawable.ic_delete,
+                            0xFFDC2626);
+
+                    showErrorDialog(
+                            isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
+                            isArabic ? "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n"
+                                        + "🔹 TID: " + finalTid + "\n"
+                                        + "🔹 الموردون المعتمدون: SunlandRFID\n\n"
+                                        + "💡 استخدم شريحة من مورد معتمد."
+                                     : "This tag is not from approved inventory:\n\n"
+                                        + "🔹 TID: " + finalTid + "\n"
+                                        + "🔹 Approved: SunlandRFID\n\n"
+                                        + "💡 Use a tag from an approved supplier.");
+                    return;
+                }
+
+                // ═════════════════════════════════════════════
+                //  2) مكررة
+                // ═════════════════════════════════════════════
+                if (fDuplicate) {
+                    playErrorSound();
+
+                    showScanFeedback(
+                            isArabic ? "⚠️ شريحة مكررة" : "⚠️ Duplicate Tag",
+                            isArabic ? "TID: " + finalTid
+                                        + "\nمسجلة بالفعل في النظام"
+                                     : "TID: " + finalTid
+                                        + "\nAlready registered",
+                            null,
+                            android.R.drawable.ic_dialog_alert,
+                            0xFF3B82F6);
+
+                    showErrorDialog(
+                            isArabic ? "شريحة مكررة" : "Duplicate Tag",
+                            isArabic ? "هذه الشريحة مسجلة بالفعل في النظام:\n\n"
+                                        + "🔹 TID: " + finalTid + "\n"
+                                        + "🔹 لا يمكن استخدامها مرتين.\n\n"
+                                        + "💡 استخدم شريحة جديدة."
+                                     : "This tag is already registered:\n\n"
+                                        + "🔹 TID: " + finalTid + "\n"
+                                        + "🔹 Cannot be reused.\n\n"
+                                        + "💡 Use a new tag.");
+                    return;
+                }
+
+                // ═════════════════════════════════════════════
+                //  3) صالحة
+                // ═════════════════════════════════════════════
+                boolean wasReplacing = false;
+                if (isEpcBound && binding.etEpc != null) {
+                    String existing = binding.etEpc.getText() != null
+                            ? binding.etEpc.getText().toString().trim() : "";
+
+                    if (!existing.isEmpty() && !existing.equals(finalTid)) {
+                        wasReplacing = true;
+                        Log.i(TAG, "🔄 Replacing: " + existing + " → " + finalTid);
+                    }
+                }
+
+                if (binding.etEpc != null) {
+                    binding.etEpc.setText(finalTid);
+                    binding.etEpc.setTag(finalTid);
+                    isEpcBound = true;
+                }
+                if (binding.tvStatusBadge != null) {
+                    binding.tvStatusBadge.setText("BOUND");
+                }
+
+                String titleText = wasReplacing
+                        ? (isArabic ? "🔄 تم استبدال الوسم" : "🔄 Tag Replaced")
+                        : (isArabic ? "✅ شريحة صالحة" : "✅ Valid Tag");
+
+                String detailsText = wasReplacing
+                        ? (isArabic ? "TID جديد: " + finalTid + "\nجاهز للتكويد"
+                                    : "New TID: " + finalTid + "\nReady for encoding")
+                        : (isArabic ? "TID: " + finalTid + "\nجاهزة للتكويد"
+                                    : "TID: " + finalTid + "\nReady for encoding");
+
+                showScanFeedback(
+                        titleText,
+                        detailsText,
+                        null,
+                        R.drawable.ic_pos_cart_gold,
+                        0xFF22C55E);
+
+                Log.i(TAG, "✅ Tag accepted: " + finalTid
+                        + (wasReplacing ? " (replaced)" : ""));
+                playSuccessSound();
+
+            } finally {
+                // ✅ أعد تعيين العلم دائماً
+                isProcessingTag.set(false);
+            }
+        });
+    });
+}
+/**
  * ✅ [v6.4] يستخدم RFIDManager.removeListener + stopScan.
  */
 private void stopRfidScanningMode() {
@@ -1491,12 +1452,13 @@ private void updateScanningUI(boolean scanning) {
  */
 public void onRfidScanned(String epc) {
     if (!isAdded() || getActivity() == null) return;
+    if (epc == null || epc.trim().isEmpty()) return;
 
-    final String scannedEpc = epc != null
-            ? epc.trim().toUpperCase(Locale.US) : "";
+    final String scannedEpc = epc.trim().toUpperCase(Locale.US);
     Log.i(TAG, "📡 onRfidScanned (external): " + scannedEpc);
-
-    processRfidTagAsync(false);
+    
+    lastScannedEpc = scannedEpc;          // ✅ أضف
+    processReceivedTag(scannedEpc);       // ✅ وحّد المسار
 }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1787,7 +1749,7 @@ public void onRfidScanned(String epc) {
         }
 
         // ═══════════════════════════════════════════════════════
-        //  1) قراءة البيانات
+        //  1) قراءة البيانات من الواجهة (main thread — سريع)
         // ═══════════════════════════════════════════════════════
         String identifier = binding.etEpc.getText() != null
                 ? binding.etEpc.getText().toString().trim() : "";
@@ -1832,7 +1794,7 @@ public void onRfidScanned(String epc) {
         }
 
         // ═══════════════════════════════════════════════════════
-        //  2) التسعير
+        //  2) التسعير (main thread — سريع)
         // ═══════════════════════════════════════════════════════
         int selectedKaratNum = getSelectedKaratNumber();
         double[] pricing = PricingCalculator.calculatePricingDetails(
@@ -1879,128 +1841,115 @@ public void onRfidScanned(String epc) {
         final int currentUserId = getCurrentUserId();
 
         // ═══════════════════════════════════════════════════════
-        //  قراءة TID/EPC من الشريحة
-        // ═══════════════════════════════════════════════════════
-        String tidFromTagWorking = "";
-        String epcFromTagWorking = "";
-
-        try {
-    MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
-    tidFromTagWorking = rfidSvc.readTid(null);
-    epcFromTagWorking = lastScannedEpc;
-    Log.i(TAG, "📡 Using SAVED EPC: '" + epcFromTagWorking + "'");
-    
-    // ✅ fallback فقط إذا لم يكن محفوظاً
-    if (epcFromTagWorking == null || epcFromTagWorking.isEmpty()) {
-        Log.w(TAG, "⚠️ No saved EPC — fallback to readEpc()");
-        epcFromTagWorking = rfidSvc.readEpc(null);
-    }                                    // ← قوس إغلاق if
-} catch (Exception e) {                  // ← قوس إغلاق try ثم catch
-    Log.e(TAG, "Read TID/EPC error", e);
-}
-        // ✅ Fallback: TID من حقل EPC
-        if (tidFromTagWorking == null || tidFromTagWorking.isEmpty()) {
-            tidFromTagWorking = binding.etEpc.getText() != null
-                    ? binding.etEpc.getText().toString().trim()
-                            .toUpperCase(Locale.US)
-                    : "";
-        }
-
-        if (epcFromTagWorking == null) {
-            epcFromTagWorking = "";
-        }
-
-        final String tid = tidFromTagWorking;
-        final String gtin = "";
-        final String originalEpc = epcFromTagWorking;
-
-        Log.i(TAG, "════════ IDENTIFIERS TO SEND ════════");
-        Log.i(TAG, "   TID      = '" + tid + "' (len=" + tid.length() + ")");
-        Log.i(TAG, "   EPC      = '" + originalEpc + "' (len="
-                + originalEpc.length() + ")");
-        Log.i(TAG, "   GTIN     = '" + gtin + "' (empty → server auto-fetch)");
-        Log.i(TAG, "═════════════════════════════════════");
-
-        if (tid.isEmpty()) {
-            safeRun(() -> {
-                dismissDialog(activeLoadingDialog);
-                activeLoadingDialog = null;
-                unlockFormFast();
-                setFormEnabled(true);
-                showErrorDialog(
-                        isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
-                        isArabic ? "لا يمكن قراءة TID الشريحة.\n\n"
-                                    + "يرجى:\n"
-                                    + "• مسح الشريحة أولاً\n"
-                                    + "• أو إدخال TID يدوياً"
-                                 : "Cannot read tag TID.\n\n"
-                                    + "Please:\n"
-                                    + "• Scan the tag first\n"
-                                    + "• Or enter TID manually");
-            });
-            return;
-        }
-
-        if (ENABLE_TID_LENGTH_VALIDATION) {
-            if (tid.length() < MIN_TID_LENGTH) {
-                safeRun(() -> {
-                    dismissDialog(activeLoadingDialog);
-                    activeLoadingDialog = null;
-                    unlockFormFast();
-                    setFormEnabled(true);
-                    showErrorDialog(
-                            isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
-                            isArabic ? "طول TID غير كافٍ (" + tid.length()
-                                        + " حرف، الحد الأدنى " + MIN_TID_LENGTH + ")"
-                                     : "TID length too short (" + tid.length()
-                                        + " chars, min " + MIN_TID_LENGTH + ")");
-                });
-                return;
-            }
-            if (tid.length() > MAX_TID_LENGTH) {
-                safeRun(() -> {
-                    dismissDialog(activeLoadingDialog);
-                    activeLoadingDialog = null;
-                    unlockFormFast();
-                    setFormEnabled(true);
-                    showErrorDialog(
-                            isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
-                            isArabic ? "طول TID أكبر من المتوقع (" + tid.length() + ")"
-                                     : "TID length exceeds expected ("
-                                        + tid.length() + ")");
-                });
-                return;
-            }
-        } else {
-            Log.d(TAG, "⏭️ TID length validation DISABLED — TID: "
-                    + tid + " (len=" + tid.length() + ")");
-        }
-
-        // ═══════════════════════════════════════════════════════
-        //  4) فحص وضع المحاكاة
-        // ═══════════════════════════════════════════════════════
-        final boolean isSim;
-        try {
-            MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
-            isSim = rfidService.isSimulationMode();
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to check simulation mode", e);
-            safeRun(() -> {
-                dismissDialog(activeLoadingDialog);
-                activeLoadingDialog = null;
-                unlockFormFast();
-                setFormEnabled(true);
-            });
-            return;
-        }
-
-        Log.i(TAG, "✅ Proceeding | TID=" + tid
-                + " | EPC=" + originalEpc + " | SIM=" + isSim);
-
-        // ═══════════════════════════════════════════════════════
-        //  5) إرسال البيانات للسيرفر
+        //  4) ✅ [FIX-2] انقل كل عمليات RFID إلى background
+        //     (readTid + readEpc + isSimulationMode)
         // ═══════════════════════════════════════════════════════
         miraExecutor.getBackgroundExecutor().execute(() -> {
+
+            // ✅ قراءة TID + EPC + SIM من الـ background
+            String tidFromTagWorking = "";
+            String epcFromTagWorking = "";
+            boolean isSim = false;
+
+            try {
+                MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
+                tidFromTagWorking = rfidSvc.readTid(null);
+
+                // ✅ استخدم EPC المحفوظ من المسح
+                epcFromTagWorking = lastScannedEpc;
+                Log.i(TAG, "📡 Using SAVED EPC: '" + epcFromTagWorking + "'");
+
+                if (epcFromTagWorking == null || epcFromTagWorking.isEmpty()) {
+                    Log.w(TAG, "⚠️ No saved EPC — fallback to readEpc()");
+                    epcFromTagWorking = rfidSvc.readEpc(null);
+                }
+
+                isSim = rfidService_isSimulation(rfidSvc);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Read TID/EPC error", e);
+            }
+
+            // ✅ Fallback: TID من حقل EPC
+            if (tidFromTagWorking == null || tidFromTagWorking.isEmpty()) {
+                tidFromTagWorking = finalIdentifier;
+            }
+
+            if (epcFromTagWorking == null) epcFromTagWorking = "";
+
+            final String tid = tidFromTagWorking.trim().toUpperCase(Locale.US);
+            final String originalEpc = epcFromTagWorking.trim().toUpperCase(Locale.US);
+            final String gtin = "";
+            final boolean fIsSim = isSim;
+
+            Log.i(TAG, "════════ IDENTIFIERS ════════");
+            Log.i(TAG, "   TID = '" + tid + "' (len=" + tid.length() + ")");
+            Log.i(TAG, "   EPC = '" + originalEpc + "' (len=" + originalEpc.length() + ")");
+            Log.i(TAG, "══════════════════════════════");
+
+            // ✅ فحص TID فارغ
+            if (tid.isEmpty()) {
+                safeRun(() -> {
+                    dismissDialog(activeLoadingDialog);
+                    activeLoadingDialog = null;
+                    unlockFormFast();
+                    setFormEnabled(true);
+                    showErrorDialog(
+                            isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
+                            isArabic ? "لا يمكن قراءة TID الشريحة.\n\n"
+                                        + "يرجى:\n"
+                                        + "• مسح الشريحة أولاً\n"
+                                        + "• أو إدخال TID يدوياً"
+                                     : "Cannot read tag TID.\n\n"
+                                        + "Please:\n"
+                                        + "• Scan the tag first\n"
+                                        + "• Or enter TID manually");
+                });
+                return;
+            }
+
+            // ✅ فحص طول TID
+            if (ENABLE_TID_LENGTH_VALIDATION) {
+                if (tid.length() < MIN_TID_LENGTH) {
+                    safeRun(() -> {
+                        dismissDialog(activeLoadingDialog);
+                        activeLoadingDialog = null;
+                        unlockFormFast();
+                        setFormEnabled(true);
+                        showErrorDialog(
+                                isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
+                                isArabic ? "طول TID غير كافٍ (" + tid.length()
+                                            + " حرف، الحد الأدنى " + MIN_TID_LENGTH + ")"
+                                         : "TID length too short (" + tid.length()
+                                            + " chars, min " + MIN_TID_LENGTH + ")");
+                    });
+                    return;
+                }
+                if (tid.length() > MAX_TID_LENGTH) {
+                    safeRun(() -> {
+                        dismissDialog(activeLoadingDialog);
+                        activeLoadingDialog = null;
+                        unlockFormFast();
+                        setFormEnabled(true);
+                        showErrorDialog(
+                                isArabic ? "❌ TID غير صالح" : "❌ Invalid TID",
+                                isArabic ? "طول TID أكبر من المتوقع (" + tid.length() + ")"
+                                         : "TID length exceeds expected ("
+                                            + tid.length() + ")");
+                    });
+                    return;
+                }
+            } else {
+                Log.d(TAG, "⏭️ TID length validation DISABLED — TID: "
+                        + tid + " (len=" + tid.length() + ")");
+            }
+
+            Log.i(TAG, "✅ Proceeding | TID=" + tid
+                    + " | EPC=" + originalEpc + " | SIM=" + fIsSim);
+
+            // ═══════════════════════════════════════════════════════
+            //  5) إرسال البيانات للسيرفر (نفس الـ background thread)
+            // ═══════════════════════════════════════════════════════
             try {
                 JSONObject payload = buildPayload(
                         tid, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
@@ -2008,7 +1957,7 @@ public void onRfidScanned(String epc) {
                         details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
                         localCurrency, exchangeRate, selectedCategory, location,
                         branchId, currentUserId, tid, originalEpc,
-                        isSim, finalPhotoPaths, gtin);
+                        fIsSim, finalPhotoPaths, gtin);
 
                 boolean apiSuccess = false;
                 int serverItemId = 0;
@@ -2076,33 +2025,30 @@ public void onRfidScanned(String epc) {
                     return;
                 }
 
-                // ═══════════════════════════════════════════════════════════════
-                //  7) معالجة EPC — [v8.0] Hybrid: استخدام الموجود أو الكتابة
-                // ═══════════════════════════════════════════════════════════════
-                Log.i(TAG, "✅ Server OK — Starting EPC processing sequence");
+                // ═══════════════════════════════════════════════════
+                //  7) EPC Handling (Hybrid)
+                // ═══════════════════════════════════════════════════
+                Log.i(TAG, "✅ Server OK — EPC processing");
 
                 MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
 
-                // (1) استخراج mira_id
                 String miraIdWorking = (finalResponseData != null)
-        ? finalResponseData.optString("mira_id",
-              finalResponseData.optString("serial_number", finalIdentifier))
-        : finalIdentifier;
-
+                        ? finalResponseData.optString("mira_id",
+                              finalResponseData.optString("serial_number", finalIdentifier))
+                        : finalIdentifier;
                 if (miraIdWorking == null || miraIdWorking.trim().isEmpty()) {
                     miraIdWorking = finalIdentifier;
                 }
                 final String miraId = miraIdWorking;
 
-                // ✅ [v8.3] استخدم EPC المحفوظ — لا نعيد القراءة من الشريحة
-String existingEpc = lastScannedEpc;
-if (existingEpc == null) existingEpc = "";
-existingEpc = existingEpc.trim().toUpperCase(Locale.US);
-                Log.i(TAG, "🔍 Existing EPC on tag: '" + existingEpc + "'");
+                // ✅ [v8.3] استخدم EPC المحفوظ من آخر مسح
+                String existingEpc = lastScannedEpc;
+                if (existingEpc == null) existingEpc = "";
+                existingEpc = existingEpc.trim().toUpperCase(Locale.US);
 
-                // (3) تحقق: هل EPC الحالي صالح للاستخدام؟
-                boolean hasValidEpc = existingEpc != null
-                        && existingEpc.matches("^E2[0-9A-F]{22}$")
+                Log.i(TAG, "🔍 Existing EPC: '" + existingEpc + "'");
+
+                boolean hasValidEpc = existingEpc.matches("^E2[0-9A-F]{22}$")
                         && !existingEpc.startsWith("3008")
                         && !existingEpc.equals("300800000000000000000000");
 
@@ -2111,8 +2057,7 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                 boolean wasWritten = false;
 
                 if (hasValidEpc) {
-                    // ✅ حالة A: EPC موجود وصالح → استخدمه بدون كتابة
-                    Log.i(TAG, "✅ Hybrid: Using EXISTING EPC: " + existingEpc);
+                    Log.i(TAG, "✅ Using EXISTING EPC: " + existingEpc);
                     finalNewEpc = existingEpc;
                     writeOk = true;
                     wasWritten = false;
@@ -2120,26 +2065,21 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                     safeRun(() -> showToast(isArabic
                             ? "ℹ️ تم استخدام EPC الموجود على الشريحة"
                             : "ℹ️ Using existing EPC on tag"));
+                } else {
+                    Log.i(TAG, "⚠️ EPC invalid → Demo mode, using TID");
+                    finalNewEpc = tid;
+                    writeOk = true;
+                    wasWritten = false;
 
-} else {
-    // ✅ [Demo] EPC مشوّه → استخدم TID كمعرّف بدون كتابة
-    Log.i(TAG, "⚠️ Hybrid: EPC invalid → DEMO mode, using TID as identifier");
+                    safeRun(() -> showToast(isArabic
+                            ? "ℹ️ وضع العرض: سيتم استخدام TID كمعرّف"
+                            : "ℹ️ Demo mode: using TID as identifier"));
+                }
 
-    // TID هو المعرّف الفعلي (24 حرف Hex يبدأ بـ E2 أو غيره)
-    finalNewEpc = tid;   // TID كـ EPC مؤقتاً
-    writeOk = true;      // تجاوز فشل الكتابة
-    wasWritten = false;  // لم نكتب على الشريحة
-
-    safeRun(() -> showToast(isArabic
-            ? "ℹ️ وضع العرض: سيتم استخدام TID كمعرّف"
-            : "ℹ️ Demo mode: using TID as identifier"));
-}
-
-                // ═══════════════════════════════════════════════════════
-                //  (4) التحقق — فقط إذا كُتب EPC جديد
-                // ═══════════════════════════════════════════════════════
+                // ═══════════════════════════════════════════════════
+                //  8) Verify (فقط إذا كُتب)
+                // ═══════════════════════════════════════════════════
                 boolean verifyOk;
-
                 if (wasWritten) {
                     String readBackEpcWorking = null;
                     if (writeOk) {
@@ -2159,13 +2099,8 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                             && !readBackEpc.isEmpty()
                             && readBackEpc.equals(finalNewEpc);
 
-                    // إذا فشل التحقق
                     if (!verifyOk) {
-                        Log.e(TAG, "❌❌❌ EPC VERIFICATION FAILED!");
-                        Log.e(TAG, "   Expected : '" + finalNewEpc + "'");
-                        Log.e(TAG, "   Got      : '" + readBackEpc + "'");
-                        Log.e(TAG, "   writeOk  : " + writeOk);
-
+                        Log.e(TAG, "❌ EPC VERIFICATION FAILED!");
                         final String expectedEpc = finalNewEpc;
                         final String actualEpc = readBackEpc;
                         final boolean wOk = writeOk;
@@ -2175,74 +2110,48 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                             activeLoadingDialog = null;
                             unlockFormFast();
                             setFormEnabled(true);
-
-                            String detailMsg;
-                            if (!wOk) {
-                                detailMsg = isArabic
-                                        ? "فشلت الكتابة على الشريحة (writeEpc = false)"
-                                        : "writeEpc returned false";
-                            } else if (actualEpc == null || actualEpc.isEmpty()) {
-                                detailMsg = isArabic
-                                        ? "الشريحة لا تحتوي على EPC بعد الكتابة"
-                                        : "Tag has no EPC after write";
-                            } else {
-                                detailMsg = isArabic
-                                        ? "القيمة المكتوبة لا تطابق المتوقعة:\n\n"
-                                            + "🔹 المتوقع: " + expectedEpc + "\n"
-                                            + "🔹 المقروء : " + actualEpc
-                                        : "Written value doesn't match";
-                            }
-
                             showErrorDialog(
                                     isArabic ? "❌ فشل التحقق من الكتابة"
                                              : "❌ Write Verification Failed",
-                                    (isArabic
-                                            ? "لم يتم كتابة EPC بنجاح على الشريحة.\n\n"
-                                            : "Failed to write EPC on tag.\n\n")
-                                            + detailMsg
-                                            + (isArabic
-                                                    ? "\n\n⚠️ لم يتم حفظ البيانات في النظام.\n"
-                                                        + "يرجى إعادة المسح والمحاولة."
-                                                    : "\n\n⚠️ Data NOT saved to system."));
+                                    isArabic
+                                        ? "لم يتم كتابة EPC بنجاح على الشريحة."
+                                        : "Failed to write EPC on tag.");
                         });
                         return;
                     }
                 } else {
-    verifyOk = true;
-    Log.i(TAG, wasWritten 
-            ? "✅ Skipping write — using existing EPC"
-            : "✅ Demo mode — TID used as EPC");
-}
+                    verifyOk = true;
+                    Log.i(TAG, "✅ Skipping write — existing/demo EPC");
+                }
 
-                // ═══════════════════════════════════════════════════════
-                //  (5) القفل — فقط إذا كُتب EPC جديد
-                // ═══════════════════════════════════════════════════════
+                // ═══════════════════════════════════════════════════
+                //  9) Lock (فقط إذا كُتب)
+                // ═══════════════════════════════════════════════════
                 boolean lockOk;
                 if (wasWritten) {
                     lockOk = rfidService.setTagLockState(null, 1, true);
                     Log.i(TAG, lockOk ? "🔒 Tag locked" : "⚠️ Lock failed");
                 } else {
                     lockOk = false;
-                    Log.i(TAG, "ℹ️ Skipping lock — existing EPC tag");
+                    Log.i(TAG, "ℹ️ Skipping lock");
                 }
 
-                // (6) markTagProgrammed
+                // markTagProgrammed
                 try {
                     rfidService.markTagProgrammed(tid, miraId, finalNewEpc);
                     Log.i(TAG, "✅ markTagProgrammed OK");
                 } catch (Exception e) {
-                    Log.w(TAG, "⚠️ markTagProgrammed exception: " + e.getMessage());
+                    Log.w(TAG, "⚠️ markTagProgrammed: " + e.getMessage());
                 }
 
-                // (7) تثبيت القيم النهائية
                 final boolean finalWrite = writeOk;
                 final boolean finalVerify = verifyOk;
                 final boolean finalLock = lockOk;
                 final boolean finalWasPreEncoded = !wasWritten;
 
-                // ═══════════════════════════════════════════════════════
-                //  8) تحديث السيرفر بالـ EPC النهائي
-                // ═══════════════════════════════════════════════════════
+                // ═══════════════════════════════════════════════════
+                //  10) Update server with final EPC
+                // ═══════════════════════════════════════════════════
                 try {
                     JSONObject updatePayload = new JSONObject();
                     updatePayload.put("item_id", finalServerItemId);
@@ -2256,17 +2165,15 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                             apiClient.postWithAuth("/items/update-rfid",
                                     updatePayload);
                     if (updateResp != null && updateResp.isSuccess) {
-                        Log.i(TAG, "✅ RFID metadata synced to server");
-                    } else {
-                        Log.w(TAG, "⚠️ update-rfid failed — proceeding anyway");
+                        Log.i(TAG, "✅ RFID metadata synced");
                     }
                 } catch (Exception e) {
-                    Log.w(TAG, "Failed to update RFID metadata", e);
+                    Log.w(TAG, "update-rfid failed", e);
                 }
 
-                // ═══════════════════════════════════════════════════════
-                //  9) عرض النتائج
-                // ═══════════════════════════════════════════════════════
+                // ═══════════════════════════════════════════════════
+                //  11) Show results
+                // ═══════════════════════════════════════════════════
                 safeRun(() -> {
                     dismissDialog(activeLoadingDialog);
                     activeLoadingDialog = null;
@@ -2283,7 +2190,6 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                     }
 
                     String displayEpc = finalNewEpc;
-
                     String gs1Code = "(01)0729000000"
                             + (finalServerItemId > 0
                                     ? String.format(Locale.US, "%05d",
@@ -2323,7 +2229,7 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
                     showEncodingSuccessDialogEnhanced(
                             finalTitle, displayEpc, tid, gs1Code, qrUrl,
                             String.valueOf(fGrossWeight), selectedKarat,
-                            finalPriceLocal, localCurrency, finalPhotoPaths,
+                            finalPriceUSD, localCurrency, finalPhotoPaths,  // ✅ USD
                             fStoneType, fStoneWeightCarats, fStoneCount, fStoneValue,
                             netGoldWeight);
                 });
@@ -2354,6 +2260,15 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
     }
 }
 
+// ✅ دالة مساعدة للتحقق من وضع المحاكاة
+private boolean rfidService_isSimulation(MiraRfidService svc) {
+    try {
+        return svc.isSimulationMode();
+    } catch (Exception e) {
+        Log.w(TAG, "isSimulationMode check failed", e);
+        return false;
+    }
+}
 
     private void unlockFormFast() {
         isFormLocked = false;
@@ -2663,11 +2578,11 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
     // ═══════════════════════════════════════════════════════════════════
 
     private void showEncodingSuccessDialogEnhanced(
-            String title, String epc, String tid, String gs1Code, String qrUrl,
-            String weight, String karat, double finalPrice, String currency,
-            List<String> photos,
-            String stoneType, double stoneWeightCarats, int stoneCount,
-            double stoneValue, double netWeight) {
+        String title, String epc, String tid, String gs1Code, String qrUrl,
+        String weight, String karat, double finalPriceUSD, String currency,
+        List<String> photos,
+        String stoneType, double stoneWeightCarats, int stoneCount,
+        double stoneValue, double netWeight) {
 
         if (!isAdded() || getContext() == null) return;
 
@@ -2714,8 +2629,8 @@ existingEpc = existingEpc.trim().toUpperCase(Locale.US);
             tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
 
         if (tvIdPrice != null && priceManager != null) {
-            tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice));
-        }
+    tvIdPrice.setText(priceManager.formatPriceDefault(finalPriceUSD));
+}
 
         TextView tvIdStonesInfo = view.findViewById(R.id.tvIdStonesInfo);
         if (tvIdStonesInfo != null) {
@@ -3481,24 +3396,33 @@ private void resetFormForNextScan() {
     }
 
     @Override
-    public void onPause() {
-        super.onPause();
+public void onPause() {
+    super.onPause();
 
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
-        }
-
-        // ✅ [v6.4] استعادة القوة
-        restoreOriginalPowerEncoding();
-
-        if (handler != null) {
-            handler.removeCallbacksAndMessages(null);
-        }
-        isProcessingTag.set(false); 
-        stopRfidScanningMode();
-        saveCurrentDraftAsync();
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
     }
+
+    // ✅ [FIX-3] استعادة القوة
+    restoreOriginalPowerEncoding();
+
+    // ✅ [FIX-3] نظّف المؤقتات المحددة فقط — لا removeCallbacksAndMessages(null)
+    if (handler != null) {
+        if (rfidTimeoutRunnable != null) {
+            handler.removeCallbacks(rfidTimeoutRunnable);
+            rfidTimeoutRunnable = null;
+        }
+        if (pendingHideFeedback != null) {
+            handler.removeCallbacks(pendingHideFeedback);
+            pendingHideFeedback = null;
+        }
+    }
+
+    isProcessingTag.set(false);
+    stopRfidScanningMode();
+    saveCurrentDraftAsync();
+}
 
     @Override
     public void onDestroyView() {
@@ -3513,9 +3437,15 @@ private void resetFormForNextScan() {
 
         // 3) نظّف handler
         if (handler != null) {
-            handler.removeCallbacksAndMessages(null);
-        }
+    if (rfidTimeoutRunnable != null) {
+        handler.removeCallbacks(rfidTimeoutRunnable);
         rfidTimeoutRunnable = null;
+    }
+    if (pendingHideFeedback != null) {
+        handler.removeCallbacks(pendingHideFeedback);
+        pendingHideFeedback = null;
+    }
+}
 
         // 4) نظّف Scan Feedback Card
         if (pendingHideFeedback != null) {
