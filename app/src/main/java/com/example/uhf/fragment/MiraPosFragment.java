@@ -230,7 +230,8 @@ public class MiraPosFragment extends MiraBaseFragment {
 @Nullable private TextView tvFeedbackPrice;
 @Nullable private View vFeedbackAccent;
 @Nullable private Runnable pendingHideFeedback;
-
+// ✅ حقل لتخزين الباركود القادم من الماسح
+@Nullable private volatile String pendingBarcodeFromScanner = null;
     // ═══════════════════════════════════════════════════════════════════
     //  Helper Classes
     // ═══════════════════════════════════════════════════════════════════
@@ -383,30 +384,31 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-                View fab = getActivity().findViewById(R.id.fabActionCenter);
-                if (fab != null) fab.setVisibility(View.GONE);
-            }
-
-            if (scaleManager != null) scaleManager.connect();
-
-            // ✅ تطبيق Low Power عند فتح POS
-            applyLowPowerForPos();
-
-            // ✅ ربط أولي بحالة السلة
-            if (cartManager != null) {
-                renderCart(cartManager.snapshot(), null, -1);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error", e);
+   @Override
+public void onResume() {
+    super.onResume();
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) fab.setVisibility(View.GONE);
         }
+
+        if (scaleManager != null) scaleManager.connect();
+
+        applyLowPowerForPos();
+
+        if (cartManager != null) {
+            renderCart(cartManager.snapshot(), null, -1);
+        }
+
+        // ✅ [جديد] عالج الباركود المعلّق من الماسح
+        processPendingBarcodeIfAny();
+
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error", e);
     }
+}
 
     @Override
     public void onStart() {
@@ -3121,65 +3123,133 @@ private void readTidAndProcess(final String originalEpc, final String source) {
     // ═══════════════════════════════════════════════════════════════════
 
     private void openBarcodeScanner() {
-        try {
-            if (!isFragmentAlive()) return;
+    try {
+        if (!isFragmentAlive()) return;
 
-            FragmentManager fm = getParentFragmentManager();
-            if (fm == null || fm.isStateSaved()) {
-                // ✅ إذا كان state saved — أعِد الحالة
-                currentScanMode = ScanMode.NONE;
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.IDLE);
-                }
-                return;
-            }
-
-            MiraBarcodeScannerFragment scannerFragment =
-                    new MiraBarcodeScannerFragment();
-
-            scannerFragment.setOnBarcodeScannedListener((data, format) -> {
-                try {
-                    // ✅ معالجة الباركود
-                    if (isFragmentAlive() && data != null && !data.isEmpty()) {
-                        onBarcodeScanned(data);
-                    }
-
-                    // ✅ إعادة الوضع إلى NONE
-                    currentScanMode = ScanMode.NONE;
-                    if (heroController != null) {
-                        heroController.setState(PosHeroController.State.IDLE);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Barcode callback error", e);
-                }
-            });
-
-            // احسب containerId
-            int containerId = android.R.id.content;
-            try {
-                View view = getView();
-                if (view != null && view.getParent() instanceof View) {
-                    int parentId = ((View) view.getParent()).getId();
-                    if (parentId != View.NO_ID) containerId = parentId;
-                }
-            } catch (Exception ignored) {}
-
-            fm.beginTransaction()
-                    .replace(containerId, scannerFragment)
-                    .addToBackStack("barcode_scanner")
-                    .commit();
-
-        } catch (Exception e) {
-            Log.e(TAG, "openBarcodeScanner error", e);
-            showToast(isArabic
-                    ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+        FragmentManager fm = getParentFragmentManager();
+        if (fm == null || fm.isStateSaved()) {
+            currentScanMode = ScanMode.NONE;
             if (heroController != null) {
                 heroController.setState(PosHeroController.State.IDLE);
             }
-            currentScanMode = ScanMode.NONE;
+            return;
         }
+
+        MiraBarcodeScannerFragment scannerFragment =
+                new MiraBarcodeScannerFragment();
+
+        scannerFragment.setOnBarcodeScannedListener((data, format) -> {
+            try {
+                Log.i(TAG, "📷 Scanner callback: " + data);
+                if (data != null && !data.isEmpty()) {
+                    // ✅ احفظ الكود — سنعالجه عند العودة
+                    pendingBarcodeFromScanner = data;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Barcode callback error", e);
+            }
+        });
+
+        int containerId = android.R.id.content;
+        try {
+            View view = getView();
+            if (view != null && view.getParent() instanceof View) {
+                int parentId = ((View) view.getParent()).getId();
+                if (parentId != View.NO_ID) containerId = parentId;
+            }
+        } catch (Exception ignored) {}
+
+        // ✅✅✅ الإصلاح: hide بدل replace
+        fm.beginTransaction()
+                .hide(this)                                     // ← الإصلاح
+                .add(containerId, scannerFragment, "barcode_scanner")
+                .addToBackStack("barcode_scanner")
+                .commit();
+
+    } catch (Exception e) {
+        Log.e(TAG, "openBarcodeScanner error", e);
+        showToast(isArabic ? "⚠️ تعذر فتح الماسح" : "⚠️ Unable to open scanner");
+        if (heroController != null) {
+            heroController.setState(PosHeroController.State.IDLE);
+        }
+        currentScanMode = ScanMode.NONE;
+    }
+}
+
+
+private void processPendingBarcodeIfAny() {
+    final String code = pendingBarcodeFromScanner;
+    if (code == null || code.isEmpty()) return;
+
+    pendingBarcodeFromScanner = null;   // امسحه فوراً
+
+    Log.i(TAG, "📷 Processing pending barcode: " + code);
+
+    currentScanMode = ScanMode.NONE;
+    if (heroController != null) {
+        heroController.setState(PosHeroController.State.IDLE);
     }
 
+    mainHandler.postDelayed(() -> {
+        if (!isFragmentAlive()) return;
+
+        String[] parsed = parseGs1OrQr(code);
+        String finalCode = parsed[0];
+        Log.i(TAG, "📷 Parsed: " + finalCode + " format=" + parsed[1]);
+
+        onBarcodeScanned(finalCode);
+    }, 150);
+}
+private String[] parseGs1OrQr(String raw) {
+    if (raw == null) return new String[]{"", "empty"};
+    String data = raw.trim();
+    if (data.isEmpty()) return new String[]{"", "empty"};
+
+    // QR JSON
+    if (data.startsWith("{")) {
+        try {
+            JSONObject json = new JSONObject(data);
+            String serial = json.optString("serial",
+                    json.optString("serial_number", json.optString("sn", "")));
+            if (!serial.isEmpty()) return new String[]{serial, "qr_json"};
+            String gtin = json.optString("gtin", json.optString("gtin13", ""));
+            if (!gtin.isEmpty()) return new String[]{gtin, "qr_json"};
+        } catch (Exception ignored) {}
+    }
+
+    // QR URL
+    if (data.startsWith("http://") || data.startsWith("https://")) {
+        try {
+            android.net.Uri uri = android.net.Uri.parse(data);
+            String serial = uri.getQueryParameter("serial");
+            if (serial == null) serial = uri.getQueryParameter("sn");
+            if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
+            String gtin = uri.getQueryParameter("gtin");
+            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
+            String last = uri.getLastPathSegment();
+            if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
+        } catch (Exception ignored) {}
+    }
+
+    // GS1 (01) GTIN, (21) Serial
+    String gs1 = data.replace('\u001D', '|').replace("(#)", "|");
+
+    java.util.regex.Matcher mSerial =
+            java.util.regex.Pattern.compile("21([A-Za-z0-9\\-_.]+)").matcher(gs1);
+    if (mSerial.find()) {
+        String serial = mSerial.group(1);
+        if (serial != null && !serial.isEmpty()) return new String[]{serial, "gs1_serial"};
+    }
+
+    java.util.regex.Matcher mGtin =
+            java.util.regex.Pattern.compile("01(\\d{14})").matcher(gs1);
+    if (mGtin.find()) {
+        String gtin = mGtin.group(1);
+        if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "gs1_gtin"};
+    }
+
+    return new String[]{data, "raw"};
+}
     // ═══════════════════════════════════════════════════════════════════
     //  Back Press Handler
     // ═══════════════════════════════════════════════════════════════════
