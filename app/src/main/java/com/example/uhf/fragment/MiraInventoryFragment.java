@@ -423,128 +423,138 @@ public class MiraInventoryFragment extends Fragment {
     // ═══════════════════════════════════════════════════════
 
     private void queryMiraForInventory(String epc) {
-        boolean isArabic = isArabic();
-        String defaultLocation = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+    boolean isArabic = isArabic();
+    String defaultLocation = isArabic ? "المعرض الرئيسي" : "Main Showroom";
 
-        new Thread(() -> {
-            String title    = epc;
-            String karat    = "-";
-            String weight   = "-";
-            String location = defaultLocation;
-            String status   = "✗";
-            boolean found   = false;
+    new Thread(() -> {
+        String title    = epc;
+        String karat    = "-";
+        String weight   = "-";
+        String location = defaultLocation;
+        String status   = "✗";
+        boolean found   = false;
 
-            try {
-                URL url = new URL(BASE_URL + "/authorize");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
-                conn.setDoOutput(true);
-                conn.setConnectTimeout(5000);
+        try {
+            URL url = new URL(BASE_URL + "/authorize");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
 
-                JSONObject body = new JSONObject();
-                body.put("epc", epc);
-                body.put("gate_id", "handheld_c72");
-                body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
-                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+            JSONObject body = new JSONObject();
+            body.put("epc", epc);
+            body.put("gate_id", "handheld_c72");
+            body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
+            conn.getOutputStream().write(body.toString().getBytes("utf-8"));
 
-                if (conn.getResponseCode() == 200) {
-                    BufferedReader in = new BufferedReader(
-                            new InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String l;
-                    while ((l = in.readLine()) != null) sb.append(l);
-                    in.close();
+            if (conn.getResponseCode() == 200) {
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String l;
+                while ((l = in.readLine()) != null) sb.append(l);
+                in.close();
 
-                    JSONObject json = new JSONObject(sb.toString());
-                    JSONObject item = json.optJSONObject("item");
+                JSONObject json = new JSONObject(sb.toString());
+                JSONObject item = json.optJSONObject("item");
 
-                    if (item != null) {
-                        title = item.optString("title", epc);
-                        karat = item.optString("karat", "-");
-                        double w = item.optDouble("weight", 0);
-                        weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
-                        location = item.optString("location", defaultLocation);
+                if (item != null) {
+                    title = item.optString("title", epc);
+                    karat = item.optString("karat", "-");
+                    double w = item.optDouble("weight", 0);
+                    weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
+                    location = item.optString("location", defaultLocation);
 
-                        String vaultStatus = item.optString("status", "");
-                        if (vaultStatus.equals("in_stock")
-                                || vaultStatus.equals("available")
-                                || vaultStatus.equals("sold")
-                                || vaultStatus.equals("display")
-                                || vaultStatus.equals("reserved")) {
-                            status = "✓";
-                            found = true;
-                        } else if (vaultStatus.equals("deleted")) {
-                            status = "✗";
-                            found = false;
-                        } else {
-                            status = "✓";
-                            found = true;
-                        }
+                    String vaultStatus = item.optString("status", "");
+                    if (vaultStatus.equals("in_stock")
+                            || vaultStatus.equals("available")
+                            || vaultStatus.equals("sold")
+                            || vaultStatus.equals("display")
+                            || vaultStatus.equals("reserved")) {
+                        status = "✓";
+                        found = true;
+                    } else if (vaultStatus.equals("deleted")) {
+                        status = "✗";
+                        found = false;
+                    } else {
+                        status = "✓";
+                        found = true;
                     }
                 }
-            } catch (Exception e) {
-                title = isArabic ? "خطأ" : "Error";
-                status = "✗";
-                found = false;
             }
+        } catch (Exception e) {
+            title = isArabic ? "خطأ" : "Error";
+            status = "✗";
+            found = false;
+        }
 
-            final String finalTitle    = title;
-            final String finalKarat    = karat;
-            final String finalWeight   = weight;
-            final String finalLocation = location;
-            final String finalStatus   = status;
-            final boolean finalFound   = found;
+        final String finalTitle    = title;
+        final String finalKarat    = karat;
+        final String finalWeight   = weight;
+        final String finalLocation = location;
+        final String finalStatus   = status;
+        final boolean finalFound   = found;
 
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    scannedItems.add(0, new InventoryItem(
-                        epc, finalTitle, finalKarat, finalWeight,
-                        finalStatus, finalLocation));
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                scannedItems.add(0, new InventoryItem(
+                    epc, finalTitle, finalKarat, finalWeight,
+                    finalStatus, finalLocation));
 
-                    if ("✓".equals(finalStatus)) {
-                        playInventorySound("scan");
-                    } else {
-                        playInventorySound("alert");
-                    }
+                if ("✓".equals(finalStatus)) {
+                    playInventorySound("scan");
+                } else {
+                    playInventorySound("alert");
+                }
 
-                    scannedCount++;
-                    if (finalFound) foundCount++;
+                scannedCount++;
+                if (finalFound) foundCount++;
 
-                    adapter.notifyItemInserted(0);
-                    rvInventoryItems.scrollToPosition(0);
+                adapter.notifyItemInserted(0);
+                rvInventoryItems.scrollToPosition(0);
 
-                    tvLastScan.setText(epc);
-                    tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
-                    tvScannedCount.setText(String.valueOf(scannedCount));
+                tvLastScan.setText(epc);
+                tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
+                tvScannedCount.setText(String.valueOf(scannedCount));
 
-                    double acc = expectedCount > 0
-                            ? (foundCount * 100.0 / expectedCount) : 0;
-                    tvAccuracy.setText(
-                        (isArabic ? "الدقة: " : "Accuracy: ")
-                        + String.format(Locale.US, "%.1f%%", acc));
+                double acc = expectedCount > 0
+                        ? (foundCount * 100.0 / expectedCount) : 0;
+                tvAccuracy.setText(
+                    (isArabic ? "الدقة: " : "Accuracy: ")
+                    + String.format(Locale.US, "%.1f%%", acc));
 
-                    if (rvInventoryItems.getWidth() > 0) {
+                // ═══════════════════════════════════════════════════
+                // ✅ [مُصحَّح] استخدم عرض الأب الحقيقي (RelativeLayout)
+                // ═══════════════════════════════════════════════════
+                if (progressScanned != null
+                        && progressScanned.getParent() instanceof View) {
+                    View parent = (View) progressScanned.getParent();
+                    int parentWidth = parent.getWidth();
+                    if (parentWidth > 0) {
                         int pct = expectedCount > 0
-                                ? (scannedCount * 100) / expectedCount : 0;
+                                ? Math.min(100, (scannedCount * 100) / expectedCount)
+                                : 0;
                         progressScanned.getLayoutParams().width =
-                            Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
+                            Math.max(1, (pct * parentWidth) / 100);
                         progressScanned.requestLayout();
                     }
+                }
+                // ═══════════════════════════════════════════════════
 
-                    // 🛑 إيقاف تلقائي اختياري
-                    if (autoStopEnabled
-                            && expectedCount > 0
-                            && scannedCount >= expectedCount) {
-                        stopInventory();
-                    }
-                });
-            }
+                // 🛑 إيقاف تلقائي اختياري
+                if (autoStopEnabled
+                        && expectedCount > 0
+                        && scannedCount >= expectedCount) {
+                    stopInventory();
+                }
+            });
+        }
 
-            recordScanOnServer(epc, finalStatus);
-        }).start();
-    }
+        recordScanOnServer(epc, finalStatus);
+    }).start();
+}
 
     private void recordScanOnServer(String code, String status) {
         new Thread(() -> {
