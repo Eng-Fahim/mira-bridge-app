@@ -187,11 +187,11 @@ public final class PosUIManager {
     // ═══════════════════════════════════════════════════════
 
     public static void toast(@Nullable Context ctx, @Nullable String msg) {
-        if (ctx == null || msg == null || msg.isEmpty()) return;
-        try {
-            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show();
-        } catch (Exception ignored) {}
-    }
+    if (ctx == null || msg == null || msg.isEmpty()) return;
+    try {
+        Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show();   // ← LONG
+    } catch (Exception ignored) {}
+}
 
     // ═══════════════════════════════════════════════════════
     // Broadcast Notifications
