@@ -411,12 +411,18 @@ public class RFIDManager {
      * ✅ توافق عكسي — يستبدل كل المستمعين بمستمع واحد.
      * @deprecated استخدم addListener/removeListener
      */
-    @Deprecated
-    public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
-        tagReadListeners.clear();
-        if (listener != null) tagReadListeners.add(listener);
-        ensureCompositeAttached();
+    /**
+ * ✅ [v4.0.3] setListener — نسخة آمنة
+ *    لم تعد تمسح المستمعين الآخرين.
+ *    أُبقيت فقط للتوافق العكسي.
+ */
+@Deprecated
+public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
+    if (listener != null) {
+        addListener(listener);   // ✅ آمن
+        Log.d(TAG, "⚠️ Deprecated setListener → delegated to addListener");
     }
+}
 
     private void ensureCompositeAttached() {
         if (activeReader != null) {
