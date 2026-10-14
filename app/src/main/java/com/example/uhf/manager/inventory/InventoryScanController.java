@@ -109,20 +109,22 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
     /**
      * ✅ ربط RFIDManager + تسجيل هذا الـ Controller كـ listener
      */
-    public void attachRfidManager(RFIDManager rfidManager) {
-        this.rfidManager = rfidManager;
-        if (rfidManager != null) {
-            rfidManager.setListener(this);
-            Log.d(TAG, "✅ RFID listener attached to ScanController");
-        }
+    
+public void attachRfidManager(RFIDManager rfidManager) {
+    this.rfidManager = rfidManager;
+    if (rfidManager != null) {
+        rfidManager.addListener(this);      // ✅ addListener بدل setListener
+        Log.d(TAG, "✅ RFID listener ADDED to ScanController");
     }
+}
 
-    public void detachRfidManager() {
-        if (rfidManager != null) {
-            rfidManager.setListener(null);
-            rfidManager = null;
-        }
+public void detachRfidManager() {
+    if (rfidManager != null) {
+        rfidManager.removeListener(this);   // ✅ removeListener بدل setListener(null)
+        Log.d(TAG, "➖ RFID listener REMOVED from ScanController");
+        rfidManager = null;
     }
+}
 
     // ==================== Getters ====================
 
