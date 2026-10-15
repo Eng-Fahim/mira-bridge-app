@@ -6,10 +6,9 @@ public class InventoryItem {
     private final String epc;
     private final String gtin;
     private final String serial;
-    private final String title;
-    private String karat; // إضافة متغير العيار
+    private String title;       // ✅ تم إزالة final
+    private String karat;
     
-    // ✅✅✅ إضافة حقول جديدة
     private double weight;
     private double price;
     
@@ -24,18 +23,14 @@ public class InventoryItem {
         this.serial = serial != null ? serial : "";
         this.title = title != null ? title : "";
         this.karat = "";
-        // ✅✅✅ تهيئة القيم الجديدة
         this.weight = 0;
         this.price = 0;
     }
 
-    // Overloaded Constructor ليدعم العيار مباشرة عند الإنشاء
-    public InventoryItem(String epc, String gtin, String serial, String title, String karat) {
+    public InventoryItem(String epc, String gtin, String serial, 
+                         String title, String karat) {
         this(epc, gtin, serial, title);
         this.karat = karat != null ? karat : "";
-        // ✅✅✅ تهيئة القيم الجديدة
-        this.weight = 0;
-        this.price = 0;
     }
 
     public static String normalizeEpc(String rawEpc) {
@@ -60,13 +55,16 @@ public class InventoryItem {
     public String getEpc() { return epc; }
     public String getGtin() { return gtin; }
     public String getSerial() { return serial; }
-    public String getTitle() { return title; }
     
-    // الميثود التي كان يبحث عنها المترجم (Compiler)
+    // ✅ title أصبح قابل للتعديل
+    public String getTitle() { return title; }
+    public void setTitle(String title) { 
+        this.title = title != null ? title : ""; 
+    }
+    
     public String getKarat() { return karat; }
     public void setKarat(String karat) { this.karat = karat; }
 
-    // ✅✅✅ إضافة getters و setters للوزن والسعر
     public double getWeight() { return weight; }
     public void setWeight(double weight) { this.weight = weight; }
     
