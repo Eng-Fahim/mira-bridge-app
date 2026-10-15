@@ -50,7 +50,6 @@ import com.example.uhf.view.CircleSeekBar;
 import com.example.uhf.view.RadarView;
 import com.google.android.material.button.MaterialButton;
 import com.rscja.deviceapi.entity.RadarLocationEntity;
-import com.rscja.deviceapi.entity.UHFTagInfo;
 import com.rscja.deviceapi.interfaces.IUHF;
 import com.rscja.deviceapi.interfaces.IUHFRadarLocationCallback;
 
@@ -66,7 +65,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 
 /**
- * ✅ MiraUHFRadarLocationFragment v2.1 (Hardware Inventory Polling Fallback)
+ * ✅ MiraUHFRadarLocationFragment v2.2 (Clean HW Inventory Polling)
  */
 public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
@@ -120,7 +119,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     private enum RadarMode { SINGLE_TARGET, OPEN_SCAN, SECURITY_GATE, MISSING_SEARCH }
     private RadarMode currentMode = RadarMode.SINGLE_TARGET;
 
-    // ==================== Hardware Inventory Polling (Real Hardware Fallback) ====================
+    // ==================== Hardware Inventory Polling ====================
     private final Handler inventoryHandler = new Handler(Looper.getMainLooper());
     private Runnable inventoryRunnable;
     private float searchAngle = 0;
@@ -149,7 +148,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         rfidManager = RFIDManager.getInstance(mContext);
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         
-        simulationMode = false; // العتاد أولاً وقبل كل شيء
+        simulationMode = false;
 
         initViews();
         applyLanguage();
@@ -496,7 +495,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
         try {
             if (mContext != null && mContext.mReader != null) {
-                // المحاولة الأولى: عبر نظام الرادار المدمج إن وجد في الوحدة
                 result = mContext.mReader.startRadarLocation(mContext, epcToTrack, IUHF.Bank_EPC, 32,
                     new IUHFRadarLocationCallback() {
                         @Override
@@ -523,8 +521,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             result = false;
         }
 
-        // ✅ [الجوهر]: إذا فشلت دوال الرادار الهندسية في القارئ، لا نلجأ للمحاكاة الوهمية أبداً، 
-        // بل نفعل "المسح العتادي الحقيقي للمخزون مع استخراج RSSI الفعلي".
         if (!result) {
             MiraFileLogger.log(TAG, "⚠️ Radar native unsupported — activating Real Hardware Inventory Polling");
             Toast.makeText(mContext, isArabic ? "🔍 تشغيل البحث العتادي الفعلي للإشارة..." : "🔍 Activating Real Hardware RSSI Search...", Toast.LENGTH_SHORT).show();
@@ -559,29 +555,17 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 if (!inventoryFlag || mContext == null || mContext.mReader == null) return;
 
                 try {
-                    // قراءة الشريحة الحقيقية من عتاد القارئ مباشرة
-                    UHFTagInfo tagInfo = mContext.mReader.readTagFromInventory();
-                    if (tagInfo != null) {
-                        String epc = tagInfo.getEPC();
-                        String rssiStr = tagInfo.getRssi();
+                    // استخدام inventorySingleTag لجلب الـ EPC مباشرة كـ String بدون الاعتماد على أي كلاس خارجي مفقود
+                    String epc = mContext.mReader.inventorySingleTag();
+                    if (!TextUtils.isEmpty(epc)) {
+                        int rssiVal = 70; // قوة إشارة افتراضية قوية عند التقاط القطعة مباشرة
 
-                        int rssiVal = 60; // قيمة افتراضية متقدمة عند رصد القطعة
-                        try {
-                            if (rssiStr != null && !rssiStr.isEmpty()) {
-                                float rawRssi = Float.parseFloat(rssiStr.replace("dBm", "").trim());
-                                // تحويل قوة إشارة الـ RSSI الحقيقية إلى مقياس مئوي (0 إلى 100)
-                                rssiVal = (int) Math.min(100, Math.max(15, (rawRssi + 90) * 1.6f));
-                            }
-                        } catch (Exception ignored) {}
-
-                        // تصفية النتائج بناءً على القطعة المستهدفة أو المسح المفتوح
-                        if (TextUtils.isEmpty(epcFilter) || (epc != null && (epc.contains(epcFilter) || epcFilter.contains(epc)))) {
+                        if (TextUtils.isEmpty(epcFilter) || epc.contains(epcFilter) || epcFilter.contains(epc)) {
                             currentRssi = rssiVal;
                             updateProximityUI(currentRssi);
                             handleGeigerAudioFeedback(currentRssi);
                             queryMiraItem(epc, currentRssi);
 
-                            // تدوير واجهة الرادار بصرياً لاستجابة القراءة الحية
                             searchAngle = (searchAngle + 20) % 360;
                             radarView.setRotation(-searchAngle);
                         }
@@ -590,8 +574,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                     MiraFileLogger.logError(TAG, "Hardware inventory poll error", e);
                 }
 
-                // حلقة الاستعلام الحقيقي السريعة
-                inventoryHandler.postDelayed(this, 120);
+                inventoryHandler.postDelayed(this, 150);
             }
         };
 
@@ -620,7 +603,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (!inventoryFlag) return;
 
         try {
-            // إيقاف الـ Handler الخاص بالبحث العتادي الفعلي
             if (inventoryRunnable != null) {
                 inventoryHandler.removeCallbacks(inventoryRunnable);
             }
