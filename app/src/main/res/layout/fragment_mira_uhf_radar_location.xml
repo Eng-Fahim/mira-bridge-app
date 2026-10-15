@@ -9,7 +9,7 @@
     android:background="?android:attr/colorBackground">
 
     <!-- ══════════════════════════════════════════════ -->
-    <!--  شريط العنوان مع زر الإغلاق (جديد)              -->
+    <!--  شريط العنوان مع زر الإغلاق                  -->
     <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutTitleBar"
@@ -225,107 +225,95 @@
     </LinearLayout>
 
     <!-- ══════════════════════════════════════════════ -->
-    <!--  شاشة الرادار البصرية                          -->
-    <!-- ══════════════════════════════════════════════ -->
-    <com.example.uhf.view.RadarView
-        android:id="@+id/radarView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        app:layout_constraintTop_toBottomOf="@id/layoutRssi"
-        app:layout_constraintBottom_toTopOf="@id/layoutMiraRadarInfo"
-        app:center_image="@drawable/phone"
-        android:layout_margin="4dp" />
-
-    <!-- ══════════════════════════════════════════════ -->
-    <!--  بطاقة معلومات القطعة المكتشفة                 -->
+    <!--  أزرار التحكم والتشغيل (مثبتة بالأعلى لتأمين القيود) -->
     <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
-        android:id="@+id/layoutMiraRadarInfo"
+        android:id="@+id/llButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="?attr/colorPrimary"
-        android:padding="8dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/layoutRecent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:layout_marginBottom="4dp"
+        android:orientation="horizontal"
+        android:paddingTop="4dp"
+        android:paddingHorizontal="6dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/tvRadarItemStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="حالة القطعة"
-                android:textColor="?attr/colorOnPrimary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnMarkFound"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:text="✅ تم العثور عليها"
-                android:textSize="10sp"
-                android:visibility="gone"
-                android:backgroundTint="#22C55E"
-                android:textColor="#FFFFFF" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvRadarItemName"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📦 اسم القطعة"
+        <Button
+            android:id="@+id/btRadarStart"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="▶ بدء التتبع"
+            android:backgroundTint="?attr/colorPrimary"
             android:textColor="?attr/colorOnPrimary"
-            android:alpha="0.9"
-            android:textSize="11sp"
-            android:layout_marginTop="2dp" />
+            android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvRadarItemDetails"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🏷️ التفاصيل"
-            android:textColor="?attr/colorOnPrimary"
-            android:alpha="0.75"
-            android:textSize="9sp"
-            android:layout_marginTop="1dp" />
+        <Button
+            android:id="@+id/btRadarStop"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="@string/stop_location"
+            android:backgroundTint="?attr/colorError"
+            android:textColor="?attr/colorOnError"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- ══════════════════════════════════════════════ -->
-    <!--  سجل آخر 5 عمليات                              -->
-    <!-- ══════════════════════════════════════════════ -->
-    <LinearLayout
-        android:id="@+id/layoutRecent"
+    <TextView
+        android:id="@+id/tvSearchRange"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="4dp"
+        android:gravity="center"
+        android:text="@string/searchRange"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:padding="2dp"
+        android:background="?attr/colorSurfaceVariant"
+        app:layout_constraintBottom_toTopOf="@id/llButton" />
+
+    <LinearLayout
+        android:id="@+id/_llSearchRange"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
         android:background="?attr/colorSurface"
-        app:layout_constraintBottom_toTopOf="@id/layoutStats"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintBottom_toTopOf="@id/tvSearchRange">
 
         <TextView
-            android:id="@+id/tvRecentScans"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="9sp"
-            android:maxLines="3" />
+            android:layout_gravity="center"
+            android:text="+"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <com.example.uhf.view.CircleSeekBar
+            android:id="@+id/seekBarPower"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_weight="1"
+            android:max="30"
+            android:progressDrawable="@drawable/seekbar_bg"
+            android:splitTrack="false"
+            android:thumb="@drawable/shape_seekbar_circle" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="-"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="18sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- ══════════════════════════════════════════════ -->
-    <!--  إحصائيات القطع المكتشفة                       -->
-    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutStats"
         android:layout_width="match_parent"
@@ -411,64 +399,100 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- ══════════════════════════════════════════════ -->
-    <!--  النطاق وتعديل قوة الإشارة                     -->
-    <!-- ══════════════════════════════════════════════ -->
     <LinearLayout
-        android:id="@+id/_llSearchRange"
+        android:id="@+id/layoutRecent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="8dp"
+        android:orientation="vertical"
+        android:padding="4dp"
         android:background="?attr/colorSurface"
-        app:layout_constraintBottom_toTopOf="@id/tvSearchRange">
+        app:layout_constraintBottom_toTopOf="@id/layoutStats"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvRecentScans"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="+"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <com.example.uhf.view.CircleSeekBar
-            android:id="@+id/seekBarPower"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_weight="1"
-            android:max="30"
-            android:progressDrawable="@drawable/seekbar_bg"
-            android:splitTrack="false"
-            android:thumb="@drawable/shape_seekbar_circle" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="-"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:text=""
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="9sp"
+            android:maxLines="3" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tvSearchRange"
+    <LinearLayout
+        android:id="@+id/layoutMiraRadarInfo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:text="@string/searchRange"
-        android:textColor="?attr/colorPrimary"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:padding="2dp"
-        android:background="?attr/colorSurfaceVariant"
-        app:layout_constraintBottom_toTopOf="@id/llButton" />
+        android:orientation="vertical"
+        android:background="?attr/colorPrimary"
+        android:padding="8dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/layoutRecent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvRadarItemStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="حالة القطعة"
+                android:textColor="?attr/colorOnPrimary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMarkFound"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:text="✅ تم العثور عليها"
+                android:textSize="10sp"
+                android:visibility="gone"
+                android:backgroundTint="#22C55E"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvRadarItemName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📦 اسم القطعة"
+            android:textColor="?attr/colorOnPrimary"
+            android:alpha="0.9"
+            android:textSize="11sp"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/tvRadarItemDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏷️ التفاصيل"
+            android:textColor="?attr/colorOnPrimary"
+            android:alpha="0.75"
+            android:textSize="9sp"
+            android:layout_marginTop="1dp" />
+    </LinearLayout>
 
     <!-- ══════════════════════════════════════════════ -->
-    <!--  وضع الرادار (نص مخفي للتوافق فقط)             -->
+    <!--  شاشة الرادار البصرية (تأخذ المساحة المتبقية بدقة) -->
     <!-- ══════════════════════════════════════════════ -->
+    <com.example.uhf.view.RadarView
+        android:id="@+id/radarView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/layoutRssi"
+        app:layout_constraintBottom_toTopOf="@id/layoutMiraRadarInfo"
+        app:center_image="@drawable/phone"
+        android:layout_margin="4dp" />
+
+    <!-- وضع الرادار (نص مخفي للتوافق البرمجي) -->
     <TextView
         android:id="@+id/tvRadarMode"
         android:layout_width="1dp"
@@ -477,43 +501,5 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         tools:ignore="MissingConstraints" />
-
-    <!-- ══════════════════════════════════════════════ -->
-    <!--  أزرار التحكم والتشغيل                          -->
-    <!-- ══════════════════════════════════════════════ -->
-    <LinearLayout
-        android:id="@+id/llButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
-        android:orientation="horizontal"
-        android:paddingTop="4dp"
-        android:paddingHorizontal="6dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
-
-        <Button
-            android:id="@+id/btRadarStart"
-            android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="▶ بدء التتبع"
-            android:backgroundTint="?attr/colorPrimary"
-            android:textColor="?attr/colorOnPrimary"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btRadarStop"
-            android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="@string/stop_location"
-            android:backgroundTint="?attr/colorError"
-            android:textColor="?attr/colorOnError"
-            android:textStyle="bold" />
-    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
