@@ -21,25 +21,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  ChainwayReader v4.1 — متوافق مع RFIDManager v4.0 + MiraReaderSettings v3.2
+ *  ChainwayReader v4.2 — HOT-APPLY Support (منع انقطاع المسح)
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * التغييرات الجوهرية:
+ * [v4.2] إصلاح حرج:
+ *   ✅ isHardwareActive — علم منفصل عن isScanning
+ *   ✅ applySettingsNow() — أثناء المسح النشط يطبّق Power فقط
+ *   ✅ عند بدء المسح — يطبّق كل الإعدادات
+ *   ✅ يمنع setGen2 أثناء startInventoryTag (الذي يقطع بروتوكول الهواء)
  *
- *   [v4.0]
- *   1. ✅ initialize() — لا يدّعي الجاهزية عند العثور على shared reader.
- *      يتحقق فعلياً عبر getVersion() قبل القبول.
- *   2. ✅ initialize() — ينشر القارئ عبر publishSharedReader().
- *   3. ✅ applySupportedSettings() — فحص null صريح.
- *   4. ✅ release() — لا يُحرّر shared reader (يملكه RFIDManager).
- *
- *   [v4.1] ← جديد
- *   5. ✅ التسجيل كمستمع لتغيّرات MiraReaderSettings — أي تغيير في
- *      الإعدادات من أي شاشة يُطبَّق فوراً على القارئ (خاصة الجرد).
- *   6. ✅ applySettingsNow() — دالة عامة لاستدعائها من أي Fragment
- *      في onResume() لضمان تطبيق أحدث الإعدادات.
- *   7. ✅ throttle — منع تطبيق متكرر سريع.
- *   8. ✅ release() — إلغاء تسجيل المستمع لمنع التسريبات.
+ * [v4.1] الأساس:
+ *   ✅ مستمع تغييرات MiraReaderSettings
+ *   ✅ throttle
+ *   ✅ release() يلغي المستمع
  */
 public class ChainwayReader implements MiraIRFIDReader {
 
@@ -50,9 +44,6 @@ public class ChainwayReader implements MiraIRFIDReader {
 
     private static final String DEFAULT_PWD = "00000000";
 
-    // ═══════════════════════════════════════════════════════════════
-    //  القيم الافتراضية المُحسّنة للمعادن (الذهب والمجوهرات)
-    // ═══════════════════════════════════════════════════════════════
     private static final int DEFAULT_POWER_DBM       = 30;
     private static final int DEFAULT_RSSI_THRESHOLD  = -75;
     private static final int DEFAULT_SCAN_INTERVAL   = 100;
@@ -69,9 +60,13 @@ public class ChainwayReader implements MiraIRFIDReader {
     private OnTagReadListener listener;
 
     private final AtomicBoolean isScanning = new AtomicBoolean(false);
+
+    // ✅ [v4.2] علم منفصل: هل العتاد يُصدر وسوم حالياً؟
+    //    يستخدم لتحديد: هل نطبّق كامل الإعدادات أم Power فقط؟
+    private final AtomicBoolean isHardwareActive = new AtomicBoolean(false);
+
     private volatile boolean isConnected = false;
 
-    // إعدادات ديناميكية
     private int powerDbm = DEFAULT_POWER_DBM;
     private int rssiThreshold = DEFAULT_RSSI_THRESHOLD;
     private int scanIntervalMs = DEFAULT_SCAN_INTERVAL;
@@ -86,7 +81,6 @@ public class ChainwayReader implements MiraIRFIDReader {
     private ExecutorService scanExecutor;
     private SharedPreferences prefs;
 
-    // 🆕 v4.1 — مستمع تغييرات الإعدادات + throttle
     private MiraReaderSettings.OnSettingsChangedListener settingsListener;
     private volatile long lastApplyTime = 0;
     private static final long MIN_APPLY_INTERVAL_MS = 300;
@@ -103,13 +97,12 @@ public class ChainwayReader implements MiraIRFIDReader {
             this.adaptiveConfigurator.initializeReader();
             loadSettings();
 
-            // 🆕 v4.1 — التسجيل كمستمع لتغيّرات MiraReaderSettings
             settingsListener = () -> {
                 Log.i(TAG, "🔔 Settings changed → re-applying to reader");
                 applySettingsNow();
             };
             MiraReaderSettings.getInstance(this.context).addListener(settingsListener);
-            Log.i(TAG, "✅ ChainwayReader v4.1 ready (listener registered)");
+            Log.i(TAG, "✅ ChainwayReader v4.2 ready (listener registered)");
         }
     }
 
@@ -173,9 +166,6 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
 
         try {
-            // ═══════════════════════════════════════════════════════
-            // 1) هل يوجد shared reader مُتحقَّق منه؟
-            // ═══════════════════════════════════════════════════════
             RFIDWithUHFUART sharedReader = BaseTabFragmentActivity.getSharedReader();
             if (sharedReader != null && verifySharedReader(sharedReader)) {
                 Log.i(TAG, "✅ Using VERIFIED shared reader instance");
@@ -185,9 +175,6 @@ public class ChainwayReader implements MiraIRFIDReader {
                 return true;
             }
 
-            // ═══════════════════════════════════════════════════════
-            // 2) تهيئة قارئ جديد
-            // ═══════════════════════════════════════════════════════
             if (reader == null) {
                 reader = RFIDWithUHFUART.getInstance();
             }
@@ -197,7 +184,6 @@ public class ChainwayReader implements MiraIRFIDReader {
                 return false;
             }
 
-            // ✅ init مع timeout
             final boolean[] initResult = new boolean[1];
             final Object initLock = new Object();
 
@@ -234,8 +220,6 @@ public class ChainwayReader implements MiraIRFIDReader {
 
             if (success) {
                 isConnected = true;
-
-                // ✅ انشر القارئ للاستخدام المشترك
                 BaseTabFragmentActivity.publishSharedReader(reader);
                 Log.i(TAG, "📢 Reader published to shared slot");
 
@@ -255,9 +239,6 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
     }
 
-    /**
-     * ✅ يتحقق من أن shared reader يعمل فعلاً قبل قبوله.
-     */
     private boolean verifySharedReader(RFIDWithUHFUART sdk) {
         if (sdk == null) return false;
         try {
@@ -275,9 +256,6 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
     }
 
-    /**
-     * ✅ إعدادات خفيفة — الطاقة فقط. سريعة جداً.
-     */
     private void applySupportedSettings() {
         if (reader == null || context == null) return;
         try {
@@ -294,20 +272,27 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  🆕 v4.1 — الدالة العامة لتطبيق الإعدادات فوراً
+    //  ✅ [v4.2] تطبيق الإعدادات — HOT / COLD
     // ═══════════════════════════════════════════════════════════════
     /**
-     * ✅ يقرأ أحدث إعدادات من MiraReaderSettings ويطبّقها على القارئ.
+     * ✅ يقرأ أحدث الإعدادات ويطبّقها على القارئ.
      *
-     * استخدمه في:
-     *   - onResume() لكل Fragment يستخدم القارئ (خاصة الجرد)
-     *   - بعد أي تغيير إعدادات برمجي
-     *   - قبل بدء المسح في أي وضع
+     * سلوكان مختلفان حسب حالة العتاد:
      *
-     * @return true إذا تم التطبيق بنجاح
+     *   🟢 COLD (المسح غير نشط):
+     *      → applyToReader() الكامل (Power + Frequency + Gen2 + ...)
+     *
+     *   🔴 HOT (المسح نشط — isHardwareActive = true):
+     *      → Power فقط. السبب: setGen2 أثناء startInventoryTag
+     *        يُقاطع بروتوكول الهواء ويفقد الوسوم النشطة.
+     *
+     * الإعدادات المُؤجَّلة (Session, Target, Miller, DR, Q) تُطبَّق
+     * تلقائياً عند بدء المسح التالي.
+     *
+     * @return true إذا نجح التطبيق (كامل أو جزئي)
      */
     public boolean applySettingsNow() {
-        // throttle — منع الاستدعاء المتكرر السريع
+        // throttle
         long now = System.currentTimeMillis();
         if (now - lastApplyTime < MIN_APPLY_INTERVAL_MS) {
             Log.d(TAG, "applySettingsNow throttled (Δ=" + (now - lastApplyTime) + "ms)");
@@ -321,14 +306,33 @@ public class ChainwayReader implements MiraIRFIDReader {
             return false;
         }
 
+        // ═══════════════════════════════════════════════════════════
+        //  🔴 HOT PATH — المسح نشط: Power فقط
+        // ═══════════════════════════════════════════════════════════
+        if (isHardwareActive.get()) {
+            try {
+                int power = MiraReaderSettings.getInstance(context).getPowerDbm();
+                boolean ok = reader.setPower(power);
+                if (ok) {
+                    Log.i(TAG, "⚡ HOT-apply Power during scan: " + power + " dBm");
+                } else {
+                    Log.w(TAG, "⚠️ HOT-apply Power failed");
+                }
+                return ok;
+            } catch (Exception e) {
+                MiraFileLogger.logError(TAG, "HOT-apply error", e);
+                return false;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  🟢 COLD PATH — المسح غير نشط: تطبيق كامل
+        // ═══════════════════════════════════════════════════════════
         try {
             MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
-            // نُحدّث مرجعنا الداخلي أيضاً
             loadSettings();
             MiraReaderSettings.ApplyResult result = settings.applyToReader(reader);
-            Log.i(TAG, "✅ applySettingsNow: " + result);
-
-            // إذا كان المسح نشطاً، لا نُوقفه — الإعدادات طُبّقت ديناميكياً
+            Log.i(TAG, "✅ Full applySettingsNow: " + result);
             return result.isSuccess();
         } catch (Exception e) {
             MiraFileLogger.logError(TAG, "applySettingsNow error", e);
@@ -336,9 +340,6 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
     }
 
-    /**
-     * ✅ استدعاء دالة SDK مع int عبر Reflection
-     */
     private void invokeIntMethod(String methodName, int value) {
         if (reader == null) return;
         try {
@@ -352,9 +353,6 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
     }
 
-    /**
-     * ✅ استدعاء دالة SDK مع boolean عبر Reflection
-     */
     private void invokeBooleanMethod(String methodName, boolean value) {
         if (reader == null) return;
         try {
@@ -383,7 +381,6 @@ public class ChainwayReader implements MiraIRFIDReader {
             isConnected = (reader != null);
 
             if (isConnected) {
-                // 🆕 v4.1 — استخدام الدالة الموحّدة (مع reset للـ throttle)
                 lastApplyTime = 0;
                 applySettingsNow();
 
@@ -415,7 +412,6 @@ public class ChainwayReader implements MiraIRFIDReader {
     public synchronized void release() {
         disconnect();
 
-        // 🆕 v4.1 — إلغاء تسجيل المستمع
         if (settingsListener != null && context != null) {
             try {
                 MiraReaderSettings.getInstance(context).removeListener(settingsListener);
@@ -429,7 +425,6 @@ public class ChainwayReader implements MiraIRFIDReader {
             scanExecutor = null;
         }
 
-        // ✅ لا نُحرّر shared reader — RFIDManager يملكه
         if (reader != null && reader != BaseTabFragmentActivity.getSharedReader()) {
             try {
                 reader.free();
@@ -458,21 +453,18 @@ public class ChainwayReader implements MiraIRFIDReader {
     public boolean startScan() {
         MiraFileLogger.log(TAG, "🚀 startScan() called");
 
-        // 1) تأكد من وجود العتاد
         if (!BaseTabFragmentActivity.isRfidDevicePresent()) {
             Log.e(TAG, "❌ RFID device not present");
             if (listener != null) listener.onError("RFID device not present");
             return false;
         }
 
-        // 2) منع التشغيل المزدوج
         if (!isScanning.compareAndSet(false, true)) {
             Log.d(TAG, "Already scanning");
             return true;
         }
 
         try {
-            // 3) الاتصال إن لزم
             if (reader == null || !isConnected) {
                 if (!connect()) {
                     Log.e(TAG, "❌ Cannot connect");
@@ -482,12 +474,12 @@ public class ChainwayReader implements MiraIRFIDReader {
                 }
             }
 
-            // 4) 🆕 v4.1 — إعادة تطبيق الإعدادات (بدل applyAdvancedSettings)
+            // ✅ [v4.2] COLD apply قبل بدء المسح — يُطبّق كل الإعدادات
+            lastApplyTime = 0;
             if (!applySettingsNow()) {
                 Log.w(TAG, "⚠️ applySettingsNow failed — continuing anyway");
             }
 
-            // 5) تفرّع حسب وضع القراءة
             MiraReaderSettings s = MiraReaderSettings.getInstance(context);
             boolean success;
 
@@ -499,15 +491,14 @@ public class ChainwayReader implements MiraIRFIDReader {
                 success = startAutoInventory();
             }
 
-            // 6) التحقق
             if (!success) {
                 Log.e(TAG, "❌ Failed to start inventory");
                 isScanning.set(false);
+                isHardwareActive.set(false);
                 if (listener != null) listener.onError("Failed to start inventory");
                 return false;
             }
 
-            // 7) أبلغ المستمع
             if (listener != null) listener.onScanStarted();
 
             Log.i(TAG, "✅ Scan started successfully");
@@ -516,6 +507,7 @@ public class ChainwayReader implements MiraIRFIDReader {
         } catch (Exception e) {
             Log.e(TAG, "❌ startScan exception", e);
             isScanning.set(false);
+            isHardwareActive.set(false);
             if (listener != null) listener.onError("Start error: " + e.getMessage());
             return false;
         }
@@ -525,6 +517,8 @@ public class ChainwayReader implements MiraIRFIDReader {
         try {
             boolean ok = reader.startInventoryTag();
             if (ok) {
+                // ✅ [v4.2] علّم أن العتاد أصبح نشطاً — HOT path مُفعَّل الآن
+                isHardwareActive.set(true);
                 ensureExecutor();
                 scanExecutor.execute(this::scanLoop);
             }
@@ -537,6 +531,8 @@ public class ChainwayReader implements MiraIRFIDReader {
 
     private boolean startSingleTagLoop() {
         try {
+            // ✅ [v4.2] للوضع المفرد، العتاد نشط من الآن
+            isHardwareActive.set(true);
             ensureExecutor();
             scanExecutor.execute(() -> {
                 Log.d(TAG, "🎯 Single tag loop started");
@@ -650,6 +646,9 @@ public class ChainwayReader implements MiraIRFIDReader {
             return;
         }
 
+        // ✅ [v4.2] أعد التعيين قبل أي عملية — العتاد لم يعد نشطاً
+        isHardwareActive.set(false);
+
         MiraFileLogger.log(TAG, "⏹️ stopScan() executing...");
 
         try {
@@ -747,7 +746,6 @@ public class ChainwayReader implements MiraIRFIDReader {
         invokeIntMethod("setFrequencyMode", mode);
     }
 
-    // ==================== Getters ====================
     public int getPowerDbm()       { return powerDbm; }
     public int getRssiThreshold()  { return rssiThreshold; }
     public int getScanIntervalMs() { return scanIntervalMs; }
@@ -966,4 +964,4 @@ public class ChainwayReader implements MiraIRFIDReader {
             }
         }
     }
-    }
+}
