@@ -1562,6 +1562,14 @@ addDebugLine("📡 " + normalizedEpc + " / " + rssi);
 private void processValidEpc(String epc, int rssi) {
     if (epc == null || epc.isEmpty()) return;
 
+    // ✅ [v4.4] ارفض الشرائح المشوّهة (fragments)
+    //    EPC صالح = 24 حرف على الأقل
+    //    3008، 3008XXXX إلخ = قراءات خاطئة من SDK
+    if (epc.length() < 16) {
+        addDebugLine("⚠️ Reject short EPC: " + epc);
+        return;
+    }
+
     // فلتر الفئة
     if (selectedCategoryFilter != null
             && !selectedCategoryFilter.isEmpty()) {
@@ -2767,9 +2775,9 @@ private void clearAllLists() {
     private void updateButtonsState() {
     if (!isAdded() || isFragmentDestroyed) return;
 
-    int engineCount = (inventoryEngine != null) ? inventoryEngine.getUniqueCount() : 0;
-    int listCount = (scannedItemsDisplayList != null) ? scannedItemsDisplayList.size() : 0;
-    int scanned = Math.max(engineCount, listCount);
+    // ✅ [v4.4] استخدم القائمة كمصدر الحقيقة (تطابق مع ما يراه المستخدم)
+int listCount = (scannedItemsDisplayList != null) ? scannedItemsDisplayList.size() : 0;
+int scanned = listCount;
 
     boolean hasItems = scanned > 0;
     boolean canEdit = canEditInventory();
@@ -2872,11 +2880,11 @@ private void clearAllLists() {
         return UI_UPDATE_THROTTLE_MAX_MS;
     }
 
-    private void updateUI() {
-    if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
+private void updateUI() {
+    if (!isAdded() || isFragmentDestroyed) return;
 
-    int scanned = inventoryEngine.getUniqueCount();
-
+    // ✅ [v4.4] استخدم القائمة — نفس ما يراه المستخدم
+    int scanned = scannedItemsDisplayList.size();
     // ✅ عدد الممسوحات
     if (tvScannedCount != null) {
         String newText = String.valueOf(scanned);
