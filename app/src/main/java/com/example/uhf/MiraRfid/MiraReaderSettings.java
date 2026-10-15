@@ -2,6 +2,8 @@ package com.example.uhf.MiraRfid;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.rscja.deviceapi.RFIDWithUHFUART;
@@ -14,21 +16,18 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraReaderSettings v5.0 — المصدر الوحيد لإعدادات قارئ RFID في MIRA
+ *  MiraReaderSettings v5.1 — Async Persistence + Debounced Notifications
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * [v5.0] إضافات حرجة لليمن/الخليج + المجوهرات:
- *   ✅ قيم افتراضية محسّنة (Power=24، TagFocus=ON، Filter=ON، Toggle)
- *   ✅ دالة applyYemenJewelryDefaults() — تطبيق بضغطة واحدة
- *   ✅ TONE_UNKNOWN_ITEM — تمييز صوتي للقطع غير المعروفة
- *   ✅ Trigger Mode (Hold/Toggle)
+ * [v5.1] إصلاحات الأداء:
+ *   ✅ كل setter يستخدم .apply() بدل .commit() — كتابة غير متزامنة
+ *   ✅ notifyChanged() مع Debounce (200ms) — يمنع تسلسل callbacks
+ *   ✅ Handler على Main Thread
  *
- * [v4.0] الأساس:
- *   🔊 نظام الأصوات الكامل
- *   📳 الاهتزاز القابل للتخصيص
- *   🎯 القراءة المتقدمة (مهلة + حد أقصى + إيقاف تلقائي)
- *   🚫 فلترة التكرار
- *   💡 وميض LED + إبقاء الشاشة مضاءة
+ * [v5.0] الأساس:
+ *   ✅ Trigger Mode, Tone Preview, Yemen defaults
+ *   ✅ POS Power, Advanced Reading
+ *   ✅ Sound & Vibration
  */
 public class MiraReaderSettings {
 
@@ -90,9 +89,6 @@ public class MiraReaderSettings {
             "Gen2X / Miller2 / 320KHz",  "Gen2X / Miller2 / 640KHz"
     };
 
-    // ═══════════════════════════════════════════════════════════════
-    //  🔄 وضع القراءة
-    // ═══════════════════════════════════════════════════════════════
     public static final int READ_MODE_AUTO   = 0;
     public static final int READ_MODE_SINGLE = 1;
 
@@ -104,11 +100,8 @@ public class MiraReaderSettings {
             "يقرأ وسماً واحداً فقط لكل ضغطة — مثالي للبيع"
     };
 
-    // ═══════════════════════════════════════════════════════════════
-    //  🎯 وضع الزناد الفيزيائي (Trigger Mode)
-    // ═══════════════════════════════════════════════════════════════
-    public static final int TRIGGER_MODE_HOLD   = 0;  // اضغط باستمرار
-    public static final int TRIGGER_MODE_TOGGLE = 1;  // ضغطة تبدّل
+    public static final int TRIGGER_MODE_HOLD   = 0;
+    public static final int TRIGGER_MODE_TOGGLE = 1;
 
     public static final String[] TRIGGER_MODE_LABELS = {
             "⏸️ اضغط باستمرار (Hold)",
@@ -120,17 +113,14 @@ public class MiraReaderSettings {
             "ضغطة واحدة تبدأ المسح، وضغطة أخرى توقفه — مثالي للجرد الشامل"
     };
 
-    // ═══════════════════════════════════════════════════════════════
-    //  🔊 نغمات التغذية الراجعة
-    // ═══════════════════════════════════════════════════════════════
-    public static final int TONE_BEEP_SHORT   = 0; // بيب قصير
-    public static final int TONE_BEEP_DOUBLE  = 1; // بيب مزدوج
-    public static final int TONE_BEEP_LONG    = 2; // بيب طويل
-    public static final int TONE_CLICK        = 3; // كليك
-    public static final int TONE_SUCCESS      = 4; // نجاح
-    public static final int TONE_ERROR        = 5; // خطأ
-    public static final int TONE_NONE         = 6; // صامت
-    public static final int TONE_UNKNOWN_ITEM = 7; // ⚠️ [v5.0] قطعة غير معروفة
+    public static final int TONE_BEEP_SHORT   = 0;
+    public static final int TONE_BEEP_DOUBLE  = 1;
+    public static final int TONE_BEEP_LONG    = 2;
+    public static final int TONE_CLICK        = 3;
+    public static final int TONE_SUCCESS      = 4;
+    public static final int TONE_ERROR        = 5;
+    public static final int TONE_NONE         = 6;
+    public static final int TONE_UNKNOWN_ITEM = 7;
 
     public static final String[] TONE_LABELS = {
             "🔔 بيب قصير",
@@ -144,113 +134,58 @@ public class MiraReaderSettings {
     };
 
     // ═══════════════════════════════════════════════════════════════
-    //  🎯 القيم الافتراضية — محسّنة لجرد المجوهرات في اليمن/الخليج
+    //  🎯 القيم الافتراضية
     // ═══════════════════════════════════════════════════════════════
 
-    // ────────────── القارئ (Reader) ──────────────
-
-    /** ⚡ قوة الإرسال: 24 dBm — توازن مثالي (لا يقرأ الصواني المجاورة) */
     public static final int  DEF_POWER_DBM       = 24;
-
-    /** 🌍 المنطقة: ETSI (865-868 MHz) — الأنسب لليمن/الخليج */
     public static final int  DEF_FREQ_MODE       = FREQ_ETSI;
-
-    /** 🔄 وضع القراءة: مستمر (للجرد) */
     public static final int  DEF_READ_MODE       = READ_MODE_AUTO;
-
-    /** 📊 Session 1 — يبقي الوسوم نشطة بين الدورات */
     public static final int  DEF_SESSION         = 1;
-
-    /** 🎯 Target A — يستهدف الوسوم غير المقروءة */
     public static final int  DEF_TARGET          = 0;
-
-    /** 🔢 Q Mode: ثابت (Fixed) */
     public static final int  DEF_Q_MODE          = 0;
-
-    /** 🔢 Q Value: 4 (16 فتحة) — مثالي لـ 10-30 قطعة */
     public static final int  DEF_Q_VALUE         = 4;
-
     public static final int  DEF_MIN_Q           = 0;
     public static final int  DEF_MAX_Q           = 15;
     public static final int  DEF_DR              = 0;
-
-    /** 🎵 Miller: 4 — دقة أعلى في البيئة المزدوجة بالمعادن */
     public static final int  DEF_MILLER          = 3;
-
-    /** 🔗 Link Frequency: 250 KHz — توازن سرعة/دقة */
     public static final int  DEF_LINK_FREQ       = 1;
-
-    /** 🔗 RFLink: PR-ASK / Miller4 / 250KHz — مثالي للمجوهرات */
     public static final int  DEF_RFLINK          = 1;
-
-    /** 🚀 FastID: OFF — للدقة */
     public static final boolean DEF_FAST_ID      = false;
-
-    /** ✅ TagFocus: ON — حرج للمعادن */
     public static final boolean DEF_TAG_FOCUS    = true;
-
-    /** ⚡ Fast Inventory: OFF — للدقة */
     public static final boolean DEF_FAST_INV     = false;
-
     public static final int  DEF_RSSI_THRESHOLD  = -75;
     public static final int  DEF_SCAN_INTERVAL   = 100;
 
-    // ────────────── ⚡ POS Power (للبيع) ──────────────
-
-    /** 7 dBm — يقرأ القطعة أمامك فقط */
     public static final int  DEF_POS_POWER_DBM = 7;
     public static final int  MIN_POS_POWER_DBM = 5;
     public static final int  MAX_POS_POWER_DBM = 30;
 
-    // ────────────── 🔊 الأصوات والاهتزاز ──────────────
-
     public static final boolean DEF_SOUND_ENABLED     = true;
-    public static final int     DEF_SOUND_VOLUME      = 85;   // 85%
+    public static final int     DEF_SOUND_VOLUME      = 85;
     public static final boolean DEF_VIBRATE_ENABLED   = true;
-    public static final int     DEF_VIBRATE_MS        = 45;   // 45ms
+    public static final int     DEF_VIBRATE_MS        = 45;
 
-    /** 🔔 قطعة جديدة: بيب مزدوج — واضح لا يمكن تفويته */
     public static final int     DEF_TONE_NEW_TAG      = TONE_BEEP_DOUBLE;
-
-    /** 🖱️ قطعة مكررة: كليك خفيف — يعرف أنها مكررة */
     public static final int     DEF_TONE_DUPLICATE    = TONE_CLICK;
-
-    /** ❌ خطأ: بيب طويل — تحذير واضح */
     public static final int     DEF_TONE_ERROR        = TONE_BEEP_LONG;
-
-    /** ✅ نجاح البيع: نغمة نجاح مميزة */
     public static final int     DEF_TONE_SUCCESS      = TONE_SUCCESS;
-
-    /** ⚠️ [v5.0] قطعة غير معروفة: تنبيه — يميّزها عن القطعة المعروفة */
     public static final int     DEF_TONE_UNKNOWN_ITEM = TONE_UNKNOWN_ITEM;
 
     public static final boolean DEF_SOUND_ON_POS      = true;
     public static final boolean DEF_SOUND_ON_INVENTORY= true;
 
-    // ────────────── 🎯 القراءة المتقدمة ──────────────
-
     public static final int     DEF_SINGLE_TIMEOUT_MS = 1500;
     public static final int     DEF_AUTO_STOP_MS      = 0;
     public static final int     DEF_MAX_TAGS_SESSION  = 0;
-
-    /** ✅ فلتر التكرار: ON افتراضياً — مهم جداً للمجوهرات */
     public static final boolean DEF_FILTER_DUPLICATES = true;
-
-    /** نافذة التجاهل: 2500ms */
     public static final int     DEF_DUPLICATE_FILTER_MS = 2500;
-
-    // ────────────── 🌐 إعدادات عامة ──────────────
 
     public static final boolean DEF_LED_FLASH         = false;
     public static final boolean DEF_KEEP_SCREEN_ON    = true;
     public static final boolean DEF_TOAST_ENABLED     = true;
     public static final boolean DEF_AUTO_SAVE_LOG     = false;
+    public static final int     DEF_LANGUAGE          = 0;
 
-    public static final int     DEF_LANGUAGE          = 0; // 0=AR, 1=EN
-
-    // ────────────── 🎯 وضع الزناد ──────────────
-
-    /** Toggle — الأنسب للجرد الشامل */
     public static final int DEF_TRIGGER_MODE = TRIGGER_MODE_TOGGLE;
 
     // ═══════════════════════════════════════════════════════════════
@@ -263,10 +198,15 @@ public class MiraReaderSettings {
     private final CopyOnWriteArrayList<WeakReference<OnSettingsChangedListener>> listeners
             = new CopyOnWriteArrayList<>();
 
+    // ✅ [v5.1] Debounce
+    private final Handler notifyHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingNotify;
+    private static final long NOTIFY_DEBOUNCE_MS = 200;
+
     private MiraReaderSettings(Context ctx) {
         this.context = ctx.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.i(TAG, "✅ MiraReaderSettings v5.0 initialized");
+        Log.i(TAG, "✅ MiraReaderSettings v5.1 initialized");
     }
 
     public static MiraReaderSettings getInstance(Context ctx) {
@@ -298,64 +238,68 @@ public class MiraReaderSettings {
         listeners.removeIf(ref -> ref.get() == null || ref.get() == l);
     }
 
+    /**
+     * ✅ [v5.1] Debounced notification — يمنع تسلسل callbacks
+     *
+     * يستخدم Handler على Main Thread، ويُأجّل الإشعار 200ms.
+     * إذا وردت تغييرات إضافية خلال النافذة، يُعاد الجدولة.
+     *
+     * النتيجة: بدل 50 callback/ثانية عند سحب SeekBar → callback واحد فقط.
+     */
     private void notifyChanged() {
-        for (WeakReference<OnSettingsChangedListener> ref : listeners) {
-            OnSettingsChangedListener l = ref.get();
-            if (l != null) {
-                try { l.onSettingsChanged(); }
-                catch (Exception e) { Log.e(TAG, "notify error", e); }
-            }
+        if (pendingNotify != null) {
+            notifyHandler.removeCallbacks(pendingNotify);
         }
+        pendingNotify = () -> {
+            pendingNotify = null;
+            for (WeakReference<OnSettingsChangedListener> ref : listeners) {
+                OnSettingsChangedListener l = ref.get();
+                if (l != null) {
+                    try {
+                        l.onSettingsChanged();
+                    } catch (Exception e) {
+                        Log.e(TAG, "notify error", e);
+                    }
+                }
+            }
+        };
+        notifyHandler.postDelayed(pendingNotify, NOTIFY_DEBOUNCE_MS);
     }
 
     // ═══════════════════════════════════════════════════════════════
     //  🎯 v5.0 — تطبيق الإعدادات المثالية لليمن/المجوهرات
     // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * ✅ يُطبّق الإعدادات المثالية لجرد المجوهرات في اليمن/الخليج بضغطة واحدة.
-     *
-     * يُستخدم عند:
-     *   • أول تثبيت
-     *   • الترقية من إصدار قديم
-     *   • إعادة الضبط بعد تغييرات غير موفقة
-     *
-     * ملاحظة: لا يمس إعدادات الصوت/الاهتزاز (لأنها شخصية).
-     */
     public void applyYemenJewelryDefaults() {
         Log.i(TAG, "🎯 Applying Yemen/Jewelry optimal defaults");
 
         SharedPreferences.Editor e = prefs.edit();
 
-        // ⚡ القارئ
-        e.putInt("power",         DEF_POWER_DBM);        // 24 dBm
-        e.putInt("freq",          DEF_FREQ_MODE);        // ETSI
-        e.putInt("rflink",        DEF_RFLINK);           // Miller4/250KHz
-        e.putInt("miller",        DEF_MILLER);           // 4
-        e.putInt("link_freq",     DEF_LINK_FREQ);        // 250KHz
-        e.putInt("sess",          DEF_SESSION);          // S1
-        e.putInt("target",        DEF_TARGET);           // A
-        e.putInt("q_mode",        DEF_Q_MODE);           // Fixed
-        e.putInt("q_val",         DEF_Q_VALUE);          // 4
-        e.putBoolean("tag_focus", DEF_TAG_FOCUS);        // ✅ ON
-        e.putBoolean("fast_id",   DEF_FAST_ID);          // OFF
-        e.putBoolean("fast_inv",  DEF_FAST_INV);         // OFF
+        e.putInt("power",         DEF_POWER_DBM);
+        e.putInt("freq",          DEF_FREQ_MODE);
+        e.putInt("rflink",        DEF_RFLINK);
+        e.putInt("miller",        DEF_MILLER);
+        e.putInt("link_freq",     DEF_LINK_FREQ);
+        e.putInt("sess",          DEF_SESSION);
+        e.putInt("target",        DEF_TARGET);
+        e.putInt("q_mode",        DEF_Q_MODE);
+        e.putInt("q_val",         DEF_Q_VALUE);
+        e.putBoolean("tag_focus", DEF_TAG_FOCUS);
+        e.putBoolean("fast_id",   DEF_FAST_ID);
+        e.putBoolean("fast_inv",  DEF_FAST_INV);
 
-        // 🎯 القراءة المتقدمة
-        e.putBoolean("flt_dup", DEF_FILTER_DUPLICATES);  // ✅ ON
-        e.putInt("dup_flt",     DEF_DUPLICATE_FILTER_MS);// 2500ms
-        e.putInt("max_tags",    DEF_MAX_TAGS_SESSION);   // 0 = بلا حد
-        e.putInt("auto_stop",   DEF_AUTO_STOP_MS);       // 0 = بلا إيقاف
+        e.putBoolean("flt_dup", DEF_FILTER_DUPLICATES);
+        e.putInt("dup_flt",     DEF_DUPLICATE_FILTER_MS);
+        e.putInt("max_tags",    DEF_MAX_TAGS_SESSION);
+        e.putInt("auto_stop",   DEF_AUTO_STOP_MS);
 
-        // 🌐 عام
-        e.putBoolean("keep_screen", DEF_KEEP_SCREEN_ON); // ON
+        e.putBoolean("keep_screen", DEF_KEEP_SCREEN_ON);
 
-        // 🎯 وضع الزناد
-        e.putInt("trigger_mode", DEF_TRIGGER_MODE);      // Toggle
+        e.putInt("trigger_mode", DEF_TRIGGER_MODE);
 
-        // ⚡ POS
-        e.putInt("pos_power", DEF_POS_POWER_DBM);        // 7 dBm
+        e.putInt("pos_power", DEF_POS_POWER_DBM);
 
+        // ✅ هذا bulk operation — نستخدم commit لضمان الكتابة الذرية
         e.commit();
         notifyChanged();
 
@@ -363,7 +307,7 @@ public class MiraReaderSettings {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  📡 Get / Set — الإعدادات الأساسية
+    //  📡 Get — الإعدادات الأساسية
     // ═══════════════════════════════════════════════════════════════
     public int     getPowerDbm()      { return prefs.getInt("power", DEF_POWER_DBM); }
     public int     getFreqMode()      { return prefs.getInt("freq", DEF_FREQ_MODE); }
@@ -386,30 +330,33 @@ public class MiraReaderSettings {
     public int     getPosPowerDbm()   { return prefs.getInt("pos_power", DEF_POS_POWER_DBM); }
     public int     getTriggerMode()   { return prefs.getInt("trigger_mode", DEF_TRIGGER_MODE); }
 
-    public void setPowerDbm(int v)      { prefs.edit().putInt("power", clamp(v, 5, 33)).commit(); notifyChanged(); }
-    public void setFreqMode(int v)      { prefs.edit().putInt("freq", v).commit(); notifyChanged(); }
-    public void setReadMode(int v)      { prefs.edit().putInt("read_mode", clamp(v, 0, 1)).commit(); notifyChanged(); }
-    public void setSession(int v)       { prefs.edit().putInt("sess", clamp(v, 0, 3)).commit(); notifyChanged(); }
-    public void setTarget(int v)        { prefs.edit().putInt("target", clamp(v, 0, 1)).commit(); notifyChanged(); }
-    public void setQMode(int v)         { prefs.edit().putInt("q_mode", clamp(v, 0, 1)).commit(); notifyChanged(); }
-    public void setQValue(int v)        { prefs.edit().putInt("q_val", clamp(v, 0, 15)).commit(); notifyChanged(); }
-    public void setMinQ(int v)          { prefs.edit().putInt("q_min", clamp(v, 0, 15)).commit(); notifyChanged(); }
-    public void setMaxQ(int v)          { prefs.edit().putInt("q_max", clamp(v, 0, 15)).commit(); notifyChanged(); }
-    public void setDR(int v)            { prefs.edit().putInt("dr", clamp(v, 0, 1)).commit(); notifyChanged(); }
-    public void setMiller(int v)        { prefs.edit().putInt("miller", clamp(v, 0, 3)).commit(); notifyChanged(); }
-    public void setLinkFreq(int v)      { prefs.edit().putInt("link_freq", clamp(v, 0, 7)).commit(); notifyChanged(); }
-    public void setRfLink(int v)        { prefs.edit().putInt("rflink", clamp(v, 0, 11)).commit(); notifyChanged(); }
-    public void setFastId(boolean v)    { prefs.edit().putBoolean("fast_id", v).commit(); notifyChanged(); }
-    public void setTagFocus(boolean v)  { prefs.edit().putBoolean("tag_focus", v).commit(); notifyChanged(); }
-    public void setFastInventory(boolean v) { prefs.edit().putBoolean("fast_inv", v).commit(); notifyChanged(); }
-    public void setRssiThreshold(int v) { prefs.edit().putInt("rssi", clamp(v, -100, -30)).commit(); notifyChanged(); }
-    public void setScanInterval(int v)  { prefs.edit().putInt("interval", clamp(v, 50, 1000)).commit(); notifyChanged(); }
+    // ═══════════════════════════════════════════════════════════════
+    //  📡 Set — الإعدادات الأساسية (كلها .apply() الآن)
+    // ═══════════════════════════════════════════════════════════════
+    public void setPowerDbm(int v)      { prefs.edit().putInt("power", clamp(v, 5, 33)).apply(); notifyChanged(); }
+    public void setFreqMode(int v)      { prefs.edit().putInt("freq", v).apply(); notifyChanged(); }
+    public void setReadMode(int v)      { prefs.edit().putInt("read_mode", clamp(v, 0, 1)).apply(); notifyChanged(); }
+    public void setSession(int v)       { prefs.edit().putInt("sess", clamp(v, 0, 3)).apply(); notifyChanged(); }
+    public void setTarget(int v)        { prefs.edit().putInt("target", clamp(v, 0, 1)).apply(); notifyChanged(); }
+    public void setQMode(int v)         { prefs.edit().putInt("q_mode", clamp(v, 0, 1)).apply(); notifyChanged(); }
+    public void setQValue(int v)        { prefs.edit().putInt("q_val", clamp(v, 0, 15)).apply(); notifyChanged(); }
+    public void setMinQ(int v)          { prefs.edit().putInt("q_min", clamp(v, 0, 15)).apply(); notifyChanged(); }
+    public void setMaxQ(int v)          { prefs.edit().putInt("q_max", clamp(v, 0, 15)).apply(); notifyChanged(); }
+    public void setDR(int v)            { prefs.edit().putInt("dr", clamp(v, 0, 1)).apply(); notifyChanged(); }
+    public void setMiller(int v)        { prefs.edit().putInt("miller", clamp(v, 0, 3)).apply(); notifyChanged(); }
+    public void setLinkFreq(int v)      { prefs.edit().putInt("link_freq", clamp(v, 0, 7)).apply(); notifyChanged(); }
+    public void setRfLink(int v)        { prefs.edit().putInt("rflink", clamp(v, 0, 11)).apply(); notifyChanged(); }
+    public void setFastId(boolean v)    { prefs.edit().putBoolean("fast_id", v).apply(); notifyChanged(); }
+    public void setTagFocus(boolean v)  { prefs.edit().putBoolean("tag_focus", v).apply(); notifyChanged(); }
+    public void setFastInventory(boolean v) { prefs.edit().putBoolean("fast_inv", v).apply(); notifyChanged(); }
+    public void setRssiThreshold(int v) { prefs.edit().putInt("rssi", clamp(v, -100, -30)).apply(); notifyChanged(); }
+    public void setScanInterval(int v)  { prefs.edit().putInt("interval", clamp(v, 50, 1000)).apply(); notifyChanged(); }
     public void setPosPowerDbm(int v)   {
-        prefs.edit().putInt("pos_power", clamp(v, MIN_POS_POWER_DBM, MAX_POS_POWER_DBM)).commit();
+        prefs.edit().putInt("pos_power", clamp(v, MIN_POS_POWER_DBM, MAX_POS_POWER_DBM)).apply();
         notifyChanged();
     }
     public void setTriggerMode(int v)   {
-        prefs.edit().putInt("trigger_mode", clamp(v, 0, 1)).commit();
+        prefs.edit().putInt("trigger_mode", clamp(v, 0, 1)).apply();
         notifyChanged();
     }
 
@@ -428,17 +375,17 @@ public class MiraReaderSettings {
     public boolean isVibrateEnabled()      { return prefs.getBoolean("vib_en", DEF_VIBRATE_ENABLED); }
     public int     getVibrateMs()          { return prefs.getInt("vib_ms", DEF_VIBRATE_MS); }
 
-    public void setSoundEnabled(boolean v)      { prefs.edit().putBoolean("snd_en", v).commit(); notifyChanged(); }
-    public void setSoundVolume(int v)           { prefs.edit().putInt("snd_vol", clamp(v, 0, 100)).commit(); notifyChanged(); }
-    public void setToneNewTag(int v)            { prefs.edit().putInt("tone_new", v).commit(); notifyChanged(); }
-    public void setToneDuplicate(int v)         { prefs.edit().putInt("tone_dup", v).commit(); notifyChanged(); }
-    public void setToneError(int v)             { prefs.edit().putInt("tone_err", v).commit(); notifyChanged(); }
-    public void setToneSuccess(int v)           { prefs.edit().putInt("tone_succ", v).commit(); notifyChanged(); }
-    public void setToneUnknownItem(int v)       { prefs.edit().putInt("tone_unk", v).commit(); notifyChanged(); }
-    public void setSoundOnPos(boolean v)        { prefs.edit().putBoolean("snd_pos", v).commit(); notifyChanged(); }
-    public void setSoundOnInventory(boolean v)  { prefs.edit().putBoolean("snd_inv", v).commit(); notifyChanged(); }
-    public void setVibrateEnabled(boolean v)    { prefs.edit().putBoolean("vib_en", v).commit(); notifyChanged(); }
-    public void setVibrateMs(int v)             { prefs.edit().putInt("vib_ms", clamp(v, 10, 500)).commit(); notifyChanged(); }
+    public void setSoundEnabled(boolean v)      { prefs.edit().putBoolean("snd_en", v).apply(); notifyChanged(); }
+    public void setSoundVolume(int v)           { prefs.edit().putInt("snd_vol", clamp(v, 0, 100)).apply(); notifyChanged(); }
+    public void setToneNewTag(int v)            { prefs.edit().putInt("tone_new", v).apply(); notifyChanged(); }
+    public void setToneDuplicate(int v)         { prefs.edit().putInt("tone_dup", v).apply(); notifyChanged(); }
+    public void setToneError(int v)             { prefs.edit().putInt("tone_err", v).apply(); notifyChanged(); }
+    public void setToneSuccess(int v)           { prefs.edit().putInt("tone_succ", v).apply(); notifyChanged(); }
+    public void setToneUnknownItem(int v)       { prefs.edit().putInt("tone_unk", v).apply(); notifyChanged(); }
+    public void setSoundOnPos(boolean v)        { prefs.edit().putBoolean("snd_pos", v).apply(); notifyChanged(); }
+    public void setSoundOnInventory(boolean v)  { prefs.edit().putBoolean("snd_inv", v).apply(); notifyChanged(); }
+    public void setVibrateEnabled(boolean v)    { prefs.edit().putBoolean("vib_en", v).apply(); notifyChanged(); }
+    public void setVibrateMs(int v)             { prefs.edit().putInt("vib_ms", clamp(v, 10, 500)).apply(); notifyChanged(); }
 
     // ═══════════════════════════════════════════════════════════════
     //  🎯 إعدادات القراءة المتقدمة
@@ -449,14 +396,14 @@ public class MiraReaderSettings {
     public int     getDuplicateFilterMs()    { return prefs.getInt("dup_flt", DEF_DUPLICATE_FILTER_MS); }
     public boolean isFilterDuplicates()      { return prefs.getBoolean("flt_dup", DEF_FILTER_DUPLICATES); }
 
-    public void setSingleTimeoutMs(int v)     { prefs.edit().putInt("sin_to", clamp(v, 200, 10000)).commit(); notifyChanged(); }
-    public void setAutoStopMs(int v)          { prefs.edit().putInt("auto_stop", clamp(v, 0, 600000)).commit(); notifyChanged(); }
-    public void setMaxTagsPerSession(int v)   { prefs.edit().putInt("max_tags", clamp(v, 0, 100000)).commit(); notifyChanged(); }
-    public void setDuplicateFilterMs(int v)   { prefs.edit().putInt("dup_flt", clamp(v, 0, 60000)).commit(); notifyChanged(); }
-    public void setFilterDuplicates(boolean v){ prefs.edit().putBoolean("flt_dup", v).commit(); notifyChanged(); }
+    public void setSingleTimeoutMs(int v)     { prefs.edit().putInt("sin_to", clamp(v, 200, 10000)).apply(); notifyChanged(); }
+    public void setAutoStopMs(int v)          { prefs.edit().putInt("auto_stop", clamp(v, 0, 600000)).apply(); notifyChanged(); }
+    public void setMaxTagsPerSession(int v)   { prefs.edit().putInt("max_tags", clamp(v, 0, 100000)).apply(); notifyChanged(); }
+    public void setDuplicateFilterMs(int v)   { prefs.edit().putInt("dup_flt", clamp(v, 0, 60000)).apply(); notifyChanged(); }
+    public void setFilterDuplicates(boolean v){ prefs.edit().putBoolean("flt_dup", v).apply(); notifyChanged(); }
 
     // ═══════════════════════════════════════════════════════════════
-    //  🌐 إعدادات عامة (LED, Screen, Toast, Log)
+    //  🌐 إعدادات عامة
     // ═══════════════════════════════════════════════════════════════
     public boolean isLedFlashEnabled()   { return prefs.getBoolean("led_flash", DEF_LED_FLASH); }
     public boolean isKeepScreenOn()      { return prefs.getBoolean("keep_screen", DEF_KEEP_SCREEN_ON); }
@@ -464,11 +411,11 @@ public class MiraReaderSettings {
     public boolean isAutoSaveLog()       { return prefs.getBoolean("auto_log", DEF_AUTO_SAVE_LOG); }
     public int     getLanguage()         { return prefs.getInt("lang", DEF_LANGUAGE); }
 
-    public void setLedFlashEnabled(boolean v) { prefs.edit().putBoolean("led_flash", v).commit(); notifyChanged(); }
-    public void setKeepScreenOn(boolean v)    { prefs.edit().putBoolean("keep_screen", v).commit(); notifyChanged(); }
-    public void setToastEnabled(boolean v)    { prefs.edit().putBoolean("toast_en", v).commit(); notifyChanged(); }
-    public void setAutoSaveLog(boolean v)     { prefs.edit().putBoolean("auto_log", v).commit(); notifyChanged(); }
-    public void setLanguage(int v)            { prefs.edit().putInt("lang", clamp(v, 0, 1)).commit(); notifyChanged(); }
+    public void setLedFlashEnabled(boolean v) { prefs.edit().putBoolean("led_flash", v).apply(); notifyChanged(); }
+    public void setKeepScreenOn(boolean v)    { prefs.edit().putBoolean("keep_screen", v).apply(); notifyChanged(); }
+    public void setToastEnabled(boolean v)    { prefs.edit().putBoolean("toast_en", v).apply(); notifyChanged(); }
+    public void setAutoSaveLog(boolean v)     { prefs.edit().putBoolean("auto_log", v).apply(); notifyChanged(); }
+    public void setLanguage(int v)            { prefs.edit().putInt("lang", clamp(v, 0, 1)).apply(); notifyChanged(); }
 
     // ═══════════════════════════════════════════════════════════════
     //  ✅ تطبيق على القارئ
@@ -530,7 +477,7 @@ public class MiraReaderSettings {
     }
 
     public void resetToDefaults() {
-        prefs.edit().clear().commit();
+        prefs.edit().clear().commit();   // ✅ bulk — commit أفضل
         notifyChanged();
         Log.i(TAG, "🔄 Reset to factory defaults");
     }
