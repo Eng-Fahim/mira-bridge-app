@@ -116,29 +116,34 @@ public class MiraScanSessionController {
     // ═══════════════════════════════════════════════════════════════
 
     /** يُستدعى مرة واحدة عند بدء كل جلسة مسح (جديدة أو مستأنفة) */
-    public void onScanStarted(boolean isResume) {
-        if (released) return;
-        active = true;
+public void onScanStarted(boolean isResume) {
+    if (released) return;
+    active = true;
 
-        if (!isResume) {
-            sessionTagCount = 0;
-            feedback.resetDuplicateFilter();
-            Log.d(TAG, "🆕 New session — counters reset");
-        } else {
-            Log.d(TAG, "🔄 Resume — keeping count=" + sessionTagCount);
-        }
-
-        feedback.onStartInventory();
-        applyKeepScreenOn(true);
-
-        // ⏱️ مؤقت الإيقاف التلقائي
-        mainHandler.removeCallbacks(autoStopRunnable);
-        int autoStop = settings.getAutoStopMs();
-        if (autoStop > 0) {
-            mainHandler.postDelayed(autoStopRunnable, autoStop);
-            Log.i(TAG, "⏱️ Auto-stop scheduled in " + autoStop + "ms");
-        }
+    if (!isResume) {
+        sessionTagCount = 0;
+        Log.d(TAG, "🆕 New session — counters reset");
+    } else {
+        Log.d(TAG, "🔄 Resume — keeping count=" + sessionTagCount);
     }
+
+    // ✅ [v4.4] امسح فلتر التكرار دائماً — حتى عند الاستئناف
+    //    السبب: الفلتر ذاكرة مؤقتة (2.5s) لا معنى لحمله بين الجلسات
+    //    بدون هذا: الشرائح الممسوحة سابقاً تُرفض كـ "مكررة" ولا تُضاف
+    feedback.resetDuplicateFilter();
+    Log.d(TAG, "🧹 Duplicate filter reset (isResume=" + isResume + ")");
+
+    feedback.onStartInventory();
+    applyKeepScreenOn(true);
+
+    // ⏱️ مؤقت الإيقاف التلقائي
+    mainHandler.removeCallbacks(autoStopRunnable);
+    int autoStop = settings.getAutoStopMs();
+    if (autoStop > 0) {
+        mainHandler.postDelayed(autoStopRunnable, autoStop);
+        Log.i(TAG, "⏱️ Auto-stop scheduled in " + autoStop + "ms");
+    }
+}
 
     /** يُستدعى عند أي إيقاف (pause أو stop نهائي) */
     public void onScanStopped() {
