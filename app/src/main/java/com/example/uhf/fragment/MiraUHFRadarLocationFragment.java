@@ -50,6 +50,7 @@ import com.example.uhf.view.CircleSeekBar;
 import com.example.uhf.view.RadarView;
 import com.google.android.material.button.MaterialButton;
 import com.rscja.deviceapi.entity.RadarLocationEntity;
+import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.IUHF;
 import com.rscja.deviceapi.interfaces.IUHFRadarLocationCallback;
 
@@ -65,7 +66,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 
 /**
- * ✅ MiraUHFRadarLocationFragment v2.2 (Clean HW Inventory Polling)
+ * ✅ MiraUHFRadarLocationFragment v2.3 (UHFTAGInfo Fixed)
  */
 public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
@@ -555,12 +556,13 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 if (!inventoryFlag || mContext == null || mContext.mReader == null) return;
 
                 try {
-                    // استخدام inventorySingleTag لجلب الـ EPC مباشرة كـ String بدون الاعتماد على أي كلاس خارجي مفقود
-                    String epc = mContext.mReader.inventorySingleTag();
-                    if (!TextUtils.isEmpty(epc)) {
-                        int rssiVal = 70; // قوة إشارة افتراضية قوية عند التقاط القطعة مباشرة
+                    // استخدام UHFTAGInfo لاستلام الكائن وقراءة الـ EPC منه بشكل صحيح
+                    UHFTAGInfo tagInfo = mContext.mReader.inventorySingleTag();
+                    if (tagInfo != null) {
+                        String epc = tagInfo.getEPC();
+                        int rssiVal = 70;
 
-                        if (TextUtils.isEmpty(epcFilter) || epc.contains(epcFilter) || epcFilter.contains(epc)) {
+                        if (!TextUtils.isEmpty(epc) && (TextUtils.isEmpty(epcFilter) || epc.contains(epcFilter) || epcFilter.contains(epc))) {
                             currentRssi = rssiVal;
                             updateProximityUI(currentRssi);
                             handleGeigerAudioFeedback(currentRssi);
