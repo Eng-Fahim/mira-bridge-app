@@ -16,12 +16,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraReaderSettings v5.1 — Async Persistence + Debounced Notifications
+ *  MiraReaderSettings v5.2 — Balanced for Jewelry Inventory
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * [v5.1] إصلاحات الأداء:
- *   ✅ كل setter يستخدم .apply() بدل .commit() — كتابة غير متزامنة
- *   ✅ notifyChanged() مع Debounce (200ms) — يمنع تسلسل callbacks
+ * [v5.2] إصلاحات توافق Miller/LinkFreq/RFLink:
+ *   ✅ Miller = 2 (Miller 4 — توازن سرعة/دقة للمعادن)
+ *   ✅ LinkFreq = 3 (256 kHz — قريب من 250 kHz الفعلي)
+ *   ✅ RFLink = 1 (PR-ASK / Miller4 / 250KHz — متوافق تماماً)
+ *   ✅ Power = 30 dBm (أقصى تغطية للجرد)
+ *   ✅ Q Value = 5 (32 slot — يعمل مع 5-30 شريحة)
+ *
+ * [v5.1] تحسينات الأداء:
+ *   ✅ كل setter يستخدم .apply() بدل .commit()
+ *   ✅ notifyChanged() مع Debounce (200ms)
  *   ✅ Handler على Main Thread
  *
  * [v5.0] الأساس:
@@ -134,32 +141,56 @@ public class MiraReaderSettings {
     };
 
     // ═══════════════════════════════════════════════════════════════
-    //  🎯 القيم الافتراضية
+    //  🎯 القيم الافتراضية المحسّنة [v5.2]
     // ═══════════════════════════════════════════════════════════════
 
-    public static final int  DEF_POWER_DBM       = 24;
+    // ⚡ Power: 30 dBm — أقصى تغطية (كان 24)
+    public static final int  DEF_POWER_DBM       = 30;
+
+    // 🌍 ETSI (865-868 MHz) — القانوني لليمن
     public static final int  DEF_FREQ_MODE       = FREQ_ETSI;
+
+    // 🔄 قراءة مستمرة
     public static final int  DEF_READ_MODE       = READ_MODE_AUTO;
+
+    // 📊 Session S1
     public static final int  DEF_SESSION         = 1;
+
+    // 🎯 Target A
     public static final int  DEF_TARGET          = 0;
+
+    // 🔢 Q Mode: ثابت
     public static final int  DEF_Q_MODE          = 0;
-    public static final int  DEF_Q_VALUE         = 4;
+
+    // 🔢 Q Value: 5 (32 slot) — كان 4 (16 slot)
+    public static final int  DEF_Q_VALUE         = 5;
+
     public static final int  DEF_MIN_Q           = 0;
     public static final int  DEF_MAX_Q           = 15;
     public static final int  DEF_DR              = 0;
-    public static final int  DEF_MILLER          = 3;
-    public static final int  DEF_LINK_FREQ       = 1;
+
+    // 🎵 Miller: 2 = Miller 4 (كان 3 = Miller 8 — بطيء جداً!)
+    public static final int  DEF_MILLER          = 2;
+
+    // 🔗 LinkFreq: 3 = 256 kHz (كان 1 = 160 kHz)
+    public static final int  DEF_LINK_FREQ       = 3;
+
+    // 🔗 RFLink: 1 = PR-ASK / Miller4 / 250KHz (متوافق مع Miller=2, LinkFreq=3)
     public static final int  DEF_RFLINK          = 1;
+
     public static final boolean DEF_FAST_ID      = false;
     public static final boolean DEF_TAG_FOCUS    = true;
     public static final boolean DEF_FAST_INV     = false;
+
     public static final int  DEF_RSSI_THRESHOLD  = -75;
     public static final int  DEF_SCAN_INTERVAL   = 100;
 
+    // ⚡ POS Power
     public static final int  DEF_POS_POWER_DBM = 7;
     public static final int  MIN_POS_POWER_DBM = 5;
     public static final int  MAX_POS_POWER_DBM = 30;
 
+    // 🔊 الصوت والاهتزاز
     public static final boolean DEF_SOUND_ENABLED     = true;
     public static final int     DEF_SOUND_VOLUME      = 85;
     public static final boolean DEF_VIBRATE_ENABLED   = true;
@@ -198,7 +229,6 @@ public class MiraReaderSettings {
     private final CopyOnWriteArrayList<WeakReference<OnSettingsChangedListener>> listeners
             = new CopyOnWriteArrayList<>();
 
-    // ✅ [v5.1] Debounce
     private final Handler notifyHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingNotify;
     private static final long NOTIFY_DEBOUNCE_MS = 200;
@@ -206,7 +236,7 @@ public class MiraReaderSettings {
     private MiraReaderSettings(Context ctx) {
         this.context = ctx.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.i(TAG, "✅ MiraReaderSettings v5.1 initialized");
+        Log.i(TAG, "✅ MiraReaderSettings v5.2 initialized");
     }
 
     public static MiraReaderSettings getInstance(Context ctx) {
@@ -238,14 +268,6 @@ public class MiraReaderSettings {
         listeners.removeIf(ref -> ref.get() == null || ref.get() == l);
     }
 
-    /**
-     * ✅ [v5.1] Debounced notification — يمنع تسلسل callbacks
-     *
-     * يستخدم Handler على Main Thread، ويُأجّل الإشعار 200ms.
-     * إذا وردت تغييرات إضافية خلال النافذة، يُعاد الجدولة.
-     *
-     * النتيجة: بدل 50 callback/ثانية عند سحب SeekBar → callback واحد فقط.
-     */
     private void notifyChanged() {
         if (pendingNotify != null) {
             notifyHandler.removeCallbacks(pendingNotify);
@@ -267,43 +289,47 @@ public class MiraReaderSettings {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  🎯 v5.0 — تطبيق الإعدادات المثالية لليمن/المجوهرات
+    //  🎯 v5.2 — تطبيق الإعدادات المثالية لليمن/المجوهرات
     // ═══════════════════════════════════════════════════════════════
 
     public void applyYemenJewelryDefaults() {
-        Log.i(TAG, "🎯 Applying Yemen/Jewelry optimal defaults");
+        Log.i(TAG, "🎯 Applying Yemen/Jewelry optimal defaults (v5.2)");
 
         SharedPreferences.Editor e = prefs.edit();
 
-        e.putInt("power",         DEF_POWER_DBM);
-        e.putInt("freq",          DEF_FREQ_MODE);
-        e.putInt("rflink",        DEF_RFLINK);
-        e.putInt("miller",        DEF_MILLER);
-        e.putInt("link_freq",     DEF_LINK_FREQ);
-        e.putInt("sess",          DEF_SESSION);
-        e.putInt("target",        DEF_TARGET);
-        e.putInt("q_mode",        DEF_Q_MODE);
-        e.putInt("q_val",         DEF_Q_VALUE);
-        e.putBoolean("tag_focus", DEF_TAG_FOCUS);
-        e.putBoolean("fast_id",   DEF_FAST_ID);
-        e.putBoolean("fast_inv",  DEF_FAST_INV);
+        // ⚡ القارئ — قيم متوافقة مع Miller 4
+        e.putInt("power",         DEF_POWER_DBM);        // 30 dBm
+        e.putInt("freq",          DEF_FREQ_MODE);        // ETSI
+        e.putInt("rflink",        DEF_RFLINK);           // 1 = PR-ASK/Miller4/250
+        e.putInt("miller",        DEF_MILLER);           // 2 = Miller 4
+        e.putInt("link_freq",     DEF_LINK_FREQ);        // 3 = 256 kHz
+        e.putInt("sess",          DEF_SESSION);          // S1
+        e.putInt("target",        DEF_TARGET);           // A
+        e.putInt("q_mode",        DEF_Q_MODE);           // Fixed
+        e.putInt("q_val",         DEF_Q_VALUE);          // 5 = 32 slot
+        e.putBoolean("tag_focus", DEF_TAG_FOCUS);        // ON
+        e.putBoolean("fast_id",   DEF_FAST_ID);          // OFF
+        e.putBoolean("fast_inv",  DEF_FAST_INV);         // OFF
 
-        e.putBoolean("flt_dup", DEF_FILTER_DUPLICATES);
-        e.putInt("dup_flt",     DEF_DUPLICATE_FILTER_MS);
-        e.putInt("max_tags",    DEF_MAX_TAGS_SESSION);
-        e.putInt("auto_stop",   DEF_AUTO_STOP_MS);
+        // 🎯 القراءة المتقدمة
+        e.putBoolean("flt_dup", DEF_FILTER_DUPLICATES);  // ON
+        e.putInt("dup_flt",     DEF_DUPLICATE_FILTER_MS);// 2500ms
+        e.putInt("max_tags",    DEF_MAX_TAGS_SESSION);   // 0
+        e.putInt("auto_stop",   DEF_AUTO_STOP_MS);       // 0
 
+        // 🌐 عام
         e.putBoolean("keep_screen", DEF_KEEP_SCREEN_ON);
 
+        // 🎯 وضع الزناد
         e.putInt("trigger_mode", DEF_TRIGGER_MODE);
 
+        // ⚡ POS
         e.putInt("pos_power", DEF_POS_POWER_DBM);
 
-        // ✅ هذا bulk operation — نستخدم commit لضمان الكتابة الذرية
         e.commit();
         notifyChanged();
 
-        Log.i(TAG, "✅ Yemen/Jewelry defaults applied successfully");
+        Log.i(TAG, "✅ Yemen/Jewelry defaults v5.2 applied successfully");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -331,7 +357,7 @@ public class MiraReaderSettings {
     public int     getTriggerMode()   { return prefs.getInt("trigger_mode", DEF_TRIGGER_MODE); }
 
     // ═══════════════════════════════════════════════════════════════
-    //  📡 Set — الإعدادات الأساسية (كلها .apply() الآن)
+    //  📡 Set — الإعدادات الأساسية
     // ═══════════════════════════════════════════════════════════════
     public void setPowerDbm(int v)      { prefs.edit().putInt("power", clamp(v, 5, 33)).apply(); notifyChanged(); }
     public void setFreqMode(int v)      { prefs.edit().putInt("freq", v).apply(); notifyChanged(); }
@@ -436,21 +462,27 @@ public class MiraReaderSettings {
         int applied = 0, failed = 0;
         List<String> failedNames = new ArrayList<>();
 
+        // ⚡ Power أولاً
         try { if (reader.setPower(getPowerDbm())) applied++; else { failed++; failedNames.add("setPower"); } }
         catch (Exception e) { failed++; failedNames.add("setPower"); }
 
+        // 🌍 Frequency
         try { if (reader.setFrequencyMode(getFreqMode())) applied++; else { failed++; failedNames.add("setFrequencyMode"); } }
         catch (Exception e) { failed++; failedNames.add("setFrequencyMode"); }
 
+        // 🔗 RFLink (يضع Miller/LinkFreq تلقائياً حسب SDK)
         try { if (reader.setRFLink(getRfLink())) applied++; else { failed++; failedNames.add("setRFLink"); } }
         catch (Exception e) { failed++; failedNames.add("setRFLink"); }
 
+        // 🚀 FastID
         try { if (reader.setFastID(isFastId())) applied++; else { failed++; failedNames.add("setFastID"); } }
         catch (Exception e) { failed++; failedNames.add("setFastID"); }
 
+        // 🎯 TagFocus
         try { if (reader.setTagFocus(isTagFocus())) applied++; else { failed++; failedNames.add("setTagFocus"); } }
         catch (Exception e) { failed++; failedNames.add("setTagFocus"); }
 
+        // 🔢 Gen2 (Session, Target, Q, Miller, LinkFreq, DR)
         try {
             Gen2Entity gen2 = reader.getGen2();
             if (gen2 == null) gen2 = new Gen2Entity();
@@ -461,13 +493,14 @@ public class MiraReaderSettings {
             gen2.setMinQ(getMinQ());
             gen2.setMaxQ(getMaxQ());
             gen2.setQueryDR(getDR());
-            gen2.setQueryM(getMiller());
+            gen2.setQueryM(getMiller());            // Miller 4
             gen2.setQueryTRext(1);
             gen2.setQuerySel(0);
-            gen2.setLinkFrequency(getLinkFreq());
+            gen2.setLinkFrequency(getLinkFreq());   // 256 kHz
             if (reader.setGen2(gen2)) applied++; else { failed++; failedNames.add("setGen2"); }
         } catch (Exception e) { failed++; failedNames.add("setGen2"); }
 
+        // 📖 EPC mode
         try { reader.setEPCMode(); applied++; }
         catch (Exception e) { failed++; failedNames.add("setEPCMode"); }
 
@@ -477,7 +510,7 @@ public class MiraReaderSettings {
     }
 
     public void resetToDefaults() {
-        prefs.edit().clear().commit();   // ✅ bulk — commit أفضل
+        prefs.edit().clear().commit();
         notifyChanged();
         Log.i(TAG, "🔄 Reset to factory defaults");
     }
