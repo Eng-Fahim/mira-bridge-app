@@ -181,6 +181,34 @@ public void clearSession() {
     public int getDuplicateCount() { return duplicateCount.get(); }
 
 
+
+/**
+ * ✅ [v4.3] تحديث بيانات قطعة من الكتالوج بعد التحميل
+ * 
+ * يُستدعى من reclassifyScannedItems() في MiraInventoryProFragment
+ * لضمان تطابق سجل التقرير النهائي مع بيانات الكتالوج.
+ */
+public void updateItemFromCatalog(String epc, String title, String karat,
+                                   double weight, double price) {
+    try {
+        if (epc == null || epc.isEmpty()) return;
+        
+        String normalized = InventoryItem.normalizeEpc(epc);
+        InventoryItem item = scannedByEpcMap.get(normalized);
+        
+        if (item != null) {
+            if (title != null && !title.isEmpty()) item.setTitle(title);
+            if (karat != null && !karat.isEmpty()) item.setKarat(karat);
+            if (weight > 0) item.setWeight(weight);
+            if (price > 0) item.setPrice(price);
+            
+            Log.d(TAG, "✅ Engine updated: " + normalized 
+                    + " | " + title + " | $" + price);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "updateItemFromCatalog error: " + epc, e);
+    }
+}
     /**
  * ✅ إضافة EPC للجلسة الحالية (للاسترجاع)
  * 
