@@ -813,19 +813,25 @@ private void confirmYemenDefaults() {
                     ? "🇾🇪 الإعدادات المثالية لجرد المجوهرات"
                     : "🇾🇪 Optimal Jewelry Inventory Settings")
             .setMessage(isArabic
-                    ? "سيتم تطبيق الإعدادات التالية:\n\n"
-                      + "⚡ قوة الإرسال: 24 dBm\n"
-                      + "🌍 المنطقة: الشرق الأوسط (ETSI 865-868)\n"
-                      + "🎯 TagFocus: مفعّل (للمعادن)\n"
-                      + "🎵 Miller: 4 (دقة أعلى)\n"
-                      + "🚫 فلتر التكرار: مفعّل (2.5 ثانية)\n"
-                      + "🔄 وضع الزناد: ضغطة للبدء/الإيقاف\n"
-                      + "💡 إبقاء الشاشة مضاءة: مفعّل\n"
-                      + "⚡ POS Power: 7 dBm\n\n"
-                      + "ملاحظة: لن تمس إعدادات الصوت/الاهتزاز الشخصية.\n\n"
-                      + "هل تريد المتابعة؟"
-                    : "Apply optimal settings for jewelry inventory?\n\n"
-                      + "Will NOT touch personal sound/vibrate settings.")
+        ? "سيتم تطبيق الإعدادات التالية:\n\n"
+          + "⚡ قوة الإرسال: 30 dBm (أقصى تغطية)\n"
+          + "🌍 المنطقة: الشرق الأوسط (ETSI 865-868)\n"
+          + "🎯 TagFocus: مفعّل (للمعادن)\n"
+          + "🎵 Miller: 4 (توازن سرعة/دقة)\n"
+          + "🔗 LinkFreq: 256 kHz\n"
+          + "🔢 Q Value: 5 (32 slot)\n"
+          + "🚫 فلتر التكرار: مفعّل (2.5 ثانية)\n"
+          + "🔄 وضع الزناد: ضغطة للبدء/الإيقاف\n"
+          + "💡 إبقاء الشاشة مضاءة: مفعّل\n"
+          + "⚡ POS Power: 7 dBm\n\n"
+          + "ملاحظة: لن تمس إعدادات الصوت/الاهتزاز الشخصية.\n\n"
+          + "هل تريد المتابعة؟"
+        : "Apply optimal settings for jewelry inventory?\n\n"
+          + "• Power: 30 dBm\n"
+          + "• Miller: 4\n"
+          + "• LinkFreq: 256 kHz\n"
+          + "• Q: 5\n"
+          + "Will NOT touch personal sound/vibrate settings.")
             .setPositiveButton(isArabic ? "✅ تطبيق" : "✅ Apply", (d, w) -> {
                 try {
                     // 1) طبّق الإعدادات
