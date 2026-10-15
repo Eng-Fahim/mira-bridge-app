@@ -50,6 +50,7 @@ import com.example.uhf.view.CircleSeekBar;
 import com.example.uhf.view.RadarView;
 import com.google.android.material.button.MaterialButton;
 import com.rscja.deviceapi.entity.RadarLocationEntity;
+import com.rscja.deviceapi.entity.UHFTagInfo;
 import com.rscja.deviceapi.interfaces.IUHF;
 import com.rscja.deviceapi.interfaces.IUHFRadarLocationCallback;
 
@@ -65,14 +66,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 
 /**
- * ✅ MiraUHFRadarLocationFragment v2.0
- * 
- * التحسينات:
- * - ✅ ربط مباشر بالقارئ الفعلي (VH-C83)
- * - ✅ إخفاء Bottom Nav + FAB أثناء الاستخدام
- * - ✅ Back Press Handler
- * - ✅ Hardware First (بدل Simulation Default)
- * - ✅ Fallback تلقائي للمحاكاة عند فشل العتاد
+ * ✅ MiraUHFRadarLocationFragment v2.1 (Hardware Inventory Polling Fallback)
  */
 public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
@@ -94,7 +88,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     private TextView tvAuthorizedCount, tvDeniedCount, tvUnknownCount;
     private TextView tvRecentScans, tvRadarMode, tvReaderStatus;
     private Button btnModeSingle, btnModeOpen, btnModeGate;
-    private ImageButton btnRadarClose; // ✅ جديد
+    private ImageButton btnRadarClose;
 
     // ==================== State & Tracking ====================
     private boolean inventoryFlag = false;
@@ -126,10 +120,10 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     private enum RadarMode { SINGLE_TARGET, OPEN_SCAN, SECURITY_GATE, MISSING_SEARCH }
     private RadarMode currentMode = RadarMode.SINGLE_TARGET;
 
-    // ==================== Simulation ====================
-    private final Handler simulationHandler = new Handler(Looper.getMainLooper());
-    private Runnable simulationRunnable;
-    private float simulationAngle = 0;
+    // ==================== Hardware Inventory Polling (Real Hardware Fallback) ====================
+    private final Handler inventoryHandler = new Handler(Looper.getMainLooper());
+    private Runnable inventoryRunnable;
+    private float searchAngle = 0;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -155,36 +149,26 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         rfidManager = RFIDManager.getInstance(mContext);
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         
-        // ✅ [تعديل] العتاد أولاً — وليس المحاكاة
-        simulationMode = settingsManager.getBoolean("radar_simulation", false);
+        simulationMode = false; // العتاد أولاً وقبل كل شيء
 
         initViews();
         applyLanguage();
         applyPermissions();
         setupListeners();
-        setupBackPressHandler(); // ✅ جديد
+        setupBackPressHandler();
         restoreState();
         updateReaderStatus();
     }
 
-    // ==================== ✅ إخفاء Bottom Nav + FAB ====================
     @Override
     public void onStart() {
         super.onStart();
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity activity = (UHFMainActivity) getActivity();
-
-                // ✅ أخفِ Bottom Nav
                 activity.setBottomNavVisible(false);
-
-                // ✅ أخفِ FAB
                 View fab = activity.findViewById(R.id.fabActionCenter);
-                if (fab != null) {
-                    fab.setVisibility(View.GONE);
-                }
-
-                MiraFileLogger.log(TAG, "🙈 BottomNav + FAB hidden");
+                if (fab != null) fab.setVisibility(View.GONE);
             }
         } catch (Exception e) {
             MiraFileLogger.logError(TAG, "onStart error", e);
@@ -197,52 +181,34 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity activity = (UHFMainActivity) getActivity();
-
-                // ✅ أعِد Bottom Nav
                 activity.setBottomNavVisible(true);
-
-                // ✅ أعِد FAB
                 View fab = activity.findViewById(R.id.fabActionCenter);
-                if (fab != null) {
-                    fab.setVisibility(View.VISIBLE);
-                }
-
-                MiraFileLogger.log(TAG, "👁️ BottomNav + FAB restored");
+                if (fab != null) fab.setVisibility(View.VISIBLE);
             }
         } catch (Exception e) {
             MiraFileLogger.logError(TAG, "onStop error", e);
         }
     }
 
-    // ==================== ✅ Back Press Handler ====================
     private void setupBackPressHandler() {
         if (getActivity() == null) return;
-
         backPressedCallback = new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
                 handleCustomBack();
             }
         };
-
-        requireActivity().getOnBackPressedDispatcher()
-                .addCallback(getViewLifecycleOwner(), backPressedCallback);
-        MiraFileLogger.log(TAG, "✅ Back press handler registered");
+        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(), backPressedCallback);
     }
 
     private void handleCustomBack() {
         try {
-            // 1. إذا كان المسح نشطاً → أوقفه
             if (inventoryFlag) {
-                MiraFileLogger.log(TAG, "⏹️ Back: stopping radar scan");
                 stopLocated();
                 return;
             }
-
-            // 2. اذهب للـDashboard
             navigateAway();
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "handleCustomBack error", e);
             navigateAway();
         }
     }
@@ -250,16 +216,12 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     private void navigateAway() {
         try {
             stopLocated();
-
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity activity = (UHFMainActivity) getActivity();
-
                 if (activity.getNavigationManager() != null) {
                     activity.getNavigationManager().goToDashboard();
                 } else {
-                    activity.loadFragmentDirectly(
-                            new MiraDashboardFragment(),
-                            NavigationManager.TAG_DASHBOARD);
+                    activity.loadFragmentDirectly(new MiraDashboardFragment(), NavigationManager.TAG_DASHBOARD);
                 }
             }
         } catch (Exception e) {
@@ -267,31 +229,21 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== Permissions ====================
     private void applyPermissions() {
-        boolean canUseRadar = permissionManager.canView("radar") ||
-                             permissionManager.isSecurity() ||
-                             permissionManager.isGateSecurity() ||
-                             permissionManager.isManager();
-
+        boolean canUseRadar = permissionManager.canView("radar") || permissionManager.isSecurity() || permissionManager.isGateSecurity() || permissionManager.isManager();
         boolean canMarkFound = permissionManager.canEdit("inventory") || permissionManager.isManager();
 
         if (btStart != null) btStart.setEnabled(canUseRadar);
         if (btnFetchMissing != null) btnFetchMissing.setEnabled(canUseRadar);
         if (btnMarkFound != null) btnMarkFound.setEnabled(canMarkFound);
 
-        if (!canUseRadar) {
-            if (tvRadarMode != null) {
-                tvRadarMode.setText(isArabic ? "⛔ وضع العرض فقط" : "⛔ View only mode");
-            }
+        if (!canUseRadar && tvRadarMode != null) {
+            tvRadarMode.setText(isArabic ? "⛔ وضع العرض فقط" : "⛔ View only mode");
         }
     }
 
     private boolean canUseRadar() {
-        return permissionManager.canView("radar") ||
-               permissionManager.isSecurity() ||
-               permissionManager.isGateSecurity() ||
-               permissionManager.isManager();
+        return permissionManager.canView("radar") || permissionManager.isSecurity() || permissionManager.isGateSecurity() || permissionManager.isManager();
     }
 
     private boolean canMarkFound() {
@@ -311,7 +263,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         btnExportResults = v.findViewById(R.id.btnExportResults);
         btnFetchMissing = v.findViewById(R.id.btnFetchMissing);
         btnMarkFound = v.findViewById(R.id.btnMarkFound);
-        btnRadarClose = v.findViewById(R.id.btnRadarClose); // ✅ جديد
+        btnRadarClose = v.findViewById(R.id.btnRadarClose);
 
         tvProximityLevel = v.findViewById(R.id.tvProximityLevel);
         tvSignalStrength = v.findViewById(R.id.tvSignalStrength);
@@ -354,19 +306,15 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== Reader Status ====================
     private void updateReaderStatus() {
         if (tvReaderStatus == null) return;
-
         boolean hardwareAvailable = mContext != null && mContext.mReader != null;
         boolean readerConnected = false;
 
         if (hardwareAvailable && rfidManager != null) {
             try {
                 MiraIRFIDReader reader = rfidManager.getActiveReader();
-                if (reader != null) {
-                    readerConnected = reader.isConnected();
-                }
+                if (reader != null) readerConnected = reader.isConnected();
             } catch (Exception e) {
                 readerConnected = false;
             }
@@ -396,45 +344,22 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private void setupListeners() {
         btStart.setOnClickListener(v -> {
-            if (canUseRadar()) {
-                startLocated();
-            } else {
-                Toast.makeText(mContext,
-                    isArabic ? "⛔ غير مصرح" : "⛔ Access Denied",
-                    Toast.LENGTH_SHORT).show();
-            }
+            if (canUseRadar()) startLocated();
+            else Toast.makeText(mContext, isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
         });
 
         btStop.setOnClickListener(v -> stopLocated());
-
         if (btnExportResults != null) btnExportResults.setOnClickListener(v -> exportScanResults());
         if (btnFetchMissing != null) btnFetchMissing.setOnClickListener(v -> showMissingItemsDialog());
         if (btnMarkFound != null) btnMarkFound.setOnClickListener(v -> {
-            if (canMarkFound()) {
-                markCurrentItemAsFound();
-            } else {
-                Toast.makeText(mContext,
-                    isArabic ? "⛔ غير مصرح" : "⛔ Access Denied",
-                    Toast.LENGTH_SHORT).show();
-            }
+            if (canMarkFound()) markCurrentItemAsFound();
+            else Toast.makeText(mContext, isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
         });
 
         if (btnModeSingle != null) btnModeSingle.setOnClickListener(v -> switchMode(RadarMode.SINGLE_TARGET));
         if (btnModeOpen != null) btnModeOpen.setOnClickListener(v -> switchMode(RadarMode.OPEN_SCAN));
         if (btnModeGate != null) btnModeGate.setOnClickListener(v -> switchMode(RadarMode.MISSING_SEARCH));
-
-        // ✅ زر الإغلاق الجديد
-        if (btnRadarClose != null) {
-            btnRadarClose.setOnClickListener(v -> handleCustomBack());
-        }
-
-        settingsManager.registerListener("radar_fragment", (key, value) -> {
-            if ("radar_simulation".equals(key)) {
-                simulationMode = (Boolean) value;
-                if (inventoryFlag) { stopLocated(); startLocated(); }
-                updateModeUI();
-            }
-        });
+        if (btnRadarClose != null) btnRadarClose.setOnClickListener(v -> handleCustomBack());
     }
 
     private void restoreState() {
@@ -451,7 +376,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private void showMissingItemsDialog() {
         if (getContext() == null) return;
-
         AlertDialog loading = new AlertDialog.Builder(requireContext())
                 .setMessage(isArabic ? "جاري جلب القطع المفقودة..." : "Fetching missing items...")
                 .setCancelable(false)
@@ -461,22 +385,15 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
                 MiraApiClient.ApiResponse apiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
-
-                JSONObject response = null;
-                if (apiResponse != null && apiResponse.isSuccess) {
-                    response = apiResponse.data;
-                }
+                JSONObject response = (apiResponse != null && apiResponse.isSuccess) ? apiResponse.data : null;
 
                 if (getActivity() != null) {
-                    JSONObject finalResponse = response;
                     getActivity().runOnUiThread(() -> {
                         loading.dismiss();
-                        if (finalResponse != null && finalResponse.has("audit_summary")) {
-                            parseAndSelectMissingItem(finalResponse);
+                        if (response != null && response.has("audit_summary")) {
+                            parseAndSelectMissingItem(response);
                         } else {
-                            Toast.makeText(getContext(),
-                                isArabic ? "لا توجد قطع مفقودة مسجلة" : "No missing items recorded",
-                                Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), isArabic ? "لا توجد قطع مفقودة مسجلة" : "No missing items recorded", Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
@@ -484,9 +401,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         loading.dismiss();
-                        Toast.makeText(getContext(),
-                            isArabic ? "خطأ في الاتصال" : "Connection failed",
-                            Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), isArabic ? "خطأ في الاتصال" : "Connection failed", Toast.LENGTH_SHORT).show();
                     });
                 }
             }
@@ -512,8 +427,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         } else {
             displayList.add(isArabic ? "💎 خاتم سوليتير (4.2g)\n🏷️ E200001982130124" : "💎 Solitaire Ring (4.2g)\n🏷️ E200001982130124");
             epcList.add("E200001982130124");
-            displayList.add(isArabic ? "💎 أسورة عيار 21 (12.5g)\n🏷️ E200001982130125" : "💎 21K Bracelet (12.5g)\n🏷️ E200001982130125");
-            epcList.add("E200001982130125");
         }
 
         new AlertDialog.Builder(requireContext())
@@ -544,13 +457,9 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             case MISSING_SEARCH: modeName = isArabic ? "🔍 كاشف المفقودات" : "🔍 Missing Scanner"; break;
             default: modeName = "";
         }
-
         if (inventoryFlag) {
-            modeName += simulationMode ?
-                (isArabic ? " (محاكاة)" : " (Simulation)") :
-                (isArabic ? " (جهاز فعلي)" : " (Hardware)");
+            modeName += isArabic ? " (بحث عتادي مباشر)" : " (Direct HW Search)";
         }
-
         return modeName;
     }
 
@@ -566,43 +475,11 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (inventoryFlag) return;
 
         if (!canUseRadar()) {
-            Toast.makeText(mContext,
-                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied",
-                Toast.LENGTH_SHORT).show();
+            Toast.makeText(mContext, isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
             return;
         }
 
         updateReaderStatus();
-
-        // ✅ [تعديل] فحص العتاد دائماً — Fallback تلقائي فقط عند الفشل
-        if (!simulationMode) {
-            boolean hardwareAvailable = mContext != null && mContext.mReader != null;
-            boolean readerConnected = false;
-
-            if (hardwareAvailable && rfidManager != null) {
-                try {
-                    MiraIRFIDReader reader = rfidManager.getActiveReader();
-                    if (reader != null) {
-                        readerConnected = reader.isConnected();
-                    }
-                } catch (Exception e) {
-                    readerConnected = false;
-                }
-            }
-
-            if (!hardwareAvailable || !readerConnected) {
-                MiraFileLogger.logError(TAG, "❌ Reader not connected — fallback to simulation", null);
-                Toast.makeText(mContext,
-                    isArabic ? "⚠️ القارئ غير متصل - جاري التبديل للمحاكاة" : "⚠️ Reader disconnected - switching to simulation",
-                    Toast.LENGTH_LONG).show();
-                simulationMode = true;
-                if (getContext() != null) {
-                    getContext().getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
-                        .edit().putBoolean("radar_simulation", true).apply();
-                }
-            }
-        }
-
         radarView.clearPanel();
         targetEpc = etEPC.getText().toString().trim();
 
@@ -614,62 +491,45 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (layoutMiraRadarInfo != null) layoutMiraRadarInfo.setVisibility(View.GONE);
         if (btnMarkFound != null) btnMarkFound.setVisibility(View.GONE);
 
-        if (simulationMode) {
-            startSimulatedRadar();
-            return;
-        }
-
-        // ✅ [تعديل] استخدم القارئ مباشرة (نفس طريقة POS)
         String epcToTrack = (currentMode == RadarMode.OPEN_SCAN) ? "" : targetEpc;
-
-        MiraFileLogger.log(TAG, "🚀 Starting radar for EPC: " +
-                (epcToTrack.isEmpty() ? "(open scan)" : epcToTrack));
-
         boolean result = false;
-        try {
-            result = mContext.mReader.startRadarLocation(mContext, epcToTrack, IUHF.Bank_EPC, 32,
-                new IUHFRadarLocationCallback() {
-                    @Override
-                    public void getLocationValue(List<RadarLocationEntity> list) {
-                        radarView.bindingData(list, epcToTrack);
-                        for (RadarLocationEntity entity : list) {
-                            String detectedEpc = entity.getTag();
-                            int val = entity.getValue();
 
-                            if (!TextUtils.isEmpty(detectedEpc)) {
-                                handleGeigerAudioFeedback(val);
-                                updateProximityUI(val);
-                                queryMiraItem(detectedEpc, val);
+        try {
+            if (mContext != null && mContext.mReader != null) {
+                // المحاولة الأولى: عبر نظام الرادار المدمج إن وجد في الوحدة
+                result = mContext.mReader.startRadarLocation(mContext, epcToTrack, IUHF.Bank_EPC, 32,
+                    new IUHFRadarLocationCallback() {
+                        @Override
+                        public void getLocationValue(List<RadarLocationEntity> list) {
+                            radarView.bindingData(list, epcToTrack);
+                            for (RadarLocationEntity entity : list) {
+                                String detectedEpc = entity.getTag();
+                                int val = entity.getValue();
+                                if (!TextUtils.isEmpty(detectedEpc)) {
+                                    handleGeigerAudioFeedback(val);
+                                    updateProximityUI(val);
+                                    queryMiraItem(detectedEpc, val);
+                                }
                             }
                         }
-                    }
 
-                    @Override
-                    public void getAngleValue(int angle) {
-                        radarView.setRotation(-angle);
-                    }
-                });
+                        @Override
+                        public void getAngleValue(int angle) {
+                            radarView.setRotation(-angle);
+                        }
+                    });
+            }
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "startRadarLocation exception", e);
             result = false;
         }
 
+        // ✅ [الجوهر]: إذا فشلت دوال الرادار الهندسية في القارئ، لا نلجأ للمحاكاة الوهمية أبداً، 
+        // بل نفعل "المسح العتادي الحقيقي للمخزون مع استخراج RSSI الفعلي".
         if (!result) {
-            MiraFileLogger.logError(TAG, "❌ Radar start failed — fallback to simulation", null);
-            Toast.makeText(mContext,
-                isArabic ? "⚠️ الرادار غير مدعوم - جاري التبديل للمحاكاة" : "⚠️ Radar unsupported - switching to simulation",
-                Toast.LENGTH_LONG).show();
-
-            simulationMode = true;
-            if (getContext() != null) {
-                getContext().getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
-                    .edit().putBoolean("radar_simulation", true).apply();
-            }
-
-            if (!TextUtils.isEmpty(targetEpc)) {
-                queryMiraItem(targetEpc, 70);
-            }
-            startSimulatedRadar();
+            MiraFileLogger.log(TAG, "⚠️ Radar native unsupported — activating Real Hardware Inventory Polling");
+            Toast.makeText(mContext, isArabic ? "🔍 تشغيل البحث العتادي الفعلي للإشارة..." : "🔍 Activating Real Hardware RSSI Search...", Toast.LENGTH_SHORT).show();
+            
+            startRealHardwareInventory(epcToTrack);
             return;
         }
 
@@ -679,8 +539,63 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         etEPC.setEnabled(false);
         radarView.startRadar();
         updateModeUI();
+    }
 
-        MiraFileLogger.log(TAG, "✅ Radar started successfully");
+    private void startRealHardwareInventory(String epcFilter) {
+        inventoryFlag = true;
+        btStart.setEnabled(false);
+        etEPC.setEnabled(false);
+        radarView.startRadar();
+        setupSeekBar();
+        updateModeUI();
+
+        if (!TextUtils.isEmpty(epcFilter)) {
+            queryMiraItem(epcFilter, 75);
+        }
+
+        inventoryRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!inventoryFlag || mContext == null || mContext.mReader == null) return;
+
+                try {
+                    // قراءة الشريحة الحقيقية من عتاد القارئ مباشرة
+                    UHFTagInfo tagInfo = mContext.mReader.readTagFromInventory();
+                    if (tagInfo != null) {
+                        String epc = tagInfo.getEPC();
+                        String rssiStr = tagInfo.getRssi();
+
+                        int rssiVal = 60; // قيمة افتراضية متقدمة عند رصد القطعة
+                        try {
+                            if (rssiStr != null && !rssiStr.isEmpty()) {
+                                float rawRssi = Float.parseFloat(rssiStr.replace("dBm", "").trim());
+                                // تحويل قوة إشارة الـ RSSI الحقيقية إلى مقياس مئوي (0 إلى 100)
+                                rssiVal = (int) Math.min(100, Math.max(15, (rawRssi + 90) * 1.6f));
+                            }
+                        } catch (Exception ignored) {}
+
+                        // تصفية النتائج بناءً على القطعة المستهدفة أو المسح المفتوح
+                        if (TextUtils.isEmpty(epcFilter) || (epc != null && (epc.contains(epcFilter) || epcFilter.contains(epc)))) {
+                            currentRssi = rssiVal;
+                            updateProximityUI(currentRssi);
+                            handleGeigerAudioFeedback(currentRssi);
+                            queryMiraItem(epc, currentRssi);
+
+                            // تدوير واجهة الرادار بصرياً لاستجابة القراءة الحية
+                            searchAngle = (searchAngle + 20) % 360;
+                            radarView.setRotation(-searchAngle);
+                        }
+                    }
+                } catch (Exception e) {
+                    MiraFileLogger.logError(TAG, "Hardware inventory poll error", e);
+                }
+
+                // حلقة الاستعلام الحقيقي السريعة
+                inventoryHandler.postDelayed(this, 120);
+            }
+        };
+
+        inventoryHandler.post(inventoryRunnable);
     }
 
     private void setupSeekBar() {
@@ -705,21 +620,21 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (!inventoryFlag) return;
 
         try {
-            if (simulationMode) {
-                if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
-            } else {
-                if (mContext != null && mContext.mReader != null) {
-                    try {
-                        if (!mContext.mReader.stopRadarLocation()) {
-                            Log.e(TAG, "stopLocated failure");
-                        }
-                    } catch (Exception e) {
-                        MiraFileLogger.logError(TAG, "stopRadarLocation error", e);
-                    }
-                }
+            // إيقاف الـ Handler الخاص بالبحث العتادي الفعلي
+            if (inventoryRunnable != null) {
+                inventoryHandler.removeCallbacks(inventoryRunnable);
+            }
+
+            if (mContext != null && mContext.mReader != null) {
+                try {
+                    mContext.mReader.stopRadarLocation();
+                } catch (Exception ignored) {}
+                try {
+                    mContext.mReader.stopInventory();
+                } catch (Exception ignored) {}
             }
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "stopLocated outer error", e);
+            MiraFileLogger.logError(TAG, "stopLocated error", e);
         }
 
         radarView.stopRadar();
@@ -733,55 +648,17 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         updateModeUI();
     }
 
-    private void startSimulatedRadar() {
-        if (!TextUtils.isEmpty(targetEpc)) queryMiraItem(targetEpc, 85);
-
-        radarView.startRadar();
-        seekBarPower.setEnabled(true);
-        inventoryFlag = true;
-        btStart.setEnabled(false);
-        etEPC.setEnabled(false);
-
-        simulationRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!inventoryFlag) return;
-
-                simulationAngle += 10;
-                if (simulationAngle >= 360) simulationAngle = 0;
-
-                currentRssi = Math.min(100, currentRssi + random.nextInt(15) - 5);
-                if (currentRssi < 20) currentRssi = 30;
-
-                updateProximityUI(currentRssi);
-                handleGeigerAudioFeedback(currentRssi);
-
-                List<RadarLocationEntity> simulatedList = new ArrayList<>();
-                radarView.bindingData(simulatedList, targetEpc);
-                radarView.setRotation(-simulationAngle);
-
-                simulationHandler.postDelayed(this, Math.max(150, 800 - (currentRssi * 6)));
-            }
-        };
-        simulationHandler.post(simulationRunnable);
-        updateModeUI();
-        Toast.makeText(mContext,
-            isArabic ? "⚡ وضع المحاكاة" : "⚡ Simulation mode",
-            Toast.LENGTH_SHORT).show();
-    }
-
     private void handleGeigerAudioFeedback(int rssi) {
         long now = System.currentTimeMillis();
-        long interval = Math.max(100, 1000 - (rssi * 9));
+        long interval = Math.max(80, 1000 - (rssi * 9));
 
         if (now - lastBeepTime > Math.max(interval, BEEP_THROTTLE_MS)) {
             lastBeepTime = now;
             if (mContext != null && settingsManager.getBoolean("sound_on_scan", true)) {
                 mContext.playSound(1);
             }
-
-            if (rssi > 80 && vibrator != null) {
-                vibrator.vibrate(50);
+            if (rssi > 75 && vibrator != null) {
+                vibrator.vibrate(40);
             }
         }
     }
@@ -792,17 +669,14 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (tvSignalStrength != null) tvSignalStrength.setText(rssi + "%");
 
         if (tvEstimatedDistance != null) {
-            tvEstimatedDistance.setText(
-                (isArabic ? "📏 المسافة: " : "📏 Distance: ") + getEstimatedDistance(rssi));
+            tvEstimatedDistance.setText((isArabic ? "📏 المسافة: " : "📏 Distance: ") + getEstimatedDistance(rssi));
         }
 
         if (tvProximityLevel != null) {
             if (rssi > 80) {
                 tvProximityLevel.setText(isArabic ? "🔥 ملاصق جداً!" : "🔥 Extremely Close!");
                 tvProximityLevel.setTextColor(0xFF22C55E);
-                if (btnMarkFound != null && canMarkFound()) {
-                    btnMarkFound.setVisibility(View.VISIBLE);
-                }
+                if (btnMarkFound != null && canMarkFound()) btnMarkFound.setVisibility(View.VISIBLE);
             } else if (rssi > 50) {
                 tvProximityLevel.setText(isArabic ? "📍 النطاق القريب" : "📍 Near Range");
                 tvProximityLevel.setTextColor(0xFFF59E0B);
@@ -903,17 +777,12 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private void markCurrentItemAsFound() {
         if (!canMarkFound()) {
-            Toast.makeText(mContext,
-                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied",
-                Toast.LENGTH_SHORT).show();
+            Toast.makeText(mContext, isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
             return;
         }
-
         if (TextUtils.isEmpty(targetEpc)) return;
 
-        Toast.makeText(mContext,
-            isArabic ? "جاري تحديث الحالة..." : "Updating status...",
-            Toast.LENGTH_SHORT).show();
+        Toast.makeText(mContext, isArabic ? "جاري تحديث الحالة..." : "Updating status...", Toast.LENGTH_SHORT).show();
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -923,13 +792,11 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 params.put("status", "AVAILABLE");
                 params.put("branch_id", branchesManager.getActiveBranchId());
 
-                MiraApiClient.ApiResponse res = client.authorize(targetEpc, "mark_found", params);
+                client.authorize(targetEpc, "mark_found", params);
 
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        Toast.makeText(mContext,
-                            isArabic ? "🎉 تم تأكيد موقع القطعة!" : "🎉 Item located!",
-                            Toast.LENGTH_LONG).show();
+                        Toast.makeText(mContext, isArabic ? "🎉 تم تأكيد موقع القطعة!" : "🎉 Item located!", Toast.LENGTH_LONG).show();
                         stopLocated();
                     });
                 }
@@ -968,9 +835,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private void exportScanResults() {
         if (recentScans.isEmpty()) {
-            Toast.makeText(mContext,
-                isArabic ? "لا توجد نتائج للتصدير" : "No results to export",
-                Toast.LENGTH_SHORT).show();
+            Toast.makeText(mContext, isArabic ? "لا توجد نتائج للتصدير" : "No results to export", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -983,8 +848,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         share.setType("text/csv");
         share.putExtra(Intent.EXTRA_SUBJECT, "MIRA Radar Export - " + branchesManager.getActiveBranchDisplayName());
         share.putExtra(Intent.EXTRA_TEXT, csv.toString());
-        startActivity(Intent.createChooser(share,
-            isArabic ? "تصدير نتائج التتبع" : "Export Tracking Results"));
+        startActivity(Intent.createChooser(share, isArabic ? "تصدير نتائج التتبع" : "Export Tracking Results"));
     }
 
     @Override
@@ -996,7 +860,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     @Override
     public void onResume() {
         super.onResume();
-        simulationMode = settingsManager.getBoolean("radar_simulation", false); // ✅ افتراضي: false
         updateReaderStatus();
         updateModeUI();
     }
@@ -1010,13 +873,10 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-
-        // ✅ إزالة Back press callback
         if (backPressedCallback != null) {
             backPressedCallback.setEnabled(false);
             backPressedCallback.remove();
             backPressedCallback = null;
-            MiraFileLogger.log(TAG, "🗑️ Back press handler removed");
         }
     }
 
