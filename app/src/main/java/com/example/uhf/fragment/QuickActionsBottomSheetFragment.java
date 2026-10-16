@@ -32,15 +32,15 @@ import java.util.Locale;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  QuickActionsBottomSheetFragment v7.0 — Permission-Driven
+ *  QuickActionsBottomSheetFragment v7.1 — Permission-Driven
  * ═══════════════════════════════════════════════════════════════════
  *
  *  ✅ كل زر يمر عبر canAccessFragment(tag) — مصدر واحد للحقيقة
- *  ✅ يدعم 12 عنصراً في 3 صفوف (4+4+4) + Primary CTA
+ *  ✅ 13 عنصراً محتملاً + Primary CTA
  *  ✅ يشمل: المستخدمين + الفروع
  *  ✅ يحترم MiraQuickAccessSettings (تخصيص المستخدم)
  *  ✅ Stagger animation + Haptic feedback
- *  ✅ Navigation بعد dismiss بـ Handler مستقل
+ *  ✅ Navigation آمن بعد dismiss
  */
 public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
@@ -73,11 +73,11 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         try {
             Context context = requireContext();
             isArabic = Locale.getDefault().getLanguage().equals("ar");
-            permissionManager  = PermissionManager.getInstance(context);
+            permissionManager   = PermissionManager.getInstance(context);
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
 
             // ═══════════════════════════════════════════════════
-            //  PRIMARY CTA — Identity Studio
+            //  PRIMARY CTA — استوديو التكويد
             // ═══════════════════════════════════════════════════
             setupPrimaryCta(view);
 
@@ -94,7 +94,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                     NavigationManager.TAG_RFID_BINDINGS);
 
             setupGridAction(view, R.id.cardSecureGate, "gate",
-                    NavigationManager.TAG_GATES);   // موحّد مع NavigationManager
+                    NavigationManager.TAG_GATES);
 
             // ═══════════════════════════════════════════════════
             //  ROW 2
@@ -120,11 +120,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             setupGridAction(view, R.id.cardServerConfig, "server_config",
                     NavigationManager.TAG_SERVER_CONFIG);
 
-            // ✨ جديد: المستخدمين
             setupGridAction(view, R.id.cardAdminUsers, "admin_users",
                     NavigationManager.TAG_USERS_MANAGEMENT);
 
-            // ✨ جديد: الفروع
             setupGridAction(view, R.id.cardAdminBranches, "admin_branches",
                     NavigationManager.TAG_BRANCHES);
 
@@ -140,9 +138,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 });
             }
 
-            // ═══════════════════════════════════════════════════
-            //  ANIMATION
-            // ═══════════════════════════════════════════════════
             runStaggerAnimation();
 
         } catch (Exception e) {
@@ -169,7 +164,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 vg.setFocusable(true);
             }
 
-            // ✅ بوابة موحّدة + تخصيص المستخدم
             boolean hasPermission = permissionManager.canAccessFragment(
                     NavigationManager.TAG_IDENTITY_STUDIO);
 
@@ -197,34 +191,26 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  GRID ACTION — يُستخدم لكل الأزرار
+    //  GRID ACTION — البوابة الموحّدة لكل الأزرار
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * @param root         الجذر
-     * @param cardId       معرف البطاقة في XML
-     * @param actionKey    مفتاح التخصيص في MiraQuickAccessSettings
-     * @param tag          Tag الشاشة في NavigationManager (تُستخدم كبوابة + للتنقل)
-     */
     private void setupGridAction(View root, int cardId, String actionKey, String tag) {
         try {
             View card = root.findViewById(cardId);
             if (card == null) {
-                Log.w(TAG, "Grid item NOT FOUND in layout: " + actionKey
+                Log.w(TAG, "Grid item NOT FOUND: " + actionKey
                         + " (id=" + getResourceIdName(cardId) + ")");
                 return;
             }
 
-            // ✅ بوابة موحّدة
+            // 1. بوابة الصلاحيات الموحّدة
             boolean hasPermission = permissionManager.canAccessFragment(tag);
 
-            // ✅ تخصيص المستخدم
+            // 2. تخصيص المستخدم
             boolean quickAccessAllowed = quickAccessSettings == null
                     || quickAccessSettings.isActionEnabled(actionKey);
 
-            boolean isVisible = hasPermission && quickAccessAllowed;
-
-            if (!isVisible) {
+            if (!hasPermission || !quickAccessAllowed) {
                 card.setVisibility(View.GONE);
                 return;
             }
@@ -235,11 +221,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             card.setOnClickListener(v -> {
                 performHaptic();
 
-                // ✅ أنشئ Fragment عبر Factory الموحّد (يدعم fallback)
                 Fragment target = FragmentFactory.createFragmentByTag(tag);
                 if (target == null) {
                     Log.w(TAG, "FragmentFactory returned null for: " + tag);
-                    // Fallback: اعتمد على NavigationManager
                 }
                 navigateTo(tag, target);
             });
@@ -250,14 +234,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  NAVIGATION — موحّد مع NavigationManager
+    //  NAVIGATION
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * التنقل الفعلي بعد إغلاق القائمة.
-     * - يستخدم Handler مستقل عن دورة حياة Fragment
-     * - يمر عبر UHFMainActivity.loadFragmentDirectly() ليمر على guardSetupAccess
-     */
     private void navigateTo(String tag, @Nullable Fragment fallbackFragment) {
         if (tag == null || tag.isEmpty()) {
             Log.e(TAG, "❌ Cannot navigate: empty tag");
@@ -274,10 +253,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             return;
         }
 
-        // حاول إنشاء Fragment من Factory أولاً
         Fragment fragment = FragmentFactory.createFragmentByTag(tag);
-
-        // fallback احتياطي
         if (fragment == null) {
             fragment = fallbackFragment;
         }
@@ -290,10 +266,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         final Fragment finalFragment = fragment;
         final String finalTag = tag;
 
-        // أغلق القائمة
         dismiss();
 
-        // ✅ Handler مستقل — ينفّذ حتى بعد onDestroyView
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             try {
                 if (activity.isFinishing() || activity.isDestroyed()) {
@@ -366,7 +340,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         } catch (Exception e) {
             Log.e(TAG, "runStaggerAnimation error: " + e.getMessage(), e);
 
-            // Fallback: أظهر الكل بدون أنيميشن
             for (View v : animatedViews) {
                 if (v != null) {
                     v.setAlpha(1f);
