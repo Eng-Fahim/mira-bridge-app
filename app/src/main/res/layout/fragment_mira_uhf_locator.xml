@@ -81,7 +81,8 @@
                     android:paddingEnd="12dp"
                     android:background="@drawable/bg_input_dark" />
 
-                <MaterialButton
+                <!-- ✅ التصحيح: إضافة المسار الكامل -->
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnMiraSearch"
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
@@ -128,7 +129,8 @@
                 android:layout_marginTop="16dp"
                 android:orientation="horizontal">
 
-                <MaterialButton
+                <!-- ✅ التصحيح: إضافة المسار الكامل -->
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStart"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
@@ -138,7 +140,8 @@
                     android:textStyle="bold"
                     android:backgroundTint="#1A237E" />
 
-                <MaterialButton
+                <!-- ✅ التصحيح: إضافة المسار الكامل -->
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStop"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
@@ -151,7 +154,8 @@
             </LinearLayout>
 
             <!-- ═══ زر "تم العثور" ═══ -->
-            <MaterialButton
+            <!-- ✅ التصحيح: إضافة المسار الكامل -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnMarkFound"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
@@ -230,7 +234,8 @@
                 android:layout_marginTop="8dp"
                 android:nestedScrollingEnabled="false" />
 
-            <MaterialButton
+            <!-- ✅ التصحيح: إضافة المسار الكامل -->
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnExport"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
