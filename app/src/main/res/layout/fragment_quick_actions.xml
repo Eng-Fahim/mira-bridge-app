@@ -11,9 +11,7 @@
     android:paddingTop="8dp"
     android:paddingBottom="16dp">
 
-    <!-- ═══════════════════════════════════════════════════════
-         DRAG HANDLE
-         ═══════════════════════════════════════════════════════ -->
+    <!-- ═══ DRAG HANDLE ═══ -->
     <View
         android:layout_width="32dp"
         android:layout_height="4dp"
@@ -23,9 +21,7 @@
         android:background="?attr/colorOutlineVariant"
         android:alpha="0.6" />
 
-    <!-- ═══════════════════════════════════════════════════════
-         PRIMARY CTA — استوديو التكويد (بارز)
-         ═══════════════════════════════════════════════════════ -->
+    <!-- ═══ PRIMARY CTA — استوديو التكويد ═══ -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardIdentityStudio"
         android:layout_width="match_parent"
@@ -90,9 +86,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- ═══════════════════════════════════════════════════════
-         DIVIDER
-         ═══════════════════════════════════════════════════════ -->
+    <!-- ═══ DIVIDER ═══ -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
@@ -102,9 +96,7 @@
         android:background="?attr/colorOutlineVariant"
         android:alpha="0.4" />
 
-    <!-- ═══════════════════════════════════════════════════════
-         GRID — الأيقونات
-         ═══════════════════════════════════════════════════════ -->
+    <!-- ═══ GRID ═══ -->
     <GridLayout
         android:id="@+id/qaGrid"
         android:layout_width="match_parent"
@@ -113,7 +105,7 @@
         android:paddingHorizontal="12dp"
         android:useDefaultMargins="false">
 
-        <!-- Row 1 -->
+        <!-- ═══ ROW 1 ═══ -->
         <LinearLayout
             android:id="@+id/cardRfidWrite"
             android:layout_width="0dp"
@@ -126,14 +118,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_rfid_write"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -158,14 +148,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_radar"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -190,14 +178,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_rfid_bindings"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -222,14 +208,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_security_gate"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -242,7 +226,7 @@
                 tools:text="بوابات" />
         </LinearLayout>
 
-        <!-- Row 2 -->
+        <!-- ═══ ROW 2 ═══ -->
         <LinearLayout
             android:id="@+id/cardReports"
             android:layout_width="0dp"
@@ -255,14 +239,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_reports"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -287,14 +269,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_accounting"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -319,14 +299,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_transfer"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -351,14 +329,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_sales_history"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -371,7 +347,7 @@
                 tools:text="مبيعات" />
         </LinearLayout>
 
-        <!-- Row 3 -->
+        <!-- ═══ ROW 3 ═══ -->
         <LinearLayout
             android:id="@+id/cardAdminHub"
             android:layout_width="0dp"
@@ -384,14 +360,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_admin_hub"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -416,14 +390,12 @@
             android:gravity="center"
             android:orientation="vertical"
             android:paddingVertical="12dp">
-
             <ImageView
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_server"
                 app:tint="?attr/colorPrimary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -436,21 +408,71 @@
                 tools:text="سيرفر" />
         </LinearLayout>
 
-        <!-- Placeholder لتفادي كسر الشبكة -->
-        <View
+        <!-- ✨ جديد: إدارة المستخدمين -->
+        <LinearLayout
+            android:id="@+id/cardAdminUsers"
             android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_columnWeight="1" />
-        <View
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="12dp">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_users"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:text="@string/qa_admin_users_short"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="11sp"
+                tools:text="مستخدمين" />
+        </LinearLayout>
+
+        <!-- ✨ جديد: إدارة الفروع -->
+        <LinearLayout
+            android:id="@+id/cardAdminBranches"
             android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_columnWeight="1" />
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="12dp">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_branches"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:text="@string/qa_admin_branches_short"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="11sp"
+                tools:text="فروع" />
+        </LinearLayout>
 
     </GridLayout>
 
-    <!-- ═══════════════════════════════════════════════════════
-         CLOSE BUTTON
-         ═══════════════════════════════════════════════════════ -->
+    <!-- ═══ CLOSE BUTTON ═══ -->
     <TextView
         android:id="@+id/btnClose"
         android:layout_width="wrap_content"
