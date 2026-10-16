@@ -43,6 +43,7 @@ import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -50,14 +51,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * MiraUHFLocatorFragment v2.2
+ * MiraUHFLocatorFragment v2.3
  *
- * 🔧 إصلاحات v2.2:
- *   • setPower(30) لأقصى قوة إرسال
- *   • setDynamicDistance(35) لأقصى مدى
- *   • لوحة تشخيص داخل الشاشة (tvDebug)
- *   • حلقة إعادة startLocation كل 700ms
- *   • إيقاف الحلقة في stopLocating
+ * 🔧 إصلاحات v2.3 (بعد اختبار v2.2 على الجهاز):
+ *   ✅ إزالة restart loop (كان يقطع القراءات كل 700ms)
+ *   ✅ تخفيض القوة إلى 20 dBm (منع التشبع عند الاقتراب)
+ *   ✅ تخفيض dynamic distance إلى 15 (تركيز أعلى)
+ *   ✅ إضافة Median Filter (يرفض القيم الشاذة)
+ *   ✅ تنعيم أقوى (0.15)
+ *   ✅ عرض القيمة الخام والمتوسط في debug
  */
 public class MiraUHFLocatorFragment extends KeyDwonFragment {
 
@@ -72,19 +74,22 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     private static final long BEEP_MIN_INTERVAL = 80L;
     private static final long BEEP_MAX_INTERVAL = 800L;
 
-    // ═══ Signal Smoothing (EMA) ═══
-    private static final float SMOOTHING_FACTOR = 0.25f;
+    // ═══ Signal Smoothing (EMA) — قيم مضبوطة ═══
+    private static final float SMOOTHING_FACTOR = 0.15f;
+
+    // ═══ Median Filter — نافذة 7 قراءات ═══
+    private static final int MEDIAN_WINDOW = 7;
+    private final int[] rawValueWindow = new int[MEDIAN_WINDOW];
+    private int windowIndex = 0;
+    private int windowFill = 0;
 
     // ═══ Auto-Snap ═══
-    private static final float SNAP_THRESHOLD = 0.88f;
+    private static final float SNAP_THRESHOLD = 0.85f;
     private static final long SNAP_HOLD_MS = 2000L;
 
-    // ═══ Dynamic Distance ═══
-    private static final int DEFAULT_DYNAMIC_DISTANCE = 35;
-    private static final int DEFAULT_POWER_DBM = 30;
-
-    // ═══ Restart Loop ═══
-    private static final long RESTART_INTERVAL_MS = 700L;
+    // ═══ Reader Settings (مضبوطة) ═══
+    private static final int READER_POWER_DBM = 20;      // من 30 → 20
+    private static final int DYNAMIC_DISTANCE = 15;      // من 35 → 15
 
     // ═══ State ═══
     private boolean isLocating = false;
@@ -120,7 +125,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     private MaterialButton btnStart, btnStop, btnMiraSearch, btnExport, btnMarkFound;
     private ImageButton btnClose;
     private TextView tvStatus, tvDistance, tvReaderState;
-    private TextView tvDebug;   // 🔬 لوحة التشخيص
+    private TextView tvDebug;
     private TextView tvItemTitle, tvItemDetails, tvItemLocation, tvItemStatus;
     private LinearLayout layoutItemCard;
     private RecyclerView rvHistory;
@@ -234,7 +239,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         tvStatus = v.findViewById(R.id.tvStatus);
         tvDistance = v.findViewById(R.id.tvDistance);
         tvReaderState = v.findViewById(R.id.tvReaderState);
-        tvDebug = v.findViewById(R.id.tvDebug);   // 🔬 جديد
+        tvDebug = v.findViewById(R.id.tvDebug);
 
         tvItemTitle = v.findViewById(R.id.tvItemTitle);
         tvItemDetails = v.findViewById(R.id.tvItemDetails);
@@ -275,10 +280,6 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
                 .addCallback(getViewLifecycleOwner(), backCallback);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  زر الزناد الفيزيائي
-    // ═══════════════════════════════════════════════════════════
-
     @Override
     public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
         boolean isTrigger = (keyCode == KEYCODE_TRIGGER_1
@@ -302,7 +303,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Start / Stop  ← 🔧 الإصلاحات الرئيسية هنا
+    //  Start / Stop
     // ═══════════════════════════════════════════════════════════
 
     private void startLocating() {
@@ -323,18 +324,18 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         resetSessionState();
 
         try {
-            // ═══ 1. رفع قوة الإرسال لأقصى حد ═══
+            // ═══ 1. القوة المعتدلة (20 dBm) لمنع التشبع ═══
             try {
-                mainActivity.mReader.setPower(DEFAULT_POWER_DBM);
-                Log.d(TAG, "✅ setPower(" + DEFAULT_POWER_DBM + ")");
+                mainActivity.mReader.setPower(READER_POWER_DBM);
+                Log.d(TAG, "✅ setPower(" + READER_POWER_DBM + ")");
             } catch (Exception e) {
                 Log.w(TAG, "setPower failed: " + e.getMessage());
             }
 
-            // ═══ 2. المسافة الديناميكية ═══
+            // ═══ 2. المسافة الديناميكية الضيقة (15) للتركيز ═══
             try {
-                mainActivity.mReader.setDynamicDistance(DEFAULT_DYNAMIC_DISTANCE);
-                Log.d(TAG, "✅ setDynamicDistance(" + DEFAULT_DYNAMIC_DISTANCE + ")");
+                mainActivity.mReader.setDynamicDistance(DYNAMIC_DISTANCE);
+                Log.d(TAG, "✅ setDynamicDistance(" + DYNAMIC_DISTANCE + ")");
             } catch (Exception e) {
                 Log.w(TAG, "setDynamicDistance failed: " + e.getMessage());
             }
@@ -348,21 +349,6 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
                     new IUHFLocationCallback() {
                         @Override
                         public void getLocationValue(int value, boolean valid) {
-                            final int v = value;
-                            final boolean vd = valid;
-                            final int count = ++totalReadings;
-
-                            // 🔬 تحديث لوحة التشخيص فوراً
-                            mainHandler.post(() -> {
-                                if (tvDebug != null) {
-                                    tvDebug.setText(
-                                        "🔬 قراءات: " + count
-                                        + " | آخر قيمة: " + v
-                                        + " | صالحة: " + (vd ? "✓" : "✗")
-                                    );
-                                }
-                            });
-
                             handleLocationValue(value, valid);
                         }
                     });
@@ -377,9 +363,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
             onStartUI();
             queryMiraItem(epc);
 
-            // ═══ 4. تشغيل حلقة إعادة التشغيل ═══
-            startLocationRestartLoop();
-
+            // ✅ لا restart loop — نترك القارئ يعمل بحرية
             Log.i(TAG, "✅ Locator started for: " + epc);
 
         } catch (Exception e) {
@@ -389,9 +373,6 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     private void stopLocating() {
-        // 🔧 إيقاف الحلقة أولاً (قبل فحص isLocating)
-        stopLocationRestartLoop();
-
         if (!isLocating) return;
 
         try {
@@ -415,6 +396,11 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         totalReadings = 0;
         bestProximity = 0f;
         timeToFindMs = 0;
+
+        // إعادة تعيين Median Window
+        Arrays.fill(rawValueWindow, 0);
+        windowIndex = 0;
+        windowFill = 0;
 
         if (tvDebug != null) {
             tvDebug.setText("🔬 جاري البدء...");
@@ -458,61 +444,26 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  🔁 حلقة إعادة تشغيل startLocation
-    // ═══════════════════════════════════════════════════════════
-
-    private final Runnable locationRestartRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (!isLocating) return;
-
-            try {
-                if (mainActivity != null && mainActivity.mReader != null) {
-                    mainActivity.mReader.stopLocation();
-
-                    mainActivity.mReader.startLocation(
-                            mainActivity,
-                            currentEpc,
-                            IUHF.Bank_EPC,
-                            32,
-                            new IUHFLocationCallback() {
-                                @Override
-                                public void getLocationValue(int value, boolean valid) {
-                                    handleLocationValue(value, valid);
-                                }
-                            });
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Restart loop error: " + e.getMessage());
-            }
-
-            if (isLocating) {
-                mainHandler.postDelayed(this, RESTART_INTERVAL_MS);
-            }
-        }
-    };
-
-    private void startLocationRestartLoop() {
-        mainHandler.removeCallbacks(locationRestartRunnable);
-        mainHandler.postDelayed(locationRestartRunnable, RESTART_INTERVAL_MS);
-    }
-
-    private void stopLocationRestartLoop() {
-        mainHandler.removeCallbacks(locationRestartRunnable);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Core: Handle Location Value
+    //  Core: Handle Location Value (مع Median + Smoothing)
     // ═══════════════════════════════════════════════════════════
 
     private void handleLocationValue(int value, boolean valid) {
         if (!valid) return;
 
+        totalReadings++;
         currentValue = value;
-        // ملاحظة: totalReadings يزيد في الـ callback قبل هذه الدالة
 
-        float rawProximity = Math.max(0f, Math.min(1f, (80f - value) / 60f));
+        // ═══ 1. Median Filter (يرفض القيم الشاذة) ═══
+        rawValueWindow[windowIndex] = value;
+        windowIndex = (windowIndex + 1) % MEDIAN_WINDOW;
+        if (windowFill < MEDIAN_WINDOW) windowFill++;
 
+        int filteredValue = medianOfWindow();
+
+        // ═══ 2. تحويل القيمة المفلترة إلى نسبة قرب ═══
+        float rawProximity = Math.max(0f, Math.min(1f, (80f - filteredValue) / 60f));
+
+        // ═══ 3. EMA Smoothing ═══
         if (!smoothingInitialized) {
             smoothedProximity = rawProximity;
             smoothingInitialized = true;
@@ -525,17 +476,47 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
             bestProximity = smoothedProximity;
         }
 
+        // ═══ 4. عرض في Debug ═══
+        final int finalRaw = value;
+        final int finalFiltered = filteredValue;
+        final int finalCount = totalReadings;
+
+        mainHandler.post(() -> {
+            if (tvDebug != null) {
+                tvDebug.setText(
+                    "🔬 " + finalCount
+                    + " | خام: " + finalRaw
+                    + " | فلتر: " + finalFiltered
+                );
+            }
+        });
+
+        // ═══ 5. تحديث الواجهة ═══
         final float finalProximity = smoothedProximity;
 
         mainHandler.post(() -> {
             if (!isLocating) return;
 
             meterView.setProximity(finalProximity);
-            tvDistance.setText(estimateDistance(value));
+            tvDistance.setText(estimateDistance(filteredValue));
             updateStatusText(finalProximity);
             handleAutoSnap(finalProximity);
-            geigerFeedback(value);
+            geigerFeedback(filteredValue);
         });
+    }
+
+    /**
+     * ✅ حساب الوسيط (Median) للنافذة الحالية
+     *    يرفض القيم الشاذة (outliers)
+     */
+    private int medianOfWindow() {
+        if (windowFill == 0) return 100;
+
+        int[] copy = new int[windowFill];
+        System.arraycopy(rawValueWindow, 0, copy, 0, windowFill);
+        Arrays.sort(copy);
+
+        return copy[copy.length / 2];
     }
 
     private void updateStatusText(float proximity) {
@@ -693,7 +674,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  MIRA Integration
+    //  MIRA Integration (بدون تغيير)
     // ═══════════════════════════════════════════════════════════
 
     private void searchMiraByInput() {
@@ -825,10 +806,6 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
             Log.w(TAG, "showSessionStats error", e);
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  RFID Listener
-    // ═══════════════════════════════════════════════════════════
 
     private void onTagScanned(String epc) {
         if (epc == null || epc.isEmpty()) return;
