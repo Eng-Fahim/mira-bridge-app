@@ -2714,4 +2714,21 @@
 <!-- ✨ جديد -->
 <string name="qa_admin_users_short">مستخدمين</string>
 <string name="qa_admin_branches_short">فروع</string>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     Users Management — إدارة المستخدمين (جديد)
+     ═══════════════════════════════════════════════════════ -->
+<string name="users_management_title">👥 إدارة المستخدمين والصلاحيات</string>
+<string name="search_users_hint">بحث عن مستخدم...</string>
+<string name="no_users">لا يوجد مستخدمين</string>
+<string name="refresh">تحديث</string>
+<string name="export_users">تصدير المستخدمين</string>
+<string name="stats_total">مستخدم</string>
+<string name="stats_active">نشط</string>
+<string name="stats_online">متصل الآن</string>
+<string name="stats_suspended">موقوف</string>
+<string name="edit">تعديل</string>
+<string name="delete">حذف</string>
+<string name="permissions">الصلاحيات</string>
 </resources>
