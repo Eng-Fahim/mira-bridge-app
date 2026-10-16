@@ -2731,4 +2731,25 @@
 <string name="edit">تعديل</string>
 <string name="delete">حذف</string>
 <string name="permissions">الصلاحيات</string>
+
+
+ <!-- ═══════════════════════════════════════════════════════════
+     Admin Hub — مركز التحكم الإداري
+     ═══════════════════════════════════════════════════════════ -->
+<string name="admin_hub_title">مركز التحكم والخيارات الإدارية</string>
+<string name="admin_hub_section_devices">⚙️ تهيئة الأجهزة والشبكة</string>
+<string name="admin_hub_section_org">🏢 إدارة المنظومة الحاكمة</string>
+
+<!-- بطاقات الأجهزة -->
+<string name="admin_hub_system_settings">⚙️ إعدادات النظام</string>
+<string name="admin_hub_reader_setup">📟 إعدادات القارئ</string>
+<string name="admin_hub_gate_setup">🚪 إعدادات البوابات</string>
+<string name="admin_hub_security">🔒 الأمان والحماية</string>
+<string name="admin_hub_uhf_set">📡 إعدادات UHF</string>
+<string name="admin_hub_gold_rates">💰 الذهب والبورصة</string>
+
+<!-- بطاقات المنظومة -->
+<string name="admin_hub_branches">🏢 إدارة الفروع</string>
+<string name="admin_hub_users">👥 المستخدمين والترخيص</string>
+<string name="admin_hub_profile">👤 الملف الشخصي</string>
 </resources>
