@@ -82,24 +82,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraPosFragment v6.0 — Unified Edition
+ *  MiraPosFragment v6.3 — Production Edition
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * إعادة هيكلة جذرية تعالج 13 سبباً بنيوياً:
- *
- *   ✅ مصدر واحد لتحديثات السلة: PosCartManager listener → renderCart().
- *   ✅ إلغاء forceShowCart (كانت تُعيد بناء adapter في كل إضافة).
- *   ✅ adapter واحد للجلسة، replaceItems() + notifyItem*.
- *   ✅ علم واحد للمسح: currentScanMode (لا isRFIDScanActive / isRFIDModeActive).
- *   ✅ RFIDManager.addListener / removeListener (بدل setListener المفرد).
- *   ✅ PosCartManager.addListener / removeListener (بدل setListener المفرد).
- *   ✅ thread-safety كاملة عبر PosCartManager v2.0 و PosHeroController v2.0.
- *   ✅ حفظ قيمة Power الأصلية ديناميكياً (لا 27 المفترضة).
- *   ✅ ترتيب shutdown صحيح في onDestroyView.
- *   ✅ renderCart() موحّد لكل الحالات.
- *   ✅ updateFooterVisibility() single source of truth.
- *   ✅ منع تسريب الـ listeners عبر removeListener.
- *   ✅ حماية ضد الاستدعاء بعد onDestroyView.
+ * [v6.3] Production-ready:
+ *   🗑️ حذف كل رسائل DEBUG من الـ Toasts
+ *   ✅ hasPosPermission() يستخدم PermissionManager v3.0
+ *   ✅ canPerformRefund() فحص صلاحية الاسترجاع
+ *   ✅ canPerformCheckout() فحص صلاحية الدفع
+ *   ✅ إبقاء Log.e/Log.w لتشخيص الأخطاء الحقيقية
  */
 public class MiraPosFragment extends MiraBaseFragment {
 
@@ -112,7 +103,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final int  KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int  KEYCODE_RFID_TRIGGER_2 = 280;
     private static final int  KEYCODE_RFID_TRIGGER_3 = 293;
-    private static final long PENDING_EPC_TIMEOUT_MS = 10_000;  // 10 ثوانٍ
+    private static final long PENDING_EPC_TIMEOUT_MS = 10_000;
 
     private static final long SCAN_COOLDOWN_MS          = 1500;
     private static final long REFUND_MAX_DAYS           = 30;
@@ -120,10 +111,11 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final long ITEM_ADDED_DISPLAY_MS     = 1000;
     private static final long AUTO_ADD_DELAY_MS         = 350;
     private static final int  AUTO_ADD_MIN_LEN          = 6;
-   // private static final int  POS_LOW_POWER_DBM         = 15;
+
+    private static final long TRIGGER_GRACE_MS = 2000;
 
     // ═══════════════════════════════════════════════════════════════════
-    //  وضع المسح الموحّد (علم واحد فقط)
+    //  وضع المسح الموحّد
     // ═══════════════════════════════════════════════════════════════════
     private enum ScanMode { NONE, RFID, MANUAL, GS1 }
     private volatile ScanMode currentScanMode = ScanMode.NONE;
@@ -135,7 +127,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private final AtomicBoolean oneShotConsumed = new AtomicBoolean(false);
 
     // ═══════════════════════════════════════════════════════════════════
-    //  SDK Executor — عمليات RFID المتسلسلة
+    //  SDK Executor
     // ═══════════════════════════════════════════════════════════════════
     private final ExecutorService sdkExecutor =
             Executors.newSingleThreadExecutor(r -> {
@@ -166,7 +158,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private RFIDManager rfidManager;
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Listener References (لإزالتهم بأمان)
+    //  Listener References
     // ═══════════════════════════════════════════════════════════════════
     @Nullable private PosCartManager.OnCartChangedListener cartListener;
     @Nullable private MiraIRFIDReader.OnTagReadListener rfidListener;
@@ -181,9 +173,9 @@ public class MiraPosFragment extends MiraBaseFragment {
     // ═══════════════════════════════════════════════════════════════════
     private volatile boolean isCheckoutDialogShowing = false;
     private volatile double  liveScaleWeight = 0.0;
-    private volatile int     savedPowerBeforePos = -1;   // -1 = لم يُحفظ بعد
+    private volatile int     savedPowerBeforePos = -1;
 
-    private final Set<String> pendingEpcs       = ConcurrentHashMap.newKeySet();
+    private final Set<String> pendingEpcs = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> lastScannedTimes = new ConcurrentHashMap<>();
 
     private volatile MiraApiClient.ApiResponse lastSaleResponse = null;
@@ -219,26 +211,20 @@ public class MiraPosFragment extends MiraBaseFragment {
     private View btnPosScanManual;
 
     private CartAdapter cartAdapter;
-    
-// ═══════════════════════════════════════════════════════════════════
-//  Scan Feedback Card — بطاقة تأكيد مؤقتة
-// ═══════════════════════════════════════════════════════════════════
-@Nullable private View scanFeedbackOverlay;
-@Nullable private MaterialCardView scanFeedbackCard;
-@Nullable private ImageView ivFeedbackIcon;
-@Nullable private TextView tvFeedbackTitle;
-@Nullable private TextView tvFeedbackDetails;
-@Nullable private TextView tvFeedbackPrice;
-@Nullable private View vFeedbackAccent;
-@Nullable private Runnable pendingHideFeedback;
-// ✅ حقل لتخزين الباركود القادم من الماسح
-@Nullable private volatile String pendingBarcodeFromScanner = null;
 
-// ═══════════════════════════════════════════════════════════
-//  ⏱️ Trigger Grace Period — حل مشكلة "ضغط ثم ضع الشريحة"
-// ═══════════════════════════════════════════════════════════
-private static final long TRIGGER_GRACE_MS = 2000;
-@Nullable private Runnable pendingStopRfid = null;
+    // Scan Feedback Card
+    @Nullable private View scanFeedbackOverlay;
+    @Nullable private MaterialCardView scanFeedbackCard;
+    @Nullable private ImageView ivFeedbackIcon;
+    @Nullable private TextView tvFeedbackTitle;
+    @Nullable private TextView tvFeedbackDetails;
+    @Nullable private TextView tvFeedbackPrice;
+    @Nullable private View vFeedbackAccent;
+    @Nullable private Runnable pendingHideFeedback;
+
+    @Nullable private volatile String pendingBarcodeFromScanner = null;
+    @Nullable private Runnable pendingStopRfid = null;
+
     // ═══════════════════════════════════════════════════════════════════
     //  Helper Classes
     // ═══════════════════════════════════════════════════════════════════
@@ -313,9 +299,6 @@ private static final long TRIGGER_GRACE_MS = 2000;
         try {
             Context ctx = requireContext().getApplicationContext();
 
-            // ═══════════════════════════════════════════════════════
-            //  1) Managers
-            // ═══════════════════════════════════════════════════════
             branchesManager    = MiraBranchesManager.getInstance(ctx);
             priceManager       = MiraPriceManager.getInstance(ctx);
             permissionManager  = PermissionManager.getInstance(ctx);
@@ -334,19 +317,16 @@ private static final long TRIGGER_GRACE_MS = 2000;
             cartManager   = PosCartManager.getInstance();
             apiClient     = MiraApiClient.getInstance(ctx);
 
-            // ═══════════════════════════════════════════════════════
-            //  2) RFID — addListener بدلاً من setListener
-            // ═══════════════════════════════════════════════════════
+            // RFID — addListener
             rfidManager = RFIDManager.getInstance(ctx);
             if (rfidManager != null) {
                 rfidListener = new MiraIRFIDReader.OnTagReadListener() {
                     @Override
                     public void onTagRead(String epc, int rssi) {
-    if (currentScanMode == ScanMode.RFID) {
-        // ✅ تأكد من main thread
-        safeRun(() -> onRingScanned(epc));
-    }
-}
+                        if (currentScanMode == ScanMode.RFID) {
+                            safeRun(() -> onRingScanned(epc));
+                        }
+                    }
                     @Override public void onScanStarted() {}
                     @Override public void onScanStopped() {}
                     @Override
@@ -366,21 +346,17 @@ private static final long TRIGGER_GRACE_MS = 2000;
                 rfidManager.addListener(rfidListener);
             }
 
-            // ═══════════════════════════════════════════════════════
-            //  3) Views + Setup
-            // ═══════════════════════════════════════════════════════
             bindViews(view);
             setupHeroController(view);
-            initScanFeedbackCard(view);   // ✅ [v6.2]
+            initScanFeedbackCard(view);
             setupRecyclerView();
-            setupCartListener();       // ← يربط PosCartManager listener
+            setupCartListener();
             setupListeners();
             applyPermissions();
             hideRfidButtonIfUnsupported();
 
             initSmartScale();
 
-            // ✅ ربط أولي بحالة السلة
             renderCart(cartManager.snapshot(), null, -1);
 
             heroController.setState(PosHeroController.State.IDLE);
@@ -391,31 +367,30 @@ private static final long TRIGGER_GRACE_MS = 2000;
         }
     }
 
-   @Override
-public void onResume() {
-    super.onResume();
-    try {
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-            View fab = getActivity().findViewById(R.id.fabActionCenter);
-            if (fab != null) fab.setVisibility(View.GONE);
+    @Override
+    public void onResume() {
+        super.onResume();
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+                View fab = getActivity().findViewById(R.id.fabActionCenter);
+                if (fab != null) fab.setVisibility(View.GONE);
+            }
+
+            if (scaleManager != null) scaleManager.connect();
+
+            applyLowPowerForPos();
+
+            if (cartManager != null) {
+                renderCart(cartManager.snapshot(), null, -1);
+            }
+
+            processPendingBarcodeIfAny();
+
+        } catch (Exception e) {
+            Log.e(TAG, "onResume error", e);
         }
-
-        if (scaleManager != null) scaleManager.connect();
-
-        applyLowPowerForPos();
-
-        if (cartManager != null) {
-            renderCart(cartManager.snapshot(), null, -1);
-        }
-
-        // ✅ [جديد] عالج الباركود المعلّق من الماسح
-        processPendingBarcodeIfAny();
-
-    } catch (Exception e) {
-        Log.e(TAG, "onResume error", e);
     }
-}
 
     @Override
     public void onStart() {
@@ -427,33 +402,31 @@ public void onResume() {
         } catch (Exception ignored) {}
     }
 
-   @Override
-public void onPause() {
-    super.onPause();
-    try {
-        // ✅ [جديد] ألغِ أي مؤقت Grace معلّق قبل إيقاف المسح
-        cancelPendingStopIfAny();
+    @Override
+    public void onPause() {
+        super.onPause();
+        try {
+            cancelPendingStopIfAny();
 
-        // ✅ إغلاق كل الأوضاع
-        if (currentScanMode != ScanMode.NONE) {
-            switchScanMode(ScanMode.NONE);
+            if (currentScanMode != ScanMode.NONE) {
+                switchScanMode(ScanMode.NONE);
+            }
+
+            isCheckoutDialogShowing = false;
+
+            if (heroController != null) {
+                heroController.setState(PosHeroController.State.IDLE);
+            }
+
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+                View fab = getActivity().findViewById(R.id.fabActionCenter);
+                if (fab != null) fab.setVisibility(View.VISIBLE);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onPause error", e);
         }
-
-        isCheckoutDialogShowing = false;
-
-        if (heroController != null) {
-            heroController.setState(PosHeroController.State.IDLE);
-        }
-
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-            View fab = getActivity().findViewById(R.id.fabActionCenter);
-            if (fab != null) fab.setVisibility(View.VISIBLE);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "onPause error", e);
     }
-}
 
     @Override
     public void onStop() {
@@ -465,40 +438,28 @@ public void onPause() {
         } catch (Exception ignored) {}
     }
 
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
 
-@Override
-public void onHiddenChanged(boolean hidden) {
-    super.onHiddenChanged(hidden);
-
-    showToast("👁️ DEBUG onHiddenChanged: hidden=" + hidden);
-    Log.d(TAG, "👁️ onHiddenChanged: hidden=" + hidden);
-
-    if (!hidden) {
-        processPendingBarcodeIfAny();
+        if (!hidden) {
+            processPendingBarcodeIfAny();
+        }
     }
-}
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
 
         try {
-            // ═══════════════════════════════════════════════════════
-            //  1) أوقف RFID أولاً (لا حجب)
-            // ═══════════════════════════════════════════════════════
             stopRFIDScan();
 
-            // ═══════════════════════════════════════════════════════
-            //  2) إزالة مستمع الـ Back
-            // ═══════════════════════════════════════════════════════
             if (backPressedCallback != null) {
                 backPressedCallback.setEnabled(false);
                 backPressedCallback.remove();
                 backPressedCallback = null;
             }
 
-            // ═══════════════════════════════════════════════════════
-            //  3) إزالة مستمعي RFID و Cart (لا نُصفّرهم للآخرين)
-            // ═══════════════════════════════════════════════════════
             if (rfidManager != null && rfidListener != null) {
                 rfidManager.removeListener(rfidListener);
                 rfidListener = null;
@@ -508,14 +469,8 @@ public void onHiddenChanged(boolean hidden) {
                 cartListener = null;
             }
 
-            // ═══════════════════════════════════════════════════════
-            //  4) استعادة الطاقة (قبل shutdown)
-            // ═══════════════════════════════════════════════════════
             restoreOriginalPower();
 
-            // ═══════════════════════════════════════════════════════
-            //  5) إغلاق Scale و Hero
-            // ═══════════════════════════════════════════════════════
             if (scaleManager != null) scaleManager.cleanup();
             if (simulationHelper != null) simulationHelper.cleanup();
             if (heroController != null) {
@@ -523,37 +478,26 @@ public void onHiddenChanged(boolean hidden) {
                 heroController = null;
             }
 
-            // ═══════════════════════════════════════════════════════
-            //  6) تفريغ RecyclerView
-            // ═══════════════════════════════════════════════════════
             if (rvCartItems != null) {
                 rvCartItems.setAdapter(null);
                 rvCartItems.setLayoutManager(null);
             }
             cartAdapter = null;
 
-            // ═══════════════════════════════════════════════════════
-           // ═══════════════════════════════════════════════════════
-//  6.5) تنظيف بطاقة التأكيد [v6.2]
-// ═══════════════════════════════════════════════════════
-if (pendingHideFeedback != null && mainHandler != null) {
-    mainHandler.removeCallbacks(pendingHideFeedback);
-    pendingHideFeedback = null;
-}
-// ✅ تنظيف مؤقت الزناد المعلّق
-cancelPendingStopIfAny();
-scanFeedbackOverlay = null;
-scanFeedbackCard = null;
-ivFeedbackIcon = null;
-tvFeedbackTitle = null;
-tvFeedbackDetails = null;
-tvFeedbackPrice = null;
-vFeedbackAccent = null;
+            if (pendingHideFeedback != null && mainHandler != null) {
+                mainHandler.removeCallbacks(pendingHideFeedback);
+                pendingHideFeedback = null;
+            }
+            cancelPendingStopIfAny();
+            scanFeedbackOverlay = null;
+            scanFeedbackCard = null;
+            ivFeedbackIcon = null;
+            tvFeedbackTitle = null;
+            tvFeedbackDetails = null;
+            tvFeedbackPrice = null;
+            vFeedbackAccent = null;
 
-// ═══════════════════════════════════════════════════════
-//  7) تصفير الحالة
-// ═══════════════════════════════════════════════════════
-pendingEpcs.clear();
+            pendingEpcs.clear();
             lastScannedTimes.clear();
             selectedRefundItem.set(null);
             currentScanMode = ScanMode.NONE;
@@ -564,10 +508,6 @@ pendingEpcs.clear();
                 mainHandler.removeCallbacksAndMessages(null);
             }
 
-            // ═══════════════════════════════════════════════════════
-            //  8) ✅ أخيراً: shutdown الـ SDK executor
-            //     (بعد أن أُرسلت كل المهام)
-            // ═══════════════════════════════════════════════════════
             if (sdkExecutor != null && !sdkExecutor.isShutdown()) {
                 sdkExecutor.shutdown();
             }
@@ -589,93 +529,77 @@ pendingEpcs.clear();
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Power Management — Dynamic Save/Restore
+    //  Power Management
     // ═══════════════════════════════════════════════════════════════════
 
-  /**
- * ✅ [v6.1] يقلل قوة الإرسال في POS — يقرأ القيمة من MiraReaderSettings.
- *    المستخدم يتحكم بها من واجهة الإعداد (Long-press على زر RFID).
- */
-private void applyLowPowerForPos() {
-    if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
+    private void applyLowPowerForPos() {
+        if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
 
-    sdkExecutor.execute(() -> {
-        try {
-            Context appCtx = getSafeAppContext();
-            if (appCtx == null) return;
+        sdkExecutor.execute(() -> {
+            try {
+                Context appCtx = getSafeAppContext();
+                if (appCtx == null) return;
 
-            com.example.uhf.MiraRfid.MiraReaderSettings settings =
-                    com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appCtx);
+                com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                        com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appCtx);
 
-            // ✅ احفظ القيمة الفعلية قبل التغيير (للاستعادة لاحقاً)
-            savedPowerBeforePos = settings.getPowerDbm();
+                savedPowerBeforePos = settings.getPowerDbm();
+                int posPower = settings.getPosPowerDbm();
 
-            // ✅ اقرأ قوة POS من الإعدادات
-            int posPower = settings.getPosPowerDbm();
-
-            if (savedPowerBeforePos == posPower) {
-                Log.d(TAG, "⚡ POS power already at " + posPower);
-                return;
-            }
-
-            settings.setPowerDbm(posPower);
-
-            com.rscja.deviceapi.RFIDWithUHFUART reader =
-                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
-            if (reader != null) {
-                try {
-                    reader.setPower(posPower);
-                    Log.i(TAG, "⚡ POS Low-Power applied: "
-                            + posPower
-                            + " dBm (saved=" + savedPowerBeforePos + ")");
-                } catch (Exception e) {
-                    Log.w(TAG, "setPower failed", e);
+                if (savedPowerBeforePos == posPower) {
+                    Log.d(TAG, "POS power already at " + posPower);
+                    return;
                 }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "applyLowPowerForPos error", e);
-        }
-    });
-}
 
+                settings.setPowerDbm(posPower);
 
-/**
- * ✅ [v6.1] يُستدعى من Dialog عند تغيير المستخدم لقوة POS.
- *    يُطبّق القيمة الجديدة على القارئ فوراً (بدون إعادة فتح POS).
- */
-private void applyPosPowerImmediate(int newPowerDbm) {
-    if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
-
-    sdkExecutor.execute(() -> {
-        try {
-            com.rscja.deviceapi.RFIDWithUHFUART reader =
-                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
-            if (reader != null) {
-                try {
-                    reader.setPower(newPowerDbm);
-                    Log.i(TAG, "⚡ POS power updated immediately: " + newPowerDbm);
-                } catch (Exception e) {
-                    Log.w(TAG, "setPower failed", e);
+                com.rscja.deviceapi.RFIDWithUHFUART reader =
+                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+                if (reader != null) {
+                    try {
+                        reader.setPower(posPower);
+                        Log.i(TAG, "POS Low-Power applied: " + posPower
+                                + " dBm (saved=" + savedPowerBeforePos + ")");
+                    } catch (Exception e) {
+                        Log.w(TAG, "setPower failed", e);
+                    }
                 }
+            } catch (Exception e) {
+                Log.e(TAG, "applyLowPowerForPos error", e);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "applyPosPowerImmediate error", e);
-        }
-    });
-}
-    /**
-     * ✅ استعادة القيمة الأصلية — ديناميكياً.
-     *    إذا لم تُحفظ → لا تُغيَّر (منع الكتابة فوق إعداد المستخدم).
-     */
+        });
+    }
+
+    private void applyPosPowerImmediate(int newPowerDbm) {
+        if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
+
+        sdkExecutor.execute(() -> {
+            try {
+                com.rscja.deviceapi.RFIDWithUHFUART reader =
+                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+                if (reader != null) {
+                    try {
+                        reader.setPower(newPowerDbm);
+                        Log.i(TAG, "POS power updated immediately: " + newPowerDbm);
+                    } catch (Exception e) {
+                        Log.w(TAG, "setPower failed", e);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "applyPosPowerImmediate error", e);
+            }
+        });
+    }
+
     private void restoreOriginalPower() {
         if (savedPowerBeforePos <= 0) {
-            Log.d(TAG, "⏭️ restoreOriginalPower: no saved value — skip");
+            Log.d(TAG, "restoreOriginalPower: no saved value — skip");
             return;
         }
         if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
 
         final int target = savedPowerBeforePos;
-        savedPowerBeforePos = -1;   // ✅ مرة واحدة فقط
+        savedPowerBeforePos = -1;
 
         sdkExecutor.execute(() -> {
             try {
@@ -692,7 +616,7 @@ private void applyPosPowerImmediate(int newPowerDbm) {
                 if (reader != null) {
                     try {
                         reader.setPower(target);
-                        Log.i(TAG, "⚡ Original power restored: " + target + " dBm");
+                        Log.i(TAG, "Original power restored: " + target + " dBm");
                     } catch (Exception ignored) {}
                 }
             } catch (Exception e) {
@@ -705,14 +629,12 @@ private void applyPosPowerImmediate(int newPowerDbm) {
     //  Lifecycle Helpers
     // ═══════════════════════════════════════════════════════════════════
 
-    /** ✅ هل الـ Fragment ما زال صالحاً للتفاعل؟ */
     private boolean isFragmentAlive() {
         return isAdded() && !isRemoving() && !isDetached()
                 && getActivity() != null && !getActivity().isFinishing()
                 && !getActivity().isDestroyed();
     }
 
-    /** ✅ application context آمن للاستخدام من أي thread */
     @Nullable
     private Context getSafeAppContext() {
         try {
@@ -720,9 +642,8 @@ private void applyPosPowerImmediate(int newPowerDbm) {
         } catch (Exception ignored) {}
         return null;
     }
-
-
-// ═══════════════════════════════════════════════════════════════════
+    
+    // ═══════════════════════════════════════════════════════════════════
 //  Views Binding
 // ═══════════════════════════════════════════════════════════════════
 
@@ -755,7 +676,6 @@ private void bindViews(View view) {
     btnPosScanRfid  = view.findViewById(R.id.btnPosScanRfid);
     btnPosScanManual = view.findViewById(R.id.btnPosScanManual);
 
-    // Scale status click → settings dialog
     if (tvScaleStatus != null) {
         tvScaleStatus.setOnClickListener(v -> {
             if (scaleManager != null) scaleManager.showSettingsDialog();
@@ -764,9 +684,6 @@ private void bindViews(View view) {
     if (etManualEpc != null) etManualEpc.clearFocus();
 }
 
-/**
- * ✅ إخفاء زر RFID على الأجهزة التي لا تحتوي على قارئ مدمج
- */
 private void hideRfidButtonIfUnsupported() {
     try {
         boolean hasRfid = com.example.uhf.tools.DeviceDetector
@@ -775,8 +692,8 @@ private void hideRfidButtonIfUnsupported() {
         if (btnPosScanRfid != null) {
             btnPosScanRfid.setVisibility(hasRfid ? View.VISIBLE : View.GONE);
             Log.i(TAG, hasRfid
-                    ? "📡 RFID button visible"
-                    : "📱 RFID button hidden (phone mode)");
+                    ? "RFID button visible"
+                    : "RFID button hidden (phone mode)");
         }
     } catch (Exception e) {
         Log.w(TAG, "hideRfidButtonIfUnsupported error", e);
@@ -817,7 +734,7 @@ private void setupHeroController(View view) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  RecyclerView — adapter واحد للجلسة
+//  RecyclerView
 // ═══════════════════════════════════════════════════════════════════
 
 private void setupRecyclerView() {
@@ -827,10 +744,8 @@ private void setupRecyclerView() {
         rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
         rvCartItems.setHasFixedSize(false);
 
-        // ✅ adapter واحد — لا يحمل قائمة حيّة
         cartAdapter = new CartAdapter(
                 position -> {
-                    // ✅ الحذف عبر cartManager — listener سيُحدّث UI
                     if (cartManager != null) {
                         cartManager.removeItemAt(position);
                     }
@@ -841,11 +756,10 @@ private void setupRecyclerView() {
 
         rvCartItems.setAdapter(cartAdapter);
 
-        // ✅ ربط أولي بحالة السلة الحالية
         cartAdapter.replaceItems(cartManager.getItems());
         cartAdapter.notifyDataSetChanged();
 
-        Log.d(TAG, "✅ CartAdapter initialized (single instance)");
+        Log.d(TAG, "CartAdapter initialized (single instance)");
 
     } catch (Exception e) {
         Log.e(TAG, "setupRecyclerView error", e);
@@ -853,37 +767,24 @@ private void setupRecyclerView() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Cart Listener — إشعار موحّد من PosCartManager
+//  Cart Listener
 // ═══════════════════════════════════════════════════════════════════
 
 private void setupCartListener() {
     if (cartManager == null) return;
 
-    // ✅ listener واحد — يستقبل كل التغييرات
     cartListener = (snapshot, type, position) -> {
         safeRun(() -> renderCart(snapshot, type, position));
     };
 
     cartManager.addListener(cartListener);
-    Log.d(TAG, "✅ Cart listener registered (unified)");
+    Log.d(TAG, "Cart listener registered (unified)");
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  renderCart — الدالة الموحّدة لتحديث UI
+//  renderCart — الدالة الموحّدة
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * ✅ [v6.0] الدالة الوحيدة لعرض السلة.
- *
- * تُستدعى من:
- *   - PosCartManager listener
- *   - onViewCreated (ربط أولي)
- *   - onResume (ربط أولي)
- *
- * @param snapshot صورة ثابتة للحالة الجديدة
- * @param type     نوع التغيير (null = ربط أولي)
- * @param position فهرس التغيير (أو -1)
- */
 private void renderCart(@NonNull PosCartManager.CartSnapshot snapshot,
                         @Nullable PosCartManager.ChangeType type,
                         int position) {
@@ -892,14 +793,10 @@ private void renderCart(@NonNull PosCartManager.CartSnapshot snapshot,
     try {
         final int count = snapshot.count;
 
-        // ═══════════════════════════════════════════════════
-        //  1) تحديث الـ Adapter
-        // ═══════════════════════════════════════════════════
+        // 1) Adapter
         if (cartAdapter != null) {
-            // أولاً: استبدل البيانات
             cartAdapter.replaceItems(snapshot.items);
 
-            // ثانياً: notify حسب نوع التغيير
             if (type != null) {
                 switch (type) {
                     case ITEM_ADDED:
@@ -928,14 +825,11 @@ private void renderCart(@NonNull PosCartManager.CartSnapshot snapshot,
                         break;
                 }
             } else {
-                // ربط أولي — إعادة رسم كامل
                 cartAdapter.notifyDataSetChanged();
             }
         }
 
-        // ═══════════════════════════════════════════════════
-        //  2) تبديل Hero / Cart Visibility
-        // ═══════════════════════════════════════════════════
+        // 2) Hero / Cart Visibility
         if (posHeroContainer != null) {
             posHeroContainer.setVisibility(count == 0
                     ? View.VISIBLE : View.GONE);
@@ -949,14 +843,10 @@ private void renderCart(@NonNull PosCartManager.CartSnapshot snapshot,
                     ? View.VISIBLE : View.GONE);
         }
 
-        // ═══════════════════════════════════════════════════
-        //  3) Footer Sticky — source of truth واحدة
-        // ═══════════════════════════════════════════════════
+        // 3) Footer Sticky
         updateFooterVisibility(count > 0);
 
-        // ═══════════════════════════════════════════════════
-        //  4) النصوص والملخص
-        // ═══════════════════════════════════════════════════
+        // 4) النصوص
         if (tvItemCount != null) {
             tvItemCount.setText(String.valueOf(count));
         }
@@ -980,9 +870,7 @@ private void renderCart(@NonNull PosCartManager.CartSnapshot snapshot,
             posSummaryStrip.setSelected(count > 0);
         }
 
-        // ═══════════════════════════════════════════════════
-        //  5) CTA buttons
-        // ═══════════════════════════════════════════════════
+        // 5) CTA buttons
         if (btnCheckout != null) {
             boolean enabled = count > 0
                     && !snapshot.hasUnavailable
@@ -1000,10 +888,6 @@ private void renderCart(@NonNull PosCartManager.CartSnapshot snapshot,
     }
 }
 
-/**
- * ✅ Footer visibility — single source of truth
- * لا يتداخل مع animations أخرى.
- */
 private void updateFooterVisibility(boolean shouldBeVisible) {
     if (posFooterSticky == null) return;
 
@@ -1011,11 +895,8 @@ private void updateFooterVisibility(boolean shouldBeVisible) {
         int currentVisibility = posFooterSticky.getVisibility();
 
         if (shouldBeVisible) {
-            if (currentVisibility == View.VISIBLE) {
-                // ✅ ظاهر بالفعل — لا تفعل شيئاً (منع تراكم animations)
-                return;
-            }
-            // أظهره بـ animation
+            if (currentVisibility == View.VISIBLE) return;
+
             posFooterSticky.setVisibility(View.VISIBLE);
             posFooterSticky.setAlpha(0f);
             posFooterSticky.setTranslationY(
@@ -1030,11 +911,8 @@ private void updateFooterVisibility(boolean shouldBeVisible) {
                             new android.view.animation.DecelerateInterpolator())
                     .start();
         } else {
-            if (currentVisibility != View.VISIBLE) {
-                // ✅ مخفي بالفعل — لا تفعل شيئاً
-                return;
-            }
-            // أخفه بـ animation
+            if (currentVisibility != View.VISIBLE) return;
+
             posFooterSticky.animate()
                     .alpha(0f)
                     .translationY(posFooterSticky.getHeight())
@@ -1055,9 +933,6 @@ private void updateFooterVisibility(boolean shouldBeVisible) {
     }
 }
 
-/**
- * ✅ بناء نص الإجمالي — مضمون 100%
- */
 private String buildTotalText(int count, double totalUsd) {
     if (count <= 0) {
         String def = getString(R.string.pos_default_amount);
@@ -1077,7 +952,6 @@ private String buildTotalText(int count, double totalUsd) {
             Log.w(TAG, "formatPriceDefault error", e);
         }
 
-        // Fallback عبر priceManager
         try {
             String currency = priceManager.getDefaultCurrency();
             double rate = priceManager.getExchangeRate(currency);
@@ -1088,7 +962,6 @@ private String buildTotalText(int count, double totalUsd) {
         }
     }
 
-    // Fallback نهائي — USD
     return String.format(Locale.US, "$%,.2f", totalUsd);
 }
 
@@ -1117,7 +990,6 @@ private void setupListeners() {
 private void setupManualInputListeners() {
     if (etManualEpc == null) return;
 
-    // ✅ Enter / Search → submit
     etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
         if (actionId == EditorInfo.IME_ACTION_DONE
                 || actionId == EditorInfo.IME_ACTION_SEARCH
@@ -1130,7 +1002,6 @@ private void setupManualInputListeners() {
         return false;
     });
 
-    // ✅ Auto-submit بعد 350ms من آخر حرف (≥ 6 أحرف)
     final Runnable[] pendingAuto = new Runnable[1];
     etManualEpc.addTextChangedListener(new android.text.TextWatcher() {
         @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
@@ -1157,7 +1028,6 @@ private void setupManualInputListeners() {
 }
 
 private void setupScanButtonListeners() {
-    // ⭐ GS1 — ماسح الباركود
     if (btnPosScanGs1 != null) {
         btnPosScanGs1.setOnClickListener(v -> {
             UIHelper.hideKeyboard(getActivity());
@@ -1165,9 +1035,7 @@ private void setupScanButtonListeners() {
         });
     }
 
-    // ⭐ RFID — إعلامي فقط + Long-press للإعدادات
     if (btnPosScanRfid != null) {
-        // ✅ ضغطة عادية → رسالة توجيه
         btnPosScanRfid.setOnClickListener(v -> {
             UIHelper.hideKeyboard(getActivity());
             showToast(isArabic
@@ -1175,7 +1043,6 @@ private void setupScanButtonListeners() {
                     : "🎯 Use the physical trigger to scan");
         });
 
-        // ✅ ضغطة مطوّلة → إعدادات قوة POS
         btnPosScanRfid.setOnLongClickListener(v -> {
             UIHelper.hideKeyboard(getActivity());
             openPosPowerSettings();
@@ -1183,7 +1050,6 @@ private void setupScanButtonListeners() {
         });
     }
 
-    // ⭐ Manual — Toggle
     if (btnPosScanManual != null) {
         btnPosScanManual.setOnClickListener(v -> {
             UIHelper.hideKeyboard(getActivity());
@@ -1193,11 +1059,6 @@ private void setupScanButtonListeners() {
     }
 }
 
-
-/**
- * ✅ [v6.1] فتح نافذة إعداد قوة قراءة POS.
- *    عند الحفظ، تُطبّق القيمة الجديدة فوراً على القارئ.
- */
 private void openPosPowerSettings() {
     if (!isFragmentAlive()) return;
 
@@ -1209,12 +1070,8 @@ private void openPosPowerSettings() {
                 ctx,
                 isArabic,
                 newPowerDbm -> {
-                    Log.i(TAG, "⚡ User set POS power → " + newPowerDbm + " dBm");
-
-                    // ✅ طبّق القيمة الجديدة فوراً
+                    Log.i(TAG, "User set POS power → " + newPowerDbm + " dBm");
                     applyPosPowerImmediate(newPowerDbm);
-
-                    // ✅ أبلغ المستخدم
                     showToast(isArabic
                             ? "✅ تم تحديث قوة القراءة إلى " + newPowerDbm + " dBm"
                             : "✅ Power updated to " + newPowerDbm + " dBm");
@@ -1227,7 +1084,6 @@ private void openPosPowerSettings() {
                 : "⚠️ Could not open settings");
     }
 }
-
 
 private void setupActionButtonListeners() {
     if (btnClearCart != null) {
@@ -1341,29 +1197,23 @@ private void submitManualEpc() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Process Item — Lookup + Parse
+//  Process Item
 // ═══════════════════════════════════════════════════════════════════
+
 private void processRingEpc(final String code, final String source) {
     if (code == null || code.trim().isEmpty() || !isFragmentAlive()) return;
     final String cleanCode = code.trim();
 
-    // ✅ DEBUG
-    showToast("📡 DEBUG processRingEpc: [" + cleanCode + "] src=" + source);
+    if (!pendingEpcs.add(cleanCode)) return;
 
-    if (!pendingEpcs.add(cleanCode)) {
-    showToast("⏭️ DEBUG: already pending");
-    return;
-}
+    final String epcToClean = cleanCode;
+    mainHandler.postDelayed(() -> {
+        boolean removed = pendingEpcs.remove(epcToClean);
+        if (removed) {
+            Log.w(TAG, "Pending EPC timed out: " + epcToClean);
+        }
+    }, PENDING_EPC_TIMEOUT_MS);
 
-// ✅ شبكة أمان: احذف EPC تلقائياً بعد 10 ثوانٍ مهما حدث
-final String epcToClean = cleanCode;
-mainHandler.postDelayed(() -> {
-    boolean removed = pendingEpcs.remove(epcToClean);
-    if (removed) {
-        Log.w(TAG, "⚠️ Pending EPC timed out and removed: " + epcToClean);
-    }
-}, PENDING_EPC_TIMEOUT_MS);
-    
     playAlertSound(1);
 
     safeRun(() -> {
@@ -1385,8 +1235,7 @@ mainHandler.postDelayed(() -> {
                 syncManager.findItem(cleanCode, branchId,
                         new MiraItemSyncManager.ItemLookupCallback() {
                     @Override
-public void onItemFound(JSONObject item, boolean fromServer) {
-    showToast("✅ DEBUG ItemFound from " + (fromServer ? "server" : "cache"));
+                    public void onItemFound(JSONObject item, boolean fromServer) {
                         safeRun(() -> {
                             if (!isFragmentAlive()) return;
 
@@ -1402,25 +1251,23 @@ public void onItemFound(JSONObject item, boolean fromServer) {
                     }
 
                     @Override
-public void onItemNotFound() {
-    showToast("❌ DEBUG ItemNotFound");
-    safeRun(() -> {
-        if (!isFragmentAlive()) return;
-        showToast(getString(R.string.pos_msg_not_found));
-        playAlertSound(2);
-        setHeroError();
-        resetHeroAfterDelay();
+                    public void onItemNotFound() {
+                        safeRun(() -> {
+                            if (!isFragmentAlive()) return;
+                            showToast(getString(R.string.pos_msg_not_found));
+                            playAlertSound(2);
+                            setHeroError();
+                            resetHeroAfterDelay();
 
-        // ✅ [v6.2] بطاقة "غير موجود"
-        showScanFeedback(
-                isArabic ? "❌ لم يتم العثور" : "❌ Not Found",
-                cleanCode,
-                null,
-                android.R.drawable.ic_dialog_alert,
-                0xFFDC2626   // أحمر
-        );
-    });
-}
+                            showScanFeedback(
+                                    isArabic ? "❌ لم يتم العثور" : "❌ Not Found",
+                                    cleanCode,
+                                    null,
+                                    android.R.drawable.ic_dialog_alert,
+                                    0xFFDC2626
+                            );
+                        });
+                    }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "processRingEpc network error", e);
@@ -1439,11 +1286,6 @@ public void onItemNotFound() {
     }
 }
 
-/**
- * ✅ تحليل استجابة السيرفر — يُنفَّذ على main thread عبر safeRun
- *    من processRingEpc. لا forceShowCart. الإضافة عبر cartManager
- *    تُطلق الإشعار الموحّد → renderCart.
- */
 private void parseItemResponse(String code, JSONObject data, String source) {
     try {
         JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
@@ -1459,28 +1301,24 @@ private void parseItemResponse(String code, JSONObject data, String source) {
                 item.optString("vault_status", "")).toLowerCase();
 
         if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
-    showToast(getString(R.string.pos_msg_already_sold));
-    playAlertSound(2);
-    setHeroError();
-    resetHeroAfterDelay();
+            showToast(getString(R.string.pos_msg_already_sold));
+            playAlertSound(2);
+            setHeroError();
+            resetHeroAfterDelay();
 
-    // ✅ [v6.2] بطاقة رفض
-    showScanFeedback(
-            isArabic ? "❌ القطعة مباعة" : "❌ Already Sold",
-            extractString(item, "title", "item_title"),
-            null,
-            android.R.drawable.ic_delete,
-            0xFFDC2626   // أحمر
-    );
-    return;
-}
+            showScanFeedback(
+                    isArabic ? "❌ القطعة مباعة" : "❌ Already Sold",
+                    extractString(item, "title", "item_title"),
+                    null,
+                    android.R.drawable.ic_delete,
+                    0xFFDC2626
+            );
+            return;
+        }
 
         boolean isAvailable = !vaultStatus.equals("sold")
                 && !vaultStatus.equals("reserved");
 
-        // ═══════════════════════════════════════════════════
-        //  استخراج بيانات القطعة
-        // ═══════════════════════════════════════════════════
         String title = item.optString("title",
                 item.optString("item_title",
                         isArabic ? "قطعة" : "Item"));
@@ -1496,12 +1334,6 @@ private void parseItemResponse(String code, JSONObject data, String source) {
                 priceResolver.resolve(item, karatNum, weight);
         double price = priceResult.priceUsd;
 
-        Log.d(TAG, "💰 Price resolved: " + price
-                + " (source=" + priceResult.source + ")");
-
-        // ═══════════════════════════════════════════════════
-        //  بناء CartItem
-        // ═══════════════════════════════════════════════════
         CartItem cartItem = new CartItem(code, title, karat, weight,
                 liveScaleWeight, price, isAvailable,
                 vaultStatus.toUpperCase());
@@ -1529,47 +1361,39 @@ private void parseItemResponse(String code, JSONObject data, String source) {
             cartItem.rfidEpc = code;
         }
 
-        // ═══════════════════════════════════════════════════
-        //  فحوصات ما قبل الإضافة
-        // ═══════════════════════════════════════════════════
         boolean alreadyInCart = cartManager != null
                 && cartManager.containsItem(cartItem.epc,
                 cartItem.serialNo, cartItem.gtin);
 
         if (alreadyInCart) {
-    showToast(getString(R.string.pos_msg_already_in_cart));
-    playAlertSound(2);
-    resetHeroAfterDelay();
+            showToast(getString(R.string.pos_msg_already_in_cart));
+            playAlertSound(2);
+            resetHeroAfterDelay();
 
-    // ✅ [v6.2] بطاقة تحذير
-    showScanFeedback(
-            isArabic ? "⚠️ مكررة في السلة" : "⚠️ Already in Cart",
-            title,
-            null,
-            android.R.drawable.ic_dialog_alert,
-            0xFF3B82F6   // أزرق
-    );
-    return;
-}
+            showScanFeedback(
+                    isArabic ? "⚠️ مكررة في السلة" : "⚠️ Already in Cart",
+                    title,
+                    null,
+                    android.R.drawable.ic_dialog_alert,
+                    0xFF3B82F6
+            );
+            return;
+        }
 
         if (!isAvailable) {
-    showToast(getString(R.string.pos_msg_unavailable));
-    resetHeroAfterDelay();
+            showToast(getString(R.string.pos_msg_unavailable));
+            resetHeroAfterDelay();
 
-    // ✅ [v6.2] بطاقة تحذير
-    showScanFeedback(
-            isArabic ? "⚠️ القطعة غير متاحة" : "⚠️ Item Unavailable",
-            title,
-            null,
-            android.R.drawable.ic_dialog_alert,
-            0xFFF59E0B   // كهرماني
-    );
-    return;
-}
+            showScanFeedback(
+                    isArabic ? "⚠️ القطعة غير متاحة" : "⚠️ Item Unavailable",
+                    title,
+                    null,
+                    android.R.drawable.ic_dialog_alert,
+                    0xFFF59E0B
+            );
+            return;
+        }
 
-        // ═══════════════════════════════════════════════════
-        //  ✅ الإضافة — كل UI يتحدّث تلقائياً عبر renderCart
-        // ═══════════════════════════════════════════════════
         int pos = cartManager.addItem(cartItem);
         if (pos < 0) {
             showToast(getString(R.string.pos_msg_already_in_cart));
@@ -1577,20 +1401,17 @@ private void parseItemResponse(String code, JSONObject data, String source) {
             return;
         }
 
-        // ✅ الأصوات والـ toast
-playAlertSound(1);
-showToast(getString(R.string.pos_msg_added, title));
+        playAlertSound(1);
+        showToast(getString(R.string.pos_msg_added, title));
 
-// ✅ [v6.2] بطاقة تأكيد احترافية
-showScanFeedback(
-        title,
-        karat + " • " + String.format(Locale.US, "%.2fg", weight),
-        buildTotalText(1, price),
-        R.drawable.ic_pos_cart_gold,
-        0xFF22C55E   // أخضر
-);
+        showScanFeedback(
+                title,
+                karat + " • " + String.format(Locale.US, "%.2fg", weight),
+                buildTotalText(1, price),
+                R.drawable.ic_pos_cart_gold,
+                0xFF22C55E
+        );
 
-        // ✅ Hero state
         if (heroController != null) {
             heroController.setState(PosHeroController.State.ITEM_ADDED);
             if ("rfid".equals(source)) {
@@ -1695,10 +1516,6 @@ private void initSmartScale() {
     }
 }
 
-/**
- * ✅ تحديث وزن أعلى قطعة في السلة — عبر cartManager
- *    حتى يمرّ عبر renderCart (تحديث موحّد).
- */
 private void updateTopCartItemScaleWeight(double currentScaleWeight) {
     if (cartManager == null || cartManager.isEmpty()
             || currentScaleWeight <= 0) {
@@ -1712,10 +1529,7 @@ private void updateTopCartItemScaleWeight(double currentScaleWeight) {
         if (topItem == null) return;
         if (topItem.scaleWeight == currentScaleWeight) return;
 
-        // ✅ عدّل مباشرة
         topItem.scaleWeight = currentScaleWeight;
-
-        // ✅ أبلغ cartManager (يطلق ITEM_UPDATED → renderCart)
         cartManager.updateItemAt(0, topItem);
 
     } catch (Exception e) {
@@ -1724,10 +1538,9 @@ private void updateTopCartItemScaleWeight(double currentScaleWeight) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Scan Feedback Card — التنفيذ [v6.2]
+//  Scan Feedback Card
 // ═══════════════════════════════════════════════════════════════════
 
-/** تحويل dp → pixels */
 private int dp(int value) {
     try {
         return Math.round(value * getResources()
@@ -1737,18 +1550,11 @@ private int dp(int value) {
     }
 }
 
-/**
- * ✅ [v6.2] إنشاء بطاقة التأكيد برمجياً.
- *    تُضاف إلى الجزء العلوي من الشاشة وتظهر عند كل مسح.
- */
 private void initScanFeedbackCard(@NonNull View fragmentRoot) {
     try {
         if (!(fragmentRoot instanceof ViewGroup)) return;
         ViewGroup root = (ViewGroup) fragmentRoot;
 
-        // ═══════════════════════════════════════════════════
-        //  الحاوية (تملأ الشاشة، للتمركز)
-        // ═══════════════════════════════════════════════════
         FrameLayout overlay = new FrameLayout(requireContext());
         overlay.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1757,9 +1563,6 @@ private void initScanFeedbackCard(@NonNull View fragmentRoot) {
         overlay.setFocusable(false);
         overlay.setVisibility(View.GONE);
 
-        // ═══════════════════════════════════════════════════
-        //  البطاقة
-        // ═══════════════════════════════════════════════════
         MaterialCardView card = new MaterialCardView(requireContext());
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1772,15 +1575,11 @@ private void initScanFeedbackCard(@NonNull View fragmentRoot) {
         card.setCardBackgroundColor(0xFFFFFFFF);
         card.setClickable(false);
 
-        // ═══════════════════════════════════════════════════
-        //  صف المحتوى
-        // ═══════════════════════════════════════════════════
         LinearLayout row = new LinearLayout(requireContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(dp(16), dp(14), dp(16), dp(14));
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        // أيقونة
         ImageView icon = new ImageView(requireContext());
         LinearLayout.LayoutParams iconParams =
                 new LinearLayout.LayoutParams(dp(44), dp(44));
@@ -1788,7 +1587,6 @@ private void initScanFeedbackCard(@NonNull View fragmentRoot) {
         icon.setImageResource(R.drawable.ic_pos_cart_gold);
         row.addView(icon);
 
-        // عمود النصوص
         LinearLayout textCol = new LinearLayout(requireContext());
         textCol.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
@@ -1829,7 +1627,6 @@ private void initScanFeedbackCard(@NonNull View fragmentRoot) {
 
         row.addView(textCol);
 
-        // شريط جانبي ملوّن
         View accent = new View(requireContext());
         LinearLayout.LayoutParams accentParams = new LinearLayout.LayoutParams(
                 dp(4), ViewGroup.LayoutParams.MATCH_PARENT);
@@ -1841,7 +1638,6 @@ private void initScanFeedbackCard(@NonNull View fragmentRoot) {
         overlay.addView(card);
         root.addView(overlay);
 
-        // ✅ حفظ المراجع
         this.scanFeedbackOverlay = overlay;
         this.scanFeedbackCard = card;
         this.ivFeedbackIcon = icon;
@@ -1850,22 +1646,11 @@ private void initScanFeedbackCard(@NonNull View fragmentRoot) {
         this.tvFeedbackPrice = price;
         this.vFeedbackAccent = accent;
 
-        Log.d(TAG, "✅ Scan feedback card initialized");
-
     } catch (Exception e) {
         Log.e(TAG, "initScanFeedbackCard error", e);
     }
 }
 
-/**
- * ✅ [v6.2] عرض بطاقة تأكيد مؤقتة.
- *
- * @param title       العنوان (اسم القطعة أو الرسالة)
- * @param details     التفاصيل (العيار • الوزن)
- * @param price       السعر (null = لا يُعرض)
- * @param iconRes     أيقونة
- * @param accentColor لون الشريط الجانبي والأيقونة
- */
 private void showScanFeedback(@NonNull String title,
                               @Nullable String details,
                               @Nullable String price,
@@ -1874,13 +1659,11 @@ private void showScanFeedback(@NonNull String title,
     if (!isFragmentAlive() || scanFeedbackOverlay == null) return;
 
     try {
-        // إلغاء الإخفاء السابق
         if (pendingHideFeedback != null) {
             mainHandler.removeCallbacks(pendingHideFeedback);
             pendingHideFeedback = null;
         }
 
-        // تحديث المحتوى
         if (tvFeedbackTitle != null) {
             tvFeedbackTitle.setText(title);
         }
@@ -1913,7 +1696,6 @@ private void showScanFeedback(@NonNull String title,
             vFeedbackAccent.setBackgroundColor(accentColor);
         }
 
-        // إظهار بأنيميشن
         final View card = scanFeedbackCard;
         final View overlay = scanFeedbackOverlay;
 
@@ -1930,7 +1712,6 @@ private void showScanFeedback(@NonNull String title,
                     .start();
         }
 
-        // إخفاء تلقائي بعد 2.5 ثانية
         pendingHideFeedback = () -> {
             if (card == null || overlay == null) return;
             card.animate()
@@ -1953,16 +1734,13 @@ private void showScanFeedback(@NonNull String title,
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Utilities (تُستخدم في كل الأجزاء)
+//  Utilities
 // ═══════════════════════════════════════════════════════════════════
 
 private void showToast(String msg) {
     PosUIManager.toast(getContext(), msg);
 }
 
-/**
- * ✅ تنفيذ آمن على main thread — مع فحص lifecycle.
- */
 private void safeRun(Runnable r) {
     if (r == null) return;
     try {
@@ -2000,13 +1778,53 @@ private int getActiveBranchId() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  ✅ [v6.3] Permission Checks — موحّدة مع PermissionManager v3.0
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * ✅ هل يمكنه استخدام شاشة POS؟
+ *    (View + Edit)
+ */
 private boolean hasPosPermission() {
+    if (permissionManager == null) return false;
     try {
-        return permissionManager != null && (
-                permissionManager.canView("pos")
-                        || permissionManager.isPosOperator()
-                        || permissionManager.isManager());
+        return permissionManager.canUsePos();
     } catch (Exception e) {
+        Log.e(TAG, "hasPosPermission error", e);
+        return false;
+    }
+}
+
+/**
+ * ✅ هل يمكنه إجراء عملية بيع (Checkout)؟
+ *    أوسع قليلاً من canUsePos — يشمل POS Operator + Manager + Admin
+ */
+private boolean canPerformCheckout() {
+    if (permissionManager == null) return false;
+    try {
+        return permissionManager.canUsePos()
+                && (permissionManager.isPosOperator()
+                    || permissionManager.isManager()
+                    || permissionManager.isAdmin());
+    } catch (Exception e) {
+        Log.e(TAG, "canPerformCheckout error", e);
+        return false;
+    }
+}
+
+/**
+ * ✅ هل يمكنه إجراء عملية استرجاع (Refund)؟
+ *    مقيد: Manager / Admin / Finance Manager فقط
+ */
+private boolean canPerformRefund() {
+    if (permissionManager == null) return false;
+    try {
+        return permissionManager.isManager()
+                || permissionManager.isAdmin()
+                || permissionManager.isFinanceManager();
+    } catch (Exception e) {
+        Log.e(TAG, "canPerformRefund error", e);
         return false;
     }
 }
@@ -2032,9 +1850,6 @@ private String extractString(JSONObject obj, String... keys) {
     return "";
 }
 
-/**
- * ✅ إخفاء لوحة المفاتيح بأمان — يستخدمها navigateAwayFromPos.
- */
 private void UIKeyboardHide() {
     try {
         if (getActivity() != null) {
@@ -2050,16 +1865,20 @@ private void UIKeyboardHide() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  Checkout — الدفع
+//  Checkout
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * ✅ فتح نافذة الدفع — الحماية الكاملة ضد النقر المزدوج.
- */
 private void processCheckoutAndStockUpdate() {
     try {
+        // ✅ [v6.3] فحص الصلاحية الكاملة
         if (!hasPosPermission()) {
             showToast(getString(R.string.pos_msg_no_permission));
+            return;
+        }
+        if (!canPerformCheckout()) {
+            showToast(isArabic
+                    ? "⛔ غير مصرح بإجراء البيع"
+                    : "⛔ Not authorized to checkout");
             return;
         }
         if (cartManager == null || cartManager.isEmpty()) {
@@ -2099,9 +1918,6 @@ private void processCheckoutAndStockUpdate() {
     }
 }
 
-/**
- * ✅ تنفيذ الدفع على الخيط الشبكي — مع retry عند الفشل.
- */
 private void executeCheckoutDirectly(final POSCheckoutDialog.POSCheckoutData data) {
     if (data == null || !isFragmentAlive()) return;
 
@@ -2165,10 +1981,6 @@ private void executeCheckoutDirectly(final POSCheckoutDialog.POSCheckoutData dat
     }
 }
 
-/**
- * ✅ معالجة نجاح البيع — بسيط، مختصر، لا يتلاعب بـ UI السلة.
- *    cartManager.clear() سيُطلق renderCart تلقائياً.
- */
 private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
                                final POSCheckoutDialog.POSCheckoutData data,
                                final boolean isOffline) {
@@ -2179,12 +1991,10 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
         lastSaleResponse = response;
         lastSaleResponseTime = System.currentTimeMillis();
 
-        // ✅ لقطة قبل التفريغ — للـ GateSaleBridge
         final List<CartItem> soldItems = new ArrayList<>(cartManager.getItems());
         final long saleId = isOffline
                 ? 0L : extractSaleIdFromResponse(response);
 
-        // ✅ إشعار Gate
         Context appCtx = getSafeAppContext();
         if (appCtx != null) {
             GateSaleBridge.onSaleCompleted(
@@ -2198,10 +2008,8 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
             );
         }
 
-        // ✅ تفريغ السلة — renderCart سيُستدعى تلقائياً
         cartManager.clear();
 
-        // ✅ عرض الإيصال + إشعارات
         if (!isOffline) {
             showReceipt(response);
             PosUIManager.notifyDataChanged(requireContext(),
@@ -2213,7 +2021,6 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
                     "sale_offline", getActiveBranchId());
         }
 
-        // ✅ إعادة تعيين Hero
         if (heroController != null) {
             heroController.resetRfidCount();
             heroController.setState(PosHeroController.State.IDLE);
@@ -2223,18 +2030,12 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
     }
 }
 
-/**
- * ✅ بناء Payload الدفع — كل التحويلات والحقول.
- */
 private JSONObject buildCheckoutPayload(MiraApiClient client,
                                         POSCheckoutDialog.POSCheckoutData data)
         throws Exception {
 
     JSONObject payload = new JSONObject();
 
-    // ═══════════════════════════════════════════════════════
-    //  المعلومات الأساسية
-    // ═══════════════════════════════════════════════════════
     payload.put("action", "COMPLETE_POS_SALE");
     payload.put("gate_id", client != null ? client.getGateId() : "");
     payload.put("branch_id", getActiveBranchId());
@@ -2243,9 +2044,6 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     payload.put("username", sessionManager != null
             ? sessionManager.getUsername() : "");
 
-    // ═══════════════════════════════════════════════════════
-    //  معلومات العميل
-    // ═══════════════════════════════════════════════════════
     String customerName = (data.customerName != null
             && !data.customerName.trim().isEmpty())
             ? data.customerName.trim()
@@ -2272,9 +2070,6 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
             ? data.paymentMethod : "CASH");
     payload.put("customer", customerObj);
 
-    // ═══════════════════════════════════════════════════════
-    //  العناصر
-    // ═══════════════════════════════════════════════════════
     JSONArray itemsArr = new JSONArray();
     for (CartItem item : cartManager.getItems()) {
         if (item == null) continue;
@@ -2291,9 +2086,6 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     payload.put("items", itemsArr);
     payload.put("item_count", cartManager.size());
 
-    // ═══════════════════════════════════════════════════════
-    //  الأسعار والعمولة
-    // ═══════════════════════════════════════════════════════
     String currencyCode = priceManager.getDefaultCurrency();
     double exchangeRate = priceManager.getExchangeRate(currencyCode);
 
@@ -2399,6 +2191,14 @@ private long extractSaleIdFromResponse(MiraApiClient.ApiResponse response) {
 
 private void showRefundDialog() {
     if (!isFragmentAlive()) return;
+
+    // ✅ [v6.3] فحص الصلاحية قبل العرض
+    if (!canPerformRefund()) {
+        showToast(isArabic
+                ? "⛔ غير مصرح بالاسترجاع"
+                : "⛔ Not authorized to refund");
+        return;
+    }
 
     try {
         selectedRefundItem.set(null);
@@ -2628,6 +2428,14 @@ private void showRefundItemErrorInDialog(String message) {
 private void processRefund(final String code, final String reason) {
     if (!isFragmentAlive()) return;
 
+    // ✅ [v6.3] فحص مزدوج للصلاحية
+    if (!canPerformRefund()) {
+        showToast(isArabic
+                ? "⛔ غير مصرح بالاسترجاع"
+                : "⛔ Not authorized to refund");
+        return;
+    }
+
     final AlertDialog loadingDialog =
             PosUIManager.showLoadingDialog(requireContext(), isArabic);
     final RefundItem itemToRefund = selectedRefundItem.get();
@@ -2854,6 +2662,12 @@ private void applyPermissions() {
         if (btnPosScanManual != null) btnPosScanManual.setEnabled(canUse);
         if (etManualEpc != null) etManualEpc.setEnabled(canUse);
 
+        // ✅ [v6.3] زر الاسترجاع — حسب الصلاحية
+        if (btnPosRefund != null) {
+            boolean canRefund = canPerformRefund();
+            btnPosRefund.setVisibility(canRefund ? View.VISIBLE : View.GONE);
+        }
+
         if (!canUse && tvCartStatus != null) {
             tvCartStatus.setText(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
         }
@@ -2861,134 +2675,124 @@ private void applyPermissions() {
         Log.e(TAG, "applyPermissions error", e);
     }
 }
-
     // ═══════════════════════════════════════════════════════════════════
     //  Scan Mode Switching — Unified
     // ═══════════════════════════════════════════════════════════════════
 
-    /**
-     * ✅ تبديل ذكي بين أوضاع المسح — علم واحد فقط.
-     *    idempotent: إذا كان الوضع المطلوب = الحالي → لا يفعل شيئاً.
-     */
     private void switchScanMode(ScanMode target) {
-    // ✅ حماية مزدوجة
-    if (!isFragmentAlive()) return;
+        if (!isFragmentAlive()) return;
 
-    if (heroController == null) {
-        // ✅ heroController معدوم لكننا ما زلنا نريد تحديث الحالة
-        Log.w(TAG, "⚠️ switchScanMode: heroController null — forcing state update");
-        cancelPendingStopIfAny();
-        currentScanMode = target;
+        if (heroController == null) {
+            Log.w(TAG, "switchScanMode: heroController null — forcing state update");
+            cancelPendingStopIfAny();
+            currentScanMode = target;
 
-        // نفّذ المطلوب بدون heroController
-        switch (target) {
+            switch (target) {
+                case RFID:
+                    startRFIDScan();
+                    break;
+                case NONE:
+                default:
+                    stopRFIDScan();
+                    break;
+            }
+            return;
+        }
+
+        if (currentScanMode == target) return;
+
+        Log.d(TAG, "Scan mode: " + currentScanMode + " → " + target);
+
+        // 1) تنظيف الوضع الحالي
+        switch (currentScanMode) {
             case RFID:
-                startRFIDScan();
+                cancelPendingStopIfAny();
+                stopRFIDScan();
+                break;
+            case MANUAL:
+                hideManualInput();
+                break;
+            case GS1:
                 break;
             case NONE:
             default:
-                stopRFIDScan();
                 break;
         }
-        return;
+
+        // 2) تفعيل الوضع الجديد
+        currentScanMode = target;
+
+        switch (target) {
+            case GS1:
+                heroController.setState(PosHeroController.State.GS1_SCANNING);
+                openBarcodeScanner();
+                break;
+            case RFID:
+                heroController.setState(PosHeroController.State.RFID_LISTENING);
+                heroController.resetRfidCount();
+                startRFIDScan();
+                break;
+            case MANUAL:
+                heroController.setState(PosHeroController.State.MANUAL_ENTRY);
+                showManualInput();
+                break;
+            case NONE:
+            default:
+                heroController.setState(PosHeroController.State.IDLE);
+                break;
+        }
     }
-
-    if (currentScanMode == target) return;
-
-    Log.d(TAG, "🔄 Scan mode: " + currentScanMode + " → " + target);
-
-    // ✅ 1) تنظيف الوضع الحالي
-    switch (currentScanMode) {
-        case RFID:
-            cancelPendingStopIfAny();   // ← إضافة
-            stopRFIDScan();
-            break;
-        case MANUAL:
-            hideManualInput();
-            break;
-        case GS1:
-            break;
-        case NONE:
-        default:
-            break;
-    }
-
-    // ✅ 2) تفعيل الوضع الجديد
-    currentScanMode = target;
-
-    switch (target) {
-        case GS1:
-            heroController.setState(PosHeroController.State.GS1_SCANNING);
-            openBarcodeScanner();
-            break;
-        case RFID:
-            heroController.setState(PosHeroController.State.RFID_LISTENING);
-            heroController.resetRfidCount();
-            startRFIDScan();
-            break;
-        case MANUAL:
-            heroController.setState(PosHeroController.State.MANUAL_ENTRY);
-            showManualInput();
-            break;
-        case NONE:
-        default:
-            heroController.setState(PosHeroController.State.IDLE);
-            break;
-    }
-}
 
     // ═══════════════════════════════════════════════════════════════════
     //  RFID Scan — Start/Stop
     // ═══════════════════════════════════════════════════════════════════
 
     private void startRFIDScan() {
-    try {
-        if (rfidManager == null) return;
+        try {
+            if (rfidManager == null) return;
 
-        // ✅ [جديد] حماية من sdkExecutor المُغلق
-        if (sdkExecutor == null || sdkExecutor.isShutdown()) {
-            Log.e(TAG, "startRFIDScan: sdkExecutor unavailable — skip");
-            return;
-        }
-
-        oneShotConsumed.set(false);
-        stopAfterFirstRead = true;
-
-        sdkExecutor.execute(() -> {
-            try {
-                rfidManager.startScan(new RFIDManager.ReadyCallback() {
-                    @Override
-                    public void onReady(MiraIRFIDReader reader) {
-                        Log.d(TAG, "✅ RFID started (async)");
-                    }
-
-                    @Override
-                    public void onError(String reason) {
-                        Log.w(TAG, "RFID start failed: " + reason);
-                        safeRun(() -> {
-                            if (!isFragmentAlive()) return;
-                            currentScanMode = ScanMode.NONE;
-                            if (heroController != null) {
-                                heroController.setState(
-                                        PosHeroController.State.IDLE);
-                            }
-                        });
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "startScan bg error", e);
+            if (sdkExecutor == null || sdkExecutor.isShutdown()) {
+                Log.e(TAG, "startRFIDScan: sdkExecutor unavailable — skip");
+                return;
             }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "startRFIDScan error", e);
+
+            oneShotConsumed.set(false);
+            stopAfterFirstRead = true;
+
+            sdkExecutor.execute(() -> {
+                try {
+                    rfidManager.startScan(new RFIDManager.ReadyCallback() {
+                        @Override
+                        public void onReady(MiraIRFIDReader reader) {
+                            Log.d(TAG, "RFID started (async)");
+                        }
+
+                        @Override
+                        public void onError(String reason) {
+                            Log.w(TAG, "RFID start failed: " + reason);
+                            safeRun(() -> {
+                                if (!isFragmentAlive()) return;
+                                currentScanMode = ScanMode.NONE;
+                                if (heroController != null) {
+                                    heroController.setState(
+                                            PosHeroController.State.IDLE);
+                                }
+                            });
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "startScan bg error", e);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "startRFIDScan error", e);
+        }
     }
-}
 
     private void stopRFIDScan() {
         try {
             if (rfidManager == null) return;
             if (sdkExecutor == null || sdkExecutor.isShutdown()) {
-                // ✅ نفّذ مباشرة إذا كان المنفّذ مغلق
                 try { rfidManager.stopScan(); }
                 catch (Exception ignored) {}
                 return;
@@ -3009,334 +2813,262 @@ private void applyPermissions() {
     //  Tag Handlers — One-Shot + Continuous
     // ═══════════════════════════════════════════════════════════════════
 
-    /**
- * ✅ معالجة وسم RFID — علم واحد للتحقق.
- * [Demo v6.3] يقبل EPC مشوّه (3008...) ويقرأ TID كبديل.
- */
-public void onRingScanned(String epc) {
-    try {
-        if (epc == null || epc.trim().isEmpty()) return;
-
-        // ✅ العلم الوحيد
-        if (currentScanMode != ScanMode.RFID) return;
-
-        // ═══════════════════════════════════════════════════════
-        //  Debounce — تجاهل نفس الوسم خلال فترة قصيرة
-        // ═══════════════════════════════════════════════════════
-        final String cleanEpc = epc.trim().toUpperCase(Locale.US);
-
-        long now = System.currentTimeMillis();
-        Long lastTime = lastScannedTimes.get(cleanEpc);
-        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-        lastScannedTimes.put(cleanEpc, now);
-
-        // ═══════════════════════════════════════════════════════
-        //  One Shot — حماية ذرّية كاملة
-        // ═══════════════════════════════════════════════════════
-        if (stopAfterFirstRead) {
-            // فحص ذرّي: أول خيط فقط سينجح
-            if (!oneShotConsumed.compareAndSet(false, true)) {
-                Log.i(TAG, "🎯 One-shot: ignoring extra tag " + cleanEpc);
-                return;
-            }
-
-            stopAfterFirstRead = false;
-            Log.i(TAG, "🎯 One-shot: accepted first tag " + cleanEpc);
-            // ✅ ألغِ الإيقاف المعلّق (وصل الوسم قبل انتهاء المهلة)
-            cancelPendingStopIfAny();
-
-            // ✅ أغلق الوضع — switchScanMode سيتولّى stopRFIDScan
-            switchScanMode(ScanMode.NONE);
-        }
-
-        // ═══════════════════════════════════════════════════════
-        //  ✅ [Demo] فحص صحة EPC
-        //  EPC الصالح في هذا النظام: 24 hex يبدأ بـ E2
-        //  EPC المشوّه (3008...): غير صالح → اقرأ TID
-        // ═══════════════════════════════════════════════════════
-        boolean isValidEpc = cleanEpc.matches("^E2[0-9A-F]{22}$");
-
-        if (!isValidEpc) {
-            Log.w(TAG, "⚠️ POS: Invalid EPC '" + cleanEpc
-                    + "' → reading TID as fallback");
-            readTidAndProcess(cleanEpc, "rfid");
-            return;
-        }
-
-        // ═══════════════════════════════════════════════════════
-        //  ✅ EPC صالح — مسار عادي
-        // ═══════════════════════════════════════════════════════
-        if (cartManager != null && cartManager.isIdScanned(cleanEpc)) {
-            showToast(getString(R.string.pos_msg_already_in_cart));
-            playAlertSound(2);
-            return;
-        }
-
-        processRingEpc(cleanEpc, "rfid");
-
-    } catch (Exception e) {
-        Log.e(TAG, "onRingScanned error", e);
-    }
-}
-
-
-/**
- * ✅ [Demo v6.3] قراءة TID عندما يكون EPC مشوّهاً.
- *
- *  السياق:
- *   - EPC على الشريحة = "3008..." (لم يُكتب بعد)
- *   - التطبيق (التكويد) خزّن TID في حقل rfid_epc
- *   - لذلك نقرأ TID من الشريحة ونسأل به
- *
- *  التسلسل:
- *   - switchScanMode(NONE) → sdkExecutor.execute(stopScan)
- *   - readTidAndProcess     → sdkExecutor.execute(readTid)
- *   - FIFO: stopScan ينفّذ قبل readTid (القارئ جاهز)
- */
-private void readTidAndProcess(final String originalEpc, final String source) {
-    if (sdkExecutor == null || sdkExecutor.isShutdown()) {
-        Log.w(TAG, "readTidAndProcess: sdkExecutor unavailable → fallback to EPC");
-        processRingEpc(originalEpc, source);
-        return;
-    }
-
-    // ✅ مؤشر البحث للمستخدم
-    safeRun(() -> {
-        if (tvCartStatus != null) {
-            tvCartStatus.setText(getString(R.string.pos_msg_searching));
-        }
-    });
-
-    // ✅ استخدم sdkExecutor — FIFO مع stopScan
-    sdkExecutor.execute(() -> {
-        String tidRead = null;
+    public void onRingScanned(String epc) {
         try {
-            Context ctx = getSafeAppContext();
-            if (ctx != null) {
-                com.example.uhf.MiraRfid.MiraRfidService rfidService =
-                        com.example.uhf.MiraRfid.MiraRfidService.getInstance(ctx);
-                tidRead = rfidService.readTid(null);
+            if (epc == null || epc.trim().isEmpty()) return;
+
+            if (currentScanMode != ScanMode.RFID) return;
+
+            final String cleanEpc = epc.trim().toUpperCase(Locale.US);
+
+            long now = System.currentTimeMillis();
+            Long lastTime = lastScannedTimes.get(cleanEpc);
+            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
+            lastScannedTimes.put(cleanEpc, now);
+
+            // One Shot
+            if (stopAfterFirstRead) {
+                if (!oneShotConsumed.compareAndSet(false, true)) {
+                    Log.i(TAG, "One-shot: ignoring extra tag " + cleanEpc);
+                    return;
+                }
+
+                stopAfterFirstRead = false;
+                Log.i(TAG, "One-shot: accepted first tag " + cleanEpc);
+                cancelPendingStopIfAny();
+
+                switchScanMode(ScanMode.NONE);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "readTidAndProcess: readTid error", e);
-        }
 
-        final String cleanTid = (tidRead != null && !tidRead.trim().isEmpty())
-                ? tidRead.trim().toUpperCase(Locale.US)
-                : null;
+            // فحص EPC
+            boolean isValidEpc = cleanEpc.matches("^E2[0-9A-F]{22}$");
 
-        safeRun(() -> {
-            if (!isFragmentAlive()) return;
-
-            // ═══════════════════════════════════════════════════
-            //  فشل قراءة TID → fallback إلى EPC الأصلي
-            // ═══════════════════════════════════════════════════
-            if (cleanTid == null) {
-                Log.w(TAG, "⚠️ POS: TID read failed → fallback to EPC");
-                processRingEpc(originalEpc, source);
+            if (!isValidEpc) {
+                Log.w(TAG, "Invalid EPC '" + cleanEpc + "' → reading TID");
+                readTidAndProcess(cleanEpc, "rfid");
                 return;
             }
 
-            Log.i(TAG, "✅ POS: Using TID identifier: " + cleanTid);
-
-            // ═══════════════════════════════════════════════════
-            //  فحص السلة بالـ TID
-            // ═══════════════════════════════════════════════════
-            if (cartManager != null && cartManager.isIdScanned(cleanTid)) {
+            if (cartManager != null && cartManager.isIdScanned(cleanEpc)) {
                 showToast(getString(R.string.pos_msg_already_in_cart));
                 playAlertSound(2);
                 return;
             }
 
-            // ═══════════════════════════════════════════════════
-            //  المعالجة بالـ TID
-            // ═══════════════════════════════════════════════════
-            processRingEpc(cleanTid, source);
-        });
-    });
-}
-    /**
-     * ✅ معالجة باركود — مسار مستقل عن RFID.
-     */
-    public void onBarcodeScanned(String data) {
-    try {
-        showToast("🟠 DEBUG onBarcodeScanned: [" + data + "]");
+            processRingEpc(cleanEpc, "rfid");
 
-        if (data == null || data.trim().isEmpty()) {
-            showToast("❌ DEBUG: data empty");
-            return;
+        } catch (Exception e) {
+            Log.e(TAG, "onRingScanned error", e);
         }
-
-        long now = System.currentTimeMillis();
-        Long lastTime = lastScannedTimes.get(data);
-        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) {
-            showToast("⏭️ DEBUG: cooldown skip");
-            return;
-        }
-        lastScannedTimes.put(data, now);
-
-        if (cartManager != null && cartManager.isIdScanned(data)) {
-            showToast("⚠️ DEBUG: already in cart");
-            playAlertSound(2);
-            return;
-        }
-
-        showToast("🚀 DEBUG: calling processRingEpc");
-        processRingEpc(data, "barcode");
-    } catch (Exception e) {
-        showToast("❌ DEBUG onBarcode: " + e.getMessage());
-        Log.e(TAG, "onBarcodeScanned error", e);
     }
-}
+
+    private void readTidAndProcess(final String originalEpc, final String source) {
+        if (sdkExecutor == null || sdkExecutor.isShutdown()) {
+            Log.w(TAG, "readTidAndProcess: sdkExecutor unavailable → fallback");
+            processRingEpc(originalEpc, source);
+            return;
+        }
+
+        safeRun(() -> {
+            if (tvCartStatus != null) {
+                tvCartStatus.setText(getString(R.string.pos_msg_searching));
+            }
+        });
+
+        sdkExecutor.execute(() -> {
+            String tidRead = null;
+            try {
+                Context ctx = getSafeAppContext();
+                if (ctx != null) {
+                    com.example.uhf.MiraRfid.MiraRfidService rfidService =
+                            com.example.uhf.MiraRfid.MiraRfidService.getInstance(ctx);
+                    tidRead = rfidService.readTid(null);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "readTidAndProcess: readTid error", e);
+            }
+
+            final String cleanTid = (tidRead != null && !tidRead.trim().isEmpty())
+                    ? tidRead.trim().toUpperCase(Locale.US)
+                    : null;
+
+            safeRun(() -> {
+                if (!isFragmentAlive()) return;
+
+                if (cleanTid == null) {
+                    Log.w(TAG, "TID read failed → fallback to EPC");
+                    processRingEpc(originalEpc, source);
+                    return;
+                }
+
+                Log.i(TAG, "Using TID identifier: " + cleanTid);
+
+                if (cartManager != null && cartManager.isIdScanned(cleanTid)) {
+                    showToast(getString(R.string.pos_msg_already_in_cart));
+                    playAlertSound(2);
+                    return;
+                }
+
+                processRingEpc(cleanTid, source);
+            });
+        });
+    }
+
+    public void onBarcodeScanned(String data) {
+        try {
+            if (data == null || data.trim().isEmpty()) return;
+
+            long now = System.currentTimeMillis();
+            Long lastTime = lastScannedTimes.get(data);
+            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) {
+                return;
+            }
+            lastScannedTimes.put(data, now);
+
+            if (cartManager != null && cartManager.isIdScanned(data)) {
+                showToast(getString(R.string.pos_msg_already_in_cart));
+                playAlertSound(2);
+                return;
+            }
+
+            processRingEpc(data, "barcode");
+        } catch (Exception e) {
+            Log.e(TAG, "onBarcodeScanned error", e);
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     //  Barcode Scanner Fragment
     // ═══════════════════════════════════════════════════════════════════
 
     private void openBarcodeScanner() {
-    try {
-        if (!isFragmentAlive()) return;
+        try {
+            if (!isFragmentAlive()) return;
 
-        showToast("🔵 DEBUG: openBarcodeScanner called");
+            FragmentManager fm = getParentFragmentManager();
+            if (fm == null || fm.isStateSaved()) {
+                currentScanMode = ScanMode.NONE;
+                if (heroController != null) {
+                    heroController.setState(PosHeroController.State.IDLE);
+                }
+                Log.w(TAG, "openBarcodeScanner: fm null/stateSaved");
+                return;
+            }
 
-        FragmentManager fm = getParentFragmentManager();
-        if (fm == null || fm.isStateSaved()) {
-            currentScanMode = ScanMode.NONE;
+            MiraBarcodeScannerFragment scannerFragment =
+                    new MiraBarcodeScannerFragment();
+
+            scannerFragment.setOnBarcodeScannedListener((data, format) -> {
+                try {
+                    Log.i(TAG, "Scanner callback: " + data);
+                    if (data != null && !data.isEmpty()) {
+                        pendingBarcodeFromScanner = data;
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Barcode callback error", e);
+                }
+            });
+
+            int containerId = android.R.id.content;
+            try {
+                View view = getView();
+                if (view != null && view.getParent() instanceof View) {
+                    int parentId = ((View) view.getParent()).getId();
+                    if (parentId != View.NO_ID) containerId = parentId;
+                }
+            } catch (Exception ignored) {}
+
+            fm.beginTransaction()
+                    .hide(this)
+                    .add(containerId, scannerFragment, "barcode_scanner")
+                    .addToBackStack("barcode_scanner")
+                    .commit();
+
+        } catch (Exception e) {
+            Log.e(TAG, "openBarcodeScanner error", e);
             if (heroController != null) {
                 heroController.setState(PosHeroController.State.IDLE);
             }
-            showToast("❌ DEBUG: fm null/stateSaved");
-            return;
+            currentScanMode = ScanMode.NONE;
         }
+    }
 
-        MiraBarcodeScannerFragment scannerFragment =
-                new MiraBarcodeScannerFragment();
+    private void processPendingBarcodeIfAny() {
+        final String code = pendingBarcodeFromScanner;
 
-        scannerFragment.setOnBarcodeScannedListener((data, format) -> {
-            try {
-                // ✅ DEBUG: أخبر المستخدم فوراً
-                showToast("📷 DEBUG callback: " + data);
-                Log.i(TAG, "📷 Scanner callback: " + data);
+        if (code == null || code.isEmpty()) return;
 
-                if (data != null && !data.isEmpty()) {
-                    pendingBarcodeFromScanner = data;
-                }
-            } catch (Exception e) {
-                showToast("❌ DEBUG cb error: " + e.getMessage());
-                Log.e(TAG, "Barcode callback error", e);
-            }
-        });
+        pendingBarcodeFromScanner = null;
 
-        int containerId = android.R.id.content;
-        try {
-            View view = getView();
-            if (view != null && view.getParent() instanceof View) {
-                int parentId = ((View) view.getParent()).getId();
-                if (parentId != View.NO_ID) containerId = parentId;
-            }
-        } catch (Exception ignored) {}
+        Log.i(TAG, "Processing pending barcode: " + code);
 
-        fm.beginTransaction()
-                .hide(this)
-                .add(containerId, scannerFragment, "barcode_scanner")
-                .addToBackStack("barcode_scanner")
-                .commit();
-
-        showToast("✅ DEBUG: Scanner opened");
-
-    } catch (Exception e) {
-        showToast("❌ DEBUG open: " + e.getMessage());
-        Log.e(TAG, "openBarcodeScanner error", e);
+        currentScanMode = ScanMode.NONE;
         if (heroController != null) {
             heroController.setState(PosHeroController.State.IDLE);
         }
-        currentScanMode = ScanMode.NONE;
-    }
-}
 
-private void processPendingBarcodeIfAny() {
-    final String code = pendingBarcodeFromScanner;
+        mainHandler.postDelayed(() -> {
+            if (!isFragmentAlive()) return;
 
-    showToast("🟡 DEBUG processPending: [" + code + "]");
+            String[] parsed = parseGs1OrQr(code);
+            String finalCode = parsed[0];
+            Log.i(TAG, "Parsed: " + finalCode + " format=" + parsed[1]);
 
-    if (code == null || code.isEmpty()) {
-        showToast("⚠️ DEBUG: pending is empty");
-        return;
+            onBarcodeScanned(finalCode);
+        }, 150);
     }
 
-    pendingBarcodeFromScanner = null;
+    private String[] parseGs1OrQr(String raw) {
+        if (raw == null) return new String[]{"", "empty"};
+        String data = raw.trim();
+        if (data.isEmpty()) return new String[]{"", "empty"};
 
-    Log.i(TAG, "📷 Processing pending barcode: " + code);
-
-    currentScanMode = ScanMode.NONE;
-    if (heroController != null) {
-        heroController.setState(PosHeroController.State.IDLE);
-    }
-
-    mainHandler.postDelayed(() -> {
-        if (!isFragmentAlive()) {
-            showToast("❌ DEBUG: fragment not alive");
-            return;
+        // QR JSON
+        if (data.startsWith("{")) {
+            try {
+                JSONObject json = new JSONObject(data);
+                String serial = json.optString("serial",
+                        json.optString("serial_number", json.optString("sn", "")));
+                if (!serial.isEmpty()) return new String[]{serial, "qr_json"};
+                String gtin = json.optString("gtin", json.optString("gtin13", ""));
+                if (!gtin.isEmpty()) return new String[]{gtin, "qr_json"};
+            } catch (Exception ignored) {}
         }
 
-        String[] parsed = parseGs1OrQr(code);
-        String finalCode = parsed[0];
-        showToast("🟢 DEBUG Parsed: [" + finalCode + "] fmt=" + parsed[1]);
-        Log.i(TAG, "📷 Parsed: " + finalCode + " format=" + parsed[1]);
+        // QR URL
+        if (data.startsWith("http://") || data.startsWith("https://")) {
+            try {
+                android.net.Uri uri = android.net.Uri.parse(data);
+                String serial = uri.getQueryParameter("serial");
+                if (serial == null) serial = uri.getQueryParameter("sn");
+                if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
+                String gtin = uri.getQueryParameter("gtin");
+                if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
+                String last = uri.getLastPathSegment();
+                if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
+            } catch (Exception ignored) {}
+        }
 
-        onBarcodeScanned(finalCode);
-    }, 150);
-}
-private String[] parseGs1OrQr(String raw) {
-    if (raw == null) return new String[]{"", "empty"};
-    String data = raw.trim();
-    if (data.isEmpty()) return new String[]{"", "empty"};
+        // GS1 (01) GTIN, (21) Serial
+        String gs1 = data.replace('\u001D', '|').replace("(#)", "|");
 
-    // QR JSON
-    if (data.startsWith("{")) {
-        try {
-            JSONObject json = new JSONObject(data);
-            String serial = json.optString("serial",
-                    json.optString("serial_number", json.optString("sn", "")));
-            if (!serial.isEmpty()) return new String[]{serial, "qr_json"};
-            String gtin = json.optString("gtin", json.optString("gtin13", ""));
-            if (!gtin.isEmpty()) return new String[]{gtin, "qr_json"};
-        } catch (Exception ignored) {}
+        java.util.regex.Matcher mSerial =
+                java.util.regex.Pattern.compile("21([A-Za-z0-9\\-_.]+)").matcher(gs1);
+        if (mSerial.find()) {
+            String serial = mSerial.group(1);
+            if (serial != null && !serial.isEmpty()) return new String[]{serial, "gs1_serial"};
+        }
+
+        java.util.regex.Matcher mGtin =
+                java.util.regex.Pattern.compile("01(\\d{14})").matcher(gs1);
+        if (mGtin.find()) {
+            String gtin = mGtin.group(1);
+            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "gs1_gtin"};
+        }
+
+        return new String[]{data, "raw"};
     }
 
-    // QR URL
-    if (data.startsWith("http://") || data.startsWith("https://")) {
-        try {
-            android.net.Uri uri = android.net.Uri.parse(data);
-            String serial = uri.getQueryParameter("serial");
-            if (serial == null) serial = uri.getQueryParameter("sn");
-            if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
-            String gtin = uri.getQueryParameter("gtin");
-            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
-            String last = uri.getLastPathSegment();
-            if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
-        } catch (Exception ignored) {}
-    }
-
-    // GS1 (01) GTIN, (21) Serial
-    String gs1 = data.replace('\u001D', '|').replace("(#)", "|");
-
-    java.util.regex.Matcher mSerial =
-            java.util.regex.Pattern.compile("21([A-Za-z0-9\\-_.]+)").matcher(gs1);
-    if (mSerial.find()) {
-        String serial = mSerial.group(1);
-        if (serial != null && !serial.isEmpty()) return new String[]{serial, "gs1_serial"};
-    }
-
-    java.util.regex.Matcher mGtin =
-            java.util.regex.Pattern.compile("01(\\d{14})").matcher(gs1);
-    if (mGtin.find()) {
-        String gtin = mGtin.group(1);
-        if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "gs1_gtin"};
-    }
-
-    return new String[]{data, "raw"};
-}
     // ═══════════════════════════════════════════════════════════════════
     //  Back Press Handler
     // ═══════════════════════════════════════════════════════════════════
@@ -3354,54 +3086,40 @@ private String[] parseGs1OrQr(String raw) {
         requireActivity().getOnBackPressedDispatcher()
                 .addCallback(getViewLifecycleOwner(), backPressedCallback);
 
-        Log.d(TAG, "✅ Back press handler registered");
+        Log.d(TAG, "Back press handler registered");
     }
 
-    /**
-     * ✅ منطق زر الرجوع — متدرّج:
-     *   1. Dialog الدفع مفتوح → تجاهل
-     *   2. RFID نشط → أوقفه
-     *   3. Manual نشط → أغلقه
-     *   4. السلة غير فارغة → تأكيد
-     *   5. خلاف ذلك → انتقل للـ Dashboard
-     */
     private void handleCustomBack() {
-    try {
-        // 1. حوار الدفع
-        if (isCheckoutDialogShowing) return;
+        try {
+            if (isCheckoutDialogShowing) return;
 
-        // 2. RFID نشط → أوقفه فقط
-        if (currentScanMode == ScanMode.RFID) {
-            cancelPendingStopIfAny();   // ✅ [جديد] ألغِ المؤقت أولاً
-            switchScanMode(ScanMode.NONE);
-            return;
+            if (currentScanMode == ScanMode.RFID) {
+                cancelPendingStopIfAny();
+                switchScanMode(ScanMode.NONE);
+                return;
+            }
+
+            if (currentScanMode == ScanMode.MANUAL) {
+                switchScanMode(ScanMode.NONE);
+                return;
+            }
+
+            if (currentScanMode == ScanMode.GS1) {
+                switchScanMode(ScanMode.NONE);
+                return;
+            }
+
+            if (cartManager != null && !cartManager.isEmpty()) {
+                showExitConfirmation();
+                return;
+            }
+
+            navigateAwayFromPos();
+
+        } catch (Exception e) {
+            Log.e(TAG, "handleCustomBack error", e);
         }
-
-        // 3. Manual نشط → أغلقه
-        if (currentScanMode == ScanMode.MANUAL) {
-            switchScanMode(ScanMode.NONE);
-            return;
-        }
-
-        // 4. GS1 نشط → أغلقه
-        if (currentScanMode == ScanMode.GS1) {
-            switchScanMode(ScanMode.NONE);
-            return;
-        }
-
-        // 5. السلة فيها عناصر → تأكيد
-        if (cartManager != null && !cartManager.isEmpty()) {
-            showExitConfirmation();
-            return;
-        }
-
-        // 6. اخرج
-        navigateAwayFromPos();
-
-    } catch (Exception e) {
-        Log.e(TAG, "handleCustomBack error", e);
     }
-}
 
     private void showExitConfirmation() {
         if (!isFragmentAlive()) return;
@@ -3426,56 +3144,46 @@ private String[] parseGs1OrQr(String raw) {
     //  Navigation — Back to Dashboard
     // ═══════════════════════════════════════════════════════════════════
 
-    /**
-     * ✅ الخروج من شاشة POS — استبدال مباشر بـ FragmentManager.
-     *
-     * سبب عدم استخدام NavigationManager:
-     *   - NavigationManager قد يرفض التنقل في ظروف خاصة.
-     *   - الاستبدال المباشر مضمون — نتحكم في كل الخطوات.
-     */
     private void navigateAwayFromPos() {
-    try {
-        // ✅ [جديد] ألغِ المؤقت قبل أي شيء
-        cancelPendingStopIfAny();
-
-        try { stopRFIDScan(); } catch (Exception ignored) {}
-        try { UIKeyboardHide(); } catch (Exception ignored) {}
-
-        currentScanMode = ScanMode.NONE;
-        stopAfterFirstRead = false;
-        oneShotConsumed.set(false);
-
-        if (!isAdded() || isRemoving() || isDetached()) return;
-        if (getActivity() == null || getActivity().isFinishing()
-                || getActivity().isDestroyed()) return;
-
-        UHFMainActivity activity = (UHFMainActivity) getActivity();
-
-        activity.setBottomNavVisible(true);
-        activity.setNavigationLocked(false);
-        activity.clearActiveListeners();
-
-        // ✅ [v6.1] فوّض التنقل لـ NavigationManager
-        NavigationManager nav = activity.getNavigationManager();
-
-        if (nav != null) {
-            nav.goToDashboard();
-            activity.syncCurrentFragment();
-            Log.i(TAG, "✅ Navigated to Dashboard via NavigationManager");
-        } else {
-            // fallback (نادر)
-            Log.w(TAG, "⚠️ NavigationManager null — direct replace");
-            forceRestartActivity(activity);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "navigateAwayFromPos error", e);
         try {
-            if (getActivity() instanceof UHFMainActivity) {
-                forceRestartActivity((UHFMainActivity) getActivity());
+            cancelPendingStopIfAny();
+
+            try { stopRFIDScan(); } catch (Exception ignored) {}
+            try { UIKeyboardHide(); } catch (Exception ignored) {}
+
+            currentScanMode = ScanMode.NONE;
+            stopAfterFirstRead = false;
+            oneShotConsumed.set(false);
+
+            if (!isAdded() || isRemoving() || isDetached()) return;
+            if (getActivity() == null || getActivity().isFinishing()
+                    || getActivity().isDestroyed()) return;
+
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+            activity.setBottomNavVisible(true);
+            activity.setNavigationLocked(false);
+            activity.clearActiveListeners();
+
+            NavigationManager nav = activity.getNavigationManager();
+
+            if (nav != null) {
+                nav.goToDashboard();
+                activity.syncCurrentFragment();
+                Log.i(TAG, "Navigated to Dashboard via NavigationManager");
+            } else {
+                Log.w(TAG, "NavigationManager null — direct replace");
+                forceRestartActivity(activity);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.e(TAG, "navigateAwayFromPos error", e);
+            try {
+                if (getActivity() instanceof UHFMainActivity) {
+                    forceRestartActivity((UHFMainActivity) getActivity());
+                }
+            } catch (Exception ignored) {}
+        }
     }
-}
 
     private void updateBottomNavToHome(UHFMainActivity activity) {
         try {
@@ -3495,7 +3203,7 @@ private String[] parseGs1OrQr(String raw) {
 
     private void forceRestartActivity(UHFMainActivity activity) {
         try {
-            Log.w(TAG, "🛡️ Force restart activity");
+            Log.w(TAG, "Force restart activity");
             Intent intent = new Intent(activity, UHFMainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
                     | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -3517,7 +3225,8 @@ private String[] parseGs1OrQr(String raw) {
                     (android.view.inputmethod.InputMethodManager)
                     getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) {
-                imm.showSoftInput(view, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                imm.showSoftInput(view,
+                        android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
             }
         } catch (Exception e) {
             Log.w(TAG, "showKeyboard error", e);
@@ -3529,91 +3238,78 @@ private String[] parseGs1OrQr(String raw) {
     // ═══════════════════════════════════════════════════════════════════
 
     @Override
-public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
-    boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
-            || keyCode == KEYCODE_RFID_TRIGGER_2
-            || keyCode == KEYCODE_RFID_TRIGGER_3);
+    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+        boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
+                || keyCode == KEYCODE_RFID_TRIGGER_2
+                || keyCode == KEYCODE_RFID_TRIGGER_3);
 
-    if (!isTrigger) return false;
+        if (!isTrigger) return false;
 
-    // ═══════════════════════════════════════════════════════════
-    //  ACTION_DOWN — ابدأ المسح + إلغاء أي إيقاف معلّق
-    // ═══════════════════════════════════════════════════════════
-    if (event.getAction() == KeyEvent.ACTION_DOWN
-            && event.getRepeatCount() == 0) {
+        // ACTION_DOWN
+        if (event.getAction() == KeyEvent.ACTION_DOWN
+                && event.getRepeatCount() == 0) {
 
-        // ✅ ضغطة جديدة = تجديد المسح (إلغاء الإيقاف المعلّق)
-        cancelPendingStopIfAny();
+            cancelPendingStopIfAny();
 
-        if (!hasPosPermission()) {
-            showToast(getString(R.string.pos_msg_no_permission));
+            if (!hasPosPermission()) {
+                showToast(getString(R.string.pos_msg_no_permission));
+                return true;
+            }
+
+            try {
+                if (!com.example.uhf.tools.DeviceDetector
+                        .isRfidHardwareSupported()) {
+                    return true;
+                }
+            } catch (Exception ignored) {}
+
+            if (currentScanMode != ScanMode.RFID) {
+                Log.i(TAG, "Trigger DOWN → starting RFID One-Shot");
+                switchScanMode(ScanMode.RFID);
+            } else {
+                Log.i(TAG, "Trigger DOWN (already RFID) → refresh one-shot");
+                oneShotConsumed.set(false);
+                stopAfterFirstRead = true;
+            }
             return true;
         }
 
-        try {
-            if (!com.example.uhf.tools.DeviceDetector
-                    .isRfidHardwareSupported()) {
-                return true;
+        // ACTION_UP
+        if (event.getAction() == KeyEvent.ACTION_UP) {
+            if (currentScanMode == ScanMode.RFID) {
+                Log.i(TAG, "Trigger UP → grace period (" + TRIGGER_GRACE_MS + "ms)");
+                scheduleDelayedStopIfNeeded();
             }
-        } catch (Exception ignored) {}
-
-        if (currentScanMode != ScanMode.RFID) {
-            Log.i(TAG, "🎯 Trigger DOWN → starting RFID One-Shot");
-            switchScanMode(ScanMode.RFID);
-        } else {
-            // ✅ ضغطة جديدة أثناء RFID نشط → أعد ضبط one-shot
-            Log.i(TAG, "🎯 Trigger DOWN (already RFID) → refresh one-shot");
-            oneShotConsumed.set(false);
-            stopAfterFirstRead = true;
+            return true;
         }
-        return true;
+
+        return false;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  ACTION_UP — لا تُوقف فوراً — امنح مهلة سماح
-    // ═══════════════════════════════════════════════════════════
-    if (event.getAction() == KeyEvent.ACTION_UP) {
-        if (currentScanMode == ScanMode.RFID) {
-            Log.i(TAG, "🎯 Trigger UP → grace period (" + TRIGGER_GRACE_MS + "ms)");
-            scheduleDelayedStopIfNeeded();
-        }
-        return true;
+    private void scheduleDelayedStopIfNeeded() {
+        cancelPendingStopIfAny();
+
+        pendingStopRfid = () -> {
+            pendingStopRfid = null;
+
+            if (currentScanMode == ScanMode.RFID && stopAfterFirstRead) {
+                Log.i(TAG, "Grace expired → stopping RFID (no tag received)");
+                switchScanMode(ScanMode.NONE);
+            } else {
+                Log.d(TAG, "Grace expired — scan already stopped or tag read");
+            }
+        };
+
+        mainHandler.postDelayed(pendingStopRfid, TRIGGER_GRACE_MS);
     }
 
-    return false;
-}
-
-/**
- * ⏱️ يمنح مهلة بعد رفع الإصبع — إذا وصل وسم خلالها يُقرأ، وإلا يتوقف.
- */
-private void scheduleDelayedStopIfNeeded() {
-    cancelPendingStopIfAny();
-
-    pendingStopRfid = () -> {
-        pendingStopRfid = null;
-
-        if (currentScanMode == ScanMode.RFID && stopAfterFirstRead) {
-            Log.i(TAG, "⏱️ Grace expired → stopping RFID (no tag received)");
-            switchScanMode(ScanMode.NONE);
-        } else {
-            Log.d(TAG, "⏱️ Grace expired — scan already stopped or tag read");
+    private void cancelPendingStopIfAny() {
+        if (pendingStopRfid != null) {
+            mainHandler.removeCallbacks(pendingStopRfid);
+            pendingStopRfid = null;
+            Log.d(TAG, "Pending stop cancelled");
         }
-    };
-
-    mainHandler.postDelayed(pendingStopRfid, TRIGGER_GRACE_MS);
-}
-
-/**
- * ✅ إلغاء الإيقاف المعلّق (عند ضغطة جديدة أو قراءة ناجحة).
- */
-private void cancelPendingStopIfAny() {
-    if (pendingStopRfid != null) {
-        mainHandler.removeCallbacks(pendingStopRfid);
-        pendingStopRfid = null;
-        Log.d(TAG, "⏱️ Pending stop cancelled");
     }
-}
-
 
     // ═══════════════════════════════════════════════════════════════════
     //  Backward Compatibility
