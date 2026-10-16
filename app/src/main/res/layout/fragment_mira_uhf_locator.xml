@@ -58,7 +58,7 @@
         android:padding="6dp"
         android:gravity="center"
         android:text="🔬 جاهز للتشخيص"
-        android:textColor="@color/warning_yellow"
+        android:textColor="@color/warning_amber"
         android:textSize="10sp"
         android:fontFamily="monospace"
         android:background="?attr/colorSurfaceVariant" />
