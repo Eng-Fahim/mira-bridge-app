@@ -2661,4 +2661,53 @@
 <string name="qa_secure_gate">مراقبة البوابات</string>
 <string name="qa_admin_hub">الخيارات الإدارية</string>
 <string name="qa_server_config">إعدادات السيرفر</string>
+
+
+<!-- ═══ MIRA Locator Strings ═══ -->
+<string name="locator_title">📡 باحث القطع</string>
+<string name="locator_enter_epc">أدخل EPC أو Serial</string>
+<string name="locator_search">🔍 بحث</string>
+<string name="locator_start">▶ بدء</string>
+<string name="locator_stop">⏹ إيقاف</string>
+<string name="locator_export">📤 تصدير</string>
+<string name="locator_found">✅ تم العثور</string>
+<string name="locator_ready">جاهز</string>
+<string name="locator_searching">📡 جاري البحث...</string>
+<string name="locator_history">📋 السجل</string>
+<string name="locator_reader_connected">📡 القارئ: متصل ✓</string>
+<string name="locator_reader_disconnected">📡 القارئ: غير متصل</string>
+<string name="locator_reader_checking">📡 القارئ: جاري الفحص...</string>
+<string name="locator_distance_none">—</string>
+<string name="locator_item_default">📦 اسم القطعة</string>
+<string name="locator_item_details">🏷️ التفاصيل</string>
+<string name="locator_item_location">📍 الموقع</string>
+<string name="locator_item_status">الحالة</string>
+
+<!-- Status labels -->
+<string name="locator_close_very_near">🔥 ملاصق جداً</string>
+<string name="locator_close_near">📍 قريب</string>
+<string name="locator_close_far">🌐 بعيد</string>
+<string name="locator_found_toast">✅ تم تسجيل القطعة</string>
+<string name="locator_snap_toast">🎯 إشارة قوية! اضغط ✅ للتأكيد</string>
+<string name="locator_reader_not_connected">⚠️ القارئ غير متصل</string>
+<string name="locator_enter_epc_first">⚠️ أدخل EPC أولاً</string>
+<string name="locator_failed_start">❌ فشل بدء التتبع</string>
+<string name="locator_error">❌ خطأ</string>
+<string name="locator_no_records">لا توجد سجلات</string>
+<string name="locator_export_title">📤 تصدير السجل</string>
+<string name="locator_export_copy">نسخ</string>
+<string name="locator_export_close">إغلاق</string>
+<string name="locator_export_copied">✅ تم النسخ</string>
+<string name="locator_stats_title">📈 إحصائيات الجلسة</string>
+<string name="locator_stats_great">رائع!</string>
+
+<!-- Status mapping -->
+<string name="status_available">✅ متاح</string>
+<string name="status_sold">🔴 مباع</string>
+<string name="status_display">👁️ معروض</string>
+<string name="status_reserved">⏳ محجوز</string>
+<string name="status_unregistered">غير مسجلة</string>
+
+<!-- Menu -->
+<string name="menu_locator">باحث القطع</string>
 </resources>
