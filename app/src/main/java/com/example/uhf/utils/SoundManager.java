@@ -115,9 +115,45 @@ public class SoundManager {
                 () -> playSound(context, 1),
                 Math.max(10, delayMs));
     }
+    
+    // ═══════════════════════════════════════════════════════════
+//  ✅ دالة مخصصة لباحث القطع (MIRA Locator)
+//  ترشد المستخدم للاقتراب من القطعة بصوت متدرج
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * تشغيل صوت البحث الميداني حسب مستوى القرب
+ *
+ * @param level 0 = بعيد (صوت خفيف منخفض)
+ *              1 = متوسط (صوت "ping" واضح)
+ *              2 = قريب (صوت نجاح حاد)
+ */
+public void playLocatorBeep(Context context, int level) {
+    try {
+        SoundEvent event;
+        switch (level) {
+            case 2:
+                // 🔥 قريب — صوت نجاح حاد (يقترب من الهدف)
+                event = SoundEvent.GENERAL_SUCCESS;
+                break;
+            case 1:
+                // 📍 متوسط — صوت "قراءة" جديد (ping متكرر)
+                event = SoundEvent.TAG_READ_NEW;
+                break;
+            case 0:
+            default:
+                // 🌐 بعيد — صوت خفيف للتنبيه بالاستمرار
+                // نستخدم DUPLICATE لأنه أقصر وأخف
+                event = SoundEvent.TAG_READ_DUPLICATE;
+                break;
+        }
+        miraSoundManager.play(event);
+    } catch (Exception e) {
+        Log.e(TAG, "playLocatorBeep error: " + e.getMessage());
+    }
+}
 
     // ==================== Cleanup ====================
-
     /**
      * ✅ لا يفعل شيئاً — MiraSoundManager Singleton يبقى حياً
      */
