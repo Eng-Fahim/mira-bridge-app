@@ -9,49 +9,49 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fillViewport="true"
-        android:background="?attr/colorSurface">
+        android:background="?attr/colorSurface"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="?attr/colorSurface"
             android:orientation="vertical"
-            android:padding="24dp"
-            android:background="?attr/colorSurface">
+            android:padding="24dp">
 
-            <!-- ✅ زر إغلاق X في الأعلى -->
+            <!-- ═══ زر إغلاق ═══ -->
             <ImageButton
                 android:id="@+id/btnCloseDialog"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:layout_gravity="end"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/close"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
                 app:tint="?attr/colorOnSurface" />
 
-            <!-- العنوان -->
+            <!-- ═══ العنوان ═══ -->
             <TextView
                 android:id="@+id/tvDialogTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="@string/add_user_title"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="20sp"
-                android:textStyle="bold"
-                android:gravity="center" />
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvDialogSubtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:gravity="center"
                 android:text="@string/add_user_subtitle"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="14sp"
-                android:gravity="center" />
+                android:textSize="14sp" />
 
-            <!-- مؤشر الخطوات -->
+            <!-- ═══ مؤشر الخطوات ═══ -->
             <LinearLayout
                 android:id="@+id/stepsIndicator"
                 android:layout_width="match_parent"
@@ -87,7 +87,9 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- الخطوة 1: المعلومات الأساسية -->
+            <!-- ═══════════════════════════════════════════
+                 الخطوة 1: المعلومات الأساسية
+                 ═══════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/layoutStep1"
                 android:layout_width="match_parent"
@@ -100,24 +102,25 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:hint="@string/display_name"
-                    app:hintTextColor="?attr/colorOnSurfaceVariant"
-                    app:boxStrokeColor="?attr/colorPrimary">
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etDisplayName"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textPersonName"
+                        android:maxLines="1"
                         android:textColor="?attr/colorOnSurface"
                         android:textColorHint="?attr/colorOnSurfaceVariant" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- اسم المستخدم مع زر الاقتراح -->
+                <!-- اسم المستخدم + زر الاقتراح -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:gravity="end"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal">
 
                     <com.google.android.material.textfield.TextInputLayout
@@ -125,14 +128,15 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:hint="@string/username"
-                        app:hintTextColor="?attr/colorOnSurfaceVariant"
-                        app:boxStrokeColor="?attr/colorPrimary">
+                        app:boxStrokeColor="?attr/colorPrimary"
+                        app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etUsername"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="text"
+                            android:maxLines="1"
                             android:textColor="?attr/colorOnSurface"
                             android:textColorHint="?attr/colorOnSurfaceVariant" />
                     </com.google.android.material.textfield.TextInputLayout>
@@ -154,16 +158,17 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:hint="@string/password"
-                    app:hintTextColor="?attr/colorOnSurfaceVariant"
                     app:boxStrokeColor="?attr/colorPrimary"
                     app:endIconMode="password_toggle"
-                    app:endIconTint="?attr/colorOnSurfaceVariant">
+                    app:endIconTint="?attr/colorOnSurfaceVariant"
+                    app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etPassword"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textPassword"
+                        android:maxLines="1"
                         android:textColor="?attr/colorOnSurface"
                         android:textColorHint="?attr/colorOnSurfaceVariant" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -197,7 +202,9 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- الخطوة 2: معلومات إضافية -->
+            <!-- ═══════════════════════════════════════════
+                 الخطوة 2: معلومات إضافية
+                 ═══════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/layoutStep2"
                 android:layout_width="match_parent"
@@ -207,61 +214,71 @@
 
                 <!-- رقم الموظف -->
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilEmployeeId"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:hint="@string/employee_id"
-                    app:hintTextColor="?attr/colorOnSurfaceVariant"
-                    app:boxStrokeColor="?attr/colorPrimary">
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etEmployeeId"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="text"
+                        android:maxLines="1"
                         android:textColor="?attr/colorOnSurface" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- الفرع -->
+                <!-- ✅ الفرع — click على TextInputLayout -->
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilBranch"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:hint="@string/branch"
-                    app:hintTextColor="?attr/colorOnSurfaceVariant"
-                    app:boxStrokeColor="?attr/colorPrimary">
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etBranch"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="none"
+                        android:cursorVisible="false"
                         android:focusable="false"
-                        android:clickable="true"
+                        android:inputType="none"
+                        android:maxLines="1"
                         android:textColor="?attr/colorOnSurface" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- الصلاحية -->
+                <!-- ✅ الصلاحية -->
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilRole"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:hint="@string/role"
-                    app:hintTextColor="?attr/colorOnSurfaceVariant"
-                    app:boxStrokeColor="?attr/colorPrimary">
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etRole"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="none"
+                        android:cursorVisible="false"
                         android:focusable="false"
-                        android:clickable="true"
+                        android:inputType="none"
+                        android:maxLines="1"
                         android:textColor="?attr/colorOnSurface" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- أزرار التنقل -->
+            <!-- ═══════════════════════════════════════════
+                 صف الأزرار الموحّد
+                 ═══════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/layoutButtons1"
                 android:layout_width="match_parent"
@@ -274,53 +291,54 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
-                    android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:text="@string/cancel"
                     android:textColor="?attr/colorOnSurface" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnNextStep"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:text="@string/next_step"
-                    android:textColor="?attr/colorOnPrimary"
-                    app:backgroundTint="?attr/colorPrimary" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPrevStep"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="@string/prev_step"
                     android:textColor="?attr/colorOnSurface"
                     android:visibility="gone" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNextStep"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/next_step"
+                    android:textColor="?attr/colorOnPrimary"
+                    app:backgroundTint="?attr/colorPrimary" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSaveUser"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="@string/save_user"
-                    android:textColor="@android:color/white"
-                    app:backgroundTint="#22C55E"
-                    android:visibility="gone" />
+                    android:textColor="?attr/colorOnTertiary"
+                    android:visibility="gone"
+                    app:backgroundTint="?attr/colorTertiary" />
             </LinearLayout>
 
         </LinearLayout>
     </ScrollView>
 
-    <!-- Loading Overlay -->
+    <!-- ═══ Loading Overlay ═══ -->
     <FrameLayout
         android:id="@+id/loadingOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#80000000"
+        android:background="?attr/colorSurface"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone">
@@ -329,7 +347,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:background="?attr/colorSurface"
+            android:background="?attr/colorSurfaceContainerHigh"
             android:elevation="8dp"
             android:orientation="vertical"
             android:padding="24dp">
