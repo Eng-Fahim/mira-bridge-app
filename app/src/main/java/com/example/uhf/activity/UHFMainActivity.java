@@ -101,6 +101,7 @@ import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraServerConfigFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
+import com.example.uhf.fragment.MiraUHFLocatorFragment;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 import com.example.uhf.fragment.MiraReaderSetupFragment;
@@ -2392,6 +2393,9 @@ if (miraInventory != null) {
         } else if (id == R.id.action_export_data) {
             loadFragment(new MiraReportsProFragment(), "Reports");
             return true;
+        } else if (id == R.id.action_locator) {
+    loadFragment(new MiraUHFLocatorFragment(), "Locator");
+    return true;
         } else if (id == R.id.action_accounting_setup) {
     // ⭐ علّم أنه فتح يدوي — لا تُحوّل تلقائيًا
     Bundle args = new Bundle();
