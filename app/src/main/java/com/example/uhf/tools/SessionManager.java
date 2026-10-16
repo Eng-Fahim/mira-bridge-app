@@ -143,6 +143,9 @@ public class SessionManager {
     public boolean isSystemAdmin() {
         return secureManager.isSystemAdmin();
     }
+    public boolean isOrgAdmin() {
+    return secureManager.isOrgAdmin();
+}
 
     public boolean isAnyAdmin() {
         return secureManager.isAnyAdmin();
