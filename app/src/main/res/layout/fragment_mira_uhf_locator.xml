@@ -50,6 +50,19 @@
         android:textSize="11sp"
         android:background="#0F172A" />
 
+    <!-- ═══ 🔬 لوحة التشخيص (مؤقتة) ═══ -->
+    <TextView
+        android:id="@+id/tvDebug"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="6dp"
+        android:gravity="center"
+        android:text="🔬 جاهز للتشخيص"
+        android:textColor="#FBBF24"
+        android:textSize="10sp"
+        android:fontFamily="monospace"
+        android:background="#1E1B0F" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
