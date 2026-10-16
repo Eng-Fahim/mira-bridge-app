@@ -556,6 +556,14 @@ public class SecureSessionManager {
     public boolean isSystemAdmin() {
         return Role.SYSTEM_ADMIN.name().equals(getRoleString());
     }
+    
+    public boolean isOrgAdmin() {
+    return Role.ORG_ADMIN.name().equals(getRoleString());
+}
+
+public boolean isSystemAdmin() {
+    return Role.SYSTEM_ADMIN.name().equals(getRoleString());
+}
 
     public boolean isAnyAdmin() {
         String role = getRoleString();
@@ -578,9 +586,11 @@ public class SecureSessionManager {
     }
 
     public boolean isManager() {
-        String role = getRoleString();
-        return isAnyAdmin() || Role.BRANCH_MANAGER.name().equals(role);
-    }
+    String role = getRoleString();
+    return isAnyAdmin()
+        || Role.BRANCH_MANAGER.name().equals(role)
+        || Role.INVENTORY_MGR.name().equals(role);
+}
 
     public boolean isAccountant() {
         return Role.ACCOUNTANT.name().equals(getRoleString());
