@@ -60,6 +60,12 @@
 
     <!-- إدارة النظام والفروع -->
 <group android:id="@+id/group_management">
+   <item
+    android:id="@+id/action_locator"
+    android:icon="@android:drawable/ic_menu_mylocation"
+    android:title="باحث القطع"
+    app:showAsAction="never" />
+    
     <item
         android:id="@+id/action_branches"
         android:icon="@drawable/ic_branch"
