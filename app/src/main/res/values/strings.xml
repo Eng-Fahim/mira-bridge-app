@@ -2710,4 +2710,8 @@
 
 <!-- Menu -->
 <string name="menu_locator">باحث القطع</string>
+
+<!-- ✨ جديد -->
+<string name="qa_admin_users_short">مستخدمين</string>
+<string name="qa_admin_branches_short">فروع</string>
 </resources>
