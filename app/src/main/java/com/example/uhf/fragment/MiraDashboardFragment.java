@@ -23,7 +23,6 @@ import androidx.constraintlayout.motion.widget.MotionLayout;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
@@ -63,7 +62,7 @@ public class MiraDashboardFragment extends Fragment {
     private static final String PREFS_PRIVACY = "mira_dashboard_privacy";
     private static final String KEY_HIDE_HERO = "hide_hero_value";
     private static final String KEY_HIDE_SALES = "hide_sales_value";
-    
+
     private RecentActivityCache activityCache;
 
     private static final double OUNCE_TO_GRAM = 31.1035;
@@ -73,6 +72,7 @@ public class MiraDashboardFragment extends Fragment {
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final long SWIPE_REFRESH_TIMEOUT_MS = 15 * 1000;
+
     // ═══════════════════════════════════════════════════════
     // State
     // ═══════════════════════════════════════════════════════
@@ -96,7 +96,6 @@ public class MiraDashboardFragment extends Fragment {
     private View shimmerLayout, loadingOverlay;
     private ProgressBar pbGoldLoading;
     private CardView cardGoldPrices;
-    
 
     private View heroBalanceCard, heroSparkline;
     private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
@@ -105,12 +104,10 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
     private View liveStatusDot;
     private TextView tvLiveStatusText;
-    
+
     private TextView tvHeroItemCount;   // ✅ متغير جديد
 
     // ✅ Recent Activity
-    //private RecyclerView rvRecentActivity;
-    //private ActivityTimelineAdapter recentActivityAdapter;
     private android.widget.LinearLayout llRecentActivity;
     private TextView tvViewAllActivity;
 
@@ -124,7 +121,7 @@ public class MiraDashboardFragment extends Fragment {
     private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     private MiraBranchesManager.OnBranchChangedListener branchListener;
     private MiraPriceManager priceManager;
-    
+
     private PermissionManager permissionManager;
 
     private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(4);
@@ -231,77 +228,72 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     @Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
-    try {
-        initializeManagers();
-        initViews(view);
-        setupProfileListener();
-        setupBranchListener();
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        try {
+            initializeManagers();
+            initViews(view);
+            setupProfileListener();
+            setupBranchListener();
 
-        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-        initBranchCache(currentBranchId);
+            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            initBranchCache(currentBranchId);
 
-        updateHeader();
-        showShimmer(false);
+            updateHeader();
+            showShimmer(false);
 
-        isViewInitialized = true;
-        
-        // ✅ حركة دخول
-        View heroCard = view.findViewById(R.id.heroBalanceCard);
-        if (heroCard != null) {
-            heroCard.setAlpha(0f);
-            heroCard.setTranslationY(30f);
-            heroCard.animate()
-                    .alpha(1f)
-                    .translationY(0f)
-                    .setDuration(400)
-                    .start();
-        }
+            isViewInitialized = true;
 
-        // ✅ عرض الكاش فوراً
-        // ✅ عرض الكاش فوراً
-loadOfflineData();
-
-// ✅ استرجاع آخر العمليات من الكاش المحلي فوراً
-if (isAdded() && llRecentActivity != null && activityCache != null) {
-    try {
-        JSONArray cached = activityCache.load();
-        if (cached != null && cached.length() > 0) {
-            updateRecentActivityUI(cached);
-            Log.d(TAG, "✅ Restored " + cached.length() 
-                    + " activities from cache in onViewCreated");
-        } else {
-            Log.d(TAG, "⚠️ No cached activities to restore");
-        }
-    } catch (Exception e) {
-        logNonFatal("onViewCreated.restoreActivities", e);
-    }
-}
-        // ✅ ping مؤجل
-        mainHandler.postDelayed(() -> {
-            if (isAdded() && isResumed()) {
-                updateLiveStatus();
+            // ✅ حركة دخول
+            View heroCard = view.findViewById(R.id.heroBalanceCard);
+            if (heroCard != null) {
+                heroCard.setAlpha(0f);
+                heroCard.setTranslationY(30f);
+                heroCard.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(400)
+                        .start();
             }
-        }, 2000);
 
-        syncOrgProfileFromServer(false);
-        
-        // ❌ لا fetchData هنا — onResume سيفعل ذلك
-        // ❌ لا fetchRecentActivity هنا — onResume سيفعل ذلك
-        
-        startAutoRefresh();
-        
-        // ✅ الوقت 0 → onResume سيجلب
-        lastDataFetchTime = 0;
-        
-    } catch (Throwable e) {
-        logNonFatal("onViewCreated", e);
+            // ✅ عرض الكاش فوراً
+            loadOfflineData();
+
+            // ✅ استرجاع آخر العمليات من الكاش المحلي فوراً
+            if (isAdded() && llRecentActivity != null && activityCache != null) {
+                try {
+                    JSONArray cached = activityCache.load();
+                    if (cached != null && cached.length() > 0) {
+                        updateRecentActivityUI(cached);
+                        Log.d(TAG, "✅ Restored " + cached.length()
+                                + " activities from cache in onViewCreated");
+                    } else {
+                        Log.d(TAG, "⚠️ No cached activities to restore");
+                    }
+                } catch (Exception e) {
+                    logNonFatal("onViewCreated.restoreActivities", e);
+                }
+            }
+
+            // ✅ ping مؤجل
+            mainHandler.postDelayed(() -> {
+                if (isAdded() && isResumed()) {
+                    updateLiveStatus();
+                }
+            }, 2000);
+
+            syncOrgProfileFromServer(false);
+
+            startAutoRefresh();
+
+            // ✅ الوقت 0 → onResume سيجلب
+            lastDataFetchTime = 0;
+
+        } catch (Throwable e) {
+            logNonFatal("onViewCreated", e);
+        }
     }
-}
 
-    
-    
     private void initViews(View v) {
         try {
             tvTotalItems = v.findViewById(R.id.tvTotalItems);
@@ -313,9 +305,6 @@ if (isAdded() && llRecentActivity != null && activityCache != null) {
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-            
-            
-            
 
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
@@ -344,8 +333,6 @@ if (isAdded() && llRecentActivity != null && activityCache != null) {
             tvAlertMessage = v.findViewById(R.id.tvAlertMessage);
             tvAlertAction = v.findViewById(R.id.tvAlertAction);
 
-            
-
             btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
 
@@ -353,24 +340,31 @@ if (isAdded() && llRecentActivity != null && activityCache != null) {
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
             if (tvViewAllActivity != null) {
-    tvViewAllActivity.setOnClickListener(v2 ->
-            navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
-}
-            
+                tvViewAllActivity.setOnClickListener(v2 ->
+                        navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
+            }
 
             // ═══════════════════════════════════════
             // Listeners
             // ═══════════════════════════════════════
 
+            // ✅✅✅ [تحديث] زر تحديث الذهب — مقيد بالمدير فقط
             if (btnRefreshGold != null) {
-                btnRefreshGold.setOnClickListener(v2 -> {
-                    Log.d(TAG, "🔘 Refresh Gold button clicked. isGoldRefreshing=" + isGoldRefreshing.get());
-                    if (!isGoldRefreshing.get()) {
-                        fetchLiveGoldPrices(true);
-                    } else {
-                        Log.d(TAG, "⏳ Gold refresh already in progress");
-                    }
-                });
+                if (!canManuallyRefreshGold()) {
+                    btnRefreshGold.setVisibility(View.GONE);
+                    Log.d(TAG, "🔒 Gold refresh button hidden (no permission)");
+                } else {
+                    btnRefreshGold.setVisibility(View.VISIBLE);
+                    btnRefreshGold.setOnClickListener(v2 -> {
+                        Log.d(TAG, "🔘 Refresh Gold button clicked. isGoldRefreshing="
+                                + isGoldRefreshing.get());
+                        if (!isGoldRefreshing.get()) {
+                            fetchLiveGoldPrices(true);
+                        } else {
+                            Log.d(TAG, "⏳ Gold refresh already in progress");
+                        }
+                    });
+                }
             }
 
             if (btnToggleHeroVisibility != null) {
@@ -397,38 +391,33 @@ if (isAdded() && llRecentActivity != null && activityCache != null) {
                 cardGoldPrices.setVisibility(View.GONE);
             }
 
-          
-
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
                 swipeRefresh.setColorSchemeResources(R.color.colorPrimary, R.color.gray1);
             }
 
-          // ═══════════════════════════════════════════════════════
-// ✅ سياسة أمنية: إجبار الإخفاء دائماً
-// ═══════════════════════════════════════════════════════
-isHeroHidden = true;
-isSalesHidden = true;
+            // ═══════════════════════════════════════════════════════
+            // ✅ سياسة أمنية: إجبار الإخفاء دائماً
+            // ═══════════════════════════════════════════════════════
+            isHeroHidden = true;
+            isSalesHidden = true;
 
-// ✅ تحديث أيقونات العين
-if (btnToggleHeroVisibility != null) {
-    btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
-}
-if (btnToggleSalesVisibility != null) {
-    btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
-}
+            // ✅ تحديث أيقونات العين
+            if (btnToggleHeroVisibility != null) {
+                btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
+            }
+            if (btnToggleSalesVisibility != null) {
+                btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
+            }
 
-// ✅ تطبيق الحالة الأولية
-updateHeroBalance();
-applySalesVisibility();
-            // تحديث أيقونات العين
-            
+            // ✅ تطبيق الحالة الأولية
+            updateHeroBalance();
+            applySalesVisibility();
 
         } catch (Exception e) {
             logNonFatal("initViews", e);
         }
     }
-
 
     private void updateHeader() {
         // Greeting Card محذوف
@@ -462,19 +451,19 @@ applySalesVisibility();
             }
 
             // ═══════════════════════════════════════════════════════
-// ✅ Chip 1: الوزن (tvHeroSubtitle)
-// ═══════════════════════════════════════════════════════
-if (tvHeroSubtitle != null) {
-    tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
-}
+            // ✅ Chip 1: الوزن (tvHeroSubtitle)
+            // ═══════════════════════════════════════════════════════
+            if (tvHeroSubtitle != null) {
+                tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
+            }
 
-// ═══════════════════════════════════════════════════════
-// ✅ Chip 2: عدد القطع (tvHeroItemCount)
-// ═══════════════════════════════════════════════════════
-if (tvHeroItemCount != null) {
-    tvHeroItemCount.setText(String.format(
-            Locale.getDefault(), "%d قطعة", itemCount));
-}
+            // ═══════════════════════════════════════════════════════
+            // ✅ Chip 2: عدد القطع (tvHeroItemCount)
+            // ═══════════════════════════════════════════════════════
+            if (tvHeroItemCount != null) {
+                tvHeroItemCount.setText(String.format(
+                        Locale.getDefault(), "%d قطعة", itemCount));
+            }
 
             // ═══════════════════════════════════════════════════════
             // ✅ عرض القيمة بـ 3 عملات
@@ -521,44 +510,38 @@ if (tvHeroItemCount != null) {
     }
 
     private void toggleHeroVisibility() {
-    if (!isAdded() || tvHeroBalance == null) return;
+        if (!isAdded() || tvHeroBalance == null) return;
 
-    isHeroHidden = !isHeroHidden;
+        isHeroHidden = !isHeroHidden;
 
-    // ✅ لا نحفظ في SharedPreferences — تُعاد للإخفاء دائماً عند مغادرة الشاشة
-    // requireContext().getSharedPreferences(PREFS_PRIVACY, Context.MODE_PRIVATE)
-    //         .edit().putBoolean(KEY_HIDE_HERO, isHeroHidden).apply();
+        if (btnToggleHeroVisibility != null) {
+            btnToggleHeroVisibility.setImageResource(
+                    isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
 
-    if (btnToggleHeroVisibility != null) {
-        btnToggleHeroVisibility.setImageResource(
-                isHeroHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        updateHeroBalance();
+
+        Log.d(TAG, "✅ Hero visibility toggled (temporary). isHeroHidden=" + isHeroHidden);
     }
-
-    updateHeroBalance();
-
-    Log.d(TAG, "✅ Hero visibility toggled (temporary). isHeroHidden=" + isHeroHidden);
-}
 
     // ═══════════════════════════════════════════════════════
     // Sales Visibility
     // ═══════════════════════════════════════════════════════
 
     private void toggleSalesVisibility() {
-    if (!isAdded() || tvSalesToday == null) return;
+        if (!isAdded() || tvSalesToday == null) return;
 
-    isSalesHidden = !isSalesHidden;
+        isSalesHidden = !isSalesHidden;
 
-    // ✅ لا نحفظ — تُعاد للإخفاء دائماً عند مغادرة الشاشة
+        if (btnToggleSalesVisibility != null) {
+            btnToggleSalesVisibility.setImageResource(
+                    isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
 
-    if (btnToggleSalesVisibility != null) {
-        btnToggleSalesVisibility.setImageResource(
-                isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        applySalesVisibility();
+
+        Log.d(TAG, "✅ Sales visibility toggled (temporary). isSalesHidden=" + isSalesHidden);
     }
-
-    applySalesVisibility();
-
-    Log.d(TAG, "✅ Sales visibility toggled (temporary). isSalesHidden=" + isSalesHidden);
-}
 
     private void applySalesVisibility() {
         if (isSalesHidden) {
@@ -738,7 +721,6 @@ if (tvHeroItemCount != null) {
             logNonFatal("syncBranchesListFromServer", e);
         }
     }
-
 
     // ═══════════════════════════════════════════════════════
     // Live Status (Ping)
@@ -1170,243 +1152,209 @@ if (tvHeroItemCount != null) {
     }
 
     // ═══════════════════════════════════════════════════════
-    // ✅ Recent Activity (NEW)
+    // ✅ Recent Activity
     // ═══════════════════════════════════════════════════════
 
-    /**
- * ✅ جلب آخر 10 عمليات — مع Cache
- * 
- * 1. عرض البيانات من الكاش فوراً (لا تأخير)
- * 2. جلب من السيرفر في الخلفية
- * 3. تحديث الواجهة + الكاش
- */
-private void fetchRecentActivity() {
-    if (apiClient == null || !isAdded()) return;
+    private void fetchRecentActivity() {
+        if (apiClient == null || !isAdded()) return;
 
-    // ═══════════════════════════════════════════════════════
-    // 1. عرض الكاش فوراً (بدون تأخير)
-    // ═══════════════════════════════════════════════════════
-    if (activityCache != null) {
-        JSONArray cached = activityCache.load();
-        if (cached != null && cached.length() > 0) {
-            updateRecentActivityUI(cached);
-            Log.d(TAG, "✅ Displayed " + cached.length() + " activities from cache");
+        // ═══════════════════════════════════════════════════════
+        // 1. عرض الكاش فوراً (بدون تأخير)
+        // ═══════════════════════════════════════════════════════
+        if (activityCache != null) {
+            JSONArray cached = activityCache.load();
+            if (cached != null && cached.length() > 0) {
+                updateRecentActivityUI(cached);
+                Log.d(TAG, "✅ Displayed " + cached.length() + " activities from cache");
+            }
         }
-    }
 
-    // ═══════════════════════════════════════════════════════
-    // 2. إذا كان الكاش لا يزال صالحاً (أقل من دقيقتين)، لا نجلب من السيرفر
-    // ═══════════════════════════════════════════════════════
-    if (activityCache != null && activityCache.isValid()) {
-        Log.d(TAG, "⏳ Activity cache is still valid, skipping network call");
-        return;
-    }
+        // ═══════════════════════════════════════════════════════
+        // 2. إذا كان الكاش لا يزال صالحاً (أقل من دقيقتين)، لا نجلب من السيرفر
+        // ═══════════════════════════════════════════════════════
+        if (activityCache != null && activityCache.isValid()) {
+            Log.d(TAG, "⏳ Activity cache is still valid, skipping network call");
+            return;
+        }
 
-    // ═══════════════════════════════════════════════════════
-    // 3. جلب من السيرفر في الخلفية
-    // ═══════════════════════════════════════════════════════
-    sharedExecutor.execute(() -> {
-        try {
-            int branchId = branchesManager != null
-                    ? branchesManager.getActiveBranchId() : 0;
+        // ═══════════════════════════════════════════════════════
+        // 3. جلب من السيرفر في الخلفية
+        // ═══════════════════════════════════════════════════════
+        sharedExecutor.execute(() -> {
+            try {
+                int branchId = branchesManager != null
+                        ? branchesManager.getActiveBranchId() : 0;
 
-            MiraApiClient.ApiResponse response =
-        apiClient.getUnifiedActivity(branchId, 15);
+                MiraApiClient.ApiResponse response =
+                        apiClient.getUnifiedActivity(branchId, 15);
 
-            mainHandler.post(() -> {
-                if (!isAdded() || response == null) return;
+                mainHandler.post(() -> {
+                    if (!isAdded() || response == null) return;
 
-                if (response.isSuccess && response.data != null) {
-                    try {
-                        JSONArray activities = response.data.optJSONArray("activities");
-                        if (activities != null && activities.length() > 0) {
-                            // ✅ حفظ في الكاش (يحفظ آخر تحديث تلقائياً)
-                            if (activityCache != null) {
-                                activityCache.save(activities);
+                    if (response.isSuccess && response.data != null) {
+                        try {
+                            JSONArray activities = response.data.optJSONArray("activities");
+                            if (activities != null && activities.length() > 0) {
+                                if (activityCache != null) {
+                                    activityCache.save(activities);
+                                }
+                                updateRecentActivityUI(activities);
                             }
-                            // ✅ تحديث الواجهة
-                            updateRecentActivityUI(activities);
+                        } catch (Exception e) {
+                            logNonFatal("fetchRecentActivity.parse", e);
                         }
-                    } catch (Exception e) {
-                        logNonFatal("fetchRecentActivity.parse", e);
                     }
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("fetchRecentActivity", e);
-        }
-    });
-}
-/**
- * ✅ تحديث واجهة آخر العمليات
- */
-/**
- * ✅ تحديث واجهة آخر العمليات — LinearLayout
- */
-private void updateRecentActivityUI(JSONArray activities) {
-    if (activities == null || llRecentActivity == null) {
-        Log.w(TAG, "⚠️ updateRecentActivityUI: null refs (activities="
-                + (activities != null)
-                + ", llRecentActivity=" + (llRecentActivity != null) + ")");
-        return;
+                });
+            } catch (Exception e) {
+                logNonFatal("fetchRecentActivity", e);
+            }
+        });
     }
 
-    try {
-        // ✅ امسح العناصر القديمة
-        llRecentActivity.removeAllViews();
-
-        int max = Math.min(activities.length(), 10);
-        Log.d(TAG, "📊 Rendering " + max + " activities");
-
-        for (int i = 0; i < max; i++) {
-            JSONObject item = activities.getJSONObject(i);
-
-            // ✅ inflate item_activity_timeline
-            View itemView = getLayoutInflater().inflate(
-                    R.layout.item_activity_timeline,
-                    llRecentActivity,
-                    false);
-
-            // ✅ اربط البيانات
-            bindActivityToView(itemView, item);
-
-            // ✅ onClick
-            itemView.setOnClickListener(v -> handleRecentActivityClick(item));
-
-            // ✅ أضف إلى LinearLayout
-            llRecentActivity.addView(itemView);
+    private void updateRecentActivityUI(JSONArray activities) {
+        if (activities == null || llRecentActivity == null) {
+            Log.w(TAG, "⚠️ updateRecentActivityUI: null refs (activities="
+                    + (activities != null)
+                    + ", llRecentActivity=" + (llRecentActivity != null) + ")");
+            return;
         }
 
-        Log.d(TAG, "✅ Rendered " + max + " activities successfully");
-
-    } catch (Exception e) {
-        logNonFatal("updateRecentActivityUI", e);
-    }
-}
-
-/**
- * ✅ ربط بيانات العملية بـ View
- */
-private void bindActivityToView(View v, JSONObject item) {
-    if (v == null || item == null) return;
-
-    try {
-        // ✅ ابحث عن العناصر
-        TextView tvIcon = v.findViewById(R.id.tvActivityIcon);
-        TextView tvTitle = v.findViewById(R.id.tvActivityTitle);
-        TextView tvDetails = v.findViewById(R.id.tvActivityDetails);
-        TextView tvUser = v.findViewById(R.id.tvActivityUser);
-        TextView tvTime = v.findViewById(R.id.tvActivityTime);
-        TextView tvAmount = v.findViewById(R.id.tvActivityAmount);
-        TextView tvStatusChip = v.findViewById(R.id.tvActivityStatusChip);
-
-        // ✅ استخرج البيانات
-        String icon = item.optString("icon", "⚙️");
-        String title = isArabic
-                ? item.optString("title_ar", "")
-                : item.optString("title_en", "");
-        if (title.isEmpty()) {
-            title = item.optString("title_ar",
-                    item.optString("title_en", ""));
-        }
-
-        String details = isArabic
-                ? item.optString("details_ar", "")
-                : item.optString("details_en", "");
-        if (details.isEmpty()) {
-            details = item.optString("details_ar",
-                    item.optString("details_en", ""));
-        }
-
-        String user = item.optString("user", "—");
-        String timestamp = item.optString("timestamp", "");
-        double amount = item.optDouble("amount", 0);
-        String currency = item.optString("currency", "USD");
-        double accuracy = item.optDouble("accuracy", -1);
-
-        // ✅ طبّق
-        if (tvIcon != null) tvIcon.setText(icon);
-        if (tvTitle != null) tvTitle.setText(title);
-        if (tvDetails != null) tvDetails.setText(details);
-        if (tvUser != null) tvUser.setText("👤 " + user);
-        if (tvTime != null) tvTime.setText(extractTime(timestamp));
-
-        // ✅ المبلغ أو الدقة
-        if (tvAmount != null) {
-            if (amount > 0) {
-                tvAmount.setVisibility(View.VISIBLE);
-                tvAmount.setText(String.format(Locale.US, "%,.2f %s", amount, currency));
-            } else if (accuracy >= 0) {
-                tvAmount.setVisibility(View.VISIBLE);
-                tvAmount.setText(String.format(Locale.US, "🎯 %.1f%%", accuracy));
-            } else {
-                tvAmount.setVisibility(View.GONE);
-            }
-        }
-
-        // ✅ chip الحالة
-        if (tvStatusChip != null) {
-            String status = item.optString("status", "neutral");
-            if ("danger".equals(status)) {
-                tvStatusChip.setVisibility(View.VISIBLE);
-                tvStatusChip.setText(isArabic ? "⚠️ حرج" : "⚠️ Critical");
-                tvStatusChip.setTextColor(0xFFDC2626);
-            } else if ("warning".equals(status)) {
-                tvStatusChip.setVisibility(View.VISIBLE);
-                tvStatusChip.setText(isArabic ? "⚠️ تحذير" : "⚠️ Warning");
-                tvStatusChip.setTextColor(0xFFF59E0B);
-            } else {
-                tvStatusChip.setVisibility(View.GONE);
-            }
-        }
-
-    } catch (Exception e) {
-        Log.e(TAG, "bindActivityToView error", e);
-    }
-}
-
-/**
- * ✅ استخراج الوقت من timestamp
- */
-private String extractTime(String dateStr) {
-    if (dateStr == null || dateStr.isEmpty()) return "";
-    try {
-        // "2026-09-22 14:30:00" → "14:30"
-        String[] parts = dateStr.split(" ");
-        if (parts.length >= 2) {
-            String[] timeParts = parts[1].split(":");
-            if (timeParts.length >= 2) {
-                return timeParts[0] + ":" + timeParts[1];
-            }
-        }
-    } catch (Exception ignored) {}
-    return dateStr;
-}
-    /**
- * ✅ عند النقر على عملية → فتح Bottom Sheet التفاصيل
- */
-private void handleRecentActivityClick(JSONObject activity) {
-    if (activity == null || !isAdded()) return;
-    try {
-        // ✅ DEBUG
-        boolean hasItems = activity.has("items");
-        int itemsCount = 0;
         try {
-            JSONArray items = activity.optJSONArray("items");
-            if (items != null) itemsCount = items.length();
-        } catch (Exception ignored) {}
-        
-        Log.d(TAG, "📋 Opening: type=" + activity.optString("type")
-                + ", hasItems=" + hasItems
-                + ", itemsCount=" + itemsCount);
-        
-        ActivityDetailsBottomSheet sheet =
-                ActivityDetailsBottomSheet.newInstance(activity, isArabic);
-        sheet.show(getParentFragmentManager(), "ActivityDetails");
-    } catch (Exception e) {
-        logNonFatal("handleRecentActivityClick", e);
+            llRecentActivity.removeAllViews();
+
+            int max = Math.min(activities.length(), 10);
+            Log.d(TAG, "📊 Rendering " + max + " activities");
+
+            for (int i = 0; i < max; i++) {
+                JSONObject item = activities.getJSONObject(i);
+
+                View itemView = getLayoutInflater().inflate(
+                        R.layout.item_activity_timeline,
+                        llRecentActivity,
+                        false);
+
+                bindActivityToView(itemView, item);
+
+                itemView.setOnClickListener(v -> handleRecentActivityClick(item));
+
+                llRecentActivity.addView(itemView);
+            }
+
+            Log.d(TAG, "✅ Rendered " + max + " activities successfully");
+
+        } catch (Exception e) {
+            logNonFatal("updateRecentActivityUI", e);
+        }
     }
-}
+
+    private void bindActivityToView(View v, JSONObject item) {
+        if (v == null || item == null) return;
+
+        try {
+            TextView tvIcon = v.findViewById(R.id.tvActivityIcon);
+            TextView tvTitle = v.findViewById(R.id.tvActivityTitle);
+            TextView tvDetails = v.findViewById(R.id.tvActivityDetails);
+            TextView tvUser = v.findViewById(R.id.tvActivityUser);
+            TextView tvTime = v.findViewById(R.id.tvActivityTime);
+            TextView tvAmount = v.findViewById(R.id.tvActivityAmount);
+            TextView tvStatusChip = v.findViewById(R.id.tvActivityStatusChip);
+
+            String icon = item.optString("icon", "⚙️");
+            String title = isArabic
+                    ? item.optString("title_ar", "")
+                    : item.optString("title_en", "");
+            if (title.isEmpty()) {
+                title = item.optString("title_ar",
+                        item.optString("title_en", ""));
+            }
+
+            String details = isArabic
+                    ? item.optString("details_ar", "")
+                    : item.optString("details_en", "");
+            if (details.isEmpty()) {
+                details = item.optString("details_ar",
+                        item.optString("details_en", ""));
+            }
+
+            String user = item.optString("user", "—");
+            String timestamp = item.optString("timestamp", "");
+            double amount = item.optDouble("amount", 0);
+            String currency = item.optString("currency", "USD");
+            double accuracy = item.optDouble("accuracy", -1);
+
+            if (tvIcon != null) tvIcon.setText(icon);
+            if (tvTitle != null) tvTitle.setText(title);
+            if (tvDetails != null) tvDetails.setText(details);
+            if (tvUser != null) tvUser.setText("👤 " + user);
+            if (tvTime != null) tvTime.setText(extractTime(timestamp));
+
+            if (tvAmount != null) {
+                if (amount > 0) {
+                    tvAmount.setVisibility(View.VISIBLE);
+                    tvAmount.setText(String.format(Locale.US, "%,.2f %s", amount, currency));
+                } else if (accuracy >= 0) {
+                    tvAmount.setVisibility(View.VISIBLE);
+                    tvAmount.setText(String.format(Locale.US, "🎯 %.1f%%", accuracy));
+                } else {
+                    tvAmount.setVisibility(View.GONE);
+                }
+            }
+
+            if (tvStatusChip != null) {
+                String status = item.optString("status", "neutral");
+                if ("danger".equals(status)) {
+                    tvStatusChip.setVisibility(View.VISIBLE);
+                    tvStatusChip.setText(isArabic ? "⚠️ حرج" : "⚠️ Critical");
+                    tvStatusChip.setTextColor(0xFFDC2626);
+                } else if ("warning".equals(status)) {
+                    tvStatusChip.setVisibility(View.VISIBLE);
+                    tvStatusChip.setText(isArabic ? "⚠️ تحذير" : "⚠️ Warning");
+                    tvStatusChip.setTextColor(0xFFF59E0B);
+                } else {
+                    tvStatusChip.setVisibility(View.GONE);
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "bindActivityToView error", e);
+        }
+    }
+
+    private String extractTime(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) return "";
+        try {
+            String[] parts = dateStr.split(" ");
+            if (parts.length >= 2) {
+                String[] timeParts = parts[1].split(":");
+                if (timeParts.length >= 2) {
+                    return timeParts[0] + ":" + timeParts[1];
+                }
+            }
+        } catch (Exception ignored) {}
+        return dateStr;
+    }
+
+    private void handleRecentActivityClick(JSONObject activity) {
+        if (activity == null || !isAdded()) return;
+        try {
+            boolean hasItems = activity.has("items");
+            int itemsCount = 0;
+            try {
+                JSONArray items = activity.optJSONArray("items");
+                if (items != null) itemsCount = items.length();
+            } catch (Exception ignored) {}
+
+            Log.d(TAG, "📋 Opening: type=" + activity.optString("type")
+                    + ", hasItems=" + hasItems
+                    + ", itemsCount=" + itemsCount);
+
+            ActivityDetailsBottomSheet sheet =
+                    ActivityDetailsBottomSheet.newInstance(activity, isArabic);
+            sheet.show(getParentFragmentManager(), "ActivityDetails");
+        } catch (Exception e) {
+            logNonFatal("handleRecentActivityClick", e);
+        }
+    }
 
     // ═══════════════════════════════════════════════════════
     // Broadcast Receiver Registration
@@ -1486,8 +1434,11 @@ private void handleRecentActivityClick(JSONObject activity) {
             fetchRecentActivity();
 
             long now = System.currentTimeMillis();
-            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+
+            // ✅✅✅ [تحديث] السحب للتحديث: يجلب الذهب فقط للمدراء
+            if (canManuallyRefreshGold()) {
                 if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    Log.d(TAG, "👑 Admin swipe → forcing gold refresh");
                     fetchLiveGoldPrices(true);
                 } else {
                     displayGoldPricesFromCache();
@@ -1495,6 +1446,10 @@ private void handleRecentActivityClick(JSONObject activity) {
                     if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                 }
             } else {
+                // ⚠️ غير المدير: اعرض الكاش فقط، لا تجلب
+                Log.d(TAG, "🔒 Non-admin swipe → showing cached gold only");
+                displayGoldPricesFromCache();
+                updateLiveStatusText(true);
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
             }
         } catch (Exception e) {
@@ -1644,203 +1599,196 @@ private void handleRecentActivityClick(JSONObject activity) {
     // ═══════════════════════════════════════════════════════
     // Lifecycle (Resume/Pause/Destroy)
     // ═══════════════════════════════════════════════════════
-  public void onBranchChanged() {
-    try {
-        if (!isAdded()) return;
-        int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-        if (newBranchId != currentBranchId) {
-            currentBranchId = newBranchId;
-            initBranchCache(currentBranchId);
-            updateHeader();
-            syncOrgProfileFromServer(true);
-            
-            // ✅ عرض الكاش أولاً، ثم Shimmer فقط إذا كان الكاش فارغاً
-            loadOfflineData();
-            
-            // عرض Shimmer فقط إذا كان الكاش فارغاً
-            if (offlineCache == null || offlineCache.getInt("total_items", 0) == 0) {
-                showShimmer(true);
-            }
-            
-            fetchData();
-            fetchRecentActivity();
-        }
-    } catch (Exception e) {
-        logNonFatal("onBranchChanged", e);
-    }
-}
-@Override
-public void onResume() {
-    super.onResume();
-    try {
-        // ✅ سياسة أمنية
-        isHeroHidden = true;
-        isSalesHidden = true;
-        if (btnToggleHeroVisibility != null) {
-            btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
-        }
-        if (btnToggleSalesVisibility != null) {
-            btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
-        }
-
-        registerDataRefreshReceiver();
-
-        // ✅ لا تصفّر lastDataFetchTime
-        int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-        if (latestBranchId != currentBranchId) {
-            onBranchChanged();
-        } else if (isViewInitialized) {
-            updateHeader();
-            syncOrgProfileFromServer(false);
-
-            long now = System.currentTimeMillis();
-            long timeSinceLastFetch = now - lastDataFetchTime;
-            long timeSinceLastGoldFetch = now - lastGoldFetchTime;
-            boolean isCacheValid = activityCache != null && activityCache.isValid();
-
-            Log.d(TAG, "📊 onResume — lastFetch: " + (timeSinceLastFetch / 1000) + "s ago"
-                    + ", lastGold: " + (timeSinceLastGoldFetch / 1000) + "s ago"
-                    + ", activityCacheValid: " + isCacheValid);
-
-            // ✅ fetchData فقط إذا مرت 30 ثانية أو أكثر
-            if (timeSinceLastFetch > 30 * 1000) {
-                Log.d(TAG, "🔄 Fetching dashboard data (stale)");
-                fetchData();
-            } else {
-                Log.d(TAG, "⏭️ Skipping fetchData (fresh)");
-            }
-
-            // ✅ fetchRecentActivity فقط إذا الكاش منتهي
-            if (!isCacheValid) {
-    Log.d(TAG, "🔄 Fetching recent activity (cache expired)");
-    mainHandler.postDelayed(() -> {
-        if (isAdded() && isResumed()) {
-            fetchRecentActivity();
-        }
-    }, 800);
-} else {
-    Log.d(TAG, "⏭️ Skipping fetchRecentActivity (cache valid)");
-    
-    // ✅ حماية إضافية: أعِد الرسم إذا كانت القائمة فارغة
-    if (isAdded() && llRecentActivity != null 
-            && llRecentActivity.getChildCount() == 0
-            && activityCache != null) {
+    public void onBranchChanged() {
         try {
-            JSONArray cached = activityCache.load();
-            if (cached != null && cached.length() > 0) {
-                updateRecentActivityUI(cached);
-                Log.d(TAG, "✅ Re-rendered " + cached.length() 
-                        + " activities in onResume");
+            if (!isAdded()) return;
+            int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            if (newBranchId != currentBranchId) {
+                currentBranchId = newBranchId;
+                initBranchCache(currentBranchId);
+                updateHeader();
+                syncOrgProfileFromServer(true);
+
+                loadOfflineData();
+
+                if (offlineCache == null || offlineCache.getInt("total_items", 0) == 0) {
+                    showShimmer(true);
+                }
+
+                fetchData();
+                fetchRecentActivity();
             }
         } catch (Exception e) {
-            logNonFatal("onResume.restoreActivities", e);
+            logNonFatal("onBranchChanged", e);
         }
     }
-}
 
-            // ✅ fetchLiveGoldPrices فقط إذا مرت 30 دقيقة
-            if (timeSinceLastGoldFetch > 30 * 60 * 1000) {
-                Log.d(TAG, "🔄 Fetching gold prices (stale)");
-                mainHandler.postDelayed(() -> {
-                    if (isAdded() && isResumed()) {
-                        if (permissionManager != null
-                                && permissionManager.canAccessFragment("GoldRates")) {
-                            fetchLiveGoldPrices(false);
-                        }
-                    }
-                }, 1500);
-            } else {
-                Log.d(TAG, "⏭️ Using cached gold prices");
-                displayGoldPricesFromCache();
-            }
-        }
-        startAutoRefresh();
-    } catch (Exception e) {
-        logNonFatal("onResume", e);
-    }
-}
     @Override
-public void onPause() {
-    super.onPause();
-    try {
-        unregisterDataRefreshReceiver();
-        stopAutoRefresh();
-
-        // ✅ سياسة أمنية: إعادة الإخفاء عند مغادرة الشاشة
-        hideSensitiveValuesOnExit();
-
-    } catch (Exception e) {
-        logNonFatal("onPause", e);
-    }
-}
-
-/**
- * ✅ إعادة الإخفاء عند مغادرة الشاشة
- * - تُستدعى في onPause (تغطي: التنقل، تبديل التطبيقات، إغلاق)
- * - تُستدعى أيضاً في onStop للأمان الإضافي
- */
-private void hideSensitiveValuesOnExit() {
-    try {
-        // ✅ إعادة الإخفاء
-        if (!isHeroHidden) {
+    public void onResume() {
+        super.onResume();
+        try {
+            // ✅ سياسة أمنية
             isHeroHidden = true;
+            isSalesHidden = true;
             if (btnToggleHeroVisibility != null) {
                 btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             }
-            Log.d(TAG, "🔒 Hero value hidden on exit");
-        }
-
-        if (!isSalesHidden) {
-            isSalesHidden = true;
             if (btnToggleSalesVisibility != null) {
                 btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
             }
-            Log.d(TAG, "🔒 Sales value hidden on exit");
-        }
-    } catch (Exception e) {
-        logNonFatal("hideSensitiveValuesOnExit", e);
-    }
-}
 
-@Override
-public void onStop() {
-    super.onStop();
-    // ✅ للأمان: تأكيد الإخفاء عند إيقاف الشاشة
-    hideSensitiveValuesOnExit();
-}
+            registerDataRefreshReceiver();
+
+            int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            if (latestBranchId != currentBranchId) {
+                onBranchChanged();
+            } else if (isViewInitialized) {
+                updateHeader();
+                syncOrgProfileFromServer(false);
+
+                long now = System.currentTimeMillis();
+                long timeSinceLastFetch = now - lastDataFetchTime;
+                long timeSinceLastGoldFetch = now - lastGoldFetchTime;
+                boolean isCacheValid = activityCache != null && activityCache.isValid();
+
+                Log.d(TAG, "📊 onResume — lastFetch: " + (timeSinceLastFetch / 1000) + "s ago"
+                        + ", lastGold: " + (timeSinceLastGoldFetch / 1000) + "s ago"
+                        + ", activityCacheValid: " + isCacheValid);
+
+                // ✅ fetchData فقط إذا مرت 30 ثانية أو أكثر
+                if (timeSinceLastFetch > 30 * 1000) {
+                    Log.d(TAG, "🔄 Fetching dashboard data (stale)");
+                    fetchData();
+                } else {
+                    Log.d(TAG, "⏭️ Skipping fetchData (fresh)");
+                }
+
+                // ✅ fetchRecentActivity فقط إذا الكاش منتهي
+                if (!isCacheValid) {
+                    Log.d(TAG, "🔄 Fetching recent activity (cache expired)");
+                    mainHandler.postDelayed(() -> {
+                        if (isAdded() && isResumed()) {
+                            fetchRecentActivity();
+                        }
+                    }, 800);
+                } else {
+                    Log.d(TAG, "⏭️ Skipping fetchRecentActivity (cache valid)");
+
+                    // ✅ حماية إضافية: أعِد الرسم إذا كانت القائمة فارغة
+                    if (isAdded() && llRecentActivity != null
+                            && llRecentActivity.getChildCount() == 0
+                            && activityCache != null) {
+                        try {
+                            JSONArray cached = activityCache.load();
+                            if (cached != null && cached.length() > 0) {
+                                updateRecentActivityUI(cached);
+                                Log.d(TAG, "✅ Re-rendered " + cached.length()
+                                        + " activities in onResume");
+                            }
+                        } catch (Exception e) {
+                            logNonFatal("onResume.restoreActivities", e);
+                        }
+                    }
+                }
+
+                // ✅ fetchLiveGoldPrices فقط إذا مرت 30 دقيقة
+                if (timeSinceLastGoldFetch > 30 * 60 * 1000) {
+                    Log.d(TAG, "🔄 Fetching gold prices (stale)");
+                    mainHandler.postDelayed(() -> {
+                        if (isAdded() && isResumed()) {
+                            if (permissionManager != null
+                                    && permissionManager.canAccessFragment("GoldRates")) {
+                                fetchLiveGoldPrices(false);
+                            }
+                        }
+                    }, 1500);
+                } else {
+                    Log.d(TAG, "⏭️ Using cached gold prices");
+                    displayGoldPricesFromCache();
+                }
+            }
+            startAutoRefresh();
+        } catch (Exception e) {
+            logNonFatal("onResume", e);
+        }
+    }
 
     @Override
-public void onDestroyView() {
-    super.onDestroyView();
-    try {
-        unregisterDataRefreshReceiver();
-        stopAutoRefresh();
-        llRecentActivity = null;
-        if (branchesManager != null && branchListener != null) {
-            branchesManager.removeListener(branchListener);
-            branchListener = null;
-        }
-        if (orgProfile != null && profileListener != null) {
-            orgProfile.removeListener(profileListener);
-        }
+    public void onPause() {
+        super.onPause();
+        try {
+            unregisterDataRefreshReceiver();
+            stopAutoRefresh();
 
-        cancelFuture(dataFuture);
-        cancelFuture(goldPriceFuture);
-        cancelFuture(pingFuture);
+            // ✅ سياسة أمنية: إعادة الإخفاء عند مغادرة الشاشة
+            hideSensitiveValuesOnExit();
 
-        // ✅ احذف الرسائل المُحدَّدة فقط
-        if (mainHandler != null) {
-            mainHandler.removeCallbacks(autoRefreshRunnable);
-            if (swipeTimeoutRunnable != null) {
-                mainHandler.removeCallbacks(swipeTimeoutRunnable);
-            }
+        } catch (Exception e) {
+            logNonFatal("onPause", e);
         }
-
-        isViewInitialized = false;
-    } catch (Exception e) {
-        logNonFatal("onDestroyView", e);
     }
-}
+
+    private void hideSensitiveValuesOnExit() {
+        try {
+            if (!isHeroHidden) {
+                isHeroHidden = true;
+                if (btnToggleHeroVisibility != null) {
+                    btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
+                }
+                Log.d(TAG, "🔒 Hero value hidden on exit");
+            }
+
+            if (!isSalesHidden) {
+                isSalesHidden = true;
+                if (btnToggleSalesVisibility != null) {
+                    btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
+                }
+                Log.d(TAG, "🔒 Sales value hidden on exit");
+            }
+        } catch (Exception e) {
+            logNonFatal("hideSensitiveValuesOnExit", e);
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        // ✅ للأمان: تأكيد الإخفاء عند إيقاف الشاشة
+        hideSensitiveValuesOnExit();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        try {
+            unregisterDataRefreshReceiver();
+            stopAutoRefresh();
+            llRecentActivity = null;
+            if (branchesManager != null && branchListener != null) {
+                branchesManager.removeListener(branchListener);
+                branchListener = null;
+            }
+            if (orgProfile != null && profileListener != null) {
+                orgProfile.removeListener(profileListener);
+            }
+
+            cancelFuture(dataFuture);
+            cancelFuture(goldPriceFuture);
+            cancelFuture(pingFuture);
+
+            if (mainHandler != null) {
+                mainHandler.removeCallbacks(autoRefreshRunnable);
+                if (swipeTimeoutRunnable != null) {
+                    mainHandler.removeCallbacks(swipeTimeoutRunnable);
+                }
+            }
+
+            isViewInitialized = false;
+        } catch (Exception e) {
+            logNonFatal("onDestroyView", e);
+        }
+    }
+
     private void cancelFuture(Future<?> future) {
         try {
             if (future != null && !future.isDone()) future.cancel(true);
@@ -1856,43 +1804,67 @@ public void onDestroyView() {
             Log.e(TAG, "logNonFatal error: " + e.getMessage());
         }
     }
-    
-    private void initializeManagers() {
-    try {
-        if (!isAdded()) return;
-        Context context = requireContext();
-        apiClient = MiraApiClient.getInstance(context);
-        sessionManager = new SessionManager(context);
-        branchesManager = MiraBranchesManager.getInstance(context);
-        orgProfile = MiraOrgProfileManager.getInstance(context);
-        priceManager = MiraPriceManager.getInstance(context);
-        permissionManager = PermissionManager.getInstance(context);
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
-        lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
-        activityCache = new RecentActivityCache(context);
 
-        // ✅✅✅ إضافة جديدة: مسح الكاش القديم عند تغيير الإصدار
+    private void initializeManagers() {
         try {
-            android.content.SharedPreferences prefs = 
-                context.getSharedPreferences("mira_dashboard", Context.MODE_PRIVATE);
-            int currentVersion = 2;  // رُفعت من 1 إلى 2 (بسبب إضافة items)
-            int savedVersion = prefs.getInt("activity_cache_version", 0);
-            
-            if (savedVersion < currentVersion) {
-                if (activityCache != null) {
-                    activityCache.clear();
-                    Log.d(TAG, "🗑️ Old activity cache cleared (v" + savedVersion + " → v" + currentVersion + ")");
+            if (!isAdded()) return;
+            Context context = requireContext();
+            apiClient = MiraApiClient.getInstance(context);
+            sessionManager = new SessionManager(context);
+            branchesManager = MiraBranchesManager.getInstance(context);
+            orgProfile = MiraOrgProfileManager.getInstance(context);
+            priceManager = MiraPriceManager.getInstance(context);
+            permissionManager = PermissionManager.getInstance(context);
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+            goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
+            lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
+            activityCache = new RecentActivityCache(context);
+
+            // ✅✅✅ إضافة جديدة: مسح الكاش القديم عند تغيير الإصدار
+            try {
+                android.content.SharedPreferences prefs =
+                        context.getSharedPreferences("mira_dashboard", Context.MODE_PRIVATE);
+                int currentVersion = 2;
+                int savedVersion = prefs.getInt("activity_cache_version", 0);
+
+                if (savedVersion < currentVersion) {
+                    if (activityCache != null) {
+                        activityCache.clear();
+                        Log.d(TAG, "🗑️ Old activity cache cleared (v" + savedVersion + " → v" + currentVersion + ")");
+                    }
+                    prefs.edit().putInt("activity_cache_version", currentVersion).apply();
                 }
-                prefs.edit().putInt("activity_cache_version", currentVersion).apply();
+            } catch (Exception e) {
+                logNonFatal("initializeManagers.cacheVersion", e);
             }
+
         } catch (Exception e) {
-            logNonFatal("initializeManagers.cacheVersion", e);
+            logNonFatal("initializeManagers", e);
         }
-        
-    } catch (Exception e) {
-        logNonFatal("initializeManagers", e);
     }
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ [تحديث] تقييدات الصلاحيات
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * ✅ هل يُسمح بجلب أسعار الذهب يدوياً (Force Refresh)؟
+     *
+     * ─────────────────────────────────────────────────
+     *  SYSTEM_ADMIN    → ✅
+     *  ORG_ADMIN       → ✅
+     *  FINANCE_MANAGER → ✅ (يتقاسم إدارة الأسعار)
+     *  بقية الأدوار     → ❌ (يشاهدون الكاش فقط)
+     *
+     *  ملاحظة: الجلب التلقائي في onResume يعمل للجميع
+     *         (كل 30 دقيقة — عبر fetchLiveGoldPrices(false))
+     *         ولكن يفحص صلاحية الكاش (12 ساعة) قبل الجلب.
+     * ─────────────────────────────────────────────────
+     */
+    private boolean canManuallyRefreshGold() {
+        if (permissionManager == null) return false;
+        return permissionManager.isSystemAdmin()
+            || permissionManager.isOrgAdmin()
+            || permissionManager.isFinanceManager();
     }
 }
-        
