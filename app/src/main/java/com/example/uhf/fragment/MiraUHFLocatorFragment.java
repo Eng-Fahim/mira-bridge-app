@@ -2,6 +2,8 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -48,15 +50,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * MiraUHFLocatorFragment v2.0
+ * MiraUHFLocatorFragment v2.2
  *
- * ✨ الجديد في هذه النسخة:
- *   • تنعيم الإشارة (EMA Smoothing) — يقضي على القفزات المجنونة
- *   • اهتزاز متدرج ذكي (Patterned Vibrations)
- *   • الالتقاط التلقائي (Auto-Snap) عند ثبات الإشارة 2 ثانية
- *   • إحصائيات الجلسة (Best proximity, Time to find)
- *   • وميض احتفالي عند الالتقاط
- *   • تحسين الأداء والاستقرار
+ * 🔧 إصلاحات v2.2:
+ *   • setPower(30) لأقصى قوة إرسال
+ *   • setDynamicDistance(35) لأقصى مدى
+ *   • لوحة تشخيص داخل الشاشة (tvDebug)
+ *   • حلقة إعادة startLocation كل 700ms
+ *   • إيقاف الحلقة في stopLocating
  */
 public class MiraUHFLocatorFragment extends KeyDwonFragment {
 
@@ -72,19 +73,27 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     private static final long BEEP_MAX_INTERVAL = 800L;
 
     // ═══ Signal Smoothing (EMA) ═══
-    private static final float SMOOTHING_FACTOR = 0.18f; // 0.1 = أنعم، 0.4 = أسرع استجابة
+    private static final float SMOOTHING_FACTOR = 0.25f;
 
     // ═══ Auto-Snap ═══
-    private static final float SNAP_THRESHOLD = 0.88f;  // عتبة الالتقاط
-    private static final long SNAP_HOLD_MS = 2000L;     // مدة الثبات المطلوبة
+    private static final float SNAP_THRESHOLD = 0.88f;
+    private static final long SNAP_HOLD_MS = 2000L;
+
+    // ═══ Dynamic Distance ═══
+    private static final int DEFAULT_DYNAMIC_DISTANCE = 35;
+    private static final int DEFAULT_POWER_DBM = 30;
+
+    // ═══ Restart Loop ═══
+    private static final long RESTART_INTERVAL_MS = 700L;
 
     // ═══ State ═══
     private boolean isLocating = false;
     private boolean isArabic = false;
     private int currentValue = 100;
 
-    // ═══ Signal Smoothing State ═══
+    // ═══ Smoothing State ═══
     private float smoothedProximity = 0f;
+    private boolean smoothingInitialized = false;
 
     // ═══ Auto-Snap State ═══
     private long snapStartTime = 0;
@@ -103,6 +112,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     private Vibrator vibrator;
     private Handler mainHandler;
     private ExecutorService executor;
+    private ToneGenerator toneGenerator;
 
     // ═══ Views ═══
     private MiraProximityMeterView meterView;
@@ -110,6 +120,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     private MaterialButton btnStart, btnStop, btnMiraSearch, btnExport, btnMarkFound;
     private ImageButton btnClose;
     private TextView tvStatus, tvDistance, tvReaderState;
+    private TextView tvDebug;   // 🔬 لوحة التشخيص
     private TextView tvItemTitle, tvItemDetails, tvItemLocation, tvItemStatus;
     private LinearLayout layoutItemCard;
     private RecyclerView rvHistory;
@@ -151,6 +162,12 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
             executor = Executors.newSingleThreadExecutor();
             vibrator = (Vibrator) requireContext()
                     .getSystemService(Context.VIBRATOR_SERVICE);
+
+            try {
+                toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 85);
+            } catch (Exception e) {
+                Log.w(TAG, "ToneGenerator init failed", e);
+            }
 
             permissionManager = PermissionManager.getInstance(requireContext());
             branchesManager = MiraBranchesManager.getInstance(requireContext());
@@ -194,6 +211,10 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
             backCallback = null;
         }
         if (executor != null) executor.shutdownNow();
+        if (toneGenerator != null) {
+            try { toneGenerator.release(); } catch (Exception ignored) {}
+            toneGenerator = null;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -213,6 +234,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         tvStatus = v.findViewById(R.id.tvStatus);
         tvDistance = v.findViewById(R.id.tvDistance);
         tvReaderState = v.findViewById(R.id.tvReaderState);
+        tvDebug = v.findViewById(R.id.tvDebug);   // 🔬 جديد
 
         tvItemTitle = v.findViewById(R.id.tvItemTitle);
         tvItemDetails = v.findViewById(R.id.tvItemDetails);
@@ -280,7 +302,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Start / Stop
+    //  Start / Stop  ← 🔧 الإصلاحات الرئيسية هنا
     // ═══════════════════════════════════════════════════════════
 
     private void startLocating() {
@@ -298,11 +320,26 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         }
 
         currentEpc = epc;
-
-        // إعادة تعيين حالة الجلسة
         resetSessionState();
 
         try {
+            // ═══ 1. رفع قوة الإرسال لأقصى حد ═══
+            try {
+                mainActivity.mReader.setPower(DEFAULT_POWER_DBM);
+                Log.d(TAG, "✅ setPower(" + DEFAULT_POWER_DBM + ")");
+            } catch (Exception e) {
+                Log.w(TAG, "setPower failed: " + e.getMessage());
+            }
+
+            // ═══ 2. المسافة الديناميكية ═══
+            try {
+                mainActivity.mReader.setDynamicDistance(DEFAULT_DYNAMIC_DISTANCE);
+                Log.d(TAG, "✅ setDynamicDistance(" + DEFAULT_DYNAMIC_DISTANCE + ")");
+            } catch (Exception e) {
+                Log.w(TAG, "setDynamicDistance failed: " + e.getMessage());
+            }
+
+            // ═══ 3. بدء تحديد الموقع ═══
             boolean started = mainActivity.mReader.startLocation(
                     mainActivity,
                     epc,
@@ -311,6 +348,21 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
                     new IUHFLocationCallback() {
                         @Override
                         public void getLocationValue(int value, boolean valid) {
+                            final int v = value;
+                            final boolean vd = valid;
+                            final int count = ++totalReadings;
+
+                            // 🔬 تحديث لوحة التشخيص فوراً
+                            mainHandler.post(() -> {
+                                if (tvDebug != null) {
+                                    tvDebug.setText(
+                                        "🔬 قراءات: " + count
+                                        + " | آخر قيمة: " + v
+                                        + " | صالحة: " + (vd ? "✓" : "✗")
+                                    );
+                                }
+                            });
+
                             handleLocationValue(value, valid);
                         }
                     });
@@ -325,6 +377,9 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
             onStartUI();
             queryMiraItem(epc);
 
+            // ═══ 4. تشغيل حلقة إعادة التشغيل ═══
+            startLocationRestartLoop();
+
             Log.i(TAG, "✅ Locator started for: " + epc);
 
         } catch (Exception e) {
@@ -334,6 +389,9 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     private void stopLocating() {
+        // 🔧 إيقاف الحلقة أولاً (قبل فحص isLocating)
+        stopLocationRestartLoop();
+
         if (!isLocating) return;
 
         try {
@@ -351,11 +409,16 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
 
     private void resetSessionState() {
         smoothedProximity = 0f;
+        smoothingInitialized = false;
         snapStartTime = 0;
         snapOffered = false;
         totalReadings = 0;
         bestProximity = 0f;
         timeToFindMs = 0;
+
+        if (tvDebug != null) {
+            tvDebug.setText("🔬 جاري البدء...");
+        }
 
         if (meterView != null) {
             meterView.resetTrailAndPeak();
@@ -387,27 +450,77 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         tvDistance.setText("—");
         btnMarkFound.setVisibility(View.GONE);
 
+        if (tvDebug != null) {
+            tvDebug.setText("🔬 متوقف");
+        }
+
         resetAutoSnap();
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Core: Handle Location Value (مع التنعيم والالتقاط التلقائي)
+    //  🔁 حلقة إعادة تشغيل startLocation
+    // ═══════════════════════════════════════════════════════════
+
+    private final Runnable locationRestartRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isLocating) return;
+
+            try {
+                if (mainActivity != null && mainActivity.mReader != null) {
+                    mainActivity.mReader.stopLocation();
+
+                    mainActivity.mReader.startLocation(
+                            mainActivity,
+                            currentEpc,
+                            IUHF.Bank_EPC,
+                            32,
+                            new IUHFLocationCallback() {
+                                @Override
+                                public void getLocationValue(int value, boolean valid) {
+                                    handleLocationValue(value, valid);
+                                }
+                            });
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Restart loop error: " + e.getMessage());
+            }
+
+            if (isLocating) {
+                mainHandler.postDelayed(this, RESTART_INTERVAL_MS);
+            }
+        }
+    };
+
+    private void startLocationRestartLoop() {
+        mainHandler.removeCallbacks(locationRestartRunnable);
+        mainHandler.postDelayed(locationRestartRunnable, RESTART_INTERVAL_MS);
+    }
+
+    private void stopLocationRestartLoop() {
+        mainHandler.removeCallbacks(locationRestartRunnable);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Core: Handle Location Value
     // ═══════════════════════════════════════════════════════════
 
     private void handleLocationValue(int value, boolean valid) {
         if (!valid) return;
 
         currentValue = value;
-        totalReadings++;
+        // ملاحظة: totalReadings يزيد في الـ callback قبل هذه الدالة
 
-        // ─── 1) حساب القرب الخام ───
         float rawProximity = Math.max(0f, Math.min(1f, (80f - value) / 60f));
 
-        // ─── 2) تطبيق التنعيم (EMA) ───
-        smoothedProximity = (SMOOTHING_FACTOR * rawProximity)
-                          + ((1 - SMOOTHING_FACTOR) * smoothedProximity);
+        if (!smoothingInitialized) {
+            smoothedProximity = rawProximity;
+            smoothingInitialized = true;
+        } else {
+            smoothedProximity = (SMOOTHING_FACTOR * rawProximity)
+                              + ((1 - SMOOTHING_FACTOR) * smoothedProximity);
+        }
 
-        // ─── 3) تحديث أفضل قراءة ───
         if (smoothedProximity > bestProximity) {
             bestProximity = smoothedProximity;
         }
@@ -419,7 +532,6 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
 
             meterView.setProximity(finalProximity);
             tvDistance.setText(estimateDistance(value));
-
             updateStatusText(finalProximity);
             handleAutoSnap(finalProximity);
             geigerFeedback(value);
@@ -427,17 +539,23 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     private void updateStatusText(float proximity) {
-        if (proximity >= 0.85f) {
+        if (proximity >= 0.75f) {
             tvStatus.setText(isArabic
                     ? "🔥 ملاصق جداً — " + currentTitle
                     : "🔥 Extremely Close — " + currentTitle);
             tvStatus.setTextColor(0xFF22C55E);
             btnMarkFound.setVisibility(View.VISIBLE);
-        } else if (proximity >= 0.55f) {
+        } else if (proximity >= 0.50f) {
             tvStatus.setText(isArabic
                     ? "📍 قريب — " + currentTitle
                     : "📍 Near — " + currentTitle);
             tvStatus.setTextColor(0xFFEAB308);
+            btnMarkFound.setVisibility(View.GONE);
+        } else if (proximity >= 0.25f) {
+            tvStatus.setText(isArabic
+                    ? "🎯 متوسط — " + currentTitle
+                    : "🎯 Medium — " + currentTitle);
+            tvStatus.setTextColor(0xFFF97316);
             btnMarkFound.setVisibility(View.GONE);
         } else {
             tvStatus.setText(isArabic
@@ -449,7 +567,7 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Auto-Snap (الالتقاط التلقائي)
+    //  Auto-Snap
     // ═══════════════════════════════════════════════════════════
 
     private void handleAutoSnap(float proximity) {
@@ -470,16 +588,9 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
     private void triggerAutoSnap() {
         snapOffered = true;
 
-        // وميض احتفالي
         if (meterView != null) meterView.flashFound();
-
-        // اهتزاز احتفالي
         performHapticCelebration();
-
-        // صوت احتفالي
-try {
-    if (mainActivity != null) mainActivity.playLocatorBeep(2);
-} catch (Exception ignored) {}
+        playBeep(ToneGenerator.TONE_CDMA_HIGH_L, 150);
 
         toast(isArabic
                 ? "🎯 إشارة قوية! اضغط ✅ للتأكيد"
@@ -519,13 +630,12 @@ try {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Geiger Feedback (صوت + اهتزاز متدرج)
+    //  Geiger Feedback
     // ═══════════════════════════════════════════════════════════
 
     private void geigerFeedback(int value) {
         long now = System.currentTimeMillis();
 
-        // حساب الفاصل الزمني حسب القرب
         long interval = (long) (BEEP_MIN_INTERVAL
                 + (BEEP_MAX_INTERVAL - BEEP_MIN_INTERVAL)
                 * Math.min(1.0, value / 80.0));
@@ -533,31 +643,35 @@ try {
         if (now - lastBeepTime < interval) return;
         lastBeepTime = now;
 
-        // ─── الصوت (متدرج حسب القرب) ───
-try {
-    if (mainActivity != null) {
-        // 0 = بعيد، 1 = متوسط، 2 = قريب
-        int level = value < 35 ? 2 : (value < 55 ? 1 : 0);
-        mainActivity.playLocatorBeep(level);
-    }
-} catch (Exception ignored) {}
+        int tone;
+        int duration;
 
-        // ─── الاهتزاز المتدرج ───
+        if (value < 30) {
+            tone = ToneGenerator.TONE_CDMA_HIGH_L;
+            duration = 80;
+        } else if (value < 45) {
+            tone = ToneGenerator.TONE_PROP_BEEP;
+            duration = 60;
+        } else if (value < 60) {
+            tone = ToneGenerator.TONE_PROP_BEEP;
+            duration = 40;
+        } else {
+            tone = ToneGenerator.TONE_PROP_BEEP;
+            duration = 25;
+        }
+        playBeep(tone, duration);
+
         if (vibrator == null || !vibrator.hasVibrator()) return;
 
         try {
             long[] pattern;
             if (value < 30) {
-                // 🔥 ملاصق — اهتزاز مكثف
                 pattern = new long[]{0, 60, 30, 60, 30, 60};
             } else if (value < 45) {
-                // 📍 قريب — اهتزاز مزدوج
                 pattern = new long[]{0, 50, 50, 50};
             } else if (value < 60) {
-                // 🟡 متوسط — اهتزازة واحدة
                 pattern = new long[]{0, 40};
             } else {
-                // 🌐 بعيد — اهتزازة خفيفة
                 pattern = new long[]{0, 15};
             }
 
@@ -567,6 +681,15 @@ try {
                 vibrator.vibrate(pattern, -1);
             }
         } catch (Exception ignored) {}
+    }
+
+    private void playBeep(int toneType, int durationMs) {
+        if (toneGenerator == null) return;
+        try {
+            toneGenerator.startTone(toneType, durationMs);
+        } catch (Exception e) {
+            Log.w(TAG, "playBeep failed: " + e.getMessage());
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -662,15 +785,11 @@ try {
     private void markAsFound() {
         if (TextUtils.isEmpty(currentEpc)) return;
 
-        // حساب وقت العثور
         if (sessionStartTime > 0) {
             timeToFindMs = System.currentTimeMillis() - sessionStartTime;
         }
 
-        // تسجيل في السجل
         addHistory(currentEpc, currentTitle, true);
-
-        // عرض إحصائيات الجلسة
         showSessionStats();
 
         toast(isArabic ? "✅ تم تسجيل القطعة" : "✅ Item marked");
