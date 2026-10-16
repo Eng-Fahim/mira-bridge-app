@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0B0F17">
+    android:background="?android:attr/colorBackground">
 
     <!-- ═══ HEADER ═══ -->
     <LinearLayout
@@ -14,7 +14,7 @@
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
-        android:background="#0F172A">
+        android:background="?attr/colorSurface">
 
         <ImageButton
             android:id="@+id/btnClose"
@@ -22,7 +22,7 @@
             android:layout_height="40dp"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="#FFFFFF"
+            app:tint="?attr/colorOnSurface"
             android:contentDescription="Close" />
 
         <TextView
@@ -31,7 +31,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="@string/locator_title"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -46,9 +46,9 @@
         android:padding="6dp"
         android:gravity="center"
         android:text="@string/locator_reader_checking"
-        android:textColor="#94A3B8"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="11sp"
-        android:background="#0F172A" />
+        android:background="?attr/colorSurface" />
 
     <!-- ═══ 🔬 لوحة التشخيص (مؤقتة) ═══ -->
     <TextView
@@ -58,10 +58,10 @@
         android:padding="6dp"
         android:gravity="center"
         android:text="🔬 جاهز للتشخيص"
-        android:textColor="#FBBF24"
+        android:textColor="@color/warning_yellow"
         android:textSize="10sp"
         android:fontFamily="monospace"
-        android:background="#1E1B0F" />
+        android:background="?attr/colorSurfaceVariant" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -87,8 +87,8 @@
                     android:layout_height="48dp"
                     android:layout_weight="1"
                     android:hint="@string/locator_enter_epc"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#64748B"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:fontFamily="monospace"
                     android:paddingStart="12dp"
@@ -103,8 +103,7 @@
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:text="@string/locator_search"
-                    android:textSize="12sp"
-                    android:backgroundTint="#1A237E" />
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <!-- ═══ المقياس الدائري ═══ -->
@@ -123,7 +122,7 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:text="@string/locator_distance_none"
-                android:textColor="#38BDF8"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -134,7 +133,7 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center"
                 android:text="@string/locator_ready"
-                android:textColor="#94A3B8"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp" />
 
             <!-- ═══ أزرار التحكم ═══ -->
@@ -151,8 +150,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
                     android:text="@string/locator_start"
-                    android:textStyle="bold"
-                    android:backgroundTint="#1A237E" />
+                    android:textStyle="bold" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStop"
@@ -163,7 +161,7 @@
                     android:text="@string/locator_stop"
                     android:textStyle="bold"
                     android:enabled="false"
-                    android:backgroundTint="#DC2626" />
+                    app:backgroundTint="?attr/colorError" />
             </LinearLayout>
 
             <!-- ═══ زر "تم العثور" ═══ -->
@@ -175,7 +173,7 @@
                 android:text="@string/locator_found"
                 android:textStyle="bold"
                 android:visibility="gone"
-                android:backgroundTint="#22C55E" />
+                app:backgroundTint="@color/success_green" />
 
             <!-- ═══ بطاقة معلومات MIRA ═══ -->
             <LinearLayout
@@ -185,7 +183,7 @@
                 android:layout_marginTop="16dp"
                 android:orientation="vertical"
                 android:padding="14dp"
-                android:background="#0F172A"
+                android:background="?attr/colorSurface"
                 android:visibility="gone">
 
                 <TextView
@@ -193,7 +191,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/locator_item_default"
-                    android:textColor="#FFFFFF"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="15sp"
                     android:textStyle="bold" />
 
@@ -203,7 +201,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="@string/locator_item_details"
-                    android:textColor="#94A3B8"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
 
                 <TextView
@@ -212,7 +210,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="@string/locator_item_location"
-                    android:textColor="#94A3B8"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
 
                 <TextView
@@ -226,7 +224,7 @@
                     android:textColor="#FFFFFF"
                     android:textSize="11sp"
                     android:textStyle="bold"
-                    android:background="#22C55E" />
+                    android:background="@color/success_green" />
             </LinearLayout>
 
             <!-- ═══ السجل ═══ -->
@@ -235,7 +233,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:text="@string/locator_history"
-                android:textColor="#94A3B8"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
