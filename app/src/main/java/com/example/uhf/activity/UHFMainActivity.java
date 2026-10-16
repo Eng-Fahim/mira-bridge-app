@@ -2046,6 +2046,15 @@ public void syncCurrentFragment() {
             soundManager.playSound(this, id);
         }
     }
+    /**
+ * ✅ صوت مخصص لباحث القطع — 3 مستويات
+ *    0 = بعيد، 1 = متوسط، 2 = قريب
+ */
+public void playLocatorBeep(int level) {
+    if (soundManager != null) {
+        soundManager.playLocatorBeep(this, level);
+    }
+}
 
     public void playSoundDelayed(int value) {
         if (soundManager != null) {
