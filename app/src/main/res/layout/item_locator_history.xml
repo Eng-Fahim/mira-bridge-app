@@ -6,9 +6,8 @@
     android:gravity="center_vertical"
     android:padding="10dp"
     android:layout_marginBottom="4dp"
-    android:background="#0F172A">
+    android:background="?attr/colorSurface">
 
-    <!-- أيقونة الحالة (✅ أو 🔍) -->
     <TextView
         android:id="@+id/tvIcon"
         android:layout_width="36dp"
@@ -17,7 +16,6 @@
         android:text="🔍"
         android:textSize="18sp" />
 
-    <!-- المحتوى -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -30,7 +28,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="عنصر"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="13sp"
             android:textStyle="bold"
             android:maxLines="1"
@@ -42,20 +40,19 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="EPC"
-            android:textColor="#94A3B8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="11sp"
             android:fontFamily="monospace"
             android:maxLines="1"
             android:ellipsize="middle" />
     </LinearLayout>
 
-    <!-- الوقت -->
     <TextView
         android:id="@+id/tvTime"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="00:00"
-        android:textColor="#64748B"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="10sp"
         android:fontFamily="monospace" />
 </LinearLayout>
