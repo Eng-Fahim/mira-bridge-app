@@ -22,14 +22,15 @@
             android:layout_height="40dp"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="#FFFFFF" />
+            app:tint="#FFFFFF"
+            android:contentDescription="Close" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="📡 باحث القطع"
+            android:text="@string/locator_title"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -44,7 +45,7 @@
         android:layout_height="wrap_content"
         android:padding="6dp"
         android:gravity="center"
-        android:text="📡 القارئ: جاري الفحص..."
+        android:text="@string/locator_reader_checking"
         android:textColor="#94A3B8"
         android:textSize="11sp"
         android:background="#0F172A" />
@@ -72,22 +73,23 @@
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:hint="أدخل EPC أو Serial"
+                    android:hint="@string/locator_enter_epc"
                     android:textColor="#FFFFFF"
                     android:textColorHint="#64748B"
                     android:textSize="13sp"
                     android:fontFamily="monospace"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
-                    android:background="@drawable/bg_input_dark" />
+                    android:background="@drawable/bg_input_dark"
+                    android:inputType="text"
+                    android:importantForAutofill="no" />
 
-                <!-- ✅ التصحيح: إضافة المسار الكامل -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnMiraSearch"
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
-                    android:text="🔍 بحث"
+                    android:text="@string/locator_search"
                     android:textSize="12sp"
                     android:backgroundTint="#1A237E" />
             </LinearLayout>
@@ -95,11 +97,11 @@
             <!-- ═══ المقياس الدائري ═══ -->
             <com.example.uhf.view.MiraProximityMeterView
                 android:id="@+id/meterView"
-                android:layout_width="220dp"
-                android:layout_height="220dp"
+                android:layout_width="240dp"
+                android:layout_height="240dp"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp" />
 
             <!-- ═══ المسافة + الحالة ═══ -->
             <TextView
@@ -107,7 +109,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:text="—"
+                android:text="@string/locator_distance_none"
                 android:textColor="#38BDF8"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -118,7 +120,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:gravity="center"
-                android:text="جاهز"
+                android:text="@string/locator_ready"
                 android:textColor="#94A3B8"
                 android:textSize="14sp" />
 
@@ -126,41 +128,38 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:orientation="horizontal">
 
-                <!-- ✅ التصحيح: إضافة المسار الكامل -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStart"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
-                    android:text="▶ بدء"
+                    android:text="@string/locator_start"
                     android:textStyle="bold"
                     android:backgroundTint="#1A237E" />
 
-                <!-- ✅ التصحيح: إضافة المسار الكامل -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStop"
                     android:layout_width="0dp"
                     android:layout_height="52dp"
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
-                    android:text="⏹ إيقاف"
+                    android:text="@string/locator_stop"
                     android:textStyle="bold"
                     android:enabled="false"
                     android:backgroundTint="#DC2626" />
             </LinearLayout>
 
             <!-- ═══ زر "تم العثور" ═══ -->
-            <!-- ✅ التصحيح: إضافة المسار الكامل -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnMarkFound"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:layout_marginTop="8dp"
-                android:text="✅ تم العثور عليها"
+                android:text="@string/locator_found"
                 android:textStyle="bold"
                 android:visibility="gone"
                 android:backgroundTint="#22C55E" />
@@ -180,7 +179,7 @@
                     android:id="@+id/tvItemTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="📦 اسم القطعة"
+                    android:text="@string/locator_item_default"
                     android:textColor="#FFFFFF"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -190,7 +189,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="🏷️ التفاصيل"
+                    android:text="@string/locator_item_details"
                     android:textColor="#94A3B8"
                     android:textSize="12sp" />
 
@@ -199,7 +198,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="📍 الموقع"
+                    android:text="@string/locator_item_location"
                     android:textColor="#94A3B8"
                     android:textSize="12sp" />
 
@@ -210,7 +209,7 @@
                     android:layout_marginTop="8dp"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="4dp"
-                    android:text="الحالة"
+                    android:text="@string/locator_item_status"
                     android:textColor="#FFFFFF"
                     android:textSize="11sp"
                     android:textStyle="bold"
@@ -222,7 +221,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="📋 السجل"
+                android:text="@string/locator_history"
                 android:textColor="#94A3B8"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -234,14 +233,13 @@
                 android:layout_marginTop="8dp"
                 android:nestedScrollingEnabled="false" />
 
-            <!-- ✅ التصحيح: إضافة المسار الكامل -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnExport"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="12dp"
-                android:text="📤 تصدير السجل"
+                android:text="@string/locator_export"
                 android:textSize="12sp" />
 
         </LinearLayout>
