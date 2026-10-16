@@ -561,9 +561,6 @@ public class SecureSessionManager {
     return Role.ORG_ADMIN.name().equals(getRoleString());
 }
 
-public boolean isSystemAdmin() {
-    return Role.SYSTEM_ADMIN.name().equals(getRoleString());
-}
 
     public boolean isAnyAdmin() {
         String role = getRoleString();
