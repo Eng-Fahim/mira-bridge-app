@@ -1,53 +1,186 @@
 package com.example.uhf.fragment;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.navigation.NavigationManager;
+import com.google.android.material.card.MaterialCardView;
 
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ *  MiraAdminHubFragment v2.0 — Permission-Aware
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ *  ✅ كل بطاقة تُخفى/تُظهر حسب صلاحية المستخدم
+ *  ✅ كل بطاقة تُربط بالـ Fragment الصحيح (بعد إصلاح الخلط)
+ *  ✅ يستخدم PermissionManager v3.0
+ *  ✅ يستخدم Tags موحّدة من NavigationManager
+ *  ✅ يمر عبر UHFMainActivity.loadFragment() (مع guardSetupAccess)
+ */
 public class MiraAdminHubFragment extends Fragment {
+
+    private static final String TAG = "MiraAdminHub";
+
+    private PermissionManager permissionManager;
+    private boolean isArabic;
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_admin_hub, container, false);
 
-        // 1. إدارة الفروع والشركات (استخدام MiraBranchesManagementFragment بالجمع)
-        bindCard(view, R.id.cardAdminBranches, new MiraBranchesManagementFragment(), "BranchesManagement");
+        try {
+            permissionManager = PermissionManager.getInstance(requireContext());
+            isArabic = java.util.Locale.getDefault().getLanguage().equals("ar");
 
-        // 2. إعدادات القارئ والتجهيزات
-        bindCard(view, R.id.cardAdminReaderSetup, new MiraReaderSetupFragment(), "ReaderSetup");
+            // ═══════════════════════════════════════════════════
+            //  Section 1 — تهيئة الأجهزة والشبكة
+            // ═══════════════════════════════════════════════════
 
-        // 3. إعدادات البوابات الأمنية
-        bindCard(view, R.id.cardAdminGateSetup, new MiraGateSettingsFragment(), "GateSettings");
+            bindCard(view, R.id.cardAdminSettings,
+                    "ServerConfig",
+                    NavigationManager.TAG_SERVER_CONFIG,
+                    permissionManager.canViewServerConfig());
 
-        // 4. إدارة المستخدمين والصلاحيات (استخدام UsersManagementFragment بدلاً من Profile المفقود)
-        bindCard(view, R.id.cardAdminProfile, new UsersManagementFragment(), "UsersManagement");
+            bindCard(view, R.id.cardAdminReaderSetup,
+                    "ReaderSetup",
+                    NavigationManager.TAG_READER_SETUP,
+                    permissionManager.canViewReaderSetup());
 
-        // 5. التشفير والمصادقة المتقدمة (NXP UCode DNA)
-        bindCard(view, R.id.cardAdminSecurity, new AuthenticateNxpUcodeDnaFragment(), "NxpSecurity");
+            bindCard(view, R.id.cardAdminGateSetup,
+                    "GateSettings",
+                    NavigationManager.TAG_GATE_SETTINGS,
+                    permissionManager.canManageGates());
 
-        // 6. إعدادات الهوائيات والترددات (UHF Set)
-        bindCard(view, R.id.cardAdminUhfSet, new UHFSetFragment(), "UHFSet");
+            bindCard(view, R.id.cardAdminSecurity,
+                    "NxpSecurity",
+                    "NxpSecurity",
+                    permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
+
+            bindCard(view, R.id.cardAdminUhfSet,
+                    "UHFSet",
+                    "UHFSet",
+                    permissionManager.canViewReaderSetup());
+
+            bindCard(view, R.id.cardAdminGoldRates,
+                    "GoldRates",
+                    NavigationManager.TAG_GOLD_RATES,
+                    permissionManager.canViewGoldRates());
+
+            // ═══════════════════════════════════════════════════
+            //  Section 2 — إدارة المنظومة الحاكمة
+            // ═══════════════════════════════════════════════════
+
+            // 🏢 الفروع
+            bindCard(view, R.id.cardAdminBranches,
+                    "Branches",
+                    NavigationManager.TAG_BRANCHES,
+                    permissionManager.canViewBranches());
+
+            // 👥 المستخدمين
+            bindCard(view, R.id.cardAdminUsers,
+                    "UsersManagement",
+                    NavigationManager.TAG_USERS_MANAGEMENT,
+                    permissionManager.canManageUsers());
+
+            // 👤 الملف الشخصي
+            bindCard(view, R.id.cardAdminProfile,
+                    "Profile",
+                    NavigationManager.TAG_PROFILE,
+                    true);   // متاح للجميع
+
+        } catch (Exception e) {
+            Log.e(TAG, "onCreateView error", e);
+        }
 
         return view;
     }
 
-    private void bindCard(View root, int cardId, Fragment fragment, String tag) {
+    // ═══════════════════════════════════════════════════════
+    //  bindCard — البوابة الموحّدة
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * @param root            الجذر
+     * @param cardId          معرف البطاقة في XML
+     * @param displayKey      للّوج فقط
+     * @param tag             Tag الشاشة في NavigationManager
+     * @param hasPermission   هل يملك المستخدم الصلاحية؟
+     */
+    private void bindCard(View root,
+                          int cardId,
+                          String displayKey,
+                          String tag,
+                          boolean hasPermission) {
         if (root == null) return;
+
         View card = root.findViewById(cardId);
-        if (card != null) {
-            card.setOnClickListener(v -> {
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).loadFragment(fragment, tag);
+        if (card == null) {
+            Log.w(TAG, "❌ Card NOT FOUND in layout: " + displayKey
+                    + " (id=" + getResourceIdName(cardId) + ")");
+            return;
+        }
+
+        // ✅ احترم البوابة الموحّدة أيضاً (whitelist)
+        boolean canAccess = hasPermission
+                && permissionManager.canAccessFragment(tag);
+
+        if (!canAccess) {
+            card.setVisibility(View.GONE);
+            Log.d(TAG, "⏭️ Hidden card: " + displayKey + " (no permission)");
+            return;
+        }
+
+        card.setVisibility(View.VISIBLE);
+
+        // ✅ استخدم MaterialCardView ripple effect
+        if (card instanceof MaterialCardView) {
+            ((MaterialCardView) card).setClickable(true);
+            ((MaterialCardView) card).setFocusable(true);
+        }
+
+        card.setOnClickListener(v -> {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+
+                // إنشاء Fragment عبر Factory الموحّد
+                Fragment target = com.example.uhf.navigation.FragmentFactory
+                        .createFragmentByTag(tag);
+
+                if (target != null) {
+                    activity.loadFragmentDirectly(target, tag);
+                    Log.d(TAG, "✅ Navigated to: " + tag);
+                } else {
+                    Log.e(TAG, "❌ FragmentFactory returned null for: " + tag);
                 }
-            });
+            } else {
+                Log.w(TAG, "Activity is not UHFMainActivity");
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  HELPERS
+    // ═══════════════════════════════════════════════════════
+
+    private String getResourceIdName(int resId) {
+        try {
+            return getResources().getResourceEntryName(resId);
+        } catch (Exception e) {
+            return String.valueOf(resId);
         }
     }
 }
