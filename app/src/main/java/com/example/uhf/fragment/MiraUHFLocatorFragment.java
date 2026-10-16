@@ -476,10 +476,10 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         // اهتزاز احتفالي
         performHapticCelebration();
 
-        // صوت
-        try {
-            if (mainActivity != null) mainActivity.playSound(2);
-        } catch (Exception ignored) {}
+        // صوت احتفالي
+try {
+    if (mainActivity != null) mainActivity.playLocatorBeep(2);
+} catch (Exception ignored) {}
 
         toast(isArabic
                 ? "🎯 إشارة قوية! اضغط ✅ للتأكيد"
@@ -533,14 +533,14 @@ public class MiraUHFLocatorFragment extends KeyDwonFragment {
         if (now - lastBeepTime < interval) return;
         lastBeepTime = now;
 
-        // ─── الصوت ───
-        try {
-            if (mainActivity != null) {
-                // 0 = بعيد، 1 = متوسط، 2 = قريب
-                int soundId = value < 35 ? 2 : (value < 55 ? 1 : 0);
-                mainActivity.playSound(soundId);
-            }
-        } catch (Exception ignored) {}
+        // ─── الصوت (متدرج حسب القرب) ───
+try {
+    if (mainActivity != null) {
+        // 0 = بعيد، 1 = متوسط، 2 = قريب
+        int level = value < 35 ? 2 : (value < 55 ? 1 : 0);
+        mainActivity.playLocatorBeep(level);
+    }
+} catch (Exception ignored) {}
 
         // ─── الاهتزاز المتدرج ───
         if (vibrator == null || !vibrator.hasVibrator()) return;
