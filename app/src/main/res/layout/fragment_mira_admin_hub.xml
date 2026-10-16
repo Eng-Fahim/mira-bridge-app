@@ -1,41 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/android:colorBackground"
-    android:padding="16dp">
+    android:background="?attr/colorSurface"
+    android:fillViewport="true"
+    tools:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <!-- هيدر مركز الإدارة -->
+        <!-- ═══ هيدر ═══ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="مركز التحكم والخيارات الإدارية"
+            android:layout_marginBottom="16dp"
+            android:text="@string/admin_hub_title"
             android:textColor="?attr/colorOnSurface"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:layout_marginBottom="16dp"/>
+            tools:text="مركز التحكم والخيارات الإدارية" />
 
-        <!-- القسم 1: تهيئة الأجهزة والمستشعرات -->
+        <!-- ═══ القسم 1: الأجهزة ═══ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="⚙️ تهيئة الأجهزة والشبكة"
+            android:layout_marginBottom="8dp"
+            android:text="@string/admin_hub_section_devices"
             android:textColor="?attr/colorPrimary"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            tools:text="⚙️ تهيئة الأجهزة والشبكة" />
 
         <GridLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:alignmentMode="alignMargins"
             android:columnCount="2"
-            android:alignmentMode="alignMargins">
+            android:useDefaultMargins="false">
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminSettings"
@@ -43,66 +49,147 @@
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚙️ إعدادات النظام" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_system_settings"
+                        android:textStyle="bold"
+                        tools:text="⚙️ إعدادات النظام" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- تم تعديل الـ ID من cardAdminReader إلى cardAdminReaderSetup -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminReaderSetup"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📟 إعدادات القارئ" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_reader_setup"
+                        android:textStyle="bold"
+                        tools:text="📟 إعدادات القارئ" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- تم تعديل الـ ID من cardAdminGateSettings إلى cardAdminGateSetup -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminGateSetup"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🚪 إعدادات البوابات" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_gate_setup"
+                        android:textStyle="bold"
+                        tools:text="🚪 إعدادات البوابات" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- تم إضافة الكارت المفقود cardAdminSecurity -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminSecurity"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔒 الأمان والحماية" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_security"
+                        android:textStyle="bold"
+                        tools:text="🔒 الأمان والحماية" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- تم إضافة الكارت المفقود cardAdminUhfSet -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminUhfSet"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📡 إعدادات UHF" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_uhf_set"
+                        android:textStyle="bold"
+                        tools:text="📡 إعدادات UHF" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -112,69 +199,143 @@
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💰 الذهب والبورصة" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_gold_rates"
+                        android:textStyle="bold"
+                        tools:text="💰 الذهب والبورصة" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </GridLayout>
 
-        <!-- القسم 2: الصلاحيات والهيكل الإداري -->
+        <!-- ═══ القسم 2: المنظومة ═══ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="🏢 إدارة المنظومة الحاكمة"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/admin_hub_section_org"
             android:textColor="?attr/colorPrimary"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp"/>
+            tools:text="🏢 إدارة المنظومة الحاكمة" />
 
         <GridLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:alignmentMode="alignMargins"
             android:columnCount="2"
-            android:alignmentMode="alignMargins">
+            android:useDefaultMargins="false">
 
+            <!-- 🏢 الفروع -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminBranches"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏢 إدارة الفروع" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_branches"
+                        android:textStyle="bold"
+                        tools:text="🏢 إدارة الفروع" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- 👥 المستخدمين -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminUsers"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="👥 المستخدمين والترخيص" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_users"
+                        android:textStyle="bold"
+                        tools:text="👥 المستخدمين والترخيص" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- 👤 الملف الشخصي -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminProfile"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
                 android:layout_margin="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="👤 الملف الشخصي" android:textStyle="bold"/>
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/admin_hub_profile"
+                        android:textStyle="bold"
+                        tools:text="👤 الملف الشخصي" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+
         </GridLayout>
 
     </LinearLayout>
