@@ -114,7 +114,8 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final long LAST_SALE_VALIDITY_MS     = 5 * 60 * 1000;
     private static final long ITEM_ADDED_DISPLAY_MS     = 1000;
     private static final long AUTO_ADD_DELAY_MS         = 350;
-    private static final int  AUTO_ADD_MIN_LEN          = 6;
+    // (يبقى كحد أدنى للأكواد المختلطة - لكن الأرقام القصيرة تُعالَج عبر shouldAutoSubmit)
+    private static final int AUTO_ADD_MIN_LEN = 6;
 
     private static final long TRIGGER_GRACE_MS = 2000;
 
@@ -194,6 +195,35 @@ private OfflineSalesSyncer offlineSyncer;
     private final AtomicReference<RefundItem> selectedRefundItem =
             new AtomicReference<>(null);
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ✅ [v6.4] Partial Serial Support
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * البادئات المحتملة للأرقام التسلسلية.
+ * يمكنك إضافة المزيد حسب صيغة عميلك.
+ */
+private static final String[] SERIAL_PREFIXES = {
+        "MIRA-SN-",
+        "MIRA-SN",
+        "MIRASN-",
+        "MIRASN",
+        "MIRA-",
+        "MIRA",
+        "SN-",
+        "SN",
+        "JG-",
+        "GOLD-",
+        "GLD-"
+};
+
+/** الحد الأدنى للأرقام عند الإدخال المختصر (1004 → 4) */
+private static final int  PARTIAL_SERIAL_MIN_LEN = 3;
+private static final int  PARTIAL_SERIAL_MAX_LEN = 8;
+
+/** تأخير أطول للأكواد القصيرة (نمهل المستخدم ليكمل الكتابة) */
+private static final long SHORT_CODE_DELAY_MS = 800L;
     // ═══════════════════════════════════════════════════════════════════
     //  View References
     // ═══════════════════════════════════════════════════════════════════
@@ -1075,18 +1105,28 @@ private void setupManualInputListeners() {
         public void afterTextChanged(android.text.Editable s) {
             if (pendingAuto[0] != null) {
                 mainHandler.removeCallbacks(pendingAuto[0]);
+                pendingAuto[0] = null;
             }
+
             final String code = s.toString().trim();
-            if (code.length() < AUTO_ADD_MIN_LEN) return;
+
+            // ✅ [v6.4] منطق مختلف للأرقام القصيرة
+            if (!shouldAutoSubmit(code)) return;
+
+            // ✅ تأخير أطول للأكواد القصيرة (نمهل المستخدم)
+            final long delay = looksLikePartialSerial(code)
+                    ? SHORT_CODE_DELAY_MS
+                    : AUTO_ADD_DELAY_MS;
 
             pendingAuto[0] = () -> {
+                pendingAuto[0] = null;
                 if (etManualEpc != null
                         && code.equals(etManualEpc.getText().toString().trim())
                         && isFragmentAlive()) {
                     submitManualEpc();
                 }
             };
-            mainHandler.postDelayed(pendingAuto[0], AUTO_ADD_DELAY_MS);
+            mainHandler.postDelayed(pendingAuto[0], delay);
         }
     });
 }
@@ -1245,14 +1285,20 @@ private void submitManualEpc() {
             return;
         }
 
-        if (cartManager != null && cartManager.isIdScanned(epc)) {
-            showToast(getString(R.string.pos_msg_already_in_cart));
-            playAlertSound(2);
-            return;
+        if (cartManager != null) {
+    boolean dup = cartManager.isIdScanned(epc);
+    if (!dup && looksLikePartialSerial(epc)) {
+        for (String prefix : SERIAL_PREFIXES) {
+            if (cartManager.isIdScanned(prefix + epc)) { dup = true; break; }
         }
+    }
+    if (dup) { showToast(getString(R.string.pos_msg_already_in_cart)); playAlertSound(2); return; }
+}
 
+        // ✅ [v6.4] processRingEpc الآن يتعامل مع البحث المتعدد
         processRingEpc(epc, "manual");
 
+        // امسح الحقل فقط عند وجود مدخلات صحيحة
         if (etManualEpc != null) etManualEpc.setText("");
         hideManualInput();
 
@@ -1272,15 +1318,64 @@ private void processRingEpc(final String code, final String source) {
     if (code == null || code.trim().isEmpty() || !isFragmentAlive()) return;
     final String cleanCode = code.trim();
 
-    if (!pendingEpcs.add(cleanCode)) return;
+    // ✅ [v6.4] ابنِ قائمة المرشحين (كود كامل + بادئات محتملة)
+    final List<String> candidates = buildSearchCandidates(cleanCode);
 
-    final String epcToClean = cleanCode;
-    mainHandler.postDelayed(() -> {
-        boolean removed = pendingEpcs.remove(epcToClean);
-        if (removed) {
-            Log.w(TAG, "Pending EPC timed out: " + epcToClean);
-        }
-    }, PENDING_EPC_TIMEOUT_MS);
+    if (candidates.size() > 1) {
+        Log.i(TAG, "🔍 Partial serial detected: '" + cleanCode
+                + "' → trying " + candidates.size() + " candidates");
+    }
+
+    processRingEpcWithCandidates(cleanCode, source, candidates, 0);
+}
+
+/**
+ * ✅ [v6.4] يجرّب المرشحين بالتسلسل حتى ينجح أحدهم.
+ */
+private void processRingEpcWithCandidates(
+        @NonNull final String originalCode,
+        @NonNull final String source,
+        @NonNull final List<String> candidates,
+        final int index) {
+
+    if (!isFragmentAlive()) return;
+
+    // ═══════════════════════════════════════════════════════════════
+    // كل المرشحين فشلوا
+    // ═══════════════════════════════════════════════════════════════
+    if (index >= candidates.size()) {
+        Log.w(TAG, "❌ All " + candidates.size()
+                + " candidates failed for: " + originalCode);
+        safeRun(() -> {
+            if (!isFragmentAlive()) return;
+            showToast(getString(R.string.pos_msg_not_found));
+            playAlertSound(2);
+            setHeroError();
+            resetHeroAfterDelay();
+            showScanFeedback(
+                    isArabic ? "❌ لم يتم العثور" : "❌ Not Found",
+                    originalCode,
+                    null,
+                    android.R.drawable.ic_dialog_alert,
+                    0xFFDC2626
+            );
+        });
+        return;
+    }
+
+    final String candidate = candidates.get(index);
+
+    if (index > 0) {
+        Log.i(TAG, "🔁 Trying candidate [" + (index + 1) + "/"
+                + candidates.size() + "]: '" + candidate
+                + "' (original: '" + originalCode + "')");
+    }
+
+    if (!pendingEpcs.add(candidate)) return;
+
+    mainHandler.postDelayed(
+            () -> pendingEpcs.remove(candidate),
+            PENDING_EPC_TIMEOUT_MS);
 
     playAlertSound(1);
 
@@ -1292,6 +1387,7 @@ private void processRingEpc(final String code, final String source) {
 
     try {
         miraExecutor.getNetworkExecutor().execute(() -> {
+            boolean found = false;
             try {
                 Context context = getSafeAppContext();
                 if (context == null) return;
@@ -1300,7 +1396,7 @@ private void processRingEpc(final String code, final String source) {
                         MiraItemSyncManager.getInstance(context);
                 final int branchId = getActiveBranchId();
 
-                syncManager.findItem(cleanCode, branchId,
+                syncManager.findItem(candidate, branchId,
                         new MiraItemSyncManager.ItemLookupCallback() {
                     @Override
                     public void onItemFound(JSONObject item, boolean fromServer) {
@@ -1314,43 +1410,35 @@ private void processRingEpc(final String code, final String source) {
                                 resetHeroAfterDelay();
                                 return;
                             }
-                            parseItemResponse(cleanCode, item, source);
+                            parseItemResponse(candidate, item, source);
                         });
                     }
 
                     @Override
                     public void onItemNotFound() {
-                        safeRun(() -> {
-                            if (!isFragmentAlive()) return;
-                            showToast(getString(R.string.pos_msg_not_found));
-                            playAlertSound(2);
-                            setHeroError();
-                            resetHeroAfterDelay();
-
-                            showScanFeedback(
-                                    isArabic ? "❌ لم يتم العثور" : "❌ Not Found",
-                                    cleanCode,
-                                    null,
-                                    android.R.drawable.ic_dialog_alert,
-                                    0xFFDC2626
-                            );
-                        });
+                        // ✅ جرّب المرشح التالي
+                        safeRun(() -> processRingEpcWithCandidates(
+                                originalCode, source, candidates, index + 1));
                     }
                 });
+
+                found = true;
             } catch (Exception e) {
-                Log.e(TAG, "processRingEpc network error", e);
-                safeRun(() -> {
-                    if (!isFragmentAlive()) return;
-                    setHeroError();
-                    resetHeroAfterDelay();
-                });
+                Log.e(TAG, "processRingEpcWithCandidates network error", e);
+                if (!found) {
+                    // جرّب المرشح التالي عند الخطأ أيضاً
+                    safeRun(() -> processRingEpcWithCandidates(
+                            originalCode, source, candidates, index + 1));
+                }
             } finally {
-                pendingEpcs.remove(cleanCode);
+                pendingEpcs.remove(candidate);
             }
         });
     } catch (Exception e) {
-        Log.e(TAG, "processRingEpc submit error", e);
-        pendingEpcs.remove(cleanCode);
+        Log.e(TAG, "processRingEpcWithCandidates submit error", e);
+        pendingEpcs.remove(candidate);
+        safeRun(() -> processRingEpcWithCandidates(
+                originalCode, source, candidates, index + 1));
     }
 }
 
@@ -1851,7 +1939,63 @@ private void showScanFeedback(@NonNull String title,
 // ═══════════════════════════════════════════════════════════════════
 //  Utilities
 // ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  ✅ [v6.4] Partial Serial Helpers
+// ═══════════════════════════════════════════════════════════════════
 
+/**
+ * هل الإدخال يمكن أن يكون جزءاً من رقم تسلسلي؟
+ * (أرقام فقط، بين PARTIAL_SERIAL_MIN_LEN و PARTIAL_SERIAL_MAX_LEN)
+ */
+private boolean looksLikePartialSerial(@Nullable String code) {
+    if (code == null) return false;
+    int len = code.length();
+    if (len < PARTIAL_SERIAL_MIN_LEN || len > PARTIAL_SERIAL_MAX_LEN) {
+        return false;
+    }
+    for (int i = 0; i < len; i++) {
+        if (!Character.isDigit(code.charAt(i))) return false;
+    }
+    return true;
+}
+
+/**
+ * هل يجب أن نُرسل الطلب تلقائياً بعد توقف الكتابة؟
+ *  - أرقام فقط بطول 4+     → نعم (مثل 1004)
+ *  - مختلط بطول 6+         → نعم (مثل MIRA-SN-1004)
+ */
+private boolean shouldAutoSubmit(@Nullable String code) {
+    if (code == null || code.isEmpty()) return false;
+
+    if (looksLikePartialSerial(code)) {
+        return code.length() >= 4;   // 1004 → 4 أرقام → تلقائي
+    }
+    return code.length() >= AUTO_ADD_MIN_LEN;
+}
+
+/**
+ * يبني قائمة المرشحين للبحث.
+ * الترتيب مهم: الأكثر احتمالاً أولاً.
+ */
+@NonNull
+private List<String> buildSearchCandidates(@NonNull String code) {
+    List<String> candidates = new ArrayList<>();
+
+    // 1) الكود كما هو (يدعم البحث الكامل MIRA-SN-1004)
+    candidates.add(code);
+
+    // 2) إذا كان رقماً قصيراً → جرّب البادئات الشائعة
+    if (looksLikePartialSerial(code)) {
+        for (String prefix : SERIAL_PREFIXES) {
+            String candidate = prefix + code;
+            if (!candidates.contains(candidate)) {
+                candidates.add(candidate);
+            }
+        }
+    }
+
+    return candidates;
+}
 private void showToast(String msg) {
     PosUIManager.toast(getContext(), msg);
 }
