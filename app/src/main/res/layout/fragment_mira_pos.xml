@@ -59,7 +59,37 @@
             android:textSize="16sp"
             android:textStyle="bold"
             tools:text="نظام البيع" />
+<!-- ✅ [v4.2] Badge البيوع المعلّقة -->
+<LinearLayout
+    android:id="@+id/pendingSalesBadge"
+    android:layout_width="wrap_content"
+    android:layout_height="32dp"
+    android:layout_marginEnd="6dp"
+    android:background="@drawable/bg_pending_badge"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="10dp"
+    android:visibility="gone"
+    tools:visibility="visible">
 
+    <ImageView
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:src="@drawable/ic_cloud_upload"
+        app:tint="?attr/colorOnTertiaryContainer" />
+
+    <TextView
+        android:id="@+id/tvPendingBadgeCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:textColor="?attr/colorOnTertiaryContainer"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="3" />
+</LinearLayout>
         <!-- زر الإرجاع -->
         <ImageButton
             android:id="@+id/btnPosRefund"
