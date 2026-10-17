@@ -5,10 +5,7 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         Preview: ملء الشاشة (fillCenter) بدل fitCenter
-         SurfaceView (performance) بدل TextureView
-         ═══════════════════════════════════════════════════════════════ -->
+    <!-- Preview -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"
@@ -16,24 +13,18 @@
         app:implementationMode="performance"
         app:scaleType="fillCenter" />
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         حاوية إطار المسح + خط المسح
-         - الإطار 220dp (أصغر من السابق → يُقرب المستخدم)
-         - خط المسح داخل الحاوية → يتحرك ضمن الحدود بدقة
-         ═══════════════════════════════════════════════════════════════ -->
+    <!-- إطار المسح + خط المسح -->
     <FrameLayout
         android:layout_width="220dp"
         android:layout_height="220dp"
         android:layout_gravity="center">
 
-        <!-- الحدود الذهبية للإطار -->
         <View
             android:id="@+id/scannerOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@drawable/scanner_overlay_border" />
 
-        <!-- خط المسح المتحرك (داخل الإطار) -->
         <View
             android:id="@+id/scanLine"
             android:layout_width="match_parent"
@@ -42,9 +33,7 @@
             android:background="#4ADE80" />
     </FrameLayout>
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         مؤشر الزوم (يُحدَّث من Java — انظر التعديل أدناه)
-         ═══════════════════════════════════════════════════════════════ -->
+    <!-- ✅ [v3.1] مؤشر الزوم -->
     <TextView
         android:id="@+id/tvZoomLevel"
         android:layout_width="wrap_content"
@@ -62,9 +51,7 @@
         android:textSize="12sp"
         android:textStyle="bold" />
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         الشريط العلوي: إغلاق + عنوان + فلاش
-         ═══════════════════════════════════════════════════════════════ -->
+    <!-- شريط علوي -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
@@ -103,9 +90,7 @@
             android:tint="@android:color/white" />
     </LinearLayout>
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         الشريط السفلي: حالة + تلميح + نتيجة
-         ═══════════════════════════════════════════════════════════════ -->
+    <!-- شريط سفلي -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
