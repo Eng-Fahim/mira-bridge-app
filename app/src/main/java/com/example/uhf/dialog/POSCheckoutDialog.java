@@ -335,13 +335,36 @@ public class POSCheckoutDialog extends DialogFragment {
     // ═══════════════════════════════════════════════════════════
 
     private void setupSpinner() {
-        if (spPaymentMethod == null || getContext() == null) return;
+    if (spPaymentMethod == null || getContext() == null) return;
 
-        spPaymentMethod.setEnabled(false);
-        spPaymentMethod.setHint(isArabic ? "جاري التحميل..." : "Loading...");
+    spPaymentMethod.setEnabled(false);
+    spPaymentMethod.setHint(isArabic ? "جاري التحميل..." : "Loading...");
 
-        loadPaymentMethodsFromServer();
-    }
+    // ✅ [FIX] افتح القائمة عند النقر على الحقل (حتى قبل التحميل)
+    spPaymentMethod.setThreshold(0, android.widget.AutoCompleteTextView.THRESHOLD_ALWAYS);
+
+    spPaymentMethod.setOnClickListener(v -> {
+        if (spPaymentMethod.isEnabled()) {
+            try {
+                spPaymentMethod.showDropDown();
+            } catch (Exception e) {
+                Log.w(TAG, "showDropDown failed", e);
+            }
+        }
+    });
+
+    spPaymentMethod.setOnFocusChangeListener((v, hasFocus) -> {
+        if (hasFocus && spPaymentMethod.isEnabled()) {
+            try {
+                spPaymentMethod.showDropDown();
+            } catch (Exception e) {
+                Log.w(TAG, "showDropDown (focus) failed", e);
+            }
+        }
+    });
+
+    loadPaymentMethodsFromServer();
+}
 
     /**
      * ✅ تحميل طرق الدفع من السيرفر على خيط خلفي.
@@ -412,19 +435,25 @@ public class POSCheckoutDialog extends DialogFragment {
      * ✅ قائمة احتياطية عند فشل السيرفر.
      */
     private List<PaymentMethodDto> getFallbackMethods() {
-        List<PaymentMethodDto> list = new ArrayList<>();
+    List<PaymentMethodDto> list = new ArrayList<>();
 
-        list.add(makeMethod("CASH", "نقداً", "Cash", "💵",
-                "1101", "الصناديق والنقدية", "Cash Box"));
-        list.add(makeMethod("CARD", "بطاقة", "Card", "💳",
-                "1102", "البنوك والمصارف", "Bank Account"));
-        list.add(makeMethod("BANK_TRANSFER", "تحويل بنكي", "Bank Transfer", "🏦",
-                "1102", "البنوك والمصارف", "Bank Account"));
-        list.add(makeMethod("CREDIT", "آجل", "Credit", "⏳",
-                "1201", "العملاء والمدينون", "Customers"));
+    list.add(makeMethod("CASH", "نقداً", "Cash",
+            "💵", "1101", "الصناديق والنقدية", "Cash Box"));
 
-        return list;
-    }
+    list.add(makeMethod("BANK_TRANSFER", "تحويل بنكي", "Bank Transfer",
+            "🏦", "1102", "البنوك والمصارف", "Bank Account"));
+
+    list.add(makeMethod("E_WALLET", "محفظة إلكترونية", "E-Wallet",
+            "📱", "1103", "المحافظ الإلكترونية", "E-Wallets"));
+
+    list.add(makeMethod("CHECK", "شيك", "Check",
+            "📝", "1104", "شيكات تحت التحصيل", "Checks under Collection"));
+
+    list.add(makeMethod("CREDIT", "آجل", "Credit",
+            "⏳", "1201", "العملاء والمدينون", "Customers / Receivables"));
+
+    return list;
+}
 
     private PaymentMethodDto makeMethod(String code, String nameAr, String nameEn,
                                         String icon, String accountCode,
@@ -440,77 +469,115 @@ public class POSCheckoutDialog extends DialogFragment {
         return m;
     }
 
-    /**
-     * ✅ تطبيق القائمة على الواجهة — يستخدم `addTextChangedListener`
-     *    بدل `setOnItemClickListener` (الأخير يُعطّل dropdown الخاص
-     *    بـ `MaterialAutoCompleteTextView`).
-     */
-    private void applyPaymentMethods(List<PaymentMethodDto> methods,
-                                     boolean isFallback) {
-        if (spPaymentMethod == null || !isAdded()) return;
+/**
+ * ✅ تطبيق قائمة طرق الدفع على الواجهة — [v2.5 FIXED]
+ *
+ * إصلاحات v2.5:
+ *   - setThreshold(0, THRESHOLD_ALWAYS) — تُفتح القائمة فوراً عند النقر
+ *   - post() بعد setText — تضمن أن الـ dropdown جاهز بعد layout
+ *   - Logs تفصيلية للتحقق من عدد الطرق المُطبّقة
+ */
+private void applyPaymentMethods(List<PaymentMethodDto> methods,
+                                 boolean isFallback) {
+    if (spPaymentMethod == null || !isAdded()) return;
 
-        paymentMethods.clear();
-        paymentMethods.addAll(methods);
+    // ═══════════════════════════════════════════════════════════
+    // 1) تحديث البيانات الداخلية
+    // ═══════════════════════════════════════════════════════════
+    paymentMethods.clear();
+    paymentMethods.addAll(methods);
 
-        String[] displayNames = new String[methods.size()];
-        for (int i = 0; i < methods.size(); i++) {
-            displayNames[i] = methods.get(i).getDisplayName(isArabic);
-        }
+    String[] displayNames = new String[methods.size()];
+    for (int i = 0; i < methods.size(); i++) {
+        displayNames[i] = methods.get(i).getDisplayName(isArabic);
+    }
 
-        Log.i(TAG, "📋 applyPaymentMethods: " + methods.size() + " methods"
-                + " → " + Arrays.toString(displayNames));
+    Log.i(TAG, "📋 applyPaymentMethods: " + methods.size() + " methods"
+            + " → " + Arrays.toString(displayNames));
 
-        spPaymentMethod.setEnabled(true);
-        spPaymentMethod.setHint(isArabic ? "طريقة الدفع" : "Payment Method");
+    // ═══════════════════════════════════════════════════════════
+    // 2) تفعيل الحقل + ضبط الـ hint
+    // ═══════════════════════════════════════════════════════════
+    spPaymentMethod.setEnabled(true);
+    spPaymentMethod.setHint(isArabic ? "طريقة الدفع" : "Payment Method");
 
-        // ✅ 1) TextWatcher — لا يُضاف مرتين
-        if (!paymentWatcherAttached) {
-            paymentWatcherAttached = true;
-            spPaymentMethod.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-                @Override
-                public void onTextChanged(CharSequence s, int a, int b, int c) {}
+    // ═══════════════════════════════════════════════════════════
+    // 3) TextWatcher — لا يُضاف مرتين
+    // ═══════════════════════════════════════════════════════════
+    if (!paymentWatcherAttached) {
+        paymentWatcherAttached = true;
+        spPaymentMethod.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override
+            public void onTextChanged(CharSequence s, int a, int b, int c) {}
 
-                @Override
-                public void afterTextChanged(Editable s) {
-                    String text = s != null ? s.toString().trim() : "";
-                    if (text.isEmpty()) return;
+            @Override
+            public void afterTextChanged(Editable s) {
+                String text = s != null ? s.toString().trim() : "";
+                if (text.isEmpty()) return;
 
-                    for (PaymentMethodDto m : paymentMethods) {
-                        if (m.getDisplayName(isArabic).equals(text)) {
-                            selectedMethod = m;
-                            updateAccountNumberFromMethod(m);
-                            Log.d(TAG, "💳 Selected: " + m.code);
-                            break;
-                        }
+                for (PaymentMethodDto m : paymentMethods) {
+                    if (m.getDisplayName(isArabic).equals(text)) {
+                        selectedMethod = m;
+                        updateAccountNumberFromMethod(m);
+                        Log.d(TAG, "💳 Selected: " + m.code);
+                        break;
                     }
                 }
-            });
-        }
-
-        // ✅ 2) ضبط القائمة
-        spPaymentMethod.setSimpleItems(displayNames);
-
-        // ✅ 3) اختيار الطريقة الافتراضية
-        if (!methods.isEmpty()) {
-            spPaymentMethod.setText(displayNames[0], false);
-            selectedMethod = methods.get(0);
-            updateAccountNumberFromMethod(selectedMethod);
-        } else {
-            spPaymentMethod.setText("", false);
-            selectedMethod = null;
-            if (tvAccountNumber != null) {
-                tvAccountNumber.setVisibility(View.GONE);
             }
-        }
+        });
+    }
 
-        if (isFallback) {
-            Log.w(TAG, "⚠️ Using FALLBACK payment methods");
-        } else {
-            Log.d(TAG, "✅ Loaded " + methods.size() + " methods from server");
+    // ═══════════════════════════════════════════════════════════
+    // 4) ضبط القائمة
+    // ═══════════════════════════════════════════════════════════
+    spPaymentMethod.setSimpleItems(displayNames);
+
+    // ✅ [FIX] اجعل القائمة تُفتح فوراً عند النقر (threshold = 0)
+    spPaymentMethod.setThreshold(0,
+            android.widget.AutoCompleteTextView.THRESHOLD_ALWAYS);
+
+    // ═══════════════════════════════════════════════════════════
+    // 5) اختيار الطريقة الافتراضية
+    // ═══════════════════════════════════════════════════════════
+    if (!methods.isEmpty()) {
+        spPaymentMethod.setText(displayNames[0], false);
+        selectedMethod = methods.get(0);
+        updateAccountNumberFromMethod(selectedMethod);
+    } else {
+        spPaymentMethod.setText("", false);
+        selectedMethod = null;
+        if (tvAccountNumber != null) {
+            tvAccountNumber.setVisibility(View.GONE);
         }
     }
+
+    // ✅ [FIX] تأكد أن الـ dropdown جاهز — يعيد التطبيق بعد layout
+    spPaymentMethod.post(() -> {
+        try {
+            spPaymentMethod.setThreshold(0,
+                    android.widget.AutoCompleteTextView.THRESHOLD_ALWAYS);
+
+            // ✅ اختياري: إن أردت فتح القائمة تلقائياً عند تحميلها، أزل التعليق:
+            // spPaymentMethod.showDropDown();
+            // spPaymentMethod.dismissDropDown();  // لإغلاقها فوراً
+
+        } catch (Exception e) {
+            Log.w(TAG, "applyPaymentMethods post setup failed", e);
+        }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // 6) Logs
+    // ═══════════════════════════════════════════════════════════
+    if (isFallback) {
+        Log.w(TAG, "⚠️ Using FALLBACK payment methods: "
+                + methods.size() + " items");
+    } else {
+        Log.d(TAG, "✅ Loaded " + methods.size() + " methods from server");
+    }
+}
 
     /**
      * ✅ عرض بيانات الحساب المرتبط بالطريقة المختارة.
@@ -558,10 +625,12 @@ public class POSCheckoutDialog extends DialogFragment {
         }
 
         String text = spPaymentMethod.getText().toString();
-        if (text.contains("تحويل") || text.contains("Bank")) return "BANK_TRANSFER";
-        if (text.contains("بطاق") || text.contains("Card")) return "CARD";
-        if (text.contains("آجل") || text.contains("Credit")) return "CREDIT";
-        return "CASH";
+if (text.contains("تحويل") || text.contains("Bank")) return "BANK_TRANSFER";
+if (text.contains("بطاق") || text.contains("Card")) return "CARD";
+if (text.contains("محفظ") || text.contains("Wallet")) return "E_WALLET";
+if (text.contains("شيك") || text.contains("Check")) return "CHECK";
+if (text.contains("آجل") || text.contains("Credit")) return "CREDIT";
+return "CASH";
     }
 
     /**
