@@ -1317,6 +1317,53 @@ private void parseItemResponse(String code, JSONObject data, String source) {
             return;
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // ✅ [v4.1] حماية مزدوجة: فحص الـ cache أولاً
+        // ═══════════════════════════════════════════════════════════
+        // المشكلة:
+        //   - بعد البيع، cache يُحدَّث
+        //   - لكن إذا فشل التحديث، أو طلب POS جديد جاء من cache قديم
+        //   - يجب أن نتأكد أن القطعة ليست sold في الـ cache أيضاً
+        //
+        // الفائدة:
+        //   - إذا كان cache يقول "sold" والسيرفر يقول "in_stock"
+        //     → نثق بـ cache (لأنه محدّث من بيع فعلي)
+        // ═══════════════════════════════════════════════════════════
+        try {
+            MiraLocalItemCache cache = MiraLocalItemCache.getInstance(
+                    getSafeAppContext());
+            if (cache != null) {
+                JSONObject cached = cache.findItemComprehensive(code);
+                if (cached != null) {
+                    String cachedStatus = cached.optString(
+                            "vault_status",
+                            cached.optString("status", "")
+                    ).toLowerCase();
+
+                    if ("sold".equals(cachedStatus) 
+                            || "exited".equals(cachedStatus)) {
+                        Log.w(TAG, "🚫 Cache override: item is marked as sold");
+                        showToast(getString(R.string.pos_msg_already_sold));
+                        playAlertSound(2);
+                        setHeroError();
+                        resetHeroAfterDelay();
+
+                        showScanFeedback(
+                                isArabic ? "❌ القطعة مباعة" : "❌ Already Sold",
+                                extractString(item, "title", "item_title"),
+                                null,
+                                android.R.drawable.ic_delete,
+                                0xFFDC2626
+                        );
+                        return;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Cache check error (non-fatal)", e);
+            // نستمر — لن نُفشل البيع بسبب خطأ في cache
+        }
+
         String vaultStatus = item.optString("status",
                 item.optString("vault_status", "")).toLowerCase();
 
@@ -2050,6 +2097,72 @@ private void saveOfflineSale(JSONObject payload,
     }
 }
 
+/**
+ * ✅ [v4.1] يُحدّث الـ cache المحلي بعد البيع الناجح.
+ *
+ * المشكلة التي يحلها:
+ *   - MiraItemSyncManager يبحث في cache أولاً
+ *   - بعد البيع، cache لا يعرف أن القطعة بيعت
+ *   - عند البحث مجدداً → يرجع الـ cache القديم → يظهر كمتاح ❌
+ *
+ * الحل:
+ *   - بعد البيع، نوسم كل قطعة مباعة بـ "sold" في cache
+ *   - البحث القادم يعيد status=sold → POS يرفضها ✅
+ *
+ * @param soldItems القطع التي تم بيعها للتو (من السلة قبل مسحها)
+ */
+private void updateCacheAfterSale(@NonNull List<CartItem> soldItems) {
+    if (soldItems.isEmpty()) return;
+
+    try {
+        MiraLocalItemCache cache = MiraLocalItemCache.getInstance(
+                getSafeAppContext());
+        if (cache == null) {
+            Log.w(TAG, "updateCacheAfterSale: cache is null — skipped");
+            return;
+        }
+
+        int marked = 0;
+
+        for (CartItem item : soldItems) {
+            if (item == null) continue;
+
+            // ✅ وسم بكل معرّف متاح — لضمان التغطية الكاملة
+            //    (المستخدم قد يبحث بالـ EPC أو serial أو gtin)
+
+            if (item.epc != null && !item.epc.isEmpty()) {
+                cache.markItemAsSold(item.epc);
+                marked++;
+            }
+
+            if (item.rfidEpc != null && !item.rfidEpc.isEmpty()
+                    && !item.rfidEpc.equals(item.epc)) {
+                cache.markItemAsSold(item.rfidEpc);
+            }
+
+            if (item.serialNo != null && !item.serialNo.isEmpty()) {
+                cache.markItemAsSold(item.serialNo);
+            }
+
+            if (item.gtin != null && !item.gtin.isEmpty()) {
+                cache.markItemAsSold(item.gtin);
+            }
+
+            if (item.tid != null && !item.tid.isEmpty()) {
+                cache.markItemAsSold(item.tid);
+            }
+        }
+
+        Log.i(TAG, "✅ Cache updated: " + marked 
+                + " identifiers marked as sold from " 
+                + soldItems.size() + " items");
+
+    } catch (Exception e) {
+        Log.e(TAG, "updateCacheAfterSale error", e);
+        // فشل تحديث الـ cache لا يجب أن يُفشل البيع
+    }
+}
+
 private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
                                final POSCheckoutDialog.POSCheckoutData data,
                                final boolean isOffline) {
@@ -2059,7 +2172,7 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
         playAlertSound(1);
         lastSaleResponse = response;
         lastSaleResponseTime = System.currentTimeMillis();
-        
+
         // ✅ [v4.0] صفّر UUID بعد النجاح — عملية جديدة = UUID جديد
         currentSaleUuid = null;
         Log.d(TAG, "✅ Sale success — UUID reset");
@@ -2080,6 +2193,9 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
                     isOffline
             );
         }
+
+        // ✅ [v4.1] حدّث الـ cache — CRITICAL لمنع عرض القطع المباعة
+        updateCacheAfterSale(soldItems);
 
         cartManager.clear();
 
@@ -2102,7 +2218,6 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
         Log.e(TAG, "handleSaleSuccess error", e);
     }
 }
-
 private JSONObject buildCheckoutPayload(MiraApiClient client,
                                         POSCheckoutDialog.POSCheckoutData data)
         throws Exception {
