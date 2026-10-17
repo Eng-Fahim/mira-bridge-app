@@ -231,13 +231,15 @@
                         android:textColor="?attr/colorOnSurface" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- ✅ الفرع — click على TextInputLayout -->
+                <!-- ✅ الفرع — TextInputLayout عادي + clickable -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilBranch"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:clickable="true"
+                    android:focusable="false"
                     android:hint="@string/branch"
                     app:boxStrokeColor="?attr/colorPrimary"
                     app:hintTextColor="?attr/colorOnSurfaceVariant">
@@ -246,6 +248,7 @@
                         android:id="@+id/etBranch"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:clickable="false"
                         android:cursorVisible="false"
                         android:focusable="false"
                         android:inputType="none"
@@ -253,13 +256,15 @@
                         android:textColor="?attr/colorOnSurface" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- ✅ الصلاحية -->
+                <!-- ✅ الصلاحية — TextInputLayout عادي + clickable -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilRole"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:clickable="true"
+                    android:focusable="false"
                     android:hint="@string/role"
                     app:boxStrokeColor="?attr/colorPrimary"
                     app:hintTextColor="?attr/colorOnSurfaceVariant">
@@ -268,6 +273,7 @@
                         android:id="@+id/etRole"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:clickable="false"
                         android:cursorVisible="false"
                         android:focusable="false"
                         android:inputType="none"
