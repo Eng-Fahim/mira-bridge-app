@@ -17,7 +17,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatDelegate;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraControl;
 import androidx.camera.core.CameraSelector;
@@ -34,9 +33,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraOrgProfileManager;
-import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.navigation.NavigationManager;
-import com.example.uhf.tools.MiraLanguageHelper;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
@@ -53,49 +50,43 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraBarcodeScannerFragment v3.0 — Small Code Professional Edition
+ *  MiraBarcodeScannerFragment v3.1 — Small Code Mastery Edition
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * يدعم قراءة البطاقات الصغيرة (6mm × 6mm):
- *   - QR Code دقيق
- *   - GS1 DataMatrix صغير
- *   - باركود 1D قياسي (Code128, EAN)
- *
- * تحسينات v3.0 (Small Code Support):
- *   ✅ رفع دقة التحليل من 1280×720 إلى 1920×1080
- *   ✅ Continuous Auto-Focus (تركيز تلقائي مستمر)
- *   ✅ Tap-to-Focus (نقر لإعادة التركيز)
- *   ✅ Pinch-to-Zoom (قرصة إصبع حتى 5x)
- *   ✅ Multi-frame Confirmation (تأكيد من إطارين — يمنع القراءات الخاطئة)
- *   ✅ تقليل صيغ الباركود للضروري فقط (أسرع + أدق)
- *
- * الإصلاحات السابقة v2.0/v2.1:
- *   18 إصلاح لتقوية الاستقرار ومنع الأخطاء.
+ * يدعم البطاقات 6mm × 6mm:
+ *   ✅ Auto-Zoom ذكي (ML Kit يكتشف → نزوّم تلقائياً → يفك)
+ *   ✅ ML Kit + CameraX
+ *   ✅ Continuous AF + Tap-to-Focus
+ *   ✅ Pinch-to-Zoom (5x max)
+ *   ✅ Multi-frame Confirmation
+ *   ✅ Torch + GS1/QR/DataMatrix
  */
 public class MiraBarcodeScannerFragment extends Fragment {
 
     private static final String TAG = "MiraBarcodeScanner";
     private static final int CAMERA_PERMISSION_CODE = 1001;
 
-    // ✅ [v2.0] تقليل cooldown
     private static final long SCAN_COOLDOWN_MS = 800;
 
-    // ✅ [v2.0] ثوابت الألوان
-    private static final int COLOR_READY = Color.parseColor("#38BDF8");    // أزرق
-    private static final int COLOR_SUCCESS = Color.parseColor("#4ADE80");  // أخضر
+    private static final int COLOR_READY = Color.parseColor("#38BDF8");
+    private static final int COLOR_SUCCESS = Color.parseColor("#4ADE80");
 
-    // ✅ [v3.0] إعدادات الزوم
     private static final float MAX_ZOOM = 5.0f;
     private static final float MIN_ZOOM = 1.0f;
 
-    // ✅ [v3.0] إعدادات Multi-frame Confirmation
     private static final long CONFIRM_WINDOW_MS = 180L;
     private static final int REQUIRED_CONFIRMATIONS = 2;
+
+    // ✅ [v3.1] Auto-Zoom
+    private static final long AUTO_ZOOM_COOLDOWN_MS = 700L;
+    private static final float MIN_BARCODE_RATIO = 0.015f;
+    private static final float TARGET_BARCODE_RATIO = 0.08f;
 
     // ==================== UI ====================
     private PreviewView previewView;
     private View scannerOverlay, scanLine;
     private TextView tvScanStatus, tvScannedData;
+    private TextView tvZoomLevel; // ✅ [v3.1] مؤشر الزوم
     private ImageButton btnClose, btnFlash;
 
     // ==================== Camera ====================
@@ -120,32 +111,20 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     private androidx.activity.OnBackPressedCallback backCallback;
 
-    // ═══════════════════════════════════════════════════════════
-    //  ✅ [v2.1] حماية الحالة
-    // ═══════════════════════════════════════════════════════════
-
-    /** هل تم اكتشاف باركود وانتهت المهمة؟ */
     private volatile boolean isCompleted = false;
-
-    /** هل الكاميرا مرتبطة حالياً؟ */
     private volatile boolean isCameraBound = false;
 
-    // ═══════════════════════════════════════════════════════════
-    //  ✅ [v3.0] حقول تحسينات الأكواد الدقيقة
-    // ═══════════════════════════════════════════════════════════
-
-    /** نسبة التكبير الحالية */
+    // ✅ [v3.0] Zoom
     private volatile float currentZoom = 1.0f;
-
-    /** مستمع قرصة الإصبع للزوم */
     private android.view.ScaleGestureDetector scaleDetector;
 
-    /** Multi-frame confirmation */
+    // ✅ [v3.1] Auto-Zoom
+    private volatile long lastAutoZoomTime = 0L;
+
+    // ✅ Multi-frame Confirmation
     @Nullable private volatile String candidateCode = null;
     private volatile long candidateTime = 0L;
     private volatile int candidateConfirmations = 0;
-
-    // ==================== Interface ====================
 
     public interface OnBarcodeScannedListener {
         void onBarcodeScanned(String barcodeData, String format);
@@ -172,38 +151,31 @@ public class MiraBarcodeScannerFragment extends Fragment {
         appContext = requireContext().getApplicationContext();
 
         try {
-            // ✅ قراءة اللغة بشكل صحيح
             isArabic = "ar".equals(Locale.getDefault().getLanguage());
-
             orgProfile = MiraOrgProfileManager.getInstance(appContext);
 
-            // ربط العناصر
             previewView = view.findViewById(R.id.previewView);
             scannerOverlay = view.findViewById(R.id.scannerOverlay);
             scanLine = view.findViewById(R.id.scanLine);
             tvScanStatus = view.findViewById(R.id.tvScanStatus);
             tvScannedData = view.findViewById(R.id.tvScannedData);
+            tvZoomLevel = view.findViewById(R.id.tvZoomLevel); // ✅ [v3.1]
             btnClose = view.findViewById(R.id.btnCloseScanner);
             btnFlash = view.findViewById(R.id.btnToggleFlash);
 
-            // ✅ معالج زر الرجوع
             setupBackHandler();
 
-            // ✅ فحص وجود العناصر الأساسية
             if (previewView == null) {
                 Log.e(TAG, "previewView not found in layout!");
                 showErrorAndClose();
                 return;
             }
 
-            // ✅ دعم RTL
             applyLanguageAndDirection(view);
 
-            // أزرار
             if (btnClose != null) btnClose.setOnClickListener(v -> closeScanner());
             if (btnFlash != null) btnFlash.setOnClickListener(v -> toggleFlash());
 
-            // ✅ تهيئة الموارد مرة واحدة فقط
             if (cameraExecutor == null || cameraExecutor.isShutdown()) {
                 cameraExecutor = Executors.newSingleThreadExecutor();
             }
@@ -215,7 +187,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
                 }
             }
 
-            // ✅ تهيئة barcodeScanner مع فحص
             if (initBarcodeScanner()) {
                 if (hasCameraPermission()) {
                     startCamera();
@@ -254,7 +225,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
         isViewDestroyed = false;
 
         try {
-            // لا تستأنف إذا انتهت المهمة
             if (isCompleted) {
                 Log.d(TAG, "⏭️ onResume skipped (already completed)");
                 return;
@@ -262,7 +232,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
             isScanning = true;
 
-            // استخدم isCameraBound وليس cameraProvider == null
             if (hasCameraPermission() && !isCameraBound) {
                 startCamera();
             }
@@ -271,7 +240,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
                 startScanAnimation();
             }
 
-            // getOnBackPressedDispatcher
             if (getView() != null) {
                 getView().setFocusableInTouchMode(true);
                 getView().requestFocus();
@@ -301,8 +269,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    // ==================== Permission Handling ====================
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
@@ -320,35 +286,23 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    // ==================== Language ====================
-
     private void applyLanguageAndDirection(View root) {
         try {
             if (root != null) {
                 root.setLayoutDirection(isArabic ?
                         View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
             }
-
             if (tvScanStatus != null) {
-                tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
+                tvScanStatus.setText(isArabic ? "📷 قرّب الكاميرا من الباركود" : "📷 Move closer to barcode");
                 tvScanStatus.setTextColor(COLOR_READY);
             }
-            if (btnFlash != null) {
-                btnFlash.setContentDescription(isArabic ? "فلاش" : "Flash");
-            }
-            if (btnClose != null) {
-                btnClose.setContentDescription(isArabic ? "إغلاق" : "Close");
-            }
+            if (btnFlash != null) btnFlash.setContentDescription(isArabic ? "فلاش" : "Flash");
+            if (btnClose != null) btnClose.setContentDescription(isArabic ? "إغلاق" : "Close");
         } catch (Exception e) {
             Log.e(TAG, "Error applying language: " + e.getMessage());
         }
     }
 
-    // ==================== Barcode Scanner Init ====================
-
-    /**
-     * ✅ [v3.0] قلّصنا الصيغ للضروري فقط — أسرع تحليل + دقة أعلى
-     */
     private boolean initBarcodeScanner() {
         try {
             BarcodeScannerOptions options = new BarcodeScannerOptions.Builder()
@@ -361,15 +315,13 @@ public class MiraBarcodeScannerFragment extends Fragment {
                             Barcode.FORMAT_CODE_39
                     ).build();
             barcodeScanner = BarcodeScanning.getClient(options);
-            Log.i(TAG, "✅ ML Kit ready — QR + DataMatrix + 1D focused");
+            Log.i(TAG, "✅ ML Kit ready — QR + DataMatrix + 1D");
             return barcodeScanner != null;
         } catch (Exception e) {
             Log.e(TAG, "Error initializing barcode scanner: " + e.getMessage());
             return false;
         }
     }
-
-    // ==================== Camera ====================
 
     private boolean hasCameraPermission() {
         try {
@@ -410,38 +362,33 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
                     cameraProvider = future.get();
 
-                    // إعداد المعاينة
                     Preview preview = new Preview.Builder()
                             .setTargetResolution(new Size(1280, 720))
                             .build();
                     preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-                    // ✅ [v3.0] رفع دقة التحليل إلى 1920×1080 (ضروري لأكواد 6mm)
+                    // ✅ [v3.0] دقة عالية للتحليل
                     ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                             .setTargetResolution(new Size(1920, 1080))
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build();
                     imageAnalysis.setAnalyzer(cameraExecutor, this::analyzeImage);
 
-                    // اختيار الكاميرا الخلفية
                     CameraSelector selector = new CameraSelector.Builder()
                             .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                             .build();
 
-                    // ربط الكاميرا
                     cameraProvider.unbindAll();
                     camera = cameraProvider.bindToLifecycle(
                             MiraBarcodeScannerFragment.this, selector, preview, imageAnalysis);
                     cameraControl = camera.getCameraControl();
 
-                    // ✅ [v3.0] علّم الكاميرا مرتبطة
                     isCameraBound = true;
                     isScanning = true;
 
-                    // ✅ [v3.0] تفعيل التركيز + الزوم
                     setupFocusAndZoom();
 
-                    Log.d(TAG, "✅ Camera bound at 1920×1080 (small code mode)");
+                    Log.d(TAG, "✅ Camera bound at 1920×1080");
 
                 } catch (Exception e) {
                     Log.e(TAG, "Error starting camera: " + e.getMessage(), e);
@@ -455,15 +402,10 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  ✅ [v3.0] إعداد التركيز التلقائي + النقر للتركيز + قرصة الزوم
-    // ═══════════════════════════════════════════════════════════
-
     private void setupFocusAndZoom() {
         if (cameraControl == null || previewView == null) return;
 
         try {
-            // ─── 1) التركيز التلقائي المستمر ───
             if (camera != null
                     && camera.getCameraInfo().isFocusMeteringSupported(
                     FocusMeteringAction.FLAG_AF)) {
@@ -473,13 +415,11 @@ public class MiraBarcodeScannerFragment extends Fragment {
                                         .createPoint(0.5f, 0.5f),
                                 FocusMeteringAction.FLAG_AF
                                         | FocusMeteringAction.FLAG_AE
-                        ).setAutoCancelDuration(3, TimeUnit.SECONDS)
-                                .build();
+                        ).setAutoCancelDuration(3, TimeUnit.SECONDS).build();
                 cameraControl.startFocusAndMetering(autofocus);
                 Log.i(TAG, "🎯 Continuous autofocus enabled");
             }
 
-            // ─── 2) النقر للتركيز (Tap-to-focus) ───
             previewView.setOnTouchListener((v, event) -> {
                 if (event.getAction() == android.view.MotionEvent.ACTION_UP) {
                     try {
@@ -491,20 +431,15 @@ public class MiraBarcodeScannerFragment extends Fragment {
                                                 | FocusMeteringAction.FLAG_AE
                                 ).setAutoCancelDuration(3, TimeUnit.SECONDS).build();
                         cameraControl.startFocusAndMetering(focus);
-                        Log.d(TAG, "👆 Tap focus at " + event.getX() + "," + event.getY());
-                        showHintSafe(isArabic
-                                ? "🎯 جاري التركيز..."
-                                : "🎯 Focusing...", COLOR_READY);
+                        showHintSafe(isArabic ? "🎯 جاري التركيز..." : "🎯 Focusing...", COLOR_READY);
                     } catch (Exception ignored) {}
                 }
-                // مرّر الحدث للـ scale detector
                 if (scaleDetector != null) {
                     scaleDetector.onTouchEvent(event);
                 }
                 return true;
             });
 
-            // ─── 3) قرصة الإصبع للتكبير (Pinch-to-zoom) ───
             scaleDetector = new android.view.ScaleGestureDetector(
                     requireContext(),
                     new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -513,8 +448,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
                             try {
                                 float newZoom = currentZoom * d.getScaleFactor();
                                 newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
-                                currentZoom = newZoom;
-                                cameraControl.setZoomRatio(newZoom);
+                                applyAutoZoom(newZoom);
                                 showHintSafe(String.format(Locale.US,
                                         "🔍 %.1fx", newZoom), COLOR_READY);
                             } catch (Exception ignored) {}
@@ -522,14 +456,11 @@ public class MiraBarcodeScannerFragment extends Fragment {
                         }
                     });
 
-            Log.i(TAG, "✅ Focus + Zoom controls ready");
-
         } catch (Exception e) {
             Log.w(TAG, "setupFocusAndZoom error: " + e.getMessage());
         }
     }
 
-    /** ✅ تلميح سريع على الشاشة (لا يُغيّر الحالة النهائية) */
     private void showHintSafe(@NonNull String hint, int color) {
         safeRun(() -> {
             try {
@@ -543,18 +474,13 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     // ==================== Image Analysis ====================
 
-    /**
-     * ✅ إغلاق imageProxy مرة واحدة فقط
-     */
     private void analyzeImage(@NonNull ImageProxy imageProxy) {
-        // فحص barcodeScanner
         if (barcodeScanner == null || !isScanning || isViewDestroyed
                 || imageProxy.getImage() == null) {
             closeImageProxySafely(imageProxy);
             return;
         }
 
-        // ضمان إغلاق واحد
         final AtomicBoolean closed = new AtomicBoolean(false);
         final Runnable closeOnce = () -> {
             if (closed.compareAndSet(false, true)) {
@@ -570,15 +496,40 @@ public class MiraBarcodeScannerFragment extends Fragment {
             barcodeScanner.process(inputImage)
                     .addOnSuccessListener(barcodes -> {
                         try {
-                            if (!barcodes.isEmpty() && isScanning && !isViewDestroyed) {
-                                for (Barcode barcode : barcodes) {
-                                    String rawValue = barcode.getRawValue();
-                                    if (rawValue != null && !rawValue.isEmpty()) {
-                                        onBarcodeDetected(rawValue, barcode.getFormat());
-                                        break;
+                            if (barcodes.isEmpty() || !isScanning || isViewDestroyed) {
+                                return;
+                            }
+
+                            Barcode decodable = null;
+                            Barcode largestDetected = null;
+                            int largestArea = 0;
+
+                            for (Barcode b : barcodes) {
+                                String rawValue = b.getRawValue();
+                                if (rawValue != null && !rawValue.isEmpty()) {
+                                    decodable = b;
+                                    break;
+                                }
+
+                                android.graphics.Rect box = b.getBoundingBox();
+                                if (box != null) {
+                                    int area = box.width() * box.height();
+                                    if (area > largestArea) {
+                                        largestArea = area;
+                                        largestDetected = b;
                                     }
                                 }
                             }
+
+                            if (decodable != null) {
+                                onBarcodeDetected(decodable.getRawValue(), decodable.getFormat());
+                                return;
+                            }
+
+                            if (largestDetected != null) {
+                                tryAutoZoomForSmallBarcode(largestDetected, inputImage);
+                            }
+
                         } catch (Exception e) {
                             Log.e(TAG, "Process success error: " + e.getMessage());
                         } finally {
@@ -597,6 +548,61 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
+    private void tryAutoZoomForSmallBarcode(@NonNull Barcode barcode,
+                                            @NonNull InputImage image) {
+        long now = System.currentTimeMillis();
+        if (now - lastAutoZoomTime < AUTO_ZOOM_COOLDOWN_MS) return;
+        if (cameraControl == null) return;
+
+        android.graphics.Rect box = barcode.getBoundingBox();
+        if (box == null) return;
+
+        int imageW = image.getWidth();
+        int imageH = image.getHeight();
+        if (imageW <= 0 || imageH <= 0) return;
+
+        float barcodeRatio = ((float) box.width() * box.height())
+                / ((float) imageW * imageH);
+
+        if (barcodeRatio >= MIN_BARCODE_RATIO) return;
+
+        float neededZoomFactor = (float) Math.sqrt(TARGET_BARCODE_RATIO / barcodeRatio);
+        float newZoom = Math.min(MAX_ZOOM, currentZoom * neededZoomFactor);
+        newZoom = Math.max(MIN_ZOOM, newZoom);
+
+        if (newZoom < currentZoom * 1.15f) return;
+
+        lastAutoZoomTime = now;
+        applyAutoZoom(newZoom);
+
+        String hint = isArabic
+                ? "🔍 تكبير تلقائي " + String.format(Locale.US, "%.1fx", newZoom)
+                : "🔍 Auto-zoom " + String.format(Locale.US, "%.1fx", newZoom);
+        showHintSafe(hint, COLOR_READY);
+
+        Log.i(TAG, "🔍 Auto-zoom: " + currentZoom
+                + "x → " + newZoom + "x (barcode " + (barcodeRatio * 100) + "%)");
+    }
+
+    private void applyAutoZoom(float newZoom) {
+        try {
+            if (cameraControl == null) return;
+            newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+            currentZoom = newZoom;
+            cameraControl.setZoomRatio(newZoom);
+
+            if (tvZoomLevel != null) {
+                tvZoomLevel.post(() -> {
+                    if (tvZoomLevel != null) {
+                        tvZoomLevel.setText(String.format(Locale.US, "%.1fx", newZoom));
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "applyAutoZoom error: " + e.getMessage());
+        }
+    }
+
     private void closeImageProxySafely(ImageProxy imageProxy) {
         try {
             if (imageProxy != null) imageProxy.close();
@@ -607,39 +613,26 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     // ==================== Detection ====================
 
-    /**
-     * ✅ [v3.0] Multi-frame Confirmation — يمنع القراءات الخاطئة
-     */
     private void onBarcodeDetected(String data, int format) {
         long now = System.currentTimeMillis();
 
-        // ─── Cooldown ───
         if (now - lastScanTime < SCAN_COOLDOWN_MS) return;
         if (isCompleted) return;
 
-        // ═══════════════════════════════════════════════════════════
-        //  ✅ [v3.0] Multi-frame Confirmation
-        //  نطلب رؤية نفس الكود في إطارين قبل قبوله
-        // ═══════════════════════════════════════════════════════════
         if (candidateCode == null || !candidateCode.equals(data)
                 || now - candidateTime > CONFIRM_WINDOW_MS) {
-            // إطار جديد أو كود مختلف أو انقضت النافذة → ابدأ العد
             candidateCode = data;
             candidateTime = now;
             candidateConfirmations = 1;
             return;
         }
 
-        // نفس الكود — زد العداد
         candidateConfirmations++;
 
         if (candidateConfirmations < REQUIRED_CONFIRMATIONS) {
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  ✅ تأكيد مزدوج — اقبل الكود
-        // ═══════════════════════════════════════════════════════════
         lastScanTime = now;
         isCompleted = true;
         isScanning = false;
@@ -651,7 +644,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
         playBeepSafe();
         String formatName = getBarcodeFormatName(format);
 
-        // تحديث UI
         safeRun(() -> {
             try {
                 if (tvScanStatus != null) {
@@ -665,7 +657,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             } catch (Exception ignored) {}
         });
 
-        // تسليم البيانات
         boolean delivered = false;
         if (barcodeListener != null) {
             try {
@@ -680,7 +671,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             forwardToPOS(data);
         }
 
-        // إغلاق آمن بعد تأخير
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             if (isAdded() && !isViewDestroyed) {
                 closeScanner();
@@ -688,16 +678,12 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }, 800);
     }
 
-    /**
-     * ✅ حماية من ClassCastException
-     */
     private void forwardToPOS(String data) {
         try {
             if (!isAdded() || getActivity() == null) return;
             if (!(getActivity() instanceof UHFMainActivity)) return;
 
             UHFMainActivity activity = (UHFMainActivity) getActivity();
-
             Fragment pos = activity.getSupportFragmentManager()
                     .findFragmentByTag(NavigationManager.TAG_POS);
 
@@ -726,21 +712,16 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    // ==================== Close ====================
-
     private void closeScanner() {
-        // حماية من الاستدعاء المزدوج
         if (isViewDestroyed) return;
         isViewDestroyed = true;
         isScanning = false;
         isCompleted = true;
 
-        // إلغاء الأنيميشن
         if (scanLine != null) {
             try { scanLine.animate().cancel(); } catch (Exception ignored) {}
         }
 
-        // إطفاء الفلاش
         if (cameraControl != null) {
             try {
                 cameraControl.enableTorch(false);
@@ -748,7 +729,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             } catch (Exception ignored) {}
         }
 
-        // فصل الكاميرا
         if (isCameraBound && cameraProvider != null) {
             try {
                 cameraProvider.unbindAll();
@@ -758,7 +738,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             }
         }
 
-        // إزالة back callback
         if (backCallback != null) {
             try {
                 backCallback.setEnabled(false);
@@ -767,7 +746,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             } catch (Exception ignored) {}
         }
 
-        // pop
         if (!isAdded()) return;
 
         androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
@@ -801,8 +779,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
         });
     }
 
-    // ==================== Animation ====================
-
     private void startScanAnimation() {
         if (scanLine == null || scannerOverlay == null || isViewDestroyed || !isScanning) return;
 
@@ -834,8 +810,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    // ==================== Flash ====================
-
     public void toggleFlash() {
         try {
             if (cameraControl != null) {
@@ -850,8 +824,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             Log.e(TAG, "Error toggling flash: " + e.getMessage());
         }
     }
-
-    // ==================== Helpers ====================
 
     private void safeRun(Runnable r) {
         try {
@@ -889,10 +861,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             case Barcode.FORMAT_EAN_8: return "EAN-8";
             case Barcode.FORMAT_CODE_128: return "Code-128";
             case Barcode.FORMAT_CODE_39: return "Code-39";
-            case Barcode.FORMAT_UPC_A: return "UPC-A";
-            case Barcode.FORMAT_UPC_E: return "UPC-E";
-            case Barcode.FORMAT_AZTEC: return "Aztec";
-            case Barcode.FORMAT_PDF417: return "PDF417";
             default: return "Barcode";
         }
     }
@@ -913,14 +881,11 @@ public class MiraBarcodeScannerFragment extends Fragment {
         startScanAnimation();
     }
 
-    // ==================== Cleanup ====================
-
     @Override
     public void onDestroyView() {
         isViewDestroyed = true;
         isScanning = false;
 
-        // إلغاء الأنيميشن
         if (scanLine != null) {
             try { scanLine.animate().cancel(); } catch (Exception ignored) {}
         }
@@ -931,7 +896,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             backCallback = null;
         }
 
-        // فصل الكاميرا
         if (cameraProvider != null) {
             try {
                 cameraProvider.unbindAll();
@@ -943,18 +907,18 @@ public class MiraBarcodeScannerFragment extends Fragment {
         cameraControl = null;
         camera = null;
 
-        // ✅ [v3.0] تنظيف مستمعات الزوم والتركيز
         scaleDetector = null;
         currentZoom = 1.0f;
         candidateCode = null;
         candidateConfirmations = 0;
+        lastAutoZoomTime = 0L;
 
-        // تنظيف المراجع UI
         previewView = null;
         scannerOverlay = null;
         scanLine = null;
         tvScanStatus = null;
         tvScannedData = null;
+        tvZoomLevel = null; // ✅ [v3.1]
         btnClose = null;
         btnFlash = null;
 
@@ -965,14 +929,12 @@ public class MiraBarcodeScannerFragment extends Fragment {
     public void onDestroy() {
         super.onDestroy();
 
-        // إطفاء الفلاش
         try {
             if (cameraControl != null) {
                 cameraControl.enableTorch(false);
             }
         } catch (Exception ignored) {}
 
-        // إغلاق executor بأمان
         if (cameraExecutor != null) {
             try {
                 cameraExecutor.shutdown();
@@ -982,7 +944,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             cameraExecutor = null;
         }
 
-        // إغلاق barcodeScanner بحماية
         if (barcodeScanner != null) {
             try {
                 barcodeScanner.close();
@@ -992,7 +953,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             barcodeScanner = null;
         }
 
-        // إغلاق toneGenerator
         if (toneGenerator != null) {
             try {
                 toneGenerator.release();
