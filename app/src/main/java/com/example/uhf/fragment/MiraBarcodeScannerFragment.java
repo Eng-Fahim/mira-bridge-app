@@ -586,23 +586,26 @@ try {
     }
 
     private void applyAutoZoom(float newZoom) {
-        try {
-            if (cameraControl == null) return;
-            newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
-            currentZoom = newZoom;
-            cameraControl.setZoomRatio(newZoom);
+    try {
+        if (cameraControl == null) return;
 
-            if (tvZoomLevel != null) {
-                tvZoomLevel.post(() -> {
-                    if (tvZoomLevel != null) {
-                        tvZoomLevel.setText(String.format(Locale.US, "%.1fx", newZoom));
-                    }
-                });
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "applyAutoZoom error: " + e.getMessage());
+        // ✅ نُخزّن القيمة النهائية في متغير final لاستخدامه في الـ lambda
+        final float finalZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+
+        currentZoom = finalZoom;
+        cameraControl.setZoomRatio(finalZoom);
+
+        if (tvZoomLevel != null) {
+            tvZoomLevel.post(() -> {
+                if (tvZoomLevel != null) {
+                    tvZoomLevel.setText(String.format(Locale.US, "%.1fx", finalZoom));
+                }
+            });
         }
+    } catch (Exception e) {
+        Log.w(TAG, "applyAutoZoom error: " + e.getMessage());
     }
+}
 
     private void closeImageProxySafely(ImageProxy imageProxy) {
         try {
