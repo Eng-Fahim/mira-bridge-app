@@ -2597,11 +2597,8 @@ private long extractSaleIdFromResponse(MiraApiClient.ApiResponse response) {
 private void showRefundDialog() {
     if (!isFragmentAlive()) return;
 
-    // ✅ [v6.3] فحص الصلاحية قبل العرض
     if (!canPerformRefund()) {
-        showToast(isArabic
-                ? "⛔ غير مصرح بالاسترجاع"
-                : "⛔ Not authorized to refund");
+        showToast(isArabic ? "⛔ غير مصرح بالاسترجاع" : "⛔ Not authorized to refund");
         return;
     }
 
@@ -2616,16 +2613,19 @@ private void showRefundDialog() {
             }
 
             @Override
-public void onBarcodeScan() {
-    // ✅ [v6.5] استخدم MiraBarcodeScannerFragment الموحّد
-    openRefundBarcodeScanner();
-}
+            public void onBarcodeScan() {
+                openRefundBarcodeScanner();
+            }
 
             @Override
             public void onCodeChanged(String code) {
                 searchItemForRefund(code);
             }
         });
+
+        // ✅ [v6.6 FIX] تفعيل عمل زناد القارئ داخل نافذة الإرجاع
+        refundDialog.setOnHardwareKeyListener((dialog, keyCode, event) -> myOnKeyDwon(keyCode, event));
+
         refundDialog.show();
     } catch (Exception e) {
         Log.e(TAG, "showRefundDialog error", e);
@@ -2825,10 +2825,11 @@ private RefundEligibility checkRefundEligibility(JSONObject itemData) {
         String status = itemData.optString("status",
                 itemData.optString("vault_status", "")).toLowerCase();
 
-        if (!"sold".equals(status)) {
-            return RefundEligibility.notEligible(isArabic
-                    ? "⚠️ القطعة غير مباعة" : "⚠️ Item not sold");
-        }
+        // ✅ قبول "exited" أيضاً لأن السيرفر قد يُرجع هذه الحالة للقطع المباعة
+if (!"sold".equals(status) && !"exited".equals(status)) {
+    return RefundEligibility.notEligible(isArabic
+            ? "⚠️ القطعة غير مباعة" : "⚠️ Item not sold");
+}
 
         String lastAction = itemData.optString("last_action", "")
                 .toLowerCase();
