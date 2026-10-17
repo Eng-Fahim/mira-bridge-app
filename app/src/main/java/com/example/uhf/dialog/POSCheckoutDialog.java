@@ -341,7 +341,7 @@ public class POSCheckoutDialog extends DialogFragment {
     spPaymentMethod.setHint(isArabic ? "جاري التحميل..." : "Loading...");
 
     // ✅ [FIX] افتح القائمة عند النقر على الحقل (حتى قبل التحميل)
-    spPaymentMethod.setThreshold(0, android.widget.AutoCompleteTextView.THRESHOLD_ALWAYS);
+    spPaymentMethod.setThreshold(0);
 
     spPaymentMethod.setOnClickListener(v -> {
         if (spPaymentMethod.isEnabled()) {
@@ -535,8 +535,8 @@ private void applyPaymentMethods(List<PaymentMethodDto> methods,
     spPaymentMethod.setSimpleItems(displayNames);
 
     // ✅ [FIX] اجعل القائمة تُفتح فوراً عند النقر (threshold = 0)
-    spPaymentMethod.setThreshold(0,
-            android.widget.AutoCompleteTextView.THRESHOLD_ALWAYS);
+    
+    spPaymentMethod.setThreshold(0);
 
     // ═══════════════════════════════════════════════════════════
     // 5) اختيار الطريقة الافتراضية
@@ -556,8 +556,7 @@ private void applyPaymentMethods(List<PaymentMethodDto> methods,
     // ✅ [FIX] تأكد أن الـ dropdown جاهز — يعيد التطبيق بعد layout
     spPaymentMethod.post(() -> {
         try {
-            spPaymentMethod.setThreshold(0,
-                    android.widget.AutoCompleteTextView.THRESHOLD_ALWAYS);
+            spPaymentMethod.setThreshold(0);
 
             // ✅ اختياري: إن أردت فتح القائمة تلقائياً عند تحميلها، أزل التعليق:
             // spPaymentMethod.showDropDown();
