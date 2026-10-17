@@ -1967,24 +1967,28 @@ private boolean looksLikePartialSerial(@Nullable String code) {
 private boolean shouldAutoSubmit(@Nullable String code) {
     if (code == null || code.isEmpty()) return false;
 
+    // ✅ أرقام فقط: تلقائي من 4 خانات
     if (looksLikePartialSerial(code)) {
-        return code.length() >= 4;   // 1004 → 4 أرقام → تلقائي
+        return code.length() >= 4;
     }
-    return code.length() >= AUTO_ADD_MIN_LEN;
-}
 
-/**
- * يبني قائمة المرشحين للبحث.
- * الترتيب مهم: الأكثر احتمالاً أولاً.
- */
+    // ✅ مختلط: يجب أن يبدو مكتملاً (يحتوي على '-') أو طويلاً
+    if (code.length() < AUTO_ADD_MIN_LEN) return false;
+
+    // ✅ لا تُرسل مختلطاً قصيراً بدون شرطة (مثل "MIRA-S")
+    //    إلا لو كان واضحاً أنه كامل (≥ 10 أحرف)
+    if (code.length() < 10 && !code.contains("-")) {
+        return false;
+    }
+    return true;
+}
+// في MiraPosFragment — تبسيط buildSearchCandidates
 @NonNull
 private List<String> buildSearchCandidates(@NonNull String code) {
     List<String> candidates = new ArrayList<>();
-
-    // 1) الكود كما هو (يدعم البحث الكامل MIRA-SN-1004)
-    candidates.add(code);
-
-    // 2) إذا كان رقماً قصيراً → جرّب البادئات الشائعة
+    candidates.add(code);  // ابدأ بالكود الخام دائماً
+    
+    // المرشحات الاحتياطية فقط لو السيرفر قديم/غير محدّث
     if (looksLikePartialSerial(code)) {
         for (String prefix : SERIAL_PREFIXES) {
             String candidate = prefix + code;
@@ -1993,7 +1997,6 @@ private List<String> buildSearchCandidates(@NonNull String code) {
             }
         }
     }
-
     return candidates;
 }
 private void showToast(String msg) {
