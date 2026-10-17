@@ -83,7 +83,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-
+import java.util.concurrent.atomic.AtomicInteger;
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  *  MiraPosFragment v6.3 — Production Edition
@@ -182,6 +182,8 @@ public class MiraPosFragment extends MiraBaseFragment {
     // ✅ [v4.0] UUID لعملية البيع الحالية — لمنع الازدواج offline
     private volatile String currentSaleUuid = null;
     
+// ✅ [v6.5] Seq guard لمنع نتائج بحث الاسترجاع القديمة
+
     // ✅ [v4.0] الطابور والمزامنة Offline
 private PendingSalesQueue pendingSalesQueue;
 private OfflineSalesSyncer offlineSyncer;
@@ -194,7 +196,8 @@ private OfflineSalesSyncer offlineSyncer;
 
     private final AtomicReference<RefundItem> selectedRefundItem =
             new AtomicReference<>(null);
-
+            // ✅ [v6.5] Seq guard
+    private final AtomicInteger refundSearchSeq = new AtomicInteger(0);
 
 // ═══════════════════════════════════════════════════════════════════
 //  ✅ [v6.4] Partial Serial Support
@@ -591,7 +594,8 @@ currentScanMode = ScanMode.NONE;
 stopAfterFirstRead = false;
 oneShotConsumed.set(false);
 currentSaleUuid = null;   // ✅ [v4.0] جديد
-
+// ✅ [v6.5] ألغِ أي بحث معلّق
+refundSearchSeq.incrementAndGet();
             if (mainHandler != null) {
                 mainHandler.removeCallbacksAndMessages(null);
             }
@@ -2612,17 +2616,10 @@ private void showRefundDialog() {
             }
 
             @Override
-            public void onBarcodeScan() {
-                try {
-                    ScanOptions options = new ScanOptions();
-                    options.setPrompt(getString(R.string.pos_refund_scan_prompt));
-                    options.setBeepEnabled(false);
-                    options.setOrientationLocked(true);
-                    refundBarcodeLauncher.launch(options);
-                } catch (Exception e) {
-                    Log.e(TAG, "onBarcodeScan error", e);
-                }
-            }
+public void onBarcodeScan() {
+    // ✅ [v6.5] استخدم MiraBarcodeScannerFragment الموحّد
+    openRefundBarcodeScanner();
+}
 
             @Override
             public void onCodeChanged(String code) {
@@ -2635,11 +2632,106 @@ private void showRefundDialog() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  ✅ [v6.5] باركود موحّد للاسترجاع (MiraBarcodeScannerFragment)
+// ═══════════════════════════════════════════════════════════
+
+private void openRefundBarcodeScanner() {
+    if (!isFragmentAlive()) return;
+
+    FragmentManager fm = getParentFragmentManager();
+    if (fm == null || fm.isStateSaved()) {
+        Log.w(TAG, "openRefundBarcodeScanner: fm null/stateSaved");
+        return;
+    }
+
+    MiraBarcodeScannerFragment scannerFragment =
+            new MiraBarcodeScannerFragment();
+
+    scannerFragment.setOnBarcodeScannedListener((data, format) -> {
+        try {
+            if (data == null || data.isEmpty()) return;
+
+            Log.i(TAG, "🔄 [REFUND] Barcode scanned: " + data);
+
+            // ✅ املأ الحقل وابحث مباشرة
+            if (refundDialog != null && refundDialog.isShowing()) {
+                refundDialog.setRefundCode(data);
+                searchItemForRefund(data);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Refund barcode callback error", e);
+        }
+    });
+
+    int containerId = android.R.id.content;
+    try {
+        View view = getView();
+        if (view != null && view.getParent() instanceof View) {
+            int parentId = ((View) view.getParent()).getId();
+            if (parentId != View.NO_ID) containerId = parentId;
+        }
+    } catch (Exception ignored) {}
+
+    fm.beginTransaction()
+            .hide(this)
+            .add(containerId, scannerFragment, "refund_barcode_scanner")
+            .addToBackStack("refund_barcode_scanner")
+            .commit();
+}
+// ═══════════════════════════════════════════════════════════
+//  ✅ [v6.5] البحث في الاسترجاع — يدعم الأرقام الجزئية
+// ═══════════════════════════════════════════════════════════
+
 private void searchItemForRefund(String code) {
     if (code == null || code.trim().isEmpty()) return;
     final String cleanCode = code.trim();
-
     selectedRefundItem.set(null);
+
+    // ✅ رقم تسلسلي — يمنع عرض نتائج بحث قديم
+    final int mySeq = refundSearchSeq.incrementAndGet();
+
+    final List<String> candidates = buildSearchCandidates(cleanCode);
+
+    if (candidates.size() > 1) {
+        Log.i(TAG, "🔍 [REFUND] Partial serial: '" + cleanCode
+                + "' → trying " + candidates.size() + " candidates");
+    }
+
+    searchItemForRefundWithCandidates(cleanCode, candidates, 0, mySeq);
+}
+
+private void searchItemForRefundWithCandidates(
+        @NonNull final String originalCode,
+        @NonNull final List<String> candidates,
+        final int index,
+        final int seq) {
+
+    if (!isFragmentAlive()) return;
+
+    // ✅ نتجاهل البحث إذا بدأ المستخدم بحثاً جديداً
+    if (refundSearchSeq.get() != seq) {
+        Log.d(TAG, "⏭️ Ignoring stale refund search (seq "
+                + seq + " vs " + refundSearchSeq.get() + ")");
+        return;
+    }
+
+    if (index >= candidates.size()) {
+        Log.w(TAG, "❌ [REFUND] All candidates failed: " + originalCode);
+        safeRun(() -> {
+            if (isFragmentAlive()) {
+                showRefundItemErrorInDialog(getString(R.string.pos_msg_not_found));
+            }
+        });
+        return;
+    }
+
+    final String candidate = candidates.get(index);
+
+    if (index > 0) {
+        Log.i(TAG, "🔁 [REFUND] Candidate [" + (index + 1) + "/"
+                + candidates.size() + "]: '" + candidate + "'");
+    }
 
     try {
         miraExecutor.getNetworkExecutor().execute(() -> {
@@ -2648,7 +2740,7 @@ private void searchItemForRefund(String code) {
                 if (ctx == null) return;
 
                 JSONObject payload = new JSONObject();
-                payload.put("code", cleanCode);
+                payload.put("code", candidate);
                 payload.put("search_type", "auto");
                 payload.put("branch_id", getActiveBranchId());
                 payload.put("context", "refund_check");
@@ -2664,14 +2756,28 @@ private void searchItemForRefund(String code) {
 
                 safeRun(() -> {
                     if (!isFragmentAlive()) return;
-                    handleRefundSearchResponse(response, cleanCode);
+
+                    // ✅ نتجاهل النتائج إذا تغيّر البحث
+                    if (refundSearchSeq.get() != seq) return;
+
+                    if (response != null && response.isSuccess
+                            && response.data != null) {
+                        handleRefundSearchResponse(response, candidate);
+                    } else {
+                        searchItemForRefundWithCandidates(
+                                originalCode, candidates, index + 1, seq);
+                    }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "searchItemForRefund error", e);
+                safeRun(() -> searchItemForRefundWithCandidates(
+                        originalCode, candidates, index + 1, seq));
             }
         });
     } catch (Exception e) {
         Log.e(TAG, "searchItemForRefund submit error", e);
+        safeRun(() -> searchItemForRefundWithCandidates(
+                originalCode, candidates, index + 1, seq));
     }
 }
 
@@ -2994,24 +3100,6 @@ public void focusSearchField() {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  Launchers
-// ═══════════════════════════════════════════════════════════════════
-
-private final ActivityResultLauncher<ScanOptions> refundBarcodeLauncher =
-        registerForActivityResult(new ScanContract(), result -> {
-    try {
-        if (result != null && result.getContents() != null
-                && isFragmentAlive()) {
-            if (refundDialog != null && refundDialog.isShowing()) {
-                selectedRefundItem.set(null);
-                searchItemForRefund(result.getContents());
-            }
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "refundBarcodeLauncher error", e);
-    }
-});
 
 // ═══════════════════════════════════════════════════════════════════
 //  Buttons State
@@ -3215,53 +3303,69 @@ private void applyPermissions() {
     // ═══════════════════════════════════════════════════════════════════
 
     public void onRingScanned(String epc) {
-        try {
-            if (epc == null || epc.trim().isEmpty()) return;
+    try {
+        if (epc == null || epc.trim().isEmpty()) return;
 
-            if (currentScanMode != ScanMode.RFID) return;
+        // ✅ [v6.5] إذا كان RefundDialog مفتوحاً → وجّه للاسترجاع
+        if (refundDialog != null && refundDialog.isShowing()) {
+            Log.i(TAG, "🔄 [REFUND] RFID tag read: " + epc);
 
-            final String cleanEpc = epc.trim().toUpperCase(Locale.US);
-
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(cleanEpc);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-            lastScannedTimes.put(cleanEpc, now);
-
-            // One Shot
-            if (stopAfterFirstRead) {
-                if (!oneShotConsumed.compareAndSet(false, true)) {
-                    Log.i(TAG, "One-shot: ignoring extra tag " + cleanEpc);
-                    return;
-                }
-
-                stopAfterFirstRead = false;
-                Log.i(TAG, "One-shot: accepted first tag " + cleanEpc);
-                cancelPendingStopIfAny();
-
+            if (currentScanMode != ScanMode.NONE) {
                 switchScanMode(ScanMode.NONE);
             }
 
-            // فحص EPC
-            boolean isValidEpc = cleanEpc.matches("^E2[0-9A-F]{22}$");
+            refundDialog.setRefundCode(epc.trim());
+            searchItemForRefund(epc.trim());
 
-            if (!isValidEpc) {
-                Log.w(TAG, "Invalid EPC '" + cleanEpc + "' → reading TID");
-                readTidAndProcess(cleanEpc, "rfid");
-                return;
+            if (heroController != null) {
+                heroController.setState(PosHeroController.State.IDLE);
             }
-
-            if (cartManager != null && cartManager.isIdScanned(cleanEpc)) {
-                showToast(getString(R.string.pos_msg_already_in_cart));
-                playAlertSound(2);
-                return;
-            }
-
-            processRingEpc(cleanEpc, "rfid");
-
-        } catch (Exception e) {
-            Log.e(TAG, "onRingScanned error", e);
+            return;
         }
+
+        // ═══════════════════════════════════════════════════════
+        //  من هنا: تدفق البيع العادي (بدون تغيير)
+        // ═══════════════════════════════════════════════════════
+        if (currentScanMode != ScanMode.RFID) return;
+
+        final String cleanEpc = epc.trim().toUpperCase(Locale.US);
+
+        long now = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(cleanEpc);
+        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
+        lastScannedTimes.put(cleanEpc, now);
+
+        if (stopAfterFirstRead) {
+            if (!oneShotConsumed.compareAndSet(false, true)) {
+                Log.i(TAG, "One-shot: ignoring extra tag " + cleanEpc);
+                return;
+            }
+            stopAfterFirstRead = false;
+            Log.i(TAG, "One-shot: accepted first tag " + cleanEpc);
+            cancelPendingStopIfAny();
+            switchScanMode(ScanMode.NONE);
+        }
+
+        boolean isValidEpc = cleanEpc.matches("^E2[0-9A-F]{22}$");
+
+        if (!isValidEpc) {
+            Log.w(TAG, "Invalid EPC '" + cleanEpc + "' → reading TID");
+            readTidAndProcess(cleanEpc, "rfid");
+            return;
+        }
+
+        if (cartManager != null && cartManager.isIdScanned(cleanEpc)) {
+            showToast(getString(R.string.pos_msg_already_in_cart));
+            playAlertSound(2);
+            return;
+        }
+
+        processRingEpc(cleanEpc, "rfid");
+
+    } catch (Exception e) {
+        Log.e(TAG, "onRingScanned error", e);
     }
+}
 
     private void readTidAndProcess(final String originalEpc, final String source) {
         if (sdkExecutor == null || sdkExecutor.isShutdown()) {
