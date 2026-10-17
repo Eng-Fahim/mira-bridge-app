@@ -1,63 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="220dp"
+    android:height="220dp"
+    android:viewportWidth="220"
+    android:viewportHeight="220">
 
-    <!-- ═══════════════════════════════════════════════════════
-         1) الإطار الكامل الخفيف (تحديد المنطقة)
-         ═══════════════════════════════════════════════════════ -->
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="#00000000" />
-            <stroke android:width="1dp" android:color="#40C59B27" />
-            <corners android:radius="12dp" />
-        </shape>
-    </item>
+    <!-- الإطار الكامل الخفيف -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#40C59B27"
+        android:strokeWidth="1"
+        android:pathData="M12,2 L208,2 A10,10 0 0,1 218,12 L218,208 A10,10 0 0,1 208,218 L12,218 A10,10 0 0,1 2,208 L2,12 A10,10 0 0,1 12,2 Z" />
 
-    <!-- ═══════════════════════════════════════════════════════
-         2) الزوايا الذهبية البارزة (التركيز البصري)
-         ═══════════════════════════════════════════════════════ -->
-
-    <!-- زاوية علوية يسرى -->
-    <item
-        android:width="32dp"
-        android:height="32dp"
-        android:gravity="top|start">
-        <shape android:shape="rectangle">
-            <solid android:color="#00000000" />
-            <stroke android:width="3dp" android:color="#C59B27" />
-        </shape>
-    </item>
+    <!-- زاوية علوية يسرى (L) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C59B27"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M2,32 L2,12 A10,10 0 0,1 12,2 L32,2" />
 
     <!-- زاوية علوية يمنى -->
-    <item
-        android:width="32dp"
-        android:height="32dp"
-        android:gravity="top|end">
-        <shape android:shape="rectangle">
-            <solid android:color="#00000000" />
-            <stroke android:width="3dp" android:color="#C59B27" />
-        </shape>
-    </item>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C59B27"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M188,2 L208,2 A10,10 0 0,1 218,12 L218,32" />
 
     <!-- زاوية سفلية يسرى -->
-    <item
-        android:width="32dp"
-        android:height="32dp"
-        android:gravity="bottom|start">
-        <shape android:shape="rectangle">
-            <solid android:color="#00000000" />
-            <stroke android:width="3dp" android:color="#C59B27" />
-        </shape>
-    </item>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C59B27"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M2,188 L2,208 A10,10 0 0,0 12,218 L32,218" />
 
     <!-- زاوية سفلية يمنى -->
-    <item
-        android:width="32dp"
-        android:height="32dp"
-        android:gravity="bottom|end">
-        <shape android:shape="rectangle">
-            <solid android:color="#00000000" />
-            <stroke android:width="3dp" android:color="#C59B27" />
-        </shape>
-    </item>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C59B27"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M188,218 L208,218 A10,10 0 0,0 218,208 L218,188" />
 
-</layer-list>
+</vector>
