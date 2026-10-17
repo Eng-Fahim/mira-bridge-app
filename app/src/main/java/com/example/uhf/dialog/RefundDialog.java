@@ -2,6 +2,7 @@ package com.example.uhf.dialog;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -10,6 +11,7 @@ import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
@@ -24,10 +26,16 @@ import com.google.android.material.button.MaterialButton;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  RefundDialog v2.0 — Partial Serial + RFID + Barcode Support
+ *  RefundDialog v2.1 — Partial Serial + RFID Hardware Trigger + Barcode Support
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * إصلاحات v2.0:
+ * إصلاحات v2.1:
+ *   ✅ [NEW] اعتراض زناد الـ RFID (139, 280, 293) وتمريره للـ Fragment.
+ *            (لأن الـ Dialog يأخذ التركيز فلا يصل الزناد للـ Fragment تلقائياً)
+ *   ✅ [NEW] دالة setOnHardwareKeyListener لربط الزناد بـ myOnKeyDwon.
+ *   ✅ [NEW] تنظيف hardwareKeyListener عند dismiss.
+ *
+ * إصلاحات v2.0 (سابقة):
  *   ✅ Debounce على TextWatcher (700ms) — بدل إرسال طلب لكل حرف
  *   ✅ setRefundCode(code) — لاستقبال RFID/باركود من الخارج
  *   ✅ suppressWatcher flag — يمنع double-search عند setText برمجياً
@@ -46,6 +54,11 @@ public class RefundDialog extends Dialog {
     private static final long SEARCH_DEBOUNCE_MS = 700L;
     private static final int  MIN_SEARCH_LEN = 4;
 
+    // أكواد أزرار الزناد في قارئ RFID
+    private static final int KEYCODE_RFID_TRIGGER_1 = 139;
+    private static final int KEYCODE_RFID_TRIGGER_2 = 280;
+    private static final int KEYCODE_RFID_TRIGGER_3 = 293;
+
     private EditText etRefundCode;
     private EditText etReason;
     private TextView tvRefundItemTitle;
@@ -58,6 +71,9 @@ public class RefundDialog extends Dialog {
     private final Handler handler = new Handler(Looper.getMainLooper());
     @Nullable private Runnable pendingSearch = null;
     private boolean suppressWatcher = false;
+
+    // ✅ [v2.1] مستمع أزرار الزناد (يُمرَّر للـ Fragment)
+    @Nullable private DialogInterface.OnKeyListener hardwareKeyListener;
 
     public RefundDialog(@NonNull Context context, RefundCallback callback) {
         super(context);
@@ -173,10 +189,44 @@ public class RefundDialog extends Dialog {
             cardRefundItemInfo = null;
             isRefundable = false;
             suppressWatcher = false;
+            hardwareKeyListener = null; // ✅ [v2.1]
         });
 
         setCancelable(true);
         setCanceledOnTouchOutside(true);
+    }
+
+    /**
+     * ✅ [v2.1] ربط أزرار الزناد الخاصة بالقارئ (RFID).
+     *    الـ Dialog يأخذ التركيز، لذا نعترض الأزرار هنا ونمرّرها للـ Fragment.
+     *    الاستخدام من MiraPosFragment:
+     *      refundDialog.setOnHardwareKeyListener((d, k, e) -> myOnKeyDwon(k, e));
+     */
+    public void setOnHardwareKeyListener(@Nullable DialogInterface.OnKeyListener listener) {
+        this.hardwareKeyListener = listener;
+    }
+
+    /**
+     * ✅ [v2.1] اعتراض أزرار الزناد قبل توزيعها على عناصر الـ Dialog.
+     */
+    @Override
+    public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
+        try {
+            int code = event.getKeyCode();
+            boolean isTriggerKey =
+                    (code == KEYCODE_RFID_TRIGGER_1
+                            || code == KEYCODE_RFID_TRIGGER_2
+                            || code == KEYCODE_RFID_TRIGGER_3);
+
+            if (isTriggerKey && hardwareKeyListener != null) {
+                Log.d(TAG, "🎯 [v2.1] Hardware trigger intercepted: " + code
+                        + " action=" + event.getAction());
+                return hardwareKeyListener.onKey(this, code, event);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "dispatchKeyEvent error", e);
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     /**
