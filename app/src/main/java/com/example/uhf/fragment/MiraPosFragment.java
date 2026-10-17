@@ -150,6 +150,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private POSManager posManager;
     private PendingSalesManager pendingSalesManager;
     private RefundDialog refundDialog;
+    private boolean isRefundDialogHiddenForScan = false; // ✅ [v6.6] لحل مشكلة الـ Dialog
     private MiraExecutorService miraExecutor;
     private MiraApiClient apiClient;
     private MiraPriceManager priceManager;
@@ -529,13 +530,21 @@ triggerOfflineSyncIfNeeded();
     }
 
     @Override
-    public void onHiddenChanged(boolean hidden) {
-        super.onHiddenChanged(hidden);
+public void onHiddenChanged(boolean hidden) {
+    super.onHiddenChanged(hidden);
 
-        if (!hidden) {
-            processPendingBarcodeIfAny();
+    if (!hidden) {
+        processPendingBarcodeIfAny();
+
+        // ✅ [v6.6] استعادة نافذة الإرجاع إذا كانت مخفية بسبب فتح الماسح
+        if (isRefundDialogHiddenForScan) {
+            isRefundDialogHiddenForScan = false;
+            if (refundDialog != null && !refundDialog.isShowing()) {
+                refundDialog.show();
+            }
         }
     }
+}
 
     @Override
     public void onDestroyView() {
@@ -2604,6 +2613,7 @@ private void showRefundDialog() {
 
     try {
         selectedRefundItem.set(null);
+        isRefundDialogHiddenForScan = false; // ✅ إعادة ضبط المتغير
 
         refundDialog = new RefundDialog(requireContext(),
                 new RefundDialog.RefundCallback() {
@@ -2614,6 +2624,11 @@ private void showRefundDialog() {
 
             @Override
             public void onBarcodeScan() {
+                // ✅ [v6.6] إخفاء النافذة قبل فتح الماسح
+                isRefundDialogHiddenForScan = true;
+                if (refundDialog != null) {
+                    refundDialog.hide();
+                }
                 openRefundBarcodeScanner();
             }
 
@@ -2623,8 +2638,8 @@ private void showRefundDialog() {
             }
         });
 
-        // ✅ [v6.6 FIX] تفعيل عمل زناد القارئ داخل نافذة الإرجاع
-        refundDialog.setOnHardwareKeyListener((dialog, keyCode, event) -> myOnKeyDwon(keyCode, event));
+        // ✅ تفعيل زناد الـ RFID
+        refundDialog.setOnHardwareKeyListener((d, k, e) -> myOnKeyDwon(k, e));
 
         refundDialog.show();
     } catch (Exception e) {
@@ -2642,11 +2657,12 @@ private void openRefundBarcodeScanner() {
     FragmentManager fm = getParentFragmentManager();
     if (fm == null || fm.isStateSaved()) {
         Log.w(TAG, "openRefundBarcodeScanner: fm null/stateSaved");
+        if (refundDialog != null) refundDialog.show();
+        isRefundDialogHiddenForScan = false;
         return;
     }
 
-    MiraBarcodeScannerFragment scannerFragment =
-            new MiraBarcodeScannerFragment();
+    MiraBarcodeScannerFragment scannerFragment = new MiraBarcodeScannerFragment();
 
     scannerFragment.setOnBarcodeScannedListener((data, format) -> {
         try {
@@ -2654,8 +2670,13 @@ private void openRefundBarcodeScanner() {
 
             Log.i(TAG, "🔄 [REFUND] Barcode scanned: " + data);
 
-            // ✅ املأ الحقل وابحث مباشرة
-            if (refundDialog != null && refundDialog.isShowing()) {
+            // ✅ [v6.6] إعادة عرض النافذة قبل إدخال الكود
+            if (refundDialog != null && !refundDialog.isShowing()) {
+                refundDialog.show();
+                isRefundDialogHiddenForScan = false;
+            }
+
+            if (refundDialog != null) {
                 refundDialog.setRefundCode(data);
                 searchItemForRefund(data);
             }
@@ -2825,11 +2846,10 @@ private RefundEligibility checkRefundEligibility(JSONObject itemData) {
         String status = itemData.optString("status",
                 itemData.optString("vault_status", "")).toLowerCase();
 
-        // ✅ قبول "exited" أيضاً لأن السيرفر قد يُرجع هذه الحالة للقطع المباعة
-if (!"sold".equals(status) && !"exited".equals(status)) {
-    return RefundEligibility.notEligible(isArabic
-            ? "⚠️ القطعة غير مباعة" : "⚠️ Item not sold");
-}
+        if (!"sold".equals(status) && !"exited".equals(status)) {
+            return RefundEligibility.notEligible(isArabic
+                    ? "⚠️ القطعة غير مباعة" : "⚠️ Item not sold");
+        }
 
         String lastAction = itemData.optString("last_action", "")
                 .toLowerCase();
