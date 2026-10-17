@@ -5,8 +5,11 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
@@ -14,17 +17,34 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
 import com.google.android.material.button.MaterialButton;
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  RefundDialog v2.0 — Partial Serial + RFID + Barcode Support
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * إصلاحات v2.0:
+ *   ✅ Debounce على TextWatcher (700ms) — بدل إرسال طلب لكل حرف
+ *   ✅ setRefundCode(code) — لاستقبال RFID/باركود من الخارج
+ *   ✅ suppressWatcher flag — يمنع double-search عند setText برمجياً
+ *   ✅ تنظيف pendingSearch عند dismiss
+ */
 public class RefundDialog extends Dialog {
+
+    private static final String TAG = "RefundDialog";
 
     public interface RefundCallback {
         void onRefundConfirm(String code, String reason);
         void onBarcodeScan();
-        void onCodeChanged(String code);   // ✅ مُضاف
+        void onCodeChanged(String code);
     }
+
+    private static final long SEARCH_DEBOUNCE_MS = 700L;
+    private static final int  MIN_SEARCH_LEN = 4;
 
     private EditText etRefundCode;
     private EditText etReason;
@@ -35,10 +55,15 @@ public class RefundDialog extends Dialog {
     private boolean isRefundable = false;
     private boolean isArabic;
 
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    @Nullable private Runnable pendingSearch = null;
+    private boolean suppressWatcher = false;
+
     public RefundDialog(@NonNull Context context, RefundCallback callback) {
         super(context);
         this.callback = callback;
-        this.isArabic = context.getResources().getConfiguration().locale.getLanguage().equals("ar");
+        this.isArabic = context.getResources().getConfiguration()
+                .locale.getLanguage().equals("ar");
     }
 
     @Override
@@ -49,8 +74,9 @@ public class RefundDialog extends Dialog {
 
         if (getWindow() != null) {
             getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, 
-                                  WindowManager.LayoutParams.WRAP_CONTENT);
+            getWindow().setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT);
         }
 
         initViews();
@@ -78,88 +104,130 @@ public class RefundDialog extends Dialog {
             String reason = etReason.getText().toString().trim();
 
             if (code.isEmpty()) {
-                Toast.makeText(getContext(), 
-                    isArabic ? "⚠️ أدخل رمز القطعة" : "⚠️ Enter item code",
-                    Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(),
+                        isArabic ? "⚠️ أدخل رمز القطعة" : "⚠️ Enter item code",
+                        Toast.LENGTH_SHORT).show();
                 return;
             }
 
             if (!isRefundable) {
-                Toast.makeText(getContext(), 
-                    isArabic ? "⚠️ لا يمكن إرجاع هذه القطعة" : "⚠️ Item not refundable",
-                    Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(),
+                        isArabic ? "⚠️ لا يمكن إرجاع هذه القطعة"
+                                : "⚠️ Item not refundable",
+                        Toast.LENGTH_SHORT).show();
                 return;
             }
 
             if (callback != null) {
-                callback.onRefundConfirm(code, reason.isEmpty() ?
-                    (isArabic ? "مرتجع مبيعات" : "Sales Refund") : reason);
+                callback.onRefundConfirm(code, reason.isEmpty()
+                        ? (isArabic ? "مرتجع مبيعات" : "Sales Refund")
+                        : reason);
             }
         });
 
-        // ✅ TextWatcher مُحدَّث يستدعي onCodeChanged
+        // ✅ TextWatcher مع Debounce (700ms)
         etRefundCode.addTextChangedListener(new TextWatcher() {
-            @Override 
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
 
-            @Override 
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() >= 4) {
-                    if (callback != null) {
-                        callback.onCodeChanged(s.toString().trim());
-                    }
-                } else {
-                    hideRefundItemInfo();
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (suppressWatcher) return;
+
+                // إلغاء أي بحث معلّق
+                if (pendingSearch != null) {
+                    handler.removeCallbacks(pendingSearch);
+                    pendingSearch = null;
                 }
-            }
 
-            @Override 
-            public void afterTextChanged(Editable s) {}
+                final String text = s != null ? s.toString().trim() : "";
+
+                if (text.length() < MIN_SEARCH_LEN) {
+                    hideRefundItemInfo();
+                    return;
+                }
+
+                // ✅ Debounce
+                pendingSearch = () -> {
+                    pendingSearch = null;
+                    if (callback != null && etRefundCode != null
+                            && text.equals(etRefundCode.getText().toString().trim())) {
+                        Log.d(TAG, "🔍 Debounced search: " + text);
+                        callback.onCodeChanged(text);
+                    }
+                };
+                handler.postDelayed(pendingSearch, SEARCH_DEBOUNCE_MS);
+            }
         });
     }
 
     private void setupListeners() {
         setOnDismissListener(dialog -> {
+            if (pendingSearch != null) {
+                handler.removeCallbacks(pendingSearch);
+                pendingSearch = null;
+            }
             etRefundCode = null;
             tvRefundItemTitle = null;
             tvRefundItemStatus = null;
             cardRefundItemInfo = null;
             isRefundable = false;
+            suppressWatcher = false;
         });
 
         setCancelable(true);
         setCanceledOnTouchOutside(true);
     }
 
+    /**
+     * ✅ [v2.0] تعيين الكود برمجياً (من RFID أو باركود) — بدون تفعيل watcher
+     *    المتصل (Fragment) سيتولى استدعاء البحث مباشرة.
+     */
+    public void setRefundCode(@Nullable String code) {
+        if (etRefundCode == null || code == null) return;
+
+        suppressWatcher = true;
+        try {
+            etRefundCode.setText(code);
+            etRefundCode.setSelection(code.length());
+        } finally {
+            suppressWatcher = false;
+        }
+
+        // امسح أي حالة سابقة
+        hideRefundItemInfo();
+        Log.d(TAG, "📥 setRefundCode: " + code);
+    }
+
     public void showRefundItemInfo(String title, String price) {
-        if (cardRefundItemInfo != null) 
+        if (cardRefundItemInfo != null)
             cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
-        if (tvRefundItemTitle != null) 
+        if (tvRefundItemTitle != null)
             tvRefundItemTitle.setText(title + " (" + price + ")");
         if (tvRefundItemStatus != null) {
-            tvRefundItemStatus.setText(isArabic ? 
-                "✅ القطعة مباعة وقابلة للإرجاع" : 
-                "✅ Item sold and refundable");
+            tvRefundItemStatus.setText(isArabic
+                    ? "✅ القطعة مباعة وقابلة للإرجاع"
+                    : "✅ Item sold and refundable");
             tvRefundItemStatus.setTextColor(Color.parseColor("#2ECC71"));
         }
         isRefundable = true;
     }
 
     public void showRefundItemError(String message) {
-        if (cardRefundItemInfo != null) 
+        if (cardRefundItemInfo != null)
             cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
-        if (tvRefundItemTitle != null) 
+        if (tvRefundItemTitle != null)
             tvRefundItemTitle.setText(message);
         if (tvRefundItemStatus != null) {
-            tvRefundItemStatus.setText(isArabic ? 
-                "غير قابلة للإرجاع ❌" : "Not Refundable ❌");
+            tvRefundItemStatus.setText(isArabic
+                    ? "غير قابلة للإرجاع ❌" : "Not Refundable ❌");
             tvRefundItemStatus.setTextColor(Color.parseColor("#E74C3C"));
         }
         isRefundable = false;
     }
 
     private void hideRefundItemInfo() {
-        if (cardRefundItemInfo != null) 
+        if (cardRefundItemInfo != null)
             cardRefundItemInfo.setVisibility(android.view.View.GONE);
         isRefundable = false;
     }
