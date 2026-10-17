@@ -266,18 +266,28 @@
                 android:textAppearance="@style/TextAppearance.App.Title.Small"
                 android:textColor="@color/text_gold_accent" />
 
-            <!-- قائمة اختيار طريقة الدفع -->
+            <!-- ═══════════════════════════════════════════════════════
+                 ✅ [FIX] قائمة اختيار طريقة الدفع
+                 - app:endIconMode="dropdown_menu"  ← يُفعّل وضع الـ dropdown
+                 - android:inputType="none"          ← يمنع الكتابة
+                 - focusable="false"                 ← يمنع لوحة المفاتيح
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilPaymentMethod"
                 style="@style/AppTextInputStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/space_2"
-                android:hint="طريقة الدفع">
+                android:hint="طريقة الدفع"
+                app:endIconMode="dropdown_menu">
 
                 <com.google.android.material.textfield.MaterialAutoCompleteTextView
                     android:id="@+id/spPaymentMethod"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:cursorVisible="false"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
                     android:inputType="none"
                     android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
