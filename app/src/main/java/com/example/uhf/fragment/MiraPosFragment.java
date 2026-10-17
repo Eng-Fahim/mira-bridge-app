@@ -49,6 +49,10 @@ import com.example.uhf.manager.MiraLocalItemCache;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.POSManager;
 import com.example.uhf.manager.PendingSalesManager;
+import com.example.uhf.manager.PendingSalesQueue;
+import com.example.uhf.manager.PendingSale;
+import com.example.uhf.manager.OfflineSalesSyncer;
+
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.PosCartManager;
 import com.example.uhf.manager.PosHeroController;
@@ -176,6 +180,10 @@ public class MiraPosFragment extends MiraBaseFragment {
     private volatile int     savedPowerBeforePos = -1;
     // ✅ [v4.0] UUID لعملية البيع الحالية — لمنع الازدواج offline
     private volatile String currentSaleUuid = null;
+    
+    // ✅ [v4.0] الطابور والمزامنة Offline
+private PendingSalesQueue pendingSalesQueue;
+private OfflineSalesSyncer offlineSyncer;
 
     private final Set<String> pendingEpcs = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> lastScannedTimes = new ConcurrentHashMap<>();
@@ -314,10 +322,12 @@ public class MiraPosFragment extends MiraBaseFragment {
                 showToast(getString(R.string.pos_msg_engine_error));
                 return;
             }
-
             priceResolver = new PosPriceResolver(priceManager);
             cartManager   = PosCartManager.getInstance();
             apiClient     = MiraApiClient.getInstance(ctx);
+            // ✅ [v4.0] تهيئة طابور المبيعات Offline
+            pendingSalesQueue = PendingSalesQueue.getInstance(ctx);
+            offlineSyncer = OfflineSalesSyncer.getInstance(ctx);
 
             // RFID — addListener
             rfidManager = RFIDManager.getInstance(ctx);
@@ -389,9 +399,12 @@ public class MiraPosFragment extends MiraBaseFragment {
 
             processPendingBarcodeIfAny();
 
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error", e);
-        }
+// ✅ [v4.0] مزامنة البيوع Offline تلقائياً
+triggerOfflineSyncIfNeeded();
+
+} catch (Exception e) {
+    Log.e(TAG, "onResume error", e);
+}
     }
 
     @Override
@@ -1945,26 +1958,28 @@ private void executeCheckoutDirectly(final POSCheckoutDialog.POSCheckoutData dat
                 MiraApiClient.ApiResponse response = client.checkout(payload);
 
                 safeRun(() -> {
-                    PosUIManager.dismissDialog(loadingDialog);
-                    setButtonsEnabled(true);
+    PosUIManager.dismissDialog(loadingDialog);
+    setButtonsEnabled(true);
 
-                    if (response != null && response.isSuccess) {
-                        handleSaleSuccess(response, data, false);
-                    } else if (response != null && response.isNetworkError) {
-                        handleSaleSuccess(response, data, true);
-                    } else {
-                        String errorMsg = (response != null
-                                && response.error != null)
-                                ? response.error : "Unknown error";
-                        PosUIManager.showRetryDialog(
-                                requireContext(),
-                                getString(R.string.pos_dialog_retry_title),
-                                errorMsg,
-                                () -> executeCheckoutDirectly(data),
-                                isArabic
-                        );
-                    }
-                });
+    if (response != null && response.isSuccess) {
+        handleSaleSuccess(response, data, false);
+    } else if (response != null && response.isNetworkError) {
+        // ✅ [v4.0] فشل شبكة → احفظ في الطابور ثم عالج كبيع offline
+        saveOfflineSale(payload, data);
+        handleSaleSuccess(response, data, true);
+    } else {
+        String errorMsg = (response != null
+                && response.error != null)
+                ? response.error : "Unknown error";
+        PosUIManager.showRetryDialog(
+                requireContext(),
+                getString(R.string.pos_dialog_retry_title),
+                errorMsg,
+                () -> executeCheckoutDirectly(data),
+                isArabic
+        );
+    }
+});
 
             } catch (Exception e) {
                 Log.e(TAG, "executeCheckoutDirectly error", e);
@@ -1985,6 +2000,53 @@ private void executeCheckoutDirectly(final POSCheckoutDialog.POSCheckoutData dat
     } catch (Exception e) {
         Log.e(TAG, "executeCheckoutDirectly outer error", e);
         setButtonsEnabled(true);
+    }
+}
+
+/**
+ * ✅ [v4.0] يحفظ البيع في الطابور المحلي عند فشل الشبكة.
+ *    سيُرسَل تلقائياً عند عودة الاتصال بنفس local_uuid.
+ */
+private void saveOfflineSale(JSONObject payload,
+                             POSCheckoutDialog.POSCheckoutData data) {
+    try {
+        if (payload == null || pendingSalesQueue == null) return;
+
+        String localUuid = payload.optString("local_uuid", "");
+        if (localUuid.isEmpty()) {
+            Log.w(TAG, "⚠️ No local_uuid — cannot enqueue offline sale");
+            return;
+        }
+
+        PendingSale sale = new PendingSale();
+        sale.localUuid     = localUuid;
+        sale.payloadJson   = payload.toString();
+        sale.branchId      = getActiveBranchId();
+        sale.userId        = sessionManager != null 
+                ? sessionManager.getUserId() : 0;
+        sale.totalUsd      = data != null ? data.finalAmount : 0;
+        sale.itemCount     = cartManager != null ? cartManager.size() : 0;
+        sale.customerName  = data != null && data.customerName != null
+                ? data.customerName : "";
+        sale.createdAt     = System.currentTimeMillis();
+        sale.status        = PendingSale.STATUS_PENDING;
+
+        boolean ok = pendingSalesQueue.enqueue(sale);
+        
+        if (ok) {
+            int pending = pendingSalesQueue.countPending();
+            Log.i(TAG, "📥 Sale queued for offline sync: " + localUuid
+                    + " | total pending=" + pending);
+            
+            showToast(isArabic
+                    ? "📥 سيُرسَل البيع تلقائياً عند عودة الاتصال"
+                    : "📥 Sale will be sent automatically when online");
+        } else {
+            Log.e(TAG, "❌ Failed to queue offline sale");
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "saveOfflineSale error", e);
     }
 }
 
@@ -3019,7 +3081,68 @@ private void applyPermissions() {
             currentScanMode = ScanMode.NONE;
         }
     }
-
+/**
+ * ✅ [v4.0] يشغّل المزامنة Offline إذا كان هناك بيوع معلّقة.
+ *    - لا يُشغّل مزامنة متزامنة
+ *    - لا يُشغّل إذا لا يوجد اتصال
+ */
+private void triggerOfflineSyncIfNeeded() {
+    try {
+        if (offlineSyncer == null || pendingSalesQueue == null) return;
+        
+        // إذا كان هناك مزامنة جارية → لا نبدأ
+        if (offlineSyncer.isSyncing()) {
+            Log.d(TAG, "⏭️ Sync already in progress");
+            return;
+        }
+        
+        int pending = pendingSalesQueue.countPending();
+        if (pending == 0) {
+            Log.d(TAG, "✅ No pending sales to sync");
+            return;
+        }
+        
+        Log.i(TAG, "🚀 Starting auto-sync: " + pending + " pending sales");
+        
+        offlineSyncer.syncAll(new OfflineSalesSyncer.SyncCallback() {
+            @Override
+            public void onSyncStart(int total) {
+                Log.d(TAG, "📤 Sync started: " + total + " sales");
+            }
+            
+            @Override
+            public void onSaleSynced(PendingSale sale, boolean success, 
+                                     @Nullable String error) {
+                if (success) {
+                    Log.i(TAG, "✅ Synced: " + sale.localUuid);
+                } else {
+                    Log.w(TAG, "⚠️ Failed to sync: " + sale.localUuid 
+                            + " | " + error);
+                }
+            }
+            
+            @Override
+            public void onSyncComplete(int synced, int failed, int remaining) {
+                Log.i(TAG, "📊 Sync complete: synced=" + synced 
+                        + ", failed=" + failed 
+                        + ", remaining=" + remaining);
+                
+                if (synced > 0 && isFragmentAlive()) {
+                    showToast(isArabic
+                            ? "✅ تمت مزامنة " + synced + " من البيوع المعلّقة"
+                            : "✅ Synced " + synced + " pending sales");
+                }
+                
+                if (remaining > 0 && isFragmentAlive()) {
+                    Log.d(TAG, "⏳ " + remaining + " sales still pending");
+                }
+            }
+        });
+        
+    } catch (Exception e) {
+        Log.e(TAG, "triggerOfflineSyncIfNeeded error", e);
+    }
+}
     private void processPendingBarcodeIfAny() {
         final String code = pendingBarcodeFromScanner;
 
