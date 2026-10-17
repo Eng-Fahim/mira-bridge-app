@@ -1352,26 +1352,60 @@ public ApiResponse addPostApprovalBalance(String type, double amount,
         return getDashboardFull(0);
     }
 
-    // ==================== POS ====================
-    public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
-        try {
-            if (payload == null) payload = new JSONObject();
-            if (!payload.has("idempotency_key")) {
-                payload.put("idempotency_key", UUID.randomUUID().toString());
-            }
-            if (!payload.has("gate_id")) {
-                payload.put("gate_id", getEffectiveGateId());
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "checkout payload prep error: " + e.getMessage());
+    /**
+ * ✅ [v4.0] Checkout مع Long Timeout + دعم local_uuid
+ * 
+ * ⚠️ مهم: لا نُضيف local_uuid عشوائياً هنا!
+ *    يجب أن يمرّره المستدعي (MiraPosFragment) ليضمن نفس UUID
+ *    عند إعادة المحاولة.
+ */
+public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
+    try {
+        if (payload == null) payload = new JSONObject();
+        
+        // ✅ لا نضيف idempotency_key عشوائياً — يُمرَّر من المستدعي كـ local_uuid
+        
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
         }
-        return executeRequest("POST", "pos/checkout", payload, true,
-                LONG_CONNECT_TIMEOUT, LONG_READ_TIMEOUT);
+        
+        // ✅ Log للتشخيص (اختياري)
+        String localUuid = payload.optString("local_uuid", "");
+        if (!localUuid.isEmpty()) {
+            Log.d(TAG, "✅ Checkout with local_uuid: " + localUuid);
+        } else {
+            Log.w(TAG, "⚠️ Checkout WITHOUT local_uuid — offline retry غير محمي!");
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "checkout payload prep error: " + e.getMessage());
     }
+    return executeRequest("POST", "pos/checkout", payload, true,
+            LONG_CONNECT_TIMEOUT, LONG_READ_TIMEOUT);
+}
 
-    public ApiResponse checkout(JSONObject payload) {
-        return postWithAuth("/pos/checkout", payload);
+    /**
+ * ✅ [v4.0] Checkout عادي + دعم local_uuid
+ */
+public ApiResponse checkout(JSONObject payload) {
+    try {
+        if (payload == null) payload = new JSONObject();
+        
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
+        }
+        
+        // ✅ لا نضيف local_uuid — يجب أن يمرّره المستدعي
+        String localUuid = payload.optString("local_uuid", "");
+        if (localUuid.isEmpty()) {
+            Log.w(TAG, "⚠️ Checkout without local_uuid");
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "checkout payload prep error: " + e.getMessage());
     }
+    return postWithAuth("/pos/checkout", payload);
+}
 
     public ApiResponse checkRefundEligibility(JSONObject payload) {
         try {
@@ -1382,23 +1416,29 @@ public ApiResponse addPostApprovalBalance(String type, double amount,
         }
     }
 
-    public ApiResponse processRefund(JSONObject payload) {
-        try {
-            if (payload == null) payload = new JSONObject();
-            if (!payload.has("gate_id")) {
-                payload.put("gate_id", getEffectiveGateId());
-            }
-            if (!payload.has("idempotency_key")) {
-                payload.put("idempotency_key", UUID.randomUUID().toString());
-            }
-            return postWithAuth("/pos/refund", payload);
-        } catch (Exception e) {
-            Log.e(TAG, "processRefund error: " + e.getMessage());
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-            response.isNetworkError = true;
-            return response;
+    /**
+ * ✅ [v4.0] Refund + دعم local_uuid
+ */
+public ApiResponse processRefund(JSONObject payload) {
+    try {
+        if (payload == null) payload = new JSONObject();
+        
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
         }
+        
+        // ✅ لا نضيف idempotency_key — السيرفر يمنع الإرجاع المزدوج
+        //    من خلال UNIQUE(item_id) في جدول refund_items
+        
+        return postWithAuth("/pos/refund", payload);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "processRefund error: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
     }
+}
 
     public ApiResponse processRefund(String epc, String serialNo, String reason) {
         JSONObject payload = new JSONObject();
