@@ -406,19 +406,20 @@ public class MiraBarcodeScannerFragment extends Fragment {
         if (cameraControl == null || previewView == null) return;
 
         try {
-            if (camera != null
-                    && camera.getCameraInfo().isFocusMeteringSupported(
-                    FocusMeteringAction.FLAG_AF)) {
-                FocusMeteringAction autofocus =
-                        new FocusMeteringAction.Builder(
-                                previewView.getMeteringPointFactory()
-                                        .createPoint(0.5f, 0.5f),
-                                FocusMeteringAction.FLAG_AF
-                                        | FocusMeteringAction.FLAG_AE
-                        ).setAutoCancelDuration(3, TimeUnit.SECONDS).build();
-                cameraControl.startFocusAndMetering(autofocus);
-                Log.i(TAG, "🎯 Continuous autofocus enabled");
-            }
+            // ─── 1) التركيز التلقائي المستمر ───
+try {
+    FocusMeteringAction autofocus =
+            new FocusMeteringAction.Builder(
+                    previewView.getMeteringPointFactory()
+                            .createPoint(0.5f, 0.5f),
+                    FocusMeteringAction.FLAG_AF
+                            | FocusMeteringAction.FLAG_AE
+            ).setAutoCancelDuration(3, TimeUnit.SECONDS).build();
+    cameraControl.startFocusAndMetering(autofocus);
+    Log.i(TAG, "🎯 Continuous autofocus enabled");
+} catch (Exception e) {
+    Log.w(TAG, "Autofocus setup failed (device may not support AF): " + e.getMessage());
+}
 
             previewView.setOnTouchListener((v, event) -> {
                 if (event.getAction() == android.view.MotionEvent.ACTION_UP) {
