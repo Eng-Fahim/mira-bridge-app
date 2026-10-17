@@ -2664,26 +2664,35 @@ private void openRefundBarcodeScanner() {
 
     MiraBarcodeScannerFragment scannerFragment = new MiraBarcodeScannerFragment();
 
-    scannerFragment.setOnBarcodeScannedListener((data, format) -> {
-        try {
-            if (data == null || data.isEmpty()) return;
+    scannerFragment.setOnBarcodeScannedListener((rawData, format) -> {
+    try {
+        if (rawData == null || rawData.isEmpty()) return;
 
-            Log.i(TAG, "🔄 [REFUND] Barcode scanned: " + data);
+        // ✅ [v6.7] فك تشفير GS1/QR قبل البحث
+        String[] parsed = parseGs1OrQr(rawData);
+        final String data = parsed[0];
+        final String dataFormat = parsed[1];
 
-            // ✅ [v6.6] إعادة عرض النافذة قبل إدخال الكود
-            if (refundDialog != null && !refundDialog.isShowing()) {
-                refundDialog.show();
-                isRefundDialogHiddenForScan = false;
-            }
+        Log.i(TAG, "🔄 [REFUND] Barcode '" + rawData
+                + "' → '" + data + "' (" + dataFormat + ")");
 
-            if (refundDialog != null) {
-                refundDialog.setRefundCode(data);
-                searchItemForRefund(data);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Refund barcode callback error", e);
+        if (data == null || data.isEmpty()) return;
+
+        // ✅ [v6.7-FIX] أعد عرض النافذة أولاً (لأنها كانت مخفية)
+        if (refundDialog != null && !refundDialog.isShowing()) {
+            refundDialog.show();
+            isRefundDialogHiddenForScan = false;
         }
-    });
+
+        // ✅ ثم أدخل الكود وابحث
+        if (refundDialog != null) {
+            refundDialog.setRefundCode(data);
+            searchItemForRefund(data);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Refund barcode callback error", e);
+    }
+});
 
     int containerId = android.R.id.content;
     try {
@@ -3440,28 +3449,62 @@ private void applyPermissions() {
         });
     }
 
-    public void onBarcodeScanned(String data) {
-        try {
-            if (data == null || data.trim().isEmpty()) return;
+    public void onBarcodeScanned(String rawData) {
+    try {
+        if (rawData == null || rawData.trim().isEmpty()) return;
 
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(data);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) {
-                return;
+        // ✅ [v6.7] 1) فك تشفير GS1/QR (احتياطي — يكون جاهزاً في التدفق العادي)
+        String[] parsed = parseGs1OrQr(rawData.trim());
+        final String data = parsed[0];
+        final String format = parsed[1];
+
+        Log.i(TAG, "📷 [BARCODE] '" + rawData + "' → '" + data
+                + "' (" + format + ")");
+
+        if (data == null || data.trim().isEmpty()) return;
+
+        // ✅ [v6.7] 2) Cooldown
+        long now = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(data);
+        if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) {
+            Log.d(TAG, "⏭️ Barcode cooldown: " + data);
+            return;
+        }
+        lastScannedTimes.put(data, now);
+
+        // ✅ [v6.7] 3) إذا RefundDialog مفتوح → وجّه للاسترجاع
+        if (refundDialog != null && refundDialog.isShowing()) {
+            Log.i(TAG, "🔄 [REFUND] Barcode → refund: " + data);
+            refundDialog.setRefundCode(data);
+            searchItemForRefund(data);
+            return;
+        }
+
+        // ✅ [v6.7] 4) فحص التكرار الذكي (كامل + جزئي)
+        if (cartManager != null) {
+            boolean dup = cartManager.isIdScanned(data);
+            if (!dup && looksLikePartialSerial(data)) {
+                for (String prefix : SERIAL_PREFIXES) {
+                    if (cartManager.isIdScanned(prefix + data)) {
+                        dup = true;
+                        break;
+                    }
+                }
             }
-            lastScannedTimes.put(data, now);
-
-            if (cartManager != null && cartManager.isIdScanned(data)) {
+            if (dup) {
                 showToast(getString(R.string.pos_msg_already_in_cart));
                 playAlertSound(2);
                 return;
             }
-
-            processRingEpc(data, "barcode");
-        } catch (Exception e) {
-            Log.e(TAG, "onBarcodeScanned error", e);
         }
+
+        // ✅ [v6.7] 5) المعالجة مع البحث متعدد المرشحين
+        processRingEpc(data, "barcode");
+
+    } catch (Exception e) {
+        Log.e(TAG, "onBarcodeScanned error", e);
     }
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Barcode Scanner Fragment
@@ -3609,55 +3652,81 @@ public void onSyncComplete(int synced, int failed, int remaining) {
     }
 
     private String[] parseGs1OrQr(String raw) {
-        if (raw == null) return new String[]{"", "empty"};
-        String data = raw.trim();
-        if (data.isEmpty()) return new String[]{"", "empty"};
+    if (raw == null) return new String[]{"", "empty"};
+    String data = raw.trim();
+    if (data.isEmpty()) return new String[]{"", "empty"};
 
-        // QR JSON
-        if (data.startsWith("{")) {
-            try {
-                JSONObject json = new JSONObject(data);
-                String serial = json.optString("serial",
-                        json.optString("serial_number", json.optString("sn", "")));
-                if (!serial.isEmpty()) return new String[]{serial, "qr_json"};
-                String gtin = json.optString("gtin", json.optString("gtin13", ""));
-                if (!gtin.isEmpty()) return new String[]{gtin, "qr_json"};
-            } catch (Exception ignored) {}
-        }
-
-        // QR URL
-        if (data.startsWith("http://") || data.startsWith("https://")) {
-            try {
-                android.net.Uri uri = android.net.Uri.parse(data);
-                String serial = uri.getQueryParameter("serial");
-                if (serial == null) serial = uri.getQueryParameter("sn");
-                if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
-                String gtin = uri.getQueryParameter("gtin");
-                if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
-                String last = uri.getLastPathSegment();
-                if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
-            } catch (Exception ignored) {}
-        }
-
-        // GS1 (01) GTIN, (21) Serial
-        String gs1 = data.replace('\u001D', '|').replace("(#)", "|");
-
-        java.util.regex.Matcher mSerial =
-                java.util.regex.Pattern.compile("21([A-Za-z0-9\\-_.]+)").matcher(gs1);
-        if (mSerial.find()) {
-            String serial = mSerial.group(1);
-            if (serial != null && !serial.isEmpty()) return new String[]{serial, "gs1_serial"};
-        }
-
-        java.util.regex.Matcher mGtin =
-                java.util.regex.Pattern.compile("01(\\d{14})").matcher(gs1);
-        if (mGtin.find()) {
-            String gtin = mGtin.group(1);
-            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "gs1_gtin"};
-        }
-
-        return new String[]{data, "raw"};
+    // ✅ [v6.7] 1) إزالة AIM ID Prefix (شائع جداً في DataMatrix)
+    //    أمثلة: ]d2 (GS1 DataMatrix), ]Q3, ]e0 (EAN), ]C1
+    if (data.startsWith("]d") || data.startsWith("]Q")
+            || data.startsWith("]e") || data.startsWith("]C")
+            || data.startsWith("]D") || data.startsWith("]A")) {
+        data = data.substring(3).trim();
+        Log.d(TAG, "🔧 Stripped AIM prefix → " + data);
     }
+
+    // ✅ QR JSON
+    if (data.startsWith("{")) {
+        try {
+            JSONObject json = new JSONObject(data);
+            String serial = json.optString("serial",
+                    json.optString("serial_number", json.optString("sn", "")));
+            if (!serial.isEmpty()) return new String[]{serial, "qr_json"};
+            String gtin = json.optString("gtin", json.optString("gtin13", ""));
+            if (!gtin.isEmpty()) return new String[]{gtin, "qr_json"};
+        } catch (Exception ignored) {}
+    }
+
+    // ✅ QR URL
+    if (data.startsWith("http://") || data.startsWith("https://")) {
+        try {
+            android.net.Uri uri = android.net.Uri.parse(data);
+            String serial = uri.getQueryParameter("serial");
+            if (serial == null) serial = uri.getQueryParameter("sn");
+            if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
+            String gtin = uri.getQueryParameter("gtin");
+            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
+            String last = uri.getLastPathSegment();
+            if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
+        } catch (Exception ignored) {}
+    }
+
+    // ✅ [v6.7] GS1 DataMatrix — FNC1 handling + anchored regex
+    // FNC1 (0x1D) = group separator
+    String gs1 = data
+            .replace('\u001D', '|')
+            .replace("(#)", "|");
+
+    // ✅ استخراج الـ Serial (AI 21) — يبدأ بعد بداية السلسلة أو بعد |
+    //    يقف عند أي | (FNC1) أو نهاية السلسلة
+    java.util.regex.Matcher mSerial =
+            java.util.regex.Pattern
+                    .compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)")
+                    .matcher(gs1);
+    if (mSerial.find()) {
+        String serial = mSerial.group(1);
+        if (serial != null && !serial.isEmpty()) {
+            Log.d(TAG, "📦 GS1 Serial extracted: " + serial);
+            return new String[]{serial, "gs1_serial"};
+        }
+    }
+
+    // ✅ استخراج الـ GTIN (AI 01)
+    java.util.regex.Matcher mGtin =
+            java.util.regex.Pattern
+                    .compile("(?:^|\\|)01(\\d{14})")
+                    .matcher(gs1);
+    if (mGtin.find()) {
+        String gtin = mGtin.group(1);
+        if (gtin != null && !gtin.isEmpty()) {
+            Log.d(TAG, "📦 GS1 GTIN extracted: " + gtin);
+            return new String[]{gtin, "gs1_gtin"};
+        }
+    }
+
+    Log.d(TAG, "📦 Raw barcode (no GS1 match): " + data);
+    return new String[]{data, "raw"};
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Back Press Handler
