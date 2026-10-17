@@ -2752,4 +2752,12 @@
 <string name="admin_hub_branches">🏢 إدارة الفروع</string>
 <string name="admin_hub_users">👥 المستخدمين والترخيص</string>
 <string name="admin_hub_profile">👤 الملف الشخصي</string>
+
+<!-- Pending Sales -->
+<string name="pending_sales_title">📥 البيوع المعلّقة</string>
+<string name="pending_sales_empty">لا توجد بيوع معلّقة</string>
+<string name="pending_sales_close">إغلاق</string>
+<string name="pending_sales_retry_all">مزامنة الكل</string>
+<string name="pending_sale_retry">إعادة المحاولة</string>
+<string name="pending_sale_delete">حذف</string>
 </resources>
