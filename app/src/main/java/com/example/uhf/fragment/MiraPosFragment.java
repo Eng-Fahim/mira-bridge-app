@@ -219,7 +219,10 @@ private OfflineSalesSyncer offlineSyncer;
     private View btnPosScanGs1;
     private View btnPosScanRfid;
     private View btnPosScanManual;
-
+    
+    // ✅ [v4.2] Badge لعرض البيوع المعلّقة
+@Nullable private View pendingSalesBadge;
+@Nullable private TextView tvPendingBadgeCount;
     private CartAdapter cartAdapter;
 
     // Scan Feedback Card
@@ -379,6 +382,44 @@ private OfflineSalesSyncer offlineSyncer;
         }
     }
 
+/**
+ * ✅ [v4.2] يُحدّث Badge عدد البيوع المعلّقة.
+ */
+private void updatePendingSalesBadge() {
+    try {
+        if (pendingSalesBadge == null || pendingSalesQueue == null) return;
+
+        int pending = pendingSalesQueue.countPending();
+
+        if (pending > 0) {
+            pendingSalesBadge.setVisibility(View.VISIBLE);
+            if (tvPendingBadgeCount != null) {
+                tvPendingBadgeCount.setText(String.valueOf(pending));
+            }
+        } else {
+            pendingSalesBadge.setVisibility(View.GONE);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "updatePendingSalesBadge error", e);
+    }
+}
+
+/**
+ * ✅ [v4.2] يفتح نافذة إدارة البيوع المعلّقة.
+ */
+private void openPendingSalesSheet() {
+    try {
+        if (!isFragmentAlive()) return;
+
+        com.example.uhf.dialog.PendingSalesBottomSheet sheet =
+                new com.example.uhf.dialog.PendingSalesBottomSheet();
+        sheet.show(getParentFragmentManager(), "PendingSalesSheet");
+
+    } catch (Exception e) {
+        Log.e(TAG, "openPendingSalesSheet error", e);
+    }
+}
+
     @Override
     public void onResume() {
         super.onResume();
@@ -398,10 +439,11 @@ private OfflineSalesSyncer offlineSyncer;
             }
 
             processPendingBarcodeIfAny();
+            // ✅ [v4.2] حدّث Badge البيوع المعلّقة
+updatePendingSalesBadge();
 
 // ✅ [v4.0] مزامنة البيوع Offline تلقائياً
 triggerOfflineSyncIfNeeded();
-
 } catch (Exception e) {
     Log.e(TAG, "onResume error", e);
 }
@@ -691,7 +733,13 @@ private void bindViews(View view) {
     btnPosScanGs1   = view.findViewById(R.id.btnPosScanGs1);
     btnPosScanRfid  = view.findViewById(R.id.btnPosScanRfid);
     btnPosScanManual = view.findViewById(R.id.btnPosScanManual);
+    // ✅ [v4.2] Badge البيوع المعلّقة
+pendingSalesBadge = view.findViewById(R.id.pendingSalesBadge);
+tvPendingBadgeCount = view.findViewById(R.id.tvPendingBadgeCount);
 
+if (pendingSalesBadge != null) {
+    pendingSalesBadge.setOnClickListener(v -> openPendingSalesSheet());
+}
     if (tvScaleStatus != null) {
         tvScaleStatus.setOnClickListener(v -> {
             if (scaleManager != null) scaleManager.showSettingsDialog();
@@ -2088,6 +2136,8 @@ private void saveOfflineSale(JSONObject payload,
             showToast(isArabic
                     ? "📥 سيُرسَل البيع تلقائياً عند عودة الاتصال"
                     : "📥 Sale will be sent automatically when online");
+               // ✅ [v4.2] حدّث Badge فوراً
+updatePendingSalesBadge();     
         } else {
             Log.e(TAG, "❌ Failed to queue offline sale");
         }
@@ -3237,21 +3287,24 @@ private void triggerOfflineSyncIfNeeded() {
             }
             
             @Override
-            public void onSyncComplete(int synced, int failed, int remaining) {
-                Log.i(TAG, "📊 Sync complete: synced=" + synced 
-                        + ", failed=" + failed 
-                        + ", remaining=" + remaining);
-                
-                if (synced > 0 && isFragmentAlive()) {
-                    showToast(isArabic
-                            ? "✅ تمت مزامنة " + synced + " من البيوع المعلّقة"
-                            : "✅ Synced " + synced + " pending sales");
-                }
-                
-                if (remaining > 0 && isFragmentAlive()) {
-                    Log.d(TAG, "⏳ " + remaining + " sales still pending");
-                }
-            }
+public void onSyncComplete(int synced, int failed, int remaining) {
+    Log.i(TAG, "📊 Sync complete: synced=" + synced 
+            + ", failed=" + failed 
+            + ", remaining=" + remaining);
+    
+    // ✅ [v4.2] حدّث Badge بعد المزامنة
+    updatePendingSalesBadge();
+    
+    if (synced > 0 && isFragmentAlive()) {
+        showToast(isArabic
+                ? "✅ تمت مزامنة " + synced + " من البيوع المعلّقة"
+                : "✅ Synced " + synced + " pending sales");
+    }
+    
+    if (remaining > 0 && isFragmentAlive()) {
+        Log.d(TAG, "⏳ " + remaining + " sales still pending");
+    }
+}
         });
         
     } catch (Exception e) {
