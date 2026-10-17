@@ -682,6 +682,9 @@ public class UsersManagementFragment extends Fragment {
             EditText etBranch      = dialogView.findViewById(R.id.etBranch);
             EditText etRole        = dialogView.findViewById(R.id.etRole);
 
+            TextInputLayout tilBranch = dialogView.findViewById(R.id.tilBranch);
+            TextInputLayout tilRole   = dialogView.findViewById(R.id.tilRole);
+
             Button btnCancel   = dialogView.findViewById(R.id.btnCancelUser);
             Button btnNextStep = dialogView.findViewById(R.id.btnNextStep);
             Button btnPrevStep = dialogView.findViewById(R.id.btnPrevStep);
@@ -719,7 +722,9 @@ public class UsersManagementFragment extends Fragment {
                         : (isArabic ? "أدخل بيانات المستخدم الجديد" : "Enter new user data"));
             }
 
-            // ─── قائمة الفروع ───
+            // ═══════════════════════════════════════════════════
+            //  ✅ [v4.0] قائمة الفروع — click على TextInputLayout
+            // ═══════════════════════════════════════════════════
             final List<String> branchNames = new ArrayList<>();
             int activeBranchId = branchesManager.getActiveBranchId();
             int selectedBranchIndex = 0;
@@ -736,9 +741,11 @@ public class UsersManagementFragment extends Fragment {
             if (etBranch != null) {
                 etBranch.setText(branchNames.get(
                         Math.min(selectedBranchIndex, branchNames.size() - 1)));
-                etBranch.setFocusable(false);
-                etBranch.setClickable(true);
-                etBranch.setOnClickListener(v ->
+            }
+
+            // ✅ النقر على TextInputLayout وليس EditText
+            if (tilBranch != null) {
+                tilBranch.setOnClickListener(v ->
                         new MaterialAlertDialogBuilder(
                                 new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
                                 .setTitle(isArabic ? "اختر الفرع" : "Select Branch")
@@ -747,16 +754,20 @@ public class UsersManagementFragment extends Fragment {
                                 .show());
             }
 
-            // ─── الصلاحيات المتعددة ───
+            // ═══════════════════════════════════════════════════
+            //  ✅ [v4.0] الصلاحيات المتعددة — click على TextInputLayout
+            // ═══════════════════════════════════════════════════
             updateRoleDisplay(etRole, selectedRoles);
 
             if (etRole != null) {
-                etRole.setFocusable(false);
-                etRole.setClickable(true);
                 etRole.setHint(isArabic
                         ? "اضغط لاختيار الصلاحيات (متعدد)"
                         : "Tap to select permissions (Multiple)");
-                etRole.setOnClickListener(v ->
+            }
+
+            // ✅ النقر على TextInputLayout وليس EditText
+            if (tilRole != null) {
+                tilRole.setOnClickListener(v ->
                         showMultiRolePicker(selectedRoles,
                                 roles -> updateRoleDisplay(etRole, selectedRoles)));
             }
