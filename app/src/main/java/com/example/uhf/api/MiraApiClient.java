@@ -67,7 +67,7 @@ public class MiraApiClient {
 
     // ==================== الإعدادات العامة ====================
     private static final String API_PREFIX = "mira-gate/v1";
-    private static final String DEFAULT_BASE_URL = "https://miratechye.com/wp-json";
+    private static final String DEFAULT_BASE_URL = "https://id.ibreg.org/wp-json";
 
     private static final int DEFAULT_CONNECT_TIMEOUT = 10_000;
     private static final int DEFAULT_READ_TIMEOUT    = 10_000;
@@ -209,7 +209,7 @@ okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
 //  ✅ Retrofit مع OkHttpClient المخصص
 // ═══════════════════════════════════════════════════════════
 this.accountingService = new retrofit2.Retrofit.Builder()
-    .baseUrl("https://miratechye.com/wp-json/mira/v2/")
+    .baseUrl("https://id.ibreg.org/wp-json/mira/v2/")
     .client(accountingOkHttp)  // ← ⚠️⚠️⚠️ الأهم! هذا السطر مفقود حالياً
     .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
     .build()
@@ -699,7 +699,7 @@ private ApiResponse accountingRequest(String method, String endpoint, JSONObject
     HttpURLConnection conn = null;
     try {
         String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
-        String fullUrl = "https://miratechye.com/wp-json/mira/v2/" + cleanEndpoint;
+        String fullUrl = "https://id.ibreg.org/wp-json/mira/v2/" + cleanEndpoint;
         URL url = new URL(fullUrl);
         
         HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
@@ -2426,4 +2426,4 @@ public ApiResponse getPaymentMethods() {
             return t;
         }
     }
-}
+    }
