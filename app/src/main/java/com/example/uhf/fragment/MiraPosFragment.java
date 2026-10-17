@@ -174,6 +174,8 @@ public class MiraPosFragment extends MiraBaseFragment {
     private volatile boolean isCheckoutDialogShowing = false;
     private volatile double  liveScaleWeight = 0.0;
     private volatile int     savedPowerBeforePos = -1;
+    // ✅ [v4.0] UUID لعملية البيع الحالية — لمنع الازدواج offline
+    private volatile String currentSaleUuid = null;
 
     private final Set<String> pendingEpcs = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> lastScannedTimes = new ConcurrentHashMap<>();
@@ -498,11 +500,12 @@ public class MiraPosFragment extends MiraBaseFragment {
             vFeedbackAccent = null;
 
             pendingEpcs.clear();
-            lastScannedTimes.clear();
-            selectedRefundItem.set(null);
-            currentScanMode = ScanMode.NONE;
-            stopAfterFirstRead = false;
-            oneShotConsumed.set(false);
+lastScannedTimes.clear();
+selectedRefundItem.set(null);
+currentScanMode = ScanMode.NONE;
+stopAfterFirstRead = false;
+oneShotConsumed.set(false);
+currentSaleUuid = null;   // ✅ [v4.0] جديد
 
             if (mainHandler != null) {
                 mainHandler.removeCallbacksAndMessages(null);
@@ -1087,11 +1090,15 @@ private void openPosPowerSettings() {
 
 private void setupActionButtonListeners() {
     if (btnClearCart != null) {
-        btnClearCart.setOnClickListener(v -> {
-            UIHelper.hideKeyboard(getActivity());
-            if (cartManager != null) cartManager.clear();
-        });
-    }
+    btnClearCart.setOnClickListener(v -> {
+        UIHelper.hideKeyboard(getActivity());
+        if (cartManager != null) cartManager.clear();
+        
+        // ✅ [v4.0] صفّر UUID عند تفريغ السلة يدوياً
+        currentSaleUuid = null;
+        Log.d(TAG, "🗑️ Cart cleared — UUID reset");
+    });
+}
 
     if (btnCheckout != null) {
         btnCheckout.setOnClickListener(v -> {
@@ -1990,6 +1997,10 @@ private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
         playAlertSound(1);
         lastSaleResponse = response;
         lastSaleResponseTime = System.currentTimeMillis();
+        
+        // ✅ [v4.0] صفّر UUID بعد النجاح — عملية جديدة = UUID جديد
+        currentSaleUuid = null;
+        Log.d(TAG, "✅ Sale success — UUID reset");
 
         final List<CartItem> soldItems = new ArrayList<>(cartManager.getItems());
         final long saleId = isOffline
@@ -2041,6 +2052,22 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
     payload.put("branch_id", getActiveBranchId());
     payload.put("user_id", sessionManager != null
             ? sessionManager.getUserId() : 0);
+    
+    // ═══════════════════════════════════════════════════════════
+    // ✅ [v4.0] local_uuid — Idempotency Key لمنع الازدواج
+    // ═══════════════════════════════════════════════════════════
+    // المنطق:
+    //   - أول محاولة: UUID جديد
+    //   - إعادة محاولة (retry): نفس UUID → السيرفر يرفض الازدواج
+    // ═══════════════════════════════════════════════════════════
+    if (currentSaleUuid == null || currentSaleUuid.isEmpty()) {
+        currentSaleUuid = java.util.UUID.randomUUID().toString();
+        Log.d(TAG, "🆔 New sale UUID: " + currentSaleUuid);
+    } else {
+        Log.d(TAG, "🔄 Retry with existing UUID: " + currentSaleUuid);
+    }
+    payload.put("local_uuid", currentSaleUuid);
+    
     payload.put("username", sessionManager != null
             ? sessionManager.getUsername() : "");
 
