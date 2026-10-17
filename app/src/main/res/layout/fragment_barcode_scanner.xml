@@ -5,88 +5,132 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Preview الكاميرا -->
+    <!-- ═══════════════════════════════════════════════════════════════
+         Preview: ملء الشاشة (fillCenter) بدل fitCenter
+         SurfaceView (performance) بدل TextureView
+         ═══════════════════════════════════════════════════════════════ -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitCenter" />
+        app:implementationMode="performance"
+        app:scaleType="fillCenter" />
 
-    <!-- إطار المسح -->
-    <View
-        android:id="@+id/scannerOverlay"
-        android:layout_width="280dp"
-        android:layout_height="280dp"
-        android:layout_gravity="center"
-        android:background="@drawable/scanner_overlay_border" />
+    <!-- ═══════════════════════════════════════════════════════════════
+         حاوية إطار المسح + خط المسح
+         - الإطار 220dp (أصغر من السابق → يُقرب المستخدم)
+         - خط المسح داخل الحاوية → يتحرك ضمن الحدود بدقة
+         ═══════════════════════════════════════════════════════════════ -->
+    <FrameLayout
+        android:layout_width="220dp"
+        android:layout_height="220dp"
+        android:layout_gravity="center">
 
-    <!-- خط المسح المتحرك -->
-    <View
-        android:id="@+id/scanLine"
-        android:layout_width="280dp"
-        android:layout_height="2dp"
-        android:layout_gravity="center"
-        android:background="#4ADE80" />
+        <!-- الحدود الذهبية للإطار -->
+        <View
+            android:id="@+id/scannerOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/scanner_overlay_border" />
 
-    <!-- شريط علوي مع زر الإغلاق -->
+        <!-- خط المسح المتحرك (داخل الإطار) -->
+        <View
+            android:id="@+id/scanLine"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_gravity="top"
+            android:background="#4ADE80" />
+    </FrameLayout>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         مؤشر الزوم (يُحدَّث من Java — انظر التعديل أدناه)
+         ═══════════════════════════════════════════════════════════════ -->
+    <TextView
+        android:id="@+id/tvZoomLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="64dp"
+        android:layout_marginEnd="16dp"
+        android:background="#80000000"
+        android:paddingStart="10dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="4dp"
+        android:text="1.0x"
+        android:textColor="#4ADE80"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         الشريط العلوي: إغلاق + عنوان + فلاش
+         ═══════════════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
+        android:layout_gravity="top"
+        android:background="#80000000"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="8dp"
-        android:layout_gravity="top"
-        android:background="#80000000">
+        android:paddingHorizontal="8dp">
 
-        <!-- زر الإغلاق (×) -->
         <ImageButton
             android:id="@+id/btnCloseScanner"
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="إغلاق"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
-            android:tint="@android:color/white"
-            android:contentDescription="إغلاق" />
+            android:tint="@android:color/white" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:gravity="center"
             android:text="مسح GS1 / باركود"
             android:textColor="@android:color/white"
             android:textSize="16sp"
-            android:textStyle="bold"
-            android:gravity="center" />
+            android:textStyle="bold" />
 
-        <!-- زر الفلاش -->
         <ImageButton
             android:id="@+id/btnToggleFlash"
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="فلاش"
             android:src="@android:drawable/ic_menu_manage"
-            android:tint="@android:color/white"
-            android:contentDescription="فلاش" />
+            android:tint="@android:color/white" />
     </LinearLayout>
 
-    <!-- منطقة عرض نتيجة المسح -->
+    <!-- ═══════════════════════════════════════════════════════════════
+         الشريط السفلي: حالة + تلميح + نتيجة
+         ═══════════════════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
+        android:background="#80000000"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="16dp"
-        android:background="#80000000">
+        android:padding="16dp">
 
         <TextView
             android:id="@+id/tvScanStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📷 جاهز للمسح..."
+            android:text="📷 قرّب الكاميرا من الباركود"
             android:textColor="#38BDF8"
             android:textSize="14sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="قرصة إصبعين للتكبير · انقر للتركيز"
+            android:textColor="#B0FFFFFF"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/tvScannedData"
