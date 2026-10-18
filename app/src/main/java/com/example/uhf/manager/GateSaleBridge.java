@@ -7,6 +7,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.example.uhf.BuildConfig;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.model.CartItem;
 
@@ -16,13 +17,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * GateSaleBridge v1.1
- * ═══════════════════════════════════════════════════════════════
- * جسر يربط عمليات البيع/الإرجاع بنظام البوابات الأمنية (Secure Gate).
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  GateSaleBridge v2.0 — SECURED
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * v1.1:
- *  - إضافة "محاكاة الخروج" (وضع اختباري)
- *  - استخراج منطق المحاكاة إلى دالة مستقلة
+ * إصلاحات v2.0:
+ *   ✅ [CRITICAL] استخراج EPC + TID (كلاهما) للتخزين المحلي
+ *      → offline mode يعمل حتى لو القارئ قرأ TID (Item 26/27)
+ *   ✅ [CRITICAL] simulateExitIfEnabled معطّل في الإنتاج
+ *      → لا خروج كاذب من builds الإنتاج
+ *   ✅ [SAFE] التطبيع (uppercase) عند الإضافة
  */
 public final class GateSaleBridge {
 
@@ -68,30 +72,34 @@ public final class GateSaleBridge {
         }
 
         try {
-            // استخراج EPCs الصالحة
-            List<String> epcs = extractValidEpcs(items);
-            if (epcs.isEmpty()) {
-                Log.w(TAG, "onSaleCompleted: no valid EPCs — skip broadcast");
+            // ✅ [v2.0] استخراج كل المعرّفات (EPC + TID) للكاش
+            List<String> allIdentifiers = extractAllIdentifiers(items);
+            
+            // ✅ EPCs فقط للـ broadcast (توافق مع المستمعين)
+            List<String> epcsOnly = extractValidEpcs(items);
+
+            if (allIdentifiers.isEmpty()) {
+                Log.w(TAG, "onSaleCompleted: no valid identifiers — skip");
                 return;
             }
 
             Log.i(TAG, "🔓 Sale completed: saleId=" + saleId
-                    + ", epcs=" + epcs.size()
+                    + ", identifiers=" + allIdentifiers.size()
+                    + ", epcs=" + epcsOnly.size()
                     + ", branch=" + branchId
                     + ", offline=" + isOffline);
 
-            // 1. حفظ في القائمة المسموحة (محلياً)
-            addToAllowedListSafe(ctx, epcs, saleId, branchId, isOffline);
+            // 1. حفظ في القائمة المسموحة (EPC + TID)
+            addToAllowedListSafe(ctx, allIdentifiers, saleId, branchId, isOffline);
 
-            // 2. إرسال Broadcast للبوابات (محلياً)
-            sendSaleBroadcast(ctx, epcs, saleId, totalUsd, items.size(),
+            // 2. إرسال Broadcast (EPC فقط)
+            sendSaleBroadcast(ctx, epcsOnly, saleId, totalUsd, items.size(),
                     branchId, userId, isOffline);
 
-            // 3. ✅ [جديد] محاكاة الخروج (وضع اختباري)
-            simulateExitIfEnabled(ctx, epcs, saleId, branchId);
+            // 3. ✅ [v2.0] محاكاة الخروج (فقط في builds التطوير)
+            simulateExitIfEnabled(ctx, epcsOnly, saleId, branchId);
 
         } catch (Exception e) {
-            // ⚠️ لا نُفشل البيع أبداً بسبب الجسر
             Log.e(TAG, "onSaleCompleted error (non-fatal): " + e.getMessage(), e);
         }
     }
@@ -132,28 +140,34 @@ public final class GateSaleBridge {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 3. 🎬 محاكاة الخروج (وضع اختباري)
+    // 3. 🎬 محاكاة الخروج (وضع اختباري فقط)
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * إذا كان "محاكاة الخروج" مفعّلاً في MiraGatesSettings،
-     * يُرسل لكل EPC حدث خروج فوري للسيرفر.
-     *
-     * الغرض: اختبار النظام بدون قارئ RFID.
-     * ⚠️ لا يستخدم في الإنتاج.
+     * ✅ [v2.0 CRITICAL] معطّل تماماً في builds الإنتاج.
+     * 
+     * قبل v2.0: كان يعمل بدون فحص BuildConfig → خطر خروج كاذب.
+     * بعد v2.0: لا يعمل إلا إذا كان BuildConfig.ALLOW_SIMULATOR = true
+     *           (وهو false في release).
      */
     private static void simulateExitIfEnabled(Context ctx,
                                               List<String> epcs,
                                               long saleId,
                                               int branchId) {
         try {
-            MiraGatesSettings settings = MiraGatesSettings.getInstance(ctx);
-            if (settings == null || !settings.isSimulateExitOnSale()) {
-                return; // ✅ معطّل — لا شيء يحدث
+            // ✅ [v2.0] فحص صارم — لا محاكاة في الإنتاج
+            if (!BuildConfig.ALLOW_SIMULATOR) {
+                Log.d(TAG, "⏭️ Simulation disabled (production build)");
+                return;
             }
 
-            Log.i(TAG, "🎬 SIMULATE EXIT enabled — sending /gate-exit-event for "
-                    + epcs.size() + " EPCs");
+            MiraGatesSettings settings = MiraGatesSettings.getInstance(ctx);
+            if (settings == null || !settings.isSimulateExitOnSale()) {
+                return; // معطّل من المستخدم
+            }
+
+            Log.w(TAG, "🎬 SIMULATE EXIT enabled — " + epcs.size() + " EPCs");
+            Log.w(TAG, "🎬 DEV BUILD: items will be marked EXITED without gate scan");
 
             for (String epc : epcs) {
                 sendSimulatedExitEvent(ctx, epc, saleId, branchId);
@@ -163,9 +177,6 @@ public final class GateSaleBridge {
         }
     }
 
-    /**
-     * يُرسل حدث خروج محاكي للسيرفر — في Thread منفصل.
-     */
     private static void sendSimulatedExitEvent(Context ctx, String epc,
                                                 long saleId, int branchId) {
         if (epc == null || epc.isEmpty()) return;
@@ -206,7 +217,7 @@ public final class GateSaleBridge {
     // Helpers — Cache
     // ═══════════════════════════════════════════════════════════
 
-    private static void addToAllowedListSafe(Context ctx, List<String> epcs,
+    private static void addToAllowedListSafe(Context ctx, List<String> identifiers,
                                              long saleId, int branchId,
                                              boolean isOffline) {
         try {
@@ -215,10 +226,10 @@ public final class GateSaleBridge {
                 Log.w(TAG, "OfflineGateCache is null — skip cache");
                 return;
             }
-            for (String epc : epcs) {
-                cache.addToAllowedList(epc, saleId, branchId, isOffline);
+            for (String id : identifiers) {
+                cache.addToAllowedList(id, saleId, branchId, isOffline);
             }
-            Log.d(TAG, "✅ Added " + epcs.size() + " EPCs to allowed list");
+            Log.d(TAG, "✅ Added " + identifiers.size() + " identifiers to allowed list");
         } catch (Exception e) {
             Log.w(TAG, "addToAllowedListSafe error: " + e.getMessage());
         }
@@ -285,9 +296,39 @@ public final class GateSaleBridge {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // Helpers — Extract EPCs
+    // Helpers — Extract Identifiers
     // ═══════════════════════════════════════════════════════════
 
+    /**
+     * ✅ [v2.0] يستخرج كل المعرّفات الفريدة (EPC + TID).
+     * مهم للـ offline cache: القارئ قد يقرأ EPC أو TID.
+     */
+    private static List<String> extractAllIdentifiers(List<CartItem> items) {
+        List<String> result = new ArrayList<>(items.size() * 2);
+        for (CartItem item : items) {
+            if (item == null) continue;
+
+            // EPC
+            if (item.rfidEpc != null && !item.rfidEpc.trim().isEmpty()) {
+                String epc = item.rfidEpc.trim().toUpperCase();
+                if (!result.contains(epc)) result.add(epc);
+            } else if (item.epc != null && !item.epc.trim().isEmpty()) {
+                String epc = item.epc.trim().toUpperCase();
+                if (!result.contains(epc)) result.add(epc);
+            }
+
+            // ✅ TID (قد يختلف عن EPC — Items 26/27)
+            if (item.tid != null && !item.tid.trim().isEmpty()) {
+                String tid = item.tid.trim().toUpperCase();
+                if (!result.contains(tid)) result.add(tid);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * ✅ EPCs فقط — للـ broadcast (توافق مع المستمعين).
+     */
     private static List<String> extractValidEpcs(List<CartItem> items) {
         List<String> result = new ArrayList<>(items.size());
         for (CartItem item : items) {
@@ -295,11 +336,11 @@ public final class GateSaleBridge {
 
             String epc = null;
             if (item.rfidEpc != null && !item.rfidEpc.trim().isEmpty()) {
-                epc = item.rfidEpc.trim();
+                epc = item.rfidEpc.trim().toUpperCase();
             } else if (item.epc != null && !item.epc.trim().isEmpty()) {
-                epc = item.epc.trim();
+                epc = item.epc.trim().toUpperCase();
             } else if (item.serialNo != null && !item.serialNo.trim().isEmpty()) {
-                epc = item.serialNo.trim();
+                epc = item.serialNo.trim().toUpperCase();
             }
 
             if (epc != null && !result.contains(epc)) {
