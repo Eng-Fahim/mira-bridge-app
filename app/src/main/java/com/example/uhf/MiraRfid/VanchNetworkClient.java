@@ -16,21 +16,17 @@ import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- *  VanchNetworkClient v1.0 — عميل شبكة لبوابات VANCH Fixed
- * ═══════════════════════════════════════════════════════════════════════════
+ * VanchNetworkClient v1.1
  *
- * يدعم بروتوكول TCP Stream مع اكتشاف تلقائي للتنسيق:
- *   • TAG,<EPC>,<RSSI>,<ANT>
- *   • EPC,<EPC>,<RSSI>
- *   • {"epc":"...","rssi":-50}
- *   • Raw hex (24 chars)
- *   • "EPC: <hex>"
+ * v1.1:
+ *   ✅ gateId حقل اختياري للربط ببوابة محددة
+ *   ✅ constructor جديد: (endpoint, gateId, listener)
+ *   ✅ getGateId() accessor
  *
- * الميزات:
- *   ✅ Auto-reconnect مع exponential backoff (2s → 30s)
- *   ✅ Keep-alive every READ_TIMEOUT
- *   ✅ START/STOP commands
+ * v1.0 (محفوظ):
+ *   ✅ Auto-reconnect + exponential backoff
+ *   ✅ Keep-alive
+ *   ✅ START/STOP
  *   ✅ Zero context dependencies
  */
 public class VanchNetworkClient {
@@ -54,6 +50,9 @@ public class VanchNetworkClient {
     private final int port;
     private final VanchEventListener listener;
 
+    // ✅ [v1.1] gateId اختياري
+    private final String gateId;
+
     private volatile Socket socket;
     private volatile BufferedReader reader;
     private volatile OutputStream writer;
@@ -65,18 +64,32 @@ public class VanchNetworkClient {
     private String startCommand = "START\n";
     private String stopCommand = "STOP\n";
 
-    // Constructors
+    // ═══════════════════════════════════════════════════════════
+    //  Constructors
+    // ═══════════════════════════════════════════════════════════
+
+    /** ✅ [v1.1] مع gateId */
+    public VanchNetworkClient(String ipAddressWithPort, String gateId,
+                              VanchEventListener listener) {
+        String[] parts = parseAddress(ipAddressWithPort);
+        this.host = parts[0];
+        this.port = Integer.parseInt(parts[1]);
+        this.gateId = gateId != null ? gateId : "";
+        this.listener = listener;
+    }
 
     public VanchNetworkClient(String ipAddressWithPort, VanchEventListener listener) {
         String[] parts = parseAddress(ipAddressWithPort);
         this.host = parts[0];
         this.port = Integer.parseInt(parts[1]);
+        this.gateId = "";
         this.listener = listener;
     }
 
     public VanchNetworkClient(String host, int port, VanchEventListener listener) {
         this.host = host != null ? host.trim() : "";
         this.port = port > 0 ? port : 4001;
+        this.gateId = "";
         this.listener = listener;
     }
 
@@ -92,6 +105,11 @@ public class VanchNetworkClient {
         return new String[]{input, "4001"};
     }
 
+    /** ✅ [v1.1] accessor */
+    public String getGateId() {
+        return gateId;
+    }
+
     public void setStartCommand(String cmd) {
         this.startCommand = cmd;
     }
@@ -100,7 +118,9 @@ public class VanchNetworkClient {
         this.stopCommand = cmd;
     }
 
-    // Lifecycle
+    // ═══════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════
 
     public void connect() {
         if (isRunning.getAndSet(true)) {
@@ -189,7 +209,9 @@ public class VanchNetworkClient {
         } catch (Exception ignored) {}
     }
 
-    // Protocol parsing
+    // ═══════════════════════════════════════════════════════════
+    //  Protocol parsing
+    // ═══════════════════════════════════════════════════════════
 
     private void parseLine(String rawLine) {
         if (rawLine == null) return;
@@ -234,7 +256,7 @@ public class VanchNetworkClient {
                 return;
             }
 
-            // Format 4: EPC:<hex> or "epc : <hex>"
+            // Format 4: EPC:<hex>
             Matcher m = Pattern.compile("(?i)epc\\s*[:=]\\s*([0-9A-Fa-f]{16,32})").matcher(line);
             if (m.find()) {
                 String epc = normalizeEpc(m.group(1));
@@ -242,7 +264,7 @@ public class VanchNetworkClient {
                 return;
             }
 
-            // Format 5: Raw hex (24-32 hex chars)
+            // Format 5: Raw hex
             String cleanHex = line.replaceAll("[^0-9A-Fa-f]", "");
             if (cleanHex.length() >= MIN_EPC_LENGTH
                     && cleanHex.length() <= 40
@@ -274,7 +296,9 @@ public class VanchNetworkClient {
         catch (Exception e) { return def; }
     }
 
-    // Notifications
+    // ═══════════════════════════════════════════════════════════
+    //  Notifications
+    // ═══════════════════════════════════════════════════════════
 
     private void notifyConnected() {
         if (listener != null) {
@@ -294,13 +318,9 @@ public class VanchNetworkClient {
         }
     }
 
-    private void notifyError(String error) {
-        if (listener != null) {
-            try { listener.onError(error); } catch (Exception ignored) {}
-        }
-    }
-
-    // Shutdown
+    // ═══════════════════════════════════════════════════════════
+    //  Shutdown
+    // ═══════════════════════════════════════════════════════════
 
     public void disconnect() {
         Log.d(TAG, "Disconnecting from " + getEndpoint());
