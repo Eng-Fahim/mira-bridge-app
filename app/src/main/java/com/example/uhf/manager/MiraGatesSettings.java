@@ -86,7 +86,42 @@ public class MiraGatesSettings {
     public String getDeviceGateId() {
         return prefs.getString(KEY_DEVICE_GATE_ID, "");
     }
+    
+    
+/**
+ * ✅ [v2.2] يُعيد البوابة النشطة لهذا الجهاز.
+ * 
+ * منطق:
+ *   1. اقرأ device_gate_id (gate_id المثبت من login)
+ *   2. ابحث في القائمة عن البوابة المطابقة
+ *   3. أرجعها أو null
+ * 
+ * تُستخدم من GateRfidBridge لمعرفة نوع الجهاز
+ * (vanch_fixed vs chainway_c72) قبل بدء المسح.
+ * 
+ * @return GateDevice أو null
+ */
+public GateDevice getActiveDeviceGate() {
+    try {
+        String deviceGateId = getDeviceGateId();
+        if (deviceGateId == null || deviceGateId.trim().isEmpty()) {
+            return null;
+        }
 
+        List<GateDevice> gates = getGates();
+        if (gates == null || gates.isEmpty()) return null;
+
+        for (GateDevice gate : gates) {
+            if (gate == null) continue;
+            if (gate.gateId != null && gate.gateId.equals(deviceGateId)) {
+                return gate;
+            }
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "getActiveDeviceGate error: " + e.getMessage());
+    }
+    return null;
+}
     /**
      * اضبط gate_id لهذا الجهاز.
      * يُستدعى من MiraApiClient.login() بعد نجاح الدخول.
