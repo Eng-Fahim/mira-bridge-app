@@ -52,7 +52,7 @@ import com.example.uhf.manager.PendingSalesManager;
 import com.example.uhf.manager.PendingSalesQueue;
 import com.example.uhf.manager.PendingSale;
 import com.example.uhf.manager.OfflineSalesSyncer;
-
+import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.PosCartManager;
 import com.example.uhf.manager.PosHeroController;
@@ -3591,15 +3591,35 @@ private void triggerOfflineSyncIfNeeded() {
             }
             
             @Override
-            public void onSaleSynced(PendingSale sale, boolean success, 
-                                     @Nullable String error) {
-                if (success) {
-                    Log.i(TAG, "✅ Synced: " + sale.localUuid);
-                } else {
-                    Log.w(TAG, "⚠️ Failed to sync: " + sale.localUuid 
-                            + " | " + error);
+public void onSaleSynced(PendingSale sale, boolean success,
+                        @Nullable String error) {
+    if (success) {
+        Log.i(TAG, "✅ Synced: " + sale.localUuid);
+        
+        // ✅ [v3.2] علّم القطع كمزامنة
+        try {
+            if (sale.payloadJson != null) {
+                JSONObject payload = new JSONObject(sale.payloadJson);
+                JSONArray items = payload.optJSONArray("items");
+                if (items != null) {
+                    Context ctx = getSafeAppContext();
+                    if (ctx != null) {
+                        OfflineGateCache cache = OfflineGateCache.getInstance(ctx);
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject item = items.getJSONObject(i);
+                            String epc = item.optString("epc", "");
+                            String tid = item.optString("tid", "");
+                            if (!epc.isEmpty()) cache.markAsSynced(epc);
+                            if (!tid.isEmpty() && !tid.equals(epc)) {
+                                cache.markAsSynced(tid);
+                            }
+                        }
+                    }
                 }
             }
+        } catch (Exception ignored) {}
+    }
+}
             
             @Override
 public void onSyncComplete(int synced, int failed, int remaining) {
