@@ -8,15 +8,20 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- * MIRA Settings Manager v2.1
- * 
- * ✅ [v2.1] إضافة:
- *   - getDeviceGateId() / setDeviceGateId()
- *   - KEY_DEVICE_GATE_ID — gate_id المثبت على الجهاز
- *   - يُستخدم من MiraSecureGateFragment لتسجيل gate_id دقيق في السجلات
+ * MIRA Settings Manager v3.0
+ *
+ * ✅ [v3.0] ربط متعدد:
+ *   - getLinkedGateIds() / addLinkedGate() / removeLinkedGate()
+ *   - isGateLinked() / getLinkedGateCount() / getLinkedGates()
+ *   - الحفاظ على getDeviceGateId() / setDeviceGateId() للتوافق العكسي
+ *
+ * ✅ [v2.1] يعمل كما هو (deprecated):
+ *   - getDeviceGateId / setDeviceGateId — للتوافق
  */
 public class MiraGatesSettings {
 
@@ -47,8 +52,8 @@ public class MiraGatesSettings {
 
     private static final String KEY_SIMULATE_EXIT_ON_SALE = "simulate_exit_on_sale";
 
-    /** ✅ [v2.1] gate_id المثبت على هذا الجهاز */
-    private static final String KEY_DEVICE_GATE_ID = "device_gate_id";
+    /** ✅ [v3.0] قائمة gate_ids المربوطة (JSON array) */
+    private static final String KEY_LINKED_GATE_IDS = "linked_gate_ids";
 
     // ═══════════════════════════════════════════════════════════
     // 🎯 Operation Mode Enum
@@ -72,65 +77,127 @@ public class MiraGatesSettings {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ✅ [v2.1] Device Gate ID — للاستخدام في السجلات الأمنية
+    // ✅ [v3.0] Linked Gates — ربط متعدد
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * gate_id المثبت على هذا الجهاز (يُضبط عند login).
-     * 
-     * يُستخدم من MiraSecureGateFragment.getCurrentGateId()
-     * لتسجيل قرار البوابة تحت gate_id الصحيح (وليس أول قائمة).
-     * 
-     * @return gate_id أو "" إذا لم يُضبط بعد
+     * ✅ يعيد مجموعة gate_ids المربوطة حالياً.
+     * LinkedHashSet للحفاظ على ترتيب الإضافة.
      */
-    public String getDeviceGateId() {
-        return prefs.getString(KEY_DEVICE_GATE_ID, "");
-    }
-    
-    
-/**
- * ✅ [v2.2] يُعيد البوابة النشطة لهذا الجهاز.
- * 
- * منطق:
- *   1. اقرأ device_gate_id (gate_id المثبت من login)
- *   2. ابحث في القائمة عن البوابة المطابقة
- *   3. أرجعها أو null
- * 
- * تُستخدم من GateRfidBridge لمعرفة نوع الجهاز
- * (vanch_fixed vs chainway_c72) قبل بدء المسح.
- * 
- * @return GateDevice أو null
- */
-public GateDevice getActiveDeviceGate() {
-    try {
-        String deviceGateId = getDeviceGateId();
-        if (deviceGateId == null || deviceGateId.trim().isEmpty()) {
-            return null;
-        }
-
-        List<GateDevice> gates = getGates();
-        if (gates == null || gates.isEmpty()) return null;
-
-        for (GateDevice gate : gates) {
-            if (gate == null) continue;
-            if (gate.gateId != null && gate.gateId.equals(deviceGateId)) {
-                return gate;
+    public Set<String> getLinkedGateIds() {
+        Set<String> result = new LinkedHashSet<>();
+        try {
+            String json = prefs.getString(KEY_LINKED_GATE_IDS, "[]");
+            JSONArray arr = new JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                String id = arr.optString(i, "").trim();
+                if (!id.isEmpty()) result.add(id);
             }
+        } catch (Exception e) {
+            Log.w(TAG, "getLinkedGateIds parse error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.w(TAG, "getActiveDeviceGate error: " + e.getMessage());
+        return result;
     }
-    return null;
-}
+
+    /** ✅ إضافة بوابة للقائمة (idempotent) */
+    public synchronized void addLinkedGate(String gateId) {
+        if (gateId == null || gateId.trim().isEmpty()) return;
+        Set<String> current = getLinkedGateIds();
+        if (current.add(gateId.trim())) {
+            saveLinkedGateIds(current);
+            Log.i(TAG, "✅ Gate linked: " + gateId
+                    + " (total=" + current.size() + ")");
+        }
+    }
+
+    /** ✅ إزالة بوابة من القائمة */
+    public synchronized void removeLinkedGate(String gateId) {
+        if (gateId == null) return;
+        Set<String> current = getLinkedGateIds();
+        if (current.remove(gateId.trim())) {
+            saveLinkedGateIds(current);
+            Log.i(TAG, "✅ Gate unlinked: " + gateId
+                    + " (total=" + current.size() + ")");
+        }
+    }
+
+    /** ✅ هل البوابة مربوطة؟ */
+    public boolean isGateLinked(String gateId) {
+        if (gateId == null) return false;
+        return getLinkedGateIds().contains(gateId.trim());
+    }
+
+    /** ✅ عدد البوابات المربوطة */
+    public int getLinkedGateCount() {
+        return getLinkedGateIds().size();
+    }
+
+    /** ✅ جميع البوابات المربوطة (كائنات كاملة) */
+    public List<GateDevice> getLinkedGates() {
+        List<GateDevice> result = new ArrayList<>();
+        try {
+            Set<String> ids = getLinkedGateIds();
+            if (ids.isEmpty()) return result;
+
+            List<GateDevice> all = getGates();
+            for (GateDevice g : all) {
+                if (g != null && g.gateId != null && ids.contains(g.gateId)) {
+                    result.add(g);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "getLinkedGates error: " + e.getMessage());
+        }
+        return result;
+    }
+
+    /** حفظ JSON داخلي */
+    private void saveLinkedGateIds(Set<String> ids) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (String id : ids) arr.put(id);
+            prefs.edit().putString(KEY_LINKED_GATE_IDS, arr.toString()).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "saveLinkedGateIds error: " + e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ✅ Backward Compatibility — v2.1 API (deprecated)
+    // ═══════════════════════════════════════════════════════════
+
     /**
-     * اضبط gate_id لهذا الجهاز.
-     * يُستدعى من MiraApiClient.login() بعد نجاح الدخول.
+     * @deprecated استخدم getLinkedGateIds() / getLinkedGates()
+     * يعيد أول بوابة مربوطة.
      */
+    @Deprecated
+    public String getDeviceGateId() {
+        Set<String> ids = getLinkedGateIds();
+        return ids.isEmpty() ? "" : ids.iterator().next();
+    }
+
+    /**
+     * @deprecated استخدم addLinkedGate() / removeLinkedGate()
+     * يستبدل القائمة كاملة بـ gate_id واحد.
+     */
+    @Deprecated
     public void setDeviceGateId(String gateId) {
         if (gateId == null) gateId = "";
         String trimmed = gateId.trim();
-        prefs.edit().putString(KEY_DEVICE_GATE_ID, trimmed).apply();
-        Log.i(TAG, "✅ Device gate_id set: " + trimmed);
+        Set<String> current = new LinkedHashSet<>();
+        if (!trimmed.isEmpty()) current.add(trimmed);
+        saveLinkedGateIds(current);
+        Log.i(TAG, "⚠️ setDeviceGateId (deprecated) → linked set = " + current);
+    }
+
+    /**
+     * @deprecated استخدم getLinkedGates()
+     * يعيد أول بوابة مربوطة.
+     */
+    @Deprecated
+    public GateDevice getActiveDeviceGate() {
+        List<GateDevice> linked = getLinkedGates();
+        return linked.isEmpty() ? null : linked.get(0);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -214,7 +281,7 @@ public GateDevice getActiveDeviceGate() {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 🏢 إدارة البوابات
+    // 🏢 إدارة البوابات — GateDevice
     // ═══════════════════════════════════════════════════════════
 
     public static class GateDevice {
@@ -356,6 +423,8 @@ public GateDevice getActiveDeviceGate() {
             }
         }
         saveGates(gates);
+        // ✅ [v3.0] إزالة من القائمة المربوطة أيضاً
+        removeLinkedGate(gateId);
     }
 
     public void saveGateSettings(String gateId, String soundPass, String soundDeny,
