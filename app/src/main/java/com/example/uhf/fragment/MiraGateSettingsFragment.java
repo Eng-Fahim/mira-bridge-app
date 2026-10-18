@@ -1392,7 +1392,87 @@ public class MiraGateSettingsFragment extends Fragment {
             }
         });
     }
+/**
+ * ✅ [v2.3] نافذة تأكيد ربط الجهاز بالبوابة
+ */
+private void confirmLinkGate(MiraGatesSettings.GateDevice gate) {
+    try {
+        if (!isAdded() || getContext() == null || gate == null || settings == null) return;
 
+        String linkedGateId = settings.getDeviceGateId();
+        boolean isCurrentlyLinked = gate.gateId != null
+                && gate.gateId.equals(linkedGateId);
+
+        String typeDisplay = deviceTypeDisplayName(gate.deviceType);
+        String ipLine = (gate.ipAddress != null && !gate.ipAddress.trim().isEmpty())
+                ? "\n🌐 " + gate.ipAddress
+                : "";
+
+        String title = isArabic
+                ? (isCurrentlyLinked ? "🔓 إلغاء ربط الجهاز" : "📌 ربط الجهاز بالبوابة")
+                : (isCurrentlyLinked ? "🔓 Unlink Device" : "📌 Link Device to Gate");
+
+        String message = isArabic
+                ? (isCurrentlyLinked
+                        ? "هذا الجهاز مربوط حالياً بـ:\n\n📌 " + safe(gate.gateName)
+                        : "سيتم ربط هذا التابلت بالبوابة:\n\n"
+                          + "📌 " + safe(gate.gateName) + "\n"
+                          + "📡 " + typeDisplay + ipLine + "\n\n"
+                          + "بعد الربط، سيتصل تطبيق Secure Gate بهذه البوابة تلقائياً.")
+                : (isCurrentlyLinked
+                        ? "This device is currently linked to:\n\n📌 " + safe(gate.gateName)
+                        : "This tablet will be linked to:\n\n"
+                          + "📌 " + safe(gate.gateName) + "\n"
+                          + "📡 " + typeDisplay + ipLine + "\n\n"
+                          + "Secure Gate will auto-connect to this gate.");
+
+        AlertDialog.Builder b = new AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+
+        if (isCurrentlyLinked) {
+            b.setPositiveButton(isArabic ? "🔓 إلغاء الربط" : "🔓 Unlink",
+                    (d, w) -> {
+                        settings.setDeviceGateId("");
+                        loadGatesFromLocal();
+                        Toast.makeText(getContext(),
+                                isArabic ? "🔓 تم إلغاء الربط" : "🔓 Unlinked",
+                                Toast.LENGTH_SHORT).show();
+                    });
+        } else {
+            b.setPositiveButton(isArabic ? "📌 ربط الآن" : "📌 Link Now",
+                    (d, w) -> {
+                        settings.setDeviceGateId(gate.gateId);
+                        loadGatesFromLocal();
+                        Toast.makeText(getContext(),
+                                isArabic
+                                        ? "✅ تم ربط الجهاز بـ: " + safe(gate.gateName)
+                                        : "✅ Linked to: " + safe(gate.gateName),
+                                Toast.LENGTH_LONG).show();
+                        Log.i(TAG, "Device linked to gate: "
+                                + gate.gateId + " (" + gate.deviceType + ")");
+                    });
+        }
+
+        b.show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "confirmLinkGate error: " + e.getMessage(), e);
+    }
+}
+
+/** ✅ [v2.3] اسم نوع الجهاز للعرض */
+private String deviceTypeDisplayName(String type) {
+    if (type == null) return "Unknown";
+    switch (type) {
+        case "vanch_fixed":       return isArabic ? "📡 VANCH Fixed" : "📡 VANCH Fixed";
+        case "chainway_c72":      return isArabic ? "📱 Chainway C72" : "📱 Chainway C72";
+        case "generic_bluetooth": return isArabic ? "📶 Bluetooth" : "📶 Bluetooth";
+        case "simulator":         return isArabic ? "🧪 Simulator" : "🧪 Simulator";
+        default:                  return type;
+    }
+}
     private void removeGate(int position) {
         try {
             if (!isAdded() || getContext() == null) return;
@@ -1416,12 +1496,17 @@ public class MiraGateSettingsFragment extends Fragment {
                                 ? "هل تريد حذف: " + safe(gate.gateName) + "؟"
                                 : "Delete: " + safe(gate.gateName) + "?")
                         .setPositiveButton(isArabic ? "حذف" : "Delete", (d, w) -> {
-                            if (settings != null) {
-                                settings.removeGate(gate.gateId);
-                            }
-                            // امسح من ذاكرة VANCH
-                            vanchHealthCache.remove(gate.gateId);
-                            loadGatesFromLocal();
+                            // ✅ [v2.3] إذا كانت هذه البوابة مربوطة → ألغِ الربط أولاً
+if (gate.gateId != null && gate.gateId.equals(settings.getDeviceGateId())) {
+    settings.setDeviceGateId("");
+    Log.w(TAG, "Linked gate removed — auto-unlinked");
+}
+
+if (settings != null) {
+    settings.removeGate(gate.gateId);
+}
+vanchHealthCache.remove(gate.gateId);
+loadGatesFromLocal();
 
                             Toast.makeText(getContext(),
                                     isArabic
@@ -1848,6 +1933,30 @@ public class MiraGateSettingsFragment extends Fragment {
                         }
                     });
                 }
+                
+                // ✅ [v2.3] زر «📌 ربط بالجهاز»
+if (holder.btnLinkDevice != null) {
+    String linkedGateId = (settings != null) ? settings.getDeviceGateId() : "";
+    boolean isLinked = gate.gateId != null
+            && gate.gateId.equals(linkedGateId);
+
+    if (isLinked) {
+        holder.btnLinkDevice.setText(isArabic ? "✅ مربوط" : "✅ Linked");
+        holder.btnLinkDevice.setEnabled(false);
+        holder.btnLinkDevice.setAlpha(0.55f);
+        holder.btnLinkDevice.setOnClickListener(null);
+    } else {
+        holder.btnLinkDevice.setText(isArabic ? "📌 ربط" : "📌 Link");
+        holder.btnLinkDevice.setEnabled(true);
+        holder.btnLinkDevice.setAlpha(1.0f);
+        holder.btnLinkDevice.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos != RecyclerView.NO_POSITION && pos < gates.size()) {
+                confirmLinkGate(gates.get(pos));
+            }
+        });
+    }
+}
 
                 holder.itemView.setOnClickListener(v -> {
                     int pos = holder.getAdapterPosition();
@@ -1866,25 +1975,26 @@ public class MiraGateSettingsFragment extends Fragment {
         }
 
         class GateViewHolder extends RecyclerView.ViewHolder {
-            TextView tvGateName, tvGateLocation, tvGateStatus, tvGateStats,
-                     tvGateLastEvent, tvGateBranch, tvGateDeviceType;
-            View btnRemove;
-            MaterialButton btnToggleGate;
+    TextView tvGateName, tvGateLocation, tvGateStatus, tvGateStats,
+             tvGateLastEvent, tvGateBranch, tvGateDeviceType;
+    View btnRemove;
+    MaterialButton btnToggleGate;
+    MaterialButton btnLinkDevice;   // ✅ [v2.3]
 
-            GateViewHolder(@NonNull View itemView) {
-                super(itemView);
-                tvGateName = itemView.findViewById(R.id.tvGateName);
-                tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
-                tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
-                tvGateStats = itemView.findViewById(R.id.tvGateStats);
-                tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
-                tvGateBranch = itemView.findViewById(R.id.tvGateBranch);
-                tvGateDeviceType = itemView.findViewById(R.id.tvGateDeviceType);
-                btnRemove = itemView.findViewById(R.id.btnRemoveGate);
-                btnToggleGate = itemView.findViewById(R.id.btnToggleGate);
-            }
-        }
+    GateViewHolder(@NonNull View itemView) {
+        super(itemView);
+        tvGateName = itemView.findViewById(R.id.tvGateName);
+        tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
+        tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+        tvGateStats = itemView.findViewById(R.id.tvGateStats);
+        tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+        tvGateBranch = itemView.findViewById(R.id.tvGateBranch);
+        tvGateDeviceType = itemView.findViewById(R.id.tvGateDeviceType);
+        btnRemove = itemView.findViewById(R.id.btnRemoveGate);
+        btnToggleGate = itemView.findViewById(R.id.btnToggleGate);
+        btnLinkDevice = itemView.findViewById(R.id.btnLinkDevice);  // ✅
     }
+}
 
     // ═══════════════════════════════════════════════════════
     // Interfaces
