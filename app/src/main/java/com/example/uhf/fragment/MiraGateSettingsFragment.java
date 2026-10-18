@@ -1840,99 +1840,99 @@ loadGatesFromLocal();
         }
 
         @Override
-        public void onBindViewHolder(@NonNull GateViewHolder holder, int position) {
-            try {
-                if (position < 0 || position >= gates.size()) return;
-                MiraGatesSettings.GateDevice gate = gates.get(position);
-                if (gate == null) return;
+public void onBindViewHolder(@NonNull GateViewHolder holder, int position) {
+    try {
+        if (position < 0 || position >= gates.size()) return;
+        MiraGatesSettings.GateDevice gate = gates.get(position);
+        if (gate == null) return;
 
-                if (holder.tvGateName != null) {
-                    String name = gate.gateName != null && !gate.gateName.isEmpty()
-                            ? gate.gateName
-                            : (isArabic ? "بوابة" : "Gate");
-                    holder.tvGateName.setText(name);
-                }
-
-                if (holder.tvGateLocation != null) {
-                    String location = gate.location != null && !gate.location.isEmpty()
-                            ? gate.location
-                            : (isArabic ? "غير محدد" : "Not specified");
-                    holder.tvGateLocation.setText("📍 " + location);
-                }
-
-                if (holder.tvGateBranch != null) {
-                    String branch = gate.branchName != null && !gate.branchName.isEmpty()
-                            ? gate.branchName
-                            : (isArabic ? "غير محدد" : "Not specified");
-                    holder.tvGateBranch.setText("🏢 " + branch);
-                }
-
-                // نوع الجهاز
-                if (holder.tvGateDeviceType != null) {
-                    String deviceTypeName;
-                    switch (gate.deviceType != null ? gate.deviceType : "chainway_c72") {
-                        case "vanch_fixed":
-                            deviceTypeName = "📡 VANCH Fixed";
-                            if (gate.ipAddress != null && !gate.ipAddress.isEmpty()) {
-                                deviceTypeName += " • " + gate.ipAddress;
-                            }
-                            break;
-                        case "generic_bluetooth":
-                            deviceTypeName = "📶 Bluetooth";
-                            break;
-                        case "simulator":
-                            deviceTypeName = "🧪 Simulator";
-                            break;
-                        default:
-                            deviceTypeName = "📱 Chainway C72";
-                    }
-                    holder.tvGateDeviceType.setText(deviceTypeName);
-                }
-
-                boolean isOnline = "online".equals(gate.status)
-                        || "armed".equals(gate.status);
-                if (holder.tvGateStatus != null) {
-                    if (isOnline) {
-                        holder.tvGateStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
-                        holder.tvGateStatus.setTextColor(0xFF2E7D32);
-                    } else {
-                        holder.tvGateStatus.setText(isArabic ? "⚪ غير متصل" : "⚪ Offline");
-                        holder.tvGateStatus.setTextColor(0xFF9E9E9E);
-                    }
-                }
-
-                if (holder.tvGateStats != null) {
-                    holder.tvGateStats.setText("✅ " + gate.passCount
-                            + " | ❌ " + gate.denyCount);
-                }
-
-                if (holder.tvGateLastEvent != null) {
-                    String lastEventText = gate.lastEvent;
-                    if (lastEventText == null || lastEventText.isEmpty()
-                            || "null".equalsIgnoreCase(lastEventText)) {
-                        lastEventText = isArabic ? "لا أحداث" : "No events";
-                    }
-                    holder.tvGateLastEvent.setText(lastEventText);
-                }
-
-                if (holder.btnToggleGate != null) {
-                    holder.btnToggleGate.setText(isOnline ? "🔒" : "🔓");
-                    holder.btnToggleGate.setOnClickListener(v -> {
-                        int pos = holder.getAdapterPosition();
-                        if (pos != RecyclerView.NO_POSITION && toggleListener != null) {
-                            toggleListener.onToggle(pos, !isOnline);
-                        }
-                    });
-                }
-
-               if (holder.btnRemove != null) {
-    holder.btnRemove.setOnClickListener(v -> {
-        int pos = holder.getAdapterPosition();
-        if (pos != RecyclerView.NO_POSITION && removeListener != null) {
-            removeListener.onRemove(pos);
+        if (holder.tvGateName != null) {
+            String name = gate.gateName != null && !gate.gateName.isEmpty()
+                    ? gate.gateName
+                    : (isArabic ? "بوابة" : "Gate");
+            holder.tvGateName.setText(name);
         }
-    });
-}
+
+        if (holder.tvGateLocation != null) {
+            String location = gate.location != null && !gate.location.isEmpty()
+                    ? gate.location
+                    : (isArabic ? "غير محدد" : "Not specified");
+            holder.tvGateLocation.setText("📍 " + location);
+        }
+
+        if (holder.tvGateBranch != null) {
+            String branch = gate.branchName != null && !gate.branchName.isEmpty()
+                    ? gate.branchName
+                    : (isArabic ? "غير محدد" : "Not specified");
+            holder.tvGateBranch.setText("🏢 " + branch);
+        }
+
+        // نوع الجهاز
+        if (holder.tvGateDeviceType != null) {
+            String deviceTypeName;
+            switch (gate.deviceType != null ? gate.deviceType : "chainway_c72") {
+                case "vanch_fixed":
+                    deviceTypeName = "📡 VANCH Fixed";
+                    if (gate.ipAddress != null && !gate.ipAddress.isEmpty()) {
+                        deviceTypeName += " • " + gate.ipAddress;
+                    }
+                    break;
+                case "generic_bluetooth":
+                    deviceTypeName = "📶 Bluetooth";
+                    break;
+                case "simulator":
+                    deviceTypeName = "🧪 Simulator";
+                    break;
+                default:
+                    deviceTypeName = "📱 Chainway C72";
+            }
+            holder.tvGateDeviceType.setText(deviceTypeName);
+        }
+
+        boolean isOnline = "online".equals(gate.status)
+                || "armed".equals(gate.status);
+        if (holder.tvGateStatus != null) {
+            if (isOnline) {
+                holder.tvGateStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
+                holder.tvGateStatus.setTextColor(0xFF2E7D32);
+            } else {
+                holder.tvGateStatus.setText(isArabic ? "⚪ غير متصل" : "⚪ Offline");
+                holder.tvGateStatus.setTextColor(0xFF9E9E9E);
+            }
+        }
+
+        if (holder.tvGateStats != null) {
+            holder.tvGateStats.setText("✅ " + gate.passCount
+                    + " | ❌ " + gate.denyCount);
+        }
+
+        if (holder.tvGateLastEvent != null) {
+            String lastEventText = gate.lastEvent;
+            if (lastEventText == null || lastEventText.isEmpty()
+                    || "null".equalsIgnoreCase(lastEventText)) {
+                lastEventText = isArabic ? "لا أحداث" : "No events";
+            }
+            holder.tvGateLastEvent.setText(lastEventText);
+        }
+
+        if (holder.btnToggleGate != null) {
+            holder.btnToggleGate.setText(isOnline ? "🔒" : "🔓");
+            holder.btnToggleGate.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && toggleListener != null) {
+                    toggleListener.onToggle(pos, !isOnline);
+                }
+            });
+        }
+
+        if (holder.btnRemove != null) {
+            holder.btnRemove.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && removeListener != null) {
+                    removeListener.onRemove(pos);
+                }
+            });
+        }
 
         // ✅ [v2.3] زر «📌 ربط بالجهاز»
         if (holder.btnLinkDevice != null) {
@@ -1954,7 +1954,7 @@ loadGatesFromLocal();
                     confirmLinkGate(gates.get(pos));
                 }
             });
-        }   // ← قوس واحد فقط هنا
+        }
 
         holder.itemView.setOnClickListener(v -> {
             int pos = holder.getAdapterPosition();
@@ -1962,10 +1962,10 @@ loadGatesFromLocal();
                 editListener.onEdit(pos);
             }
         });
-    } catch (Exception e) {
+    } catch (Exception e) {                    // ← ✅ CATCH بعد إغلاق try
         Log.e(TAG, "onBindViewHolder error: " + e.getMessage(), e);
     }
-}
+}                                              // ← ✅ إغلاق onBindViewHolder
                 
 
         @Override
