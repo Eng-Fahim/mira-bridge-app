@@ -1332,13 +1332,21 @@ private void processRingEpc(final String code, final String source) {
     if (code == null || code.trim().isEmpty() || !isFragmentAlive()) return;
     final String cleanCode = code.trim();
 
-    // ✅ [v6.4] ابنِ قائمة المرشحين (كود كامل + بادئات محتملة)
     final List<String> candidates = buildSearchCandidates(cleanCode);
 
     if (candidates.size() > 1) {
         Log.i(TAG, "🔍 Partial serial detected: '" + cleanCode
                 + "' → trying " + candidates.size() + " candidates");
     }
+
+    // ✅ [إصلاح] تشغيل صوت البحث مرة واحدة فقط قبل بدء التجربة
+    playAlertSound(1); 
+    
+    safeRun(() -> {
+        if (tvCartStatus != null) {
+            tvCartStatus.setText(getString(R.string.pos_msg_searching));
+        }
+    });
 
     processRingEpcWithCandidates(cleanCode, source, candidates, 0);
 }
@@ -1391,7 +1399,7 @@ private void processRingEpcWithCandidates(
             () -> pendingEpcs.remove(candidate),
             PENDING_EPC_TIMEOUT_MS);
 
-    playAlertSound(1);
+    //playAlertSound(1);
 
     safeRun(() -> {
         if (tvCartStatus != null) {
@@ -2000,17 +2008,11 @@ private boolean shouldAutoSubmit(@Nullable String code) {
 @NonNull
 private List<String> buildSearchCandidates(@NonNull String code) {
     List<String> candidates = new ArrayList<>();
-    candidates.add(code);  // ابدأ بالكود الخام دائماً
     
-    // المرشحات الاحتياطية فقط لو السيرفر قديم/غير محدّث
-    if (looksLikePartialSerial(code)) {
-        for (String prefix : SERIAL_PREFIXES) {
-            String candidate = prefix + code;
-            if (!candidates.contains(candidate)) {
-                candidates.add(candidate);
-            }
-        }
-    }
+    // ✅ [تحسين] أرسل الكود الخام فقط. السيرفر الآن يبحث في اللواحق تلقائياً
+    // (بفضل دالة find_by_partial_serial في PHP)
+    candidates.add(code);  
+    
     return candidates;
 }
 private void showToast(String msg) {
