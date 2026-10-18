@@ -7,6 +7,7 @@ import android.util.Log;
 
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraServerConfig;
+import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.model.ItemModel;
 import com.example.uhf.model.MessageModel;
@@ -791,9 +792,16 @@ private ApiResponse accountingRequest(String method, String endpoint,
             String effectiveGateId = !newGateId.isEmpty() ? newGateId
                     : (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
             if (!effectiveGateId.isEmpty()) {
-                sessionManager.saveGateId(effectiveGateId);
-                serverConfig.setGateId(effectiveGateId);
-            }
+    sessionManager.saveGateId(effectiveGateId);
+    serverConfig.setGateId(effectiveGateId);
+
+    // ✅ [v2.1] احفظ device_gate_id في MiraGatesSettings
+    // يستخدمه MiraSecureGateFragment في السجلات الأمنية
+    try {
+        MiraGatesSettings.getInstance(context)
+                .setDeviceGateId(effectiveGateId);
+    } catch (Exception ignored) {}
+}
 
             // 3. Auth Token
             if (!authToken.isEmpty()) {
