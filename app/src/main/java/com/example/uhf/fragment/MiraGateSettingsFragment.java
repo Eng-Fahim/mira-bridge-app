@@ -1925,49 +1925,48 @@ loadGatesFromLocal();
                     });
                 }
 
-                if (holder.btnRemove != null) {
-                    holder.btnRemove.setOnClickListener(v -> {
-                        int pos = holder.getAdapterPosition();
-                        if (pos != RecyclerView.NO_POSITION && removeListener != null) {
-                            removeListener.onRemove(pos);
-                        }
-                    });
-                }
-                
-                // ✅ [v2.3] زر «📌 ربط بالجهاز»
-if (holder.btnLinkDevice != null) {
-    String linkedGateId = (settings != null) ? settings.getDeviceGateId() : "";
-    boolean isLinked = gate.gateId != null
-            && gate.gateId.equals(linkedGateId);
-
-    if (isLinked) {
-        holder.btnLinkDevice.setText(isArabic ? "✅ مربوط" : "✅ Linked");
-        holder.btnLinkDevice.setEnabled(false);
-        holder.btnLinkDevice.setAlpha(0.55f);
-        holder.btnLinkDevice.setOnClickListener(null);
-    } else {
-        holder.btnLinkDevice.setText(isArabic ? "📌 ربط" : "📌 Link");
-        holder.btnLinkDevice.setEnabled(true);
-        holder.btnLinkDevice.setAlpha(1.0f);
-        holder.btnLinkDevice.setOnClickListener(v -> {
-            int pos = holder.getAdapterPosition();
-            if (pos != RecyclerView.NO_POSITION && pos < gates.size()) {
-                confirmLinkGate(gates.get(pos));
-            }
-        });
-    }
+               if (holder.btnRemove != null) {
+    holder.btnRemove.setOnClickListener(v -> {
+        int pos = holder.getAdapterPosition();
+        if (pos != RecyclerView.NO_POSITION && removeListener != null) {
+            removeListener.onRemove(pos);
+        }
+    });
 }
 
-                holder.itemView.setOnClickListener(v -> {
-                    int pos = holder.getAdapterPosition();
-                    if (pos != RecyclerView.NO_POSITION && editListener != null) {
-                        editListener.onEdit(pos);
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "onBindViewHolder error: " + e.getMessage(), e);
+        // ✅ [v2.3] زر «📌 ربط بالجهاز»
+        if (holder.btnLinkDevice != null) {
+            String linkedGateId = (settings != null) ? settings.getDeviceGateId() : "";
+            boolean isLinked = gate.gateId != null
+                    && gate.gateId.equals(linkedGateId);
+
+            if (isLinked) {
+                holder.btnLinkDevice.setText(isArabic ? "✅ مربوط" : "✅ Linked");
+                holder.btnLinkDevice.setTextColor(0xFF16A34A);
+            } else {
+                holder.btnLinkDevice.setText(isArabic ? "📌 ربط" : "📌 Link");
+                holder.btnLinkDevice.setTextColor(0xFF1976D2);
             }
-        }
+
+            holder.btnLinkDevice.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && pos < gates.size()) {
+                    confirmLinkGate(gates.get(pos));
+                }
+            });
+        }   // ← قوس واحد فقط هنا
+
+        holder.itemView.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos != RecyclerView.NO_POSITION && editListener != null) {
+                editListener.onEdit(pos);
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "onBindViewHolder error: " + e.getMessage(), e);
+    }
+}
+                
 
         @Override
         public int getItemCount() {
