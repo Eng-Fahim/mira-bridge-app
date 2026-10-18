@@ -159,6 +159,7 @@ public class MiraGateSettingsFragment extends Fragment {
             applyPermissions();
             loadBranches();
             loadGatesFromLocal();
+            updateLinkedCountBadge();  
             loadGatesFromServer();
             loadGateStats();
 
@@ -284,6 +285,26 @@ public class MiraGateSettingsFragment extends Fragment {
             Log.e(TAG, "initViews error: " + e.getMessage(), e);
         }
     }
+
+/**
+ * ✅ [v3.0] تحديث شارة عدد البوابات المربوطة على زر الإضافة
+ */
+private void updateLinkedCountBadge() {
+    try {
+        if (settings == null) return;
+        int count = settings.getLinkedGateCount();
+
+        if (btnAddGate != null) {
+            String baseText = isArabic ? "➕ إضافة" : "➕ Add";
+            String suffix = count > 0
+                    ? " (" + count + " " + (isArabic ? "مربوط" : "linked") + ")"
+                    : "";
+            btnAddGate.setText(baseText + suffix);
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "updateLinkedCountBadge error: " + e.getMessage());
+    }
+}
 
     private void applyPermissions() {
         try {
@@ -1134,11 +1155,13 @@ public class MiraGateSettingsFragment extends Fragment {
                 mainHandler.postDelayed(this::checkVanchGatesHealth, 500);
             }
 
-            Toast.makeText(context,
-                    isArabic
-                        ? "✅ تمت إضافة البوابة لفرع: " + branchName
-                        : "✅ Gate added to: " + branchName,
-                    Toast.LENGTH_SHORT).show();
+            updateLinkedCountBadge();   // ✅ [v3.0]
+
+Toast.makeText(context,
+        isArabic
+            ? "✅ تمت إضافة البوابة لفرع: " + branchName
+            : "✅ Gate added to: " + branchName,
+        Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.e(TAG, "createGate error: " + e.getMessage(), e);
         }
@@ -1393,38 +1416,42 @@ public class MiraGateSettingsFragment extends Fragment {
         });
     }
 /**
- * ✅ [v2.3] نافذة تأكيد ربط الجهاز بالبوابة
+ * ✅ [v3.0] نافذة ربط/فك ربط متعدد
  */
 private void confirmLinkGate(MiraGatesSettings.GateDevice gate) {
     try {
         if (!isAdded() || getContext() == null || gate == null || settings == null) return;
 
-        String linkedGateId = settings.getDeviceGateId();
-        boolean isCurrentlyLinked = gate.gateId != null
-                && gate.gateId.equals(linkedGateId);
+        boolean isCurrentlyLinked = settings.isGateLinked(gate.gateId);
+        int totalLinked = settings.getLinkedGateCount();
 
         String typeDisplay = deviceTypeDisplayName(gate.deviceType);
         String ipLine = (gate.ipAddress != null && !gate.ipAddress.trim().isEmpty())
-                ? "\n🌐 " + gate.ipAddress
-                : "";
+                ? "\n🌐 " + gate.ipAddress : "";
 
         String title = isArabic
-                ? (isCurrentlyLinked ? "🔓 إلغاء ربط الجهاز" : "📌 ربط الجهاز بالبوابة")
-                : (isCurrentlyLinked ? "🔓 Unlink Device" : "📌 Link Device to Gate");
+                ? (isCurrentlyLinked ? "🔓 إلغاء ربط البوابة" : "📌 ربط البوابة")
+                : (isCurrentlyLinked ? "🔓 Unlink Gate" : "📌 Link Gate");
 
         String message = isArabic
                 ? (isCurrentlyLinked
-                        ? "هذا الجهاز مربوط حالياً بـ:\n\n📌 " + safe(gate.gateName)
-                        : "سيتم ربط هذا التابلت بالبوابة:\n\n"
+                        ? "هذه البوابة مربوطة حالياً:\n\n📌 " + safe(gate.gateName)
+                          + "\n\n📊 إجمالي المربوط: " + totalLinked
+                          + "\n\nبعد إلغاء الربط ستتوقف هذه البوابة عن المسح."
+                        : "سيتم إضافة هذه البوابة للقائمة النشطة:\n\n"
                           + "📌 " + safe(gate.gateName) + "\n"
-                          + "📡 " + typeDisplay + ipLine + "\n\n"
-                          + "بعد الربط، سيتصل تطبيق Secure Gate بهذه البوابة تلقائياً.")
+                          + "📡 " + typeDisplay + ipLine
+                          + "\n\n📊 سيصبح العدد: " + (totalLinked + 1)
+                          + "\n\nستعمل هذه البوابة بالتوازي مع البوابات المربوطة الأخرى.")
                 : (isCurrentlyLinked
-                        ? "This device is currently linked to:\n\n📌 " + safe(gate.gateName)
-                        : "This tablet will be linked to:\n\n"
+                        ? "This gate is currently linked:\n\n📌 " + safe(gate.gateName)
+                          + "\n\n📊 Total linked: " + totalLinked
+                          + "\n\nUnlinking will stop this gate."
+                        : "This gate will be added to active list:\n\n"
                           + "📌 " + safe(gate.gateName) + "\n"
-                          + "📡 " + typeDisplay + ipLine + "\n\n"
-                          + "Secure Gate will auto-connect to this gate.");
+                          + "📡 " + typeDisplay + ipLine
+                          + "\n\n📊 New total: " + (totalLinked + 1)
+                          + "\n\nIt will run in parallel with other linked gates.");
 
         AlertDialog.Builder b = new AlertDialog.Builder(requireContext())
                 .setTitle(title)
@@ -1434,24 +1461,32 @@ private void confirmLinkGate(MiraGatesSettings.GateDevice gate) {
         if (isCurrentlyLinked) {
             b.setPositiveButton(isArabic ? "🔓 إلغاء الربط" : "🔓 Unlink",
                     (d, w) -> {
-                        settings.setDeviceGateId("");
+                        settings.removeLinkedGate(gate.gateId);
                         loadGatesFromLocal();
+                        updateLinkedCountBadge();
                         Toast.makeText(getContext(),
-                                isArabic ? "🔓 تم إلغاء الربط" : "🔓 Unlinked",
+                                isArabic ? "🔓 تم إلغاء ربط: " + safe(gate.gateName)
+                                        : "🔓 Unlinked: " + safe(gate.gateName),
                                 Toast.LENGTH_SHORT).show();
+                        Log.i(TAG, "Gate unlinked: " + gate.gateId
+                                + " (remaining=" + settings.getLinkedGateCount() + ")");
                     });
         } else {
             b.setPositiveButton(isArabic ? "📌 ربط الآن" : "📌 Link Now",
                     (d, w) -> {
-                        settings.setDeviceGateId(gate.gateId);
+                        settings.addLinkedGate(gate.gateId);
                         loadGatesFromLocal();
+                        updateLinkedCountBadge();
                         Toast.makeText(getContext(),
-                                isArabic
-                                        ? "✅ تم ربط الجهاز بـ: " + safe(gate.gateName)
-                                        : "✅ Linked to: " + safe(gate.gateName),
+                                isArabic ? "✅ تم ربط: " + safe(gate.gateName)
+                                          + " (الإجمالي: "
+                                          + settings.getLinkedGateCount() + ")"
+                                        : "✅ Linked: " + safe(gate.gateName)
+                                          + " (total: "
+                                          + settings.getLinkedGateCount() + ")",
                                 Toast.LENGTH_LONG).show();
-                        Log.i(TAG, "Device linked to gate: "
-                                + gate.gateId + " (" + gate.deviceType + ")");
+                        Log.i(TAG, "Gate linked: " + gate.gateId
+                                + " (" + gate.deviceType + ")");
                     });
         }
 
@@ -1461,7 +1496,6 @@ private void confirmLinkGate(MiraGatesSettings.GateDevice gate) {
         Log.e(TAG, "confirmLinkGate error: " + e.getMessage(), e);
     }
 }
-
 /** ✅ [v2.3] اسم نوع الجهاز للعرض */
 private String deviceTypeDisplayName(String type) {
     if (type == null) return "Unknown";
@@ -1496,9 +1530,9 @@ private String deviceTypeDisplayName(String type) {
                                 ? "هل تريد حذف: " + safe(gate.gateName) + "؟"
                                 : "Delete: " + safe(gate.gateName) + "?")
                         .setPositiveButton(isArabic ? "حذف" : "Delete", (d, w) -> {
-                            // ✅ [v2.3] إذا كانت هذه البوابة مربوطة → ألغِ الربط أولاً
-if (gate.gateId != null && gate.gateId.equals(settings.getDeviceGateId())) {
-    settings.setDeviceGateId("");
+                                                        // ✅ [v3.0] إزالة تلقائية من القائمة المربوطة
+if (gate.gateId != null && settings.isGateLinked(gate.gateId)) {
+    settings.removeLinkedGate(gate.gateId);
     Log.w(TAG, "Linked gate removed — auto-unlinked");
 }
 
@@ -1507,6 +1541,7 @@ if (settings != null) {
 }
 vanchHealthCache.remove(gate.gateId);
 loadGatesFromLocal();
+updateLinkedCountBadge();
 
                             Toast.makeText(getContext(),
                                     isArabic
@@ -1934,27 +1969,27 @@ public void onBindViewHolder(@NonNull GateViewHolder holder, int position) {
             });
         }
 
-        // ✅ [v2.3] زر «📌 ربط بالجهاز»
-        if (holder.btnLinkDevice != null) {
-            String linkedGateId = (settings != null) ? settings.getDeviceGateId() : "";
-            boolean isLinked = gate.gateId != null
-                    && gate.gateId.equals(linkedGateId);
+        // ✅ [v3.0] زر «📌 ربط» متعدد
+if (holder.btnLinkDevice != null) {
+    boolean isLinked = settings != null
+            && gate.gateId != null
+            && settings.isGateLinked(gate.gateId);
 
-            if (isLinked) {
-                holder.btnLinkDevice.setText(isArabic ? "✅ مربوط" : "✅ Linked");
-                holder.btnLinkDevice.setTextColor(0xFF16A34A);
-            } else {
-                holder.btnLinkDevice.setText(isArabic ? "📌 ربط" : "📌 Link");
-                holder.btnLinkDevice.setTextColor(0xFF1976D2);
-            }
+    if (isLinked) {
+        holder.btnLinkDevice.setText(isArabic ? "✅ مربوط" : "✅ Linked");
+        holder.btnLinkDevice.setTextColor(0xFF16A34A);
+    } else {
+        holder.btnLinkDevice.setText(isArabic ? "📌 ربط" : "📌 Link");
+        holder.btnLinkDevice.setTextColor(0xFF1976D2);
+    }
 
-            holder.btnLinkDevice.setOnClickListener(v -> {
-                int pos = holder.getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && pos < gates.size()) {
-                    confirmLinkGate(gates.get(pos));
-                }
-            });
+    holder.btnLinkDevice.setOnClickListener(v -> {
+        int pos = holder.getAdapterPosition();
+        if (pos != RecyclerView.NO_POSITION && pos < gates.size()) {
+            confirmLinkGate(gates.get(pos));
         }
+    });
+}
 
         holder.itemView.setOnClickListener(v -> {
             int pos = holder.getAdapterPosition();
