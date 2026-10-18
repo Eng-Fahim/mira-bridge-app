@@ -2011,3 +2011,4 @@ public void onBindViewHolder(@NonNull GateViewHolder holder, int position) {
         void onEdit(int position);
     }
 }
+}
