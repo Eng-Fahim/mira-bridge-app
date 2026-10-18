@@ -8,73 +8,50 @@ import android.util.Log;
 import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.utils.MiraFileLogger;
 
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  GateRfidBridge v2.0 — الجسر الموحّد للبوابة الأمنية
+ *  GateRfidBridge v3.0 — Multi-Gate Router
  * ═══════════════════════════════════════════════════════════════════════════
  *
- *  v2.0 (هذا الإصدار) — إضافة VANCH Fixed:
- *  ────────────────────────────────────────
- *  ✅ يقرأ MiraGatesSettings.getActiveDeviceGate() لمعرفة البوابة المربوطة
- *  ✅ يوجّه حسب deviceType:
- *      • "vanch_fixed"      → VanchNetworkClient (TCP)
- *      • "chainway_c72"     → RFIDManager (Chainway)
- *      • "simulator"        → RFIDManager (Simulator)
- *      • "generic_bluetooth"→ RFIDManager
- *      • لا يوجد ربط       → RFIDManager (fallback آمن)
- *  ✅ onTagRead يعمل بنفس المسار لكلا النوعين
- *  ✅ doStopScan يوقف VANCH والقارئ الافتراضي بشكل صحيح
- *  ✅ shutdown ينظّف كلا المصدرين
+ *  v3.0:
+ *  ─────
+ *  ✅ N VANCH clients متزامن (Map<gateId, Client>)
+ *  ✅ onTagRead(gateId, epc, rssi) — يعرف المصدر
+ *  ✅ قارئ افتراضي واحد (Chainway/Simulator) fallback
+ *  ✅ reloadGates() — إعادة تحميل أثناء التشغيل
+ *  ✅ stopAllGates / shutdown نظيف
  *
- *  v1.0 (محفوظ):
+ *  v2.0 محفوظ:
  *  ─────────────
+ *  ✅ getLinkedGates() بدلاً من getActiveDeviceGate()
  *  ✅ Threading آمن (executor أحادي)
- *  ✅ لا ANR، لا Race Conditions
- *  ✅ Lifecycle واضح (start/stop/release)
- *
- *  المعمارية:
- *  ─────────
- *  MiraSecureGateFragment
- *      ↓ يستدعي
- *  GateRfidBridge (هذا الملف)
- *      ↓ يفوض حسب deviceType
- *  ┌────────────────────┬──────────────────────┐
- *  │ vanch_fixed        │ chainway / simulator │
- *  │ VanchNetworkClient │ RFIDManager          │
- *  └────────────────────┴──────────────────────┘
+ *  ✅ onTagRead عبر main thread
  * ═══════════════════════════════════════════════════════════════════════════
  */
 public class GateRfidBridge {
 
     private static final String TAG = "GateRfidBridge";
 
-    /** مهلة انتظار تحرير منفذ UART قبل فتح الكاميرا */
     private static final long CAMERA_PORT_RELEASE_MS = 150;
-
-    /** نطاق قوة الإرسال المسموح */
     private static final int MIN_POWER_DBM = 5;
     private static final int MAX_POWER_DBM = 30;
 
     // ═══════════════════════════════════════════════════════════
-    //  واجهة المستمع — يستخدمها MiraSecureGateFragment
+    //  واجهة المستمع
     // ═══════════════════════════════════════════════════════════
 
     public interface GateTagListener {
-        /** يُستدعى عند قراءة وسم جديد (على Main Thread) */
-        void onTagRead(String epc, int rssi);
-
-        /** بدأ المسح بنجاح */
-        void onScanStarted();
-
-        /** توقف المسح */
-        void onScanStopped();
-
-        /** حدث خطأ */
-        void onError(String error);
+        void onTagRead(String gateId, String epc, int rssi);
+        void onScanStarted(String gateId);
+        void onScanStopped(String gateId);
+        void onError(String gateId, String error);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -102,18 +79,19 @@ public class GateRfidBridge {
     private final ExecutorService hardwareExecutor;
     private final Handler mainHandler;
 
-    private final AtomicBoolean isScanning = new AtomicBoolean(false);
+    private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final AtomicBoolean isReleased = new AtomicBoolean(false);
 
     private volatile GateTagListener currentListener;
     private volatile int currentPowerDbm = MAX_POWER_DBM;
 
-    // ✅ [v2.0] VANCH Network Client
-    private volatile VanchNetworkClient vanchClient;
+    // ✅ [v3.0] عملاء VANCH متعددون
+    private final Map<String, VanchNetworkClient> vanchClients
+            = new ConcurrentHashMap<>();
 
-    // ✅ [v2.0] نوع الجهاز النشط حالياً
-    // "vanch_fixed" | "default" | null
-    private volatile String activeDeviceType;
+    // ✅ قارئ افتراضي واحد
+    private volatile MiraIRFIDReader defaultReader;
+    private volatile boolean defaultReaderActive = false;
 
     // ═══════════════════════════════════════════════════════════
     //  Constructor
@@ -128,29 +106,27 @@ public class GateRfidBridge {
             return t;
         });
         this.mainHandler = new Handler(Looper.getMainLooper());
-        MiraFileLogger.log(TAG, "✅ GateRfidBridge v2.0 initialized");
+        MiraFileLogger.log(TAG, "✅ GateRfidBridge v3.0 initialized");
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Reader Listener Adapter (MiraIRFIDReader → GateTagListener)
+    //  Default Reader Listener Adapter
     // ═══════════════════════════════════════════════════════════
 
-    private final MiraIRFIDReader.OnTagReadListener readerListener =
+    private final MiraIRFIDReader.OnTagReadListener defaultReaderListener =
             new MiraIRFIDReader.OnTagReadListener() {
 
         @Override
         public void onTagRead(String epc, int rssi) {
-            final GateTagListener listener = currentListener;
-            if (listener == null) return;
             if (epc == null || epc.trim().isEmpty()) return;
-
             final String cleanEpc = epc.trim().toUpperCase();
+            final String gateId = "__default__";
             mainHandler.post(() -> {
                 try {
                     GateTagListener l = currentListener;
-                    if (l != null) l.onTagRead(cleanEpc, rssi);
+                    if (l != null) l.onTagRead(gateId, cleanEpc, rssi);
                 } catch (Exception e) {
-                    MiraFileLogger.logError(TAG, "onTagRead dispatch error", e);
+                    MiraFileLogger.logError(TAG, "default onTagRead error", e);
                 }
             });
         }
@@ -160,7 +136,7 @@ public class GateRfidBridge {
             mainHandler.post(() -> {
                 try {
                     GateTagListener l = currentListener;
-                    if (l != null) l.onScanStarted();
+                    if (l != null) l.onScanStarted("__default__");
                 } catch (Exception ignored) {}
             });
         }
@@ -170,24 +146,23 @@ public class GateRfidBridge {
             mainHandler.post(() -> {
                 try {
                     GateTagListener l = currentListener;
-                    if (l != null) l.onScanStopped();
+                    if (l != null) l.onScanStopped("__default__");
                 } catch (Exception ignored) {}
             });
         }
 
         @Override
         public void onConnectionChanged(boolean connected) {
-            MiraFileLogger.log(TAG, "🔌 Reader connection changed: " + connected);
+            MiraFileLogger.log(TAG, "🔌 Default reader connected=" + connected);
         }
 
         @Override
         public void onError(String error) {
-            MiraFileLogger.logError(TAG, "Reader error: " + error);
-            final String errMsg = (error != null) ? error : "Unknown error";
+            final String msg = (error != null) ? error : "Unknown";
             mainHandler.post(() -> {
                 try {
                     GateTagListener l = currentListener;
-                    if (l != null) l.onError(errMsg);
+                    if (l != null) l.onError("__default__", msg);
                 } catch (Exception ignored) {}
             });
         }
@@ -198,19 +173,15 @@ public class GateRfidBridge {
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * ✅ بدء المسح — يوجّه تلقائياً حسب البوابة المربوطة
-     *
-     * @param listener  المستمع للوسوم
-     * @param powerDbm  قوة الإرسال (5-30)
-     * @return true إذا قُبل الطلب (لا يعني النجاح الفعلي)
+     * ✅ [v3.0] بدء جميع البوابات المربوطة
      */
-    public boolean startScan(GateTagListener listener, int powerDbm) {
+    public boolean startAllGates(GateTagListener listener, int powerDbm) {
         if (isReleased.get()) {
-            MiraFileLogger.logWarn(TAG, "❌ Cannot start — bridge released");
+            MiraFileLogger.logWarn(TAG, "❌ Bridge released");
             return false;
         }
         if (listener == null) {
-            MiraFileLogger.logWarn(TAG, "❌ startScan: null listener");
+            MiraFileLogger.logWarn(TAG, "❌ null listener");
             return false;
         }
 
@@ -218,279 +189,286 @@ public class GateRfidBridge {
         currentPowerDbm = clampPower(powerDbm);
 
         try {
-            hardwareExecutor.execute(this::doStartScan);
+            hardwareExecutor.execute(this::doStartAllGates);
             return true;
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "startScan dispatch failed", e);
+            MiraFileLogger.logError(TAG, "startAllGates dispatch error", e);
             return false;
         }
     }
 
-    /**
-     * ✅ [v2.0] يقرأ البوابة المربوطة ويوجّه حسب deviceType
-     */
-    private void doStartScan() {
-        try {
-            // 1) اقرأ البوابة المربوطة
-            MiraGatesSettings settings =
-                    MiraGatesSettings.getInstance(appContext);
-            MiraGatesSettings.GateDevice activeGate =
-                    settings.getActiveDeviceGate();
+    private void doStartAllGates() {
+        if (!isRunning.compareAndSet(false, true)) {
+            MiraFileLogger.log(TAG, "⏭️ Already running — skip start");
+            return;
+        }
 
-            if (activeGate == null) {
-                MiraFileLogger.log(TAG,
-                        "⚠️ No linked gate — falling back to default reader");
-                activeDeviceType = "default";
+        try {
+            MiraGatesSettings settings = MiraGatesSettings.getInstance(appContext);
+            List<MiraGatesSettings.GateDevice> linked = settings.getLinkedGates();
+
+            if (linked.isEmpty()) {
+                MiraFileLogger.log(TAG, "⚠️ No linked gates — fallback to default");
                 startDefaultReader();
                 return;
             }
 
-            activeDeviceType = activeGate.deviceType;
-
             MiraFileLogger.log(TAG,
-                    "🎯 Active gate: " + activeGate.gateName
-                            + " [" + activeGate.deviceType + "]");
+                    "🎯 Starting " + linked.size() + " linked gate(s)");
 
-            // 2) التوجيه
-            if ("vanch_fixed".equals(activeGate.deviceType)) {
-                startVanchClient(activeGate);
-            } else {
-                // chainway_c72 / generic_bluetooth / simulator
-                startDefaultReader();
+            for (MiraGatesSettings.GateDevice gate : linked) {
+                if (gate == null || gate.gateId == null) continue;
+                if ("vanch_fixed".equals(gate.deviceType)) {
+                    startVanchClient(gate);
+                } else {
+                    if (!defaultReaderActive) {
+                        startDefaultReader();
+                    }
+                }
             }
 
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "doStartScan exception", e);
-            notifyError("doStartScan: " + e.getMessage());
+            MiraFileLogger.logError(TAG, "doStartAllGates exception", e);
+            notifyError("__all__", "doStartAllGates: " + e.getMessage());
         }
     }
 
-    /**
-     * ✅ [v2.0] مسار VANCH Fixed (TCP)
-     */
     private void startVanchClient(MiraGatesSettings.GateDevice gate) {
         try {
             String endpoint = gate.ipAddress;
+            String gateId = gate.gateId;
+            String gateName = gate.gateName != null ? gate.gateName : gateId;
+
             if (endpoint == null || endpoint.trim().isEmpty()) {
-                notifyError("VANCH gate has no IP address");
+                notifyError(gateId, "No IP for VANCH: " + gateName);
+                return;
+            }
+
+            if (vanchClients.containsKey(gateId)) {
+                MiraFileLogger.log(TAG, "⏭️ VANCH already active: " + gateName);
                 return;
             }
 
             MiraFileLogger.log(TAG,
-                    "🚀 Starting VANCH client → " + endpoint);
+                    "🚀 VANCH [" + gateName + "] → " + endpoint);
 
-            isScanning.set(true);
+            VanchNetworkClient client = new VanchNetworkClient(
+                    endpoint, gateId,
+                    createVanchListener(gateId, gateName));
 
-            vanchClient = new VanchNetworkClient(endpoint,
-                    new VanchNetworkClient.VanchEventListener() {
-
-                @Override
-                public void onConnected() {
-                    MiraFileLogger.log(TAG, "✅ VANCH connected");
-                    mainHandler.post(() -> {
-                        GateTagListener l = currentListener;
-                        if (l != null) l.onScanStarted();
-                    });
-                }
-
-                @Override
-                public void onDisconnected(String reason) {
-                    MiraFileLogger.log(TAG,
-                            "🔌 VANCH disconnected: " + reason);
-                }
-
-                @Override
-                public void onTagRead(String epc, int rssi) {
-                    if (epc == null || epc.trim().isEmpty()) return;
-
-                    final String cleanEpc = epc.trim().toUpperCase();
-                    mainHandler.post(() -> {
-                        try {
-                            GateTagListener l = currentListener;
-                            if (l != null) l.onTagRead(cleanEpc, rssi);
-                        } catch (Exception e) {
-                            MiraFileLogger.logError(TAG,
-                                    "VANCH onTagRead dispatch error", e);
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(String error) {
-                    MiraFileLogger.logError(TAG, "VANCH error: " + error);
-                    notifyError("VANCH: " + error);
-                }
-            });
-
-            vanchClient.connect();
+            vanchClients.put(gateId, client);
+            client.connect();
 
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "startVanchClient exception", e);
-            notifyError("startVanchClient: " + e.getMessage());
-            isScanning.set(false);
+            MiraFileLogger.logError(TAG, "startVanchClient error", e);
+            notifyError(gate.gateId, "VANCH start: " + e.getMessage());
         }
     }
 
-    /**
-     * ✅ [v2.0] المسار الافتراضي (Chainway / Simulator / Bluetooth)
-     *    — نفس منطق v1.0 دون تغيير
-     */
+    private VanchNetworkClient.VanchEventListener createVanchListener(
+            final String gateId, final String gateName) {
+        return new VanchNetworkClient.VanchEventListener() {
+            @Override
+            public void onConnected() {
+                MiraFileLogger.log(TAG, "✅ VANCH connected: " + gateName);
+                mainHandler.post(() -> {
+                    GateTagListener l = currentListener;
+                    if (l != null) l.onScanStarted(gateId);
+                });
+            }
+
+            @Override
+            public void onDisconnected(String reason) {
+                MiraFileLogger.log(TAG,
+                        "🔌 VANCH [" + gateName + "] disconnected: " + reason);
+            }
+
+            @Override
+            public void onTagRead(String epc, int rssi) {
+                if (epc == null || epc.trim().isEmpty()) return;
+                final String cleanEpc = epc.trim().toUpperCase();
+                mainHandler.post(() -> {
+                    try {
+                        GateTagListener l = currentListener;
+                        if (l != null) l.onTagRead(gateId, cleanEpc, rssi);
+                    } catch (Exception e) {
+                        MiraFileLogger.logError(TAG,
+                                "VANCH onTagRead error [" + gateName + "]", e);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String error) {
+                MiraFileLogger.logError(TAG,
+                        "VANCH error [" + gateName + "]: " + error);
+                notifyError(gateId, "VANCH: " + error);
+            }
+        };
+    }
+
     private void startDefaultReader() {
         try {
             RFIDManager manager = RFIDManager.getInstance(appContext);
             MiraIRFIDReader reader = manager.getActiveReader();
 
             if (reader == null) {
-                MiraFileLogger.logWarn(TAG, "❌ No active reader");
-                notifyError("No active RFID reader configured");
+                notifyError("__default__", "No default reader available");
                 return;
             }
 
-            reader.setOnTagReadListener(readerListener);
+            defaultReader = reader;
+            reader.setOnTagReadListener(defaultReaderListener);
 
             try {
                 reader.setPower(currentPowerDbm);
-                MiraFileLogger.log(TAG, "⚡ Power: "
-                        + currentPowerDbm + " dBm");
             } catch (Exception e) {
-                MiraFileLogger.logWarn(TAG,
-                        "Set power failed: " + e.getMessage());
+                MiraFileLogger.logWarn(TAG, "setPower failed: " + e.getMessage());
             }
 
             if (!reader.isConnected()) {
-                MiraFileLogger.log(TAG, "🔌 Connecting reader...");
                 if (!reader.initialize() || !reader.connect()) {
-                    notifyError("Reader connect failed");
+                    notifyError("__default__", "Default reader connect failed");
                     return;
                 }
             }
 
             boolean ok = reader.startScan();
-            isScanning.set(ok);
+            defaultReaderActive = ok;
 
             if (ok) {
-                MiraFileLogger.log(TAG, "🚀 Scan started ["
+                MiraFileLogger.log(TAG, "🚀 Default reader scanning ["
                         + reader.getClass().getSimpleName() + "]");
+                mainHandler.post(() -> {
+                    GateTagListener l = currentListener;
+                    if (l != null) l.onScanStarted("__default__");
+                });
             } else {
-                notifyError("Failed to start scan");
+                notifyError("__default__", "Default startScan returned false");
             }
 
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "startDefaultReader exception", e);
-            notifyError("startDefaultReader: " + e.getMessage());
+            MiraFileLogger.logError(TAG, "startDefaultReader error", e);
+            notifyError("__default__", "startDefaultReader: " + e.getMessage());
         }
     }
 
     /**
-     * ✅ إيقاف المسح مع callback اختياري
+     * ✅ [v3.0] إيقاف جميع البوابات
      */
-    public void stopScan(Runnable onComplete) {
+    public void stopAllGates(Runnable onComplete) {
         try {
             hardwareExecutor.execute(() -> {
                 try {
-                    doStopScan();
-                } catch (Exception e) {
-                    MiraFileLogger.logError(TAG, "stopScan exception", e);
+                    doStopAllGates();
                 } finally {
-                    if (onComplete != null) {
-                        mainHandler.post(onComplete);
-                    }
+                    if (onComplete != null) mainHandler.post(onComplete);
                 }
             });
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "stopScan dispatch failed", e);
+            MiraFileLogger.logError(TAG, "stopAllGates dispatch error", e);
             if (onComplete != null) mainHandler.post(onComplete);
         }
     }
 
-    /**
-     * ✅ [v2.0] يوقف VANCH إن كان نشطاً + القارئ الافتراضي
-     */
-    private void doStopScan() {
-        if (!isScanning.getAndSet(false)) {
-            MiraFileLogger.log(TAG, "⏹️ stopScan: skipped (already stopped)");
+    private void doStopAllGates() {
+        if (!isRunning.getAndSet(false)) {
+            MiraFileLogger.log(TAG, "⏹️ Already stopped");
             return;
         }
 
         try {
-            // ✅ أوقف VANCH
-            if (vanchClient != null) {
-                MiraFileLogger.log(TAG, "⏹️ Stopping VANCH client");
+            for (Map.Entry<String, VanchNetworkClient> entry :
+                    vanchClients.entrySet()) {
                 try {
-                    vanchClient.disconnect();
+                    entry.getValue().disconnect();
+                    MiraFileLogger.log(TAG,
+                            "⏹️ VANCH stopped: " + entry.getKey());
                 } catch (Exception e) {
                     MiraFileLogger.logError(TAG,
-                            "VANCH disconnect error", e);
-                }
-                vanchClient = null;
-            }
-
-            // ✅ أوقف القارئ الافتراضي إن كان نشطاً
-            if ("default".equals(activeDeviceType)) {
-                RFIDManager manager = RFIDManager.getInstance(appContext);
-                MiraIRFIDReader reader = manager.getActiveReader();
-                if (reader != null) {
-                    reader.stopScan();
-                    reader.setOnTagReadListener(null);
+                            "VANCH disconnect error " + entry.getKey(), e);
                 }
             }
+            vanchClients.clear();
 
-            activeDeviceType = null;
-            MiraFileLogger.log(TAG, "⏹️ Scan stopped");
+            if (defaultReaderActive && defaultReader != null) {
+                try {
+                    defaultReader.stopScan();
+                    defaultReader.setOnTagReadListener(null);
+                    MiraFileLogger.log(TAG, "⏹️ Default reader stopped");
+                } catch (Exception e) {
+                    MiraFileLogger.logError(TAG,
+                            "Default reader stop error", e);
+                }
+            }
+            defaultReaderActive = false;
+
+            MiraFileLogger.log(TAG, "⏹️ All gates stopped");
 
         } catch (Exception e) {
-            MiraFileLogger.logError(TAG, "doStopScan error", e);
+            MiraFileLogger.logError(TAG, "doStopAllGates error", e);
         }
     }
 
     /**
-     * ✅ التمهيد لفتح الكاميرا:
-     *   1. أوقف المسح
-     *   2. انتظر 150ms (تحرير UART port)
-     *   3. نفّذ الـ callback
-     *
-     *   يعمل مع VANCH والافتراضي بلا تعديل.
+     * ✅ [v3.0] إعادة تحميل قائمة البوابات أثناء التشغيل
      */
+    public void reloadGates() {
+        MiraFileLogger.log(TAG, "🔄 Reloading gates");
+        stopAllGates(() -> {
+            try {
+                hardwareExecutor.execute(this::doStartAllGates);
+            } catch (Exception e) {
+                MiraFileLogger.logError(TAG, "reloadGates error", e);
+            }
+        });
+    }
+
+    /** ✅ توافق عكسي — يستدعي startAllGates */
+    public boolean startScan(GateTagListener listener, int powerDbm) {
+        return startAllGates(listener, powerDbm);
+    }
+
+    /** ✅ توافق عكسي — يستدعي stopAllGates */
+    public void stopScan(Runnable onComplete) {
+        stopAllGates(onComplete);
+    }
+
+    /** ✅ التمهيد للكاميرا */
     public void prepareForCamera(Runnable launchAction) {
         if (launchAction == null) return;
-
         MiraFileLogger.log(TAG, "📷 Preparing for camera...");
-
-        stopScan(() -> mainHandler.postDelayed(() -> {
+        stopAllGates(() -> mainHandler.postDelayed(() -> {
             try {
-                MiraFileLogger.log(TAG,
-                        "📷 UART released — launching camera");
                 launchAction.run();
             } catch (Exception e) {
-                MiraFileLogger.logError(TAG,
-                        "prepareForCamera launch error", e);
+                MiraFileLogger.logError(TAG, "camera launch error", e);
             }
         }, CAMERA_PORT_RELEASE_MS));
     }
 
-    /**
-     * ✅ هل البوابة تمسح الآن؟
-     */
     public boolean isScanning() {
-        return isScanning.get();
+        return isRunning.get();
     }
 
-    /**
-     * ✅ هل يوجد قارئ نشط جاهز؟
-     */
+    public int getActiveVanchCount() {
+        return vanchClients.size();
+    }
+
+    public boolean isDefaultReaderActive() {
+        return defaultReaderActive;
+    }
+
     public boolean isReaderReady() {
+        if (!vanchClients.isEmpty() || defaultReaderActive) return true;
         try {
-            RFIDManager manager = RFIDManager.getInstance(appContext);
-            MiraIRFIDReader reader = manager.getActiveReader();
-            return reader != null;
+            MiraGatesSettings settings = MiraGatesSettings.getInstance(appContext);
+            return !settings.getLinkedGates().isEmpty();
         } catch (Exception e) {
             return false;
         }
     }
 
-    /**
-     * ✅ هل القارئ النشط محاكياً (SIMULATOR)؟
-     */
     public boolean isSimulationMode() {
         try {
             RFIDManager manager = RFIDManager.getInstance(appContext);
@@ -502,34 +480,18 @@ public class GateRfidBridge {
         }
     }
 
-    /**
-     * ✅ [v2.0] نوع الجهاز النشط (للتشخيص والاختبار)
-     * @return "vanch_fixed" | "default" | null
-     */
-    public String getActiveDeviceType() {
-        return activeDeviceType;
-    }
-
-    /**
-     * ✅ إغلاق نظيف
-     */
     public void shutdown() {
         if (!isReleased.compareAndSet(false, true)) return;
+        MiraFileLogger.log(TAG, "🛑 Shutting down GateRfidBridge v3.0");
 
-        MiraFileLogger.log(TAG, "🛑 Shutting down GateRfidBridge");
-
-        try { doStopScan(); } catch (Exception ignored) {}
-
-        // ✅ تنظيف VANCH (احتياط إضافي)
-        if (vanchClient != null) {
-            try { vanchClient.disconnect(); } catch (Exception ignored) {}
-            vanchClient = null;
-        }
+        try { doStopAllGates(); } catch (Exception ignored) {}
+        vanchClients.clear();
 
         try { hardwareExecutor.shutdownNow(); } catch (Exception ignored) {}
 
         currentListener = null;
-        activeDeviceType = null;
+        defaultReader = null;
+        defaultReaderActive = false;
         instance = null;
     }
 
@@ -537,12 +499,13 @@ public class GateRfidBridge {
     //  Helpers
     // ═══════════════════════════════════════════════════════════
 
-    private void notifyError(String error) {
-        final String msg = (error != null) ? error : "Unknown error";
+    private void notifyError(String gateId, String error) {
+        final String gid = (gateId != null) ? gateId : "__all__";
+        final String msg = (error != null) ? error : "Unknown";
         mainHandler.post(() -> {
             try {
                 GateTagListener l = currentListener;
-                if (l != null) l.onError(msg);
+                if (l != null) l.onError(gid, msg);
             } catch (Exception ignored) {}
         });
     }
