@@ -106,6 +106,9 @@ private final StringBuilder debugLog = new StringBuilder();
 private static final int DEBUG_MAX_LINES = 12;
 
 private void addDebugLine(String line) {
+    // ✅ [PERF] لا شيء في production — حماية من 500+ UI posts/ثانية
+    if (!com.example.uhf.BuildConfig.DEBUG) return;
+    
     if (!isAdded() || getActivity() == null) return;
     getActivity().runOnUiThread(() -> {
         try {
@@ -113,7 +116,6 @@ private void addDebugLine(String line) {
                     .format(new java.util.Date());
             debugLog.insert(0, time + "  " + line + "\n");
             
-            // احتفظ بآخر N أسطر فقط
             String[] lines = debugLog.toString().split("\n");
             if (lines.length > DEBUG_MAX_LINES) {
                 debugLog.setLength(0);
@@ -128,7 +130,6 @@ private void addDebugLine(String line) {
         } catch (Exception ignored) {}
     });
 }
-
     // ==================== Refs ====================
     private View welcomeState;
     private View activeContentGroup;
@@ -582,11 +583,13 @@ try {
     Log.e(TAG, "Early RFID init error", e);
 }
 
-// 16.5) إنشاء لوحة التشخيص
-try {
-    createDebugOverlay();
-} catch (Exception e) {
-    Log.e(TAG, "createDebugOverlay error", e);
+// ✅ [SECURITY] Debug overlay فقط في DEV builds
+if (com.example.uhf.BuildConfig.DEBUG) {
+    try {
+        createDebugOverlay();
+    } catch (Exception e) {
+        Log.e(TAG, "createDebugOverlay error", e);
+    }
 }
 
         // 16) Views
@@ -1896,10 +1899,12 @@ private void proceedWithScanning() {
 nextScanIsResume = shouldResumeOnNextStart;
 shouldResumeOnNextStart = false;   // استُهلك الطلب
 
+    
     if (!nextScanIsResume) {
-        Log.i(TAG, "🆕 New session — clearing lists");
-        clearAllLists();
-        sessionElapsedBeforePause = 0;
+    Log.i(TAG, "🆕 New session — clearing lists + catalog");
+    clearAllLists();
+    catalogEpcs.clear();   // ✅ [CRITICAL] أفرِغ الكتالوج القديم
+    sessionElapsedBeforePause = 0;
     } else {
         Log.i(TAG, "🔄 Resuming session — preserving " +
                 scannedItemsDisplayList.size() + " items");
@@ -1952,9 +1957,11 @@ if (!started) {
 private void loadCatalogInBackground() {
     if (!isAdded() || isFragmentDestroyed || catalogManager == null) return;
 
-    backgroundExecutor.execute(() -> {
-        if (isFragmentDestroyed) return;
+    // ✅ [v4.4] احفظ session id الحالي للتحقق لاحقاً
+    final String sessionAtStart = inventoryEngine != null
+            ? inventoryEngine.getClientSessionId() : null;
 
+    backgroundExecutor.execute(() -> {
         catalogManager.fetchCatalog(apiClient, branchesManager,
                 new InventoryCatalogManager.CatalogCallback() {
                     @Override
@@ -1962,17 +1969,21 @@ private void loadCatalogInBackground() {
                         mainHandler.post(() -> {
                             if (!isAdded() || isFragmentDestroyed) return;
 
-                            // ✅ 1) احفظ الـ EPCs في الذاكرة
+                            // ✅ تجاهل إذا تغيّرت الجلسة
+                            if (sessionAtStart == null || inventoryEngine == null
+                                    || !sessionAtStart.equals(
+                                            inventoryEngine.getClientSessionId())) {
+                                Log.d(TAG, "⏭️ Stale catalog load — session changed");
+                                return;
+                            }
+
                             catalogEpcs.clear();
                             if (catalog != null) {
                                 catalogEpcs.addAll(catalog.keySet());
                             }
 
-                            // ✅ 2) حدّث العدد المتوقع
-                            // داخل onCatalogLoaded → mainHandler.post
-expectedCount = catalog != null ? catalog.size() : 0;
-addDebugLine("📚 Catalog: " + expectedCount + " items");   // ← أضف هنا
-                            
+                            expectedCount = catalog != null ? catalog.size() : 0;
+                            addDebugLine("📚 Catalog: " + expectedCount + " items");
 
                             if (tvExpectedCount != null) {
                                 tvExpectedCount.setText(
@@ -1982,8 +1993,6 @@ addDebugLine("📚 Catalog: " + expectedCount + " items");   // ← أضف هن�
                                 progressScanned.setMax(100);
                             }
 
-                            // ✅ 3) أعِد تقييم المواد الممسوحة (بدون updateCatalog)
-                            //    reclassifyScannedItems تقرأ من catalogManager.getItemByEpc()
                             reclassifyScannedItems();
 
                             Log.i(TAG, "✅ Catalog loaded in background: "
@@ -1993,12 +2002,18 @@ addDebugLine("📚 Catalog: " + expectedCount + " items");   // ← أضف هن�
 
                     @Override
                     public void onError(String error) {
+                        // ✅ لا تعرض الخطأ إذا تغيّرت الجلسة
+                        if (sessionAtStart == null || inventoryEngine == null
+                                || !sessionAtStart.equals(
+                                        inventoryEngine.getClientSessionId())) {
+                            return;
+                        }
+
                         Log.w(TAG, "⚠️ Catalog load failed (blind mode active): " + error);
                         mainHandler.post(() -> {
-                        addDebugLine("❌ Catalog FAILED");   
+                            addDebugLine("❌ Catalog FAILED");
                             if (!isAdded() || isFragmentDestroyed) return;
 
-                            // ✅ الجرد يعمل أصلاً (blind) — لا نوقف شيء
                             if (tvInventoryStatus != null) {
                                 tvInventoryStatus.setText(isArabic
                                         ? "📡 جرد بدون كتالوج"
@@ -2962,9 +2977,9 @@ private void updateUI() {
                         : "🎉 All expected items scanned — continue or stop manually");
             }
         } else {
-            // ✅ إعادة التعيين عند العودة تحت العدد المتوقع (بعد حذف أو مسح جديد)
-            //hasCelebrated = false;
-        }
+    // ✅ [v4.4] أعِد التعيين — قد يحذف المستخدم قطعة ثم يكمل مرة أخرى
+    hasCelebrated = false;
+}
 
     } else {
         // ✅ وضع الجرد الأعمى — لا توقعات
@@ -5001,6 +5016,14 @@ if (scanController != null) {
             printManager = null;
         } catch (Exception ignored) {}
 
+// ✅ [SECURITY] إزالة debug overlay من decorView
+if (debugOverlay != null && debugOverlay.getParent() != null) {
+    try {
+        ((android.view.ViewGroup) debugOverlay.getParent())
+                .removeView(debugOverlay);
+    } catch (Exception ignored) {}
+    debugOverlay = null;
+}
         super.onDestroyView();
     }
 
