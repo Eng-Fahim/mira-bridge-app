@@ -239,31 +239,39 @@ public class MiraApiClient {
 
     // ==================== إدارة الاعتمادات ====================
     private void refreshCredentials() {
-        synchronized (credentialsLock) {
-            String cleanBaseUrl = normalizeBaseUrl(baseUrl);
-            this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
+    synchronized (credentialsLock) {
+        String cleanBaseUrl = normalizeBaseUrl(baseUrl);
+        this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
 
-            String key = sessionManager.getApiKey();
-            if (key == null || key.isEmpty()) {
-                key = serverConfig.getApiKey();
-            }
-            this.apiKey = key != null ? key : "";
+        String key = sessionManager.getApiKey();
+        if (key == null || key.isEmpty()) {
+            key = serverConfig.getApiKey();
+        }
+        this.apiKey = key != null ? key : "";
 
-            String gate = sessionManager.getGateId();
-            if (gate == null || gate.isEmpty()) {
-                gate = serverConfig.getGateId();
-            }
-            this.gateId = gate != null ? gate : "";
+        String gate = sessionManager.getGateId();
+        if (gate == null || gate.isEmpty()) {
+            gate = serverConfig.getGateId();
+        }
+        this.gateId = gate != null ? gate : "";
 
-            // ✅ إجبار تحديث Cache
+        // ✅ [v3.3] حدّث cachedToken من sessionManager فوراً
+        // (بدلاً من مسحها — يسبب race مع login)
+        String token = sessionManager.getAuthToken();
+        if (token != null && !token.isEmpty()) {
+            this.cachedToken = token;
+            this.cachedTokenTimestamp = System.currentTimeMillis();
+        } else {
             this.cachedToken = null;
             this.cachedTokenTimestamp = 0;
-
-            Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
-                    + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "EXISTS")
-                    + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
         }
+
+        Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
+                + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "EXISTS")
+                + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId)
+                + ", Token=" + (cachedToken == null ? "EMPTY" : "EXISTS"));
     }
+}
 
     /**
      * ✅ refreshCredentialsAsync — على background مع حماية race
@@ -376,13 +384,26 @@ public class MiraApiClient {
 
     // ==================== الدوال الأساسية ===================
     private String getEffectiveApiKey() {
-        String key = apiKey;
-        if (key == null || key.isEmpty()) {
-            Log.e(TAG, "⛔ API Key is empty! User must login first.");
-            return "";
-        }
-        return key;
+    String key = apiKey;
+    
+    // ✅ [v3.3] Fallback: اقرأ من SessionManager مباشرة
+    // (حماية إضافية ضد race conditions)
+    if (key == null || key.isEmpty()) {
+        try {
+            key = sessionManager.getApiKey();
+            if (key != null && !key.isEmpty()) {
+                this.apiKey = key;   // cache فوري
+                return key;
+            }
+        } catch (Exception ignored) {}
     }
+    
+    if (key == null || key.isEmpty()) {
+        Log.e(TAG, "⛔ API Key is empty! User must login first.");
+        return "";
+    }
+    return key;
+}
 
     private String getEffectiveGateId() {
         String gate = gateId;
@@ -838,8 +859,10 @@ private ApiResponse accountingRequest(String method, String endpoint,
                 Log.e(TAG, "Save user info error: " + e.getMessage());
             }
 
-            // ✅ 5. تحديث Credentials — على background
-            refreshCredentialsAsync();
+           // ✅ [v3.3 CRITICAL] refreshCredentials() SYNC
+           // يضمن أن apiKey + cachedToken جاهزان قبل عودة login()
+           // بدون هذا، UHFMainActivity.onCreate() يُطلق طلبات بـ apiKey فارغ → 401
+           refreshCredentials();
 
         } else {
             // ✅ إصلاح: إبطال Cache عند فشل login
