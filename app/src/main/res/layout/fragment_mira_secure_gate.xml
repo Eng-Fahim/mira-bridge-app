@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout 
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/rootGateLayout"
@@ -10,8 +10,8 @@
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fillViewport="true"
         android:clipToPadding="false"
+        android:fillViewport="true"
         android:padding="12dp">
 
         <LinearLayout
@@ -19,7 +19,9 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- 1. Header & Status Card -->
+            <!-- ═══════════════════════════════════════════════════════
+                 1. Header & Status Card
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -33,11 +35,11 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
                     android:gravity="center_vertical"
+                    android:orientation="horizontal"
                     android:padding="14dp">
 
-                    <!-- ⭐ زر الإغلاق — يظهر يمين الشاشة في RTL -->
+                    <!-- ⭐ زر الإغلاق — يمين الشاشة في RTL -->
                     <ImageButton
                         android:id="@+id/btnGateClose"
                         android:layout_width="40dp"
@@ -52,6 +54,7 @@
                         android:src="@drawable/ic_close"
                         app:tint="?attr/colorOnSurfaceVariant" />
 
+                    <!-- العنوان + الحالة -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -77,21 +80,47 @@
                             android:textSize="12sp" />
                     </LinearLayout>
 
+                    <!-- شارة الحالة -->
                     <TextView
                         android:id="@+id/tvSystemStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:background="@drawable/status_badge_bg"
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="6dp"
-                        android:background="@drawable/status_badge_bg"
                         android:text="@string/gate_system_armed"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="12sp"
                         android:textStyle="bold" />
+
+                    <!-- ✅ [v4.0] زر PANIC - مطلوب من Java -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPanicLock"
+                        style="@style/Widget.Material3.Button.IconButton.Filled"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:minWidth="0dp"
+                        android:paddingHorizontal="10dp"
+                        android:text="🚨"
+                        android:textColor="?attr/colorOnError"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:contentDescription="Panic Lock"
+                        app:backgroundTint="?attr/colorError"
+                        app:cornerRadius="18dp"
+                        app:icon="@android:drawable/ic_lock_lock"
+                        app:iconGravity="textStart"
+                        app:iconPadding="4dp"
+                        app:iconSize="14dp"
+                        app:iconTint="?attr/colorOnError" />
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 2. Branch Selector / Info Card -->
+            <!-- ═══════════════════════════════════════════════════════
+                 2. Branch Selector / Info Card
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -130,7 +159,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 3. Live Ticker Card -->
+            <!-- ═══════════════════════════════════════════════════════
+                 3. Live Ticker Card
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardLiveTicker"
                 android:layout_width="match_parent"
@@ -170,9 +201,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ═══════════════════════════════════════════════════════════
-                 3.5 وضع التشغيل (جديد v2.0)
-                 ═══════════════════════════════════════════════════════════ -->
+            <!-- ═══════════════════════════════════════════════════════
+                 3.5 وضع التشغيل
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardOperationMode"
                 android:layout_width="match_parent"
@@ -190,13 +221,12 @@
                     android:orientation="vertical"
                     android:padding="12dp">
 
-                    <!-- العنوان + Badge -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="8dp">
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="0dp"
@@ -220,7 +250,6 @@
                             android:textStyle="bold" />
                     </LinearLayout>
 
-                    <!-- RadioGroup للأوضاع -->
                     <RadioGroup
                         android:id="@+id/rgOperationMode"
                         android:layout_width="match_parent"
@@ -253,14 +282,12 @@
                             android:textSize="12sp" />
                     </RadioGroup>
 
-                    <!-- فاصل -->
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginVertical="8dp"
                         android:background="?attr/colorOutlineVariant" />
 
-                    <!-- إعدادات إضافية -->
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/swKeepScreenOn"
                         android:layout_width="match_parent"
@@ -296,9 +323,6 @@
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp" />
 
-                    <!-- ═══════════════════════════════════════════════════════════
-                         🎬 محاكاة الخروج عند البيع (وضع اختباري)
-                         ═══════════════════════════════════════════════════════════ -->
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/swSimulateExitOnSale"
                         android:layout_width="match_parent"
@@ -313,15 +337,17 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:layout_marginBottom="4dp"
+                        android:paddingStart="8dp"
                         android:text="@string/gate_setting_simulate_exit_desc"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp"
-                        android:paddingStart="8dp" />
+                        android:textSize="10sp" />
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 4. KPI Summary Cards -->
+            <!-- ═══════════════════════════════════════════════════════
+                 4. KPI Summary Cards
+                 ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -437,7 +463,9 @@
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
-            <!-- 5. Main Action Buttons -->
+            <!-- ═══════════════════════════════════════════════════════
+                 5. Main Action Buttons
+                 ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -480,7 +508,9 @@
                     app:cornerRadius="10dp" />
             </LinearLayout>
 
-            <!-- 6. Risk Meter Card -->
+            <!-- ═══════════════════════════════════════════════════════
+                 6. Risk Meter Card
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -526,7 +556,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 7. Filter Buttons Bar -->
+            <!-- ═══════════════════════════════════════════════════════
+                 7. Filter Buttons Bar
+                 ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -564,7 +596,9 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- 8. Network Section Label & RecyclerView -->
+            <!-- ═══════════════════════════════════════════════════════
+                 8. Network Section Label & RecyclerView
+                 ═══════════════════════════════════════════════════════ -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -578,10 +612,12 @@
                 android:id="@+id/rvGatesMonitor"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="12dp"
+                android:nestedScrollingEnabled="false" />
 
-            <!-- 9. Tools & Simulation Actions Bar -->
+            <!-- ═══════════════════════════════════════════════════════
+                 9. Tools & Simulation Actions Bar
+                 ═══════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -619,7 +655,9 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- 10. Console Output Log -->
+            <!-- ═══════════════════════════════════════════════════════
+                 10. Console Output Log
+                 ═══════════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="120dp"
@@ -649,7 +687,9 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- 11. Fullscreen Alarm Overlay -->
+    <!-- ═══════════════════════════════════════════════════════════
+         11. Fullscreen Alarm Overlay
+         ═══════════════════════════════════════════════════════════ -->
     <FrameLayout
         android:id="@+id/overlayAlarm"
         android:layout_width="match_parent"
