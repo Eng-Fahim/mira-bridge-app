@@ -11,18 +11,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * MIRA Settings Manager
- * إدارة إعدادات التطبيق الشاملة
- * - إعدادات البوابات الأمنية
- * - إعدادات الأصوات والتنبيهات
- * - إعدادات أجهزة Chainway C72
- *
- * ═══════════════════════════════════════════════════════════════
- * v2.0 — الإضافات:
- *  - OperationMode: يدوي / شبه تلقائي / تلقائي كامل
- *  - إعدادات KeepScreenOn / ContinuousScan
- *  - دوال مساعدة لسلوك الوضع
- * ═══════════════════════════════════════════════════════════════
+ * MIRA Settings Manager v2.1
+ * 
+ * ✅ [v2.1] إضافة:
+ *   - getDeviceGateId() / setDeviceGateId()
+ *   - KEY_DEVICE_GATE_ID — gate_id المثبت على الجهاز
+ *   - يُستخدم من MiraSecureGateFragment لتسجيل gate_id دقيق في السجلات
  */
 public class MiraGatesSettings {
 
@@ -47,27 +41,22 @@ public class MiraGatesSettings {
     private static final String KEY_RFID_POWER = "rfid_power";
     private static final String KEY_SCAN_COOLDOWN = "scan_cooldown";
 
-    // ✅ v2.0 — مفاتيح جديدة
     private static final String KEY_OPERATION_MODE = "operation_mode";
     private static final String KEY_KEEP_SCREEN_ON = "keep_screen_on";
     private static final String KEY_CONTINUOUS_SCAN = "continuous_scan";
-    
+
     private static final String KEY_SIMULATE_EXIT_ON_SALE = "simulate_exit_on_sale";
 
-    // ═══════════════════════════════════════════════════════════
-    // 🎯 Operation Mode Enum (v2.0)
-    // ═══════════════════════════════════════════════════════════
+    /** ✅ [v2.1] gate_id المثبت على هذا الجهاز */
+    private static final String KEY_DEVICE_GATE_ID = "device_gate_id";
 
-    /**
-     * أوضاع تشغيل نظام البوابات:
-     *  - MANUAL    : يدوي — تحكم كامل من المستخدم
-     *  - SEMI_AUTO : شبه تلقائي — مسح تلقائي مع تنبيهات (موصى به)
-     *  - FULL_AUTO : تلقائي كامل — مسح مستمر بدون تدخل
-     */
+    // ═══════════════════════════════════════════════════════════
+    // 🎯 Operation Mode Enum
+    // ═══════════════════════════════════════════════════════════
     public enum OperationMode {
-        MANUAL,       // ✋ يدوي
-        SEMI_AUTO,    // 🔄 شبه تلقائي
-        FULL_AUTO     // ⚡ تلقائي كامل
+        MANUAL,
+        SEMI_AUTO,
+        FULL_AUTO
     }
 
     private MiraGatesSettings(Context context) {
@@ -83,7 +72,34 @@ public class MiraGatesSettings {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 🎯 Operation Mode (v2.0)
+    // ✅ [v2.1] Device Gate ID — للاستخدام في السجلات الأمنية
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * gate_id المثبت على هذا الجهاز (يُضبط عند login).
+     * 
+     * يُستخدم من MiraSecureGateFragment.getCurrentGateId()
+     * لتسجيل قرار البوابة تحت gate_id الصحيح (وليس أول قائمة).
+     * 
+     * @return gate_id أو "" إذا لم يُضبط بعد
+     */
+    public String getDeviceGateId() {
+        return prefs.getString(KEY_DEVICE_GATE_ID, "");
+    }
+
+    /**
+     * اضبط gate_id لهذا الجهاز.
+     * يُستدعى من MiraApiClient.login() بعد نجاح الدخول.
+     */
+    public void setDeviceGateId(String gateId) {
+        if (gateId == null) gateId = "";
+        String trimmed = gateId.trim();
+        prefs.edit().putString(KEY_DEVICE_GATE_ID, trimmed).apply();
+        Log.i(TAG, "✅ Device gate_id set: " + trimmed);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 🎯 Operation Mode
     // ═══════════════════════════════════════════════════════════
 
     public OperationMode getOperationMode() {
@@ -103,24 +119,15 @@ public class MiraGatesSettings {
         Log.i(TAG, "✅ Operation mode set: " + mode.name());
     }
 
-    /**
-     * هل الوضع الحالي يتطلب مسحاً تلقائياً؟
-     */
     public boolean isAutoScanMode() {
         OperationMode mode = getOperationMode();
         return mode == OperationMode.SEMI_AUTO || mode == OperationMode.FULL_AUTO;
     }
 
-    /**
-     * هل الوضع الحالي يدوي؟
-     */
     public boolean isManualMode() {
         return getOperationMode() == OperationMode.MANUAL;
     }
 
-    /**
-     * اسم الوضع للعرض
-     */
     public String getModeDisplayName(boolean isArabic) {
         switch (getOperationMode()) {
             case MANUAL:
@@ -135,12 +142,9 @@ public class MiraGatesSettings {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ⚙️ إعدادات v2.0 الإضافية
+    // ⚙️ إعدادات إضافية
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * إبقاء الشاشة نشطة
-     */
     public boolean isKeepScreenOn() {
         return prefs.getBoolean(KEY_KEEP_SCREEN_ON, true);
     }
@@ -149,54 +153,35 @@ public class MiraGatesSettings {
         prefs.edit().putBoolean(KEY_KEEP_SCREEN_ON, value).apply();
     }
 
-    /**
-     * هل يجب إبقاء الشاشة نشطة في الوضع الحالي؟
-     */
     public boolean shouldKeepScreenOn() {
         return isKeepScreenOn() && !isManualMode();
     }
 
-    /**
-     * المسح المستمر التلقائي
-     */
     public boolean isContinuousScanEnabled() {
         return prefs.getBoolean(KEY_CONTINUOUS_SCAN, true);
     }
-    
-    // ═══════════════════════════════════════════════════════════
-// 🎬 محاكاة الخروج عند البيع (وضع اختباري)
-// ═══════════════════════════════════════════════════════════
-
-/**
- * عند تفعيله:
- * - بمجرد البيع، يُنفَّذ record_exit_event تلقائياً
- * - gate_logs + gate_status يُحدَّثان
- * - items.vault_status = 'exited'
- * - allowed_epcs.status = 'exited'
- * 
- * ⚠️ افتراضياً: معطّل (للاستخدام في الإنتاج)
- * للاختبار فقط!
- */
-public boolean isSimulateExitOnSale() {
-    return prefs.getBoolean(KEY_SIMULATE_EXIT_ON_SALE, false);
-}
-
-public void setSimulateExitOnSale(boolean value) {
-    prefs.edit().putBoolean(KEY_SIMULATE_EXIT_ON_SALE, value).apply();
-    Log.i(TAG, "🎬 Simulate exit on sale: " + value);
-}
 
     public void setContinuousScanEnabled(boolean value) {
         prefs.edit().putBoolean(KEY_CONTINUOUS_SCAN, value).apply();
     }
 
-    // ============================================
-    // 🏢 إدارة البوابات الأمنية
-    // ============================================
+    // ═══════════════════════════════════════════════════════════
+    // 🎬 محاكاة الخروج عند البيع
+    // ═══════════════════════════════════════════════════════════
 
-    /**
-     * نموذج بوابة أمنية
-     */
+    public boolean isSimulateExitOnSale() {
+        return prefs.getBoolean(KEY_SIMULATE_EXIT_ON_SALE, false);
+    }
+
+    public void setSimulateExitOnSale(boolean value) {
+        prefs.edit().putBoolean(KEY_SIMULATE_EXIT_ON_SALE, value).apply();
+        Log.i(TAG, "🎬 Simulate exit on sale: " + value);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 🏢 إدارة البوابات
+    // ═══════════════════════════════════════════════════════════
+
     public static class GateDevice {
         public String gateId;
         public String gateName;
@@ -218,12 +203,10 @@ public void setSimulateExitOnSale(boolean value) {
         public boolean flashEnabled = true;
         public int alarmDuration = 10;
 
-        // ✅ الإحصائيات
         public int passCount = 0;
         public int denyCount = 0;
         public String lastEvent = "";
 
-        // ✅ الفرع
         public int branchId = 0;
         public String branchName = "";
 
@@ -290,9 +273,6 @@ public void setSimulateExitOnSale(boolean value) {
         }
     }
 
-    /**
-     * حفظ قائمة البوابات
-     */
     public void saveGates(List<GateDevice> gates) {
         JSONArray array = new JSONArray();
         for (GateDevice gate : gates) {
@@ -301,9 +281,6 @@ public void setSimulateExitOnSale(boolean value) {
         prefs.edit().putString(KEY_GATES_LIST, array.toString()).apply();
     }
 
-    /**
-     * جلب قائمة البوابات
-     */
     public List<GateDevice> getGates() {
         List<GateDevice> gates = new ArrayList<>();
         String json = prefs.getString(KEY_GATES_LIST, "[]");
@@ -318,18 +295,12 @@ public void setSimulateExitOnSale(boolean value) {
         return gates;
     }
 
-    /**
-     * إضافة بوابة جديدة
-     */
     public void addGate(GateDevice gate) {
         List<GateDevice> gates = getGates();
         gates.add(gate);
         saveGates(gates);
     }
 
-    /**
-     * تحديث بوابة
-     */
     public void updateGate(String gateId, GateDevice updatedGate) {
         List<GateDevice> gates = getGates();
         for (int i = 0; i < gates.size(); i++) {
@@ -341,9 +312,6 @@ public void setSimulateExitOnSale(boolean value) {
         saveGates(gates);
     }
 
-    /**
-     * حذف بوابة
-     */
     public void removeGate(String gateId) {
         List<GateDevice> gates = getGates();
         for (int i = 0; i < gates.size(); i++) {
@@ -355,9 +323,6 @@ public void setSimulateExitOnSale(boolean value) {
         saveGates(gates);
     }
 
-    /**
-     * ✅ حفظ إعدادات بوابة محددة
-     */
     public void saveGateSettings(String gateId, String soundPass, String soundDeny,
                                   String soundAlarm, boolean vibration, boolean flash,
                                   int alarmDuration, int rfidPower) {
@@ -372,9 +337,6 @@ public void setSimulateExitOnSale(boolean value) {
         editor.apply();
     }
 
-    /**
-     * ✅ استرجاع إعدادات بوابة محددة
-     */
     public GateSettings getGateSettings(String gateId) {
         GateSettings gs = new GateSettings();
         gs.soundPass = prefs.getString("gate_sound_pass_" + gateId, getSoundPass());
@@ -387,9 +349,6 @@ public void setSimulateExitOnSale(boolean value) {
         return gs;
     }
 
-    /**
-     * الحصول على البوابة الأساسية
-     */
     public GateDevice getPrimaryGate() {
         List<GateDevice> gates = getGates();
         for (GateDevice gate : gates) {
@@ -398,9 +357,6 @@ public void setSimulateExitOnSale(boolean value) {
         return gates.isEmpty() ? null : gates.get(0);
     }
 
-    /**
-     * تعيين البوابة الأساسية
-     */
     public void setPrimaryGate(String gateId) {
         List<GateDevice> gates = getGates();
         for (GateDevice gate : gates) {
@@ -409,38 +365,22 @@ public void setSimulateExitOnSale(boolean value) {
         saveGates(gates);
     }
 
-    // ============================================
-    // 🔊 إعدادات الأصوات
-    // ============================================
+    // ═══════════════════════════════════════════════════════════
+    // 🔊 الأصوات
+    // ═══════════════════════════════════════════════════════════
 
-    /**
-     * خيارات الأصوات المتاحة
-     */
     public static class SoundOptions {
         public static final String[] PASS_SOUNDS = {
-                "beep_success",
-                "beep_soft",
-                "beep_double",
-                "chime_elegant",
-                "silent"
+                "beep_success", "beep_soft", "beep_double", "chime_elegant", "silent"
         };
 
         public static final String[] DENY_SOUNDS = {
-                "beep_warning",
-                "beep_error",
-                "alarm_soft",
-                "buzz_double",
-                "silent"
+                "beep_warning", "beep_error", "alarm_soft", "buzz_double", "silent"
         };
 
         public static final String[] ALARM_SOUNDS = {
-                "alarm_sold_item",
-                "alarm_breach_security",
-                "alarm_siren_strong",
-                "alarm_police",
-                "alarm_buzzer_loud",
-                "alarm_klaxon",
-                "silent"
+                "alarm_sold_item", "alarm_breach_security", "alarm_siren_strong",
+                "alarm_police", "alarm_buzzer_loud", "alarm_klaxon", "silent"
         };
 
         public static int getSoundResourceId(Context context, String soundName) {
@@ -491,9 +431,9 @@ public void setSimulateExitOnSale(boolean value) {
         return prefs.getString(KEY_SOUND_ALARM, "alarm_breach_security");
     }
 
-    // ============================================
+    // ═══════════════════════════════════════════════════════════
     // ⚙️ إعدادات إضافية
-    // ============================================
+    // ═══════════════════════════════════════════════════════════
 
     public void setVibrationEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_VIBRATION_ENABLED, enabled).apply();
@@ -543,9 +483,9 @@ public void setSimulateExitOnSale(boolean value) {
         return prefs.getLong(KEY_SCAN_COOLDOWN, 2500);
     }
 
-    // ============================================
-    // 🏢 إعدادات Chainway C72
-    // ============================================
+    // ═══════════════════════════════════════════════════════════
+    // 🏢 Chainway C72
+    // ═══════════════════════════════════════════════════════════
 
     public static class ChainwaySettings {
         public int rfidPower = 28;
@@ -599,9 +539,6 @@ public void setSimulateExitOnSale(boolean value) {
         }
     }
 
-    /**
-     * ✅ إعدادات بوابة محددة
-     */
     public static class GateSettings {
         public String soundPass = "beep_success";
         public String soundDeny = "beep_warning";
