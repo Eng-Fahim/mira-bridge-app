@@ -141,94 +141,78 @@ public class MiraApiClient {
         this.networkExecutor = Executors.newFixedThreadPool(4, new NamedThreadFactory("MiraApi-Net"));
 
         // ✅ إصلاح CRITICAL: تهيئة Gson
-        this.gson = new GsonBuilder()
-                .setLenient()
-                .serializeNulls()
-                .create();
+            // ✅ إصلاح CRITICAL: تهيئة Gson
+    this.gson = new GsonBuilder()
+            .setLenient()
+            .serializeNulls()
+            .create();
 
-        // ✅ إصلاح CRITICAL: تهيئة AccountingApiService
-        // ملاحظة: تأكد من أن الـ Constructor يقبل (MiraApiClient, Context)
-        // إذا كان يقبل (Context) فقط، عدّل السطر التالي:
-        // ═══════════════════════════════════════════════════════════
-//  ✅ OkHttpClient مع Interceptor لإضافة X-MIRA-API-Key
-//  ⚠️ هذا نفس النظام الذي يستخدمه ActivityAPI
-// ═══════════════════════════════════════════════════════════
-okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
-    .connectTimeout(30, TimeUnit.SECONDS)
-    .readTimeout(30, TimeUnit.SECONDS)
-    .writeTimeout(30, TimeUnit.SECONDS)
-    .addInterceptor(chain -> {
-        okhttp3.Request original = chain.request();
+    // ✅ [SECURITY] OkHttpClient مع interceptor نظيف (بدون تسريب مفاتيح)
+    okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(chain -> {
+                okhttp3.Request original = chain.request();
 
-        // ✅ اقرأ القيم مباشرة من sessionManager
-        String token = "";
-        String apiKey = "";
-        String gateId = "";
-        
-        try {
-            token = sessionManager.getAuthToken();
-            apiKey = sessionManager.getApiKey();
-            gateId = sessionManager.getGateId();
-        } catch (Exception e) {
-            Log.e(TAG, "Auth read error", e);
-        }
+                String token = "";
+                String apiKey = "";
+                String gateId = "";
+                try {
+                    token = getAuthToken();
+                    apiKey = getEffectiveApiKey();
+                    gateId = getEffectiveGateId();
+                } catch (Exception e) {
+                    Log.w(TAG, "Auth read error: " + e.getClass().getSimpleName());
+                }
 
-        // ✅ Log للتشخيص
-        Log.e(TAG, "═══════════════════════════════");
-        Log.e(TAG, "URL: " + original.url());
-        Log.e(TAG, "API Key: " + (apiKey == null || apiKey.isEmpty() 
-            ? "❌ NULL" : "✅ " + apiKey.substring(0, Math.min(15, apiKey.length())) + "..."));
-        Log.e(TAG, "Token: " + (token == null || token.isEmpty() 
-            ? "❌ NULL" : "✅ " + token.length() + " chars"));
-        Log.e(TAG, "═══════════════════════════════");
+                if (com.example.uhf.BuildConfig.DEBUG) {
+                    Log.d(TAG, "Net req: " + original.method() + " "
+                            + original.url().encodedPath()
+                            + " | key=" + (apiKey.isEmpty() ? "empty" : "set")
+                            + " tok=" + (token.isEmpty() ? "empty" : "set"));
+                }
 
-        // ✅ ابنِ الطلب مع الرؤوس
-        okhttp3.Request.Builder builder = original.newBuilder()
-            .header("Accept", "application/json");
+                okhttp3.Request.Builder builder = original.newBuilder()
+                        .header("Accept", "application/json");
 
-        // ✅ الأهم: X-MIRA-API-Key (هذا ما يقرأه ApiKeyManager)
-        if (apiKey != null && !apiKey.isEmpty()) {
-            builder.header("X-MIRA-API-Key", apiKey);
-        }
-        
-        // ✅ Authorization (للتوافق)
-        if (token != null && !token.isEmpty()) {
-            builder.header("Authorization", "Bearer " + token);
-        }
-        
-        // ✅ Gate ID
-        if (gateId != null && !gateId.isEmpty()) {
-            builder.header("X-MIRA-Gate-ID", gateId);
-        }
+                if (!apiKey.isEmpty()) {
+                    builder.header("X-MIRA-API-Key", apiKey);
+                }
+                if (!token.isEmpty()) {
+                    builder.header("Authorization", "Bearer " + token);
+                    builder.header("X-MIRA-Auth-Token", token);
+                }
+                if (!gateId.isEmpty()) {
+                    builder.header("X-MIRA-Gate-ID", gateId);
+                }
 
-        return chain.proceed(builder.build());
-    })
-    .build();
+                return chain.proceed(builder.build());
+            })
+            .build();
 
-// ═══════════════════════════════════════════════════════════
-//  ✅ Retrofit مع OkHttpClient المخصص
-// ═══════════════════════════════════════════════════════════
-this.accountingService = new retrofit2.Retrofit.Builder()
-    .baseUrl("https://id.ibreg.org/wp-json/mira/v2/")
-    .client(accountingOkHttp)  // ← ⚠️⚠️⚠️ الأهم! هذا السطر مفقود حالياً
-    .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
-    .build()
-    .create(AccountingApiService.class);
+    // ✅ Retrofit مع OkHttpClient المخصص
+    this.accountingService = new retrofit2.Retrofit.Builder()
+            .baseUrl("https://id.ibreg.org/wp-json/mira/v2/")
+            .client(accountingOkHttp)
+            .addConverterFactory(
+                    retrofit2.converter.gson.GsonConverterFactory.create())
+            .build()
+            .create(AccountingApiService.class);
 
-        String savedBaseUrl = sessionManager.getServerUrl();
+    String savedBaseUrl = sessionManager.getServerUrl();
+    if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
+        savedBaseUrl = serverConfig.getBaseUrl();
         if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
-            savedBaseUrl = serverConfig.getBaseUrl();
-            if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
-                savedBaseUrl = DEFAULT_BASE_URL;
-            }
-            sessionManager.setServerUrl(savedBaseUrl);
-            serverConfig.setBaseUrl(savedBaseUrl);
+            savedBaseUrl = DEFAULT_BASE_URL;
         }
-        this.baseUrl = normalizeBaseUrl(savedBaseUrl);
-
-        // ✅ قراءة أولية — سريعة عادةً (< 10ms)
-        refreshCredentials();
+        sessionManager.setServerUrl(savedBaseUrl);
+        serverConfig.setBaseUrl(savedBaseUrl);
     }
+    this.baseUrl = normalizeBaseUrl(savedBaseUrl);
+
+    refreshCredentials();
+}
 
     /**
      * ✅ إغلاق كل الخيوط
@@ -505,15 +489,26 @@ this.accountingService = new retrofit2.Retrofit.Builder()
         try {
             String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
             String fullUrl = apiUrl + cleanEndpoint;
-            URL url = new URL(fullUrl);
+URL url = new URL(fullUrl);
 
-            if ("https".equalsIgnoreCase(url.getProtocol())) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
-            }
+// ✅ [SECURITY] ارفض HTTP (يسمح فقط localhost في DEBUG)
+if (!"https".equalsIgnoreCase(url.getProtocol())) {
+    String host = url.getHost();
+    boolean isLocal = "localhost".equals(host) 
+                   || "127.0.0.1".equals(host) 
+                   || "10.0.2.2".equals(host);
+    
+    if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
+        Log.e(TAG, "🚨 SECURITY: Refused non-HTTPS URL: " 
+            + url.getProtocol() + "://" + host);
+        return networkError("يُشترط اتصال HTTPS آمن");
+    }
+    conn = (HttpURLConnection) url.openConnection();
+} else {
+    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+    CertificatePinningManager.applyPinning(httpsConn);
+    conn = httpsConn;
+}
 
             conn.setRequestMethod(method);
             applyStandardHeaders(conn, requiresAuth);
@@ -695,48 +690,64 @@ public ApiResponse postAccounting(String endpoint, JSONObject payload) {
     return accountingRequest("POST", endpoint, payload);
 }
 
-private ApiResponse accountingRequest(String method, String endpoint, JSONObject payload) {
+private ApiResponse accountingRequest(String method, String endpoint,
+                                      JSONObject payload) {
     HttpURLConnection conn = null;
     try {
-        String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
-        String fullUrl = "https://id.ibreg.org/wp-json/mira/v2/" + cleanEndpoint;
+        String cleanEndpoint = endpoint.startsWith("/")
+                ? endpoint.substring(1) : endpoint;
+        String fullUrl = "https://id.ibreg.org/wp-json/mira/v2/"
+                + cleanEndpoint;
         URL url = new URL(fullUrl);
-        
-        HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+
+        // ✅ [SECURITY] HTTPS إجباري
+        if (!"https".equalsIgnoreCase(url.getProtocol())) {
+            Log.e(TAG, "SECURITY: accounting refused non-HTTPS");
+            return networkError("يُشترط اتصال HTTPS آمن");
+        }
+        HttpsURLConnection httpsConn =
+                (HttpsURLConnection) url.openConnection();
         CertificatePinningManager.applyPinning(httpsConn);
         conn = httpsConn;
-        
+
         conn.setRequestMethod(method);
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("Content-Type",
+                "application/json; charset=utf-8");
         conn.setRequestProperty("Accept", "application/json");
-        
-        String apiKey = sessionManager.getApiKey();
-        String token = sessionManager.getAuthToken();
-        
-        if (apiKey != null && !apiKey.isEmpty()) {
+
+        String apiKey = getEffectiveApiKey();
+        String token = getAuthToken();
+
+        if (!apiKey.isEmpty()) {
             conn.setRequestProperty("X-MIRA-API-Key", apiKey);
         }
-        if (token != null && !token.isEmpty()) {
+        if (!token.isEmpty()) {
             conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setRequestProperty("X-MIRA-Auth-Token", token);
         }
-        
+
         conn.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
         conn.setReadTimeout(DEFAULT_READ_TIMEOUT);
-        
+
         if (payload != null) {
             conn.setDoOutput(true);
-            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            byte[] input = payload.toString()
+                    .getBytes(StandardCharsets.UTF_8);
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(input, 0, input.length);
             }
         }
-        
-        Log.e(TAG, "📡 accounting " + method + ": " + fullUrl);
-        
+
+        // ✅ [SECURITY] لا نسجّل URL كاملاً
+        if (com.example.uhf.BuildConfig.DEBUG) {
+            Log.d(TAG, "accounting " + method + ": " + url.getPath());
+        }
+
         return buildResponse(conn);
-        
+
     } catch (Exception e) {
-        Log.e(TAG, "accountingRequest error: " + e.getMessage(), e);
+        Log.e(TAG, "accountingRequest error: "
+                + e.getClass().getSimpleName());
         return networkError(e.getMessage());
     } finally {
         if (conn != null) conn.disconnect();
@@ -870,7 +881,7 @@ private ApiResponse accountingRequest(String method, String endpoint, JSONObject
             payload.put("token", token);
             payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
-        return post("/auth/validate-token", payload);
+        return postWithAuth("/auth/validate-token", payload); 
     }
 
     public ApiResponse logout(String token) {
@@ -880,7 +891,7 @@ private ApiResponse accountingRequest(String method, String endpoint, JSONObject
             payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
 
-        ApiResponse response = post("/auth/logout", payload);
+        ApiResponse response = postWithAuth("/auth/logout", payload); 
 
         // ✅ تنظيف Cache
         invalidateTokenCache();
@@ -1236,21 +1247,36 @@ private ApiResponse accountingRequest(String method, String endpoint, JSONObject
 
     // ==================== التصريح ====================
     public ApiResponse authorize(String epc, String contextType, JSONObject extraParams) {
-        JSONObject payload = new JSONObject();
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("epc", epc);
+        payload.put("gate_id", getEffectiveGateId());
+        payload.put("context", contextType != null ? contextType : "scan");
+
+        // ✅ [v3.2 SECURITY] اربط القرار بهوية المستخدم
         try {
-            payload.put("epc", epc);
-            payload.put("gate_id", getEffectiveGateId());
-            payload.put("context", contextType != null ? contextType : "scan");
-            if (extraParams != null) {
-                Iterator<String> keys = extraParams.keys();
-                while (keys.hasNext()) {
-                    String key = keys.next();
-                    payload.put(key, extraParams.get(key));
-                }
+            int userId = sessionManager.getUserId();
+            String username = sessionManager.getUsername();
+            if (userId > 0)  payload.put("user_id", userId);
+            if (username != null && !username.isEmpty()) {
+                payload.put("username", username);
             }
-        } catch (Exception ignored) {}
-        return post("/authorize", payload);
-    }
+        } catch (Exception e) {
+            Log.w(TAG, "authorize: could not attach user identity");
+        }
+
+        if (extraParams != null) {
+            Iterator<String> keys = extraParams.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                payload.put(key, extraParams.get(key));
+            }
+        }
+    } catch (Exception ignored) {}
+
+    // ✅ [v3.2] postWithAuth — يرسل Bearer token + API key
+    return postWithAuth("/authorize", payload);
+}
 
     // ═══════════════════════════════════════════════════════════
 //  📝 قيود التسوية — بعد اعتماد الإعداد
@@ -1305,37 +1331,49 @@ public ApiResponse addPostApprovalBalance(String type, double amount,
      * - استخدم pingApiAsync() من الواجهات
      */
     public boolean pingApi() {
-        HttpURLConnection conn = null;
-        try {
-            String cleanUrl = this.apiUrl;
-            if (cleanUrl == null || cleanUrl.isEmpty()) {
+    HttpURLConnection conn = null;
+    try {
+        String cleanUrl = this.apiUrl;
+        if (cleanUrl == null || cleanUrl.isEmpty()) {
+            return false;
+        }
+        if (cleanUrl.endsWith("/")) {
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+        }
+
+        URL url = new URL(cleanUrl + "/ping");
+
+        // ✅ [SECURITY] HTTPS إجباري (localhost فقط في DEBUG)
+        if (!"https".equalsIgnoreCase(url.getProtocol())) {
+            String host = url.getHost();
+            boolean isLocal = "localhost".equals(host)
+                    || "127.0.0.1".equals(host)
+                    || "10.0.2.2".equals(host);
+            if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
+                Log.e(TAG, "SECURITY: ping refused non-HTTPS: " + host);
                 return false;
             }
-            if (cleanUrl.endsWith("/")) {
-                cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
-            }
-
-            URL url = new URL(cleanUrl + "/ping");
-            if ("https".equalsIgnoreCase(url.getProtocol())) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
-            }
-            conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, true);
-            conn.setConnectTimeout(PING_CONNECT_TIMEOUT);
-            conn.setReadTimeout(PING_READ_TIMEOUT);
-
-            int responseCode = conn.getResponseCode();
-            return responseCode >= 200 && responseCode < 400;
-        } catch (Exception e) {
-            return false;
-        } finally {
-            if (conn != null) conn.disconnect();
+            conn = (HttpURLConnection) url.openConnection();
+        } else {
+            HttpsURLConnection httpsConn =
+                    (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
         }
+
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, true);
+        conn.setConnectTimeout(PING_CONNECT_TIMEOUT);
+        conn.setReadTimeout(PING_READ_TIMEOUT);
+
+        int responseCode = conn.getResponseCode();
+        return responseCode >= 200 && responseCode < 400;
+    } catch (Exception e) {
+        return false;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     // ==================== لوحة التحكم ====================
     public ApiResponse getDashboardSummary() {
@@ -1572,66 +1610,84 @@ public ApiResponse getPaymentMethods() {
     }
 
     // ==================== رفع الصور ====================
-    public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + "/items/" + itemId + "/images";
-            URL url = new URL(fullUrl);
-            if ("https".equalsIgnoreCase(url.getProtocol())) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
+    public ApiResponse uploadItemImage(int itemId, File imageFile,
+                                   boolean isPrimary, String altText) {
+    HttpURLConnection conn = null;
+    try {
+        String fullUrl = apiUrl + "items/" + itemId + "/images";
+        URL url = new URL(fullUrl);
+
+        // ✅ [SECURITY] HTTPS إجباري
+        if (!"https".equalsIgnoreCase(url.getProtocol())) {
+            String host = url.getHost();
+            boolean isLocal = "localhost".equals(host)
+                    || "127.0.0.1".equals(host)
+                    || "10.0.2.2".equals(host);
+            if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
+                Log.e(TAG, "SECURITY: uploadItemImage refused non-HTTPS: "
+                        + host);
+                return networkError("يُشترط اتصال HTTPS آمن");
             }
-            conn.setRequestMethod("POST");
-            applyStandardHeaders(conn, true);
-            conn.setConnectTimeout(30_000);
-            conn.setReadTimeout(30_000);
-            conn.setDoOutput(true);
-
-            String boundary = "----MiraBoundary" + System.currentTimeMillis();
-            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-            try (OutputStream os = conn.getOutputStream()) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("--").append(boundary).append("\r\n");
-                sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
-                        .append(imageFile.getName()).append("\"\r\n");
-                sb.append("Content-Type: image/jpeg\r\n\r\n");
-                os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-
-                try (FileInputStream fis = new FileInputStream(imageFile)) {
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
-                    while ((bytesRead = fis.read(buffer)) != -1) {
-                        os.write(buffer, 0, bytesRead);
-                    }
-                }
-
-                sb = new StringBuilder();
-                sb.append("\r\n--").append(boundary).append("\r\n");
-                sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
-                sb.append(isPrimary ? "1" : "0");
-                os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-
-                sb = new StringBuilder();
-                sb.append("\r\n--").append(boundary).append("\r\n");
-                sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
-                sb.append(altText != null ? altText : "");
-                os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-
-                os.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
-                os.flush();
-            }
-
-            return buildResponse(conn);
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
+            conn = (HttpURLConnection) url.openConnection();
+        } else {
+            HttpsURLConnection httpsConn =
+                    (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
         }
+
+        conn.setRequestMethod("POST");
+        applyStandardHeaders(conn, true);
+        conn.setConnectTimeout(30_000);
+        conn.setReadTimeout(30_000);
+        conn.setDoOutput(true);
+
+        String boundary = "----MiraBoundary" + System.currentTimeMillis();
+        conn.setRequestProperty("Content-Type",
+                "multipart/form-data; boundary=" + boundary);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("--").append(boundary).append("\r\n");
+            sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
+                    .append(imageFile.getName()).append("\"\r\n");
+            sb.append("Content-Type: image/jpeg\r\n\r\n");
+            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+
+            try (FileInputStream fis = new FileInputStream(imageFile)) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = fis.read(buffer)) != -1) {
+                    os.write(buffer, 0, bytesRead);
+                }
+            }
+
+            sb = new StringBuilder();
+            sb.append("\r\n--").append(boundary).append("\r\n");
+            sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
+            sb.append(isPrimary ? "1" : "0");
+            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+
+            sb = new StringBuilder();
+            sb.append("\r\n--").append(boundary).append("\r\n");
+            sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
+            sb.append(altText != null ? altText : "");
+            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+
+            os.write(("\r\n--" + boundary + "--\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            os.flush();
+        }
+
+        return buildResponse(conn);
+    } catch (Exception e) {
+        Log.e(TAG, "uploadItemImage error: "
+                + e.getClass().getSimpleName());
+        return new ApiResponse(-1, null, e.getMessage());
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     // ==================== المخزون ====================
     public ApiResponse getLastSnapshot(String location) {
@@ -1814,7 +1870,7 @@ public ApiResponse getPaymentMethods() {
             payload.put("status", status != null ? status : "online");
             if (battery > 0) payload.put("battery", battery);
         } catch (Exception ignored) {}
-        return post("/heartbeat", payload);
+        return postWithAuth("/heartbeat", payload);  // ✅ بعد
     }
 
     public ApiResponse getSettings() {
