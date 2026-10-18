@@ -123,12 +123,28 @@
                     android:textSize="10sp" />
             </LinearLayout>
 
+            <!-- ✅ [v2.3] زر الربط بالجهاز -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLinkDevice"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:text="📌 ربط"
+                android:textSize="11sp"
+                android:minWidth="0dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="20dp" />
+
             <!-- زر التشغيل/الإيقاف -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnToggleGate"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="4dp"
                 android:text="🔓"
                 android:textSize="14sp"
                 android:insetTop="0dp"
