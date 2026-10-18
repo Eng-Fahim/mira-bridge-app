@@ -347,50 +347,61 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void auditDecision(String epc, boolean allowed, String reason,
-                               String source, long cacheAgeMs, boolean online) {
-        if (isDestroyed) return;
-        try {
-            String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
-                    .format(new Date());
-            String record = String.format(Locale.US,
-                    "[%s] EPC=%s ALLOWED=%b REASON=%s SRC=%s AGE=%dms ONLINE=%b GATE=%s BR=%d",
-                    ts, epc, allowed, reason, source, cacheAgeMs, online,
-                    getCurrentGateId(), getCurrentBranchId());
+                           String source, long cacheAgeMs, boolean online) {
+    auditDecision(epc, allowed, reason, source, cacheAgeMs, online, null);
+}
 
-            synchronized (auditLog) {
-                auditLog.append(record).append("\n");
-                if (auditLog.length() > AUDIT_LOG_MAX_CHARS) {
-                    int cut = auditLog.indexOf("\n",
-                            auditLog.length() - (int)(AUDIT_LOG_MAX_CHARS * 0.6));
-                    if (cut > 0) auditLog.delete(0, cut + 1);
-                }
-            }
-            Log.i("MiraGateAudit", record);
+private void auditDecision(String epc, boolean allowed, String reason,
+                           String source, long cacheAgeMs, boolean online,
+                           String gateId) {
+    if (isDestroyed) return;
+    try {
+        String effectiveGateId = (gateId != null && !gateId.isEmpty()
+                && !"__default__".equals(gateId))
+                ? gateId
+                : getCurrentGateId();
 
-            if (online && !isDestroyed) {
-                executeOnGateExecutor(() -> {
-                    try {
-                        Context context = getSafeAppContext();
-                        if (context == null) return;
-                        MiraApiClient client = MiraApiClient.getInstance(context);
-                        JSONObject payload = new JSONObject();
-                        payload.put("epc", epc);
-                        payload.put("allowed", allowed);
-                        payload.put("reason", reason);
-                        payload.put("source", source);
-                        payload.put("cache_age_ms", cacheAgeMs);
-                        payload.put("online", online);
-                        payload.put("gate_id", getCurrentGateId());
-                        payload.put("branch_id", getCurrentBranchId());
-                        payload.put("timestamp", System.currentTimeMillis());
-                        client.postWithAuth("/gate-audit", payload);
-                    } catch (Exception ignored) {}
-                });
+        String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+                .format(new Date());
+        String record = String.format(Locale.US,
+                "[%s] EPC=%s ALLOWED=%b REASON=%s SRC=%s AGE=%dms ONLINE=%b GATE=%s BR=%d",
+                ts, epc, allowed, reason, source, cacheAgeMs, online,
+                effectiveGateId, getCurrentBranchId());
+
+        synchronized (auditLog) {
+            auditLog.append(record).append("\n");
+            if (auditLog.length() > AUDIT_LOG_MAX_CHARS) {
+                int cut = auditLog.indexOf("\n",
+                        auditLog.length() - (int)(AUDIT_LOG_MAX_CHARS * 0.6));
+                if (cut > 0) auditLog.delete(0, cut + 1);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "auditDecision error: " + e.getMessage());
         }
+        Log.i("MiraGateAudit", record);
+
+        if (online && !isDestroyed) {
+            executeOnGateExecutor(() -> {
+                try {
+                    Context context = getSafeAppContext();
+                    if (context == null) return;
+                    MiraApiClient client = MiraApiClient.getInstance(context);
+                    JSONObject payload = new JSONObject();
+                    payload.put("epc", epc);
+                    payload.put("allowed", allowed);
+                    payload.put("reason", reason);
+                    payload.put("source", source);
+                    payload.put("cache_age_ms", cacheAgeMs);
+                    payload.put("online", online);
+                    payload.put("gate_id", effectiveGateId);
+                    payload.put("branch_id", getCurrentBranchId());
+                    payload.put("timestamp", System.currentTimeMillis());
+                    client.postWithAuth("/gate-audit", payload);
+                } catch (Exception ignored) {}
+            });
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "auditDecision error: " + e.getMessage());
     }
+}
 
     @Nullable
     private Context getSafeAppContext() {
@@ -1408,58 +1419,58 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void startScanning() {
-        if (isPanicLock) {
-            Log.w(TAG, "startScanning blocked — PANIC LOCK active");
-            return;
-        }
-
-        if (isDestroyed || mContext == null || isCameraOpen) return;
-        if (gateRfidBridge == null) return;
-
-        if (isScanning) return;
-        if (gateRfidBridge.isScanning()) return;
-
-        boolean accepted = gateRfidBridge.startScan(
-                new GateRfidBridge.GateTagListener() {
-            @Override
-            public void onTagRead(String epc, int rssi) {
-                if (!isDestroyed && isAdded() && epc != null && !epc.isEmpty()) {
-                    processInputEpc(epc, "RFID");
-                }
-            }
-
-            @Override
-            public void onScanStarted() {
-                isScanning = true;
-                mainHandler.post(() -> {
-                    if (btnToggleScan != null && !isPanicLock) {
-                        btnToggleScan.setText(getLocalizedText(
-                                "🔴 إيقاف المسح", "🔴 Stop Scan"));
-                    }
-                });
-            }
-
-            @Override
-            public void onScanStopped() {
-                isScanning = false;
-                mainHandler.post(() -> {
-                    if (btnToggleScan != null && !isPanicLock) {
-                        btnToggleScan.setText(getLocalizedText(
-                                "🛡️ تفعيل المسح", "🛡️ Start Scan"));
-                    }
-                });
-            }
-
-            @Override
-            public void onError(String error) {
-                MiraFileLogger.logError(TAG, "Gate scan error: " + error);
-            }
-        }, miraGatesSettings.getRfidPower());
-
-        if (!accepted) {
-            isScanning = false;
-        }
+    if (isPanicLock) {
+        Log.w(TAG, "startScanning blocked — PANIC LOCK active");
+        return;
     }
+
+    if (isDestroyed || mContext == null || isCameraOpen) return;
+    if (gateRfidBridge == null) return;
+
+    if (isScanning) return;
+    if (gateRfidBridge.isScanning()) return;
+
+    boolean accepted = gateRfidBridge.startScan(
+            new GateRfidBridge.GateTagListener() {
+        @Override
+        public void onTagRead(String gateId, String epc, int rssi) {
+            if (!isDestroyed && isAdded() && epc != null && !epc.isEmpty()) {
+                processInputEpc(epc, "RFID", gateId);
+            }
+        }
+
+        @Override
+        public void onScanStarted(String gateId) {
+            isScanning = true;
+            mainHandler.post(() -> {
+                if (btnToggleScan != null && !isPanicLock) {
+                    btnToggleScan.setText(getLocalizedText(
+                            "🔴 إيقاف المسح", "🔴 Stop Scan"));
+                }
+            });
+        }
+
+        @Override
+        public void onScanStopped(String gateId) {
+            isScanning = false;
+            mainHandler.post(() -> {
+                if (btnToggleScan != null && !isPanicLock) {
+                    btnToggleScan.setText(getLocalizedText(
+                            "🛡️ تفعيل المسح", "🛡️ Start Scan"));
+                }
+            });
+        }
+
+        @Override
+        public void onError(String gateId, String error) {
+            MiraFileLogger.logError(TAG, "Gate error [" + gateId + "]: " + error);
+        }
+    }, miraGatesSettings.getRfidPower());
+
+    if (!accepted) {
+        isScanning = false;
+    }
+}
 
     private void stopScanning() {
         if (gateRfidBridge == null) return;
@@ -1700,18 +1711,22 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ==================== EPC Processing ====================
-
     private void processInputEpcBackground(String epc, String sourceType) {
-        if (isDestroyed || epc == null || epc.trim().isEmpty()) return;
-        final String cleanedEpc = epc.trim().toUpperCase(Locale.US);
+    processInputEpcBackground(epc, sourceType, null);
+}
 
-        // 🚨 1) Panic lock
-        if (isPanicLock) {
-            logConsole("🚨 PANIC LOCK ACTIVE — denying " + cleanedEpc);
-            auditDecision(cleanedEpc, false, "PANIC_LOCK", sourceType, 0, isOnline);
-            handleGateDecision(false, "PANIC LOCK", cleanedEpc);
-            return;
-        }
+private void processInputEpcBackground(String epc, String sourceType, String gateId) {
+    if (isDestroyed || epc == null || epc.trim().isEmpty()) return;
+    final String cleanedEpc = epc.trim().toUpperCase(Locale.US);
+    final String gateLabel = getGateNameById(gateId);
+
+               // 🚨 1) Panic lock
+if (isPanicLock) {
+    logConsole("🚨 PANIC LOCK ACTIVE — denying " + cleanedEpc);
+    auditDecision(cleanedEpc, false, "PANIC_LOCK", sourceType, 0, isOnline, gateId);
+    handleGateDecision(false, "PANIC LOCK", cleanedEpc, gateId);
+    return;
+}
 
         long now = System.currentTimeMillis();
 
@@ -1721,7 +1736,7 @@ public class MiraSecureGateFragment extends Fragment {
             logConsole("⏭️ " + cleanedEpc + " exited "
                     + ((now - lastExit) / 1000) + "s ago — silent ignore");
             auditDecision(cleanedEpc, true, "ALREADY_EXITED_RECENT",
-                    sourceType, 0, isOnline);
+        sourceType, 0, isOnline, gateId);
             return;
         }
 
@@ -1730,7 +1745,7 @@ public class MiraSecureGateFragment extends Fragment {
         if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
         scanDebounceMap.put(cleanedEpc, now);
 
-        logConsole("[" + sourceType + "] " + cleanedEpc);
+        logConsole("[" + sourceType + "/" + gateLabel + "] " + cleanedEpc);
 
         if (isSimulatorMode()) {
             logConsole(getLocalizedText(
@@ -1741,10 +1756,9 @@ public class MiraSecureGateFragment extends Fragment {
 
         // 🚨 4) Online → دائماً السيرفر
         if (isOnline) {
-            queryMiraGateServer(cleanedEpc);
-            return;
-        }
-
+    queryMiraGateServer(cleanedEpc, gateId);
+    return;
+}
         // 🚨 5) Offline — نثق بالكاش فقط مع فحص الطازجية
         boolean cacheAllowed = offlineCache != null
                 && offlineCache.isAllowedLocally(cleanedEpc);
@@ -1759,57 +1773,76 @@ public class MiraSecureGateFragment extends Fragment {
             cacheAgeMs = lastFetch > 0 ? (now - lastFetch) : 0;
         }
 
-        if (cacheAllowed && cacheFresh) {
-            logConsole("✅ Offline cache hit (age " + (cacheAgeMs / 1000) + "s)");
-            auditDecision(cleanedEpc, true, "CACHE_FRESH_OFFLINE",
-                    sourceType, cacheAgeMs, false);
-            handleGateDecision(true,
-                    getLocalizedText("مصرح (كاش)", "Authorized (cache)"),
-                    cleanedEpc);
-            return;
-        }
-
         if (cacheAllowed && !cacheFresh) {
-            logConsole("⚠️ Cache stale (" + (cacheAgeMs / 1000)
-                    + "s) — deny offline");
-            auditDecision(cleanedEpc, false, "CACHE_STALE_OFFLINE",
-                    sourceType, cacheAgeMs, false);
-        }
+    logConsole("⚠️ Cache stale (" + (cacheAgeMs / 1000)
+            + "s) — deny offline");
+    auditDecision(cleanedEpc, false, "CACHE_STALE_OFFLINE",
+            sourceType, cacheAgeMs, false, gateId);
+}
 
-        // ❌ Offline + لا cache صالح
-        logConsole("🚨 Offline — security denial");
-        auditDecision(cleanedEpc, false, "OFFLINE_DENY",
-                sourceType, cacheAgeMs, false);
-        handleGateDecision(false,
-                getLocalizedText("بدون إنترنت", "Offline"),
-                cleanedEpc);
-
-        if (offlineCache != null) {
-            offlineCache.saveOfflineEvent(cleanedEpc, false,
-                    getLocalizedText("بدون إنترنت", "Offline"), "local");
-        }
+            // ✅ cache hit + fresh → ALLOW
+    if (cacheAllowed && cacheFresh) {
+        logConsole("✅ Offline cache hit (age " + (cacheAgeMs / 1000) + "s)");
+        auditDecision(cleanedEpc, true, "CACHE_FRESH_OFFLINE",
+                sourceType, cacheAgeMs, false, gateId);
+        handleGateDecision(true,
+                getLocalizedText("مصرح (كاش)", "Authorized (cache)"),
+                cleanedEpc, gateId);
+        return;
     }
+
+    // ⚠️ cache hit + stale → DENY
+    if (cacheAllowed && !cacheFresh) {
+        logConsole("⚠️ Cache stale (" + (cacheAgeMs / 1000)
+                + "s) — deny offline");
+        auditDecision(cleanedEpc, false, "CACHE_STALE_OFFLINE",
+                sourceType, cacheAgeMs, false, gateId);
+    }
+
+    // ❌ Offline + لا cache صالح → DENY
+    logConsole("🚨 Offline — security denial");
+    auditDecision(cleanedEpc, false, "OFFLINE_DENY",
+            sourceType, cacheAgeMs, false, gateId);
+    handleGateDecision(false,
+            getLocalizedText("بدون إنترنت", "Offline"),
+            cleanedEpc, gateId);
+
+    if (offlineCache != null) {
+        offlineCache.saveOfflineEvent(cleanedEpc, false,
+                getLocalizedText("بدون إنترنت", "Offline"), "local");
+    }
+}
 
     private void processInputEpc(String epc, String sourceType) {
-        if (gateExecutor != null && !gateExecutor.isShutdown()) {
-            final String finalEpc = epc;
-            final String finalSource = sourceType;
-            executeOnGateExecutor(() ->
-                    processInputEpcBackground(finalEpc, finalSource));
-        } else {
-            processInputEpcBackground(epc, sourceType);
-        }
+    processInputEpc(epc, sourceType, null);
+}
+
+private void processInputEpc(String epc, String sourceType, String gateId) {
+    if (gateExecutor != null && !gateExecutor.isShutdown()) {
+        final String finalEpc = epc;
+        final String finalSource = sourceType;
+        final String finalGate = gateId;
+        executeOnGateExecutor(() ->
+                processInputEpcBackground(finalEpc, finalSource, finalGate));
+    } else {
+        processInputEpcBackground(epc, sourceType, gateId);
     }
+}
 
     /**
      * ✅ [v4.2 CRITICAL] لا nested submit — استدعاء مباشر داخل Thread
      * لإزالة deadlock عند 8 قراءات متزامنة.
      */
+    
     private void queryMiraGateServer(String epc) {
-        executeOnGateExecutor(() -> {
-            try {
-                Context context = getContext();
-                if (context == null || isDestroyed) return;
+    queryMiraGateServer(epc, null);
+}
+
+private void queryMiraGateServer(String epc, String gateId) {
+    executeOnGateExecutor(() -> {
+        try {
+            Context context = getContext();
+            if (context == null || isDestroyed) return;
 
                 MiraApiClient client = MiraApiClient.getInstance(context);
                 JSONObject params = new JSONObject();
@@ -1834,8 +1867,8 @@ public class MiraSecureGateFragment extends Fragment {
                             ? decision.optString("message", "") : "";
 
                     auditDecision(epc, allowed,
-                            allowed ? "SERVER_ALLOW" : "SERVER_DENY",
-                            "SERVER", 0, true);
+        allowed ? "SERVER_ALLOW" : "SERVER_DENY",
+        "SERVER", 0, true, gateId);
 
                     if (allowed) {
                         recentlyExitedMap.put(epc, System.currentTimeMillis());
@@ -1847,39 +1880,39 @@ public class MiraSecureGateFragment extends Fragment {
                     }
 
                     mainHandler.post(() -> {
-                        if (isDestroyed || !isAdded()) return;
-                        handleGateDecision(allowed, itemTitle, serial);
-                        if (!message.isEmpty())
-                            logConsole((allowed ? "✅ " : "🚨 ") + message);
-                    });
+    if (isDestroyed || !isAdded()) return;
+    handleGateDecision(allowed, itemTitle, serial, gateId);
+    if (!message.isEmpty())
+        logConsole((allowed ? "✅ " : "🚨 ") + message);
+});
                 } else {
                     // ✅ [v4.2] networkError vs invalid response
                     boolean isNetworkIssue = response == null
                             || response.isNetworkError;
 
                     auditDecision(epc, false,
-                            isNetworkIssue ? "SERVER_NETWORK_ERROR"
-                                           : "SERVER_INVALID_RESPONSE",
-                            "SERVER", 0, true);
+        isNetworkIssue ? "SERVER_NETWORK_ERROR"
+                       : "SERVER_INVALID_RESPONSE",
+        "SERVER", 0, true, gateId);
                     mainHandler.post(() -> {
-                        if (isAdded() && !isDestroyed) {
-                            handleGateDecision(false,
-                                    isNetworkIssue
-                                            ? getLocalizedText("انقطاع اتصال", "Network error")
-                                            : getLocalizedText("رد غير متوقع", "Invalid response"),
-                                    epc);
-                        }
-                    });
+    if (isAdded() && !isDestroyed) {
+        handleGateDecision(false,
+                isNetworkIssue
+                        ? getLocalizedText("انقطاع اتصال", "Network error")
+                        : getLocalizedText("رد غير متوقع", "Invalid response"),
+                epc, gateId);
+    }
+});
                 }
             } catch (Exception e) {
-                Log.e(TAG, "queryMiraGateServer error: " + e.getMessage(), e);
-                auditDecision(epc, false, "EXCEPTION", "SERVER", 0, true);
+    Log.e(TAG, "queryMiraGateServer error: " + e.getMessage(), e);
+    auditDecision(epc, false, "EXCEPTION", "SERVER", 0, true, gateId);
                 mainHandler.post(() -> {
-                    if (isAdded() && !isDestroyed) {
-                        handleGateDecision(false,
-                                getLocalizedText("غير مصرح", "Unauthorized"), epc);
-                    }
-                });
+    if (isAdded() && !isDestroyed) {
+        handleGateDecision(false,
+                getLocalizedText("غير مصرح", "Unauthorized"), epc, gateId);
+    }
+});
             }
         });
     }
@@ -1887,56 +1920,61 @@ public class MiraSecureGateFragment extends Fragment {
     // ==================== Gate Decision Handling ====================
 
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
-        if (isDestroyed || !isAdded()) return;
+    handleGateDecision(allowed, itemTitle, serial, null);
+}
 
-        if (isSimulatorMode()) {
-            logConsole("[SIM] " + (allowed ? "PASS" : "DENY")
-                    + ": " + itemTitle + " → " + serial);
-            return;
-        }
+private void handleGateDecision(boolean allowed, String itemTitle,
+                                 String serial, String gateId) {
+    if (isDestroyed || !isAdded()) return;
 
-        if (allowed && "ALERTS".equals(logFilter)) return;
-        if (!allowed && "PASS".equals(logFilter)) return;
-
-        boolean soundEnabled = safeIsSoundAlertsEnabled();
-        boolean vibrationEnabled = miraGatesSettings != null
-                && miraGatesSettings.isVibrationEnabled();
-        boolean quietMode = currentOperationMode
-                == MiraGatesSettings.OperationMode.FULL_AUTO;
-
-        if (allowed) {
-            logConsole(getLocalizedText("✅ خروج شرعي: ", "✅ Legal exit: ") + itemTitle);
-            updateLiveTicker("✅ " + itemTitle, false);
-
-            if (soundEnabled) {
-                SoundGenerator.playSound(miraGatesSettings.getSoundPass());
-            }
-
-            incrementPassCountLocally();
-            reportExitEventToServer(serial, itemTitle, true);
-
-            if (currentOperationMode == MiraGatesSettings.OperationMode.FULL_AUTO) {
-                showResultOverlay(true, itemTitle);
-            }
-        } else {
-            logConsole(getLocalizedText("🚨 خروج غير شرعي: ", "🚨 Illegal exit: ")
-                    + itemTitle);
-            updateLiveTicker("🚨 " + itemTitle, true);
-
-            if (vibrationEnabled) {
-                triggerAlarm(itemTitle, serial);
-            }
-
-            if (soundEnabled && !quietMode) {
-                SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
-            }
-
-            incrementDenyCountLocally();
-            reportExitEventToServer(serial, itemTitle, false);
-
-            showResultOverlay(false, itemTitle);
-        }
+    if (isSimulatorMode()) {
+        logConsole("[SIM] " + (allowed ? "PASS" : "DENY")
+                + ": " + itemTitle + " → " + serial);
+        return;
     }
+
+    if (allowed && "ALERTS".equals(logFilter)) return;
+    if (!allowed && "PASS".equals(logFilter)) return;
+
+    boolean soundEnabled = safeIsSoundAlertsEnabled();
+    boolean vibrationEnabled = miraGatesSettings != null
+            && miraGatesSettings.isVibrationEnabled();
+    boolean quietMode = currentOperationMode
+            == MiraGatesSettings.OperationMode.FULL_AUTO;
+
+    if (allowed) {
+        logConsole(getLocalizedText("✅ خروج شرعي: ", "✅ Legal exit: ") + itemTitle);
+        updateLiveTicker("✅ " + itemTitle, false);
+
+        if (soundEnabled) {
+            SoundGenerator.playSound(miraGatesSettings.getSoundPass());
+        }
+
+        incrementPassCountLocally();
+        reportExitEventToServer(serial, itemTitle, true, gateId);
+
+        if (currentOperationMode == MiraGatesSettings.OperationMode.FULL_AUTO) {
+            showResultOverlay(true, itemTitle);
+        }
+    } else {
+        logConsole(getLocalizedText("🚨 خروج غير شرعي: ", "🚨 Illegal exit: ")
+                + itemTitle);
+        updateLiveTicker("🚨 " + itemTitle, true);
+
+        if (vibrationEnabled) {
+            triggerAlarm(itemTitle, serial);
+        }
+
+        if (soundEnabled && !quietMode) {
+            SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
+        }
+
+        incrementDenyCountLocally();
+        reportExitEventToServer(serial, itemTitle, false, gateId);
+
+        showResultOverlay(false, itemTitle);
+    }
+}
 
     private void showResultOverlay(boolean allowed, String itemTitle) {
         if (isDestroyed || !isAdded() || overlayAlarm == null) return;
@@ -1995,58 +2033,90 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void reportExitEventToServer(String epc, String itemTitle, boolean allowed) {
-        executeOnGateExecutor(() -> {
-            try {
-                Context context = getContext();
-                if (context == null || isDestroyed) return;
+    reportExitEventToServer(epc, itemTitle, allowed, null);
+}
 
-                MiraApiClient client = MiraApiClient.getInstance(context);
-                JSONObject payload = new JSONObject();
-                payload.put("epc", epc);
-                payload.put("item_title", itemTitle);
-                payload.put("allowed", allowed);
-                payload.put("gate_id", getCurrentGateId());
-                payload.put("branch_id", getCurrentBranchId());
-                payload.put("timestamp", System.currentTimeMillis());
-                payload.put("event_type", allowed ? "PASS" : "DENY");
+private void reportExitEventToServer(String epc, String itemTitle,
+                                      boolean allowed, String gateId) {
+    final String effectiveGateId = (gateId != null && !gateId.isEmpty()
+            && !"__default__".equals(gateId))
+            ? gateId
+            : getCurrentGateId();
 
-                MiraApiClient.ApiResponse response =
-                        client.postWithAuth("/gate-exit-event", payload);
-
-                if (response == null || !response.isSuccess) {
-                    if (offlineCache != null) {
-                        offlineCache.saveOfflineEvent(epc, allowed, itemTitle,
-                                getCurrentGateId());
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "reportExitEventToServer error: " + e.getMessage());
-                try {
-                    if (offlineCache != null) {
-                        offlineCache.saveOfflineEvent(epc, allowed, itemTitle,
-                                getCurrentGateId());
-                    }
-                } catch (Exception ignored) {}
-            }
-        });
-    }
-
-    /**
-     * ✅ [v4.2] gate_id من إعدادات الجهاز — لا من أول قائمة البوابات
-     */
-    private String getCurrentGateId() {
+    executeOnGateExecutor(() -> {
         try {
-            String configured = miraGatesSettings.getDeviceGateId();
-            if (configured != null && !configured.trim().isEmpty()) {
-                return configured.trim();
+            Context context = getContext();
+            if (context == null || isDestroyed) return;
+
+            MiraApiClient client = MiraApiClient.getInstance(context);
+            JSONObject payload = new JSONObject();
+            payload.put("epc", epc);
+            payload.put("item_title", itemTitle);
+            payload.put("allowed", allowed);
+            payload.put("gate_id", effectiveGateId);
+            payload.put("branch_id", getCurrentBranchId());
+            payload.put("timestamp", System.currentTimeMillis());
+            payload.put("event_type", allowed ? "PASS" : "DENY");
+
+            MiraApiClient.ApiResponse response =
+                    client.postWithAuth("/gate-exit-event", payload);
+
+            if (response == null || !response.isSuccess) {
+                if (offlineCache != null) {
+                    offlineCache.saveOfflineEvent(epc, allowed, itemTitle,
+                            effectiveGateId);
+                }
             }
         } catch (Exception e) {
-            Log.w(TAG, "getDeviceGateId error: " + e.getMessage());
+            Log.e(TAG, "reportExitEventToServer error: " + e.getMessage());
+            try {
+                if (offlineCache != null) {
+                    offlineCache.saveOfflineEvent(epc, allowed, itemTitle,
+                            effectiveGateId);
+                }
+            } catch (Exception ignored) {}
         }
-        Log.w(TAG, "GATE_ID not configured in settings — using UNKNOWN");
-        return "GATE-UNKNOWN";
-    }
+    });
+}
 
+/**
+ * ✅ [v3.0] اسم البوابة من gateId (للعرض في السجل)
+ */
+private String getGateNameById(String gateId) {
+    if (gateId == null || gateId.isEmpty()) return "—";
+    if ("__default__".equals(gateId)) {
+        return isArabic ? "افتراضي" : "Default";
+    }
+    try {
+        List<MiraGatesSettings.GateDevice> gates = miraGatesSettings.getGates();
+        for (MiraGatesSettings.GateDevice g : gates) {
+            if (g.gateId != null && g.gateId.equals(gateId)) {
+                return g.gateName != null && !g.gateName.isEmpty()
+                        ? g.gateName : gateId;
+            }
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "getGateNameById error: " + e.getMessage());
+    }
+    return gateId;
+}
+
+/**
+ * ✅ [v3.0] gate_id احتياطي — يُستخدم فقط عند عدم توفر gateId صريح
+ *    (مثل PANIC LOCK, Lockdown). يعيد أول بوابة مربوطة كمرجع.
+ */
+private String getCurrentGateId() {
+    try {
+        java.util.Set<String> linked = miraGatesSettings.getLinkedGateIds();
+        if (linked != null && !linked.isEmpty()) {
+            return linked.iterator().next();
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "getCurrentGateId error: " + e.getMessage());
+    }
+    Log.w(TAG, "GATE_ID not configured — using UNKNOWN");
+    return "GATE-UNKNOWN";
+}
     private void triggerAlarm(String itemTitle, String serial) {
         mainHandler.post(() -> {
             if (isDestroyed || !isAdded()) return;
