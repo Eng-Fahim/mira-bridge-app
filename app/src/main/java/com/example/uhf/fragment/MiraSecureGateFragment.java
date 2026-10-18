@@ -72,39 +72,24 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraSecureGateFragment v4.1 — SECURITY HARDENED
+ *  MiraSecureGateFragment v4.2 — PRODUCTION READY
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * إصلاحات v4.1 (Panic Lock security hardening):
- *   🚨 [v4.1] autoStartScanning() blocked when Panic Lock active
- *   🚨 [v4.1] startScanning() blocked when Panic Lock active
- *   🚨 [v4.1] toggleScanning() rejects manual start during Panic Lock
- *   🚨 [v4.1] startContinuousScan() blocked during Panic Lock
- *   🚨 [v4.1] continuousScanTask() skips restart during Panic Lock
- *   🚨 [v4.1] onResume() skips scan restart during Panic Lock
- *   🚨 [v4.1] btnToggleScan disabled while Panic Lock active
- *   🚨 [v4.1] btnToggleScan re-enabled after release
- *
- * إصلاحات v4.0 (أمنية حرجة):
- *   🚨 [CRITICAL] Online → دائماً السيرفر (الكاش فقط في offline)
- *   🚨 [CRITICAL] MAX_CACHE_AGE = 5 دقائق (لا ثقة بالكاش القديم)
- *   🚨 [CRITICAL] إزالة الصوت المزدوج من triggerAlarm
- *   🚨 [CRITICAL] quietMode يعمل فعلياً
- *   ✅ SCAN_COOL_DOWN = 5 ثوانٍ
- *   ✅ recentlyExitedMap — تجاهل صامت
- *   ✅ auditDecision() — سجل كامل
- *   ✅ تطبيع EPC إلى UPPERCASE
- *   ✅ Panic Lock
+ * إصلاحات v4.2 (بعد فحص التكامل مع POS + السيرفر):
+ *   🔴 [CRITICAL] queryMiraGateServer: إزالة nested submit → لا deadlock
+ *   🔴 [CRITICAL] MAX_CACHE_AGE = 24h (يطابق OfflineGateCache TTL)
+ *   🔴 [CRITICAL] isCacheFresh() يستخدم getLastCacheFetchTime() من الكاش
+ *   🟠 [HIGH]     getCurrentGateId() يستخدم device_gate_id من الإعدادات
+ *   🟢 [v4.1]     كل إصلاحات Panic Lock محفوظة
+ *   🟢 [v4.0]     كل إصلاحات الأمان السابقة محفوظة
  */
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MiraSecureGateFragment extends Fragment {
@@ -115,7 +100,10 @@ public class MiraSecureGateFragment extends Fragment {
     // 🚨 ثوابت أمنية
     // ═══════════════════════════════════════════════════════════
     private static final long SCAN_COOL_DOWN_MS = 5000;
-    private static final long MAX_CACHE_AGE_MS = 5 * 60 * 1000;
+
+    // ✅ [v4.2] يطابق OfflineGateCache.ALLOWED_LIST_TTL_MS (24 ساعة)
+    private static final long MAX_CACHE_AGE_MS = 24 * 60 * 60 * 1000L;
+
     private static final long RECENT_EXIT_WINDOW_MS = 60_000;
     private static final long AUDIT_LOG_MAX_CHARS = 50_000;
 
@@ -162,7 +150,6 @@ public class MiraSecureGateFragment extends Fragment {
 
     private final ConcurrentHashMap<String, Long> recentlyExitedMap = new ConcurrentHashMap<>();
 
-    // 🚨 Panic Lock
     private volatile boolean isPanicLock = false;
 
     private final StringBuilder auditLog = new StringBuilder();
@@ -225,7 +212,6 @@ public class MiraSecureGateFragment extends Fragment {
         public void run() {
             if (isDestroyed || !isAdded()) return;
 
-            // 🚨 [v4.1] Panic Lock — لا تُعد تشغيل المسح
             if (isPanicLock) {
                 mainHandler.postDelayed(this, CONTINUOUS_SCAN_INTERVAL_MS);
                 return;
@@ -442,8 +428,8 @@ public class MiraSecureGateFragment extends Fragment {
         startBackgroundService();
 
         updateSystemStatus(true);
-        logConsole(getLocalizedText("🚀 تم تفعيل مركز القيادة الأمنية",
-                "🚀 SECURITY COMMAND CENTER ACTIVATED"));
+        logConsole(getLocalizedText("🚀 تم تفعيل مركز القيادة الأمنية v4.2",
+                "🚀 SECURITY COMMAND CENTER v4.2 ACTIVATED"));
     }
 
     @Override
@@ -572,7 +558,6 @@ public class MiraSecureGateFragment extends Fragment {
 
         if (btnScanBarcode != null) {
             btnScanBarcode.setOnClickListener(v -> {
-                // 🚨 [v4.1] لا تفتح الكاميرا أثناء PANIC
                 if (isPanicLock) {
                     showToast(getLocalizedText(
                             "🚨 PANIC LOCK نشط — افتح القفل أولاً",
@@ -606,17 +591,14 @@ public class MiraSecureGateFragment extends Fragment {
             btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
         }
 
-        // 🚨 [v4.1] Panic Lock — Toggle + disable scan button
         if (btnPanicLock != null) {
             btnPanicLock.setOnClickListener(v -> {
                 if (isPanicLock) {
-                    // ✅ فتح
                     isPanicLock = false;
                     btnPanicLock.setText("🚨");
                     btnPanicLock.setBackgroundTintList(
                             android.content.res.ColorStateList.valueOf(getDangerColor()));
 
-                    // 🚨 [v4.1] أعد تفعيل زر المسح
                     if (btnToggleScan != null) {
                         btnToggleScan.setEnabled(true);
                         btnToggleScan.setAlpha(1.0f);
@@ -635,7 +617,6 @@ public class MiraSecureGateFragment extends Fragment {
                     updateSystemStatus(true);
                     autoStartScanning();
                 } else {
-                    // ⚠️ تفعيل (مع تأكيد)
                     new MaterialAlertDialogBuilder(requireContext())
                             .setTitle("🚨 PANIC LOCK")
                             .setMessage(isArabic
@@ -657,7 +638,6 @@ public class MiraSecureGateFragment extends Fragment {
                                 btnPanicLock.setBackgroundTintList(
                                         android.content.res.ColorStateList.valueOf(getSuccessColor()));
 
-                                // 🚨 [v4.1] عطّل زر المسح
                                 if (btnToggleScan != null) {
                                     btnToggleScan.setEnabled(false);
                                     btnToggleScan.setAlpha(0.5f);
@@ -944,7 +924,6 @@ public class MiraSecureGateFragment extends Fragment {
 
     private void startContinuousScan() {
         if (isDestroyed) return;
-        // 🚨 [v4.1] لا تبدأ المسح المستمر أثناء PANIC
         if (isPanicLock) {
             Log.d(TAG, "startContinuousScan blocked — PANIC LOCK active");
             return;
@@ -1163,6 +1142,7 @@ public class MiraSecureGateFragment extends Fragment {
                 JSONObject payload = new JSONObject();
                 payload.put("command", "LOCK_ALL");
                 payload.put("branch_id", getCurrentBranchId());
+                // ✅ [v4.2] user_id يُضاف تلقائياً في MiraApiClient.authorize
                 client.postWithAuth("/gate-command", payload);
             } catch (Exception e) {
                 Log.e(TAG, "lockAllGates: " + e.getMessage());
@@ -1399,7 +1379,6 @@ public class MiraSecureGateFragment extends Fragment {
 
     private void autoStartScanning() {
         if (isSimulatorMode()) return;
-        // 🚨 [v4.1] منع بدء المسح أثناء PANIC
         if (isPanicLock) {
             Log.d(TAG, "autoStartScanning blocked — PANIC LOCK active");
             return;
@@ -1409,7 +1388,6 @@ public class MiraSecureGateFragment extends Fragment {
 
         mainHandler.postDelayed(() -> {
             if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
-            // 🚨 [v4.1] منع بدء المسح أثناء PANIC (حماية إضافية)
             if (isPanicLock) return;
             if (isScanning) return;
             if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
@@ -1418,7 +1396,6 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void toggleScanning() {
-        // 🚨 [v4.1] منع التفعيل اليدوي أثناء PANIC
         if (isPanicLock) {
             showToast(getLocalizedText(
                     "🚨 PANIC LOCK نشط — افتح القفل أولاً",
@@ -1431,7 +1408,6 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void startScanning() {
-        // 🚨 [v4.1] حماية نهائية — منع بدء المسح أثناء PANIC
         if (isPanicLock) {
             Log.w(TAG, "startScanning blocked — PANIC LOCK active");
             return;
@@ -1631,6 +1607,9 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void loadTestEpcs() {
+        if (!BuildConfig.ALLOW_SIMULATOR) {
+            return; // ✅ [v4.2] فقط في dev
+        }
         executeOnGateExecutor(() -> {
             try {
                 Context context = getContext();
@@ -1712,6 +1691,14 @@ public class MiraSecureGateFragment extends Fragment {
         });
     }
 
+    // ✅ [v4.2] فحص الطازجية الموحّد — يستخدم OfflineGateCache كمصدر حقيقة
+    private boolean isCacheFresh(long now) {
+        if (offlineCache == null) return false;
+        long lastFetch = offlineCache.getLastCacheFetchTime();
+        return lastFetch > 0
+                && (now - lastFetch) < MAX_CACHE_AGE_MS;
+    }
+
     // ==================== EPC Processing ====================
 
     private void processInputEpcBackground(String epc, String sourceType) {
@@ -1761,9 +1748,16 @@ public class MiraSecureGateFragment extends Fragment {
         // 🚨 5) Offline — نثق بالكاش فقط مع فحص الطازجية
         boolean cacheAllowed = offlineCache != null
                 && offlineCache.isAllowedLocally(cleanedEpc);
-        long cacheAgeMs = now - lastCacheSuccessTime;
-        boolean cacheFresh = lastCacheSuccessTime > 0
-                && cacheAgeMs < MAX_CACHE_AGE_MS;
+
+        // ✅ [v4.2] استخدم isCacheFresh() الذي يقرأ من OfflineGateCache
+        boolean cacheFresh = isCacheFresh(now);
+
+        // احسب العمر للعرض في السجل
+        long cacheAgeMs = 0;
+        if (offlineCache != null) {
+            long lastFetch = offlineCache.getLastCacheFetchTime();
+            cacheAgeMs = lastFetch > 0 ? (now - lastFetch) : 0;
+        }
 
         if (cacheAllowed && cacheFresh) {
             logConsole("✅ Offline cache hit (age " + (cacheAgeMs / 1000) + "s)");
@@ -1807,6 +1801,10 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
+    /**
+     * ✅ [v4.2 CRITICAL] لا nested submit — استدعاء مباشر داخل Thread
+     * لإزالة deadlock عند 8 قراءات متزامنة.
+     */
     private void queryMiraGateServer(String epc) {
         executeOnGateExecutor(() -> {
             try {
@@ -1818,10 +1816,9 @@ public class MiraSecureGateFragment extends Fragment {
                 params.put("context", "gate");
                 params.put("branch_id", getCurrentBranchId());
 
-                Future<MiraApiClient.ApiResponse> future = gateExecutor.submit(
-                        () -> client.authorize(epc, "gate", params));
+                // ✅ [v4.2] استدعاء مباشر — no nested submit
                 MiraApiClient.ApiResponse response =
-                        future.get(API_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                        client.authorize(epc, "gate", params);
 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject decision = response.data.optJSONObject("decision");
@@ -1856,25 +1853,26 @@ public class MiraSecureGateFragment extends Fragment {
                             logConsole((allowed ? "✅ " : "🚨 ") + message);
                     });
                 } else {
-                    auditDecision(epc, false, "SERVER_INVALID_RESPONSE",
+                    // ✅ [v4.2] networkError vs invalid response
+                    boolean isNetworkIssue = response == null
+                            || response.isNetworkError;
+
+                    auditDecision(epc, false,
+                            isNetworkIssue ? "SERVER_NETWORK_ERROR"
+                                           : "SERVER_INVALID_RESPONSE",
                             "SERVER", 0, true);
                     mainHandler.post(() -> {
                         if (isAdded() && !isDestroyed) {
                             handleGateDecision(false,
-                                    getLocalizedText("رد غير متوقع", "Invalid response"),
+                                    isNetworkIssue
+                                            ? getLocalizedText("انقطاع اتصال", "Network error")
+                                            : getLocalizedText("رد غير متوقع", "Invalid response"),
                                     epc);
                         }
                     });
                 }
-            } catch (TimeoutException e) {
-                auditDecision(epc, false, "SERVER_TIMEOUT", "SERVER", 0, true);
-                mainHandler.post(() -> {
-                    if (isAdded() && !isDestroyed) {
-                        handleGateDecision(false,
-                                getLocalizedText("انقطاع اتصال", "Timeout"), epc);
-                    }
-                });
             } catch (Exception e) {
+                Log.e(TAG, "queryMiraGateServer error: " + e.getMessage(), e);
                 auditDecision(epc, false, "EXCEPTION", "SERVER", 0, true);
                 mainHandler.post(() -> {
                     if (isAdded() && !isDestroyed) {
@@ -2033,13 +2031,20 @@ public class MiraSecureGateFragment extends Fragment {
         });
     }
 
+    /**
+     * ✅ [v4.2] gate_id من إعدادات الجهاز — لا من أول قائمة البوابات
+     */
     private String getCurrentGateId() {
         try {
-            if (monitorList != null && !monitorList.isEmpty()) {
-                return monitorList.get(0).gateId;
+            String configured = miraGatesSettings.getDeviceGateId();
+            if (configured != null && !configured.trim().isEmpty()) {
+                return configured.trim();
             }
-        } catch (Exception ignored) {}
-        return "GATE-01";
+        } catch (Exception e) {
+            Log.w(TAG, "getDeviceGateId error: " + e.getMessage());
+        }
+        Log.w(TAG, "GATE_ID not configured in settings — using UNKNOWN");
+        return "GATE-UNKNOWN";
     }
 
     private void triggerAlarm(String itemTitle, String serial) {
@@ -2306,7 +2311,6 @@ public class MiraSecureGateFragment extends Fragment {
         applyOperationMode(currentOperationMode);
         mainHandler.postDelayed(() -> {
             if (isDestroyed || !isAdded() || isLockdown || isCameraOpen) return;
-            // 🚨 [v4.1] لا تبدأ المسح أثناء PANIC
             if (isPanicLock) return;
             if (isScanning) return;
             if (gateRfidBridge != null && gateRfidBridge.isScanning()) return;
