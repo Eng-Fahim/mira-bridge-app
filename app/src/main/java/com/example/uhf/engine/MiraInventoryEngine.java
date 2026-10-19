@@ -75,6 +75,31 @@ public void clearSession() {
         this.sessionStartTime = SystemClock.elapsedRealtime();
     }
 
+/**
+ * ✅ [Fix-A4] تحديث الكتالوج بعد التحميل المتأخر
+ *
+ * يُستدعى من MiraInventoryProFragment.loadCatalogInBackground
+ * بعد أن يصبح الكتالوج متاحاً — يُبلّغ الـ Engine ليسجّل
+ * expected_count الصحيح في التقرير المرسل للسيرفر.
+ */
+public void setCatalog(Map<String, InventoryItem> catalog) {
+    try {
+        if (catalog == null) {
+            Log.d(TAG, "setCatalog: null — skipping");
+            return;
+        }
+
+        catalogByEpc.clear();
+        for (Map.Entry<String, InventoryItem> entry : catalog.entrySet()) {
+            String canonicalEpc = InventoryItem.normalizeEpc(entry.getKey());
+            catalogByEpc.put(canonicalEpc, entry.getValue());
+        }
+
+        Log.d(TAG, "✅ Catalog updated in Engine: " + catalogByEpc.size() + " items");
+    } catch (Exception e) {
+        Log.e(TAG, "setCatalog error", e);
+    }
+}
     public void onTagScanned(String rawEpc, int rssi) {
     String epc = InventoryItem.normalizeEpc(rawEpc);
     if (epc.isEmpty()) return;
