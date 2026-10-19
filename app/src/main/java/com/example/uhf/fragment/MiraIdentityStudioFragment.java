@@ -186,6 +186,8 @@ private volatile String lastScannedEpc = "";
     @Nullable private TextView tvFeedbackPrice;
     @Nullable private View vFeedbackAccent;
     @Nullable private Runnable pendingHideFeedback;
+    
+    @Nullable private volatile String pendingBarcodeFromScanner = null;
 
     // ═══════════════════════════════════════════════════════════════════
     //  🎯 Physical RFID Trigger
@@ -1599,125 +1601,56 @@ public void onRfidScanned(String epc) {
     // ═══════════════════════════════════════════════════════════════════
 
     private void openBarcodeScannerForEPC() {
-        try {
-            if (!isAdded() || getActivity() == null) return;
+    try {
+        if (!isAdded() || getActivity() == null) return;
 
-            FragmentManager fm = getParentFragmentManager();
-            if (fm.isStateSaved()) {
-                Log.w(TAG, "State saved, cannot open scanner");
-                return;
-            }
-            if (fm.findFragmentByTag("barcode_scanner_tag") != null) {
-                Log.w(TAG, "Scanner already open");
-                return;
-            }
-
-            MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
-            sf.setOnBarcodeScannedListener((data, format) -> {
-                if (data == null || data.trim().isEmpty()) {
-                    safeRun(() -> {
-                        playErrorSound();
-                        showToast(isArabic ? "❌ باركود فارغ" : "❌ Empty barcode");
-                    });
-                    return;
-                }
-
-                final String scannedCode = data.trim().toUpperCase(Locale.US);
-
-                if (scannedCode.length() < 6 || scannedCode.length() > 128) {
-                    safeRun(() -> {
-                        playErrorSound();
-                        showScanFeedback(
-                                isArabic ? "❌ باركود غير صالح"
-                                         : "❌ Invalid Barcode",
-                                isArabic ? "الطول: " + scannedCode.length()
-                                            + " حرف"
-                                         : "Length: " + scannedCode.length() + " chars",
-                                null,
-                                android.R.drawable.ic_dialog_alert,
-                                0xFFDC2626);
-                        showErrorDialog(
-                                isArabic ? "❌ باركود غير صالح"
-                                         : "❌ Invalid Barcode",
-                                isArabic ? "طول الباركود غير منطقي ("
-                                            + scannedCode.length() + ")"
-                                         : "Barcode length unreasonable ("
-                                            + scannedCode.length() + ")");
-                    });
-                    return;
-                }
-
-                miraExecutor.getBackgroundExecutor().execute(() -> {
-                    final boolean isDuplicate = syncManager.isEpcDuplicateLocally(scannedCode);
-
-                    safeRun(() -> {
-                        if (isDuplicate) {
-                            playErrorSound();
-                            showScanFeedback(
-                                    isArabic ? "⚠️ باركود مكرر"
-                                             : "⚠️ Duplicate Barcode",
-                                    isArabic ? scannedCode
-                                                + "\nمسجل بالفعل"
-                                             : scannedCode + "\nAlready registered",
-                                    null,
-                                    android.R.drawable.ic_dialog_alert,
-                                    0xFF3B82F6);
-                            showErrorDialog(
-                                    isArabic ? "باركود مكرر" : "Duplicate Barcode",
-                                    isArabic ? "هذا الكود مسجل بالفعل:\n" + scannedCode
-                                             : "This code is already registered:\n"
-                                                + scannedCode);
-                        } else {
-                            if (binding != null && binding.etEpc != null) {
-                                binding.etEpc.setText(scannedCode);
-                                binding.etEpc.setTag(scannedCode);
-                                if (binding.tvStatusBadge != null) {
-                                    binding.tvStatusBadge.setText("BOUND");
-                                }
-                            }
-                            isEpcBound = true;
-
-                            showScanFeedback(
-                                    isArabic ? "✅ باركود صالح"
-                                             : "✅ Valid Barcode",
-                                    isArabic ? scannedCode + "\nجاهز للتكويد"
-                                             : scannedCode + "\nReady for encoding",
-                                    null,
-                                    R.drawable.ic_pos_cart_gold,
-                                    0xFF22C55E);
-
-                            playSuccessSound();
-                            Log.i(TAG, "✅ Barcode accepted: " + scannedCode);
-                        }
-
-                        try {
-                            if (fm.getBackStackEntryCount() > 0) fm.popBackStack();
-                        } catch (Exception e) {
-                            Log.e(TAG, "popBackStack error", e);
-                        }
-                    });
-                });
-            });
-
-            View view = getView();
-            int cid = (view != null && view.getParent() instanceof View)
-                    ? ((View) view.getParent()).getId()
-                    : android.R.id.content;
-
-            fm.beginTransaction()
-                    .setReorderingAllowed(true)
-                    .setCustomAnimations(
-                            android.R.anim.fade_in, android.R.anim.fade_out,
-                            android.R.anim.fade_in, android.R.anim.fade_out)
-                    .replace(cid, sf, "barcode_scanner_tag")
-                    .addToBackStack("barcode_scanner_encode")
-                    .commit();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Barcode scanner error: " + e.getMessage(), e);
-            showToast(isArabic ? "❌ خطأ في فتح الماسح" : "❌ Scanner error");
+        FragmentManager fm = getParentFragmentManager();
+        if (fm.isStateSaved()) {
+            Log.w(TAG, "State saved, cannot open scanner");
+            return;
         }
+        if (fm.findFragmentByTag("barcode_scanner_tag") != null) {
+            Log.w(TAG, "Scanner already open");
+            return;
+        }
+
+        MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
+        sf.setOnBarcodeScannedListener((data, format) -> {
+            if (data != null && !data.trim().isEmpty()) {
+                // ✅ احفظ الكود مؤقتاً فقط، ولا تتعامل مع الواجهة الآن
+                pendingBarcodeFromScanner = data.trim().toUpperCase(Locale.US);
+            }
+            
+            // ✅ أغلق الماسح ليتم استدعاء onHiddenChanged في شاشة التكويد
+            try {
+                if (fm.getBackStackEntryCount() > 0) fm.popBackStack();
+            } catch (Exception e) {
+                Log.e(TAG, "popBackStack error", e);
+            }
+        });
+
+        View view = getView();
+        int cid = (view != null && view.getParent() instanceof View)
+                ? ((View) view.getParent()).getId()
+                : android.R.id.content;
+
+        // ✅ الحل: استخدم hide بدلاً من replace للحفاظ على واجهة التكويد حية
+        fm.beginTransaction()
+                .setReorderingAllowed(true)
+                .setCustomAnimations(
+                        android.R.anim.fade_in, android.R.anim.fade_out,
+                        android.R.anim.fade_in, android.R.anim.fade_out)
+                .hide(this) // إخفاء شاشة التكويد
+                .add(cid, sf, "barcode_scanner_tag") // إضافة الماسح فوقها
+                .addToBackStack("barcode_scanner_encode")
+                .commit();
+
+    } catch (Exception e) {
+        Log.e(TAG, "Barcode scanner error: " + e.getMessage(), e);
+        showToast(isArabic ? "❌ خطأ في فتح الماسح" : "❌ Scanner error");
     }
+}
+
 
     // ═══════════════════════════════════════════════════════════════════
     //  Save & Encode — finalizeItemIdentity
@@ -3423,6 +3356,86 @@ public void onPause() {
     stopRfidScanningMode();
     saveCurrentDraftAsync();
 }
+
+@Override
+public void onHiddenChanged(boolean hidden) {
+    super.onHiddenChanged(hidden);
+    if (!hidden) {
+        // ✅ بمجرد عودة الشاشة للظهور، عالج الكود الممسوح
+        processPendingBarcode();
+    }
+}
+
+private void processPendingBarcode() {
+    final String scannedCode = pendingBarcodeFromScanner;
+    if (scannedCode == null || scannedCode.isEmpty()) return;
+
+    // تصفير المتغير
+    pendingBarcodeFromScanner = null;
+
+    if (scannedCode.length() < 6 || scannedCode.length() > 128) {
+        playErrorSound();
+        showScanFeedback(
+                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+                isArabic ? "الطول: " + scannedCode.length() + " حرف"
+                         : "Length: " + scannedCode.length() + " chars",
+                null,
+                android.R.drawable.ic_dialog_alert,
+                0xFFDC2626);
+        showErrorDialog(
+                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+                isArabic ? "طول الباركود غير منطقي (" + scannedCode.length() + ")"
+                         : "Barcode length unreasonable (" + scannedCode.length() + ")");
+        return;
+    }
+
+    // ✅ فحص قاعدة البيانات
+    if (miraExecutor == null) return;
+    miraExecutor.getBackgroundExecutor().execute(() -> {
+        final boolean isDuplicate = syncManager != null && syncManager.isEpcDuplicateLocally(scannedCode);
+
+        safeRun(() -> {
+            if (binding == null || !isAdded()) return;
+
+            if (isDuplicate) {
+                playErrorSound();
+                showScanFeedback(
+                        isArabic ? "⚠️ باركود مكرر" : "⚠️ Duplicate Barcode",
+                        isArabic ? scannedCode + "\nمسجل بالفعل" : scannedCode + "\nAlready registered",
+                        null,
+                        android.R.drawable.ic_dialog_alert,
+                        0xFF3B82F6);
+                showErrorDialog(
+                        isArabic ? "باركود مكرر" : "Duplicate Barcode",
+                        isArabic ? "هذا الكود مسجل بالفعل:\n" + scannedCode
+                                 : "This code is already registered:\n" + scannedCode);
+            } else {
+                // ✅ إدراج الكود في الحقل
+                if (binding.etEpc != null) {
+                    binding.etEpc.setText(scannedCode);
+                    binding.etEpc.setTag(scannedCode);
+                }
+                if (binding.tvStatusBadge != null) {
+                    binding.tvStatusBadge.setText("BOUND");
+                }
+                isEpcBound = true;
+                lastScannedEpc = scannedCode;
+
+                // ✅ عرض نتيجة الفحص بنجاح
+                showScanFeedback(
+                        isArabic ? "✅ باركود صالح" : "✅ Valid Barcode",
+                        isArabic ? scannedCode + "\nجاهز للتكويد" : scannedCode + "\nReady for encoding",
+                        null,
+                        R.drawable.ic_pos_cart_gold,
+                        0xFF22C55E);
+
+                playSuccessSound();
+                Log.i(TAG, "✅ Barcode accepted and DB checked: " + scannedCode);
+            }
+        });
+    });
+}
+
 
     @Override
     public void onDestroyView() {
