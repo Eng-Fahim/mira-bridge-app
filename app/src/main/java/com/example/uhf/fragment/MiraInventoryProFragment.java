@@ -1970,21 +1970,26 @@ private void loadCatalogInBackground() {
                             if (!isAdded() || isFragmentDestroyed) return;
 
                             // ✅ تجاهل إذا تغيّرت الجلسة
+                            
                             if (sessionAtStart == null || inventoryEngine == null
-                                    || !sessionAtStart.equals(
-                                            inventoryEngine.getClientSessionId())) {
-                                Log.d(TAG, "⏭️ Stale catalog load — session changed");
-                                return;
-                            }
+        || !sessionAtStart.equals(
+                inventoryEngine.getClientSessionId())) {
+    Log.d(TAG, "⏭️ Stale catalog load — session changed");
+    return;
+}
 
-                            catalogEpcs.clear();
-                            if (catalog != null) {
-                                catalogEpcs.addAll(catalog.keySet());
-                            }
+// ✅ [Fix-A4] أبلغ الـ Engine بالكتالوج — لضمان expected_count في التقرير
+if (inventoryEngine != null) {
+    inventoryEngine.setCatalog(catalog);
+}
 
-                            expectedCount = catalog != null ? catalog.size() : 0;
-                            addDebugLine("📚 Catalog: " + expectedCount + " items");
+catalogEpcs.clear();
+if (catalog != null) {
+    catalogEpcs.addAll(catalog.keySet());
+}
 
+expectedCount = catalog != null ? catalog.size() : 0;
+addDebugLine("📚 Catalog: " + expectedCount + " items");
                             if (tvExpectedCount != null) {
                                 tvExpectedCount.setText(
                                         expectedCount > 0 ? String.valueOf(expectedCount) : "—");
