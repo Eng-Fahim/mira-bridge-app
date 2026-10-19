@@ -46,12 +46,31 @@ public class ModernScannedItemsAdapter
             }
 
             @Override
-            public boolean areContentsTheSame(@NonNull ScannedItemDisplay oldItem, 
-                                              @NonNull ScannedItemDisplay newItem) {
-                return oldItem.count == newItem.count 
-                    && oldItem.rssi == newItem.rssi
-                    && (oldItem.time != null ? oldItem.time.equals(newItem.time) : newItem.time == null);
-            }
+public boolean areContentsTheSame(@NonNull ScannedItemDisplay oldItem, 
+                                  @NonNull ScannedItemDisplay newItem) {
+    // ✅ [Fix-A3] المقارنة الكاملة — يشمل title/karat/weight/price
+    // السبب: بعد reclassifyScannedItems() تُحدَّث هذه الحقول في الذاكرة
+    // لكن UI لا يتحدث إلا إذا كانت هذه الحقول في المقارنة
+    if (oldItem.count != newItem.count) return false;
+    if (oldItem.rssi != newItem.rssi) return false;
+
+    String oldTime = oldItem.time != null ? oldItem.time : "";
+    String newTime = newItem.time != null ? newItem.time : "";
+    if (!oldTime.equals(newTime)) return false;
+
+    String oldTitle = oldItem.title != null ? oldItem.title : "";
+    String newTitle = newItem.title != null ? newItem.title : "";
+    if (!oldTitle.equals(newTitle)) return false;
+
+    String oldKarat = oldItem.karat != null ? oldItem.karat : "";
+    String newKarat = newItem.karat != null ? newItem.karat : "";
+    if (!oldKarat.equals(newKarat)) return false;
+
+    if (Math.abs(oldItem.weight - newItem.weight) > 0.001) return false;
+    if (Math.abs(oldItem.price - newItem.price) > 0.01) return false;
+
+    return true;
+}
         };
 
     public ModernScannedItemsAdapter(boolean isArabic, OnItemClickListener listener) {
