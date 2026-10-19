@@ -2109,7 +2109,6 @@ try {
     Log.w(TAG, "update-rfid failed (non-fatal)", e);
 }
 // ═══════════════════════════════════════════════════
-// ✅ [تعديل جذري] استخراج البيانات الحقيقية من السيرفر
 //  11) Show results
 // ═══════════════════════════════════════════════════
 // ✅ [تعديل جذري] استخراج البيانات الحقيقية من السيرفر
@@ -2122,7 +2121,7 @@ if (serverSerial.isEmpty()) {
     serverSerial = finalIdentifier;
 }
 
-// ✅ المتغير serverEpc تم تعريفه مسبقاً في الخطوة 7، لذا نستخدمه هنا مباشرة
+// ✅ المتغير serverEpc تم تعريفه مسبقاً في الخطوة 7، لذا نستخدمه هنا مباشرة (بدون كلمة String)
 if (serverEpc.isEmpty()) {
     serverEpc = finalNewEpc;
 }
@@ -2160,8 +2159,8 @@ if (finalWasPreEncoded) {
 // ✅ نمرر البيانات الحقيقية للدالة
 showEncodingSuccessDialogEnhanced(
         finalTitle, 
-        displayEpc,     // ✅ الـ EPC الحقيقي من الداتابيز (E2340...)
-        shortBarcode,   // ✅ السيريال الحقيقي من الداتابيز (MIRA-SN-1003)
+        displayEpc,     // ✅ الـ EPC الحقيقي من الداتابيز
+        shortBarcode,   // ✅ السيريال الحقيقي من الداتابيز
         tid, 
         gs1Code,        
         qrUrl,          
