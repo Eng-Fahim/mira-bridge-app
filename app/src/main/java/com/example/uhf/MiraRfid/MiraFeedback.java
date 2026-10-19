@@ -77,9 +77,14 @@ public class MiraFeedback {
     private int currentToneVolume = -1;
     private volatile boolean released = false;
 
-    /** آخر وقت قبولنا فيه وسماً (لفلتر التكرار) */
-    private volatile long lastTagAt = 0L;
+    
+/** آخر وقت قبولنا فيه وسماً (لفلتر التكرار) — للتوافق العكسي */
+private volatile long lastTagAt = 0L;
 
+/** ✅ [Fix-A1] فلتر per-EPC — كل وسم له وقته المستقل */
+private final java.util.Map<String, Long> recentEpcsMap =
+        new java.util.concurrent.ConcurrentHashMap<>();
+private static final int MAX_RECENT_EPCS = 2000;
     // ═══════════════════════════════════════════════════════════════
     //  Constructor
     // ═══════════════════════════════════════════════════════════════
@@ -400,27 +405,44 @@ public class MiraFeedback {
      * @return true = اقبله (جديد) | false = مكرر (تجاهله)
      */
     public boolean shouldAcceptTag(String epc) {
-        if (released) return false;
+    if (released) return false;
+    if (epc == null || epc.isEmpty()) return false;
 
-        if (!settings.isFilterDuplicates()) return true;
+    if (!settings.isFilterDuplicates()) return true;
 
-        long now = System.currentTimeMillis();
-        long threshold = settings.getDuplicateFilterMs();
+    long now = System.currentTimeMillis();
+    long threshold = settings.getDuplicateFilterMs();
 
-        if (now - lastTagAt < threshold) {
-            return false;
-        }
-
-        lastTagAt = now;
-        return true;
+    // ✅ [Fix-A1] فلترة per-EPC — الوسوم المختلفة لا تحجب بعضها
+    Long lastForThisEpc = recentEpcsMap.get(epc);
+    if (lastForThisEpc != null && (now - lastForThisEpc) < threshold) {
+        lastTagAt = now;   // للتوافق العكسي فقط
+        return false;      // نفس الوسم — مكرر
     }
+
+    recentEpcsMap.put(epc, now);
+    lastTagAt = now;
+
+    // 🧹 تنظيف دوري — لا تكبر الـ Map بلا حد
+    if (recentEpcsMap.size() > MAX_RECENT_EPCS) {
+    recentEpcsMap.entrySet().removeIf(e -> (now - e.getValue()) > threshold * 2);
+    
+    // ✅ [احتياطي] إذا بقيت أكبر من الحد — احذف الأقدم
+    if (recentEpcsMap.size() > MAX_RECENT_EPCS) {
+        recentEpcsMap.clear();   // أو احتفظ بآخر 1000 فقط
+    }
+}
+    return true;
+}
 
     /**
      * إعادة تعيين فلتر التكرار.
      */
     public void resetDuplicateFilter() {
-        lastTagAt = 0L;
-    }
+    lastTagAt = 0L;
+    // ✅ [Fix-A1] امسح خريطة الـ EPCs أيضاً
+    recentEpcsMap.clear();
+}
 
     // ═══════════════════════════════════════════════════════════════
     //  🧹 تحرير الموارد
