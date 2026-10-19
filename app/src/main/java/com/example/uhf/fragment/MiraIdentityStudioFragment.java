@@ -3373,21 +3373,22 @@ private void processPendingBarcode() {
     // تصفير المتغير
     pendingBarcodeFromScanner = null;
 
-    if (scannedCode.length() < 6 || scannedCode.length() > 128) {
-        playErrorSound();
-        showScanFeedback(
-                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-                isArabic ? "الطول: " + scannedCode.length() + " حرف"
-                         : "Length: " + scannedCode.length() + " chars",
-                null,
-                android.R.drawable.ic_dialog_alert,
-                0xFFDC2626);
-        showErrorDialog(
-                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-                isArabic ? "طول الباركود غير منطقي (" + scannedCode.length() + ")"
-                         : "Barcode length unreasonable (" + scannedCode.length() + ")");
-        return;
-    }
+    // ✅ تقليل الحد الأدنى للطول ليدعم أكواد GS1 DataMatrix الصغيرة
+if (scannedCode.length() < 2 || scannedCode.length() > 128) {
+    playErrorSound();
+    showScanFeedback(
+            isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+            isArabic ? "الطول: " + scannedCode.length() + " حرف"
+                     : "Length: " + scannedCode.length() + " chars",
+            null,
+            android.R.drawable.ic_dialog_alert,
+            0xFFDC2626);
+    showErrorDialog(
+            isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+            isArabic ? "طول الباركود غير منطقي (" + scannedCode.length() + ")"
+                     : "Barcode length unreasonable (" + scannedCode.length() + ")");
+    return;
+}
 
     // ✅ فحص قاعدة البيانات
     if (miraExecutor == null) return;
