@@ -2105,68 +2105,81 @@ public void onRfidScanned(String epc) {
                 }
 
                 // ═══════════════════════════════════════════════════
-                //  11) Show results
                 // ═══════════════════════════════════════════════════
-                safeRun(() -> {
-                    dismissDialog(activeLoadingDialog);
-                    activeLoadingDialog = null;
-                    playSuccessSound();
+//  11) Show results
+// ═══════════════════════════════════════════════════
+safeRun(() -> {
+    dismissDialog(activeLoadingDialog);
+    activeLoadingDialog = null;
+    playSuccessSound();
 
-                    miraExecutor.getSingleThreadExecutor().execute(() ->
-                            syncManager.removePendingEncode(finalIdentifier));
-                    if (formManager != null) formManager.clearDraft();
+    miraExecutor.getSingleThreadExecutor().execute(() ->
+            syncManager.removePendingEncode(finalIdentifier));
+    if (formManager != null) formManager.clearDraft();
 
-                    notifyDashboardUpdate("encode_success");
+    notifyDashboardUpdate("encode_success");
 
-                    if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
-                        uploadItemImages(finalServerItemId, finalPhotoPaths);
-                    }
+    if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
+        uploadItemImages(finalServerItemId, finalPhotoPaths);
+    }
 
-                    String displayEpc = finalNewEpc;
-                    String gs1Code = "(01)0729000000"
-                            + (finalServerItemId > 0
-                                    ? String.format(Locale.US, "%05d",
-                                            finalServerItemId)
-                                    : "00000")
-                            + "(21)" + displayEpc;
-                    String qrUrl = "https://ibreg.org/id/"
-                            + (finalServerItemId > 0
-                                    ? finalServerItemId : displayEpc);
+    String displayEpc = finalNewEpc;
+    
+    // ✅ [تعديل] توليد باركود قصير مخصص للطباعة (6 أرقام)
+    String shortBarcode;
+    if (finalServerItemId > 0) {
+        shortBarcode = String.format(Locale.US, "%06d", finalServerItemId);
+    } else {
+        // احتياطي إذا لم يرجع السيرفر ID
+        shortBarcode = String.format(Locale.US, "%06d", Math.abs(finalIdentifier.hashCode()) % 1000000);
+    }
+    
+    // ✅ كود GS1 مصغر جداً (فقط Serial Number) ليناسب البطاقات الصغيرة
+    String gs1Code = "(21)" + shortBarcode; 
+    String qrUrl = "https://ibreg.org/id/" + shortBarcode;
 
-                    if (finalResponseData != null) {
-                        JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
-                        if (gs1Obj != null) {
-                            gs1Code = gs1Obj.optString("raw_fnc1", gs1Code);
-                            qrUrl = gs1Obj.optString("digital_link", qrUrl);
-                        }
-                    }
+    if (finalResponseData != null) {
+        JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
+        if (gs1Obj != null) {
+            String serverGs1 = gs1Obj.optString("raw_fnc1", "");
+            if (!serverGs1.isEmpty()) gs1Code = serverGs1;
+            
+            String serverUrl = gs1Obj.optString("digital_link", "");
+            if (!serverUrl.isEmpty()) qrUrl = serverUrl;
+        }
+    }
 
-                    if (binding != null && binding.etEpc != null) {
-                        binding.etEpc.setText("");
-                    }
+    if (binding != null && binding.etEpc != null) {
+        binding.etEpc.setText("");
+    }
 
-                    if (finalWasPreEncoded) {
-                        showToast(isArabic
-                                ? "✅ تم استخدام EPC الموجود بنجاح"
-                                : "✅ Existing EPC used successfully");
-                    } else if (finalWrite && finalVerify && finalLock) {
-                        showToast(isArabic
-                                ? "🔒 تم التكويد والقفل بنجاح"
-                                : "🔒 Encoded & locked successfully");
-                    } else if (finalWrite && finalVerify && !finalLock) {
-                        showToast(isArabic
-                                ? "⚠️ تم التكويد لكن القفل فشل"
-                                : "⚠️ Encoded but lock failed");
-                    }
+    if (finalWasPreEncoded) {
+        showToast(isArabic ? "✅ تم استخدام EPC الموجود بنجاح" : "✅ Existing EPC used successfully");
+    } else if (finalWrite && finalVerify && finalLock) {
+        showToast(isArabic ? "🔒 تم التكويد والقفل بنجاح" : "🔒 Encoded & locked successfully");
+    } else if (finalWrite && finalVerify && !finalLock) {
+        showToast(isArabic ? "⚠️ تم التكويد لكن القفل فشل" : "⚠️ Encoded but lock failed");
+    }
 
-                    showEncodingSuccessDialogEnhanced(
-                            finalTitle, displayEpc, tid, gs1Code, qrUrl,
-                            String.valueOf(fGrossWeight), selectedKarat,
-                            finalPriceUSD, localCurrency, finalPhotoPaths,  // ✅ USD
-                            fStoneType, fStoneWeightCarats, fStoneCount, fStoneValue,
-                            netGoldWeight);
-                });
-
+    // ✅ [تعديل] نمرر الـ shortBarcode للدالة
+    showEncodingSuccessDialogEnhanced(
+            finalTitle, 
+            displayEpc,     // EPC (RFID)
+            shortBarcode,   // ✅ الباركود القصير (للطباعة)
+            tid, 
+            gs1Code, 
+            qrUrl,
+            String.valueOf(fGrossWeight), 
+            selectedKarat,
+            finalPriceUSD, 
+            localCurrency, 
+            finalPhotoPaths,
+            fStoneType, 
+            fStoneWeightCarats, 
+            fStoneCount, 
+            fStoneValue,
+            netGoldWeight);
+});
             } catch (Exception e) {
                 Log.e(TAG, "Background execution error", e);
                 safeRun(() -> {
@@ -2510,136 +2523,136 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
     //  Success Dialog
     // ═══════════════════════════════════════════════════════════════════
 
-    private void showEncodingSuccessDialogEnhanced(
-        String title, String epc, String tid, String gs1Code, String qrUrl,
-        String weight, String karat, double finalPriceUSD, String currency,
-        List<String> photos,
-        String stoneType, double stoneWeightCarats, int stoneCount,
-        double stoneValue, double netWeight) {
+    // ✅ [تعديل] إضافة المتغير shortBarcode للدالة
+private void showEncodingSuccessDialogEnhanced(
+    String title, String epc, String shortBarcode, String tid, String gs1Code, String qrUrl,
+    String weight, String karat, double finalPriceUSD, String currency,
+    List<String> photos,
+    String stoneType, double stoneWeightCarats, int stoneCount,
+    double stoneValue, double netWeight) {
 
-        if (!isAdded() || getContext() == null) return;
+    if (!isAdded() || getContext() == null) return;
 
-        BottomSheetDialog successDialog = new BottomSheetDialog(requireContext());
-        View view = getLayoutInflater().inflate(
-                R.layout.dialog_mira_identity_summary, null);
-        successDialog.setContentView(view);
-        successDialog.setCancelable(false);
-        successDialog.setCanceledOnTouchOutside(false);
+    BottomSheetDialog successDialog = new BottomSheetDialog(requireContext());
+    View view = getLayoutInflater().inflate(
+            R.layout.dialog_mira_identity_summary, null);
+    successDialog.setContentView(view);
+    successDialog.setCancelable(false);
+    successDialog.setCanceledOnTouchOutside(false);
 
-        TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
-        TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
-        TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
-        TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
-        TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
-        ImageView ivGs1DataMatrix = view.findViewById(R.id.ivGs1DataMatrix);
-        ImageView ivQrCode = view.findViewById(R.id.ivQrCode);
-        MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
+    TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
+    TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
+    TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
+    TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
+    TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
+    ImageView ivGs1DataMatrix = view.findViewById(R.id.ivGs1DataMatrix);
+    ImageView ivQrCode = view.findViewById(R.id.ivQrCode);
+    MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
 
-        if (tvIdTitle != null) tvIdTitle.setText(title);
-        if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
+    if (tvIdTitle != null) tvIdTitle.setText(title);
+    
+    // ✅ عرض الباركود القصير في الواجهة ليكون واضحاً للموظف
+    if (tvEpcCode != null) {
+        tvEpcCode.setText(isArabic 
+            ? "الباركود: " + shortBarcode + " | EPC: " + epc 
+            : "Barcode: " + shortBarcode + " | EPC: " + epc);
+    }
 
-        ImageView imgIdentityPhoto = view.findViewById(R.id.imgIdentityPhoto);
-        if (imgIdentityPhoto != null && photos != null && !photos.isEmpty()) {
-            String firstPhotoPath = photos.get(0);
-            File imgFile = new File(firstPhotoPath);
-            if (imgFile.exists()) {
-                imgIdentityPhoto.setVisibility(View.VISIBLE);
-                Glide.with(requireContext())
-                        .load(imgFile)
-                        .placeholder(R.drawable.placeholder_image)
-                        .error(R.drawable.ic_error_outline)
-                        .into(imgIdentityPhoto);
-            } else {
-                imgIdentityPhoto.setVisibility(View.GONE);
-            }
-        } else if (imgIdentityPhoto != null) {
+    ImageView imgIdentityPhoto = view.findViewById(R.id.imgIdentityPhoto);
+    if (imgIdentityPhoto != null && photos != null && !photos.isEmpty()) {
+        String firstPhotoPath = photos.get(0);
+        File imgFile = new File(firstPhotoPath);
+        if (imgFile.exists()) {
+            imgIdentityPhoto.setVisibility(View.VISIBLE);
+            Glide.with(requireContext())
+                    .load(imgFile)
+                    .placeholder(R.drawable.placeholder_image)
+                    .error(R.drawable.ic_error_outline)
+                    .into(imgIdentityPhoto);
+        } else {
             imgIdentityPhoto.setVisibility(View.GONE);
         }
-
-        if (tvIdMetalKarat != null)
-            tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
-        if (tvIdWeight != null)
-            tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
-
-        if (tvIdPrice != null && priceManager != null) {
-    tvIdPrice.setText(priceManager.formatPriceDefault(finalPriceUSD));
-}
-
-        TextView tvIdStonesInfo = view.findViewById(R.id.tvIdStonesInfo);
-        if (tvIdStonesInfo != null) {
-            if (stoneWeightCarats > 0 || stoneValue > 0 || stoneCount > 0) {
-                String stonesText;
-                if (isArabic) {
-                    stonesText = "الأحجار: "
-                            + (stoneType.isEmpty() ? "غير محدد" : stoneType);
-                    if (stoneWeightCarats > 0)
-                        stonesText += " | وزن: " + stoneWeightCarats + " قيراط";
-                    if (stoneCount > 0)
-                        stonesText += " | عدد: " + stoneCount + " حجر";
-                    if (stoneValue > 0)
-                        stonesText += " | قيمة: "
-                                + priceManager.formatPriceDefault(stoneValue)
-                                + " " + currency;
-                } else {
-                    stonesText = "Stones: "
-                            + (stoneType.isEmpty() ? "N/A" : stoneType);
-                    if (stoneWeightCarats > 0)
-                        stonesText += " | Wt: " + stoneWeightCarats + " ct";
-                    if (stoneCount > 0) stonesText += " | Pcs: " + stoneCount;
-                    if (stoneValue > 0)
-                        stonesText += " | Val: "
-                                + priceManager.formatPriceDefault(stoneValue)
-                                + " " + currency;
-                }
-                tvIdStonesInfo.setText(stonesText);
-                tvIdStonesInfo.setVisibility(View.VISIBLE);
-            } else {
-                tvIdStonesInfo.setVisibility(View.GONE);
-            }
-        }
-
-        miraExecutor.getImageExecutor().execute(() -> {
-            Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty())
-                    ? BarcodeGenerator.generateGS1DataMatrix(gs1Code, 250, 250)
-                    : null;
-            Bitmap qrBitmap = (qrUrl != null && !qrUrl.isEmpty())
-                    ? BarcodeGenerator.generateMicroQRCode(qrUrl, 250, 250)
-                    : null;
-
-            safeRun(() -> {
-                if (ivGs1DataMatrix != null && dmBitmap != null) {
-                    ivGs1DataMatrix.setImageBitmap(dmBitmap);
-                    ivGs1DataMatrix.setVisibility(View.VISIBLE);
-                }
-                if (ivQrCode != null && qrBitmap != null) {
-                    ivQrCode.setImageBitmap(qrBitmap);
-                    ivQrCode.setVisibility(View.VISIBLE);
-                }
-            });
-        });
-
-        View printView = view.findViewById(R.id.btnPrintTag);
-        if (printView instanceof MaterialButton) {
-            MaterialButton btnPrintTag = (MaterialButton) printView;
-            btnPrintTag.setVisibility(View.VISIBLE);
-            btnPrintTag.setOnClickListener(v ->
-                    miraExecutor.getImageExecutor().execute(() -> {
-                        Bitmap tagToPrint = TagPrinter.generatePhysicalTagBitmap(
-                                epc, gs1Code, qrUrl);
-                        safeRun(() -> TagPrinter.printTagDirectly(
-                                requireContext(), tagToPrint));
-                    }));
-        }
-
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> {
-                successDialog.dismiss();
-                safeRun(this::resetFormForNextScan);
-            });
-        }
-
-        successDialog.show();
+    } else if (imgIdentityPhoto != null) {
+        imgIdentityPhoto.setVisibility(View.GONE);
     }
+
+    if (tvIdMetalKarat != null)
+        tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
+    if (tvIdWeight != null)
+        tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
+
+    if (tvIdPrice != null && priceManager != null) {
+        tvIdPrice.setText(priceManager.formatPriceDefault(finalPriceUSD));
+    }
+
+    TextView tvIdStonesInfo = view.findViewById(R.id.tvIdStonesInfo);
+    if (tvIdStonesInfo != null) {
+        if (stoneWeightCarats > 0 || stoneValue > 0 || stoneCount > 0) {
+            String stonesText;
+            if (isArabic) {
+                stonesText = "الأحجار: " + (stoneType.isEmpty() ? "غير محدد" : stoneType);
+                if (stoneWeightCarats > 0) stonesText += " | وزن: " + stoneWeightCarats + " قيراط";
+                if (stoneCount > 0) stonesText += " | عدد: " + stoneCount + " حجر";
+                if (stoneValue > 0) stonesText += " | قيمة: " + priceManager.formatPriceDefault(stoneValue) + " " + currency;
+            } else {
+                stonesText = "Stones: " + (stoneType.isEmpty() ? "N/A" : stoneType);
+                if (stoneWeightCarats > 0) stonesText += " | Wt: " + stoneWeightCarats + " ct";
+                if (stoneCount > 0) stonesText += " | Pcs: " + stoneCount;
+                if (stoneValue > 0) stonesText += " | Val: " + priceManager.formatPriceDefault(stoneValue) + " " + currency;
+            }
+            tvIdStonesInfo.setText(stonesText);
+            tvIdStonesInfo.setVisibility(View.VISIBLE);
+        } else {
+            tvIdStonesInfo.setVisibility(View.GONE);
+        }
+    }
+
+    miraExecutor.getImageExecutor().execute(() -> {
+        // ✅ نولد الـ DataMatrix بناءً على كود GS1 المصغر
+        Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty())
+                ? BarcodeGenerator.generateGS1DataMatrix(gs1Code, 250, 250)
+                : null;
+        Bitmap qrBitmap = (qrUrl != null && !qrUrl.isEmpty())
+                ? BarcodeGenerator.generateMicroQRCode(qrUrl, 250, 250)
+                : null;
+
+        safeRun(() -> {
+            if (ivGs1DataMatrix != null && dmBitmap != null) {
+                ivGs1DataMatrix.setImageBitmap(dmBitmap);
+                ivGs1DataMatrix.setVisibility(View.VISIBLE);
+            }
+            if (ivQrCode != null && qrBitmap != null) {
+                ivQrCode.setImageBitmap(qrBitmap);
+                ivQrCode.setVisibility(View.VISIBLE);
+            }
+        });
+    });
+
+    View printView = view.findViewById(R.id.btnPrintTag);
+    if (printView instanceof MaterialButton) {
+        MaterialButton btnPrintTag = (MaterialButton) printView;
+        btnPrintTag.setVisibility(View.VISIBLE);
+        btnPrintTag.setOnClickListener(v ->
+                miraExecutor.getImageExecutor().execute(() -> {
+                    // ✅ [تعديل] نمرر الـ shortBarcode للطباعة لإنشاء DataMatrix صغير جداً
+                    Bitmap tagToPrint = TagPrinter.generatePhysicalTagBitmap(
+                            shortBarcode, // الباركود القصير
+                            gs1Code,      // كود GS1 المبني عليه
+                            qrUrl);
+                    safeRun(() -> TagPrinter.printTagDirectly(
+                            requireContext(), tagToPrint));
+                }));
+    }
+
+    if (btnClose != null) {
+        btnClose.setOnClickListener(v -> {
+            successDialog.dismiss();
+            safeRun(this::resetFormForNextScan);
+        });
+    }
+
+    successDialog.show();
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Reset for next scan
@@ -3373,22 +3386,22 @@ private void processPendingBarcode() {
     // تصفير المتغير
     pendingBarcodeFromScanner = null;
 
-    // ✅ تقليل الحد الأدنى للطول ليدعم أكواد GS1 DataMatrix الصغيرة
-if (scannedCode.length() < 2 || scannedCode.length() > 128) {
-    playErrorSound();
-    showScanFeedback(
-            isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-            isArabic ? "الطول: " + scannedCode.length() + " حرف"
-                     : "Length: " + scannedCode.length() + " chars",
-            null,
-            android.R.drawable.ic_dialog_alert,
-            0xFFDC2626);
-    showErrorDialog(
-            isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-            isArabic ? "طول الباركود غير منطقي (" + scannedCode.length() + ")"
-                     : "Barcode length unreasonable (" + scannedCode.length() + ")");
-    return;
-}
+    // ✅ [تعديل] تقليل الحد الأدنى للطول ليدعم أكواد GS1 DataMatrix الصغيرة
+    if (scannedCode.length() < 2 || scannedCode.length() > 128) {
+        playErrorSound();
+        showScanFeedback(
+                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+                isArabic ? "الطول: " + scannedCode.length() + " حرف"
+                         : "Length: " + scannedCode.length() + " chars",
+                null,
+                android.R.drawable.ic_dialog_alert,
+                0xFFDC2626);
+        showErrorDialog(
+                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+                isArabic ? "طول الباركود غير منطقي (" + scannedCode.length() + ")"
+                         : "Barcode length unreasonable (" + scannedCode.length() + ")");
+        return;
+    }
 
     // ✅ فحص قاعدة البيانات
     if (miraExecutor == null) return;
