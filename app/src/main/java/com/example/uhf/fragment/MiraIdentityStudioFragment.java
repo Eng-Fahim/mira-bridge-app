@@ -2124,12 +2124,11 @@ try {
 //  11) Show results
 // ═══════════════════════════════════════════════════
 // ✅ [تعديل جذري] استخراج البيانات الحقيقية من السيرفر
+//  11) Show results
+// ═══════════════════════════════════════════════════
+// ✅ [تعديل جذري] استخراج البيانات الحقيقية من السيرفر
 String serverSerial = (finalResponseData != null) 
         ? finalResponseData.optString("serial_number", "") 
-        : "";
-        
-String serverEpc = (finalResponseData != null) 
-        ? finalResponseData.optString("epc", "") 
         : "";
 
 // إذا لم يرسل السيرفر السيريال (احتياطي)، نستخدم الـ identifier المحلي
@@ -2137,7 +2136,7 @@ if (serverSerial.isEmpty()) {
     serverSerial = finalIdentifier;
 }
 
-// إذا لم يرسل السيرفر EPC (احتياطي)، نستخدم الـ EPC المحلي
+// ✅ المتغير serverEpc تم تعريفه مسبقاً في الخطوة 7، لذا نستخدمه هنا مباشرة
 if (serverEpc.isEmpty()) {
     serverEpc = finalNewEpc;
 }
