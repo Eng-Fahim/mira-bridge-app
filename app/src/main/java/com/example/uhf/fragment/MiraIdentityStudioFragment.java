@@ -2018,81 +2018,72 @@ if (hasValidEpc) {
             ? "ℹ️ وضع العرض: سيتم استخدام TID كمعرّف"
             : "ℹ️ Demo mode: using TID as identifier"));
 }
+// ═══════════════════════════════════════════════════
+//  8) Verify (فقط إذا كُتب)
+// ═══════════════════════════════════════════════════
+boolean verifyOk = true;
+if (wasWritten) {
+    String readBackEpcWorking = null;
+    if (writeOk) {
+        try { Thread.sleep(150); } catch (InterruptedException ignored) {}
+        try {
+            readBackEpcWorking = rfidService.readEpc(null);
+        } catch (Exception e) {
+            Log.e(TAG, "readEpc error", e);
+        }
+        if (readBackEpcWorking != null) {
+            readBackEpcWorking = readBackEpcWorking.trim()
+                    .toUpperCase(Locale.US);
+        }
+    }
+    final String readBackEpc = readBackEpcWorking;
+    verifyOk = writeOk && readBackEpc != null && !readBackEpc.isEmpty() && readBackEpc.equals(finalNewEpc);
 
-                // ═══════════════════════════════════════════════════
-                //  8) Verify (فقط إذا كُتب)
-                // ═══════════════════════════════════════════════════
-                boolean verifyOk;
-                if (wasWritten) {
-                    String readBackEpcWorking = null;
-                    if (writeOk) {
-                        try { Thread.sleep(150); } catch (InterruptedException ignored) {}
-                        readBackEpcWorking = rfidService.readEpc(null);
-                        if (readBackEpcWorking != null) {
-                            readBackEpcWorking = readBackEpcWorking.trim()
-                                    .toUpperCase(Locale.US);
-                        }
-                    }
-                    final String readBackEpc = readBackEpcWorking;
+    if (!verifyOk) {
+        Log.e(TAG, "❌ EPC VERIFICATION FAILED!");
+        safeRun(() -> {
+            dismissDialog(activeLoadingDialog);
+            activeLoadingDialog = null;
+            unlockFormFast();
+            setFormEnabled(true);
+            showErrorDialog(
+                    isArabic ? "❌ فشل التحقق من الكتابة" : "❌ Write Verification Failed",
+                    isArabic ? "لم يتم كتابة EPC بنجاح على الشريحة." : "Failed to write EPC on tag.");
+        });
+        return;
+    }
+} else {
+    Log.i(TAG, "✅ Skipping write — existing/demo EPC");
+}
 
-                    Log.i(TAG, "🔍 Read-back EPC: '" + readBackEpc + "'");
+// ═══════════════════════════════════════════════════
+//  9) Lock (فقط إذا كُتب) - ✅ تم وضعها في try-catch
+// ═══════════════════════════════════════════════════
+boolean lockOk = false;
+if (wasWritten) {
+    try {
+        lockOk = rfidService.setTagLockState(null, 1, true);
+        Log.i(TAG, lockOk ? "🔒 Tag locked" : "⚠️ Lock failed");
+    } catch (Exception e) {
+        Log.e(TAG, "setTagLockState error (non-fatal)", e);
+    }
+} else {
+    Log.i(TAG, "ℹ️ Skipping lock");
+}
 
-                    verifyOk = writeOk
-                            && readBackEpc != null
-                            && !readBackEpc.isEmpty()
-                            && readBackEpc.equals(finalNewEpc);
+// markTagProgrammed - ✅ تم وضعها في try-catch
+try {
+    rfidService.markTagProgrammed(tid, miraId, finalNewEpc);
+    Log.i(TAG, "✅ markTagProgrammed OK");
+} catch (Exception e) {
+    Log.w(TAG, "⚠️ markTagProgrammed: " + e.getMessage());
+}
 
-                    if (!verifyOk) {
-                        Log.e(TAG, "❌ EPC VERIFICATION FAILED!");
-                        final String expectedEpc = finalNewEpc;
-                        final String actualEpc = readBackEpc;
-                        final boolean wOk = writeOk;
+final boolean finalWrite = writeOk;
+final boolean finalVerify = verifyOk;
+final boolean finalLock = lockOk;
+final boolean finalWasPreEncoded = !wasWritten;
 
-                        safeRun(() -> {
-                            dismissDialog(activeLoadingDialog);
-                            activeLoadingDialog = null;
-                            unlockFormFast();
-                            setFormEnabled(true);
-                            showErrorDialog(
-                                    isArabic ? "❌ فشل التحقق من الكتابة"
-                                             : "❌ Write Verification Failed",
-                                    isArabic
-                                        ? "لم يتم كتابة EPC بنجاح على الشريحة."
-                                        : "Failed to write EPC on tag.");
-                        });
-                        return;
-                    }
-                } else {
-                    verifyOk = true;
-                    Log.i(TAG, "✅ Skipping write — existing/demo EPC");
-                }
-
-                // ═══════════════════════════════════════════════════
-                //  9) Lock (فقط إذا كُتب)
-                // ═══════════════════════════════════════════════════
-                boolean lockOk;
-                if (wasWritten) {
-                    lockOk = rfidService.setTagLockState(null, 1, true);
-                    Log.i(TAG, lockOk ? "🔒 Tag locked" : "⚠️ Lock failed");
-                } else {
-                    lockOk = false;
-                    Log.i(TAG, "ℹ️ Skipping lock");
-                }
-
-                // markTagProgrammed
-                try {
-                    rfidService.markTagProgrammed(tid, miraId, finalNewEpc);
-                    Log.i(TAG, "✅ markTagProgrammed OK");
-                } catch (Exception e) {
-                    Log.w(TAG, "⚠️ markTagProgrammed: " + e.getMessage());
-                }
-
-                final boolean finalWrite = writeOk;
-                final boolean finalVerify = verifyOk;
-                final boolean finalLock = lockOk;
-                final boolean finalWasPreEncoded = !wasWritten;
-
-                // ═══════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════
 //  10) Update server with final EPC
 // ═══════════════════════════════════════════════════
@@ -2100,28 +2091,23 @@ try {
     JSONObject updatePayload = new JSONObject();
     updatePayload.put("item_id", finalServerItemId);
     
-    // ✅ إرسال EPC فقط إذا كان بصيغة 24 حرف Hex لتجنب رفض السيرفر
     if (finalNewEpc != null && finalNewEpc.matches("^[0-9A-F]{24}$")) {
         updatePayload.put("rfid_epc_final", finalNewEpc);
     }
-                    updatePayload.put("rfid_tid", tid);
-                    updatePayload.put("rfid_locked", finalLock);
-                    updatePayload.put("rfid_verified", finalVerify);
-                    updatePayload.put("rfid_pre_encoded", finalWasPreEncoded);
+    updatePayload.put("rfid_tid", tid);
+    updatePayload.put("rfid_locked", finalLock);
+    updatePayload.put("rfid_verified", finalVerify);
+    updatePayload.put("rfid_pre_encoded", finalWasPreEncoded);
 
-                    MiraApiClient.ApiResponse updateResp =
-                            apiClient.postWithAuth("/items/update-rfid",
-                                    updatePayload);
-                    if (updateResp != null && updateResp.isSuccess) {
-                        Log.i(TAG, "✅ RFID metadata synced");
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "update-rfid failed", e);
-                }
-
-                // ═══════════════════════════════════════════════════
-                // ═══════════════════════════════════════════════════
-//  11) Show results
+    MiraApiClient.ApiResponse updateResp =
+            apiClient.postWithAuth("/items/update-rfid",
+                    updatePayload);
+    if (updateResp != null && updateResp.isSuccess) {
+        Log.i(TAG, "✅ RFID metadata synced");
+    }
+} catch (Exception e) {
+    Log.w(TAG, "update-rfid failed (non-fatal)", e);
+}
 // ═══════════════════════════════════════════════════
 // ✅ [تعديل جذري] استخراج البيانات الحقيقية من السيرفر
 //  11) Show results
