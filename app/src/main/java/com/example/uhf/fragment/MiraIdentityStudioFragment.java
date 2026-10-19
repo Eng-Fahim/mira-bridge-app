@@ -2123,34 +2123,31 @@ try {
                 // ═══════════════════════════════════════════════════
 //  11) Show results
 // ═══════════════════════════════════════════════════
-safeRun(() -> {
-    dismissDialog(activeLoadingDialog);
-    activeLoadingDialog = null;
-    playSuccessSound();
+// ✅ [تعديل جذري] استخراج البيانات الحقيقية من السيرفر
+String serverSerial = (finalResponseData != null) 
+        ? finalResponseData.optString("serial_number", "") 
+        : "";
+        
+String serverEpc = (finalResponseData != null) 
+        ? finalResponseData.optString("epc", "") 
+        : "";
 
-    miraExecutor.getSingleThreadExecutor().execute(() ->
-            syncManager.removePendingEncode(finalIdentifier));
-    if (formManager != null) formManager.clearDraft();
+// إذا لم يرسل السيرفر السيريال (احتياطي)، نستخدم الـ identifier المحلي
+if (serverSerial.isEmpty()) {
+    serverSerial = finalIdentifier;
+}
 
-    notifyDashboardUpdate("encode_success");
+// إذا لم يرسل السيرفر EPC (احتياطي)، نستخدم الـ EPC المحلي
+if (serverEpc.isEmpty()) {
+    serverEpc = finalNewEpc;
+}
 
-    if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
-        uploadItemImages(finalServerItemId, finalPhotoPaths);
-    }
-
-    String displayEpc = finalNewEpc;
-
-// ✅ [الحل الجذري] استخدم السيريال الحقيقي القادم من السيرفر (المطابق للبطاقة المطبوعة)
-String serialNumberFromServer = (finalResponseData != null) 
-        ? finalResponseData.optString("serial_number", finalIdentifier) 
-        : finalIdentifier;
-
-// الباركود المعروض والمطبوع هو السيريال الحقيقي (مثل MIRA-SN-1001)
-String shortBarcode = serialNumberFromServer; 
+String displayEpc = serverEpc;
+String shortBarcode = serverSerial; 
 
 // كود GS1 المصغر (فقط Serial Number)
 String gs1Code = "(21)" + shortBarcode; 
-String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode; // رابط افتراضي مطابق لبطاقاتك
+String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode; 
 
 if (finalResponseData != null) {
     JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
@@ -2175,14 +2172,14 @@ if (finalWasPreEncoded) {
     showToast(isArabic ? "⚠️ تم التكويد لكن القفل فشل" : "⚠️ Encoded but lock failed");
 }
 
-// ✅ نمرر السيريال الحقيقي للدالة
+// ✅ نمرر البيانات الحقيقية للدالة
 showEncodingSuccessDialogEnhanced(
         finalTitle, 
-        displayEpc,     
-        shortBarcode,   // ✅ السيريال الحقيقي المطبوع على البطاقة (MIRA-SN-1001)
+        displayEpc,     // ✅ الـ EPC الحقيقي من الداتابيز (E2340...)
+        shortBarcode,   // ✅ السيريال الحقيقي من الداتابيز (MIRA-SN-1003)
         tid, 
-        gs1Code,        // ✅ كود GS1 المطابق للبطاقة
-        qrUrl,          // ✅ رابط الـ QR المطابق للبطاقة
+        gs1Code,        
+        qrUrl,          
         String.valueOf(fGrossWeight), 
         selectedKarat,
         finalPriceUSD, 
@@ -2193,7 +2190,6 @@ showEncodingSuccessDialogEnhanced(
         fStoneCount, 
         fStoneValue,
         netGoldWeight);
-});
             } catch (Exception e) {
                 Log.e(TAG, "Background execution error", e);
                 safeRun(() -> {
