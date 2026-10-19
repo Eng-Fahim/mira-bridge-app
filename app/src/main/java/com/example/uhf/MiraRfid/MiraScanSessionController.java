@@ -184,10 +184,15 @@ public void onScanStarted(boolean isResume) {
      * لا تُعدّل أي شيء — القرار فقط.
      */
     public Decision evaluateTag(String epc) {
-        if (released || !active) return Decision.REJECT_SESSION_OFF;
+    // ✅ [Fix-A2] احذف !active — نعتمد على Controller.isScanning() كحاجز
+    // السبب: active يُعيَّن في mainHandler.post() متأخر عن أول قراءة
+    // في بعض الحالات (فشل onScanStarted، fragment غير added، إلخ)
+    // قد تبقى active=false بينما Controller.isScanning=true → رفض أبدي
+    if (released) return Decision.REJECT_SESSION_OFF;
 
-        // 1) الحد الأقصى
-        int max = settings.getMaxTagsPerSession();
+    // 1) الحد الأقصى
+    int max = settings.getMaxTagsPerSession();
+
         if (max > 0 && sessionTagCount >= max) {
             return Decision.REJECT_LIMIT;
         }
