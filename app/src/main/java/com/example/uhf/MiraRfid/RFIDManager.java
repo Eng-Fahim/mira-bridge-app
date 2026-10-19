@@ -329,24 +329,37 @@ public class RFIDManager {
         }
 
         // ✅ اربط المستمع المركّب
-        activeReader.setOnTagReadListener(compositeListener);
+    activeReader.setOnTagReadListener(compositeListener);
 
-        if (!activeReader.isConnected()) {
-            Log.i(TAG, "🔧 Calling reader.initialize()...");
-            if (!activeReader.initialize()) {
-                Log.e(TAG, "❌ initialize() failed");
-                return false;
-            }
-
-            Log.i(TAG, "🔧 Calling reader.connect()...");
-            if (!activeReader.connect()) {
-                Log.e(TAG, "❌ connect() failed");
-                return false;
-            }
+    if (!activeReader.isConnected()) {
+        Log.i(TAG, "🔧 Calling reader.initialize()...");
+        if (!activeReader.initialize()) {
+            Log.e(TAG, "❌ initialize() failed");
+            return false;
         }
 
-        Log.i(TAG, "✅ Initialization SUCCESS");
-        return true;
+        Log.i(TAG, "🔧 Calling reader.connect()...");
+        if (!activeReader.connect()) {
+            Log.e(TAG, "❌ connect() failed");
+            return false;
+        }
+    }
+
+    // ✅ [Fix-B1] طبّق Power فوراً — مضمون عبر MiraIRFIDReader interface
+    try {
+        int power = MiraReaderSettings.getInstance(context).getPowerDbm();
+        activeReader.setPower(power);
+        Log.i(TAG, "✅ [B1] Power applied: " + power + " dBm");
+    } catch (Exception e) {
+        Log.w(TAG, "⚠️ [B1] Power apply failed: " + e.getMessage());
+    }
+
+    // ✅ [Fix-B1] طبّق باقي الإعدادات (Frequency/Miller/Q/Session/RFLink)
+    // يعيد المحاولة إذا raw SDK لم يكن جاهزاً بعد
+    applyMiraReaderSettingsWithRetry(0);
+
+    Log.i(TAG, "✅ Initialization SUCCESS");
+    return true;
     }
 
     private void onInitializationComplete(boolean success) {
@@ -731,6 +744,50 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
             Log.e(TAG, "applyMiraReaderSettings error", e);
         }
     }
+    
+    /**
+ * ✅ [Fix-B1] تطبيق كامل لإعدادات MiraReaderSettings بعد التهيئة
+ *
+ * - يحاول عبر raw SDK: Frequency, Miller, Q, Session, RFLink, FastID, Gen2
+ * - يعيد المحاولة إذا getRawSdkReader() لم يكن جاهزاً بعد (UHFMainActivity قد يتأخر)
+ * - لا يُفشل التهيئة إذا لم يتمكن — Power مُطبَّق مسبقاً كضمان
+ * - 3 محاولات كحد أقصى: 800ms, 1600ms, 2400ms
+ */
+private void applyMiraReaderSettingsWithRetry(int attempt) {
+    final int MAX_ATTEMPTS = 3;
+    final MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
+
+    try {
+        RFIDWithUHFUART sdkReader = getRawSdkReader();
+
+        if (sdkReader != null) {
+            MiraReaderSettings.ApplyResult result = settings.applyToReader(sdkReader);
+            if (result.isSuccess()) {
+                Log.i(TAG, "✅ [B1] Full settings applied ("
+                        + result.applied + " items)");
+                return;
+            }
+            Log.w(TAG, "⚠️ [B1] Partial failure: " + result.failedNames);
+            // تابع للمحاولة التالية — قد يكون SDK في منتصف التهيئة
+        } else {
+            Log.d(TAG, "⏳ [B1] Raw SDK not ready yet (attempt "
+                    + attempt + "/" + MAX_ATTEMPTS + ")");
+        }
+
+        if (attempt < MAX_ATTEMPTS) {
+            final int next = attempt + 1;
+            mainHandler.postDelayed(() -> {
+                Log.d(TAG, "🔄 [B1] Retry " + next + "/" + MAX_ATTEMPTS);
+                applyMiraReaderSettingsWithRetry(next);
+            }, 800L * next);
+        } else {
+            Log.w(TAG, "⚠️ [B1] Max attempts reached — Power only");
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "❌ [B1] applyMiraReaderSettingsWithRetry error", e);
+    }
+}
 
     // ═══════════════════════════════════════════════════════════
     //  ✅ [v4.0.2] Backward-Compatibility Layer
