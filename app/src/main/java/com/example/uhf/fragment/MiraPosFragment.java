@@ -18,6 +18,10 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.Manifest;             // ✅ مطلوب لـ Manifest.permission
+import android.os.Build;             // ✅ مطلوب لـ Build.VERSION
+import androidx.core.app.ActivityCompat;  // ✅ مطلوب لـ ActivityCompat
+import androidx.core.content.ContextCompat; // ✅ مطلوب لـ ContextCompat
 
 import com.google.android.material.card.MaterialCardView;
 
@@ -406,6 +410,8 @@ private static final long SHORT_CODE_DELAY_MS = 800L;
             hideRfidButtonIfUnsupported();
 
             initSmartScale();
+            // ✅ طلب صلاحيات البلوتوث والموقع للميزان
+            requestScalePermissions();
 
             renderCart(cartManager.snapshot(), null, -1);
 
@@ -417,6 +423,29 @@ private static final long SHORT_CODE_DELAY_MS = 800L;
         }
     }
 
+
+private void requestScalePermissions() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        // أندرويد 12 وما فوق
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{
+                            Manifest.permission.BLUETOOTH_SCAN,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                    }, 1002);
+        }
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        // أندرويد 6 إلى 11
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                    }, 1002);
+        }
+    }
+}
 /**
  * ✅ [v4.2] يُحدّث Badge عدد البيوع المعلّقة.
  */
