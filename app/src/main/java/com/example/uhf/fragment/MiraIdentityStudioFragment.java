@@ -1975,39 +1975,49 @@ public void onRfidScanned(String epc) {
                 final String miraId = miraIdWorking;
 
                 // ✅ [v8.3] استخدم EPC المحفوظ من آخر مسح
-                String existingEpc = lastScannedEpc;
-                if (existingEpc == null) existingEpc = "";
-                existingEpc = existingEpc.trim().toUpperCase(Locale.US);
+                // ✅ الحل: استخرج EPC الحقيقي من رد السيرفر (لأنه يعرف الشريحة)
+String serverEpc = (finalResponseData != null) 
+        ? finalResponseData.optString("epc", "") 
+        : "";
 
-                Log.i(TAG, "🔍 Existing EPC: '" + existingEpc + "'");
+// إذا لم يرسل السيرفر EPC (أو كان فارغاً)، استخدم الـ EPC المحلي
+String existingEpc = (!serverEpc.isEmpty()) 
+        ? serverEpc 
+        : lastScannedEpc;
 
-                boolean hasValidEpc = existingEpc.matches("^E2[0-9A-F]{22}$")
-                        && !existingEpc.startsWith("3008")
-                        && !existingEpc.equals("300800000000000000000000");
+if (existingEpc == null) existingEpc = "";
+existingEpc = existingEpc.trim().toUpperCase(Locale.US);
 
-                final String finalNewEpc;
-                boolean writeOk;
-                boolean wasWritten = false;
+Log.i(TAG, "🔍 Existing EPC: '" + existingEpc + "'");
 
-                if (hasValidEpc) {
-                    Log.i(TAG, "✅ Using EXISTING EPC: " + existingEpc);
-                    finalNewEpc = existingEpc;
-                    writeOk = true;
-                    wasWritten = false;
+boolean hasValidEpc = existingEpc.matches("^E2[0-9A-F]{22}$")
+        && !existingEpc.startsWith("3008")
+        && !existingEpc.equals("300800000000000000000000");
 
-                    safeRun(() -> showToast(isArabic
-                            ? "ℹ️ تم استخدام EPC الموجود على الشريحة"
-                            : "ℹ️ Using existing EPC on tag"));
-                } else {
-                    Log.i(TAG, "⚠️ EPC invalid → Demo mode, using TID");
-                    finalNewEpc = tid;
-                    writeOk = true;
-                    wasWritten = false;
+final String finalNewEpc;
+boolean writeOk;
+boolean wasWritten = false;
 
-                    safeRun(() -> showToast(isArabic
-                            ? "ℹ️ وضع العرض: سيتم استخدام TID كمعرّف"
-                            : "ℹ️ Demo mode: using TID as identifier"));
-                }
+if (hasValidEpc) {
+    Log.i(TAG, "✅ Using EXISTING EPC: " + existingEpc);
+    finalNewEpc = existingEpc;
+    writeOk = true;
+    wasWritten = false;
+
+    safeRun(() -> showToast(isArabic
+            ? "ℹ️ تم استخدام EPC الموجود على الشريحة"
+            : "ℹ️ Using existing EPC on tag"));
+} else {
+    Log.i(TAG, "⚠️ EPC invalid → Demo mode, using TID");
+    // احتياطي فقط: إذا فشل السيرفر في إرسال EPC
+    finalNewEpc = (finalResponseData != null) ? finalResponseData.optString("tid", tid) : tid;
+    writeOk = true;
+    wasWritten = false;
+
+    safeRun(() -> showToast(isArabic
+            ? "ℹ️ وضع العرض: سيتم استخدام TID كمعرّف"
+            : "ℹ️ Demo mode: using TID as identifier"));
+}
 
                 // ═══════════════════════════════════════════════════
                 //  8) Verify (فقط إذا كُتب)
@@ -2083,12 +2093,17 @@ public void onRfidScanned(String epc) {
                 final boolean finalWasPreEncoded = !wasWritten;
 
                 // ═══════════════════════════════════════════════════
-                //  10) Update server with final EPC
-                // ═══════════════════════════════════════════════════
-                try {
-                    JSONObject updatePayload = new JSONObject();
-                    updatePayload.put("item_id", finalServerItemId);
-                    updatePayload.put("rfid_epc_final", finalNewEpc);
+// ═══════════════════════════════════════════════════
+//  10) Update server with final EPC
+// ═══════════════════════════════════════════════════
+try {
+    JSONObject updatePayload = new JSONObject();
+    updatePayload.put("item_id", finalServerItemId);
+    
+    // ✅ إرسال EPC فقط إذا كان بصيغة 24 حرف Hex لتجنب رفض السيرفر
+    if (finalNewEpc != null && finalNewEpc.matches("^[0-9A-F]{24}$")) {
+        updatePayload.put("rfid_epc_final", finalNewEpc);
+    }
                     updatePayload.put("rfid_tid", tid);
                     updatePayload.put("rfid_locked", finalLock);
                     updatePayload.put("rfid_verified", finalVerify);
@@ -2124,61 +2139,60 @@ safeRun(() -> {
     }
 
     String displayEpc = finalNewEpc;
-    
-    // ✅ [تعديل] توليد باركود قصير مخصص للطباعة (6 أرقام)
-    String shortBarcode;
-    if (finalServerItemId > 0) {
-        shortBarcode = String.format(Locale.US, "%06d", finalServerItemId);
-    } else {
-        // احتياطي إذا لم يرجع السيرفر ID
-        shortBarcode = String.format(Locale.US, "%06d", Math.abs(finalIdentifier.hashCode()) % 1000000);
-    }
-    
-    // ✅ كود GS1 مصغر جداً (فقط Serial Number) ليناسب البطاقات الصغيرة
-    String gs1Code = "(21)" + shortBarcode; 
-    String qrUrl = "https://ibreg.org/id/" + shortBarcode;
 
-    if (finalResponseData != null) {
-        JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
-        if (gs1Obj != null) {
-            String serverGs1 = gs1Obj.optString("raw_fnc1", "");
-            if (!serverGs1.isEmpty()) gs1Code = serverGs1;
-            
-            String serverUrl = gs1Obj.optString("digital_link", "");
-            if (!serverUrl.isEmpty()) qrUrl = serverUrl;
-        }
-    }
+// ✅ [الحل الجذري] استخدم السيريال الحقيقي القادم من السيرفر (المطابق للبطاقة المطبوعة)
+String serialNumberFromServer = (finalResponseData != null) 
+        ? finalResponseData.optString("serial_number", finalIdentifier) 
+        : finalIdentifier;
 
-    if (binding != null && binding.etEpc != null) {
-        binding.etEpc.setText("");
-    }
+// الباركود المعروض والمطبوع هو السيريال الحقيقي (مثل MIRA-SN-1001)
+String shortBarcode = serialNumberFromServer; 
 
-    if (finalWasPreEncoded) {
-        showToast(isArabic ? "✅ تم استخدام EPC الموجود بنجاح" : "✅ Existing EPC used successfully");
-    } else if (finalWrite && finalVerify && finalLock) {
-        showToast(isArabic ? "🔒 تم التكويد والقفل بنجاح" : "🔒 Encoded & locked successfully");
-    } else if (finalWrite && finalVerify && !finalLock) {
-        showToast(isArabic ? "⚠️ تم التكويد لكن القفل فشل" : "⚠️ Encoded but lock failed");
-    }
+// كود GS1 المصغر (فقط Serial Number)
+String gs1Code = "(21)" + shortBarcode; 
+String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode; // رابط افتراضي مطابق لبطاقاتك
 
-    // ✅ [تعديل] نمرر الـ shortBarcode للدالة
-    showEncodingSuccessDialogEnhanced(
-            finalTitle, 
-            displayEpc,     // EPC (RFID)
-            shortBarcode,   // ✅ الباركود القصير (للطباعة)
-            tid, 
-            gs1Code, 
-            qrUrl,
-            String.valueOf(fGrossWeight), 
-            selectedKarat,
-            finalPriceUSD, 
-            localCurrency, 
-            finalPhotoPaths,
-            fStoneType, 
-            fStoneWeightCarats, 
-            fStoneCount, 
-            fStoneValue,
-            netGoldWeight);
+if (finalResponseData != null) {
+    JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
+    if (gs1Obj != null) {
+        String serverGs1 = gs1Obj.optString("raw_fnc1", "");
+        if (!serverGs1.isEmpty()) gs1Code = serverGs1;
+        
+        String serverUrl = gs1Obj.optString("digital_link", "");
+        if (!serverUrl.isEmpty()) qrUrl = serverUrl;
+    }
+}
+
+if (binding != null && binding.etEpc != null) {
+    binding.etEpc.setText("");
+}
+
+if (finalWasPreEncoded) {
+    showToast(isArabic ? "✅ تم استخدام EPC الموجود بنجاح" : "✅ Existing EPC used successfully");
+} else if (finalWrite && finalVerify && finalLock) {
+    showToast(isArabic ? "🔒 تم التكويد والقفل بنجاح" : "🔒 Encoded & locked successfully");
+} else if (finalWrite && finalVerify && !finalLock) {
+    showToast(isArabic ? "⚠️ تم التكويد لكن القفل فشل" : "⚠️ Encoded but lock failed");
+}
+
+// ✅ نمرر السيريال الحقيقي للدالة
+showEncodingSuccessDialogEnhanced(
+        finalTitle, 
+        displayEpc,     
+        shortBarcode,   // ✅ السيريال الحقيقي المطبوع على البطاقة (MIRA-SN-1001)
+        tid, 
+        gs1Code,        // ✅ كود GS1 المطابق للبطاقة
+        qrUrl,          // ✅ رابط الـ QR المطابق للبطاقة
+        String.valueOf(fGrossWeight), 
+        selectedKarat,
+        finalPriceUSD, 
+        localCurrency, 
+        finalPhotoPaths,
+        fStoneType, 
+        fStoneWeightCarats, 
+        fStoneCount, 
+        fStoneValue,
+        netGoldWeight);
 });
             } catch (Exception e) {
                 Log.e(TAG, "Background execution error", e);
@@ -3386,70 +3400,117 @@ private void processPendingBarcode() {
     // تصفير المتغير
     pendingBarcodeFromScanner = null;
 
-    // ✅ [تعديل] تقليل الحد الأدنى للطول ليدعم أكواد GS1 DataMatrix الصغيرة
-    if (scannedCode.length() < 2 || scannedCode.length() > 128) {
+    // ✅ 1) استخراج المعرّف الحقيقي (مثل MIRA-SN-1001) من الباركود الممسوح
+    final String extractedIdentifier = extractIdentifierFromBarcode(scannedCode);
+
+    // ✅ 2) فحص صحة المعرّف المستخرج (السماح بالأكواد القصيرة)
+    if (extractedIdentifier.isEmpty() || extractedIdentifier.length() < 2 || extractedIdentifier.length() > 128) {
         playErrorSound();
         showScanFeedback(
                 isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-                isArabic ? "الطول: " + scannedCode.length() + " حرف"
-                         : "Length: " + scannedCode.length() + " chars",
+                isArabic ? "الطول: " + extractedIdentifier.length() + " حرف"
+                         : "Length: " + extractedIdentifier.length() + " chars",
                 null,
                 android.R.drawable.ic_dialog_alert,
                 0xFFDC2626);
         showErrorDialog(
                 isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-                isArabic ? "طول الباركود غير منطقي (" + scannedCode.length() + ")"
-                         : "Barcode length unreasonable (" + scannedCode.length() + ")");
+                isArabic ? "طول الباركود غير منطقي أو غير معروف"
+                         : "Barcode length unreasonable or unknown");
         return;
     }
 
-    // ✅ فحص قاعدة البيانات
+    // ✅ 3) فحص قاعدة البيانات في الخلفية
     if (miraExecutor == null) return;
     miraExecutor.getBackgroundExecutor().execute(() -> {
-        final boolean isDuplicate = syncManager != null && syncManager.isEpcDuplicateLocally(scannedCode);
+        final boolean isDuplicate = syncManager != null && syncManager.isEpcDuplicateLocally(extractedIdentifier);
 
         safeRun(() -> {
             if (binding == null || !isAdded()) return;
 
             if (isDuplicate) {
+                // ═════════════════════════════════════════════
+                //  حالة مكررة
+                // ═════════════════════════════════════════════
                 playErrorSound();
                 showScanFeedback(
                         isArabic ? "⚠️ باركود مكرر" : "⚠️ Duplicate Barcode",
-                        isArabic ? scannedCode + "\nمسجل بالفعل" : scannedCode + "\nAlready registered",
+                        isArabic ? extractedIdentifier + "\nمسجل بالفعل" : extractedIdentifier + "\nAlready registered",
                         null,
                         android.R.drawable.ic_dialog_alert,
                         0xFF3B82F6);
                 showErrorDialog(
                         isArabic ? "باركود مكرر" : "Duplicate Barcode",
-                        isArabic ? "هذا الكود مسجل بالفعل:\n" + scannedCode
-                                 : "This code is already registered:\n" + scannedCode);
+                        isArabic ? "هذا الكود مسجل بالفعل:\n" + extractedIdentifier
+                                 : "This code is already registered:\n" + extractedIdentifier);
             } else {
-                // ✅ إدراج الكود في الحقل
+                // ═════════════════════════════════════════════
+                //  حالة ناجحة
+                // ═════════════════════════════════════════════
+                
+                // ✅ إدراج المعرّف المستخرج (السيريال) في الحقل
                 if (binding.etEpc != null) {
-                    binding.etEpc.setText(scannedCode);
-                    binding.etEpc.setTag(scannedCode);
+                    binding.etEpc.setText(extractedIdentifier);
+                    binding.etEpc.setTag(extractedIdentifier);
                 }
                 if (binding.tvStatusBadge != null) {
                     binding.tvStatusBadge.setText("BOUND");
                 }
+                
                 isEpcBound = true;
-                lastScannedEpc = scannedCode;
+                lastScannedEpc = extractedIdentifier; // ✅ حفظ السيريال الحقيقي ليرسل للسيرفر
 
-                // ✅ عرض نتيجة الفحص بنجاح
+                // ✅ عرض بطاقة النجاح
                 showScanFeedback(
                         isArabic ? "✅ باركود صالح" : "✅ Valid Barcode",
-                        isArabic ? scannedCode + "\nجاهز للتكويد" : scannedCode + "\nReady for encoding",
+                        isArabic ? extractedIdentifier + "\nجاهز للتكويد" : extractedIdentifier + "\nReady for encoding",
                         null,
                         R.drawable.ic_pos_cart_gold,
                         0xFF22C55E);
 
                 playSuccessSound();
-                Log.i(TAG, "✅ Barcode accepted and DB checked: " + scannedCode);
+                Log.i(TAG, "✅ Barcode accepted and DB checked: " + extractedIdentifier);
             }
         });
     });
 }
 
+// ═══════════════════════════════════════════════════════════
+// ✅ دالة مساعدة: استخراج المعرّف (السيريال) من الباركود
+// ═══════════════════════════════════════════════════════════
+private String extractIdentifierFromBarcode(String rawBarcode) {
+    if (rawBarcode == null || rawBarcode.isEmpty()) return "";
+    String clean = rawBarcode.trim();
+
+    // 1) إذا كان رابط URL (مثل https://sa.mirabarcode.com/MIRA-SN-1001)
+    if (clean.startsWith("http://") || clean.startsWith("https://")) {
+        try {
+            android.net.Uri uri = android.net.Uri.parse(clean);
+            String lastSegment = uri.getLastPathSegment();
+            if (lastSegment != null && !lastSegment.isEmpty()) {
+                return lastSegment; // سيعيد MIRA-SN-1001
+            }
+            // البحث في معاملات الرابط
+            String serial = uri.getQueryParameter("serial");
+            if (serial == null) serial = uri.getQueryParameter("sn");
+            if (serial != null && !serial.isEmpty()) return serial;
+        } catch (Exception ignored) {}
+    }
+
+    // 2) إذا كان كود GS1 (يحتوي على (21) أو 21)
+    // مثال: (01)07612345678901(21)MIRA-SN-1001
+    String gs1 = clean.replace('\u001D', '|').replace("(#)", "|");
+    java.util.regex.Matcher mSerial = java.util.regex.Pattern
+            .compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)")
+            .matcher(gs1);
+    if (mSerial.find()) {
+        String serial = mSerial.group(1);
+        if (serial != null && !serial.isEmpty()) return serial;
+    }
+
+    // 3) إذا كان رقماً أو نصاً صريحاً (مثل MIRA-SN-1001)
+    return clean;
+}
 
     @Override
     public void onDestroyView() {
