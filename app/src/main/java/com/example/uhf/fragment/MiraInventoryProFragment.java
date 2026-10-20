@@ -2559,9 +2559,8 @@ private void clearAllLists() {
     // ═══════════════════════════════════════════════════════
     //  7) تحديث القائمة (فقط للقطعة الجديدة)
     // ═══════════════════════════════════════════════════════
-    if (!isDuplicate) {
-        updateAdapterList();
-    }
+    // ✅ [Fix-B4] لا نستدعي updateAdapterList هنا — uiUpdateRunnable سيفعلها
+    // هذا يمنع ضغط main thread ويقلل خطر فقدان القراءات
 }
 
     private void updateAdapterList() {
@@ -2868,14 +2867,19 @@ int scanned = listCount;
     //  UI Updates
     // ================================================================
 
-    private final Runnable uiUpdateRunnable = new Runnable() {
-        @Override
-        public void run() {
-            pendingUiUpdate = false;
-            updateUI();
-            updateTotalWeightAndValue();
-        }
-    };
+    // ✅ [Fix-B4] تجميع تحديثات القائمة كل 200ms بدل فوري
+private final Runnable uiUpdateRunnable = new Runnable() {
+    @Override
+    public void run() {
+        pendingUiUpdate = false;
+        updateUI();
+        updateTotalWeightAndValue();
+        // ✅ [Fix-B4] أضف تحديث القائمة مع كل دورة تجميع
+        updateAdapterList();
+    }
+};
+
+private long uiUpdateDelay = 200L;  // ✅ [Fix-B4] تأخير 200ms
 
     private final Runnable timerRunnable = new Runnable() {
         @Override
@@ -2887,11 +2891,13 @@ int scanned = listCount;
     };
 
     private void scheduleUiUpdate() {
-        if (!pendingUiUpdate && !isFragmentDestroyed) {
-            pendingUiUpdate = true;
-            mainHandler.postDelayed(uiUpdateRunnable, getAdaptiveUiThrottle());
-        }
+    if (!pendingUiUpdate && !isFragmentDestroyed) {
+        pendingUiUpdate = true;
+        // ✅ [Fix-B4] استخدم 200ms ثابتة بدل getAdaptiveUiThrottle()
+        // السبب: 100ms لا تزال تُثقل main thread
+        mainHandler.postDelayed(uiUpdateRunnable, uiUpdateDelay);
     }
+}
 
     private long getAdaptiveUiThrottle() {
         int count = scannedItemsDisplayList.size();
@@ -2919,11 +2925,21 @@ private void updateUI() {
     }
     if (tvItemCount != null) tvItemCount.setText(String.valueOf(scanned));
 
-    if (expectedCount > 0) {
-        // ✅ التقدم
-        int progress = Math.min((int) (((float) scanned / expectedCount) * 100), 100);
+   if (expectedCount > 0) {
+    // ✅ [Fix-B5] "القطع الموجودة في الكتالوج من ضمن الممسوحة"
+    int foundInCatalog = 0;
+    synchronized (scannedItemsDisplayList) {
+        for (ScannedItemDisplay item : scannedItemsDisplayList) {
+            if (item != null && catalogEpcs.contains(item.epc)) {
+                foundInCatalog++;
+            }
+        }
+    }
 
-        if (progressScanned != null && animationHelper != null) {
+    // التقدم = الموجود في الكتالوج / المتوقع
+    int progress = Math.min((int) (((float) foundInCatalog / expectedCount) * 100), 100);
+
+     if (progressScanned != null && animationHelper != null) {
             int prev = progressScanned.getProgress();
             if (progress != prev) {
                 animationHelper.animateProgressBar(progressScanned, prev, progress);
@@ -2937,11 +2953,11 @@ private void updateUI() {
         } else if (tvProgressPercent != null) {
             tvProgressPercent.setText(progress + "%");
         }
-
-        // ✅ الدقة
-        if (tvAccuracy != null) {
-            tvAccuracy.setText(progress + "%");
-            int color = progress >= 100
+    
+    // ✅ [Fix-B5] استخدم foundInCatalog للدقة (وليس scanned)
+    if (tvAccuracy != null) {
+        tvAccuracy.setText(progress + "%");
+        int color = progress >= 100
                     ? ContextCompat.getColor(requireContext(), R.color.success_green)
                     : progress >= 70
                     ? ContextCompat.getColor(requireContext(), R.color.warning_amber)
@@ -2950,8 +2966,9 @@ private void updateUI() {
         }
 
         // ✅ الفارق
-        if (tvVariance != null) {
-            int variance = expectedCount - scanned;
+if (tvVariance != null) {
+    // ✅ [Fix-B5] استخدم foundInCatalog — متناسق مع progress
+    int variance = expectedCount - foundInCatalog;
             if (variance > 0) {
                 tvVariance.setText("−" + variance);
                 tvVariance.setTextColor(ContextCompat.getColor(requireContext(),
@@ -2968,7 +2985,8 @@ private void updateUI() {
         }
 
         // ✅ الاحتفال عند اكتمال العدد المتوقع — بدون إيقاف تلقائي
-        if (scanned >= expectedCount && isScanning) {
+// ✅ [Fix-B5] استخدم foundInCatalog — لا تحتفل بقطع غير موجودة في الكتالوج
+if (foundInCatalog >= expectedCount && isScanning) {
             if (!hasCelebrated) {
                 hasCelebrated = true;
 
