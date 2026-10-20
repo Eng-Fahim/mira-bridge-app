@@ -83,14 +83,19 @@
             android:layout_marginTop="2dp"/>
     </LinearLayout>
 
-    <!-- السهم -->
+    <!-- ✅ السهم المعدل (مساحة نقر كبيرة ومريحة) -->
     <TextView
         android:id="@+id/tvAccountArrow"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="▼"
+        android:layout_width="40dp"    <!-- عرض ثابت لمساحة نقر مريحة -->
+        android:layout_height="40dp"   <!-- ارتفاع ثابت -->
+        android:gravity="center"       <!-- توسيط السهم داخل المساحة -->
+        android:text="▶"               <!-- سهم مغلق افتراضياً -->
         android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="10sp"
+        android:textSize="14sp"        <!-- تكبير حجم السهم قليلاً ليكون واضحاً -->
         android:layout_marginStart="8dp"
+        android:layout_gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless" <!-- تأثير ضغط مرئي (Ripple) -->
         android:visibility="gone"/>
 </LinearLayout>
