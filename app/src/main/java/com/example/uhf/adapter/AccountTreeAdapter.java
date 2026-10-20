@@ -13,14 +13,12 @@ import com.example.uhf.R;
 import com.example.uhf.api.dto.AccountDto;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
- * Adapter لدليل الحسابات الشجري
+ * Adapter لدليل الحسابات الشجري - يدعم الطي والفتح
  */
 public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.VH> {
 
@@ -28,12 +26,10 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
         void onClick(AccountDto account);
     }
 
-    // 1. القائمة الأصلية كما تأتي من الـ API أو الـ ViewModel
     private List<AccountDto> originalItems = new ArrayList<>();
-    // 2. القائمة التي يتم رسمها على الشاشة (بعد إخفاء الحسابات المطوية)
     private List<AccountDto> displayItems = new ArrayList<>();
     
-    // 3. لحفظ أكواد الحسابات التي قام المستخدم بفتحها
+    // لحفظ أكواد الحسابات التي قام المستخدم بفتحها فقط
     private final Set<String> expandedAccounts = new HashSet<>();
     
     private final OnAccountClick listener;
@@ -48,43 +44,48 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
         notifyDataSetChanged();
     }
 
-    // دالة ذكية لبناء القائمة وإخفاء الأبناء
+    // هذه الدالة هي التي تقرر ما الذي سيظهر على الشاشة
     private void buildDisplayList() {
         displayItems.clear();
-        
-        // هذا المتغير يتذكر آخر حساب تم عرضه في كل مستوى
-        // (مثلاً: المستوى 1 = "1000"، المستوى 2 = "1100"، إلخ)
-        Map<Integer, String> currentPath = new HashMap<>();
-
         for (AccountDto a : originalItems) {
-            if (a.level == 1) {
-                // الحسابات الرئيسية (المستوى الأول) تظهر دائماً
+            // إذا كان الحساب مرئياً (جميع آبائه مفتوحين أو ليس له آباء)، نضيفه للعرض
+            if (isVisible(a)) {
                 displayItems.add(a);
-                currentPath.put(1, a.accountCode);
-            } else {
-                // الحصول على كود الأب المباشر من المستوى السابق
-                String parentCode = currentPath.get(a.level - 1);
-                
-                // إذا لم نجد الأب (هذا يحدث غالباً عند البحث عن حساب معين)
-                // نعرض الحساب لأن المستخدم يبحث عنه تحديداً
-                if (parentCode == null) {
-                    displayItems.add(a);
-                    currentPath.put(a.level, a.accountCode);
-                } 
-                // إذا وجدنا الأب، نتحقق: هل الأب مفتوح (موجود في قائمة المفتوحين)؟
-                else if (expandedAccounts.contains(parentCode)) {
-                    displayItems.add(a); // نعم مفتوح، نعرض الابن
-                    currentPath.put(a.level, a.accountCode); // نحدث المسار
-                } 
-                else {
-                    // الأب مغلق! لا نضيف الابن للقائمة، 
-                    // ونقوم بمسح أي مسارات أعمق حتى لا يظهر أبناء هذا الابن
-                    for (int i = a.level; i <= 10; i++) {
-                        currentPath.remove(i);
-                    }
-                }
             }
         }
+    }
+
+    // دالة تتحقق هل يجب إظهار هذا الحساب أم لا
+    private boolean isVisible(AccountDto account) {
+        String parentCode = getParentCode(account.accountCode);
+        
+        // نستمر في الصعود للأعلى للتحقق من كل الآباء
+        while (parentCode != null) {
+            // إذا كان الأب موجوداً في القائمة ولكنه غير مفتوح، نخفي الابن
+            if (!expandedAccounts.contains(parentCode)) {
+                return false;
+            }
+            parentCode = getParentCode(parentCode);
+        }
+        return true; // كل الآباء مفتوحين
+    }
+
+    // دالة ذكية لاستخراج كود الأب (تفترض أن كود المستوى الأول 4 أرقام، وكل مستوى يزيد رقمين)
+    // مثال: 111001 -> الأب هو 1110 -> الجد هو 1000
+    private String getParentCode(String code) {
+        if (code == null || code.length() <= 4) return null; 
+        return code.substring(0, code.length() - 2);
+    }
+
+    // دالة للتحقق مما إذا كان للحساب أبناء (لكي نعرف هل نعرض السهم أم لا)
+    private boolean hasChildren(AccountDto account) {
+        for (AccountDto item : originalItems) {
+            String pCode = getParentCode(item.accountCode);
+            if (pCode != null && pCode.equals(account.accountCode)) {
+                return true; // وجدنا ابناً لهذا الحساب
+            }
+        }
+        return false;
     }
 
     @NonNull
@@ -97,13 +98,13 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
 
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
-        AccountDto a = displayItems.get(position); // نأخذ من القائمة المعروضة
+        AccountDto a = displayItems.get(position);
 
         h.tvCode.setText(a.accountCode);
         h.tvName.setText(a.accountNameAr);
 
         // المسافة حسب المستوى
-        int indent = (a.level - 1) * 16;
+        int indent = (a.level - 1) * 24; // زيادة المسافة قليلاً لتوضيح الشجرة
         h.container.setPaddingRelative(indent, h.container.getPaddingTop(),
                 h.container.getPaddingEnd(), h.container.getPaddingBottom());
 
@@ -122,39 +123,38 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
         h.indicator.setBackgroundColor(Color.parseColor(color));
         h.tvIcon.setText(icon);
 
-        // الذهب
         h.tvGoldBadge.setVisibility(a.isGold() ? View.VISIBLE : View.GONE);
 
-        // نوع الحساب
         h.tvType.setText(a.getTypeLabelAr());
         h.tvType.setTextColor(Color.parseColor(color));
 
-        // 4. إعداد السهم (مفتوح/مغلق)
-        if (a.isLeaf()) {
-            h.tvArrow.setVisibility(View.GONE);
+        // ✅ إعداد السهم
+        boolean canExpand = hasChildren(a);
+        if (!canExpand) {
+            h.tvArrow.setVisibility(View.INVISIBLE); // إخفاء مع الاحتفاظ بالمساحة
         } else {
             h.tvArrow.setVisibility(View.VISIBLE);
             
-            // تغيير شكل السهم بناءً على الحالة
+            // تغيير شكل السهم
             if (expandedAccounts.contains(a.accountCode)) {
                 h.tvArrow.setText("▼"); // مفتوح
             } else {
                 h.tvArrow.setText("▶"); // مغلق
             }
 
-            // 5. إضافة مستمع النقر للسهم (لفتح وإغلاق الشجرة)
+            // ✅ مساحة نقر واسعة للسهم
             h.tvArrow.setOnClickListener(v -> {
                 if (expandedAccounts.contains(a.accountCode)) {
-                    expandedAccounts.remove(a.accountCode); // إغلاق (طي)
+                    expandedAccounts.remove(a.accountCode); // طي
                 } else {
-                    expandedAccounts.add(a.accountCode); // فتح (بسط)
+                    expandedAccounts.add(a.accountCode); // فتح
                 }
-                buildDisplayList(); // إعادة حساب ما سيتم عرضه
-                notifyDataSetChanged(); // تحديث الشاشة
+                buildDisplayList();
+                notifyDataSetChanged();
             });
         }
 
-        // النقر على العنصر بالكامل (يفتح دفتر الأستاذ)
+        // النقر على باقي العنصر يفتح دفتر الأستاذ
         h.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(a);
         });
