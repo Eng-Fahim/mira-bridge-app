@@ -6,7 +6,8 @@ package com.example.uhf.scanner;
 public enum ScanMethod {
     RFID("rfid", "مسح RFID"),
     GS1("gs1", "مسح باركود GS1"),
-    MANUAL("manual", "إدخال يدوي");
+    MANUAL("manual", "إدخال يدوي"),
+DESKTOP_RFID("desktop_rfid", "مسح القارئ المكتبي");
     
     private final String code;
     private final String label;
