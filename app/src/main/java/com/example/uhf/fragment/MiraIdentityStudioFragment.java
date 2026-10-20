@@ -1648,6 +1648,13 @@ private void activateDesktopScannerMode() {
     
     showToast(isArabic ? "🖥️ جاهز للمسح بالقارئ المكتبي" : "🖥️ Desktop Reader Ready");
 }
+
+// 3. إيقاف القارئ المكتبي (يُستدعى عند الانتهاء أو تغيير الوضع)
+private void stopDesktopScannerMode() {
+    if (binding != null && binding.etEpc != null) {
+        binding.etEpc.setHint(isArabic ? "رمز الشريحة (EPC / GTIN)..." : "EPC / GTIN Code...");
+    }
+}
     // ═══════════════════════════════════════════════════════════════════
     //  Barcode Scanner (for EPC)
     // ═══════════════════════════════════════════════════════════════════
