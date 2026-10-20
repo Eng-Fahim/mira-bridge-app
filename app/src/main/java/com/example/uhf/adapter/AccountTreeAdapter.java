@@ -13,7 +13,9 @@ import com.example.uhf.R;
 import com.example.uhf.api.dto.AccountDto;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Adapter لدليل الحسابات الشجري
@@ -24,7 +26,14 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
         void onClick(AccountDto account);
     }
 
-    private List<AccountDto> items = new ArrayList<>();
+    // القائمة الأصلية القادمة من الـ API
+    private List<AccountDto> originalItems = new ArrayList<>();
+    // القائمة التي يتم عرضها فعلياً (بعد إخفاء الأبناء)
+    private List<AccountDto> displayItems = new ArrayList<>();
+    
+    // لحفظ الحسابات التي قام المستخدم بفتحها
+    private final Set<String> expandedAccounts = new HashSet<>();
+    
     private final OnAccountClick listener;
 
     public AccountTreeAdapter(OnAccountClick listener) {
@@ -32,8 +41,39 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
     }
 
     public void setItems(List<AccountDto> newItems) {
-        this.items = newItems != null ? newItems : new ArrayList<>();
+        this.originalItems = newItems != null ? newItems : new ArrayList<>();
+        buildDisplayList(); // بناء القائمة المعروضة
         notifyDataSetChanged();
+    }
+
+    // دالة تقوم بفلترة القائمة وإخفاء الأبناء إذا كان الأب مغلقاً
+    private void buildDisplayList() {
+        displayItems.clear();
+        for (AccountDto a : originalItems) {
+            // إذا كان المستوى الأول (رئيسي) نعرضه دائماً
+            if (a.level == 1) {
+                displayItems.add(a);
+            } else {
+                // إذا كان فرعياً، نتحقق هل جميع آبائه مفتوحين؟
+                if (areParentsExpanded(a)) {
+                    displayItems.add(a);
+                }
+            }
+        }
+    }
+
+    // دالة للتحقق من أن الآباء مفتوحين (تعتمد على منطق أرقام الحسابات)
+    private boolean areParentsExpanded(AccountDto account) {
+        String code = account.accountCode;
+        // افترض أن كود الحساب 111001، آباؤه هما 1110 ثم 1100 ثم 1000
+        // نقوم بتقصير الكود للوصول للأب والتحقق منه
+        while (code != null && code.length() > 4) {
+            code = code.substring(0, code.length() - 2); // قص آخر رقمين
+            if (!expandedAccounts.contains(code)) {
+                return false; // إذا كان أحد الآباء مغلقاً، لا تعرض الابن
+            }
+        }
+        return true;
     }
 
     @NonNull
@@ -46,18 +86,15 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
 
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
-        AccountDto a = items.get(position);
+        AccountDto a = displayItems.get(position);
 
         h.tvCode.setText(a.accountCode);
         h.tvName.setText(a.accountNameAr);
 
         // المسافة حسب المستوى
         int indent = (a.level - 1) * 16;
-        h.container.setPaddingRelative(indent,                              // start
-        h.container.getPaddingTop(),
-        h.container.getPaddingEnd(),
-        h.container.getPaddingBottom()
-        );
+        h.container.setPaddingRelative(indent, h.container.getPaddingTop(),
+                h.container.getPaddingEnd(), h.container.getPaddingBottom());
 
         // لون حسب النوع
         String color;
@@ -75,24 +112,37 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
         h.tvIcon.setText(icon);
 
         // الذهب
-        if (a.isGold()) {
-            h.tvGoldBadge.setVisibility(View.VISIBLE);
-        } else {
-            h.tvGoldBadge.setVisibility(View.GONE);
-        }
+        h.tvGoldBadge.setVisibility(a.isGold() ? View.VISIBLE : View.GONE);
 
         // نوع الحساب
         h.tvType.setText(a.getTypeLabelAr());
         h.tvType.setTextColor(Color.parseColor(color));
 
-        // مؤشر الورقة
+        // مؤشر السهم والورقة
         if (a.isLeaf()) {
             h.tvArrow.setVisibility(View.GONE);
         } else {
             h.tvArrow.setVisibility(View.VISIBLE);
-            h.tvArrow.setText("▼");
+            // تغيير شكل السهم بناءً على الحالة (مفتوح أم مغلق)
+            if (expandedAccounts.contains(a.accountCode)) {
+                h.tvArrow.setText("▼"); // مفتوح
+            } else {
+                h.tvArrow.setText("▶"); // مغلق
+            }
+
+            // ✅ إضافة مستمع النقر للسهم فقط
+            h.tvArrow.setOnClickListener(v -> {
+                if (expandedAccounts.contains(a.accountCode)) {
+                    expandedAccounts.remove(a.accountCode); // إغلاق
+                } else {
+                    expandedAccounts.add(a.accountCode); // فتح
+                }
+                buildDisplayList(); // إعادة بناء القائمة
+                notifyDataSetChanged(); // تحديث الواجهة
+            });
         }
 
+        // النقر على العنصر بالكامل (يفتح دفتر الأستاذ كما كان في كودك الأصلي)
         h.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(a);
         });
@@ -100,7 +150,7 @@ public class AccountTreeAdapter extends RecyclerView.Adapter<AccountTreeAdapter.
 
     @Override
     public int getItemCount() {
-        return items.size();
+        return displayItems.size(); // نعرض القائمة المفلترة
     }
 
     static class VH extends RecyclerView.ViewHolder {
