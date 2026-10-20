@@ -768,18 +768,29 @@ btnFinishAndReview = view.findViewById(R.id.btnFinishAndReview);
     private void setupButtons() {
     // ✅ زر Start/Pause الرئيسي
     if (btnMainToggleScan != null) {
-        btnMainToggleScan.setOnClickListener(v -> {
-            if (isScanning) {
-                pauseScanning();  // ✅ Pause بدلاً من Stop
-            } else {
-                if (canEditInventory()) {
-                    startScanning();  // ✅ Resume أو New
-                } else {
-                    showAccessDenied();
-                }
-            }
-        });
-    }
+    btnMainToggleScan.setOnClickListener(v -> {
+        if (!canEditInventory()) {
+            showAccessDenied();
+            return;
+        }
+
+        if (isScanning) {
+            // ✅ إيقاف مؤقت — يحفظ البيانات، ويمكن الاستئناف
+            pauseScanning();
+            return;
+        }
+
+        if (isPaused && hasUncommittedSession
+                && !scannedItemsDisplayList.isEmpty()) {
+            // ✅ جلسة موقوفة — اسأل المستخدم
+            showResumeOrNewDialog();
+            return;
+        }
+
+        // ✅ لا جلسة سابقة → بدء جديد
+        startScanning();
+    });
+}
 
     // ✅ [جديد] زر "إنهاء ومراجعة"
     if (btnFinishAndReview != null) {
@@ -2407,45 +2418,67 @@ private void clearAllLists() {
     }
 
     private void updateMainToggleButton(boolean scanning) {
-        if (btnMainToggleScan == null) return;
+    if (btnMainToggleScan == null) return;
 
-        try {
-            if (scanning) {
-                btnMainToggleScan.setText(isArabic ? "⏹️ إيقاف الجرد" : "⏹️ Stop Scan");
+    try {
+        if (scanning) {
+            // 🔴 وضع المسح النشط
+            btnMainToggleScan.setText(isArabic ? "⏸️ إيقاف مؤقت" : "⏸️ Pause");
 
-                try {
-                    btnMainToggleScan.setIcon(requireContext().getDrawable(
-                            android.R.drawable.ic_media_pause));
-                } catch (Exception ignored) {}
+            try {
+                btnMainToggleScan.setIcon(requireContext().getDrawable(
+                        android.R.drawable.ic_media_pause));
+            } catch (Exception ignored) {}
 
-                try {
-                    int redColor = ContextCompat.getColor(requireContext(),
-                            R.color.inventory_stop_red);
-                    btnMainToggleScan.setBackgroundTintList(
-                            android.content.res.ColorStateList.valueOf(redColor));
-                } catch (Exception e) {
-                    Log.w(TAG, "setBackgroundTintList failed", e);
-                }
-
-            } else {
-                btnMainToggleScan.setText(isArabic ? "▶️ بدء جرد RFID" : "▶️ Start RFID Scan");
-
-                try {
-                    btnMainToggleScan.setIcon(requireContext().getDrawable(
-                            android.R.drawable.ic_media_play));
-                } catch (Exception ignored) {}
-
-                try {
-                    int primaryColor = ContextCompat.getColor(requireContext(),
-                            R.color.colorPrimary);
-                    btnMainToggleScan.setBackgroundTintList(
-                            android.content.res.ColorStateList.valueOf(primaryColor));
-                } catch (Exception ignored) {}
+            try {
+                int redColor = ContextCompat.getColor(requireContext(),
+                        R.color.inventory_stop_red);
+                btnMainToggleScan.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(redColor));
+            } catch (Exception e) {
+                Log.w(TAG, "setBackgroundTintList failed", e);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "updateMainToggleButton error", e);
+
+        } else if (isPaused && hasUncommittedSession) {
+            // 🟡 وضع الجلسة الموقوفة — يمكن الاستئناف أو البدء جديد
+            btnMainToggleScan.setText(isArabic
+                    ? "▶️ استئناف أو جرد جديد"
+                    : "▶️ Resume or New");
+
+            try {
+                btnMainToggleScan.setIcon(requireContext().getDrawable(
+                        android.R.drawable.ic_media_play));
+            } catch (Exception ignored) {}
+
+            try {
+                int greenColor = ContextCompat.getColor(requireContext(),
+                        R.color.success_green);
+                btnMainToggleScan.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(greenColor));
+            } catch (Exception ignored) {}
+
+        } else {
+            // 🟢 وضع الخمول — بدء جرد جديد
+            btnMainToggleScan.setText(isArabic
+                    ? "▶️ بدء جرد جديد"
+                    : "▶️ Start New Inventory");
+
+            try {
+                btnMainToggleScan.setIcon(requireContext().getDrawable(
+                        android.R.drawable.ic_media_play));
+            } catch (Exception ignored) {}
+
+            try {
+                int primaryColor = ContextCompat.getColor(requireContext(),
+                        R.color.colorPrimary);
+                btnMainToggleScan.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(primaryColor));
+            } catch (Exception ignored) {}
         }
+    } catch (Exception e) {
+        Log.e(TAG, "updateMainToggleButton error", e);
     }
+}
 
     private void animateMainButton() {
         if (btnMainToggleScan == null) return;
@@ -2472,6 +2505,68 @@ private void clearAllLists() {
                 .setCancelable(false)
                 .show();
     }
+    /**
+ * ✅ [UX] حوار واضح عند وجود جلسة موقوفة
+ * يُعرض فقط عندما يكون المستخدم موقفاً لجلسة سابقة
+ */
+private void showResumeOrNewDialog() {
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    int itemCount = scannedItemsDisplayList.size();
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "🔄 لديك جلسة موقوفة" : "🔄 Paused Session")
+            .setMessage(isArabic
+                    ? "لديك " + itemCount + " قطعة في الجلسة الموقوفة.\n\n"
+                    + "• استئناف: يكمل من حيث توقفت (تحتفظ بالبيانات)\n"
+                    + "• جرد جديد: يمسح البيانات ويبدأ من الصفر"
+                    : "You have " + itemCount + " items in the paused session.\n\n"
+                    + "• Resume: Continue where you stopped (data preserved)\n"
+                    + "• New: Clear data and start fresh")
+            .setPositiveButton(isArabic ? "▶️ استئناف" : "▶️ Resume", (d, w) -> {
+                // استئناف — shouldResumeOnNextStart = true بالفعل من pauseScanning
+                Log.i(TAG, "🔄 User chose: RESUME");
+                startScanning();
+            })
+            .setNeutralButton(isArabic ? "🆕 جرد جديد" : "🆕 New", (d, w) -> {
+                // جرد جديد — امسح كل شيء وابدأ من الصفر
+                Log.i(TAG, "🆕 User chose: NEW — clearing all data");
+
+                // امسح البيانات
+                clearAllLists();
+                catalogEpcs.clear();
+
+                // أعد تعيين الـ Engine والجلسة
+                if (inventoryEngine != null) {
+                    try { inventoryEngine.clearSession(); } catch (Exception ignored) {}
+                }
+                if (scanSession != null) {
+                    try { scanSession.onSessionReset(); } catch (Exception ignored) {}
+                }
+
+                // أعد تعيين كل الأعلام
+                isPaused = false;
+                hasUncommittedSession = false;
+                shouldResumeOnNextStart = false;
+                nextScanIsResume = false;
+                expectedCount = 0;
+                sessionElapsedBeforePause = 0;
+                hasCelebrated = false;
+
+                // امسح الجلسة المحفوظة
+                if (sessionManager != null) {
+                    try { sessionManager.clearSession(); } catch (Exception ignored) {}
+                }
+
+                if (tvExpectedCount != null) tvExpectedCount.setText("0");
+
+                startScanning();
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .setCancelable(true)
+            .show();
+}
+
 
     // ================================================================
     //  Scanned Items Handling
@@ -3227,6 +3322,7 @@ if (foundInCatalog >= expectedCount && isScanning) {
                         isPaused = false;
                         hasUncommittedSession = false;
                         nextScanIsResume = false;
+                        shouldResumeOnNextStart = false;
                         sessionElapsedBeforePause = 0;
                         hasCelebrated = false;
 
@@ -3311,16 +3407,37 @@ if (foundInCatalog >= expectedCount && isScanning) {
             lastServerReport = report;
 
             new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(isArabic ? "🎉 نجاح العملية" : "🎉 Success")
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print",
-                            (dialog, which) -> printCurrentReport())
-                    .setNeutralButton(isArabic ? "📂 الأرشيف" : "📂 Archive",
-                            (dialog, which) -> showArchiveReports())
-                    .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                    .setCancelable(false)
-                    .show();
+        .setTitle(isArabic ? "🎉 نجاح العملية" : "🎉 Success")
+        .setMessage(message)
+        .setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print",
+                (dialog, which) -> printCurrentReport())
+        .setNeutralButton(isArabic ? "📂 الأرشيف" : "📂 Archive",
+                (dialog, which) -> showArchiveReports())
+        .setNegativeButton(isArabic ? "✔️ إغلاق وبدء جديد" : "✔️ Close & New", (d, w) -> {
+            // ✅ [UX] بعد الاعتماد، صفّر كل شيء
+            clearAllLists();
+            catalogEpcs.clear();
+            switchToWelcomeState();
 
+            // ✅ أعد تعيين كل الأعلام — بما فيها shouldResumeOnNextStart!
+            isPaused = false;
+            hasUncommittedSession = false;
+            shouldResumeOnNextStart = false;  // ← هذا مفقود حالياً!
+            nextScanIsResume = false;
+            expectedCount = 0;
+            sessionElapsedBeforePause = 0;
+            hasCelebrated = false;
+
+            if (tvExpectedCount != null) tvExpectedCount.setText("0");
+
+            // ✅ اسمح بالاسترجاع في جلسة جديدة
+            hasRestoredThisSession = false;
+            hasTriedRestoringSession = false;
+
+            Log.i(TAG, "✅ Post-commit: everything cleared, ready for new inventory");
+        })
+        .setCancelable(false)
+        .show();
         } catch (Exception e) {
             Log.e(TAG, "showCommitSuccessDialog error", e);
             showToast(isArabic ? "✅ تم الاعتماد" : "✅ Committed");
