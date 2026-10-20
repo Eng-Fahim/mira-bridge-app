@@ -3386,19 +3386,34 @@ if (foundInCatalog >= expectedCount && isScanning) {
                                     inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0)));
             int missing = extractInt(report, "missing_count",
                     Math.max(0, expected - found));
+            int soldDuringSession = extractInt(report, "sold_during_session", 0);
+            int transferredDuring = extractInt(report, "transferred_during_session", 0);
+                    int deletedDuring = extractInt(report, "deleted_during_session", 0);
 
             StringBuilder sb = new StringBuilder();
             sb.append(isArabic ? "✅ تم اعتماد الجرد بنجاح:\n\n" : "✅ Inventory committed:\n\n");
             sb.append(isArabic ? "• الدقة: " : "• Accuracy: ").append(accuracy).append("%\n");
             sb.append(isArabic ? "• مستوى الخطورة: " : "• Risk Level: ").append(riskLevel).append("\n");
-
+            
             if (expected > 0) {
-                sb.append(isArabic ? "• المتوقع: " : "• Expected: ").append(expected).append("\n");
-                sb.append(isArabic ? "• الممسوح: " : "• Found: ").append(found).append("\n");
-                if (missing > 0) {
-                    sb.append(isArabic ? "• المفقود: " : "• Missing: ").append(missing).append("\n");
-                }
-            }
+    sb.append(isArabic ? "• المتوقع: " : "• Expected: ").append(expected).append("\n");
+    sb.append(isArabic ? "• الممسوح: " : "• Found: ").append(found).append("\n");
+    if (missing > 0) {
+        sb.append(isArabic ? "• المفقود فعلاً: " : "• Truly missing: ").append(missing).append("\n");
+    }
+    if (soldDuringSession > 0) {
+        sb.append(isArabic ? "• 🛒 مبيع أثناء الجرد: " : "• 🛒 Sold during session: ")
+          .append(soldDuringSession).append("\n");
+    }
+    if (transferredDuring > 0) {
+        sb.append(isArabic ? "• 🔄 منقول لفرع آخر: " : "• 🔄 Transferred: ")
+          .append(transferredDuring).append("\n");
+    }
+    if (deletedDuring > 0) {
+        sb.append(isArabic ? "• 🗑️ محذوف: " : "• 🗑️ Deleted: ")
+          .append(deletedDuring).append("\n");
+    }
+}
 
             sb.append("\n").append(isArabic ? "• " : "• ").append(recommendation);
 
