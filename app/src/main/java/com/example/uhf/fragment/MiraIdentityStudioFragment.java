@@ -862,20 +862,33 @@ private void setupListeners() {
 
         // ✅ EPC text watcher — status badge + unbind when cleared
         binding.etEpc.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (binding != null && binding.tvStatusBadge != null) {
-                    binding.tvStatusBadge.setText(
-                            s.length() > 0 ? "BOUND" : "WAITING");
-                }
-                if (s.length() == 0 && isEpcBound) {
-                    isEpcBound = false;
-                    Log.d(TAG, "🔓 EPC unbound (field cleared)");
-                }
+    @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+    @Override public void afterTextChanged(Editable s) {}
+    @Override
+    public void onTextChanged(CharSequence s, int start, int before, int count) {
+        if (binding == null || binding.tvStatusBadge == null) return;
+        
+        // ✅ [SECURITY] 3 حالات بدل 2 — منع التضليل
+        if (s.length() == 0) {
+            binding.tvStatusBadge.setText("WAITING");
+            binding.tvStatusBadge.setTextColor(0xFF6B7280);  // رمادي
+            if (isEpcBound) {
+                isEpcBound = false;
+                Log.d(TAG, "🔓 EPC unbound (field cleared)");
             }
-        });
+        } else if (!isEpcBound) {
+            // ⚠️ كتابة يدوية — لم يمر عبر المسح!
+            binding.tvStatusBadge.setText(
+                    isArabic ? "⚠️ كتابة يدوية" : "⚠️ TYPED");
+            binding.tvStatusBadge.setTextColor(0xFFF59E0B);  // أصفر
+        } else {
+            // ✅ تم المسح والتحقق
+            binding.tvStatusBadge.setText(
+                    isArabic ? "✅ موثّق" : "✅ VERIFIED");
+            binding.tvStatusBadge.setTextColor(0xFF22C55E);  // أخضر
+        }
+    }
+});
 
         if (binding.tilEpc != null) {
             binding.tilEpc.setEndIconOnClickListener(
@@ -1138,7 +1151,7 @@ public void onTagRead(String epc, int rssi) {
     pendingStopFromTrigger = false;
    
 final String receivedEpc = epc.trim().toUpperCase(Locale.US);
-Log.i(TAG, "📡 EPC received (trigger): " + receivedEpc);
+secureLog("📡 EPC received: " + maskEpc(receivedEpc));
 
 // ✅ [FIX-2] أوقف المسح أولاً (main thread) — ثم اقرأ TID
 safeRun(() -> {
@@ -1171,7 +1184,7 @@ safeRun(() -> {
         }
 
         final String finalTid = tid.trim().toUpperCase(Locale.US);
-        Log.i(TAG, "✅ TID read: " + finalTid);
+        secureLog("✅ TID read: " + maskEpc(finalTid));
         safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
     });
 });
@@ -1398,8 +1411,8 @@ private void startScanNow() {
                     R.drawable.ic_pos_cart_gold,
                     0xFF22C55E);
 
-            Log.i(TAG, "✅ Tag accepted: " + finalTid // ✅ تم التعديل هنا
-                    + (wasReplacing ? " (replaced)" : ""));
+            secureLog("✅ Tag accepted: " + maskEpc(finalTid) 
+        + (wasReplacing ? " (replaced)" : ""));
             playSuccessSound();
         });
     });
@@ -1416,8 +1429,8 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
   final String cleanEpc = epc.trim().toUpperCase(Locale.US);
   lastScannedEpc = cleanEpc;
   lastScanSource = source;  // ✅ [FIX-6] احفظ المصدر
-    Log.i(TAG, "🎯 Processing received tag EPC: " + cleanEpc
-            + " | preReadTid=" + preReadTid + " | source=" + source);
+    secureLog("🎯 Processing tag: " + maskEpc(cleanEpc) 
+        + " | source=" + source);
 
     miraExecutor.getBackgroundExecutor().execute(() -> {
         boolean isTagAllowed = false, isDuplicate = false;
@@ -1643,6 +1656,20 @@ public void onRfidScanned(String epc) {
     if (!isAdded() || getActivity() == null) return;
     if (epc == null || epc.trim().isEmpty()) return;
     if (appContext == null || miraExecutor == null) return;
+    
+    // ✅ [SECURITY] فحص صلاحيات — مطابق لـ myOnKeyDwon
+    if (permissionManager == null) {
+        Log.w(TAG, "onRfidScanned: permissionManager null");
+        return;
+    }
+    if (!permissionManager.canEdit("identity") && !permissionManager.isManager()) {
+        Log.w(TAG, "onRfidScanned: unauthorized — ignoring");
+        return;
+    }
+    if (isFormLocked) {
+        Log.d(TAG, "onRfidScanned: form locked — ignoring");
+        return;
+    }
 
     final String scannedEpc = epc.trim().toUpperCase(Locale.US);
     Log.i(TAG, "📡 onRfidScanned (external): " + scannedEpc);
@@ -1907,6 +1934,71 @@ private void stopDesktopScannerMode() {
     }
 }
 
+/**
+ * ✅ [SECURITY] التحقق من الشريحة من السيرفر قبل التكويد
+ * 
+ * ⚠️ يجب استدعاؤها من thread خلفي (ليست UI-safe)
+ * 
+ * يمنع:
+ *  - الشرائح المزيفة (ليست في القائمة البيضاء على السيرفر)
+ *  - TID المزور (يرسل TID مختلف عما في DB)
+ *  - Desktop reader بدون GTIN/EPC مسجل
+ *  - التطبيقات المخترقة (APK معدل)
+ * 
+ * @return null إذا نجح (verified)، أو رسالة خطأ إذا فشل
+ */
+private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, String source) {
+    if (apiClient == null) {
+        return isArabic ? "❌ لا اتصال بالسيرفر" : "❌ No server connection";
+    }
+    
+    try {
+        JSONObject payload = new JSONObject();
+        payload.put("source", source != null ? source : "CHAINWAY");
+        
+        if ("DESKTOP_RFID".equals(source)) {
+            // Desktop: EPC فقط (لا TID)
+            if (epc != null && !epc.isEmpty()) {
+                payload.put("epc", epc);
+            }
+        } else {
+            // Chainway: TID + EPC
+            if (tid != null && !tid.isEmpty()) {
+                payload.put("tid", tid);
+            }
+            if (epc != null && !epc.isEmpty()) {
+                payload.put("epc", epc);
+            }
+        }
+        
+        Log.d(TAG, "[VERIFY] Sending: " + payload.toString());
+        
+        MiraApiClient.ApiResponse response = apiClient.postWithAuth(
+                "/verify-encoding-tag", payload);
+        
+        if (response == null) {
+            return isArabic 
+                ? "❌ لم يتم استلام رد من السيرفر" 
+                : "❌ No response from server";
+        }
+        
+        if (!response.isSuccess) {
+            String errorMsg = extractErrorMessage(response);
+            Log.w(TAG, "[VERIFY] Rejected: " + errorMsg);
+            return errorMsg != null ? errorMsg : 
+                (isArabic ? "الشريحة غير معتمدة" : "Tag not authorized");
+        }
+        
+        Log.i(TAG, "✅ [VERIFY] Tag approved by server");
+        return null;  // ✅ نجح
+        
+    } catch (Exception e) {
+        Log.e(TAG, "[VERIFY] Exception", e);
+        return isArabic 
+            ? "❌ خطأ في التحقق: " + e.getMessage() 
+            : "❌ Verification error: " + e.getMessage();
+    }
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Save & Encode — finalizeItemIdentity
@@ -2014,10 +2106,23 @@ private void stopDesktopScannerMode() {
         final List<String> finalPhotoPaths = new ArrayList<>(photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
         final int currentUserId = getCurrentUserId();
 
-        // ═══════════════════════════════════════════════════════
-        //  الخلفية (Background Thread)
-        // ═══════════════════════════════════════════════════════
-        miraExecutor.getBackgroundExecutor().execute(() -> {
+// ✅ [SECURITY] رفض المتابعة إذا الجلسة غير صالحة
+if (currentUserId <= 0) {
+    dismissDialog(activeLoadingDialog);
+    activeLoadingDialog = null;
+    unlockFormFast();
+    setFormEnabled(true);
+    showErrorDialog(
+            isArabic ? "❌ جلسة منتهية" : "❌ Session Expired",
+            isArabic ? "يرجى تسجيل الدخول مجدداً"
+                     : "Please log in again");
+    return;
+}
+
+// ═══════════════════════════════════════════════════════
+//  الخلفية (Background Thread)
+// ═══════════════════════════════════════════════════════
+miraExecutor.getBackgroundExecutor().execute(() -> {
             String tidFromTagWorking = "";
 String epcFromTagWorking = "";
 boolean isSim = false;
@@ -2068,7 +2173,29 @@ if (!isDesktopScan) {
             final String originalEpc = epcFromTagWorking.trim().toUpperCase(Locale.US);
             final String gtin = "";
             final boolean fIsSim = isSim;
+// ✅ [SECURITY] التحقق من الشريحة على السيرفر أولاً
+Log.i(TAG, "🔒 [SECURITY] Verifying tag with server...");
+String verifyError = verifyTagWithServerBeforeEncodingSync(
+        tid, 
+        originalEpc, 
+        lastScanSource);
 
+if (verifyError != null) {
+    Log.e(TAG, "❌ [SECURITY] Tag rejected: " + verifyError);
+    safeRun(() -> {
+        dismissDialog(activeLoadingDialog);
+        activeLoadingDialog = null;
+        unlockFormFast();
+        setFormEnabled(true);
+        playErrorSound();
+        showErrorDialog(
+            isArabic ? "⛔ الشريحة مرفوضة" : "⛔ Tag Rejected",
+            verifyError);
+    });
+    return;
+}
+
+Log.i(TAG, "✅ [SECURITY] Tag verified, proceeding with encoding...");
             
 
             // إرسال البيانات للسيرفر
@@ -2395,42 +2522,70 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
     }
 
     private boolean validateInputData(String epc, String title, String weightStr) {
-        if (title.isEmpty()) {
-            showValidationError(isArabic ? "يرجى كتابة عنوان القطعة"
-                                         : "Please enter item title");
-            return false;
-        }
-        if (title.length() < 3) {
-            showValidationError(isArabic ? "العنوان قصير جداً"
-                                         : "Title is too short");
-            return false;
-        }
-        if (weightStr.isEmpty()) {
-            showValidationError(isArabic ? "يرجى تحديد وزن القطعة"
-                                         : "Please specify item weight");
-            return false;
-        }
-
-        try {
-            double weight = Double.parseDouble(weightStr);
-            if (weight <= 0) {
-                showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر"
-                                             : "Weight must be greater than zero");
-                return false;
-            }
-            if (weight > 10000) {
-                showValidationError(isArabic ? "الوزن كبير جداً"
-                                             : "Weight is too large");
-                return false;
-            }
-        } catch (NumberFormatException e) {
-            showValidationError(isArabic ? "صيغة الوزن غير صحيحة"
-                                         : "Invalid weight format");
-            return false;
-        }
-
-        return true;
+    // ✅ [SECURITY] يجب مسح شريحة أولاً (لا كتابة يدوية)
+    if (epc == null || epc.trim().isEmpty()) {
+        showValidationError(isArabic 
+            ? "❌ يجب مسح شريحة RFID قبل الحفظ" 
+            : "❌ Must scan RFID tag before saving");
+        return false;
     }
+    
+    // ✅ [SECURITY] يجب أن يكون الحقل مُتحققاً عبر مسح (ليس كتابة يدوية)
+    if (!isEpcBound) {
+        showValidationError(isArabic 
+            ? "❌ لم يتم التحقق من الشريحة عبر RFID\nاستخدم زر المسح" 
+            : "❌ Tag not verified via RFID\nUse the scan button");
+        return false;
+    }
+    
+    // ✅ [SECURITY] فحص صيغة
+    String epcClean = epc.trim();
+    boolean validFormat = epcClean.matches("^[0-9A-F]{16,32}$")     // TID (Chainway)
+                        || epcClean.matches("^E2[0-9A-F]{22}$");    // EPC (Desktop)
+    
+    if (!validFormat) {
+        showValidationError(isArabic 
+            ? "❌ صيغة الشريحة غير صالحة\nاستخدم المسح بدل الكتابة اليدوية" 
+            : "❌ Invalid tag format\nUse scan instead of manual typing");
+        return false;
+    }
+    
+    if (title.isEmpty()) {
+        showValidationError(isArabic ? "يرجى كتابة عنوان القطعة"
+                                     : "Please enter item title");
+        return false;
+    }
+    if (title.length() < 3) {
+        showValidationError(isArabic ? "العنوان قصير جداً"
+                                     : "Title is too short");
+        return false;
+    }
+    if (weightStr.isEmpty()) {
+        showValidationError(isArabic ? "يرجى تحديد وزن القطعة"
+                                     : "Please specify item weight");
+        return false;
+    }
+
+    try {
+        double weight = Double.parseDouble(weightStr);
+        if (weight <= 0) {
+            showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر"
+                                         : "Weight must be greater than zero");
+            return false;
+        }
+        if (weight > 10000) {
+            showValidationError(isArabic ? "الوزن كبير جداً"
+                                         : "Weight is too large");
+            return false;
+        }
+    } catch (NumberFormatException e) {
+        showValidationError(isArabic ? "صيغة الوزن غير صحيحة"
+                                     : "Invalid weight format");
+        return false;
+    }
+
+    return true;
+}
 
     private JSONObject buildPayload(
             String epc, String title, String karat, double grossWeight, double netWeight,
@@ -3046,6 +3201,18 @@ private void resetFormForNextScan() {
             Log.e(TAG, "showToast error: " + e.getMessage());
         }
     }
+// ✅ [SECURITY] تسجيل آمن — فقط في DEBUG builds
+private void secureLog(String message) {
+    if (com.example.uhf.BuildConfig.DEBUG) {
+        Log.d(TAG, message);
+    }
+}
+
+// ✅ [SECURITY] تمويه EPC/TID قبل التسجيل
+private String maskEpc(String epc) {
+    if (epc == null || epc.length() < 8) return "***";
+    return epc.substring(0, 4) + "****" + epc.substring(epc.length() - 4);
+}
 
     private void notifyDashboardUpdate(String source) {
         try {
@@ -3085,18 +3252,28 @@ private void resetFormForNextScan() {
     }
 
     private int getCurrentUserId() {
-        try {
-            if (appContext == null && getContext() != null) {
-                appContext = getContext().getApplicationContext();
-            }
-            if (appContext == null) return 0;
-            SharedPreferences prefs = appContext.getSharedPreferences(
-                    "session", Context.MODE_PRIVATE);
-            return prefs.getInt("user_id", 0);
-        } catch (Exception e) {
-            return 0;
+    try {
+        if (appContext == null && getContext() != null) {
+            appContext = getContext().getApplicationContext();
         }
+        if (appContext == null) return -1;  // ✅ رفض واضح
+        
+        SharedPreferences prefs = appContext.getSharedPreferences(
+                "session", Context.MODE_PRIVATE);
+        int userId = prefs.getInt("user_id", -1);
+        
+        // ✅ [SECURITY] رفض user_id غير صالح
+        if (userId <= 0) {
+            Log.w(TAG, "getCurrentUserId: invalid session (user_id=" + userId + ")");
+            return -1;
+        }
+        return userId;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "getCurrentUserId error", e);
+        return -1;
     }
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Power Management
@@ -3530,11 +3707,13 @@ private void processPendingBarcode() {
     // تصفير المتغير
     pendingBarcodeFromScanner = null;
 
-    // ✅ 1) استخراج المعرّف الحقيقي (مثل MIRA-SN-1001) من الباركود الممسوح
+    // ✅ 1) استخراج المعرّف
     final String extractedIdentifier = extractIdentifierFromBarcode(scannedCode);
 
-    // ✅ 2) فحص صحة المعرّف المستخرج (السماح بالأكواد القصيرة)
-    if (extractedIdentifier.isEmpty() || extractedIdentifier.length() < 2 || extractedIdentifier.length() > 128) {
+    // ✅ 2) فحص الصحة
+    if (extractedIdentifier.isEmpty()
+            || extractedIdentifier.length() < 2
+            || extractedIdentifier.length() > 128) {
         playErrorSound();
         showScanFeedback(
                 isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
@@ -3553,19 +3732,21 @@ private void processPendingBarcode() {
     // ✅ 3) فحص قاعدة البيانات في الخلفية
     if (miraExecutor == null) return;
     miraExecutor.getBackgroundExecutor().execute(() -> {
-        final boolean isDuplicate = syncManager != null && syncManager.isEpcDuplicateLocally(extractedIdentifier);
+        final boolean isDuplicate = syncManager != null
+                && syncManager.isEpcDuplicateLocally(extractedIdentifier);
 
         safeRun(() -> {
             if (binding == null || !isAdded()) return;
 
+            // ═════════════════════════════════════════════
+            //  حالة مكررة
+            // ═════════════════════════════════════════════
             if (isDuplicate) {
-                // ═════════════════════════════════════════════
-                //  حالة مكررة
-                // ═════════════════════════════════════════════
                 playErrorSound();
                 showScanFeedback(
                         isArabic ? "⚠️ باركود مكرر" : "⚠️ Duplicate Barcode",
-                        isArabic ? extractedIdentifier + "\nمسجل بالفعل" : extractedIdentifier + "\nAlready registered",
+                        isArabic ? extractedIdentifier + "\nمسجل بالفعل"
+                                 : extractedIdentifier + "\nAlready registered",
                         null,
                         android.R.drawable.ic_dialog_alert,
                         0xFF3B82F6);
@@ -3573,73 +3754,104 @@ private void processPendingBarcode() {
                         isArabic ? "باركود مكرر" : "Duplicate Barcode",
                         isArabic ? "هذا الكود مسجل بالفعل:\n" + extractedIdentifier
                                  : "This code is already registered:\n" + extractedIdentifier);
-            } else {
-                // ═════════════════════════════════════════════
-                //  حالة ناجحة
-                // ═════════════════════════════════════════════
-                
-                // ✅ إدراج المعرّف المستخرج (السيريال) في الحقل
-                if (binding.etEpc != null) {
-                    binding.etEpc.setText(extractedIdentifier);
-                    binding.etEpc.setTag(extractedIdentifier);
-                }
-                if (binding.tvStatusBadge != null) {
-                    binding.tvStatusBadge.setText("BOUND");
-                }
-                
-                isEpcBound = true;
-                lastScannedEpc = extractedIdentifier; // ✅ حفظ السيريال الحقيقي ليرسل للسيرفر
-
-                // ✅ عرض بطاقة النجاح
-                showScanFeedback(
-                        isArabic ? "✅ باركود صالح" : "✅ Valid Barcode",
-                        isArabic ? extractedIdentifier + "\nجاهز للتكويد" : extractedIdentifier + "\nReady for encoding",
-                        null,
-                        R.drawable.ic_pos_cart_gold,
-                        0xFF22C55E);
-
-                playSuccessSound();
-                Log.i(TAG, "✅ Barcode accepted and DB checked: " + extractedIdentifier);
+                return;
             }
+
+            // ═════════════════════════════════════════════
+            //  ✅ [SECURITY] الباركود لا يكفي للتكويد
+            //  يُملأ الحقل للبحث، لكن isEpcBound يبقى false
+            // ═════════════════════════════════════════════
+
+            // املأ الحقل لعرض البيانات
+            if (binding.etEpc != null) {
+                binding.etEpc.setText(extractedIdentifier);
+                binding.etEpc.setTag(extractedIdentifier);
+            }
+            if (binding.tvStatusBadge != null) {
+                binding.tvStatusBadge.setText(
+                        isArabic ? "⚠️ باركود (للبحث فقط)"
+                                 : "⚠️ Barcode (lookup only)");
+                binding.tvStatusBadge.setTextColor(0xFFF59E0B);  // أصفر
+            }
+
+            // ⚠️ لا نعتبره مربوطاً — الحفظ سيرفضه في validateInputData
+            isEpcBound = false;
+
+            showScanFeedback(
+                    isArabic ? "🔍 باركود للبحث فقط"
+                             : "🔍 Barcode (Lookup)",
+                    isArabic
+                            ? "الباركود يحدد القطعة، لكن يجب مسح شريحة RFID للتكويد"
+                            : "Barcode identifies item, but RFID scan is required to encode",
+                    null,
+                    android.R.drawable.ic_dialog_info,
+                    0xFF3B82F6);
+
+            showErrorDialog(
+                    isArabic ? "⚠️ الباركود لا يكفي" : "⚠️ Barcode is not sufficient",
+                    isArabic
+                            ? "لتكويد القطعة:\n\n" +
+                              "1. استخدم زر مسح RFID\n" +
+                              "2. قرّب الشريحة من القارئ\n" +
+                              "3. اضغط الزناد"
+                            : "To encode:\n\n" +
+                              "1. Use RFID scan button\n" +
+                              "2. Move tag near reader\n" +
+                              "3. Press trigger");
+
+            Log.i(TAG, "🔍 Barcode accepted for lookup only: " + extractedIdentifier);
         });
     });
 }
-
 // ═══════════════════════════════════════════════════════════
 // ✅ دالة مساعدة: استخراج المعرّف (السيريال) من الباركود
 // ═══════════════════════════════════════════════════════════
 private String extractIdentifierFromBarcode(String rawBarcode) {
     if (rawBarcode == null || rawBarcode.isEmpty()) return "";
     String clean = rawBarcode.trim();
-
-    // 1) إذا كان رابط URL (مثل https://sa.mirabarcode.com/MIRA-SN-1001)
+    
+    // ✅ [SECURITY] صيغ معروفة فقط — رفض كل ما عداها
+    
+    // 1) URL: https://sa.mirabarcode.com/MIRA-SN-1001
     if (clean.startsWith("http://") || clean.startsWith("https://")) {
         try {
             android.net.Uri uri = android.net.Uri.parse(clean);
             String lastSegment = uri.getLastPathSegment();
-            if (lastSegment != null && !lastSegment.isEmpty()) {
-                return lastSegment; // سيعيد MIRA-SN-1001
+            if (lastSegment != null && lastSegment.matches("^MIRA-SN-\\d+$")) {
+                return lastSegment;
             }
-            // البحث في معاملات الرابط
             String serial = uri.getQueryParameter("serial");
             if (serial == null) serial = uri.getQueryParameter("sn");
-            if (serial != null && !serial.isEmpty()) return serial;
-        } catch (Exception ignored) {}
+            if (serial != null && serial.matches("^MIRA-SN-\\d+$")) {
+                return serial;
+            }
+            return "";  // ⚠️ URL بصيغة غير معروفة
+        } catch (Exception ignored) {
+            return "";
+        }
     }
-
-    // 2) إذا كان كود GS1 (يحتوي على (21) أو 21)
-    // مثال: (01)07612345678901(21)MIRA-SN-1001
+    
+    // 2) GS1 DataMatrix: (01)07612345678901(21)MIRA-SN-1001
     String gs1 = clean.replace('\u001D', '|').replace("(#)", "|");
     java.util.regex.Matcher mSerial = java.util.regex.Pattern
-            .compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)")
+            .compile("(?:^|\\|)21(MIRA-SN-\\d+)")
             .matcher(gs1);
     if (mSerial.find()) {
         String serial = mSerial.group(1);
-        if (serial != null && !serial.isEmpty()) return serial;
+        if (serial != null && serial.matches("^MIRA-SN-\\d+$")) {
+            return serial;
+        }
     }
-
-    // 3) إذا كان رقماً أو نصاً صريحاً (مثل MIRA-SN-1001)
-    return clean;
+    
+    // 3) صيغة MIRA-SN-XXXX الصريحة
+    if (clean.matches("^MIRA-SN-\\d+$")) {
+        return clean;
+    }
+    
+    // ✅ رفض كل ما عدا ذلك
+    Log.w(TAG, "[SECURITY] Rejected barcode format: " + 
+            (clean.length() > 20 ? clean.substring(0, 20) + "..." : clean));
+    return "";
 }
 
     @Override
