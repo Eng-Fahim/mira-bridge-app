@@ -271,7 +271,10 @@ private void addDebugLine(String line) {
     private InventorySnapshotManager snapshotManager;
     
     /** ✅ [Stage-1] لمنع الاسترجاع المزدوج */
-private volatile boolean hasRestoredThisSession = false;
+    private volatile boolean hasRestoredThisSession = false;
+    // ✅ [Fix-C1] حماية من البدء المزدوج
+    private volatile boolean isStartingScan = false;
+    
     
     // ═══════════════════════════════════════════════════════
 //  ✅ [جديد - Stage 1] حالة الجلسة
@@ -1445,13 +1448,24 @@ public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
     // ═══════════════════════════════════════════════════════════
     if (event.getAction() == KeyEvent.ACTION_UP) {
     if (triggerMode == MiraReaderSettings.TRIGGER_MODE_HOLD) {
-        // ✅ [v4.3] وحّد السلوك — pause بدل stop
+        // ✅ [Fix-C4] إذا كنا في طور البدء، انتظر قليلاً قبل الإيقاف
+        // السبب: isScanning لا يزال false لأن onScanStarted لم يصل
+        if (isStartingScan) {
+            Log.i(TAG, "🎯 Trigger [HOLD]: wait for start then pause");
+            mainHandler.postDelayed(() -> {
+                if (isScanning) {
+                    Log.i(TAG, "🎯 Trigger [HOLD]: pause (delayed)");
+                    pauseScanning();
+                }
+            }, 300);
+            return true;
+        }
+
         if (isScanning) {
             Log.i(TAG, "🎯 Trigger [HOLD]: pause");
             pauseScanning();
         }
     }
-    // ✅ [Toggle] لا تفعل شيئاً — الحدث استُهلك في ACTION_DOWN
     return true;
 }
 
@@ -1468,11 +1482,16 @@ public void onScanStarted() {
     mainHandler.post(() -> {
         if (!isAdded() || isFragmentDestroyed) return;
 
-        // ✅ مرّر الحالة الحقيقية بدل false المُثبّتة
+        // ✅ [Fix-C3] امسح علم البدء
+        isStartingScan = false;
+
         scanSession.onScanStarted(nextScanIsResume);
-        nextScanIsResume = false;  // أعِد التعيين بعد الاستخدام
+        nextScanIsResume = false;
 
         isScanning = true;
+
+        // ✅ [Fix-C3] اخرج من شاشة الترحيب فوراً — لا تنتظر أول قراءة
+        switchToActiveState(false);
         updateMainToggleButton(true);
         animateMainButton();
 
@@ -1636,9 +1655,12 @@ public void onError(String error) {
     addDebugLine("❌ onError: " + error);
     
     mainHandler.post(() -> {
-        if (!isAdded() || isFragmentDestroyed) return;
-        
-        showToast((isArabic ? "⚠️ " : "⚠️ ") + error);
+    if (!isAdded() || isFragmentDestroyed) return;
+
+    // ✅ [Fix-C3] امسح علم البدء عند الفشل
+    isStartingScan = false;
+
+    showToast((isArabic ? "⚠️ " : "⚠️ ") + error);
         
         // ✅ [v4.3] أوقف الـ Controller نهائياً
         if (scanController != null) {
@@ -1791,15 +1813,20 @@ public void onExpectedCountChanged(int count) {
     // ================================================================
     //  Scan Lifecycle (✅ إصلاح جوهري)
     // ================================================================
-
+    
     private void startScanning() {
-    addDebugLine("▶️ startScanning()");        // ← دائماً يُطبع
+    addDebugLine("▶️ startScanning()");
     if (!canEditInventory()) {
         showAccessDenied();
         return;
     }
-    if (isScanning || isFragmentDestroyed) return;
 
+    // ✅ [Fix-C2] حماية من البدء المزدوج — زر العتاد قد يرسل الحدث مرتين
+    if (isScanning || isStartingScan || isFragmentDestroyed) {
+        Log.d(TAG, "⏭️ startScanning ignored: already scanning or starting");
+        return;
+    }
+    isStartingScan = true;
     // ═══════════════════════════════════════════════════════════
     //  ✅ فحص جاهزية القارئ أولاً
     // ═══════════════════════════════════════════════════════════
@@ -1874,8 +1901,9 @@ public void onExpectedCountChanged(int count) {
             }
         });
 
-    } catch (Exception e) {
+        } catch (Exception e) {
         Log.e(TAG, "Reader readiness check error", e);
+        isStartingScan = false;   // ✅ [Fix-C2] امسح العلم عند الفشل
         showToast(isArabic ? "⚠️ خطأ في القارئ" : "⚠️ Reader error");
     }
 }
@@ -1925,13 +1953,16 @@ shouldResumeOnNextStart = false;   // استُهلك الطلب
     final Map<String, InventoryItem> emptyCatalog = new ConcurrentHashMap<>();
 
     boolean started = scanController.startScanning(emptyCatalog);
-if (!started) {
+    if (!started) {
     // ✅ [v4.3] أعد الأعلام — لا تترك حالة استئناف معلّقة
     nextScanIsResume = false;
     isPaused = false;
     hasUncommittedSession = false;
     shouldResumeOnNextStart = false;
-    
+
+    // ✅ [Fix-C2b] امسح علم البدء — لا تترك الزر معلّقاً
+    isStartingScan = false;
+
     showFatalErrorDialog(
             isArabic ? "❌ فشل بدء المسح" : "❌ Failed to start scanning",
             isArabic ? "تحقق من اتصال القارئ" : "Check reader connection");
@@ -2109,6 +2140,9 @@ private void showResumeDialog(int itemCount, int expected, long timeAgoMs) {
  *             يمكن الاستئناف لاحقاً
  */
  public void pauseScanning() {
+    // ✅ [دفاعي] امسح علم البدء إذا كان الـ User يقاطع البدء
+    isStartingScan = false;
+    
     if (!isScanning) return;
 
     if (scanStartTime > 0) {
@@ -2152,6 +2186,10 @@ private void showResumeDialog(int itemCount, int expected, long timeAgoMs) {
  *             (يُستدعى فقط عند الخروج من الشاشة أو الاعتماد)
  */
 public void stopScanning() {
+    
+    // ✅ [دفاعي] امسح علم البدء إذا كان الـ User يقاطع البدء
+    isStartingScan = false;
+    
     if (!isScanning) return;
 
     Log.d(TAG, "⏹️ stopScanning (FINAL)");
@@ -2965,9 +3003,8 @@ private void updateUI() {
             tvAccuracy.setTextColor(color);
         }
 
-        // ✅ الفارق
+        // ✅ [Fix-C5] الفارق يجب أن يعتمد على foundInCatalog (لا scanned)
 if (tvVariance != null) {
-    // ✅ [Fix-B5] استخدم foundInCatalog — متناسق مع progress
     int variance = expectedCount - foundInCatalog;
             if (variance > 0) {
                 tvVariance.setText("−" + variance);
