@@ -55,6 +55,7 @@ import com.example.uhf.manager.IdentitySyncManager;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
+import com.example.uhf.scanner.DesktopScanHandler;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.utils.BarcodeGenerator;
 import com.example.uhf.utils.MiraExecutorService;
@@ -109,6 +110,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     /** ⚠️ تعطيل فحص طول TID لدعم شرائح قصيرة — أعد القيمة إلى true للتفعيل */
     private static final boolean ENABLE_TID_LENGTH_VALIDATION = false;
+   
+    private DesktopScanHandler desktopScanHandler;
 
     // ═══════════════════════════════════════════════════════════════════
     //  Trigger Keys
@@ -828,16 +831,16 @@ private void setupListeners() {
         }
 
         // ✅ زر RFID — إعلامي + Long-press للإعدادات
-        binding.btnScanRfid.setOnClickListener(v -> {
-            showToast(isArabic
-                    ? "🎯 اضغط زر الزناد في القارئ للمسح"
-                    : "🎯 Press the reader trigger to scan");
-        });
+        // ✅ زر RFID — يفتح قائمة اختيار طريقة المسح
+binding.btnScanRfid.setOnClickListener(v -> {
+    showScanMethodOptions();
+});
 
-        binding.btnScanRfid.setOnLongClickListener(v -> {
-            openEncodingPowerSettings();
-            return true;
-        });
+// ✅ Long-press للإعدادات (ابقِه كما هو)
+binding.btnScanRfid.setOnLongClickListener(v -> {
+    openEncodingPowerSettings();
+    return true;
+});
 
         // ✅ Stones container
         View stonesContainer = binding.getRoot()
@@ -932,6 +935,33 @@ private void setupListeners() {
     } catch (Exception e) {
         Log.e(TAG, "setupListeners error: " + e.getMessage(), e);
     }
+}
+
+private void showScanMethodOptions() {
+    if (isFormLocked) {
+        showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
+        return;
+    }
+
+    String[] options = {
+            isArabic ? "📡 مسح بالقارئ اليدوي (الزناد)" : "📡 Scan with Handheld Reader",
+            isArabic ? "🖥️ مسح بالقارئ المكتبي (USB)" : "🖥️ Scan with Desktop Reader"
+    };
+
+    new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "اختر طريقة المسح" : "Choose Scan Method")
+            .setItems(options, (dialog, which) -> {
+                if (which == 0) {
+                    // الخيار الأول: قارئ Chainway (يحتاج لضغط الزناد الفيزيائي)
+                    showToast(isArabic
+                            ? "🎯 اضغط زر الزناد في القارئ اليدوي الآن"
+                            : "🎯 Press the handheld reader trigger now");
+                } else {
+                    // الخيار الثاني: القارئ المكتبي
+                    activateDesktopScannerMode();
+                }
+            })
+            .show();
 }
 
 private void toggleStonesDetails(boolean show) {
@@ -1227,10 +1257,10 @@ miraExecutor.getBackgroundExecutor().execute(() -> {
 }
 
 /**
- * ✅ [FIX-3] نسخة جديدة تستقبل TID جاهزاً — تُستخدم عندما نقرأ TID
- *     بينما القارئ لا يزال نشطاً (قبل stopScan).
+ * ✅ [تحديث] نسخة جديدة تستقبل TID جاهزاً ومصدر المسح
+ * تُستخدم عندما نقرأ TID بينما القارئ لا يزال نشطاً، أو عند المسح بالقارئ المكتبي.
  */
-private void processReceivedTagWithTid(final String epc, @Nullable final String preReadTid) {
+private void processReceivedTagWithTid(final String epc, @Nullable final String preReadTid, final String source) {
     if (epc == null || epc.isEmpty()) return;
     if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
 
@@ -1238,28 +1268,42 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
     final String cleanEpc = epc.trim().toUpperCase(Locale.US);
     lastScannedEpc = cleanEpc;
     Log.i(TAG, "🎯 Processing received tag EPC: " + cleanEpc
-            + " | preReadTid=" + preReadTid);
+            + " | preReadTid=" + preReadTid + " | source=" + source);
 
     miraExecutor.getBackgroundExecutor().execute(() -> {
         boolean isTagAllowed = false, isDuplicate = false;
         String actualTid = cleanEpc;
+        boolean isTidSkipped = false; // ✅ متغير جديد لمعرفة هل تم تجاوز فحص TID
 
         try {
             MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
 
-            // ✅ استخدم TID المُمرّر إن وُجد، وإلا اقرأ مرة أخرى
-            if (preReadTid != null && !preReadTid.trim().isEmpty()) {
+            // ✅ 1) إذا كان القارئ المكتبي ولا يوجد TID ممرر (وضع HID الافتراضي)
+            if ("DESKTOP_RFID".equals(source) && (preReadTid == null || preReadTid.trim().isEmpty())) {
+                actualTid = "DESKTOP_SKIP_TID"; // قيمة وهمية للعرض فقط
+                isTagAllowed = true; // تجاوز فحص الاعتماد
+                isTidSkipped = true;
+                Log.i(TAG, "🖥️ Desktop Reader: Skipping TID verification (allowed by default).");
+            } 
+            // ✅ 2) إذا تم تمرير TID مسبقاً (سواء من Chainway أو من قارئ مكتبي مُعد لإرسال TID)
+            else if (preReadTid != null && !preReadTid.trim().isEmpty()) {
                 actualTid = preReadTid.trim().toUpperCase(Locale.US);
+                boolean isSim = rfidService.isSimulationMode();
+                isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
                 Log.i(TAG, "✅ Using pre-read TID: " + actualTid);
-            } else {
+            } 
+            // ✅ 3) المسار الأصلي (قارئ Chainway بدون TID ممرر - نقرأه الآن)
+            else {
                 String tidFromTag = rfidService.readTid(null);
                 if (tidFromTag != null && !tidFromTag.trim().isEmpty()) {
                     actualTid = tidFromTag.trim().toUpperCase(Locale.US);
                 }
+                boolean isSim = rfidService.isSimulationMode();
+                isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+                Log.i(TAG, "✅ Read TID from reader: " + actualTid);
             }
 
-            boolean isSim = rfidService.isSimulationMode();
-            isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+            // ✅ فحص التكرار (يعمل مع EPC أو TID)
             isDuplicate = syncManager.isEpcDuplicateLocally(actualTid);
 
         } catch (Exception e) {
@@ -1271,6 +1315,7 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
         final String finalTid = actualTid;
         final boolean fAllowed = isTagAllowed;
         final boolean fDuplicate = isDuplicate;
+        final boolean fTidSkipped = isTidSkipped;
 
         safeRun(() -> {
             try {
@@ -1361,11 +1406,16 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
                         ? (isArabic ? "🔄 تم استبدال الوسم" : "🔄 Tag Replaced")
                         : (isArabic ? "✅ شريحة صالحة" : "✅ Valid Tag");
 
+                // ✅ تخصيص نص التفاصيل إذا كان TID متجاوزاً
+                String tidDisplay = fTidSkipped 
+                        ? (isArabic ? "غير متوفر (قارئ مكتبي)" : "N/A (Desktop)")
+                        : finalTid;
+
                 String detailsText = wasReplacing
-                        ? (isArabic ? "TID جديد: " + finalTid + "\nجاهز للتكويد"
-                                    : "New TID: " + finalTid + "\nReady for encoding")
-                        : (isArabic ? "TID: " + finalTid + "\nجاهزة للتكويد"
-                                    : "TID: " + finalTid + "\nReady for encoding");
+                        ? (isArabic ? "TID جديد: " + tidDisplay + "\nجاهز للتكويد"
+                                    : "New TID: " + tidDisplay + "\nReady for encoding")
+                        : (isArabic ? "TID: " + tidDisplay + "\nجاهزة للتكويد"
+                                    : "TID: " + tidDisplay + "\nReady for encoding");
 
                 showScanFeedback(
                         titleText,
@@ -1384,6 +1434,11 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
             }
         });
     });
+}
+
+// ✅ دالة توافق عكسي (تستخدم المسار الافتراضي للقارئ اليدوي)
+private void processReceivedTagWithTid(final String epc, @Nullable final String preReadTid) {
+    processReceivedTagWithTid(epc, preReadTid, "CHAINWAY");
 }
 /**
  * ✅ [v6.4] يستخدم RFIDManager.removeListener + stopScan.
@@ -1596,6 +1651,36 @@ public void onRfidScanned(String epc) {
         return image;
     }
 
+private void activateDesktopScannerMode() {
+    if (binding == null || binding.etEpc == null) return;
+    
+    // تغيير شكل الحقل ليوضح للمستخدم أنه يستقبل من القارئ
+    binding.etEpc.setHint("قرب الشريحة من القارئ المكتبي...");
+    binding.etEpc.requestFocus(); // إجبار المؤشر على الحقل لاستقبال النص
+    
+    // تفعيل المعالج
+    if (desktopScanHandler == null) {
+        desktopScanHandler = new DesktopScanHandler(binding.etEpc);
+    }
+    
+    desktopScanHandler.setOnDesktopScanListener(epc -> {
+        Log.i(TAG, "🖥️ Desktop Reader Scanned: " + epc);
+        
+        // ✅ استدعاء دالة المعالجة الخاصة بك (نفس الدالة التي تستخدمها مع Chainway)
+        // ملاحظة: القارئ المكتبي في وضع HID يرسل EPC فقط، لذلك نمرر null للـ TID
+        processReceivedTagWithTid(epc, null, "DESKTOP_RFID");
+    });
+    
+    showToast(isArabic ? "🖥️ جاهز للمسح بالقارئ المكتبي" : "🖥️ Desktop Reader Ready");
+}
+
+// 3. إيقاف القارئ المكتبي (يُستدعى عند الانتهاء أو تغيير الوضع)
+private void stopDesktopScannerMode() {
+    if (binding != null && binding.etEpc != null) {
+        binding.etEpc.setHint(isArabic ? "رمز الشريحة (EPC / GTIN)..." : "EPC / GTIN Code...");
+    }
+
+}
     // ═══════════════════════════════════════════════════════════════════
     //  Barcode Scanner (for EPC)
     // ═══════════════════════════════════════════════════════════════════
@@ -1970,7 +2055,6 @@ public void onRfidScanned(String epc) {
                 } catch (Exception e) {
                     Log.w(TAG, "update-rfid failed (non-fatal)", e);
                 }
-
                 // ✅ تعريف المتغيرات النهائية قبل الانتقال للواجهة (لحل مشكلة الـ Compile)
                 final String finalServerEpc = serverEpc;
                 final String finalServerSerial = (finalResponseData != null) ? finalResponseData.optString("serial_number", "") : "";
@@ -3231,6 +3315,7 @@ public void onPause() {
 
     isProcessingTag.set(false);
     stopRfidScanningMode();
+    stopDesktopScannerMode();
     saveCurrentDraftAsync();
 }
 
