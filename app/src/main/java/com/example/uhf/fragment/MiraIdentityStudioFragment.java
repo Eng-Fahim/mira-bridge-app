@@ -1257,14 +1257,13 @@ miraExecutor.getBackgroundExecutor().execute(() -> {
 }
 
 /**
- * ✅ [تحديث] نسخة جديدة تستقبل TID جاهزاً ومصدر المسح
- * تُستخدم عندما نقرأ TID بينما القارئ لا يزال نشطاً، أو عند المسح بالقارئ المكتبي.
+ * ✅ [تحديث نهائي] نسخة تستقبل TID جاهزاً ومصدر المسح
+ * تم إصلاح الخطأ المنطقي لضمان حفظ الـ EPC الحقيقي في الشاشة.
  */
 private void processReceivedTagWithTid(final String epc, @Nullable final String preReadTid, final String source) {
     if (epc == null || epc.isEmpty()) return;
     if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
 
-    // ✅ احفظ EPC الحقيقي المقروء من القارئ
     final String cleanEpc = epc.trim().toUpperCase(Locale.US);
     lastScannedEpc = cleanEpc;
     Log.i(TAG, "🎯 Processing received tag EPC: " + cleanEpc
@@ -1273,26 +1272,31 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
     miraExecutor.getBackgroundExecutor().execute(() -> {
         boolean isTagAllowed = false, isDuplicate = false;
         String actualTid = cleanEpc;
-        boolean isTidSkipped = false; // ✅ متغير جديد لمعرفة هل تم تجاوز فحص TID
+        boolean isTidSkipped = false; 
+        
+        // ✅ متغير جديد مخصص لفحص التكرار
+        String idForDuplicateCheck = cleanEpc; 
 
         try {
             MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
 
-            // ✅ 1) إذا كان القارئ المكتبي ولا يوجد TID ممرر (وضع HID الافتراضي)
+            // 1) القارئ المكتبي (HID) بدون TID
             if ("DESKTOP_RFID".equals(source) && (preReadTid == null || preReadTid.trim().isEmpty())) {
-                actualTid = "DESKTOP_SKIP_TID"; // قيمة وهمية للعرض فقط
-                isTagAllowed = true; // تجاوز فحص الاعتماد
+                actualTid = "DESKTOP_SKIP_TID"; // للعرض فقط
+                isTagAllowed = true; 
                 isTidSkipped = true;
+                idForDuplicateCheck = cleanEpc; // ✅ افحص التكرار بناءً على الـ EPC
                 Log.i(TAG, "🖥️ Desktop Reader: Skipping TID verification (allowed by default).");
             } 
-            // ✅ 2) إذا تم تمرير TID مسبقاً (سواء من Chainway أو من قارئ مكتبي مُعد لإرسال TID)
+            // 2) قارئ يرسل TID (أو قارئ Chainway مع TID ممرر)
             else if (preReadTid != null && !preReadTid.trim().isEmpty()) {
                 actualTid = preReadTid.trim().toUpperCase(Locale.US);
                 boolean isSim = rfidService.isSimulationMode();
                 isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+                idForDuplicateCheck = actualTid; // ✅ افحص التكرار بناءً على الـ TID
                 Log.i(TAG, "✅ Using pre-read TID: " + actualTid);
             } 
-            // ✅ 3) المسار الأصلي (قارئ Chainway بدون TID ممرر - نقرأه الآن)
+            // 3) المسار الأصلي (قارئ Chainway)
             else {
                 String tidFromTag = rfidService.readTid(null);
                 if (tidFromTag != null && !tidFromTag.trim().isEmpty()) {
@@ -1300,11 +1304,12 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
                 }
                 boolean isSim = rfidService.isSimulationMode();
                 isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+                idForDuplicateCheck = actualTid; // ✅ افحص التكرار بناءً على الـ TID
                 Log.i(TAG, "✅ Read TID from reader: " + actualTid);
             }
 
-            // ✅ فحص التكرار (يعمل مع EPC أو TID)
-            isDuplicate = syncManager.isEpcDuplicateLocally(actualTid);
+            // ✅ فحص التكرار باستخدام المتغير الصحيح
+            isDuplicate = syncManager.isEpcDuplicateLocally(idForDuplicateCheck);
 
         } catch (Exception e) {
             Log.e(TAG, "processReceivedTagWithTid checks error: " + e.getMessage(), e);
@@ -1316,86 +1321,56 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
         final boolean fAllowed = isTagAllowed;
         final boolean fDuplicate = isDuplicate;
         final boolean fTidSkipped = isTidSkipped;
+        // ✅ المتغير النهائي الذي سيتم وضعه في حقل الشاشة
+        final String displayEpcValue = isTidSkipped ? cleanEpc : actualTid; 
 
         safeRun(() -> {
             try {
                 if (binding == null || !isAdded()) return;
 
-                // ═════════════════════════════════════════════
-                //  1) غير معتمدة
-                // ═════════════════════════════════════════════
+                // 1) غير معتمدة
                 if (!fAllowed) {
                     playErrorSound();
-
                     showScanFeedback(
                             isArabic ? "❌ شريحة غير معتمدة" : "❌ Unauthorized Tag",
-                            isArabic ? "TID: " + finalTid
-                                        + "\nليست من الموردين المعتمدين"
-                                     : "TID: " + finalTid
-                                        + "\nNot from approved suppliers",
-                            null,
-                            android.R.drawable.ic_delete,
-                            0xFFDC2626);
-
+                            isArabic ? "TID: " + finalTid + "\nليست من الموردين المعتمدين"
+                                     : "TID: " + finalTid + "\nNot from approved suppliers",
+                            null, android.R.drawable.ic_delete, 0xFFDC2626);
                     showErrorDialog(
                             isArabic ? "⛔ شريحة غير معتمدة" : "⛔ Unauthorized Tag",
-                            isArabic ? "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n"
-                                        + "🔹 TID: " + finalTid + "\n"
-                                        + "🔹 الموردون المعتمدون: SunlandRFID\n\n"
-                                        + "💡 استخدم شريحة من مورد معتمد."
-                                     : "This tag is not from approved inventory:\n\n"
-                                        + "🔹 TID: " + finalTid + "\n"
-                                        + "🔹 Approved: SunlandRFID\n\n"
-                                        + "💡 Use a tag from an approved supplier.");
+                            isArabic ? "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n🔹 TID: " + finalTid + "\n\n💡 استخدم شريحة من مورد معتمد."
+                                     : "This tag is not from approved inventory:\n\n🔹 TID: " + finalTid + "\n\n💡 Use a tag from an approved supplier.");
                     return;
                 }
 
-                // ═════════════════════════════════════════════
-                //  2) مكررة
-                // ═════════════════════════════════════════════
+                // 2) مكررة
                 if (fDuplicate) {
                     playErrorSound();
-
                     showScanFeedback(
                             isArabic ? "⚠️ شريحة مكررة" : "⚠️ Duplicate Tag",
-                            isArabic ? "TID: " + finalTid
-                                        + "\nمسجلة بالفعل في النظام"
-                                     : "TID: " + finalTid
-                                        + "\nAlready registered",
-                            null,
-                            android.R.drawable.ic_dialog_alert,
-                            0xFF3B82F6);
-
+                            isArabic ? "ID: " + displayEpcValue + "\nمسجلة بالفعل في النظام"
+                                     : "ID: " + displayEpcValue + "\nAlready registered",
+                            null, android.R.drawable.ic_dialog_alert, 0xFF3B82F6);
                     showErrorDialog(
                             isArabic ? "شريحة مكررة" : "Duplicate Tag",
-                            isArabic ? "هذه الشريحة مسجلة بالفعل في النظام:\n\n"
-                                        + "🔹 TID: " + finalTid + "\n"
-                                        + "🔹 لا يمكن استخدامها مرتين.\n\n"
-                                        + "💡 استخدم شريحة جديدة."
-                                     : "This tag is already registered:\n\n"
-                                        + "🔹 TID: " + finalTid + "\n"
-                                        + "🔹 Cannot be reused.\n\n"
-                                        + "💡 Use a new tag.");
+                            isArabic ? "هذه الشريحة مسجلة بالفعل في النظام:\n\n🔹 ID: " + displayEpcValue + "\n\n💡 استخدم شريحة جديدة."
+                                     : "This tag is already registered:\n\n🔹 ID: " + displayEpcValue + "\n\n💡 Use a new tag.");
                     return;
                 }
 
-                // ═════════════════════════════════════════════
-                //  3) صالحة
-                // ═════════════════════════════════════════════
+                // 3) صالحة
                 boolean wasReplacing = false;
                 if (isEpcBound && binding.etEpc != null) {
-                    String existing = binding.etEpc.getText() != null
-                            ? binding.etEpc.getText().toString().trim() : "";
-
-                    if (!existing.isEmpty() && !existing.equals(finalTid)) {
+                    String existing = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
+                    if (!existing.isEmpty() && !existing.equals(displayEpcValue)) {
                         wasReplacing = true;
-                        Log.i(TAG, "🔄 Replacing: " + existing + " → " + finalTid);
                     }
                 }
 
                 if (binding.etEpc != null) {
-                    binding.etEpc.setText(finalTid);
-                    binding.etEpc.setTag(finalTid);
+                    // ✅ هنا نضع الكود الحقيقي (EPC) وليس "DESKTOP_SKIP_TID"
+                    binding.etEpc.setText(displayEpcValue);
+                    binding.etEpc.setTag(displayEpcValue);
                     isEpcBound = true;
                 }
                 if (binding.tvStatusBadge != null) {
@@ -1406,30 +1381,18 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
                         ? (isArabic ? "🔄 تم استبدال الوسم" : "🔄 Tag Replaced")
                         : (isArabic ? "✅ شريحة صالحة" : "✅ Valid Tag");
 
-                // ✅ تخصيص نص التفاصيل إذا كان TID متجاوزاً
                 String tidDisplay = fTidSkipped 
                         ? (isArabic ? "غير متوفر (قارئ مكتبي)" : "N/A (Desktop)")
                         : finalTid;
 
                 String detailsText = wasReplacing
-                        ? (isArabic ? "TID جديد: " + tidDisplay + "\nجاهز للتكويد"
-                                    : "New TID: " + tidDisplay + "\nReady for encoding")
-                        : (isArabic ? "TID: " + tidDisplay + "\nجاهزة للتكويد"
-                                    : "TID: " + tidDisplay + "\nReady for encoding");
+                        ? (isArabic ? "TID جديد: " + tidDisplay + "\nجاهز للتكويد" : "New TID: " + tidDisplay + "\nReady for encoding")
+                        : (isArabic ? "TID: " + tidDisplay + "\nجاهزة للتكويد" : "TID: " + tidDisplay + "\nReady for encoding");
 
-                showScanFeedback(
-                        titleText,
-                        detailsText,
-                        null,
-                        R.drawable.ic_pos_cart_gold,
-                        0xFF22C55E);
-
-                Log.i(TAG, "✅ Tag accepted: " + finalTid
-                        + (wasReplacing ? " (replaced)" : ""));
+                showScanFeedback(titleText, detailsText, null, R.drawable.ic_pos_cart_gold, 0xFF22C55E);
                 playSuccessSound();
 
             } finally {
-                // ✅ أعد تعيين العلم دائماً
                 isProcessingTag.set(false);
             }
         });
@@ -1654,11 +1617,24 @@ public void onRfidScanned(String epc) {
 private void activateDesktopScannerMode() {
     if (binding == null || binding.etEpc == null) return;
     
-    // تغيير شكل الحقل ليوضح للمستخدم أنه يستقبل من القارئ
-    binding.etEpc.setHint("قرب الشريحة من القارئ المكتبي...");
-    binding.etEpc.requestFocus(); // إجبار المؤشر على الحقل لاستقبال النص
+    // 1. تغيير النص الإرشادي
+    binding.etEpc.setHint(isArabic ? "قرب الشريحة من القارئ المكتبي..." : "Approach tag to Desktop Reader...");
     
-    // تفعيل المعالج
+    // 2. إجبار المؤشر على حقل الإدخال
+    binding.etEpc.requestFocus();
+    
+    // 3. إخفاء لوحة مفاتيح الهاتف الافتراضية (مهم جداً)
+    try {
+        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) 
+                requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(binding.etEpc.getWindowToken(), 0);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Failed to hide keyboard", e);
+    }
+    
+    // 4. تفعيل المعالج
     if (desktopScanHandler == null) {
         desktopScanHandler = new DesktopScanHandler(binding.etEpc);
     }
@@ -1666,20 +1642,11 @@ private void activateDesktopScannerMode() {
     desktopScanHandler.setOnDesktopScanListener(epc -> {
         Log.i(TAG, "🖥️ Desktop Reader Scanned: " + epc);
         
-        // ✅ استدعاء دالة المعالجة الخاصة بك (نفس الدالة التي تستخدمها مع Chainway)
-        // ملاحظة: القارئ المكتبي في وضع HID يرسل EPC فقط، لذلك نمرر null للـ TID
+        // ✅ تم التعديل هنا لتمرير المصدر "DESKTOP_RFID"
         processReceivedTagWithTid(epc, null, "DESKTOP_RFID");
     });
     
     showToast(isArabic ? "🖥️ جاهز للمسح بالقارئ المكتبي" : "🖥️ Desktop Reader Ready");
-}
-
-// 3. إيقاف القارئ المكتبي (يُستدعى عند الانتهاء أو تغيير الوضع)
-private void stopDesktopScannerMode() {
-    if (binding != null && binding.etEpc != null) {
-        binding.etEpc.setHint(isArabic ? "رمز الشريحة (EPC / GTIN)..." : "EPC / GTIN Code...");
-    }
-
 }
     // ═══════════════════════════════════════════════════════════════════
     //  Barcode Scanner (for EPC)
