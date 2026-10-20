@@ -19,15 +19,16 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.tabs.TabLayout;
 
+import java.util.Stack;
+
 /**
  * ✅ الشاشة الرئيسية للنظام المحاسبي
- * - 7 تبويبات
- * - معالجة زر الرجوع (يعود للتبويب الأول → ثم للداشبورد)
  */
 public class MiraAccountingFragment extends Fragment {
 
     private static final String TAG = "MiraAccountingFragment";
     private static final String KEY_CURRENT_TAB = "current_tab";
+    private static final String KEY_TAB_HISTORY = "tab_history";
 
     private static final int TAB_JOURNAL  = 0;
     private static final int TAB_TRIAL    = 1;
@@ -47,70 +48,63 @@ public class MiraAccountingFragment extends Fragment {
     private int currentTabIndex = 0;
     private Long pendingLedgerAccountId = null;
 
-    // ═══════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════════
+    // ✅ 1. إضافة سجل للتبويبات (Stack) لحفظ مسار التنقل
+    private final Stack<Integer> tabHistory = new Stack<>();
+    private boolean isNavigatingBack = false; // لمنع تكرار الحفظ عند الرجوع
 
     @Override
-public void onCreate(@Nullable Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
-    if (getContext() != null) {
-        try {
-            permissionManager = PermissionManager.getInstance(requireContext());
-            sessionManager = new SessionManager(requireContext());
-        } catch (Exception e) {
-            Log.e(TAG, "Session init error: " + e.getMessage());
+        if (getContext() != null) {
+            try {
+                permissionManager = PermissionManager.getInstance(requireContext());
+                sessionManager = new SessionManager(requireContext());
+            } catch (Exception e) {
+                Log.e(TAG, "Session init error: " + e.getMessage());
+            }
+            isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
         }
-        isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
-    }
 
-    if (savedInstanceState != null) {
-        currentTabIndex = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
-    }
-
-    // ✅ معالجة زر الرجوع — بدون re-dispatch
-    requireActivity().getOnBackPressedDispatcher().addCallback(
-        this,
-        new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                // الحالة 1: لسنا في القيود → ارجع للقيود
-                if (currentTabIndex != TAB_JOURNAL) {
-                    TabLayout.Tab firstTab = tabLayout != null
-                        ? tabLayout.getTabAt(TAB_JOURNAL) : null;
-                    if (firstTab != null) firstTab.select();
-                    return;
-                }
-
-                // الحالة 2: نحن في القيود → انتقل للداشبورد مباشرة
-                if (getActivity() instanceof UHFMainActivity) {
-                    UHFMainActivity act = (UHFMainActivity) getActivity();
-                    act.loadFragmentDirectly(
-                        new MiraDashboardFragment(),
-                        "Dashboard");
+        // ✅ 2. استعادة الحالة (التبويب الحالي وسجل التبويبات) عند تدوير الشاشة أو إعادة إنشائها
+        if (savedInstanceState != null) {
+            currentTabIndex = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
+            int[] historyArray = savedInstanceState.getIntArray(KEY_TAB_HISTORY);
+            if (historyArray != null) {
+                tabHistory.clear();
+                for (int tab : historyArray) {
+                    tabHistory.push(tab);
                 }
             }
-        });
-}
-    /**
-     * ✅ منطق زر الرجوع:
-     * - إذا لسنا في القيود → ارجع للقيود
-     * - إذا كنا في القيود → ارجع للداشبورد (UHFMainActivity)
-     */
-    private void handleBackPress() {
-        if (currentTabIndex != TAB_JOURNAL) {
-            TabLayout.Tab firstTab = tabLayout != null
-                ? tabLayout.getTabAt(TAB_JOURNAL) : null;
-            if (firstTab != null) firstTab.select();
-        } else {
-            if (getActivity() instanceof UHFMainActivity) {
-                // استدعاء الرجوع الافتراضي للـ Activity
-                requireActivity().getOnBackPressedDispatcher().onBackPressed();
-            } else if (getActivity() != null) {
-                requireActivity().finish();
-            }
         }
+
+        // ✅ 3. معالجة زر الرجوع بالاعتماد على سجل التبويبات
+        requireActivity().getOnBackPressedDispatcher().addCallback(
+            this,
+            new OnBackPressedCallback(true) {
+                @Override
+                public void handleOnBackPressed() {
+                    // إذا كان هناك تبويبات سابقة في السجل، ارجع إليها
+                    if (!tabHistory.isEmpty()) {
+                        int previousTab = tabHistory.pop();
+                        TabLayout.Tab tab = tabLayout != null ? tabLayout.getTabAt(previousTab) : null;
+                        if (tab != null) {
+                            isNavigatingBack = true; // تفعيل وضع الرجوع
+                            tab.select();
+                            isNavigatingBack = false; // إيقاف وضع الرجوع
+                            return;
+                        }
+                    }
+
+                    // إذا كان السجل فارغاً (نحن في الجذر)، انتقل للداشبورد
+                    if (getActivity() instanceof UHFMainActivity) {
+                        UHFMainActivity act = (UHFMainActivity) getActivity();
+                        act.loadFragmentDirectly(
+                            new MiraDashboardFragment(),
+                            "Dashboard");
+                    }
+                }
+            });
     }
 
     @Nullable
@@ -158,6 +152,13 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(KEY_CURRENT_TAB, currentTabIndex);
+        
+        // ✅ 4. حفظ سجل التبويبات عند تدوير الشاشة
+        int[] historyArray = new int[tabHistory.size()];
+        for (int i = 0; i < tabHistory.size(); i++) {
+            historyArray[i] = tabHistory.get(i);
+        }
+        outState.putIntArray(KEY_TAB_HISTORY, historyArray);
     }
 
     @Override
@@ -166,10 +167,6 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
         tabLayout = null;
         tabContentContainer = null;
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Initialization
-    // ═══════════════════════════════════════════════════════════
 
     private void initViews(View view) {
         tabLayout           = view.findViewById(R.id.tabAccounting);
@@ -199,10 +196,6 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Tabs
-    // ═══════════════════════════════════════════════════════════
-
     private void setupTabs() {
         if (tabLayout == null) return;
 
@@ -224,6 +217,10 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
             public void onTabSelected(TabLayout.Tab tab) {
                 int position = tab.getPosition();
                 if (position != currentTabIndex) {
+                    // ✅ 5. إذا لم نكن في وضع "الرجوع"، قم بحفظ التبويب الحالي في السجل
+                    if (!isNavigatingBack) {
+                        tabHistory.push(currentTabIndex); 
+                    }
                     currentTabIndex = position;
                     loadTab(position);
                 }
@@ -244,10 +241,6 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
         tab.setText(isArabic ? arText : enText);
         tabLayout.addTab(tab);
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Tab Loading
-    // ═══════════════════════════════════════════════════════════
 
     private void loadTab(int tabIndex) {
         if (tabContentContainer == null) {
@@ -286,8 +279,7 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
 
                 case TAB_LEDGER: {
                     MiraGeneralLedgerFragment f = new MiraGeneralLedgerFragment();
-                    if (pendingLedgerAccountId != null
-                            && pendingLedgerAccountId > 0) {
+                    if (pendingLedgerAccountId != null && pendingLedgerAccountId > 0) {
                         Bundle args = new Bundle();
                         args.putLong("account_id", pendingLedgerAccountId);
                         f.setArguments(args);
@@ -296,7 +288,7 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
                     return f;
                 }
                 case TAB_ADJUSTING:
-                return new MiraAdjustingEntryFragment();
+                    return new MiraAdjustingEntryFragment();
 
                 default: return new MiraJournalFragment();
             }
@@ -305,10 +297,6 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
             return null;
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Public API
-    // ═══════════════════════════════════════════════════════════
 
     public void navigateToTab(int tabIndex) {
         if (tabIndex < 0 || tabIndex > TAB_LEDGER) return;
@@ -321,9 +309,6 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
         loadTab(currentTabIndex);
     }
 
-    /**
-     * ✅ الانتقال لدفتر الأستاذ مع تمرير الحساب
-     */
     public void navigateToLedgerWithAccount(long accountId) {
         this.pendingLedgerAccountId = accountId;
 
@@ -335,6 +320,7 @@ public void onCreate(@Nullable Bundle savedInstanceState) {
         if (currentTabIndex == TAB_LEDGER) {
             loadTab(TAB_LEDGER);
         } else {
+            // هنا سيتم استدعاء onTabSelected وسيقوم بحفظ تبويب "الحسابات" في الـ History تلقائياً
             ledgerTab.select();
         }
     }
