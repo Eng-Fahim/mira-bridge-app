@@ -15,7 +15,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
-import android.widget.Filter;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -45,6 +44,9 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * ✅ شاشة دفتر الأستاذ العام
+ */
 public class MiraGeneralLedgerFragment extends Fragment {
 
     private static final String PREFS_FILTERS    = "ledger_filters";
@@ -72,7 +74,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
     private String  selectedAccountName = "";
 
     private final List<AccountDto> accountsList = new ArrayList<>();
-    private ArrayAdapter<AccountDto> accountAdapter; // أبقيناه كمرجع لتحديثه
+    private ArrayAdapter<AccountDto> accountAdapter; // تم رفعه كمتغير عام لتحديثه دون إعادة إنشائه
     private LedgerRowAdapter adapter;
 
     private double currentOpening     = 0;
@@ -101,7 +103,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
         }
 
         initViews(v);
-        setupSpinnerOnce(); // ✅ تهيئة المنسدلة مرة واحدة فقط
+        setupSpinnerOnce(); // تهيئة القائمة المنسدلة مرة واحدة فقط
         setupViewModel();
         setupRecycler();
         setupListeners();
@@ -113,6 +115,15 @@ public class MiraGeneralLedgerFragment extends Fragment {
         viewModel.loadAccounts(null, null, null);
 
         return v;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (debounceHandler != null && pendingSearch != null) {
+            debounceHandler.removeCallbacks(pendingSearch);
+            pendingSearch = null;
+        }
     }
 
     private void initViews(View v) {
@@ -129,7 +140,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
         swipeRefresh   = v.findViewById(R.id.swipeRefresh);
     }
 
-    // ✅ إعداد المنسدلة (مرة واحدة فقط)
     private void setupSpinnerOnce() {
         accountAdapter = new ArrayAdapter<AccountDto>(
                 requireContext(),
@@ -164,7 +174,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
         spAccount.setAdapter(accountAdapter);
 
-        // TextWatcher
+        // TextWatcher للبحث
         spAccount.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
@@ -175,7 +185,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 
                 pendingSearch = () -> {
                     String query = s.toString().trim();
-                    // لا تبحث إذا كان النص هو نفس الحساب المختار حالياً لتجنب التحديث العشوائي
+                    // منع البحث إذا كان النص هو نفس الحساب المختار حالياً
                     if (query.equals(selectedAccountCode + " - " + selectedAccountName)) return;
 
                     if (query.length() >= 2) {
@@ -188,7 +198,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
             }
         });
 
-        // Item Click
+        // عند اختيار حساب
         spAccount.setOnItemClickListener((parent, view, position, id) -> {
             AccountDto selected = (AccountDto) parent.getItemAtPosition(position);
             if (selected != null) {
@@ -196,8 +206,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 selectedAccountCode = selected.accountCode;
                 selectedAccountName = selected.accountNameAr;
                 
-                // إخفاء لوحة المفاتيح وإغلاق القائمة
-                spAccount.dismissDropDown();
+                spAccount.dismissDropDown(); // إغلاق القائمة فوراً
                 saveFilters();
             }
         });
@@ -210,12 +219,16 @@ public class MiraGeneralLedgerFragment extends Fragment {
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
             if (accounts == null) return;
 
-            // ✅ نحدّث القائمة فقط بدلاً من إعادة إنشاء الـ Adapter
+            // ✅ التصحيح: استخدام حلقة for بدلاً من addAll لأن المتغير Array وليس List
             accountsList.clear();
-            accountsList.addAll(accounts);
+            for (AccountDto a : accounts) {
+                accountsList.add(a);
+            }
+            
+            // تحديث الـ Adapter بذكاء
             accountAdapter.notifyDataSetChanged();
 
-            // ✅ التحميل التلقائي (فقط إذا لم نكن نبحث)
+            // التحميل التلقائي عند وصول account_id
             if (selectedAccountId > 0 && !accountsList.isEmpty() && spAccount.getText().toString().isEmpty()) {
                 AccountDto matched = null;
                 for (AccountDto a : accountsList) {
@@ -239,6 +252,7 @@ public class MiraGeneralLedgerFragment extends Fragment {
             }
         });
 
+        // ─── دفتر الأستاذ ───
         viewModel.getGeneralLedger().observe(getViewLifecycleOwner(), ledger -> {
             pbLoading.setVisibility(View.GONE);
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
