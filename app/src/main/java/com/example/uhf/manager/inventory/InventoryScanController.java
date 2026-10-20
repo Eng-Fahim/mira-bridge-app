@@ -42,7 +42,8 @@ public class InventoryScanController implements MiraIRFIDReader.OnTagReadListene
 
     private static final String TAG = "InventoryScanCtrl";
 
-    private static final long TAG_READ_DEBOUNCE_MS = 500;
+    // ✅ [Fix-B3] تقليل من 500ms إلى 150ms — لا يزال يمنع التكرار لكنه لا يحجب القراءات القريبة
+    private static final long TAG_READ_DEBOUNCE_MS = 150;
     private static final int MAX_CACHE_ITEMS = 5000;
 
     private final Context context;
