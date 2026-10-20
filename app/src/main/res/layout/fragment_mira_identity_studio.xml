@@ -77,12 +77,14 @@
                     app:endIconMode="custom">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etEpc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxLines="1"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textDirection="ltr" />
+    android:id="@+id/etEpc"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:maxLines="1"
+    android:inputType="textNoSuggestions|textVisiblePassword"
+    android:imeOptions="actionDone"
+    android:textColor="?attr/colorOnSurface"
+    android:textDirection="ltr" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- معرفات مخفية (تُملأ برمجياً) -->
