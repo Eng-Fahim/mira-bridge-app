@@ -526,45 +526,50 @@ public class MiraDashboardFragment extends Fragment {
     // Inventory by Karat (الكرت الجديد)
     // ═══════════════════════════════════════════════════════
     private void renderInventoryByKarat(List<KaratInventory> items) {
-        if (llInventoryByKarat == null) return;
-        try {
-            llInventoryByKarat.removeAllViews();
+    if (llInventoryByKarat == null) return;
+    try {
+        llInventoryByKarat.removeAllViews();
 
-            if (items == null || items.isEmpty()) {
-                if (tvKaratEmptyState != null)
-                    tvKaratEmptyState.setVisibility(View.VISIBLE);
-                llInventoryByKarat.setVisibility(View.GONE);
-                return;
-            }
-
-            if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.GONE);
-            llInventoryByKarat.setVisibility(View.VISIBLE);
-
-            // ترتيب تنازلي (24K أولاً)
-            List<KaratInventory> sorted = new ArrayList<>(items);
-            Collections.sort(sorted, (a, b) -> Integer.compare(b.karat, a.karat));
-
-            for (KaratInventory inv : sorted) {
-                View card = getLayoutInflater().inflate(
-                        R.layout.item_karat_inventory, llInventoryByKarat, false);
-
-                TextView tvKarat  = card.findViewById(R.id.tvKaratLabel);
-                TextView tvCount  = card.findViewById(R.id.tvKaratCount);
-                TextView tvWeight = card.findViewById(R.id.tvKaratWeight);
-
-                if (tvKarat != null) {
-                    tvKarat.setText(inv.karat + "K");
-                    tvKarat.setTextColor(getKaratColor(inv.karat));
-                }
-                if (tvCount != null)  tvCount.setText(String.valueOf(inv.itemCount));
-                if (tvWeight != null) tvWeight.setText(formatWeight(inv.weight));
-
-                llInventoryByKarat.addView(card);
-            }
-        } catch (Exception e) {
-            logNonFatal("renderInventoryByKarat", e);
+        if (items == null || items.isEmpty()) {
+            if (tvKaratEmptyState != null)
+                tvKaratEmptyState.setVisibility(View.VISIBLE);
+            llInventoryByKarat.setVisibility(View.GONE);
+            return;
         }
+
+        if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.GONE);
+        llInventoryByKarat.setVisibility(View.VISIBLE);
+
+        // ترتيب تنازلي (24K أولاً)
+        List<KaratInventory> sorted = new ArrayList<>(items);
+        Collections.sort(sorted, (a, b) -> Integer.compare(b.karat, a.karat));
+
+        for (KaratInventory inv : sorted) {
+            // ✅ استخدام التصميم الجديد
+            View itemView = getLayoutInflater().inflate(
+                    R.layout.item_karat_inventory, llInventoryByKarat, false);
+
+            TextView tvKarat  = itemView.findViewById(R.id.tvKaratLabel);
+            TextView tvCount  = itemView.findViewById(R.id.tvKaratCount);
+            TextView tvWeight = itemView.findViewById(R.id.tvKaratWeight);
+
+            if (tvKarat != null) {
+                tvKarat.setText(inv.karat + "K");
+                // ✅ تلوين النص حسب العيار
+                try {
+                    int color = getKaratColor(inv.karat);
+                    tvKarat.setTextColor(color);
+                } catch (Exception ignored) {}
+            }
+            if (tvCount != null)  tvCount.setText(String.valueOf(inv.itemCount));
+            if (tvWeight != null) tvWeight.setText(formatWeight(inv.weight));
+
+            llInventoryByKarat.addView(itemView);
+        }
+    } catch (Exception e) {
+        logNonFatal("renderInventoryByKarat", e);
     }
+}
 
     private int getKaratColor(int karat) {
         switch (karat) {
