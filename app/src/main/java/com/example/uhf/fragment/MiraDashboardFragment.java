@@ -1471,25 +1471,26 @@ public class MiraDashboardFragment extends Fragment {
             
             @Override
             public void onPrintInvoice(JSONObject activityData) {
-    if (!isAdded() || getContext() == null) return;
-    
-    try {
-        // 💡 نمرر بيانات العملية كـ JSON String إلى واجهة الفاتورة
-        String receiptJson = activityData.toString();
-        
-        // استدعاء واجهة الفاتورة (نفس الواجهة المستخدمة في شاشة المبيعات)
-        com.example.uhf.fragment.MiraReceiptFragment receiptFragment = 
-                com.example.uhf.fragment.MiraReceiptFragment.newInstance(receiptJson);
-        
-        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
-        if (fm != null && !fm.isStateSaved()) {
-            receiptFragment.show(fm, "MiraReceiptFragment");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "onPrintInvoice error", e);
-        Toast.makeText(getContext(), "تعذر فتح الفاتورة", Toast.LENGTH_SHORT).show();
-    }
-}
+                if (!isAdded() || getActivity() == null) return;
+                
+                try {
+                    // ✅ الأفضل استخدام الدالة الجاهزة في UHFMainActivity
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).openReceiptFragment(activityData.toString());
+                    } else {
+                        // كخيار احتياطي في حال لم نكن داخل UHFMainActivity
+                        com.example.uhf.fragment.MiraReceiptFragment receiptFragment = 
+                                com.example.uhf.fragment.MiraReceiptFragment.newInstance(activityData.toString());
+                        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
+                        if (fm != null && !fm.isStateSaved()) {
+                            receiptFragment.show(fm, "MiraReceiptFragment");
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "onPrintInvoice error", e);
+                    Toast.makeText(getContext(), "تعذر فتح الفاتورة", Toast.LENGTH_SHORT).show();
+                }
+            }
 
             @Override
             public void onOpenRefund(JSONObject activityData) {
@@ -1497,17 +1498,17 @@ public class MiraDashboardFragment extends Fragment {
                 
                 try {
                     // إنشاء واجهة المبيعات
-                    Fragment salesFragment = new MiraPosFragment(); 
+                    Fragment miraPosFragment = new MiraPosFragment(); 
                     
                     // تجهيز البيانات لفتح ديالوج الاسترجاع
                     Bundle bundle = new Bundle();
                     bundle.putString("refund_data_json", activityData.toString());
                     bundle.putBoolean("auto_open_refund", true);
-                    salesFragment.setArguments(bundle);
+                    miraPosFragment.setArguments(bundle);
 
-                    // الانتقال للشاشة
+                    // ✅ الانتقال للشاشة باستخدام التاج "POS" (وليس "Sales")
                     if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).loadFragment(salesFragment, "Sales"); // تأكد من التاج
+                        ((UHFMainActivity) getActivity()).loadFragment(miraPosFragment, "POS"); 
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error opening refund", e);
