@@ -9,16 +9,31 @@
     android:paddingHorizontal="@dimen/space_4"
     android:paddingVertical="@dimen/space_2">
 
-    <!-- اسم العيار بتأثير لوني -->
-    <TextView
-        android:id="@+id/tvKaratLabel"
+    <!-- الأيقونة + اسم العيار -->
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.1"
-        tools:text="24K"
-        tools:textColor="#D4AF37" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="◈"
+            android:textSize="14sp"
+            android:textColor="#D4AF37" />
+
+        <TextView
+            android:id="@+id/tvKaratLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            tools:text="24K"
+            tools:textColor="#D4AF37" />
+    </LinearLayout>
 
     <!-- العدد (البطل) -->
     <TextView
