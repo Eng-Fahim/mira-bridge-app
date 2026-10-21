@@ -272,6 +272,9 @@ public class MiraDashboardFragment extends Fragment {
             if (ownerUserId > 0 && ownerUserId != currentUserId) {
                 if (activityCache != null) activityCache.clear();
                 if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
+                // في دالة ensureCacheOwnerIsCurrentUser
+                if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
+                if (priceManager != null) priceManager.clearCache(); // (إذا كانت هذه الدالة موجودة في MiraPriceManager)
 
                 int oldBranch = prefs.getInt(KEY_PREFIX_LAST_BRANCH + ownerUserId, -1);
                 if (oldBranch > 0) {
@@ -575,48 +578,45 @@ public class MiraDashboardFragment extends Fragment {
     // Hero Balance & Toggles
     // ═══════════════════════════════════════════════════════
     private void updateHeroBalance() {
-        try {
-            if (tvHeroBalance == null) return;
+    try {
+        if (tvHeroBalance == null) return;
 
-            double totalValue = currentInventoryValue;
-            int itemCount = currentItemCount;
-            double totalWeight = currentTotalWeight;
+        double totalValue = currentInventoryValue;
+        int itemCount = currentItemCount;
+        double totalWeight = currentTotalWeight;
 
-            if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
-                double price24 = priceManager.getGoldPricePerGram(24);
-                if (price24 > 0) totalValue = totalWeight * price24;
-            }
+        if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+            double price24 = priceManager.getGoldPricePerGram(24);
+            if (price24 > 0) totalValue = totalWeight * price24;
+        }
 
-            if (isHeroHidden) {
-                tvHeroBalance.setText("••••••••");
-            } else {
-                tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
-            }
-
+        if (isHeroHidden) {
+            tvHeroBalance.setText("••••••••");
+            // ✅ إخفاء الوزن وعدد القطع لمنع حساب القيمة
+            if (tvHeroSubtitle != null) tvHeroSubtitle.setText("••• g");
+            if (tvHeroItemCount != null) tvHeroItemCount.setText("••• قطعة");
+        } else {
+            tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+            // ✅ إظهار الوزن وعدد القطع فقط عند إظهار القيمة
             if (tvHeroSubtitle != null)
                 tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
-
             if (tvHeroItemCount != null)
-                tvHeroItemCount.setText(String.format(
-                        Locale.getDefault(), "%d قطعة", itemCount));
-
-            String usdText = isHeroHidden ? "••••••"
-                    : String.format(Locale.US, "%,.2f", totalValue);
-            if (tvHeroValueUSD != null) tvHeroValueUSD.setText(usdText);
-
-            String sarText = isHeroHidden ? "••••••"
-                    : String.format(Locale.US, "%,.2f", totalValue * 3.75);
-            if (tvHeroValueSAR != null) tvHeroValueSAR.setText(sarText);
-
-            String yerText = isHeroHidden ? "••••••"
-                    : String.format(Locale.US, "%,.0f", totalValue * 530.0);
-            if (tvHeroValueYER != null) tvHeroValueYER.setText(yerText);
-
-        } catch (Exception e) {
-            logNonFatal("updateHeroBalance", e);
+                tvHeroItemCount.setText(String.format(Locale.getDefault(), "%d قطعة", itemCount));
         }
-    }
 
+        String usdText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue);
+        if (tvHeroValueUSD != null) tvHeroValueUSD.setText(usdText);
+
+        String sarText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue * 3.75);
+        if (tvHeroValueSAR != null) tvHeroValueSAR.setText(sarText);
+
+        String yerText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.0f", totalValue * 530.0);
+        if (tvHeroValueYER != null) tvHeroValueYER.setText(yerText);
+
+    } catch (Exception e) {
+        logNonFatal("updateHeroBalance", e);
+    }
+}.
     private void toggleHeroVisibility() {
         if (!isAdded() || tvHeroBalance == null) return;
         isHeroHidden = !isHeroHidden;
@@ -835,12 +835,23 @@ public class MiraDashboardFragment extends Fragment {
     // ═══════════════════════════════════════════════════════
     // Gold prices
     // ═══════════════════════════════════════════════════════
+   
     private void fetchLiveGoldPrices(boolean forceRefresh) {
         try {
-            if (apiClient == null) {
-                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                return;
-            }
+            if (!canManuallyRefreshGold()) {
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            return;
+        }
+            // ✅ التحقق من الصلاحية قبل أي شيء
+        if (permissionManager == null || !permissionManager.canAccessFragment("GoldRates")) {
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            return;
+        }
+        
+        if (apiClient == null) {
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            return;
+        }
             if (isGoldRefreshing.get()) {
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                 return;
@@ -950,27 +961,30 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
-        try {
-            if (response == null || !response.isSuccess || response.data == null) return null;
-            JSONObject data = response.data.optJSONObject("data");
-            if (data == null) data = response.data;
-            JSONObject prices = data.optJSONObject("prices");
-            if (prices == null) prices = data;
+   private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
+    try {
+        if (response == null || !response.isSuccess || response.data == null) return null;
+        JSONObject data = response.data.optJSONObject("data");
+        if (data == null) data = response.data;
+        JSONObject prices = data.optJSONObject("prices");
+        if (prices == null) prices = data;
 
-            double price24 = prices.optDouble("24k", 0);
-            double price21 = prices.optDouble("21k", 0);
-            double price18 = prices.optDouble("18k", 0);
-            double ouncePrice = data.optDouble("price_per_ounce",
-                    prices.optDouble("ounce_price", price24 * OUNCE_TO_GRAM));
-            String source = data.optString("source", "server");
+        double price24 = prices.optDouble("24k", 0);
+        double price21 = prices.optDouble("21k", 0);
+        double price18 = prices.optDouble("18k", 0);
+        
+        // ✅ التحقق من صحة الأسعار (لا تقبل الصفر أو القيم السالبة)
+        if (price24 <= 0 || price24 > 5000) return null; 
+        
+        double ouncePrice = data.optDouble("price_per_ounce", price24 * OUNCE_TO_GRAM);
+        String source = data.optString("source", "server");
 
-            return new GoldPriceData(price24, price21, price18, ouncePrice, source);
-        } catch (Exception e) {
-            logNonFatal("parseGoldPriceData", e);
-            return null;
-        }
+        return new GoldPriceData(price24, price21, price18, ouncePrice, source);
+    } catch (Exception e) {
+        logNonFatal("parseGoldPriceData", e);
+        return null;
     }
+}
 
     private void displayGoldPrices(GoldPriceData data) {
         try {
@@ -1471,26 +1485,25 @@ public class MiraDashboardFragment extends Fragment {
             
             @Override
             public void onPrintInvoice(JSONObject activityData) {
-                if (!isAdded() || getActivity() == null) return;
-                
-                try {
-                    // ✅ الأفضل استخدام الدالة الجاهزة في UHFMainActivity
-                    if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).openReceiptFragment(activityData.toString());
-                    } else {
-                        // كخيار احتياطي في حال لم نكن داخل UHFMainActivity
-                        com.example.uhf.fragment.MiraReceiptFragment receiptFragment = 
-                                com.example.uhf.fragment.MiraReceiptFragment.newInstance(activityData.toString());
-                        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
-                        if (fm != null && !fm.isStateSaved()) {
-                            receiptFragment.show(fm, "MiraReceiptFragment");
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "onPrintInvoice error", e);
-                    Toast.makeText(getContext(), "تعذر فتح الفاتورة", Toast.LENGTH_SHORT).show();
-                }
-            }
+    if (!isAdded() || getContext() == null) return;
+    
+    try {
+        // 💡 نمرر بيانات العملية كـ JSON String إلى واجهة الفاتورة
+        String receiptJson = activityData.toString();
+        
+        // استدعاء واجهة الفاتورة (نفس الواجهة المستخدمة في شاشة المبيعات)
+        com.example.uhf.fragment.MiraReceiptFragment receiptFragment = 
+                com.example.uhf.fragment.MiraReceiptFragment.newInstance(receiptJson);
+        
+        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
+        if (fm != null && !fm.isStateSaved()) {
+            receiptFragment.show(fm, "MiraReceiptFragment");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onPrintInvoice error", e);
+        Toast.makeText(getContext(), "تعذر فتح الفاتورة", Toast.LENGTH_SHORT).show();
+    }
+}
 
             @Override
             public void onOpenRefund(JSONObject activityData) {
@@ -1498,17 +1511,17 @@ public class MiraDashboardFragment extends Fragment {
                 
                 try {
                     // إنشاء واجهة المبيعات
-                    Fragment miraPosFragment = new MiraPosFragment(); 
+                    Fragment salesFragment = new MiraPosFragment(); 
                     
                     // تجهيز البيانات لفتح ديالوج الاسترجاع
                     Bundle bundle = new Bundle();
                     bundle.putString("refund_data_json", activityData.toString());
                     bundle.putBoolean("auto_open_refund", true);
-                    miraPosFragment.setArguments(bundle);
+                    salesFragment.setArguments(bundle);
 
-                    // ✅ الانتقال للشاشة باستخدام التاج "POS" (وليس "Sales")
+                    // الانتقال للشاشة
                     if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).loadFragment(miraPosFragment, "POS"); 
+                        ((UHFMainActivity) getActivity()).loadFragment(salesFragment, "Sales"); // تأكد من التاج
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error opening refund", e);
@@ -1844,18 +1857,18 @@ public class MiraDashboardFragment extends Fragment {
                     }
                 }
 
-                if (timeSinceLastGoldFetch > 30 * 60 * 1000) {
-                    mainHandler.postDelayed(() -> {
-                        if (isAdded() && isResumed()) {
-                            if (permissionManager != null
-                                    && permissionManager.canAccessFragment("GoldRates")) {
-                                fetchLiveGoldPrices(false);
-                            }
-                        }
-                    }, 1500);
-                } else {
-                    displayGoldPricesFromCache();
-                }
+                // ✅ التحديث التلقائي من الـ API مسموح فقط للمدراء
+                if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
+    mainHandler.postDelayed(() -> {
+        if (isAdded() && isResumed()) {
+            fetchLiveGoldPrices(false);
+        }
+    }, 1500);
+} else {
+    // المستخدم العادي: يقرأ فقط من مدير الأسعار (الذي يجب أن يكون قد سحب الأسعار من السيرفر)
+    displayGoldPricesFromCache();
+    // 💡 ملاحظة: يجب أن تكون دالة displayGoldPricesFromCache تقوم بعمل sync مع السيرفر أولاً إن أمكن
+}
             }
             startAutoRefresh();
         } catch (Exception e) {
