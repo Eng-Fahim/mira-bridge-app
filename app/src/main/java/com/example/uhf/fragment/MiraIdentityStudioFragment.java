@@ -78,22 +78,20 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraIdentityStudioFragment v6.4 — Unified Edition
+ *  MiraIdentityStudioFragment v6.5 — Trigger-Safe Edition
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * إعادة هيكلة جذرية تحاكي MiraPosFragment v6.x:
- *
- *   ✅ المسح فقط بضغط الزناد الفيزيائي (لا مسح تلقائي).
- *   ✅ استبدال ذكي للوسم — لا حبس المستخدم مع وسم واحد.
- *   ✅ بطاقة تأكيد (Scan Feedback Card) لكل عملية مسح.
- *   ✅ رسائل مُثراة للشرائح: صالحة / مكررة / غير معتمدة / فشل TID.
- *   ✅ RFIDManager.addListener / removeListener (بدل setOnTagReadListener).
- *   ✅ قوة قراءة منخفضة للتكويد (نفس قيمة POS).
- *   ✅ Long-press على زر RFID → إعدادات القوة.
- *   ✅ ترتيب shutdown صحيح + حماية ضد الاستدعاء بعد onDestroyView.
+ * ✅ إصلاحات v6.5:
+ *   - تتبع isTriggerDown الفيزيائي كمرجع وحيد
+ *   - scanGeneration لمنع callbacks قديمة
+ *   - حذف pendingStopFromTrigger / MIN_SCAN_DURATION_MS (مصدر الفوضى)
+ *   - Reset شامل في onResume لتفادي الحالة العالقة
+ *   - timeout تلقائي لـ stoppingReader (3 ثوانٍ)
+ *   - حماية isProcessingTag من البقاء true بعد فشل سابق
  */
 public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
@@ -102,20 +100,16 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     // ═══════════════════════════════════════════════════════════════════
     //  ثوابت
     // ═══════════════════════════════════════════════════════════════════
-
     private static final long RFID_TIMEOUT_MS = 30000;
+    private static final long STOPPING_READER_TIMEOUT_MS = 3000;
     private static final int  MIN_TID_LENGTH = 12;
     private static final int  MAX_TID_LENGTH = 32;
     private static final int  MAX_PHOTOS = 5;
 
-    /** ⚠️ تعطيل فحص طول TID لدعم شرائح قصيرة — أعد القيمة إلى true للتفعيل */
     private static final boolean ENABLE_TID_LENGTH_VALIDATION = true;
-   
+
     private DesktopScanHandler desktopScanHandler;
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Trigger Keys
-    // ═══════════════════════════════════════════════════════════════════
     private static final int KEYCODE_TRIGGER_1 = 139;
     private static final int KEYCODE_TRIGGER_2 = 280;
     private static final int KEYCODE_TRIGGER_3 = 293;
@@ -123,7 +117,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     // ═══════════════════════════════════════════════════════════════════
     //  الحالة الأساسية
     // ═══════════════════════════════════════════════════════════════════
-
     private FragmentMiraIdentityStudioBinding binding;
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
@@ -142,31 +135,28 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable rfidTimeoutRunnable;
 
+    // ✅ [v6.5 NEW] الحالة الجديدة الحاكمة
+    /** هل الزناد الفيزيائي مضغوط حالياً؟ */
+    private volatile boolean isTriggerDown = false;
+    /** عدّاد الجيل — يُبطل أي callback قديم */
+    private final AtomicInteger scanGeneration = new AtomicInteger(0);
+    /** هل القارئ في طور المسح النشط؟ */
     private volatile boolean isRfidScanning = false;
-    // ✅ [FIX-TRIGGER] الحد الأدنى لمدة المسح قبل الإيقاف
-private static final long MIN_SCAN_DURATION_MS = 1500;
-private volatile long lastScanStartTimeMs = 0;
-private volatile boolean pendingStopFromTrigger = false;
-private volatile boolean tagReceivedThisScan = false;
+    /** هل استلمنا شريحة في هذه الدورة؟ */
+    private volatile boolean tagReceivedThisScan = false;
+    /** منع معالجة أكثر من شريحة في نفس وقت المسح */
+    private final AtomicBoolean isProcessingTag = new AtomicBoolean(false);
+    /** منع إعادة الدخول في stopRfidScanningMode */
+    private final AtomicBoolean stoppingReader = new AtomicBoolean(false);
+
     private volatile boolean isFormLocked = false;
     private boolean isArabic = true;
     private AlertDialog activeLoadingDialog;
 
-    /** ✅ منع إعادة الدخول في stopRfidScanningMode */
-    private final AtomicBoolean stoppingReader = new AtomicBoolean(false);
-    
-    /** ✅ منع معالجة أكثر من شريحة في نفس وقت المسح */
-    private final AtomicBoolean isProcessingTag = new AtomicBoolean(false);
-   /** ✅ هل EPC مربوط حالياً؟ */
-private volatile boolean isEpcBound = false;
+    private volatile boolean isEpcBound = false;
+    private volatile String lastScannedEpc = "";
+    private volatile String lastScanSource = "CHAINWAY";
 
-/** ✅ [v8.3] EPC الحقيقي المحفوظ من المسح */
-private volatile String lastScannedEpc = "";
-
-private volatile String lastScanSource = "CHAINWAY";  // ✅ [FIX-6]
-    // ═══════════════════════════════════════════════════════════════════
-    //  RFID Listener Reference
-    // ═══════════════════════════════════════════════════════════════════
     @Nullable private MiraIRFIDReader.OnTagReadListener encodingRfidListener;
 
     // ═══════════════════════════════════════════════════════════════════
@@ -194,1010 +184,637 @@ private volatile String lastScanSource = "CHAINWAY";  // ✅ [FIX-6]
     @Nullable private TextView tvFeedbackPrice;
     @Nullable private View vFeedbackAccent;
     @Nullable private Runnable pendingHideFeedback;
-    
+
     @Nullable private volatile String pendingBarcodeFromScanner = null;
 
     // ═══════════════════════════════════════════════════════════════════
-    //  🎯 Physical RFID Trigger
+    //  Lifecycle
     // ═══════════════════════════════════════════════════════════════════
 
+    @Nullable
     @Override
-    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
-        boolean isTrigger = (keyCode == KEYCODE_TRIGGER_1
-                || keyCode == KEYCODE_TRIGGER_2
-                || keyCode == KEYCODE_TRIGGER_3);
-
-        if (!isTrigger) return false;
-
-        // ═══════════════════════════════════════════════════════
-       // ═══════════════════════════════════════════════════════
-//  ACTION_DOWN — ابدأ المسح
-// ═══════════════════════════════════════════════════════
-if (event.getAction() == KeyEvent.ACTION_DOWN
-        && event.getRepeatCount() == 0) {
-
-    if (permissionManager == null
-            || (!permissionManager.canEdit("identity")
-                && !permissionManager.isManager())) {
-        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-        return true;
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        binding = FragmentMiraIdentityStudioBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
-    if (isFormLocked) {
-        showToast(isArabic
-                ? "⛔ العملية قيد التنفيذ"
-                : "⛔ Operation in progress");
-        return true;
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        if (getContext() != null) {
+            appContext = getContext().getApplicationContext();
+        }
+
+        try {
+            if (savedInstanceState != null) {
+                isFormLocked = savedInstanceState.getBoolean("is_form_locked", false);
+                currentPhotoPath = savedInstanceState.getString("camera_photo_path", null);
+            }
+
+            initializeComponents();
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+            setupPhotoLaunchers();
+            applyLanguage();
+            setupPhotosRecyclerView();
+            setupDraftNotificationCallback();
+
+            view.post(() -> {
+                if (!isAdded() || binding == null) return;
+                try {
+                    setupListeners();
+                    initScanFeedbackCard(view);
+                    applyPermissions();
+
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+                    }
+
+                    if (miraExecutor != null && miraExecutor.isHealthy()) {
+                        miraExecutor.getSingleThreadExecutor().execute(() -> {
+                            if (formManager != null) {
+                                formManager.cleanupOldDrafts();
+                                formManager.checkAndNotifyDraft();
+                            }
+                            if (photoManager != null) {
+                                photoManager.cleanupOrphanFiles(null);
+                            }
+                            safeRun(this::updatePendingSyncBadge);
+                        });
+                    }
+
+                    Log.d(TAG, "✅ IdentityStudio v6.5 initialization complete");
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+        }
     }
 
-    // ✅ [FIX-TRIGGER] إلغاء أي إيقاف معلّق + احفظ وقت البدء
-    pendingStopFromTrigger = false;
-    tagReceivedThisScan = false;
-    lastScanStartTimeMs = System.currentTimeMillis();
+    private void initializeComponents() {
+        if (appContext == null && getContext() != null) {
+            appContext = getContext().getApplicationContext();
+        }
+        if (appContext == null) {
+            Log.e(TAG, "initializeComponents: appContext is null!");
+            return;
+        }
 
-    // ✅ [v6.4] لا يوجد فحص isEpcBound — يسمح بالاستبدال
-    if (!isRfidScanning) {
-        Log.i(TAG, "🎯 Encoding trigger DOWN (isEpcBound=" + isEpcBound + ")");
-        activateRFIDModeForEncoding();
+        apiClient = MiraApiClient.getInstance(appContext);
+        branchesManager = MiraBranchesManager.getInstance(appContext);
+        orgProfile = MiraOrgProfileManager.getInstance(appContext);
+        priceManager = MiraPriceManager.getInstance(appContext);
+        permissionManager = PermissionManager.getInstance(appContext);
+        miraExecutor = MiraExecutorService.getInstance();
+        formManager = new IdentityFormManager(appContext);
+        photoManager = new IdentityPhotoManager(appContext, miraExecutor.getBackgroundExecutor());
+        syncManager = new IdentitySyncManager(appContext, miraExecutor.getBackgroundExecutor());
     }
-    return true;
-}
 
-        // ═══════════════════════════════════════════════════════
-//  ACTION_UP — أوقف المسح (مع الحد الأدنى للمدة)
-// ═══════════════════════════════════════════════════════
-if (event.getAction() == KeyEvent.ACTION_UP) {
-    if (isRfidScanning) {
-        // ✅ [FIX-TRIGGER] إذا قُرئت شريحة بالفعل، أوقف فوراً
-        if (tagReceivedThisScan) {
-            Log.i(TAG, "🎯 Encoding trigger UP (tag already read)");
-            stopRfidScanningMode();
+    // ═══════════════════════════════════════════════════════════════════
+    //  Draft Notification
+    // ═══════════════════════════════════════════════════════════════════
+
+    private void setupDraftNotificationCallback() {
+        if (formManager == null) return;
+        formManager.setNotificationCallback(new IdentityFormManager.DraftNotificationCallback() {
+            @Override
+            public void onDraftFound(@NonNull IdentityFormManager.DraftInfo info,
+                                     @NonNull String ageText) {
+                safeRun(() -> showDraftFoundDialog(info, ageText));
+            }
+
+            @Override
+            public void onDraftRestored(@NonNull IdentityFormManager.DraftInfo info) {
+                safeRun(() -> {
+                    showToast(isArabic ? "📝 تم استعادة المسودة" : "📝 Draft restored");
+                    onPhotosUpdated();
+                });
+            }
+
+            @Override
+            public void onDraftExpired(@NonNull IdentityFormManager.DraftInfo info) {
+                safeRun(() -> {
+                    if (isAdded()) {
+                        showToast(isArabic ? "🧹 تم حذف مسودة قديمة" : "🧹 Old draft removed");
+                    }
+                });
+            }
+        });
+    }
+
+    private void showDraftFoundDialog(IdentityFormManager.DraftInfo info, String ageText) {
+        if (!isAdded() || getContext() == null) return;
+        try {
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(isArabic ? "📝 مسودة محفوظة" : "📝 Saved Draft")
+                    .setMessage(formManager.getDraftSummary())
+                    .setPositiveButton(isArabic ? "استعادة" : "Restore",
+                            (d, w) -> restoreDraftIfExists())
+                    .setNegativeButton(isArabic ? "تجاهل" : "Discard",
+                            (d, w) -> {
+                                if (formManager != null) formManager.clearDraft();
+                                showToast(isArabic ? "🗑️ تم حذف المسودة" : "🗑️ Draft discarded");
+                            })
+                    .setCancelable(false)
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showDraftFoundDialog error: " + e.getMessage());
+        }
+    }
+
+    private void restoreDraftIfExists() {
+        if (binding == null || formManager == null) return;
+        if (isFormLocked) return;
+
+        try {
+            final List<String> photoPaths = new ArrayList<>();
+            boolean restored = formManager.restoreDraft(
+                    new IdentityFormManager.FormData() {
+                        @Override public String getEpc() { return safeGet(binding != null ? binding.etEpc : null); }
+                        @Override public String getTitle() { return safeGet(binding != null ? binding.etTitle : null); }
+                        @Override public String getGrossWeight() { return safeGet(binding != null ? binding.etGrossWeight : null); }
+                        @Override public boolean isHasStones() {
+                            return binding != null && binding.switchHasStones != null
+                                    && binding.switchHasStones.isChecked();
+                        }
+                        @Override public String getStoneType() { return safeGet(binding != null ? binding.etStoneType : null); }
+                        @Override public String getStoneWeight() { return safeGet(binding != null ? binding.etStoneWeight : null); }
+                        @Override public String getStoneCount() { return safeGet(binding != null ? binding.etStoneCount : null); }
+                        @Override public String getStoneValue() { return safeGet(binding != null ? binding.etStoneValue : null); }
+
+                        @Override public void setEpc(String v) {
+                            safeRun(() -> { if (binding != null && binding.etEpc != null && v != null) binding.etEpc.setText(v); });
+                        }
+                        @Override public void setTitle(String v) {
+                            safeRun(() -> { if (binding != null && binding.etTitle != null && v != null) binding.etTitle.setText(v); });
+                        }
+                        @Override public void setGrossWeight(String v) {
+                            safeRun(() -> { if (binding != null && binding.etGrossWeight != null && v != null) binding.etGrossWeight.setText(v); });
+                        }
+                        @Override public void setStoneType(String v) {
+                            safeRun(() -> { if (binding != null && binding.etStoneType != null && v != null) binding.etStoneType.setText(v); });
+                        }
+                        @Override public void setStoneWeight(String v) {
+                            safeRun(() -> { if (binding != null && binding.etStoneWeight != null && v != null) binding.etStoneWeight.setText(v); });
+                        }
+                        @Override public void setStoneCount(String v) {
+                            safeRun(() -> { if (binding != null && binding.etStoneCount != null && v != null) binding.etStoneCount.setText(v); });
+                        }
+                        @Override public void setStoneValue(String v) {
+                            safeRun(() -> { if (binding != null && binding.etStoneValue != null && v != null) binding.etStoneValue.setText(v); });
+                        }
+                        @Override public void setHasStones(boolean v) {
+                            safeRun(() -> { if (binding != null && binding.switchHasStones != null) binding.switchHasStones.setChecked(v); });
+                        }
+                    }, photoPaths);
+
+            if (restored) {
+                if (photoManager != null && !photoPaths.isEmpty()) {
+                    photoManager.restoreFromSavedPaths(photoPaths, photoCallback);
+                }
+                safeRun(() -> {
+                    if (!isAdded() || binding == null) return;
+                    onPhotosUpdated();
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "restoreDraftIfExists error: " + e.getMessage(), e);
+        }
+    }
+
+    private void saveCurrentDraftAsync() {
+        final FragmentMiraIdentityStudioBinding b = binding;
+        if (formManager == null || b == null) return;
+        final List<String> paths = photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>();
+
+        formManager.saveDraft(new IdentityFormManager.FormData() {
+            @Override public String getEpc() { return safeGet(b.etEpc); }
+            @Override public String getTitle() { return safeGet(b.etTitle); }
+            @Override public String getGrossWeight() { return safeGet(b.etGrossWeight); }
+            @Override public boolean isHasStones() {
+                return b.switchHasStones != null && b.switchHasStones.isChecked();
+            }
+            @Override public String getStoneType() { return safeGet(b.etStoneType); }
+            @Override public String getStoneWeight() { return safeGet(b.etStoneWeight); }
+            @Override public String getStoneCount() { return safeGet(b.etStoneCount); }
+            @Override public String getStoneValue() { return safeGet(b.etStoneValue); }
+
+            @Override public void setEpc(String v) { }
+            @Override public void setTitle(String v) { }
+            @Override public void setGrossWeight(String v) { }
+            @Override public void setStoneType(String v) { }
+            @Override public void setStoneWeight(String v) { }
+            @Override public void setStoneCount(String v) { }
+            @Override public void setStoneValue(String v) { }
+            @Override public void setHasStones(boolean v) { }
+        }, paths);
+    }
+
+    private String safeGet(TextView tv) {
+        return tv != null && tv.getText() != null ? tv.getText().toString() : "";
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Photos
+    // ═══════════════════════════════════════════════════════════════════
+
+    private void setupPhotosRecyclerView() {
+        if (binding == null || binding.rvPhotosPreview == null) return;
+
+        photosAdapter = new PhotosAdapter(
+                requireContext(),
+                photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>(),
+                (position, path) -> {
+                    if (isFormLocked) {
+                        showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
+                        return;
+                    }
+                    if (photoManager != null) {
+                        photoManager.removePhoto(position, false, photoCallback);
+                    }
+                });
+
+        photosAdapter.setOnPhotoClickListener((position, path, sourceView) -> {
+            showPhotoPreviewDialog(path);
+        });
+
+        binding.rvPhotosPreview.setLayoutManager(
+                new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
+        binding.rvPhotosPreview.setAdapter(photosAdapter);
+    }
+
+    private final IdentityPhotoManager.PhotoCallback photoCallback = new IdentityPhotoManager.PhotoCallback() {
+        @Override
+        public void onPhotoAdded(@NonNull String path, int totalCount) {
+            safeRun(() -> {
+                if (photosAdapter != null && photoManager != null) {
+                    photosAdapter.submitList(photoManager.getPhotoPaths());
+                }
+                updatePhotosCountText();
+                if (binding != null && binding.rvPhotosPreview != null) {
+                    binding.rvPhotosPreview.setVisibility(
+                            (photoManager != null && photoManager.getPhotoCount() > 0)
+                                    ? View.VISIBLE : View.GONE);
+                }
+            });
+        }
+
+        @Override
+        public void onPhotoRemoved(@NonNull String path, int totalCount) {
+            safeRun(() -> {
+                if (photosAdapter != null && photoManager != null) {
+                    photosAdapter.submitList(photoManager.getPhotoPaths());
+                }
+                updatePhotosCountText();
+                if (binding != null && binding.rvPhotosPreview != null) {
+                    binding.rvPhotosPreview.setVisibility(
+                            (photoManager != null && photoManager.getPhotoCount() > 0)
+                                    ? View.VISIBLE : View.GONE);
+                }
+            });
+        }
+
+        @Override
+        public void onError(@NonNull String message) {
+            safeRun(() -> showToast("❌ " + message));
+        }
+    };
+
+    private void showPhotoPreviewDialog(@NonNull String path) {
+        if (!isAdded() || getContext() == null) return;
+        try {
+            BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
+            View view = getLayoutInflater().inflate(R.layout.dialog_photo_preview, null);
+            dialog.setContentView(view);
+
+            ImageView ivPreview = view.findViewById(R.id.ivPreview);
+            MaterialButton btnClose = view.findViewById(R.id.btnClosePreview);
+
+            if (ivPreview != null) {
+                Glide.with(this).load(new File(path))
+                        .placeholder(R.drawable.placeholder_image)
+                        .error(R.drawable.ic_error_outline)
+                        .into(ivPreview);
+            }
+            if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
+            dialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "showPhotoPreviewDialog error: " + e.getMessage());
+        }
+    }
+
+    private void setupPhotoLaunchers() {
+        requestPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) openCamera();
+                    else showToast(isArabic ? "صلاحية الكاميرا مطلوبة" : "Camera permission required");
+                });
+
+        takePhotoLauncher = registerForActivityResult(
+                new ActivityResultContracts.TakePicture(),
+                success -> {
+                    if (success && photoManager != null) {
+                        photoManager.compressAndAddPhoto(currentPhotoPath, photoCallback);
+                    }
+                });
+
+        pickImageLauncher = registerForActivityResult(
+                new ActivityResultContracts.OpenMultipleDocuments(),
+                uris -> {
+                    if (uris == null || uris.isEmpty() || photoManager == null) return;
+                    int currentCount = photoManager.getPhotoCount();
+                    int remaining = MAX_PHOTOS - currentCount;
+                    if (remaining <= 0) {
+                        showToast(isArabic
+                                ? "⚠️ وصلت للحد الأقصى (" + MAX_PHOTOS + " صور)"
+                                : "⚠️ Max photos reached (" + MAX_PHOTOS + ")");
+                        return;
+                    }
+                    int toAdd = Math.min(uris.size(), remaining);
+                    for (int i = 0; i < toAdd; i++) {
+                        photoManager.copyAndAddPhoto(uris.get(i), photoCallback);
+                    }
+                    if (uris.size() > remaining) {
+                        showToast(isArabic
+                                ? "⚠️ أضيفت " + toAdd + " فقط (الحد " + MAX_PHOTOS + ")"
+                                : "⚠️ Added " + toAdd + " only (max " + MAX_PHOTOS + ")");
+                    }
+                });
+    }
+
+    private void onPhotosUpdated() {
+        if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
+        if (photosAdapter != null && photoManager != null) {
+            photosAdapter.submitList(photoManager.getPhotoPaths());
+        }
+        updatePhotosCountText();
+        if (binding.rvPhotosPreview != null && photoManager != null) {
+            binding.rvPhotosPreview.setVisibility(
+                    photoManager.getPhotoCount() == 0 ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void updatePhotosCountText() {
+        try {
+            if (binding == null || binding.tvPhotosCount == null) return;
+            int count = photoManager != null ? photoManager.getPhotoCount() : 0;
+            binding.tvPhotosCount.setText(count == 0
+                    ? (isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet")
+                    : (isArabic ? "تم إرفاق (" + count + "/" + MAX_PHOTOS + ") صور"
+                                : "Attached (" + count + "/" + MAX_PHOTOS + ") photos"));
+        } catch (Exception e) {
+            Log.e(TAG, "updatePhotosCountText error: " + e.getMessage());
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+//  🎯 Physical RFID Trigger — الإصلاح الجذري
+// ═══════════════════════════════════════════════════════════════════
+
+@Override
+public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
+    boolean isTrigger = (keyCode == KEYCODE_TRIGGER_1
+            || keyCode == KEYCODE_TRIGGER_2
+            || keyCode == KEYCODE_TRIGGER_3);
+    if (!isTrigger) return false;
+
+    // ═══════════════════════════════════════════════════════
+    //  ACTION_DOWN — بدء المسح
+    // ═══════════════════════════════════════════════════════
+    if (event.getAction() == KeyEvent.ACTION_DOWN
+            && event.getRepeatCount() == 0) {
+
+        // ✅ منع تكرار ACTION_DOWN بدون ACTION_UP
+        if (isTriggerDown) {
+            Log.d(TAG, "⚠️ Trigger already down — ignoring repeated DOWN");
             return true;
         }
 
-        // ✅ إذا لم تُقرأ شريحة بعد، انتظر حتى MIN_SCAN_DURATION
-        long elapsed = System.currentTimeMillis() - lastScanStartTimeMs;
-        long remaining = MIN_SCAN_DURATION_MS - elapsed;
+        // ✅ فحص الصلاحيات قبل كل شيء
+        if (permissionManager == null
+                || (!permissionManager.canEdit("identity")
+                    && !permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return true;
+        }
 
-        if (remaining > 0) {
-            Log.i(TAG, "🎯 Encoding trigger UP: waiting " + remaining + "ms for tag");
-            pendingStopFromTrigger = true;
-            handler.postDelayed(() -> {
-                if (pendingStopFromTrigger && isRfidScanning) {
-                    pendingStopFromTrigger = false;
-                    Log.i(TAG, "🎯 Encoding trigger: min duration met, stopping");
-                    stopRfidScanningMode();
-                }
-            }, remaining);
-        } else {
-            Log.i(TAG, "🎯 Encoding trigger UP (min duration met)");
+        // ✅ إذا فيه شريحة قيد المعالجة، ارفض
+        if (isProcessingTag.get()) {
+            Log.d(TAG, "⏭️ Tag processing in progress — trigger ignored");
+            showToast(isArabic ? "⏳ جاري معالجة الشريحة..." : "⏳ Processing tag...");
+            return true;
+        }
+
+        if (isFormLocked) {
+            showToast(isArabic ? "⛔ العملية قيد التنفيذ" : "⛔ Operation in progress");
+            return true;
+        }
+
+        // ✅ علّم الزناد كمضغوط — المصدر الوحيد للحقيقة
+        isTriggerDown = true;
+        Log.i(TAG, "🎯 Trigger DOWN — starting scan");
+        activateRFIDModeForEncoding();
+        return true;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  ACTION_UP — إيقاف المسح فوراً (بدون flip-flop)
+    // ═══════════════════════════════════════════════════════
+    if (event.getAction() == KeyEvent.ACTION_UP) {
+        if (!isTriggerDown) {
+            Log.d(TAG, "⚠️ Trigger UP but was not down — ignoring");
+            return true;
+        }
+
+        isTriggerDown = false;
+        Log.i(TAG, "🎯 Trigger UP — stopping scan immediately");
+
+        if (isRfidScanning) {
             stopRfidScanningMode();
         }
+        return true;
     }
-    return true;
+
+    return false;
 }
-
-        return false;
-    }
-
-
-// ═══════════════════════════════════════════════════════════════════
-//  Lifecycle
-// ═══════════════════════════════════════════════════════════════════
-
-@Nullable
-@Override
-public View onCreateView(@NonNull LayoutInflater inflater,
-                         @Nullable ViewGroup container,
-                         @Nullable Bundle savedInstanceState) {
-    binding = FragmentMiraIdentityStudioBinding.inflate(
-            inflater, container, false);
-    return binding.getRoot();
-}
-
-@Override
-public void onViewCreated(@NonNull View view,
-                          @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
-
-    if (getContext() != null) {
-        appContext = getContext().getApplicationContext();
-    }
-
-    try {
-        if (savedInstanceState != null) {
-            isFormLocked = savedInstanceState.getBoolean("is_form_locked", false);
-            isRfidScanning = savedInstanceState.getBoolean("is_rfid_scanning", false);
-            currentPhotoPath = savedInstanceState.getString("camera_photo_path", null);
-        }
-
-        initializeComponents();
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        setupPhotoLaunchers();
-        applyLanguage();
-        setupPhotosRecyclerView();
-        setupDraftNotificationCallback();
-
-        view.post(() -> {
-            if (!isAdded() || binding == null) return;
-
-            try {
-                setupListeners();
-                initScanFeedbackCard(view);
-                applyPermissions();
-
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-                }
-
-                if (miraExecutor != null && miraExecutor.isHealthy()) {
-                    miraExecutor.getSingleThreadExecutor().execute(() -> {
-                        if (formManager != null) {
-                            formManager.cleanupOldDrafts();
-                            formManager.checkAndNotifyDraft();
-                        }
-                        if (photoManager != null) {
-                            photoManager.cleanupOrphanFiles(null);
-                        }
-                        safeRun(this::updatePendingSyncBadge);
-                    });
-                }
-
-                Log.d(TAG, "✅ IdentityStudio v6.4 initialization complete");
-
-            } catch (Exception e) {
-                Log.e(TAG, "Delayed init error: " + e.getMessage(), e);
-            }
-        });
-
-    } catch (Exception e) {
-        Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
-    }
-}
-
-private void initializeComponents() {
-    if (appContext == null && getContext() != null) {
-        appContext = getContext().getApplicationContext();
-    }
-    if (appContext == null) {
-        Log.e(TAG, "initializeComponents: appContext is null!");
-        return;
-    }
-
-    apiClient = MiraApiClient.getInstance(appContext);
-    branchesManager = MiraBranchesManager.getInstance(appContext);
-    orgProfile = MiraOrgProfileManager.getInstance(appContext);
-    priceManager = MiraPriceManager.getInstance(appContext);
-    permissionManager = PermissionManager.getInstance(appContext);
-
-    miraExecutor = MiraExecutorService.getInstance();
-
-    formManager = new IdentityFormManager(appContext);
-
-    photoManager = new IdentityPhotoManager(
-            appContext,
-            miraExecutor.getBackgroundExecutor());
-
-    syncManager = new IdentitySyncManager(
-            appContext,
-            miraExecutor.getBackgroundExecutor());
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  Draft Notification
-// ═══════════════════════════════════════════════════════════════════
-
-private void setupDraftNotificationCallback() {
-    if (formManager == null) return;
-
-    formManager.setNotificationCallback(
-            new IdentityFormManager.DraftNotificationCallback() {
-        @Override
-        public void onDraftFound(@NonNull IdentityFormManager.DraftInfo info,
-                                 @NonNull String ageText) {
-            safeRun(() -> showDraftFoundDialog(info, ageText));
-        }
-
-        @Override
-        public void onDraftRestored(@NonNull IdentityFormManager.DraftInfo info) {
-            safeRun(() -> {
-                showToast(isArabic ? "📝 تم استعادة المسودة"
-                                   : "📝 Draft restored");
-                onPhotosUpdated();
-            });
-        }
-
-        @Override
-        public void onDraftExpired(@NonNull IdentityFormManager.DraftInfo info) {
-            safeRun(() -> {
-                if (isAdded()) {
-                    showToast(isArabic ? "🧹 تم حذف مسودة قديمة"
-                                       : "🧹 Old draft removed");
-                }
-            });
-        }
-    });
-}
-
-private void showDraftFoundDialog(IdentityFormManager.DraftInfo info,
-                                  String ageText) {
-    if (!isAdded() || getContext() == null) return;
-
-    try {
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(isArabic ? "📝 مسودة محفوظة" : "📝 Saved Draft")
-                .setMessage(formManager.getDraftSummary())
-                .setPositiveButton(isArabic ? "استعادة" : "Restore",
-                        (d, w) -> restoreDraftIfExists())
-                .setNegativeButton(isArabic ? "تجاهل" : "Discard",
-                        (d, w) -> {
-                            if (formManager != null) formManager.clearDraft();
-                            showToast(isArabic ? "🗑️ تم حذف المسودة"
-                                               : "🗑️ Draft discarded");
-                        })
-                .setCancelable(false)
-                .show();
-    } catch (Exception e) {
-        Log.e(TAG, "showDraftFoundDialog error: " + e.getMessage());
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  Form Management
-// ═══════════════════════════════════════════════════════════════════
-
-private void restoreDraftIfExists() {
-    if (binding == null || formManager == null) return;
-
-    if (isFormLocked) {
-        Log.i(TAG, "restoreDraftIfExists skipped: form is locked");
-        return;
-    }
-
-    try {
-        final List<String> photoPaths = new ArrayList<>();
-
-        boolean restored = formManager.restoreDraft(
-                new IdentityFormManager.FormData() {
-                    @Override public String getEpc() {
-                        return safeGet(binding != null ? binding.etEpc : null);
-                    }
-                    @Override public String getTitle() {
-                        return safeGet(binding != null ? binding.etTitle : null);
-                    }
-                    @Override public String getGrossWeight() {
-                        return safeGet(binding != null ? binding.etGrossWeight : null);
-                    }
-                    @Override public boolean isHasStones() {
-                        return binding != null && binding.switchHasStones != null
-                                && binding.switchHasStones.isChecked();
-                    }
-                    @Override public String getStoneType() {
-                        return safeGet(binding != null ? binding.etStoneType : null);
-                    }
-                    @Override public String getStoneWeight() {
-                        return safeGet(binding != null ? binding.etStoneWeight : null);
-                    }
-                    @Override public String getStoneCount() {
-                        return safeGet(binding != null ? binding.etStoneCount : null);
-                    }
-                    @Override public String getStoneValue() {
-                        return safeGet(binding != null ? binding.etStoneValue : null);
-                    }
-
-                    @Override public void setEpc(String value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.etEpc != null && value != null)
-                                binding.etEpc.setText(value);
-                        });
-                    }
-                    @Override public void setTitle(String value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.etTitle != null && value != null)
-                                binding.etTitle.setText(value);
-                        });
-                    }
-                    @Override public void setGrossWeight(String value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.etGrossWeight != null && value != null)
-                                binding.etGrossWeight.setText(value);
-                        });
-                    }
-                    @Override public void setStoneType(String value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.etStoneType != null && value != null)
-                                binding.etStoneType.setText(value);
-                        });
-                    }
-                    @Override public void setStoneWeight(String value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.etStoneWeight != null && value != null)
-                                binding.etStoneWeight.setText(value);
-                        });
-                    }
-                    @Override public void setStoneCount(String value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.etStoneCount != null && value != null)
-                                binding.etStoneCount.setText(value);
-                        });
-                    }
-                    @Override public void setStoneValue(String value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.etStoneValue != null && value != null)
-                                binding.etStoneValue.setText(value);
-                        });
-                    }
-                    @Override public void setHasStones(boolean value) {
-                        safeRun(() -> {
-                            if (binding != null && binding.switchHasStones != null)
-                                binding.switchHasStones.setChecked(value);
-                        });
-                    }
-                },
-                photoPaths
-        );
-
-        if (restored) {
-            if (photoManager != null && !photoPaths.isEmpty()) {
-                photoManager.restoreFromSavedPaths(photoPaths, photoCallback);
-            }
-
-            safeRun(() -> {
-                if (!isAdded() || binding == null) return;
-                onPhotosUpdated();
-            });
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "restoreDraftIfExists error: " + e.getMessage(), e);
-    }
-}
-
-private void saveCurrentDraftAsync() {
-    final FragmentMiraIdentityStudioBinding b = binding;
-    if (formManager == null || b == null) return;
-
-    final List<String> paths = photoManager != null
-            ? photoManager.getPhotoPaths() : new ArrayList<>();
-
-    formManager.saveDraft(new IdentityFormManager.FormData() {
-        @Override public String getEpc() { return safeGet(b.etEpc); }
-        @Override public String getTitle() { return safeGet(b.etTitle); }
-        @Override public String getGrossWeight() { return safeGet(b.etGrossWeight); }
-        @Override public boolean isHasStones() {
-            return b.switchHasStones != null && b.switchHasStones.isChecked();
-        }
-        @Override public String getStoneType() { return safeGet(b.etStoneType); }
-        @Override public String getStoneWeight() { return safeGet(b.etStoneWeight); }
-        @Override public String getStoneCount() { return safeGet(b.etStoneCount); }
-        @Override public String getStoneValue() { return safeGet(b.etStoneValue); }
-
-        @Override public void setEpc(String v) { /* no-op */ }
-        @Override public void setTitle(String v) { /* no-op */ }
-        @Override public void setGrossWeight(String v) { /* no-op */ }
-        @Override public void setStoneType(String v) { /* no-op */ }
-        @Override public void setStoneWeight(String v) { /* no-op */ }
-        @Override public void setStoneCount(String v) { /* no-op */ }
-        @Override public void setStoneValue(String v) { /* no-op */ }
-        @Override public void setHasStones(boolean v) { /* no-op */ }
-    }, paths);
-}
-
-private String safeGet(TextView tv) {
-    return tv != null && tv.getText() != null ? tv.getText().toString() : "";
-}
-
-   // ═══════════════════════════════════════════════════════════════════
-//  Photos
-// ═══════════════════════════════════════════════════════════════════
-
-private void setupPhotosRecyclerView() {
-    if (binding == null || binding.rvPhotosPreview == null) return;
-
-    photosAdapter = new PhotosAdapter(
-            requireContext(),
-            photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>(),
-            (position, path) -> {
-                if (isFormLocked) {
-                    showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
-                    return;
-                }
-                if (photoManager != null) {
-                    photoManager.removePhoto(position, false, photoCallback);
-                }
-            });
-
-    photosAdapter.setOnPhotoClickListener((position, path, sourceView) -> {
-        showPhotoPreviewDialog(path);
-    });
-
-    binding.rvPhotosPreview.setLayoutManager(
-            new LinearLayoutManager(requireContext(),
-                    LinearLayoutManager.HORIZONTAL, false));
-    binding.rvPhotosPreview.setAdapter(photosAdapter);
-}
-
-private final IdentityPhotoManager.PhotoCallback photoCallback =
-        new IdentityPhotoManager.PhotoCallback() {
-    @Override
-    public void onPhotoAdded(@NonNull String path, int totalCount) {
-        safeRun(() -> {
-            if (photosAdapter != null && photoManager != null) {
-                photosAdapter.submitList(photoManager.getPhotoPaths());
-            }
-            updatePhotosCountText();
-            if (binding != null && binding.rvPhotosPreview != null) {
-                binding.rvPhotosPreview.setVisibility(
-                        (photoManager != null && photoManager.getPhotoCount() > 0)
-                                ? View.VISIBLE : View.GONE);
-            }
-        });
-    }
-
-    @Override
-    public void onPhotoRemoved(@NonNull String path, int totalCount) {
-        safeRun(() -> {
-            if (photosAdapter != null && photoManager != null) {
-                photosAdapter.submitList(photoManager.getPhotoPaths());
-            }
-            updatePhotosCountText();
-            if (binding != null && binding.rvPhotosPreview != null) {
-                binding.rvPhotosPreview.setVisibility(
-                        (photoManager != null && photoManager.getPhotoCount() > 0)
-                                ? View.VISIBLE : View.GONE);
-            }
-        });
-    }
-
-    @Override
-    public void onError(@NonNull String message) {
-        safeRun(() -> showToast("❌ " + message));
-    }
-};
-
-private void showPhotoPreviewDialog(@NonNull String path) {
-    if (!isAdded() || getContext() == null) return;
-
-    try {
-        BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
-        View view = getLayoutInflater().inflate(
-                R.layout.dialog_photo_preview, null);
-        dialog.setContentView(view);
-
-        ImageView ivPreview = view.findViewById(R.id.ivPreview);
-        MaterialButton btnClose = view.findViewById(R.id.btnClosePreview);
-
-        if (ivPreview != null) {
-            Glide.with(this)
-                    .load(new File(path))
-                    .placeholder(R.drawable.placeholder_image)
-                    .error(R.drawable.ic_error_outline)
-                    .into(ivPreview);
-        }
-
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        dialog.show();
-    } catch (Exception e) {
-        Log.e(TAG, "showPhotoPreviewDialog error: " + e.getMessage());
-    }
-}
-
-private void setupPhotoLaunchers() {
-    requestPermissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(),
-            isGranted -> {
-                if (isGranted) openCamera();
-                else showToast(isArabic
-                        ? "صلاحية الكاميرا مطلوبة"
-                        : "Camera permission required");
-            });
-
-    takePhotoLauncher = registerForActivityResult(
-            new ActivityResultContracts.TakePicture(),
-            success -> {
-                if (success && photoManager != null) {
-                    photoManager.compressAndAddPhoto(currentPhotoPath, photoCallback);
-                }
-            });
-
-    pickImageLauncher = registerForActivityResult(
-        new ActivityResultContracts.OpenMultipleDocuments(),
-        uris -> {
-            if (uris == null || uris.isEmpty() || photoManager == null) return;
-
-            // ✅ [FIX-4] احترم الحد الأقصى (MAX_PHOTOS = 5)
-            int currentCount = photoManager.getPhotoCount();
-            int remaining = MAX_PHOTOS - currentCount;
-
-            if (remaining <= 0) {
-                showToast(isArabic
-                        ? "⚠️ وصلت للحد الأقصى (" + MAX_PHOTOS + " صور)"
-                        : "⚠️ Max photos reached (" + MAX_PHOTOS + ")");
-                return;
-            }
-
-            int toAdd = Math.min(uris.size(), remaining);
-            for (int i = 0; i < toAdd; i++) {
-                photoManager.copyAndAddPhoto(uris.get(i), photoCallback);
-            }
-
-            if (uris.size() > remaining) {
-                showToast(isArabic
-                        ? "⚠️ أضيفت " + toAdd + " فقط (الحد " + MAX_PHOTOS + ")"
-                        : "⚠️ Added " + toAdd + " only (max " + MAX_PHOTOS + ")");
-            }
-        });
-}
-
-private void onPhotosUpdated() {
-    if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
-
-    if (photosAdapter != null && photoManager != null) {
-        photosAdapter.submitList(photoManager.getPhotoPaths());
-    }
-    updatePhotosCountText();
-
-    if (binding.rvPhotosPreview != null && photoManager != null) {
-        binding.rvPhotosPreview.setVisibility(
-                photoManager.getPhotoCount() == 0 ? View.GONE : View.VISIBLE);
-    }
-}
-
-private void updatePhotosCountText() {
-    try {
-        if (binding == null || binding.tvPhotosCount == null) return;
-        int count = photoManager != null ? photoManager.getPhotoCount() : 0;
-        binding.tvPhotosCount.setText(count == 0
-                ? (isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet")
-                : (isArabic ? "تم إرفاق (" + count + "/" + MAX_PHOTOS + ") صور"
-                            : "Attached (" + count + "/" + MAX_PHOTOS + ") photos"));
-    } catch (Exception e) {
-        Log.e(TAG, "updatePhotosCountText error: " + e.getMessage());
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  Calculations
-// ═══════════════════════════════════════════════════════════════════
-
-private void calculateEstimatedGoldValue() {
-    try {
-        if (binding == null || binding.etGrossWeight == null) return;
-
-        String weightStr = binding.etGrossWeight.getText() != null
-                ? binding.etGrossWeight.getText().toString().trim() : "";
-        if (weightStr.isEmpty()) {
-            resetCalculatedDisplay();
-            return;
-        }
-
-        double grossWeight = Double.parseDouble(weightStr);
-        if (grossWeight <= 0) {
-            resetCalculatedDisplay();
-            return;
-        }
-
-        double stoneWeightCarats = 0.0;
-        double stoneValue = 0.0;
-
-        if (binding.switchHasStones.isChecked()) {
-            String sWeight = binding.etStoneWeight.getText() != null
-                    ? binding.etStoneWeight.getText().toString().trim() : "";
-            String sValue = binding.etStoneValue.getText() != null
-                    ? binding.etStoneValue.getText().toString().trim() : "";
-
-            if (!sWeight.isEmpty()) stoneWeightCarats = Double.parseDouble(sWeight);
-            if (!sValue.isEmpty()) stoneValue = Double.parseDouble(sValue);
-        }
-
-        int karat = getSelectedKaratNumber();
-        double[] pricing = PricingCalculator.calculatePricingDetails(
-                grossWeight, stoneWeightCarats, stoneValue, karat, priceManager);
-        double totalPrice = pricing[5];
-
-        String formattedPrice = priceManager.formatPriceDefault(totalPrice);
-        binding.tvEstimatedGoldValue.setText(formattedPrice);
-        binding.tvSummaryPrice.setText(formattedPrice);
-
-    } catch (NumberFormatException e) {
-        resetCalculatedDisplay();
-    } catch (Exception e) {
-        Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage(), e);
-    }
-}
-
-private void resetCalculatedDisplay() {
-    try {
-        if (binding == null) return;
-        String zeroText = "0.00 " + priceManager.getCurrencySymbol(
-                priceManager.getDefaultCurrency());
-        binding.tvEstimatedGoldValue.setText(zeroText);
-        binding.tvSummaryPrice.setText(zeroText);
-    } catch (Exception e) {
-        Log.e(TAG, "resetCalculatedDisplay error: " + e.getMessage());
-    }
-}
-
-private int getSelectedKaratNumber() {
-    try {
-        if (binding == null) return 21;
-        int checkedId = binding.chipGroupKarat.getCheckedChipId();
-        if (checkedId == binding.chip24K.getId()) return 24;
-        if (checkedId == binding.chip21K.getId()) return 21;
-        if (checkedId == binding.chip18K.getId()) return 18;
-        if (checkedId == binding.chip14K.getId()) return 14;
-    } catch (Exception e) {
-        Log.e(TAG, "getSelectedKaratNumber error: " + e.getMessage());
-    }
-    return 21;
-}
-
-private String getSelectedKaratCode() {
-    return getSelectedKaratNumber() + "K";
-}
-
-private String getSelectedCategory() {
-    try {
-        if (binding == null) return isArabic ? "مجوهرات" : "Jewelry";
-        int checkedId = binding.chipGroupTypes.getCheckedChipId();
-        if (checkedId == binding.chipRing.getId()) return isArabic ? "خواتم" : "Rings";
-        if (checkedId == binding.chipSet.getId()) return isArabic ? "أطقم" : "Sets";
-        if (checkedId == binding.chipBracelet.getId()) return isArabic ? "أساور" : "Bracelets";
-        if (checkedId == binding.chipNecklace.getId()) return isArabic ? "عقود" : "Necklaces";
-    } catch (Exception e) {
-        Log.e(TAG, "getSelectedCategory error: " + e.getMessage());
-    }
-    return isArabic ? "مجوهرات" : "Jewelry";
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  Listeners
-// ═══════════════════════════════════════════════════════════════════
-
-private void setupListeners() {
-    try {
-        if (binding == null) return;
-
-        // ✅ EPC text watcher — status badge + unbind when cleared
-        binding.etEpc.addTextChangedListener(new TextWatcher() {
-    @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-    @Override public void afterTextChanged(Editable s) {}
-    @Override
-    public void onTextChanged(CharSequence s, int start, int before, int count) {
-        if (binding == null || binding.tvStatusBadge == null) return;
-        
-        // ✅ [SECURITY] 3 حالات بدل 2 — منع التضليل
-        if (s.length() == 0) {
-            binding.tvStatusBadge.setText("WAITING");
-            binding.tvStatusBadge.setTextColor(0xFF6B7280);  // رمادي
-            if (isEpcBound) {
-                isEpcBound = false;
-                Log.d(TAG, "🔓 EPC unbound (field cleared)");
-            }
-        } else if (!isEpcBound) {
-            // ⚠️ كتابة يدوية — لم يمر عبر المسح!
-            binding.tvStatusBadge.setText(
-                    isArabic ? "⚠️ كتابة يدوية" : "⚠️ TYPED");
-            binding.tvStatusBadge.setTextColor(0xFFF59E0B);  // أصفر
-        } else {
-            // ✅ تم المسح والتحقق
-            binding.tvStatusBadge.setText(
-                    isArabic ? "✅ موثّق" : "✅ VERIFIED");
-            binding.tvStatusBadge.setTextColor(0xFF22C55E);  // أخضر
-        }
-    }
-});
-
-        if (binding.tilEpc != null) {
-            binding.tilEpc.setEndIconOnClickListener(
-                    v -> openBarcodeScannerForEPC());
-        }
-
-        // ✅ زر RFID — إعلامي + Long-press للإعدادات
-        // ✅ زر RFID — يفتح قائمة اختيار طريقة المسح
-binding.btnScanRfid.setOnClickListener(v -> {
-    showScanMethodOptions();
-});
-
-// ✅ Long-press للإعدادات (ابقِه كما هو)
-binding.btnScanRfid.setOnLongClickListener(v -> {
-    openEncodingPowerSettings();
-    return true;
-});
-
-        // ✅ Stones container
-        View stonesContainer = binding.getRoot()
-                .findViewById(R.id.layoutStonesContainer);
-        if (stonesContainer != null) {
-            stonesContainer.setOnClickListener(v -> {
-                if (isFormLocked) {
-                    showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
-                    return;
-                }
-                boolean newState = !binding.switchHasStones.isChecked();
-                binding.switchHasStones.setChecked(newState);
-                toggleStonesDetails(newState);
-                calculateEstimatedGoldValue();
-            });
-        }
-
-        binding.switchHasStones.setOnCheckedChangeListener(
-                (buttonView, isChecked) -> {
-                    toggleStonesDetails(isChecked);
-                    calculateEstimatedGoldValue();
-                });
-
-        // ✅ Calculations
-        TextWatcher calculationWatcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                calculateEstimatedGoldValue();
-            }
-        };
-
-        binding.etGrossWeight.addTextChangedListener(calculationWatcher);
-        binding.etStoneWeight.addTextChangedListener(calculationWatcher);
-        binding.etStoneValue.addTextChangedListener(calculationWatcher);
-
-        binding.chipGroupKarat.setOnCheckedStateChangeListener(
-                (group, checkedIds) -> calculateEstimatedGoldValue());
-
-        binding.chipGroupTypes.setOnCheckedStateChangeListener(
-                (group, checkedIds) -> {
-                    if (checkedIds.isEmpty()) return;
-                    int id = checkedIds.get(0);
-                    if (id == binding.chipRing.getId()) populateSuggestions("rings");
-                    else if (id == binding.chipSet.getId()) populateSuggestions("sets");
-                    else if (id == binding.chipBracelet.getId()) populateSuggestions("bracelets");
-                    else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
-                });
-
-        // ✅ Photos
-        binding.btnAddPhotos.setOnClickListener(v -> {
-            if (isFormLocked) {
-                showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
-                return;
-            }
-            if (photoManager != null
-                    && photoManager.getPhotoCount() >= MAX_PHOTOS) {
-                showToast(isArabic
-                        ? "⚠️ الحد الأقصى " + MAX_PHOTOS + " صور"
-                        : "⚠️ Maximum " + MAX_PHOTOS + " photos");
-                return;
-            }
-            if (permissionManager.canEdit("identity")
-                    || permissionManager.isManager()) {
-                showImageSourceDialog();
-            } else {
-                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            }
-        });
-
-        // ✅ Save
-        binding.btnSaveIdentity.setOnClickListener(v -> {
-            if (isFormLocked) {
-                showToast(isArabic
-                        ? "⛔ العملية قيد التنفيذ، يرجى الانتظار..."
-                        : "⛔ Operation in progress...");
-                return;
-            }
-            if (permissionManager.canEdit("identity")
-                    || permissionManager.isManager()) {
-                finalizeItemIdentity();
-            } else {
-                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            }
-        });
-
-        // ✅ Pending sync
-        binding.btnViewPending.setOnClickListener(
-                v -> openSyncLogFragment());
-
-    } catch (Exception e) {
-        Log.e(TAG, "setupListeners error: " + e.getMessage(), e);
-    }
-}
-
-private void showScanMethodOptions() {
-    if (isFormLocked) {
-        showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
-        return;
-    }
-
-    String[] options = {
-            isArabic ? "📡 مسح بالقارئ اليدوي (الزناد)" : "📡 Scan with Handheld Reader",
-            isArabic ? "🖥️ مسح بالقارئ المكتبي (USB)" : "🖥️ Scan with Desktop Reader"
-    };
-
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(isArabic ? "اختر طريقة المسح" : "Choose Scan Method")
-            .setItems(options, (dialog, which) -> {
-                if (which == 0) {
-                    // الخيار الأول: قارئ Chainway (يحتاج لضغط الزناد الفيزيائي)
-                    showToast(isArabic
-                            ? "🎯 اضغط زر الزناد في القارئ اليدوي الآن"
-                            : "🎯 Press the handheld reader trigger now");
-                } else {
-                    // الخيار الثاني: القارئ المكتبي
-                    activateDesktopScannerMode();
-                }
-            })
-            .show();
-}
-
-private void toggleStonesDetails(boolean show) {
-    if (binding == null || binding.layoutStonesDetails == null) return;
-
-    if (show) {
-        binding.layoutStonesDetails.setVisibility(View.VISIBLE);
-        binding.layoutStonesDetails.setAlpha(0f);
-        binding.layoutStonesDetails.setTranslationY(-10f);
-        binding.layoutStonesDetails.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(250)
-                .start();
-    } else {
-        binding.layoutStonesDetails.animate()
-                .alpha(0f)
-                .translationY(-10f)
-                .setDuration(200)
-                .withEndAction(() -> {
-                    if (binding != null && binding.layoutStonesDetails != null) {
-                        binding.layoutStonesDetails.setVisibility(View.GONE);
-                    }
-                })
-                .start();
-    }
-}
-
 
 /**
- * ✅ [v6.4] يستخدم RFIDManager.addListener.
+ * ✅ [v6.5] يبدأ المسح — إما مباشرة أو بعد تهيئة القارئ
+ * بدون استدعاء متكرر (no recursion)
  */
 private void activateRFIDModeForEncoding() {
-    // ✅ [FIX-1] حماية من NPE — الزناد قد يُضغط قبل اكتمال التهيئة
-    if (permissionManager == null) {
-        Log.w(TAG, "activateRFIDMode: permissionManager not ready");
-        return;
-    }
-    if (!(permissionManager.canEdit("identity")
-            || permissionManager.isManager())) {
+    if (permissionManager == null) return;
+    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
         showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
         return;
     }
-
-    try {
-        if (appContext == null) {
-            Log.e(TAG, "appContext is null");
-            return;
-        }
-
-        if (isRfidScanning) {
-            Log.d(TAG, "⏭️ Scanning already active");
-            return;
-        }
-
-        // ✅ إعادة تعيين قفل المعالجة عند بدء مسح جديد
-        isProcessingTag.set(false);
-
-        RFIDManager mgr = RFIDManager.getInstance(appContext);
-        if (mgr == null) {
-            Log.e(TAG, "❌ RFIDManager null");
-            stopRfidScanningMode();
-            return;
-        }
-
-        // ✅ [FIX-READY] تحقق من جاهزية القارئ قبل البدء
-        if (!mgr.isReady()) {
-            Log.i(TAG, "⏳ Reader not ready — waiting...");
-            showToast(isArabic
-                    ? "⏳ جاري تهيئة القارئ..."
-                    : "⏳ Initializing reader...");
-
-            // علّم أننا في طور البدء
-            isRfidScanning = true;
-            updateScanningUI(true);
-
-            mgr.ensureReady(new RFIDManager.ReadyCallback() {
-                @Override
-                public void onReady(MiraIRFIDReader reader) {
-                    Log.i(TAG, "✅ Reader ready — starting scan");
-                    safeRun(() -> {
-                        if (isRfidScanning) {
-                            // الآن القارئ جاهز — أعد التهيئة الكاملة
-                            isRfidScanning = false;
-                            updateScanningUI(false);
-                            activateRFIDModeForEncoding();
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(String reason) {
-                    Log.e(TAG, "❌ Reader init failed: " + reason);
-                    safeRun(() -> {
-                        stopRfidScanningMode();
-                        showErrorDialog(
-                                isArabic ? "⚠️ القارئ غير متاح" : "⚠️ Reader unavailable",
-                                reason != null ? reason : "Unknown error");
-                    });
-                }
-            });
-            return;
-        }
-
-        // ✅ القارئ جاهز — تابع مباشرة
-        isRfidScanning = true;
-        updateScanningUI(true);
-
-        encodingRfidListener = new MiraIRFIDReader.OnTagReadListener() {
-        @Override
-public void onTagRead(String epc, int rssi) {
-    if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
-
-    // ✅ الحماية من القراءات المتعددة
-    if (!isProcessingTag.compareAndSet(false, true)) {
-        Log.d(TAG, "⏭️ Ignoring extra tag (already processing): " + epc);
+    if (appContext == null) {
+        Log.e(TAG, "appContext is null");
+        return;
+    }
+    if (isRfidScanning) {
+        Log.d(TAG, "⏭️ Already scanning — ignoring activate");
+        return;
+    }
+    if (!isTriggerDown) {
+        Log.d(TAG, "⏭️ Trigger not down — aborting activate");
         return;
     }
 
-    // ✅ [FIX-TRIGGER] علّم أنه تم استقبال شريحة (لإيقاف أي pending stop)
-    tagReceivedThisScan = true;
-    pendingStopFromTrigger = false;
-   
-final String receivedEpc = epc.trim().toUpperCase(Locale.US);
-secureLog("📡 EPC received: " + maskEpc(receivedEpc));
-
-// ✅ [FIX-2] أوقف المسح أولاً (main thread) — ثم اقرأ TID
-safeRun(() -> {
-    stopRfidScanningMode();
-
-    // الآن القارئ متاح — اقرأ TID على background
-    miraExecutor.getBackgroundExecutor().execute(() -> {
-        try { Thread.sleep(50); } catch (InterruptedException ignored) {}
-
-        String tid = null;
-        try {
-            tid = MiraRfidService.getInstance(appContext).readTid(null);
-        } catch (Exception e) {
-            Log.w(TAG, "readTid failed", e);
-        }
-
-        // ⚠️ فشل TID → خطأ (لا استخدام EPC كـ TID!)
-        if (tid == null || tid.trim().isEmpty()) {
-            Log.e(TAG, "❌ TID read failed");
-            isProcessingTag.set(false);
-            safeRun(() -> {
-                playErrorSound();
-                showErrorDialog(
-                        isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
-                        isArabic
-                            ? "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
-                            : "Cannot read tag TID.\n\n💡 Move tag closer and retry.");
-            });
-            return;
-        }
-
-        final String finalTid = tid.trim().toUpperCase(Locale.US);
-        secureLog("✅ TID read: " + maskEpc(finalTid));
-        safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
-    });
-});
-       
+    RFIDManager mgr = RFIDManager.getInstance(appContext);
+    if (mgr == null) {
+        Log.e(TAG, "❌ RFIDManager null");
+        return;
     }
-    @Override public void onScanStarted() {}
-    @Override public void onScanStopped() {}
-    @Override public void onConnectionChanged(boolean c) {}
-    @Override
-    public void onError(String error) {
-        Log.e(TAG, "RFID error: " + error);
+
+    final int myGen = scanGeneration.incrementAndGet();
+    isRfidScanning = true;
+    updateScanningUI(true);
+
+    if (!mgr.isReady()) {
+        Log.i(TAG, "⏳ Reader not ready — waiting...");
+        showToast(isArabic ? "⏳ جاري تهيئة القارئ..." : "⏳ Initializing reader...");
+
+        mgr.ensureReady(new RFIDManager.ReadyCallback() {
+            @Override
+            public void onReady(MiraIRFIDReader reader) {
+                safeRun(() -> onReaderReadyForScan(myGen, mgr));
+            }
+
+            @Override
+            public void onError(String reason) {
+                safeRun(() -> onReaderInitError(myGen, reason));
+            }
+        });
+        return;
     }
-};
+
+    // القارئ جاهز — ابدأ المسح فوراً
+    startScanWithManager(myGen, mgr);
+}
+
+/**
+ * ✅ callback عند جاهزية القارئ — فحوصات أمان صارمة
+ */
+private void onReaderReadyForScan(int gen, RFIDManager mgr) {
+    // 1) هل الـ callback لا يزال حديثاً؟
+    if (scanGeneration.get() != gen) {
+        Log.d(TAG, "⏭️ Stale ready callback (gen " + gen + " vs " + scanGeneration.get() + ") — ignoring");
+        return;
+    }
+
+    // 2) هل الزناد لا يزال مضغوطاً؟
+    if (!isTriggerDown) {
+        Log.i(TAG, "⏭️ Trigger released during init — aborting");
+        isRfidScanning = false;
+        updateScanningUI(false);
+        return;
+    }
+
+    // 3) هل الـ fragment لا يزال حياً؟
+    if (!isAdded() || binding == null) {
+        Log.d(TAG, "⏭️ Fragment detached — aborting");
+        isRfidScanning = false;
+        return;
+    }
+
+    // تابع المسح
+    startScanWithManager(gen, mgr);
+}
+
+private void onReaderInitError(int gen, String reason) {
+    if (scanGeneration.get() != gen) return;
+    Log.e(TAG, "❌ Reader init failed: " + reason);
+    isRfidScanning = false;
+    updateScanningUI(false);
+    showErrorDialog(
+            isArabic ? "⚠️ القارئ غير متاح" : "⚠️ Reader unavailable",
+            reason != null ? reason : "Unknown error");
+}
+
+/**
+ * ✅ يبدأ المسح الفعلي — التسجيل + startScan + timeout
+ */
+private void startScanWithManager(int gen, RFIDManager mgr) {
+    if (scanGeneration.get() != gen) return;
+    if (!isTriggerDown) {
+        isRfidScanning = false;
+        updateScanningUI(false);
+        return;
+    }
+
+    try {
+        // إنشاء listener
+        encodingRfidListener = new MiraIRFIDReader.OnTagReadListener() {
+            @Override
+            public void onTagRead(String epc, int rssi) {
+                if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
+
+                if (!isProcessingTag.compareAndSet(false, true)) {
+                    Log.d(TAG, "⏭️ Ignoring extra tag (already processing): " + maskEpc(epc));
+                    return;
+                }
+
+                tagReceivedThisScan = true;
+                final String receivedEpc = epc.trim().toUpperCase(Locale.US);
+                secureLog("📡 EPC received: " + maskEpc(receivedEpc));
+
+                // أوقف المسح فوراً ثم اقرأ TID
+                safeRun(() -> {
+                    stopRfidScanningMode();
+
+                    if (miraExecutor == null) {
+                        isProcessingTag.set(false);
+                        return;
+                    }
+
+                    miraExecutor.getBackgroundExecutor().execute(() -> {
+                        try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+
+                        String tid = null;
+                        try {
+                            tid = MiraRfidService.getInstance(appContext).readTid(null);
+                        } catch (Exception e) {
+                            Log.w(TAG, "readTid failed", e);
+                        }
+
+                        if (tid == null || tid.trim().isEmpty()) {
+                            Log.e(TAG, "❌ TID read failed");
+                            isProcessingTag.set(false);
+                            safeRun(() -> {
+                                playErrorSound();
+                                showErrorDialog(
+                                        isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
+                                        isArabic
+                                                ? "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
+                                                : "Cannot read tag TID.\n\n💡 Move tag closer and retry.");
+                            });
+                            return;
+                        }
+
+                        final String finalTid = tid.trim().toUpperCase(Locale.US);
+                        secureLog("✅ TID read: " + maskEpc(finalTid));
+                        safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
+                    });
+                });
+            }
+
+            @Override public void onScanStarted() {}
+            @Override public void onScanStopped() {}
+            @Override public void onConnectionChanged(boolean c) {}
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "RFID error: " + error);
+            }
+        };
 
         mgr.addListener(encodingRfidListener);
 
@@ -1213,14 +830,13 @@ safeRun(() -> {
                 safeRun(() -> {
                     stopRfidScanningMode();
                     showErrorDialog(
-                            isArabic ? "❌ فشل بدء المسح"
-                                     : "❌ Scan start failed",
+                            isArabic ? "❌ فشل بدء المسح" : "❌ Scan start failed",
                             reason != null ? reason : "Reader not ready");
                 });
             }
         });
 
-                showToast(isArabic
+        showToast(isArabic
                 ? "📡 جاري البحث عن شريحة RFID..."
                 : "📡 Searching for RFID tag...");
 
@@ -1231,311 +847,192 @@ safeRun(() -> {
         handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
 
     } catch (Exception e) {
-        Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
+        Log.e(TAG, "startScanWithManager error: " + e.getMessage(), e);
         stopRfidScanningMode();
     }
 }
 
 /**
- * ✅ [FIX-READY] نسخة داخلية — تفترض أن القارئ جاهز
- * (تحتوي على منطق startScan الفعلي)
+ * ✅ [v6.5] إيقاف آمن — لا يُغلق نفسه
+ * يُصفّر كل الحالة ويلغي callbacks قديمة
  */
-private void startScanNow() {
-    RFIDManager mgr = RFIDManager.getInstance(appContext);
-    if (mgr == null) {
-        stopRfidScanningMode();
+private void stopRfidScanningMode() {
+    // 1) إلغاء أي callbacks قديمة معلّقة
+    scanGeneration.incrementAndGet();
+
+    boolean wasScanning = isRfidScanning;
+    isRfidScanning = false;
+    tagReceivedThisScan = false;
+
+    // 2) إزالة timeout المسح
+    if (rfidTimeoutRunnable != null) {
+        handler.removeCallbacks(rfidTimeoutRunnable);
+        rfidTimeoutRunnable = null;
+    }
+
+    // 3) تحديث الواجهة فوراً (حتى لو كان scan غير نشط)
+    updateScanningUI(false);
+
+    if (!wasScanning) return;
+    if (appContext == null || miraExecutor == null) return;
+
+    // 4) حماية من التكرار + timeout
+    if (!stoppingReader.compareAndSet(false, true)) {
+        // ⚠️ عالق من قبل — جدول reset بعد 3 ثوان
+        handler.postDelayed(() -> {
+            if (stoppingReader.get()) {
+                stoppingReader.set(false);
+                Log.w(TAG, "⚠️ stoppingReader force-reset after timeout");
+            }
+        }, STOPPING_READER_TIMEOUT_MS);
         return;
     }
 
-    mgr.startScan(new RFIDManager.ReadyCallback() {
-        @Override
-        public void onReady(MiraIRFIDReader reader) {
-            Log.i(TAG, "✅ Encoding scan started");
-        }
+    final MiraIRFIDReader.OnTagReadListener toRemove = encodingRfidListener;
+    encodingRfidListener = null;
 
-        @Override
-        public void onError(String reason) {
-            Log.e(TAG, "❌ Encoding scan failed: " + reason);
-            safeRun(() -> {
-                stopRfidScanningMode();
-                showErrorDialog(
-                        isArabic ? "❌ فشل بدء المسح"
-                                 : "❌ Scan start failed",
-                        reason != null ? reason : "Reader not ready");
-            });
+    try {
+        miraExecutor.getBackgroundExecutor().execute(() -> {
+            try {
+                RFIDManager mgr = RFIDManager.getInstance(appContext);
+                if (mgr == null) return;
+
+                if (toRemove != null) {
+                    try { mgr.removeListener(toRemove); }
+                    catch (Exception ignored) {}
+                }
+
+                try { mgr.stopScan(); }
+                catch (Exception ignored) {}
+
+                Log.d(TAG, "✅ RFID stopped via manager");
+            } finally {
+                stoppingReader.set(false);
+            }
+        });
+    } catch (Exception e) {
+        // If executor rejected (e.g., shutdown), release lock
+        stoppingReader.set(false);
+        Log.e(TAG, "stopRfidScanningMode execute failed", e);
+    }
+}
+
+private void updateScanningUI(boolean scanning) {
+    safeRun(() -> {
+        if (binding == null) return;
+        if (binding.btnScanRfid != null) {
+            binding.btnScanRfid.setText(scanning
+                    ? (isArabic ? "جاري المسح..." : "Scanning...")
+                    : (isArabic ? "مسح رمز RFID" : "Scan RFID Tag"));
+        }
+        if (binding.tvStatusBadge != null) {
+            if (scanning) {
+                binding.tvStatusBadge.setText("SCANNING...");
+            } else {
+                binding.tvStatusBadge.setText(isEpcBound ? "BOUND" : "WAITING");
+            }
         }
     });
 }
 
-/**
- * ✅ [v6.4] استبدال ذكي — لا حبس المستخدم مع وسم قديم.
- */
- private void processReceivedTag(String epc) {
-    if (epc == null || epc.isEmpty()) return;
-    if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
-    
-    // ✅ [v8.3] احفظ EPC الحقيقي المقروء من القارئ
+// ═══════════════════════════════════════════════════════════════════
+//  Tag Processing
+// ═══════════════════════════════════════════════════════════════════
+
+private void processReceivedTagWithTid(final String epc,
+                                       @Nullable final String preReadTid,
+                                       final String source) {
+    // ✅ [v6.5] نضمن إعادة تعيين isProcessingTag في كل مسار خروج
+    if (epc == null || epc.isEmpty()) {
+        isProcessingTag.set(false);
+        return;
+    }
+    if (!isAdded() || binding == null || isRemoving() || isDetached()) {
+        isProcessingTag.set(false);
+        return;
+    }
+
     final String cleanEpc = epc.trim().toUpperCase(Locale.US);
     lastScannedEpc = cleanEpc;
-    Log.i(TAG, "🎯 Processing received tag EPC: " + cleanEpc);
-
-    miraExecutor.getBackgroundExecutor().execute(() -> {
-        boolean isTagAllowed = false, isDuplicate = false;
-        String actualTid = epc; // القيمة الافتراضية
-        
-        try {
-            MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
-            
-            // ✅ الحل: اقرأ الـ TID الحقيقي من الشريحة
-            String tidFromTag = rfidService.readTid(null);
-            if (tidFromTag != null && !tidFromTag.trim().isEmpty()) {
-                actualTid = tidFromTag.trim().toUpperCase(Locale.US);
-            }
-            
-            // ✅ الحل — السيرفر هو المرجع الموثوق (لأن لديه القائمة الحقيقية)
-boolean isSim = rfidService.isSimulationMode();
-boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
-
-if (!localAllowed && !isSim) {
-    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid) 
-        + " — server verify in /verify-encoding-tag will decide");
-}
-
-// اسمح بالمرور — السيرفر سيرفض في verifyTagWithServerBeforeEncodingSync
-// إذا كانت الشريحة فعلاً غير معتمدة
-isTagAllowed = true;
-            isDuplicate = syncManager.isEpcDuplicateLocally(actualTid);
-            
-        } catch (Exception e) {
-            Log.e(TAG, "processReceivedTag checks error: " + e.getMessage(), e);
-            return;
-        }
-
-        final String finalTid = actualTid; // المتغير النهائي للاستخدام داخل safeRun
-        final boolean fAllowed = isTagAllowed;
-        final boolean fDuplicate = isDuplicate;
-
-        safeRun(() -> {
-            if (binding == null || !isAdded()) return;
-
-            // ═════════════════════════════════════════════
-            //  1) غير معتمدة
-            // ═════════════════════════════════════════════
-            if (!fAllowed) {
-                playErrorSound();
-
-                showScanFeedback(
-                        isArabic ? "❌ شريحة غير معتمدة"
-                                 : "❌ Unauthorized Tag",
-                        isArabic ? "TID: " + finalTid // ✅ تم التعديل هنا
-                                    + "\nليست من الموردين المعتمدين"
-                                 : "TID: " + finalTid // ✅ تم التعديل هنا
-                                    + "\nNot from approved suppliers",
-                        null,
-                        android.R.drawable.ic_delete,
-                        0xFFDC2626);
-
-                showErrorDialog(
-                        isArabic ? "⛔ شريحة غير معتمدة"
-                                 : "⛔ Unauthorized Tag",
-                        isArabic ? "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n"
-                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
-                                    + "🔹 الموردون المعتمدون: SunlandRFID\n\n"
-                                    + "💡 استخدم شريحة من مورد معتمد."
-                                 : "This tag is not from approved inventory:\n\n"
-                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
-                                    + "🔹 Approved: SunlandRFID\n\n"
-                                    + "💡 Use a tag from an approved supplier.");
-                return;
-            }
-
-            // ═════════════════════════════════════════════
-            //  2) مكررة
-            // ═════════════════════════════════════════════
-            if (fDuplicate) {
-                playErrorSound();
-
-                showScanFeedback(
-                        isArabic ? "⚠️ شريحة مكررة"
-                                 : "⚠️ Duplicate Tag",
-                        isArabic ? "TID: " + finalTid // ✅ تم التعديل هنا
-                                    + "\nمسجلة بالفعل في النظام"
-                                 : "TID: " + finalTid // ✅ تم التعديل هنا
-                                    + "\nAlready registered",
-                        null,
-                        android.R.drawable.ic_dialog_alert,
-                        0xFF3B82F6);
-
-                showErrorDialog(
-                        isArabic ? "شريحة مكررة" : "Duplicate Tag",
-                        isArabic ? "هذه الشريحة مسجلة بالفعل في النظام:\n\n"
-                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
-                                    + "🔹 لا يمكن استخدامها مرتين.\n\n"
-                                    + "💡 استخدم شريحة جديدة."
-                                 : "This tag is already registered:\n\n"
-                                    + "🔹 TID: " + finalTid + "\n" // ✅ تم التعديل هنا
-                                    + "🔹 Cannot be reused.\n\n"
-                                    + "💡 Use a new tag.");
-                return;
-            }
-
-            // ═════════════════════════════════════════════
-            //  3) صالحة — استبدال ذكي
-            // ═════════════════════════════════════════════
-            boolean wasReplacing = false;
-            if (isEpcBound && binding.etEpc != null) {
-                String existing = binding.etEpc.getText() != null
-                        ? binding.etEpc.getText().toString().trim() : "";
-
-                if (!existing.isEmpty() && !existing.equals(finalTid)) { // ✅ تم التعديل هنا
-                    wasReplacing = true;
-                    Log.i(TAG, "🔄 Replacing bound tag: " + existing + " → " + finalTid);
-                }
-            }
-
-            if (binding.etEpc != null) {
-                binding.etEpc.setText(finalTid); // ✅ تم التعديل هنا
-                binding.etEpc.setTag(finalTid);  // ✅ تم التعديل هنا
-                isEpcBound = true;
-            }
-            if (binding.tvStatusBadge != null) {
-                binding.tvStatusBadge.setText("BOUND");
-            }
-
-            // ✅ بطاقة نجاح
-            String titleText = wasReplacing
-                    ? (isArabic ? "🔄 تم استبدال الوسم" : "🔄 Tag Replaced")
-                    : (isArabic ? "✅ شريحة صالحة" : "✅ Valid Tag");
-
-            String detailsText = wasReplacing
-                    ? (isArabic ? "TID جديد: " + finalTid + "\nجاهز للتكويد" // ✅ تم التعديل هنا
-                                : "New TID: " + finalTid + "\nReady for encoding")
-                    : (isArabic ? "TID: " + finalTid + "\nجاهزة للتكويد" // ✅ تم التعديل هنا
-                                : "TID: " + finalTid + "\nReady for encoding");
-
-            showScanFeedback(
-                    titleText,
-                    detailsText,
-                    null,
-                    R.drawable.ic_pos_cart_gold,
-                    0xFF22C55E);
-
-            secureLog("✅ Tag accepted: " + maskEpc(finalTid) 
-        + (wasReplacing ? " (replaced)" : ""));
-            playSuccessSound();
-        });
-    });
-}
-
-/**
- * ✅ [تحديث نهائي] نسخة تستقبل TID جاهزاً ومصدر المسح
- * تم إصلاح الخطأ المنطقي لضمان حفظ الـ EPC الحقيقي في الشاشة.
- */
-private void processReceivedTagWithTid(final String epc, @Nullable final String preReadTid, final String source) {
-    if (epc == null || epc.isEmpty()) return;
-    if (!isAdded() || binding == null || isRemoving() || isDetached()) return;
-
-  final String cleanEpc = epc.trim().toUpperCase(Locale.US);
-  lastScannedEpc = cleanEpc;
-  lastScanSource = source;  // ✅ [FIX-6] احفظ المصدر
-    secureLog("🎯 Processing tag: " + maskEpc(cleanEpc) 
-        + " | source=" + source);
+    lastScanSource = source;
+    secureLog("🎯 Processing tag: " + maskEpc(cleanEpc) + " | source=" + source);
 
     miraExecutor.getBackgroundExecutor().execute(() -> {
         boolean isTagAllowed = false, isDuplicate = false;
         String actualTid = cleanEpc;
-        boolean isTidSkipped = false; 
-        
-        // ✅ متغير جديد مخصص لفحص التكرار
-        String idForDuplicateCheck = cleanEpc; 
+        boolean isTidSkipped = false;
+        String idForDuplicateCheck = cleanEpc;
 
         try {
             MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
 
-            // 1) القارئ المكتبي (HID) بدون TID
             if ("DESKTOP_RFID".equals(source) && (preReadTid == null || preReadTid.trim().isEmpty())) {
-                actualTid = "DESKTOP_SKIP_TID"; // للعرض فقط
-                isTagAllowed = true; 
+                actualTid = "DESKTOP_SKIP_TID";
+                isTagAllowed = true;
                 isTidSkipped = true;
-                idForDuplicateCheck = cleanEpc; // ✅ افحص التكرار بناءً على الـ EPC
+                idForDuplicateCheck = cleanEpc;
                 Log.i(TAG, "🖥️ Desktop Reader: Skipping TID verification (allowed by default).");
-            } 
-            // 2) قارئ يرسل TID (أو قارئ Chainway مع TID ممرر)
-            else if (preReadTid != null && !preReadTid.trim().isEmpty()) {
+            } else if (preReadTid != null && !preReadTid.trim().isEmpty()) {
                 actualTid = preReadTid.trim().toUpperCase(Locale.US);
-                // ✅ الحل — السيرفر هو المرجع الموثوق (لأن لديه القائمة الحقيقية)
-boolean isSim = rfidService.isSimulationMode();
-boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
-
-if (!localAllowed && !isSim) {
-    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid) 
-        + " — server verify in /verify-encoding-tag will decide");
-}
-
-// اسمح بالمرور — السيرفر سيرفض في verifyTagWithServerBeforeEncodingSync
-// إذا كانت الشريحة فعلاً غير معتمدة
-isTagAllowed = true;
-                idForDuplicateCheck = actualTid; // ✅ افحص التكرار بناءً على الـ TID
-                Log.i(TAG, "✅ Using pre-read TID: " + actualTid);
-            } 
-            // 3) المسار الأصلي (قارئ Chainway)
-            else {
+                boolean isSim = rfidService.isSimulationMode();
+                boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+                if (!localAllowed && !isSim) {
+                    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid)
+                            + " — server verify in /verify-encoding-tag will decide");
+                }
+                isTagAllowed = true;
+                idForDuplicateCheck = actualTid;
+                Log.i(TAG, "✅ Using pre-read TID: " + maskEpc(actualTid));
+            } else {
                 String tidFromTag = rfidService.readTid(null);
                 if (tidFromTag != null && !tidFromTag.trim().isEmpty()) {
                     actualTid = tidFromTag.trim().toUpperCase(Locale.US);
                 }
-                // ✅ الحل — السيرفر هو المرجع الموثوق (لأن لديه القائمة الحقيقية)
-boolean isSim = rfidService.isSimulationMode();
-boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
-
-if (!localAllowed && !isSim) {
-    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid) 
-        + " — server verify in /verify-encoding-tag will decide");
-}
-
-// اسمح بالمرور — السيرفر سيرفض في verifyTagWithServerBeforeEncodingSync
-// إذا كانت الشريحة فعلاً غير معتمدة
-isTagAllowed = true;
-                idForDuplicateCheck = actualTid; // ✅ افحص التكرار بناءً على الـ TID
-                Log.i(TAG, "✅ Read TID from reader: " + actualTid);
+                boolean isSim = rfidService.isSimulationMode();
+                boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+                if (!localAllowed && !isSim) {
+                    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid)
+                            + " — server verify in /verify-encoding-tag will decide");
+                }
+                isTagAllowed = true;
+                idForDuplicateCheck = actualTid;
+                Log.i(TAG, "✅ Read TID from reader: " + maskEpc(actualTid));
             }
 
-            // ✅ فحص التكرار باستخدام المتغير الصحيح
             isDuplicate = syncManager.isEpcDuplicateLocally(idForDuplicateCheck);
 
         } catch (Exception e) {
             Log.e(TAG, "processReceivedTagWithTid checks error: " + e.getMessage(), e);
-            safeRun(() -> isProcessingTag.set(false));
+            isProcessingTag.set(false);
             return;
         }
 
         final String finalTid = actualTid;
-// ✅ [FIX-7] تحقق من طول TID
-if (!isTidSkipped && ENABLE_TID_LENGTH_VALIDATION) {
-    if (finalTid.length() < MIN_TID_LENGTH 
-            || finalTid.length() > MAX_TID_LENGTH) {
-        isProcessingTag.set(false);
-        safeRun(() -> {
-            playErrorSound();
-            showErrorDialog(
-                    isArabic ? "⚠️ TID غير صالح" : "⚠️ Invalid TID",
-                    isArabic ? "طول TID غير متوقع: " + finalTid.length() + " حرف"
-                             : "Unexpected TID length: " + finalTid.length() + " chars");
-        });
-        return;
-    }
-}
+
+        // فحص طول TID
+        if (!isTidSkipped && ENABLE_TID_LENGTH_VALIDATION) {
+            if (finalTid.length() < MIN_TID_LENGTH || finalTid.length() > MAX_TID_LENGTH) {
+                isProcessingTag.set(false);
+                safeRun(() -> {
+                    playErrorSound();
+                    showErrorDialog(
+                            isArabic ? "⚠️ TID غير صالح" : "⚠️ Invalid TID",
+                            isArabic ? "طول TID غير متوقع: " + finalTid.length() + " حرف"
+                                     : "Unexpected TID length: " + finalTid.length() + " chars");
+                });
+                return;
+            }
+        }
+
         final boolean fAllowed = isTagAllowed;
         final boolean fDuplicate = isDuplicate;
         final boolean fTidSkipped = isTidSkipped;
-        // ✅ المتغير النهائي الذي سيتم وضعه في حقل الشاشة
-        final String displayEpcValue = isTidSkipped ? cleanEpc : actualTid; 
+        final String displayEpcValue = isTidSkipped ? cleanEpc : actualTid;
 
         safeRun(() -> {
             try {
                 if (binding == null || !isAdded()) return;
 
-                // 1) غير معتمدة
                 if (!fAllowed) {
                     playErrorSound();
                     showScanFeedback(
@@ -1550,7 +1047,6 @@ if (!isTidSkipped && ENABLE_TID_LENGTH_VALIDATION) {
                     return;
                 }
 
-                // 2) مكررة
                 if (fDuplicate) {
                     playErrorSound();
                     showScanFeedback(
@@ -1565,17 +1061,16 @@ if (!isTidSkipped && ENABLE_TID_LENGTH_VALIDATION) {
                     return;
                 }
 
-                // 3) صالحة
                 boolean wasReplacing = false;
                 if (isEpcBound && binding.etEpc != null) {
-                    String existing = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
+                    String existing = binding.etEpc.getText() != null
+                            ? binding.etEpc.getText().toString().trim() : "";
                     if (!existing.isEmpty() && !existing.equals(displayEpcValue)) {
                         wasReplacing = true;
                     }
                 }
 
                 if (binding.etEpc != null) {
-                    // ✅ هنا نضع الكود الحقيقي (EPC) وليس "DESKTOP_SKIP_TID"
                     binding.etEpc.setText(displayEpcValue);
                     binding.etEpc.setTag(displayEpcValue);
                     isEpcBound = true;
@@ -1588,15 +1083,18 @@ if (!isTidSkipped && ENABLE_TID_LENGTH_VALIDATION) {
                         ? (isArabic ? "🔄 تم استبدال الوسم" : "🔄 Tag Replaced")
                         : (isArabic ? "✅ شريحة صالحة" : "✅ Valid Tag");
 
-                String tidDisplay = fTidSkipped 
+                String tidDisplay = fTidSkipped
                         ? (isArabic ? "غير متوفر (قارئ مكتبي)" : "N/A (Desktop)")
                         : finalTid;
 
                 String detailsText = wasReplacing
-                        ? (isArabic ? "TID جديد: " + tidDisplay + "\nجاهز للتكويد" : "New TID: " + tidDisplay + "\nReady for encoding")
-                        : (isArabic ? "TID: " + tidDisplay + "\nجاهزة للتكويد" : "TID: " + tidDisplay + "\nReady for encoding");
+                        ? (isArabic ? "TID جديد: " + tidDisplay + "\nجاهز للتكويد"
+                                    : "New TID: " + tidDisplay + "\nReady for encoding")
+                        : (isArabic ? "TID: " + tidDisplay + "\nجاهزة للتكويد"
+                                    : "TID: " + tidDisplay + "\nReady for encoding");
 
-                showScanFeedback(titleText, detailsText, null, R.drawable.ic_pos_cart_gold, 0xFF22C55E);
+                showScanFeedback(titleText, detailsText, null,
+                        R.drawable.ic_pos_cart_gold, 0xFF22C55E);
                 playSuccessSound();
 
             } finally {
@@ -1606,105 +1104,29 @@ if (!isTidSkipped && ENABLE_TID_LENGTH_VALIDATION) {
     });
 }
 
-// ✅ دالة توافق عكسي (تستخدم المسار الافتراضي للقارئ اليدوي)
 private void processReceivedTagWithTid(final String epc, @Nullable final String preReadTid) {
     processReceivedTagWithTid(epc, preReadTid, "CHAINWAY");
 }
-/**
- * ✅ [v6.4] يستخدم RFIDManager.removeListener + stopScan.
- */
-private void stopRfidScanningMode() {
-    if (!stoppingReader.compareAndSet(false, true)) {
-        return;
-    }
-
-    isRfidScanning = false;
-    // ✅ [FIX-TRIGGER] أعد تعيين الأعلام
-    pendingStopFromTrigger = false;
-    tagReceivedThisScan = false;
-
-    if (rfidTimeoutRunnable != null) {
-        handler.removeCallbacks(rfidTimeoutRunnable);
-        rfidTimeoutRunnable = null;
-    }
-
-    updateScanningUI(false);
-
-    if (appContext == null || miraExecutor == null) {
-        stoppingReader.set(false);
-        return;
-    }
-
-    final MiraIRFIDReader.OnTagReadListener listenerToRemove = encodingRfidListener;
-    encodingRfidListener = null;
-
-    miraExecutor.getBackgroundExecutor().execute(() -> {
-        try {
-            RFIDManager mgr = RFIDManager.getInstance(appContext);
-            if (mgr == null) return;
-
-            if (listenerToRemove != null) {
-                try { mgr.removeListener(listenerToRemove); }
-                catch (Exception ignored) {}
-            }
-
-            try { mgr.stopScan(); }
-            catch (Exception ignored) {}
-
-            Log.d(TAG, "✅ RFID stopped via manager");
-
-        } finally {
-            stoppingReader.set(false);
-        }
-    });
-}
-
-private void updateScanningUI(boolean scanning) {
-    safeRun(() -> {
-        if (binding == null) return;
-        if (binding.btnScanRfid != null) {
-            binding.btnScanRfid.setText(scanning
-                    ? (isArabic ? "جاري المسح..." : "Scanning...")
-                    : (isArabic ? "مسح رمز RFID" : "Scan RFID Tag"));
-        }
-        if (binding.tvStatusBadge != null) {
-    if (scanning) {
-        binding.tvStatusBadge.setText("SCANNING...");
-    } else {
-        // ✅ [FIX-5] لا تُبقِ "SCANNING..." عالقة
-        binding.tvStatusBadge.setText(isEpcBound ? "BOUND" : "WAITING");
-    }
-}
-    });
-}
 
 /**
- * ✅ نقطة الدخول من UHFMainActivity (مسارات أخرى، نادرة).
+ * ✅ نقطة الدخول من UHFMainActivity (نادرة)
  */
 public void onRfidScanned(String epc) {
     if (!isAdded() || getActivity() == null) return;
     if (epc == null || epc.trim().isEmpty()) return;
     if (appContext == null || miraExecutor == null) return;
-    
-    // ✅ [SECURITY] فحص صلاحيات — مطابق لـ myOnKeyDwon
-    if (permissionManager == null) {
-        Log.w(TAG, "onRfidScanned: permissionManager null");
-        return;
-    }
-    if (!permissionManager.canEdit("identity") && !permissionManager.isManager()) {
+
+    if (permissionManager == null
+            || (!permissionManager.canEdit("identity") && !permissionManager.isManager())) {
         Log.w(TAG, "onRfidScanned: unauthorized — ignoring");
         return;
     }
-    if (isFormLocked) {
-        Log.d(TAG, "onRfidScanned: form locked — ignoring");
-        return;
-    }
+    if (isFormLocked) return;
 
     final String scannedEpc = epc.trim().toUpperCase(Locale.US);
-    Log.i(TAG, "📡 onRfidScanned (external): " + scannedEpc);
+    Log.i(TAG, "📡 onRfidScanned (external): " + maskEpc(scannedEpc));
     lastScannedEpc = scannedEpc;
 
-    // ✅ [FIX-3] استخدم المسار الموحّد بدل processReceivedTag القديمة
     if (!isProcessingTag.compareAndSet(false, true)) {
         Log.d(TAG, "⏭️ onRfidScanned skipped — already processing");
         return;
@@ -1733,6 +1155,316 @@ public void onRfidScanned(String epc) {
         });
     });
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  Server Verification
+// ═══════════════════════════════════════════════════════════════════
+
+private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, String source) {
+    if (apiClient == null) {
+        return isArabic ? "❌ لا اتصال بالسيرفر" : "❌ No server connection";
+    }
+    try {
+        JSONObject payload = new JSONObject();
+        payload.put("source", source != null ? source : "CHAINWAY");
+
+        if ("DESKTOP_RFID".equals(source)) {
+            if (epc != null && !epc.isEmpty()) payload.put("epc", epc);
+        } else {
+            if (tid != null && !tid.isEmpty()) payload.put("tid", tid);
+            if (epc != null && !epc.isEmpty()) payload.put("epc", epc);
+        }
+
+        Log.d(TAG, "[VERIFY] Sending: " + payload.toString());
+
+        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/verify-encoding-tag", payload);
+
+        if (response == null) {
+            return isArabic ? "❌ لم يتم استلام رد من السيرفر" : "❌ No response from server";
+        }
+        if (!response.isSuccess) {
+            String errorMsg = extractErrorMessage(response);
+            Log.w(TAG, "[VERIFY] Rejected: " + errorMsg);
+            return errorMsg != null ? errorMsg
+                    : (isArabic ? "الشريحة غير معتمدة" : "Tag not authorized");
+        }
+
+        Log.i(TAG, "✅ [VERIFY] Tag approved by server");
+        return null;
+    } catch (Exception e) {
+        Log.e(TAG, "[VERIFY] Exception", e);
+        return isArabic
+                ? "❌ خطأ في التحقق: " + e.getMessage()
+                : "❌ Verification error: " + e.getMessage();
+    }
+}
+    // ═══════════════════════════════════════════════════════════════════
+    //  Calculations
+    // ═══════════════════════════════════════════════════════════════════
+
+    private void calculateEstimatedGoldValue() {
+        try {
+            if (binding == null || binding.etGrossWeight == null) return;
+
+            String weightStr = binding.etGrossWeight.getText() != null
+                    ? binding.etGrossWeight.getText().toString().trim() : "";
+            if (weightStr.isEmpty()) {
+                resetCalculatedDisplay();
+                return;
+            }
+
+            double grossWeight = Double.parseDouble(weightStr);
+            if (grossWeight <= 0) {
+                resetCalculatedDisplay();
+                return;
+            }
+
+            double stoneWeightCarats = 0.0;
+            double stoneValue = 0.0;
+
+            if (binding.switchHasStones.isChecked()) {
+                String sWeight = binding.etStoneWeight.getText() != null
+                        ? binding.etStoneWeight.getText().toString().trim() : "";
+                String sValue = binding.etStoneValue.getText() != null
+                        ? binding.etStoneValue.getText().toString().trim() : "";
+
+                if (!sWeight.isEmpty()) stoneWeightCarats = Double.parseDouble(sWeight);
+                if (!sValue.isEmpty()) stoneValue = Double.parseDouble(sValue);
+            }
+
+            int karat = getSelectedKaratNumber();
+            double[] pricing = PricingCalculator.calculatePricingDetails(
+                    grossWeight, stoneWeightCarats, stoneValue, karat, priceManager);
+            double totalPrice = pricing[5];
+
+            String formattedPrice = priceManager.formatPriceDefault(totalPrice);
+            binding.tvEstimatedGoldValue.setText(formattedPrice);
+            binding.tvSummaryPrice.setText(formattedPrice);
+
+        } catch (NumberFormatException e) {
+            resetCalculatedDisplay();
+        } catch (Exception e) {
+            Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage(), e);
+        }
+    }
+
+    private void resetCalculatedDisplay() {
+        try {
+            if (binding == null) return;
+            String zeroText = "0.00 " + priceManager.getCurrencySymbol(
+                    priceManager.getDefaultCurrency());
+            binding.tvEstimatedGoldValue.setText(zeroText);
+            binding.tvSummaryPrice.setText(zeroText);
+        } catch (Exception e) {
+            Log.e(TAG, "resetCalculatedDisplay error: " + e.getMessage());
+        }
+    }
+
+    private int getSelectedKaratNumber() {
+        try {
+            if (binding == null) return 21;
+            int checkedId = binding.chipGroupKarat.getCheckedChipId();
+            if (checkedId == binding.chip24K.getId()) return 24;
+            if (checkedId == binding.chip21K.getId()) return 21;
+            if (checkedId == binding.chip18K.getId()) return 18;
+            if (checkedId == binding.chip14K.getId()) return 14;
+        } catch (Exception e) {
+            Log.e(TAG, "getSelectedKaratNumber error: " + e.getMessage());
+        }
+        return 21;
+    }
+
+    private String getSelectedKaratCode() {
+        return getSelectedKaratNumber() + "K";
+    }
+
+    private String getSelectedCategory() {
+        try {
+            if (binding == null) return isArabic ? "مجوهرات" : "Jewelry";
+            int checkedId = binding.chipGroupTypes.getCheckedChipId();
+            if (checkedId == binding.chipRing.getId()) return isArabic ? "خواتم" : "Rings";
+            if (checkedId == binding.chipSet.getId()) return isArabic ? "أطقم" : "Sets";
+            if (checkedId == binding.chipBracelet.getId()) return isArabic ? "أساور" : "Bracelets";
+            if (checkedId == binding.chipNecklace.getId()) return isArabic ? "عقود" : "Necklaces";
+        } catch (Exception e) {
+            Log.e(TAG, "getSelectedCategory error: " + e.getMessage());
+        }
+        return isArabic ? "مجوهرات" : "Jewelry";
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Listeners
+    // ═══════════════════════════════════════════════════════════════════
+
+    private void setupListeners() {
+        try {
+            if (binding == null) return;
+
+            binding.etEpc.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void afterTextChanged(Editable s) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    if (binding == null || binding.tvStatusBadge == null) return;
+
+                    if (s.length() == 0) {
+                        binding.tvStatusBadge.setText("WAITING");
+                        binding.tvStatusBadge.setTextColor(0xFF6B7280);
+                        if (isEpcBound) {
+                            isEpcBound = false;
+                            Log.d(TAG, "🔓 EPC unbound (field cleared)");
+                        }
+                    } else if (!isEpcBound) {
+                        binding.tvStatusBadge.setText(
+                                isArabic ? "⚠️ كتابة يدوية" : "⚠️ TYPED");
+                        binding.tvStatusBadge.setTextColor(0xFFF59E0B);
+                    } else {
+                        binding.tvStatusBadge.setText(
+                                isArabic ? "✅ موثّق" : "✅ VERIFIED");
+                        binding.tvStatusBadge.setTextColor(0xFF22C55E);
+                    }
+                }
+            });
+
+            if (binding.tilEpc != null) {
+                binding.tilEpc.setEndIconOnClickListener(v -> openBarcodeScannerForEPC());
+            }
+
+            binding.btnScanRfid.setOnClickListener(v -> showScanMethodOptions());
+
+            binding.btnScanRfid.setOnLongClickListener(v -> {
+                openEncodingPowerSettings();
+                return true;
+            });
+
+            View stonesContainer = binding.getRoot().findViewById(R.id.layoutStonesContainer);
+            if (stonesContainer != null) {
+                stonesContainer.setOnClickListener(v -> {
+                    if (isFormLocked) {
+                        showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
+                        return;
+                    }
+                    boolean newState = !binding.switchHasStones.isChecked();
+                    binding.switchHasStones.setChecked(newState);
+                    toggleStonesDetails(newState);
+                    calculateEstimatedGoldValue();
+                });
+            }
+
+            binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                toggleStonesDetails(isChecked);
+                calculateEstimatedGoldValue();
+            });
+
+            TextWatcher calculationWatcher = new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void afterTextChanged(Editable s) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    calculateEstimatedGoldValue();
+                }
+            };
+
+            binding.etGrossWeight.addTextChangedListener(calculationWatcher);
+            binding.etStoneWeight.addTextChangedListener(calculationWatcher);
+            binding.etStoneValue.addTextChangedListener(calculationWatcher);
+
+            binding.chipGroupKarat.setOnCheckedStateChangeListener(
+                    (group, checkedIds) -> calculateEstimatedGoldValue());
+
+            binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
+                if (checkedIds.isEmpty()) return;
+                int id = checkedIds.get(0);
+                if (id == binding.chipRing.getId()) populateSuggestions("rings");
+                else if (id == binding.chipSet.getId()) populateSuggestions("sets");
+                else if (id == binding.chipBracelet.getId()) populateSuggestions("bracelets");
+                else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
+            });
+
+            binding.btnAddPhotos.setOnClickListener(v -> {
+                if (isFormLocked) {
+                    showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
+                    return;
+                }
+                if (photoManager != null && photoManager.getPhotoCount() >= MAX_PHOTOS) {
+                    showToast(isArabic
+                            ? "⚠️ الحد الأقصى " + MAX_PHOTOS + " صور"
+                            : "⚠️ Maximum " + MAX_PHOTOS + " photos");
+                    return;
+                }
+                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                    showImageSourceDialog();
+                } else {
+                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                }
+            });
+
+            binding.btnSaveIdentity.setOnClickListener(v -> {
+                if (isFormLocked) {
+                    showToast(isArabic
+                            ? "⛔ العملية قيد التنفيذ، يرجى الانتظار..."
+                            : "⛔ Operation in progress...");
+                    return;
+                }
+                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                    finalizeItemIdentity();
+                } else {
+                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                }
+            });
+
+            binding.btnViewPending.setOnClickListener(v -> openSyncLogFragment());
+
+        } catch (Exception e) {
+            Log.e(TAG, "setupListeners error: " + e.getMessage(), e);
+        }
+    }
+
+    private void showScanMethodOptions() {
+        if (isFormLocked) {
+            showToast(isArabic ? "⛔ النموذج مقفل" : "⛔ Form is locked");
+            return;
+        }
+
+        String[] options = {
+                isArabic ? "📡 مسح بالقارئ اليدوي (الزناد)" : "📡 Scan with Handheld Reader",
+                isArabic ? "🖥️ مسح بالقارئ المكتبي (USB)" : "🖥️ Scan with Desktop Reader"
+        };
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "اختر طريقة المسح" : "Choose Scan Method")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        showToast(isArabic
+                                ? "🎯 اضغط زر الزناد في القارئ اليدوي الآن"
+                                : "🎯 Press the handheld reader trigger now");
+                    } else {
+                        activateDesktopScannerMode();
+                    }
+                })
+                .show();
+    }
+
+    private void toggleStonesDetails(boolean show) {
+        if (binding == null || binding.layoutStonesDetails == null) return;
+
+        if (show) {
+            binding.layoutStonesDetails.setVisibility(View.VISIBLE);
+            binding.layoutStonesDetails.setAlpha(0f);
+            binding.layoutStonesDetails.setTranslationY(-10f);
+            binding.layoutStonesDetails.animate()
+                    .alpha(1f).translationY(0f).setDuration(250).start();
+        } else {
+            binding.layoutStonesDetails.animate()
+                    .alpha(0f).translationY(-10f).setDuration(200)
+                    .withEndAction(() -> {
+                        if (binding != null && binding.layoutStonesDetails != null) {
+                            binding.layoutStonesDetails.setVisibility(View.GONE);
+                        }
+                    })
+                    .start();
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     //  Suggestions
@@ -1798,14 +1530,12 @@ public void onRfidScanned(String epc) {
 
     private void showImageSourceDialog() {
         if (getContext() == null || !isAdded()) return;
-        if (!(permissionManager.canEdit("identity")
-                || permissionManager.isManager())) {
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
 
-        MaterialAlertDialogBuilder builder =
-                new MaterialAlertDialogBuilder(requireContext());
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
         builder.setTitle(isArabic ? "إضافة صورة" : "Add Photo");
         String[] options = {
                 isArabic ? "📷 التقاط صورة" : "📷 Take Photo",
@@ -1832,14 +1562,12 @@ public void onRfidScanned(String epc) {
         try {
             if (getContext() == null) return;
             Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            if (takePictureIntent.resolveActivity(
-                    getContext().getPackageManager()) != null) {
+            if (takePictureIntent.resolveActivity(getContext().getPackageManager()) != null) {
                 File photoFile = createImageFile();
                 if (photoFile != null) {
                     photoUri = FileProvider.getUriForFile(
                             getContext(),
-                            getContext().getApplicationContext().getPackageName()
-                                    + ".fileprovider",
+                            getContext().getApplicationContext().getPackageName() + ".fileprovider",
                             photoFile);
                     takePhotoLauncher.launch(photoUri);
                 }
@@ -1859,653 +1587,698 @@ public void onRfidScanned(String epc) {
 
     private File createImageFile() throws IOException {
         if (getContext() == null) return null;
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
-                .format(new Date());
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         File storageDir = getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         File image = File.createTempFile("MIRA_" + timeStamp + "_", ".jpg", storageDir);
         currentPhotoPath = image.getAbsolutePath();
         return image;
     }
 
-private void activateDesktopScannerMode() {
-    if (binding == null || binding.etEpc == null) return;
-    
-    // 1. تغيير النص الإرشادي
-    binding.etEpc.setHint(isArabic ? "قرب الشريحة من القارئ المكتبي..." : "Approach tag to Desktop Reader...");
-    
-    // 2. إجبار المؤشر على حقل الإدخال
-    binding.etEpc.requestFocus();
-    
-    // 3. إخفاء لوحة مفاتيح الهاتف الافتراضية (مهم جداً)
-    try {
-        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) 
-                requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            imm.hideSoftInputFromWindow(binding.etEpc.getWindowToken(), 0);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Failed to hide keyboard", e);
-    }
-    
-    // 4. تفعيل المعالج
-    if (desktopScanHandler == null) {
-        desktopScanHandler = new DesktopScanHandler(binding.etEpc);
-    }
-    
-    desktopScanHandler.setOnDesktopScanListener(epc -> {
-        Log.i(TAG, "🖥️ Desktop Reader Scanned: " + epc);
-        
-        // ✅ تم التعديل هنا لتمرير المصدر "DESKTOP_RFID"
-        processReceivedTagWithTid(epc, null, "DESKTOP_RFID");
-    });
-    
-    showToast(isArabic ? "🖥️ جاهز للمسح بالقارئ المكتبي" : "🖥️ Desktop Reader Ready");
-}
+    private void activateDesktopScannerMode() {
+        if (binding == null || binding.etEpc == null) return;
 
-// 3. إيقاف القارئ المكتبي (يُستدعى عند الانتهاء أو تغيير الوضع)
-private void stopDesktopScannerMode() {
-    if (binding != null && binding.etEpc != null) {
-        binding.etEpc.setHint(isArabic ? "رمز الشريحة (EPC / GTIN)..." : "EPC / GTIN Code...");
+        binding.etEpc.setHint(isArabic
+                ? "قرب الشريحة من القارئ المكتبي..."
+                : "Approach tag to Desktop Reader...");
+        binding.etEpc.requestFocus();
+
+        try {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager)
+                            requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(binding.etEpc.getWindowToken(), 0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to hide keyboard", e);
+        }
+
+        if (desktopScanHandler == null) {
+            desktopScanHandler = new DesktopScanHandler(binding.etEpc);
+        }
+
+        desktopScanHandler.setOnDesktopScanListener(epc -> {
+            Log.i(TAG, "🖥️ Desktop Reader Scanned: " + maskEpc(epc));
+            processReceivedTagWithTid(epc, null, "DESKTOP_RFID");
+        });
+
+        showToast(isArabic ? "🖥️ جاهز للمسح بالقارئ المكتبي" : "🖥️ Desktop Reader Ready");
     }
-}
+
+    private void stopDesktopScannerMode() {
+        if (binding != null && binding.etEpc != null) {
+            binding.etEpc.setHint(isArabic ? "رمز الشريحة (EPC / GTIN)..." : "EPC / GTIN Code...");
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //  Barcode Scanner (for EPC)
     // ═══════════════════════════════════════════════════════════════════
 
     private void openBarcodeScannerForEPC() {
-    try {
-        if (!isAdded() || getActivity() == null) return;
+        try {
+            if (!isAdded() || getActivity() == null) return;
 
-        FragmentManager fm = getParentFragmentManager();
-        if (fm.isStateSaved()) {
-            Log.w(TAG, "State saved, cannot open scanner");
+            FragmentManager fm = getParentFragmentManager();
+            if (fm.isStateSaved()) {
+                Log.w(TAG, "State saved, cannot open scanner");
+                return;
+            }
+            if (fm.findFragmentByTag("barcode_scanner_tag") != null) {
+                Log.w(TAG, "Scanner already open");
+                return;
+            }
+
+            MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
+            sf.setOnBarcodeScannedListener((data, format) -> {
+                if (data != null && !data.trim().isEmpty()) {
+                    pendingBarcodeFromScanner = data.trim().toUpperCase(Locale.US);
+                }
+                try {
+                    if (fm.getBackStackEntryCount() > 0) fm.popBackStack();
+                } catch (Exception e) {
+                    Log.e(TAG, "popBackStack error", e);
+                }
+            });
+
+            View view = getView();
+            int cid = (view != null && view.getParent() instanceof View)
+                    ? ((View) view.getParent()).getId()
+                    : android.R.id.content;
+
+            fm.beginTransaction()
+                    .setReorderingAllowed(true)
+                    .setCustomAnimations(
+                            android.R.anim.fade_in, android.R.anim.fade_out,
+                            android.R.anim.fade_in, android.R.anim.fade_out)
+                    .hide(this)
+                    .add(cid, sf, "barcode_scanner_tag")
+                    .addToBackStack("barcode_scanner_encode")
+                    .commit();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Barcode scanner error: " + e.getMessage(), e);
+            showToast(isArabic ? "❌ خطأ في فتح الماسح" : "❌ Scanner error");
+        }
+    }
+
+    private void processPendingBarcode() {
+        final String scannedCode = pendingBarcodeFromScanner;
+        if (scannedCode == null || scannedCode.isEmpty()) return;
+        pendingBarcodeFromScanner = null;
+
+        final String extractedIdentifier = extractIdentifierFromBarcode(scannedCode);
+
+        if (extractedIdentifier.isEmpty()
+                || extractedIdentifier.length() < 2
+                || extractedIdentifier.length() > 128) {
+            playErrorSound();
+            showScanFeedback(
+                    isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+                    isArabic ? "الطول: " + extractedIdentifier.length() + " حرف"
+                             : "Length: " + extractedIdentifier.length() + " chars",
+                    null, android.R.drawable.ic_dialog_alert, 0xFFDC2626);
+            showErrorDialog(
+                    isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
+                    isArabic ? "طول الباركود غير منطقي أو غير معروف"
+                             : "Barcode length unreasonable or unknown");
             return;
         }
-        if (fm.findFragmentByTag("barcode_scanner_tag") != null) {
-            Log.w(TAG, "Scanner already open");
-            return;
-        }
 
-        MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
-        sf.setOnBarcodeScannedListener((data, format) -> {
-            if (data != null && !data.trim().isEmpty()) {
-                // ✅ احفظ الكود مؤقتاً فقط، ولا تتعامل مع الواجهة الآن
-                pendingBarcodeFromScanner = data.trim().toUpperCase(Locale.US);
-            }
-            
-            // ✅ أغلق الماسح ليتم استدعاء onHiddenChanged في شاشة التكويد
-            try {
-                if (fm.getBackStackEntryCount() > 0) fm.popBackStack();
-            } catch (Exception e) {
-                Log.e(TAG, "popBackStack error", e);
-            }
+        if (miraExecutor == null) return;
+        miraExecutor.getBackgroundExecutor().execute(() -> {
+            final boolean isDuplicate = syncManager != null
+                    && syncManager.isEpcDuplicateLocally(extractedIdentifier);
+
+            safeRun(() -> {
+                if (binding == null || !isAdded()) return;
+
+                if (isDuplicate) {
+                    playErrorSound();
+                    showScanFeedback(
+                            isArabic ? "⚠️ باركود مكرر" : "⚠️ Duplicate Barcode",
+                            isArabic ? extractedIdentifier + "\nمسجل بالفعل"
+                                     : extractedIdentifier + "\nAlready registered",
+                            null, android.R.drawable.ic_dialog_alert, 0xFF3B82F6);
+                    showErrorDialog(
+                            isArabic ? "باركود مكرر" : "Duplicate Barcode",
+                            isArabic ? "هذا الكود مسجل بالفعل:\n" + extractedIdentifier
+                                     : "This code is already registered:\n" + extractedIdentifier);
+                    return;
+                }
+
+                if (binding.etEpc != null) {
+                    binding.etEpc.setText(extractedIdentifier);
+                    binding.etEpc.setTag(extractedIdentifier);
+                }
+                if (binding.tvStatusBadge != null) {
+                    binding.tvStatusBadge.setText(
+                            isArabic ? "⚠️ باركود (للبحث فقط)"
+                                     : "⚠️ Barcode (lookup only)");
+                    binding.tvStatusBadge.setTextColor(0xFFF59E0B);
+                }
+
+                isEpcBound = false;
+
+                showScanFeedback(
+                        isArabic ? "🔍 باركود للبحث فقط" : "🔍 Barcode (Lookup)",
+                        isArabic
+                                ? "الباركود يحدد القطعة، لكن يجب مسح شريحة RFID للتكويد"
+                                : "Barcode identifies item, but RFID scan is required to encode",
+                        null, android.R.drawable.ic_dialog_info, 0xFF3B82F6);
+
+                showErrorDialog(
+                        isArabic ? "⚠️ الباركود لا يكفي" : "⚠️ Barcode is not sufficient",
+                        isArabic
+                                ? "لتكويد القطعة:\n\n" +
+                                  "1. استخدم زر مسح RFID\n" +
+                                  "2. قرّب الشريحة من القارئ\n" +
+                                  "3. اضغط الزناد"
+                                : "To encode:\n\n" +
+                                  "1. Use RFID scan button\n" +
+                                  "2. Move tag near reader\n" +
+                                  "3. Press trigger");
+
+                Log.i(TAG, "🔍 Barcode accepted for lookup only: " + extractedIdentifier);
+            });
         });
-
-        View view = getView();
-        int cid = (view != null && view.getParent() instanceof View)
-                ? ((View) view.getParent()).getId()
-                : android.R.id.content;
-
-        // ✅ الحل: استخدم hide بدلاً من replace للحفاظ على واجهة التكويد حية
-        fm.beginTransaction()
-                .setReorderingAllowed(true)
-                .setCustomAnimations(
-                        android.R.anim.fade_in, android.R.anim.fade_out,
-                        android.R.anim.fade_in, android.R.anim.fade_out)
-                .hide(this) // إخفاء شاشة التكويد
-                .add(cid, sf, "barcode_scanner_tag") // إضافة الماسح فوقها
-                .addToBackStack("barcode_scanner_encode")
-                .commit();
-
-    } catch (Exception e) {
-        Log.e(TAG, "Barcode scanner error: " + e.getMessage(), e);
-        showToast(isArabic ? "❌ خطأ في فتح الماسح" : "❌ Scanner error");
     }
-}
 
-/**
- * ✅ [SECURITY] التحقق من الشريحة من السيرفر قبل التكويد
- * 
- * ⚠️ يجب استدعاؤها من thread خلفي (ليست UI-safe)
- * 
- * يمنع:
- *  - الشرائح المزيفة (ليست في القائمة البيضاء على السيرفر)
- *  - TID المزور (يرسل TID مختلف عما في DB)
- *  - Desktop reader بدون GTIN/EPC مسجل
- *  - التطبيقات المخترقة (APK معدل)
- * 
- * @return null إذا نجح (verified)، أو رسالة خطأ إذا فشل
- */
-private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, String source) {
-    if (apiClient == null) {
-        return isArabic ? "❌ لا اتصال بالسيرفر" : "❌ No server connection";
-    }
-    
-    try {
-        JSONObject payload = new JSONObject();
-        payload.put("source", source != null ? source : "CHAINWAY");
-        
-        if ("DESKTOP_RFID".equals(source)) {
-            // Desktop: EPC فقط (لا TID)
-            if (epc != null && !epc.isEmpty()) {
-                payload.put("epc", epc);
-            }
-        } else {
-            // Chainway: TID + EPC
-            if (tid != null && !tid.isEmpty()) {
-                payload.put("tid", tid);
-            }
-            if (epc != null && !epc.isEmpty()) {
-                payload.put("epc", epc);
+    private String extractIdentifierFromBarcode(String rawBarcode) {
+        if (rawBarcode == null || rawBarcode.isEmpty()) return "";
+        String clean = rawBarcode.trim();
+
+        if (clean.startsWith("http://") || clean.startsWith("https://")) {
+            try {
+                android.net.Uri uri = android.net.Uri.parse(clean);
+                String lastSegment = uri.getLastPathSegment();
+                if (lastSegment != null && lastSegment.matches("^MIRA-SN-\\d+$")) {
+                    return lastSegment;
+                }
+                String serial = uri.getQueryParameter("serial");
+                if (serial == null) serial = uri.getQueryParameter("sn");
+                if (serial != null && serial.matches("^MIRA-SN-\\d+$")) {
+                    return serial;
+                }
+                return "";
+            } catch (Exception ignored) {
+                return "";
             }
         }
-        
-        Log.d(TAG, "[VERIFY] Sending: " + payload.toString());
-        
-        MiraApiClient.ApiResponse response = apiClient.postWithAuth(
-                "/verify-encoding-tag", payload);
-        
-        if (response == null) {
-            return isArabic 
-                ? "❌ لم يتم استلام رد من السيرفر" 
-                : "❌ No response from server";
+
+        String gs1 = clean.replace('\u001D', '|').replace("(#)", "|");
+        java.util.regex.Matcher mSerial = java.util.regex.Pattern
+                .compile("(?:^|\\|)21(MIRA-SN-\\d+)")
+                .matcher(gs1);
+        if (mSerial.find()) {
+            String serial = mSerial.group(1);
+            if (serial != null && serial.matches("^MIRA-SN-\\d+$")) {
+                return serial;
+            }
         }
-        
-        if (!response.isSuccess) {
-            String errorMsg = extractErrorMessage(response);
-            Log.w(TAG, "[VERIFY] Rejected: " + errorMsg);
-            return errorMsg != null ? errorMsg : 
-                (isArabic ? "الشريحة غير معتمدة" : "Tag not authorized");
+
+        if (clean.matches("^MIRA-SN-\\d+$")) {
+            return clean;
         }
-        
-        Log.i(TAG, "✅ [VERIFY] Tag approved by server");
-        return null;  // ✅ نجح
-        
-    } catch (Exception e) {
-        Log.e(TAG, "[VERIFY] Exception", e);
-        return isArabic 
-            ? "❌ خطأ في التحقق: " + e.getMessage() 
-            : "❌ Verification error: " + e.getMessage();
+
+        Log.w(TAG, "[SECURITY] Rejected barcode format: "
+                + (clean.length() > 20 ? clean.substring(0, 20) + "..." : clean));
+        return "";
     }
-}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Save & Encode — finalizeItemIdentity
     // ═══════════════════════════════════════════════════════════════════
 
     private void finalizeItemIdentity() {
-    if (isFormLocked) {
-        showToast(isArabic ? "⛔ العملية قيد التنفيذ..." : "⛔ Operation in progress...");
-        return;
-    }
-
-    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-        return;
-    }
-
-    isFormLocked = true;
-    if (binding != null && binding.btnSaveIdentity != null) {
-        binding.btnSaveIdentity.setEnabled(false);
-        binding.btnSaveIdentity.setAlpha(0.5f);
-    }
-
-    try {
-        if (binding == null || appContext == null) {
-            unlockFormFast();
+        if (isFormLocked) {
+            showToast(isArabic ? "⛔ العملية قيد التنفيذ..." : "⛔ Operation in progress...");
             return;
         }
 
-        // ═══════════════════════════════════════════════════════
-        //  1) قراءة البيانات من الواجهة
-        // ═══════════════════════════════════════════════════════
-        String identifier = binding.etEpc.getText() != null
-                ? binding.etEpc.getText().toString().trim() : "";
-        String title = binding.etTitle.getText() != null
-                ? binding.etTitle.getText().toString().trim() : "";
-        String weightStr = binding.etGrossWeight.getText() != null
-                ? binding.etGrossWeight.getText().toString().trim() : "";
-
-        if (!validateInputData(identifier, title, weightStr)) {
-            unlockFormFast();
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
 
-        double grossWeight = Double.parseDouble(weightStr);
-        String stoneType = "";
-        double stoneWeightCarats = 0;
-        int stoneCount = 0;
-        double stoneValue = 0;
-
-        if (binding.switchHasStones.isChecked()) {
-            stoneType = binding.etStoneType.getText() != null
-                    ? binding.etStoneType.getText().toString().trim() : "";
-            String stoneWeightStr = binding.etStoneWeight.getText() != null
-                    ? binding.etStoneWeight.getText().toString().trim() : "";
-            String stoneCountStr = binding.etStoneCount.getText() != null
-                    ? binding.etStoneCount.getText().toString().trim() : "";
-            String stoneValueStr = binding.etStoneValue.getText() != null
-                    ? binding.etStoneValue.getText().toString().trim() : "";
-
-            if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
-            if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
-            if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
+        isFormLocked = true;
+        if (binding != null && binding.btnSaveIdentity != null) {
+            binding.btnSaveIdentity.setEnabled(false);
+            binding.btnSaveIdentity.setAlpha(0.5f);
         }
 
-        double stoneWeightGrams = PricingCalculator.caratsToGrams(stoneWeightCarats);
-        if (stoneWeightGrams >= grossWeight) {
-            showValidationError(isArabic ? "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي!" : "❌ Stone weight cannot exceed gross weight!");
-            unlockFormFast();
-            return;
-        }
+        try {
+            if (binding == null || appContext == null) {
+                unlockFormFast();
+                return;
+            }
 
-        // ═══════════════════════════════════════════════════════
-        //  2) التسعير
-        // ═══════════════════════════════════════════════════════
-        int selectedKaratNum = getSelectedKaratNumber();
-        double[] pricing = PricingCalculator.calculatePricingDetails(
-                grossWeight, stoneWeightCarats, stoneValue, selectedKaratNum, priceManager);
-        final double netGoldWeight = pricing[6];
+            String identifier = binding.etEpc.getText() != null
+                    ? binding.etEpc.getText().toString().trim() : "";
+            String title = binding.etTitle.getText() != null
+                    ? binding.etTitle.getText().toString().trim() : "";
+            String weightStr = binding.etGrossWeight.getText() != null
+                    ? binding.etGrossWeight.getText().toString().trim() : "";
 
-        MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(selectedKaratNum, netGoldWeight);
+            if (!validateInputData(identifier, title, weightStr)) {
+                unlockFormFast();
+                return;
+            }
 
-        final String localCurrency = priceManager.getDefaultCurrency();
-        final double finalPriceUSD = details.finalPrice + stoneValue;
-        final double finalPriceLocal = priceManager.convertFromUSD(finalPriceUSD, localCurrency);
-        final double exchangeRate = priceManager.getExchangeRate(localCurrency);
+            double grossWeight = Double.parseDouble(weightStr);
+            String stoneType = "";
+            double stoneWeightCarats = 0;
+            int stoneCount = 0;
+            double stoneValue = 0;
 
-        setFormEnabled(false);
+            if (binding.switchHasStones.isChecked()) {
+                stoneType = binding.etStoneType.getText() != null
+                        ? binding.etStoneType.getText().toString().trim() : "";
+                String stoneWeightStr = binding.etStoneWeight.getText() != null
+                        ? binding.etStoneWeight.getText().toString().trim() : "";
+                String stoneCountStr = binding.etStoneCount.getText() != null
+                        ? binding.etStoneCount.getText().toString().trim() : "";
+                String stoneValueStr = binding.etStoneValue.getText() != null
+                        ? binding.etStoneValue.getText().toString().trim() : "";
 
-        dismissDialog(activeLoadingDialog);
-        activeLoadingDialog = showProfessionalLoadingDialog(
-                isArabic ? "🔄 جاري التكويد وإنشاء الأكواد المجهرية..." : "🔄 Encoding & Generating Micro-Codes...",
-                isArabic ? "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات" : "Please wait - saving item in database");
+                if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
+                if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
+                if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
+            }
 
-        final String finalIdentifier = identifier;
-        final String finalTitle = title;
-        final double fGrossWeight = grossWeight;
-        final double fStoneWeightCarats = stoneWeightCarats;
-        final int fStoneCount = stoneCount;
-        final double fStoneValue = stoneValue;
-        final String fStoneType = stoneType;
-        final String selectedKarat = getSelectedKaratCode();
-        final String selectedCategory = getSelectedCategory();
-        final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
-        final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-        final List<String> finalPhotoPaths = new ArrayList<>(photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
-        final int currentUserId = getCurrentUserId();
+            double stoneWeightGrams = PricingCalculator.caratsToGrams(stoneWeightCarats);
+            if (stoneWeightGrams >= grossWeight) {
+                showValidationError(isArabic
+                        ? "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي!"
+                        : "❌ Stone weight cannot exceed gross weight!");
+                unlockFormFast();
+                return;
+            }
 
-// ✅ [SECURITY] رفض المتابعة إذا الجلسة غير صالحة
-if (currentUserId <= 0) {
-    dismissDialog(activeLoadingDialog);
-    activeLoadingDialog = null;
-    unlockFormFast();
-    setFormEnabled(true);
-    showErrorDialog(
-            isArabic ? "❌ جلسة منتهية" : "❌ Session Expired",
-            isArabic ? "يرجى تسجيل الدخول مجدداً"
-                     : "Please log in again");
-    return;
-}
+            int selectedKaratNum = getSelectedKaratNumber();
+            double[] pricing = PricingCalculator.calculatePricingDetails(
+                    grossWeight, stoneWeightCarats, stoneValue, selectedKaratNum, priceManager);
+            final double netGoldWeight = pricing[6];
 
-// ═══════════════════════════════════════════════════════
-//  الخلفية (Background Thread)
-// ═══════════════════════════════════════════════════════
-miraExecutor.getBackgroundExecutor().execute(() -> {
-            String tidFromTagWorking = "";
-String epcFromTagWorking = "";
-boolean isSim = false;
-final boolean isDesktopScan = "DESKTOP_RFID".equals(lastScanSource);
+            MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(
+                    selectedKaratNum, netGoldWeight);
 
-// ✅ [FIX-6] فرز حسب مصدر المسح
-try {
-    MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
+            final String localCurrency = priceManager.getDefaultCurrency();
+            final double finalPriceUSD = details.finalPrice + stoneValue;
+            final double finalPriceLocal = priceManager.convertFromUSD(finalPriceUSD, localCurrency);
+            final double exchangeRate = priceManager.getExchangeRate(localCurrency);
 
-    if (isDesktopScan) {
-        // Desktop: لا TID — EPC فقط
-        tidFromTagWorking = "";
-        epcFromTagWorking = lastScannedEpc;
-        isSim = false;
-        Log.i(TAG, "🖥️ Desktop scan — no TID");
-    } else {
-        // Chainway: اقرأ TID
-        tidFromTagWorking = rfidSvc.readTid(null);
-        epcFromTagWorking = lastScannedEpc;
-        if (epcFromTagWorking == null || epcFromTagWorking.isEmpty()) {
-            epcFromTagWorking = rfidSvc.readEpc(null);
-        }
-        isSim = rfidService_isSimulation(rfidSvc);
-    }
-} catch (Exception e) {
-    Log.e(TAG, "Read TID/EPC error", e);
-}
+            setFormEnabled(false);
 
-// ⚠️ Chainway: فشل TID = خطأ (لا استخدام EPC كـ TID!)
-if (!isDesktopScan) {
-    if (tidFromTagWorking == null || tidFromTagWorking.trim().isEmpty()) {
-        safeRun(() -> {
             dismissDialog(activeLoadingDialog);
-            activeLoadingDialog = null;
-            unlockFormFast();
-            setFormEnabled(true);
-            showErrorDialog(
-                    isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
-                    isArabic ? "لم نتمكن من قراءة TID الشريحة.\n\n💡 أعد المسح."
-                             : "Cannot read tag TID.\n\n💡 Rescan the tag.");
-        });
-        return;
-    }
-}
-            if (epcFromTagWorking == null) epcFromTagWorking = "";
+            activeLoadingDialog = showProfessionalLoadingDialog(
+                    isArabic ? "🔄 جاري التكويد وإنشاء الأكواد المجهرية..."
+                             : "🔄 Encoding & Generating Micro-Codes...",
+                    isArabic ? "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات"
+                             : "Please wait - saving item in database");
 
-            final String tid = tidFromTagWorking.trim().toUpperCase(Locale.US);
-            final String originalEpc = epcFromTagWorking.trim().toUpperCase(Locale.US);
-            final String gtin = "";
-            final boolean fIsSim = isSim;
-// ✅ [SECURITY] التحقق من الشريحة على السيرفر أولاً
-Log.i(TAG, "🔒 [SECURITY] Verifying tag with server...");
-String verifyError = verifyTagWithServerBeforeEncodingSync(
-        tid, 
-        originalEpc, 
-        lastScanSource);
+            final String finalIdentifier = identifier;
+            final String finalTitle = title;
+            final double fGrossWeight = grossWeight;
+            final double fStoneWeightCarats = stoneWeightCarats;
+            final int fStoneCount = stoneCount;
+            final double fStoneValue = stoneValue;
+            final String fStoneType = stoneType;
+            final String selectedKarat = getSelectedKaratCode();
+            final String selectedCategory = getSelectedCategory();
+            final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+            final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
+            final List<String> finalPhotoPaths = new ArrayList<>(
+                    photoManager != null ? photoManager.getPhotoPaths() : new ArrayList<>());
+            final int currentUserId = getCurrentUserId();
 
-if (verifyError != null) {
-    Log.e(TAG, "❌ [SECURITY] Tag rejected: " + verifyError);
-    safeRun(() -> {
-        dismissDialog(activeLoadingDialog);
-        activeLoadingDialog = null;
-        unlockFormFast();
-        setFormEnabled(true);
-        playErrorSound();
-        showErrorDialog(
-            isArabic ? "⛔ الشريحة مرفوضة" : "⛔ Tag Rejected",
-            verifyError);
-    });
-    return;
-}
+            if (currentUserId <= 0) {
+                dismissDialog(activeLoadingDialog);
+                activeLoadingDialog = null;
+                unlockFormFast();
+                setFormEnabled(true);
+                showErrorDialog(
+                        isArabic ? "❌ جلسة منتهية" : "❌ Session Expired",
+                        isArabic ? "يرجى تسجيل الدخول مجدداً" : "Please log in again");
+                return;
+            }
 
-Log.i(TAG, "✅ [SECURITY] Tag verified, proceeding with encoding...");
-            
+            miraExecutor.getBackgroundExecutor().execute(() -> {
+                String tidFromTagWorking = "";
+                String epcFromTagWorking = "";
+                boolean isSim = false;
+                final boolean isDesktopScan = "DESKTOP_RFID".equals(lastScanSource);
 
-            // إرسال البيانات للسيرفر
-            try {
-                JSONObject payload = buildPayload(
-                        tid, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
-                        fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
-                        details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
-                        localCurrency, exchangeRate, selectedCategory, location,
-                        branchId, currentUserId, tid, originalEpc,
-                        fIsSim, finalPhotoPaths, gtin);
+                try {
+                    MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
 
-                boolean apiSuccess = false;
-                int serverItemId = 0;
-                String errorMessage = null;
-                boolean isNetworkError = false;
-                JSONObject responseDataObj = null;
-
-                if (apiClient != null) {
-                    try {
-                        MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                        if (response != null) {
-                            apiSuccess = response.isSuccess;
-                            responseDataObj = response.data;
-                            if (response.isSuccess && response.data != null) {
-                                serverItemId = response.data.optInt("item_id", 0);
-                            } else if (!response.isSuccess) {
-                                errorMessage = extractErrorMessage(response);
-                                isNetworkError = response.isNetworkError;
-                            }
+                    if (isDesktopScan) {
+                        tidFromTagWorking = "";
+                        epcFromTagWorking = lastScannedEpc;
+                        isSim = false;
+                        Log.i(TAG, "🖥️ Desktop scan — no TID");
+                    } else {
+                        tidFromTagWorking = rfidSvc.readTid(null);
+                        epcFromTagWorking = lastScannedEpc;
+                        if (epcFromTagWorking == null || epcFromTagWorking.isEmpty()) {
+                            epcFromTagWorking = rfidSvc.readEpc(null);
                         }
-                    } catch (Exception e) {
-                        Log.e(TAG, "API call exception", e);
-                        errorMessage = e.getMessage();
-                        isNetworkError = true;
+                        isSim = rfidService_isSimulation(rfidSvc);
                     }
+                } catch (Exception e) {
+                    Log.e(TAG, "Read TID/EPC error", e);
                 }
 
-                final boolean success = apiSuccess;
-                final int finalServerItemId = serverItemId;
-                final String finalErrorMessage = errorMessage;
-                final boolean networkError = isNetworkError;
-                final JSONObject finalResponseData = responseDataObj;
-
-                if (!success) {
-                    safeRun(() -> {
-                        dismissDialog(activeLoadingDialog);
-                        activeLoadingDialog = null;
-                        if (networkError) {
-                            miraExecutor.getSingleThreadExecutor().execute(() -> {
-                                syncManager.saveEncodeOffline(payload);
-                                safeRun(this::updatePendingSyncBadge);
-                            });
-                            showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
-                            scheduleAutoSync();
-                            unlockFormFast();
-                            setFormEnabled(true);
-                        } else {
-                            String errorMsg = finalErrorMessage != null ? finalErrorMessage : (isArabic ? "❌ فشل التكويد" : "❌ Encoding failed");
-                            showErrorDialog(isArabic ? "خطأ في التكويد" : "Encoding Error", errorMsg);
-                            unlockFormFast();
-                            setFormEnabled(true);
-                        }
-                    });
-                    return;
-                }
-
-                MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
-
-                String miraIdWorking = (finalResponseData != null)
-                        ? finalResponseData.optString("mira_id", finalResponseData.optString("serial_number", finalIdentifier))
-                        : finalIdentifier;
-                if (miraIdWorking == null || miraIdWorking.trim().isEmpty()) {
-                    miraIdWorking = finalIdentifier;
-                }
-                final String miraId = miraIdWorking;
-
-                String serverEpc = (finalResponseData != null) ? finalResponseData.optString("epc", "") : "";
-                String existingEpc = (!serverEpc.isEmpty()) ? serverEpc : lastScannedEpc;
-                if (existingEpc == null) existingEpc = "";
-                existingEpc = existingEpc.trim().toUpperCase(Locale.US);
-
-                boolean hasValidEpc = existingEpc.matches("^E2[0-9A-F]{22}$") && !existingEpc.startsWith("3008") && !existingEpc.equals("300800000000000000000000");
-
-                final String finalNewEpc;
-                boolean writeOk;
-                boolean wasWritten = false;
-
-                if (hasValidEpc) {
-                    finalNewEpc = existingEpc;
-                    writeOk = true;
-                    wasWritten = false;
-                } else {
-                    finalNewEpc = (finalResponseData != null) ? finalResponseData.optString("tid", tid) : tid;
-                    writeOk = true;
-                    wasWritten = false;
-                }
-
-                // ═══════════════════════════════════════════════════════
-                //  8) Verify (محمي)
-                // ═══════════════════════════════════════════════════════
-                boolean verifyOk = true;
-                if (wasWritten) {
-                    String readBackEpcWorking = null;
-                    if (writeOk) {
-                        try { Thread.sleep(150); } catch (InterruptedException ignored) {}
-                        try {
-                            readBackEpcWorking = rfidService.readEpc(null);
-                        } catch (Exception e) {
-                            Log.e(TAG, "readEpc verification error (non-fatal)", e);
-                        }
-                        if (readBackEpcWorking != null) {
-                            readBackEpcWorking = readBackEpcWorking.trim().toUpperCase(Locale.US);
-                        }
-                    }
-                    final String readBackEpc = readBackEpcWorking;
-                    verifyOk = writeOk && readBackEpc != null && !readBackEpc.isEmpty() && readBackEpc.equals(finalNewEpc);
-
-                    if (!verifyOk) {
+                if (!isDesktopScan) {
+                    if (tidFromTagWorking == null || tidFromTagWorking.trim().isEmpty()) {
                         safeRun(() -> {
                             dismissDialog(activeLoadingDialog);
                             activeLoadingDialog = null;
                             unlockFormFast();
                             setFormEnabled(true);
-                            showErrorDialog(isArabic ? "❌ فشل التحقق من الكتابة" : "❌ Write Verification Failed", isArabic ? "لم يتم كتابة EPC بنجاح على الشريحة." : "Failed to write EPC on tag.");
+                            showErrorDialog(
+                                    isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
+                                    isArabic
+                                            ? "لم نتمكن من قراءة TID الشريحة.\n\n💡 أعد المسح."
+                                            : "Cannot read tag TID.\n\n💡 Rescan the tag.");
                         });
                         return;
                     }
                 }
+                if (epcFromTagWorking == null) epcFromTagWorking = "";
 
-                // ═══════════════════════════════════════════════════════
-                //  9) Lock & markTagProgrammed (محمي)
-                // ═══════════════════════════════════════════════════════
-                boolean lockOk = false;
-                if (wasWritten) {
-                    try {
-                        lockOk = rfidService.setTagLockState(null, 1, true);
-                    } catch (Exception e) {
-                        Log.e(TAG, "setTagLockState error (non-fatal)", e);
-                    }
+                final String tid = tidFromTagWorking.trim().toUpperCase(Locale.US);
+                final String originalEpc = epcFromTagWorking.trim().toUpperCase(Locale.US);
+                final String gtin = "";
+                final boolean fIsSim = isSim;
+
+                Log.i(TAG, "🔒 [SECURITY] Verifying tag with server...");
+                String verifyError = verifyTagWithServerBeforeEncodingSync(
+                        tid, originalEpc, lastScanSource);
+
+                if (verifyError != null) {
+                    Log.e(TAG, "❌ [SECURITY] Tag rejected: " + verifyError);
+                    safeRun(() -> {
+                        dismissDialog(activeLoadingDialog);
+                        activeLoadingDialog = null;
+                        unlockFormFast();
+                        setFormEnabled(true);
+                        playErrorSound();
+                        showErrorDialog(
+                                isArabic ? "⛔ الشريحة مرفوضة" : "⛔ Tag Rejected",
+                                verifyError);
+                    });
+                    return;
                 }
+
+                Log.i(TAG, "✅ [SECURITY] Tag verified, proceeding with encoding...");
 
                 try {
-                    rfidService.markTagProgrammed(tid, miraId, finalNewEpc);
-                } catch (Exception e) {
-                    Log.w(TAG, "markTagProgrammed error (non-fatal)", e);
-                }
+                    JSONObject payload = buildPayload(
+                            tid, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
+                            fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
+                            details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
+                            localCurrency, exchangeRate, selectedCategory, location,
+                            branchId, currentUserId, tid, originalEpc,
+                            fIsSim, finalPhotoPaths, gtin);
 
-                final boolean finalWrite = writeOk;
-                final boolean finalVerify = verifyOk;
-                final boolean finalLock = lockOk;
-                final boolean finalWasPreEncoded = !wasWritten;
+                    boolean apiSuccess = false;
+                    int serverItemId = 0;
+                    String errorMessage = null;
+                    boolean isNetworkError = false;
+                    JSONObject responseDataObj = null;
 
-                // ═══════════════════════════════════════════════════════
-                //  10) Update server with final EPC (محمي)
-                // ═══════════════════════════════════════════════════════
-                try {
-                    JSONObject updatePayload = new JSONObject();
-                    updatePayload.put("item_id", finalServerItemId);
-                    if (finalNewEpc != null && finalNewEpc.matches("^[0-9A-F]{24}$")) {
-                        updatePayload.put("rfid_epc_final", finalNewEpc);
-                    }
-                    if (tid != null && !tid.isEmpty()) {
-                    updatePayload.put("rfid_tid", tid);
-                    }
-                    updatePayload.put("rfid_locked", finalLock);
-                    updatePayload.put("rfid_verified", finalVerify);
-                    updatePayload.put("rfid_pre_encoded", finalWasPreEncoded);
-
-                    apiClient.postWithAuth("/items/update-rfid", updatePayload);
-                } catch (Exception e) {
-                    Log.w(TAG, "update-rfid failed (non-fatal)", e);
-                }
-                // ✅ تعريف المتغيرات النهائية قبل الانتقال للواجهة (لحل مشكلة الـ Compile)
-                final String finalServerEpc = serverEpc;
-                final String finalServerSerial = (finalResponseData != null) ? finalResponseData.optString("serial_number", "") : "";
-
-                // ═══════════════════════════════════════════════════════
-                //  11) Show results (On Main Thread)
-                // ═══════════════════════════════════════════════════════
-                safeRun(() -> {
-                    dismissDialog(activeLoadingDialog);
-                    activeLoadingDialog = null;
-                    playSuccessSound();
-
-                    miraExecutor.getSingleThreadExecutor().execute(() -> syncManager.removePendingEncode(finalIdentifier));
-                    if (formManager != null) formManager.clearDraft();
-
-                    notifyDashboardUpdate("encode_success");
-
-                    if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
-                        uploadItemImages(finalServerItemId, finalPhotoPaths);
-                    }
-
-                    // ✅ البيانات الحقيقية من السيرفر
-                    String displayEpc = finalServerEpc;
-                    if (displayEpc.isEmpty()) {
-                        displayEpc = finalNewEpc;
-                    }
-                    
-                    String shortBarcode = finalServerSerial; 
-                    if (shortBarcode.isEmpty()) {
-                        shortBarcode = finalIdentifier;
-                    }
-
-                    String gs1Code = "(21)" + shortBarcode; 
-                    String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode; 
-
-                    if (finalResponseData != null) {
-                        JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
-                        if (gs1Obj != null) {
-                            String sGs1 = gs1Obj.optString("raw_fnc1", "");
-                            if (!sGs1.isEmpty()) gs1Code = sGs1;
-                            String sUrl = gs1Obj.optString("digital_link", "");
-                            if (!sUrl.isEmpty()) qrUrl = sUrl;
+                    if (apiClient != null) {
+                        try {
+                            MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
+                            if (response != null) {
+                                apiSuccess = response.isSuccess;
+                                responseDataObj = response.data;
+                                if (response.isSuccess && response.data != null) {
+                                    serverItemId = response.data.optInt("item_id", 0);
+                                } else if (!response.isSuccess) {
+                                    errorMessage = extractErrorMessage(response);
+                                    isNetworkError = response.isNetworkError;
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "API call exception", e);
+                            errorMessage = e.getMessage();
+                            isNetworkError = true;
                         }
                     }
 
-                    if (binding != null && binding.etEpc != null) {
-                        binding.etEpc.setText("");
+                    final boolean success = apiSuccess;
+                    final int finalServerItemId = serverItemId;
+                    final String finalErrorMessage = errorMessage;
+                    final boolean networkError = isNetworkError;
+                    final JSONObject finalResponseData = responseDataObj;
+
+                    if (!success) {
+                        safeRun(() -> {
+                            dismissDialog(activeLoadingDialog);
+                            activeLoadingDialog = null;
+                            if (networkError) {
+                                miraExecutor.getSingleThreadExecutor().execute(() -> {
+                                    syncManager.saveEncodeOffline(payload);
+                                    safeRun(this::updatePendingSyncBadge);
+                                });
+                                showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)"
+                                                   : "💾 Saved locally (Offline)");
+                                scheduleAutoSync();
+                                unlockFormFast();
+                                setFormEnabled(true);
+                            } else {
+                                String errorMsg = finalErrorMessage != null
+                                        ? finalErrorMessage
+                                        : (isArabic ? "❌ فشل التكويد" : "❌ Encoding failed");
+                                showErrorDialog(
+                                        isArabic ? "خطأ في التكويد" : "Encoding Error",
+                                        errorMsg);
+                                unlockFormFast();
+                                setFormEnabled(true);
+                            }
+                        });
+                        return;
                     }
 
-                    if (finalWasPreEncoded) {
-                        showToast(isArabic ? "✅ تم استخدام EPC الموجود بنجاح" : "✅ Existing EPC used successfully");
-                    } else if (finalWrite && finalVerify && finalLock) {
-                        showToast(isArabic ? "🔒 تم التكويد والقفل بنجاح" : "🔒 Encoded & locked successfully");
-                    } else if (finalWrite && finalVerify && !finalLock) {
-                        showToast(isArabic ? "⚠️ تم التكويد لكن القفل فشل" : "⚠️ Encoded but lock failed");
+                    MiraRfidService rfidService = MiraRfidService.getInstance(appContext);
+
+                    String miraIdWorking = (finalResponseData != null)
+                            ? finalResponseData.optString("mira_id",
+                                    finalResponseData.optString("serial_number", finalIdentifier))
+                            : finalIdentifier;
+                    if (miraIdWorking == null || miraIdWorking.trim().isEmpty()) {
+                        miraIdWorking = finalIdentifier;
+                    }
+                    final String miraId = miraIdWorking;
+
+                    String serverEpc = (finalResponseData != null)
+                            ? finalResponseData.optString("epc", "") : "";
+                    String existingEpc = (!serverEpc.isEmpty()) ? serverEpc : lastScannedEpc;
+                    if (existingEpc == null) existingEpc = "";
+                    existingEpc = existingEpc.trim().toUpperCase(Locale.US);
+
+                    boolean hasValidEpc = existingEpc.matches("^E2[0-9A-F]{22}$")
+                            && !existingEpc.startsWith("3008")
+                            && !existingEpc.equals("300800000000000000000000");
+
+                    final String finalNewEpc;
+                    boolean writeOk;
+                    boolean wasWritten = false;
+
+                    if (hasValidEpc) {
+                        finalNewEpc = existingEpc;
+                        writeOk = true;
+                        wasWritten = false;
+                    } else {
+                        finalNewEpc = (finalResponseData != null)
+                                ? finalResponseData.optString("tid", tid) : tid;
+                        writeOk = true;
+                        wasWritten = false;
                     }
 
-                    showEncodingSuccessDialogEnhanced(
-                            finalTitle, 
-                            displayEpc,     
-                            shortBarcode,   
-                            tid, 
-                            gs1Code,        
-                            qrUrl,          
-                            String.valueOf(fGrossWeight), 
-                            selectedKarat,
-                            finalPriceUSD, 
-                            localCurrency, 
-                            finalPhotoPaths,
-                            fStoneType, 
-                            fStoneWeightCarats, 
-                            fStoneCount, 
-                            fStoneValue,
-                            netGoldWeight);
-                });
+                    boolean verifyOk = true;
+                    if (wasWritten) {
+                        String readBackEpcWorking = null;
+                        if (writeOk) {
+                            try { Thread.sleep(150); } catch (InterruptedException ignored) {}
+                            try {
+                                readBackEpcWorking = rfidService.readEpc(null);
+                            } catch (Exception e) {
+                                Log.e(TAG, "readEpc verification error (non-fatal)", e);
+                            }
+                            if (readBackEpcWorking != null) {
+                                readBackEpcWorking = readBackEpcWorking.trim().toUpperCase(Locale.US);
+                            }
+                        }
+                        final String readBackEpc = readBackEpcWorking;
+                        verifyOk = writeOk && readBackEpc != null
+                                && !readBackEpc.isEmpty()
+                                && readBackEpc.equals(finalNewEpc);
 
-            } catch (Exception e) {
-                Log.e(TAG, "Background execution error", e);
-                safeRun(() -> {
-                    dismissDialog(activeLoadingDialog);
-                    activeLoadingDialog = null;
-                    unlockFormFast();
-                    setFormEnabled(true);
-                    showErrorDialog(isArabic ? "خطأ للنظام" : "System Error", e.getMessage() != null ? e.getMessage() : "Unknown");
-                });
-            }
-        });
+                        if (!verifyOk) {
+                            safeRun(() -> {
+                                dismissDialog(activeLoadingDialog);
+                                activeLoadingDialog = null;
+                                unlockFormFast();
+                                setFormEnabled(true);
+                                showErrorDialog(
+                                        isArabic ? "❌ فشل التحقق من الكتابة"
+                                                 : "❌ Write Verification Failed",
+                                        isArabic ? "لم يتم كتابة EPC بنجاح على الشريحة."
+                                                 : "Failed to write EPC on tag.");
+                            });
+                            return;
+                        }
+                    }
 
-    } catch (NumberFormatException e) {
-        showValidationError(isArabic ? "❌ خطأ في الأرقام المدخلة" : "❌ Invalid number format");
-        unlockFormFast();
-    } catch (Exception e) {
-        Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage(), e);
-        unlockFormFast();
-        setFormEnabled(true);
-        showToast("❌ " + e.getMessage());
+                    boolean lockOk = false;
+                    if (wasWritten) {
+                        try {
+                            lockOk = rfidService.setTagLockState(null, 1, true);
+                        } catch (Exception e) {
+                            Log.e(TAG, "setTagLockState error (non-fatal)", e);
+                        }
+                    }
+
+                    try {
+                        rfidService.markTagProgrammed(tid, miraId, finalNewEpc);
+                    } catch (Exception e) {
+                        Log.w(TAG, "markTagProgrammed error (non-fatal)", e);
+                    }
+
+                    final boolean finalWrite = writeOk;
+                    final boolean finalVerify = verifyOk;
+                    final boolean finalLock = lockOk;
+                    final boolean finalWasPreEncoded = !wasWritten;
+
+                    try {
+                        JSONObject updatePayload = new JSONObject();
+                        updatePayload.put("item_id", finalServerItemId);
+                        if (finalNewEpc != null && finalNewEpc.matches("^[0-9A-F]{24}$")) {
+                            updatePayload.put("rfid_epc_final", finalNewEpc);
+                        }
+                        if (tid != null && !tid.isEmpty()) {
+                            updatePayload.put("rfid_tid", tid);
+                        }
+                        updatePayload.put("rfid_locked", finalLock);
+                        updatePayload.put("rfid_verified", finalVerify);
+                        updatePayload.put("rfid_pre_encoded", finalWasPreEncoded);
+
+                        apiClient.postWithAuth("/items/update-rfid", updatePayload);
+                    } catch (Exception e) {
+                        Log.w(TAG, "update-rfid failed (non-fatal)", e);
+                    }
+
+                    final String finalServerEpc = serverEpc;
+                    final String finalServerSerial = (finalResponseData != null)
+                            ? finalResponseData.optString("serial_number", "") : "";
+
+                    safeRun(() -> {
+                        dismissDialog(activeLoadingDialog);
+                        activeLoadingDialog = null;
+                        playSuccessSound();
+
+                        miraExecutor.getSingleThreadExecutor().execute(
+                                () -> syncManager.removePendingEncode(finalIdentifier));
+                        if (formManager != null) formManager.clearDraft();
+
+                        notifyDashboardUpdate("encode_success");
+
+                        if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
+                            uploadItemImages(finalServerItemId, finalPhotoPaths);
+                        }
+
+                        String displayEpc = finalServerEpc;
+                        if (displayEpc.isEmpty()) displayEpc = finalNewEpc;
+
+                        String shortBarcode = finalServerSerial;
+                        if (shortBarcode.isEmpty()) shortBarcode = finalIdentifier;
+
+                        String gs1Code = "(21)" + shortBarcode;
+                        String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode;
+
+                        if (finalResponseData != null) {
+                            JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
+                            if (gs1Obj != null) {
+                                String sGs1 = gs1Obj.optString("raw_fnc1", "");
+                                if (!sGs1.isEmpty()) gs1Code = sGs1;
+                                String sUrl = gs1Obj.optString("digital_link", "");
+                                if (!sUrl.isEmpty()) qrUrl = sUrl;
+                            }
+                        }
+
+                        if (binding != null && binding.etEpc != null) {
+                            binding.etEpc.setText("");
+                        }
+
+                        if (finalWasPreEncoded) {
+                            showToast(isArabic
+                                    ? "✅ تم استخدام EPC الموجود بنجاح"
+                                    : "✅ Existing EPC used successfully");
+                        } else if (finalWrite && finalVerify && finalLock) {
+                            showToast(isArabic
+                                    ? "🔒 تم التكويد والقفل بنجاح"
+                                    : "🔒 Encoded & locked successfully");
+                        } else if (finalWrite && finalVerify && !finalLock) {
+                            showToast(isArabic
+                                    ? "⚠️ تم التكويد لكن القفل فشل"
+                                    : "⚠️ Encoded but lock failed");
+                        }
+
+                        showEncodingSuccessDialogEnhanced(
+                                finalTitle,
+                                displayEpc,
+                                shortBarcode,
+                                tid,
+                                gs1Code,
+                                qrUrl,
+                                String.valueOf(fGrossWeight),
+                                selectedKarat,
+                                finalPriceUSD,
+                                localCurrency,
+                                finalPhotoPaths,
+                                fStoneType,
+                                fStoneWeightCarats,
+                                fStoneCount,
+                                fStoneValue,
+                                netGoldWeight);
+                    });
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Background execution error", e);
+                    safeRun(() -> {
+                        dismissDialog(activeLoadingDialog);
+                        activeLoadingDialog = null;
+                        unlockFormFast();
+                        setFormEnabled(true);
+                        showErrorDialog(
+                                isArabic ? "خطأ للنظام" : "System Error",
+                                e.getMessage() != null ? e.getMessage() : "Unknown");
+                    });
+                }
+            });
+
+        } catch (NumberFormatException e) {
+            showValidationError(isArabic ? "❌ خطأ في الأرقام المدخلة" : "❌ Invalid number format");
+            unlockFormFast();
+        } catch (Exception e) {
+            Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage(), e);
+            unlockFormFast();
+            setFormEnabled(true);
+            showToast("❌ " + e.getMessage());
+        }
     }
-}
 
-// ✅ دالة مساعدة للتحقق من وضع المحاكاة
-private boolean rfidService_isSimulation(MiraRfidService svc) {
-    try {
-        return svc.isSimulationMode();
-    } catch (Exception e) {
-        Log.w(TAG, "isSimulationMode check failed", e);
-        return false;
+    private boolean rfidService_isSimulation(MiraRfidService svc) {
+        try {
+            return svc.isSimulationMode();
+        } catch (Exception e) {
+            Log.w(TAG, "isSimulationMode check failed", e);
+            return false;
+        }
     }
-}
 
     private void unlockFormFast() {
         isFormLocked = false;
@@ -2543,78 +2316,71 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
                 Log.e(TAG, "Error extracting error message", e);
             }
         }
-        if (response.message != null && !response.message.isEmpty())
-            return response.message;
-        if (response.error != null && !response.error.isEmpty())
-            return response.error;
+        if (response.message != null && !response.message.isEmpty()) return response.message;
+        if (response.error != null && !response.error.isEmpty()) return response.error;
         return isArabic ? "❌ فشل العملية" : "❌ Operation failed";
     }
 
     private boolean validateInputData(String epc, String title, String weightStr) {
-    // ✅ [SECURITY] يجب مسح شريحة أولاً (لا كتابة يدوية)
-    if (epc == null || epc.trim().isEmpty()) {
-        showValidationError(isArabic 
-            ? "❌ يجب مسح شريحة RFID قبل الحفظ" 
-            : "❌ Must scan RFID tag before saving");
-        return false;
-    }
-    
-    // ✅ [SECURITY] يجب أن يكون الحقل مُتحققاً عبر مسح (ليس كتابة يدوية)
-    if (!isEpcBound) {
-        showValidationError(isArabic 
-            ? "❌ لم يتم التحقق من الشريحة عبر RFID\nاستخدم زر المسح" 
-            : "❌ Tag not verified via RFID\nUse the scan button");
-        return false;
-    }
-    
-    // ✅ [SECURITY] فحص صيغة
-    String epcClean = epc.trim();
-    boolean validFormat = epcClean.matches("^[0-9A-F]{16,32}$")     // TID (Chainway)
-                        || epcClean.matches("^E2[0-9A-F]{22}$");    // EPC (Desktop)
-    
-    if (!validFormat) {
-        showValidationError(isArabic 
-            ? "❌ صيغة الشريحة غير صالحة\nاستخدم المسح بدل الكتابة اليدوية" 
-            : "❌ Invalid tag format\nUse scan instead of manual typing");
-        return false;
-    }
-    
-    if (title.isEmpty()) {
-        showValidationError(isArabic ? "يرجى كتابة عنوان القطعة"
-                                     : "Please enter item title");
-        return false;
-    }
-    if (title.length() < 3) {
-        showValidationError(isArabic ? "العنوان قصير جداً"
-                                     : "Title is too short");
-        return false;
-    }
-    if (weightStr.isEmpty()) {
-        showValidationError(isArabic ? "يرجى تحديد وزن القطعة"
-                                     : "Please specify item weight");
-        return false;
-    }
-
-    try {
-        double weight = Double.parseDouble(weightStr);
-        if (weight <= 0) {
-            showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر"
-                                         : "Weight must be greater than zero");
+        if (epc == null || epc.trim().isEmpty()) {
+            showValidationError(isArabic
+                    ? "❌ يجب مسح شريحة RFID قبل الحفظ"
+                    : "❌ Must scan RFID tag before saving");
             return false;
         }
-        if (weight > 10000) {
-            showValidationError(isArabic ? "الوزن كبير جداً"
-                                         : "Weight is too large");
+
+        if (!isEpcBound) {
+            showValidationError(isArabic
+                    ? "❌ لم يتم التحقق من الشريحة عبر RFID\nاستخدم زر المسح"
+                    : "❌ Tag not verified via RFID\nUse the scan button");
             return false;
         }
-    } catch (NumberFormatException e) {
-        showValidationError(isArabic ? "صيغة الوزن غير صحيحة"
-                                     : "Invalid weight format");
-        return false;
-    }
 
-    return true;
-}
+        String epcClean = epc.trim();
+        boolean validFormat = epcClean.matches("^[0-9A-F]{16,32}$")
+                || epcClean.matches("^E2[0-9A-F]{22}$");
+
+        if (!validFormat) {
+            showValidationError(isArabic
+                    ? "❌ صيغة الشريحة غير صالحة\nاستخدم المسح بدل الكتابة اليدوية"
+                    : "❌ Invalid tag format\nUse scan instead of manual typing");
+            return false;
+        }
+
+        if (title.isEmpty()) {
+            showValidationError(isArabic ? "يرجى كتابة عنوان القطعة"
+                                         : "Please enter item title");
+            return false;
+        }
+        if (title.length() < 3) {
+            showValidationError(isArabic ? "العنوان قصير جداً" : "Title is too short");
+            return false;
+        }
+        if (weightStr.isEmpty()) {
+            showValidationError(isArabic ? "يرجى تحديد وزن القطعة"
+                                         : "Please specify item weight");
+            return false;
+        }
+
+        try {
+            double weight = Double.parseDouble(weightStr);
+            if (weight <= 0) {
+                showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر"
+                                             : "Weight must be greater than zero");
+                return false;
+            }
+            if (weight > 10000) {
+                showValidationError(isArabic ? "الوزن كبير جداً" : "Weight is too large");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            showValidationError(isArabic ? "صيغة الوزن غير صحيحة"
+                                         : "Invalid weight format");
+            return false;
+        }
+
+        return true;
+    }
 
     private JSONObject buildPayload(
             String epc, String title, String karat, double grossWeight, double netWeight,
@@ -2660,11 +2426,9 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
             payload.put("tid", tid);
             payload.put("rfid_tid", tid);
         }
-
         if (originalEpc != null && !originalEpc.isEmpty()) {
             payload.put("epc", originalEpc);
         }
-
         if (gtin != null && !gtin.isEmpty()) {
             payload.put("gtin", gtin);
         }
@@ -2749,33 +2513,32 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
 
             Log.i(TAG, "🔄 Starting auto-sync for " + pendingCount + " items");
 
-            int branchId = (branchesManager != null)
-                    ? branchesManager.getActiveBranchId() : 1;
+            int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
 
             miraExecutor.getNetworkExecutor().execute(() -> {
                 syncManager.syncPendingEncodes(branchId,
                         new IdentitySyncManager.SyncCallback() {
-                    @Override
-                    public void onSyncComplete(int syncedCount) {
-                        if (syncedCount > 0) {
-                            Log.i(TAG, "✅ Auto-synced " + syncedCount);
-                            safeRun(() -> {
-                                updatePendingSyncBadge();
-                                if (isAdded() && getContext() != null) {
-                                    showToast(isArabic
-                                            ? "✅ تمت مزامنة " + syncedCount + " تكويد"
-                                            : "✅ Synced " + syncedCount + " encodings");
+                            @Override
+                            public void onSyncComplete(int syncedCount) {
+                                if (syncedCount > 0) {
+                                    Log.i(TAG, "✅ Auto-synced " + syncedCount);
+                                    safeRun(() -> {
+                                        updatePendingSyncBadge();
+                                        if (isAdded() && getContext() != null) {
+                                            showToast(isArabic
+                                                    ? "✅ تمت مزامنة " + syncedCount + " تكويد"
+                                                    : "✅ Synced " + syncedCount + " encodings");
+                                        }
+                                        notifyDashboardUpdate("sync_complete");
+                                    });
                                 }
-                                notifyDashboardUpdate("sync_complete");
-                            });
-                        }
-                    }
+                            }
 
-                    @Override
-                    public void onSyncError(String error) {
-                        Log.w(TAG, "⚠️ Auto-sync failed: " + error);
-                    }
-                });
+                            @Override
+                            public void onSyncError(String error) {
+                                Log.w(TAG, "⚠️ Auto-sync failed: " + error);
+                            }
+                        });
             });
         } catch (Exception e) {
             Log.e(TAG, "performAutoSync error: " + e.getMessage());
@@ -2807,8 +2570,7 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
     // ═══════════════════════════════════════════════════════════════════
 
     private void uploadItemImages(int itemId, List<String> imagePaths) {
-        if (imagePaths == null || imagePaths.isEmpty()
-                || itemId <= 0 || apiClient == null) return;
+        if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0 || apiClient == null) return;
 
         miraExecutor.getImageExecutor().execute(() -> {
             int uploaded = 0;
@@ -2819,8 +2581,7 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
                 try {
                     boolean isPrimary = (i == 0);
                     MiraApiClient.ApiResponse response =
-                            apiClient.uploadItemImage(itemId, imageFile,
-                                    isPrimary, "Image");
+                            apiClient.uploadItemImage(itemId, imageFile, isPrimary, "Image");
                     if (response != null && response.isSuccess) uploaded++;
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to upload image: " + path, e);
@@ -2842,146 +2603,146 @@ private boolean rfidService_isSimulation(MiraRfidService svc) {
     //  Success Dialog
     // ═══════════════════════════════════════════════════════════════════
 
-    // ✅ [تعديل] إضافة المتغير shortBarcode للدالة
-private void showEncodingSuccessDialogEnhanced(
-    String title, String epc, String shortBarcode, String tid, String gs1Code, String qrUrl,
-    String weight, String karat, double finalPriceUSD, String currency,
-    List<String> photos,
-    String stoneType, double stoneWeightCarats, int stoneCount,
-    double stoneValue, double netWeight) {
+    private void showEncodingSuccessDialogEnhanced(
+            String title, String epc, String shortBarcode, String tid, String gs1Code, String qrUrl,
+            String weight, String karat, double finalPriceUSD, String currency,
+            List<String> photos,
+            String stoneType, double stoneWeightCarats, int stoneCount,
+            double stoneValue, double netWeight) {
 
-    if (!isAdded() || getContext() == null) return;
+        if (!isAdded() || getContext() == null) return;
 
-    BottomSheetDialog successDialog = new BottomSheetDialog(requireContext());
-    View view = getLayoutInflater().inflate(
-            R.layout.dialog_mira_identity_summary, null);
-    successDialog.setContentView(view);
-    successDialog.setCancelable(false);
-    successDialog.setCanceledOnTouchOutside(false);
+        BottomSheetDialog successDialog = new BottomSheetDialog(requireContext());
+        View view = getLayoutInflater().inflate(R.layout.dialog_mira_identity_summary, null);
+        successDialog.setContentView(view);
+        successDialog.setCancelable(false);
+        successDialog.setCanceledOnTouchOutside(false);
 
-    TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
-    TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
-    TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
-    TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
-    TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
-    ImageView ivGs1DataMatrix = view.findViewById(R.id.ivGs1DataMatrix);
-    ImageView ivQrCode = view.findViewById(R.id.ivQrCode);
-    MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
+        TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
+        TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
+        TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
+        TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
+        TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
+        ImageView ivGs1DataMatrix = view.findViewById(R.id.ivGs1DataMatrix);
+        ImageView ivQrCode = view.findViewById(R.id.ivQrCode);
+        MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
 
-    if (tvIdTitle != null) tvIdTitle.setText(title);
-    
-    // ✅ عرض الباركود القصير في الواجهة ليكون واضحاً للموظف
-    if (tvEpcCode != null) {
-        tvEpcCode.setText(isArabic 
-            ? "الباركود: " + shortBarcode + " | EPC: " + epc 
-            : "Barcode: " + shortBarcode + " | EPC: " + epc);
-    }
+        if (tvIdTitle != null) tvIdTitle.setText(title);
 
-    ImageView imgIdentityPhoto = view.findViewById(R.id.imgIdentityPhoto);
-    if (imgIdentityPhoto != null && photos != null && !photos.isEmpty()) {
-        String firstPhotoPath = photos.get(0);
-        File imgFile = new File(firstPhotoPath);
-        if (imgFile.exists()) {
-            imgIdentityPhoto.setVisibility(View.VISIBLE);
-            Glide.with(requireContext())
-                    .load(imgFile)
-                    .placeholder(R.drawable.placeholder_image)
-                    .error(R.drawable.ic_error_outline)
-                    .into(imgIdentityPhoto);
-        } else {
+        if (tvEpcCode != null) {
+            tvEpcCode.setText(isArabic
+                    ? "الباركود: " + shortBarcode + " | EPC: " + epc
+                    : "Barcode: " + shortBarcode + " | EPC: " + epc);
+        }
+
+        ImageView imgIdentityPhoto = view.findViewById(R.id.imgIdentityPhoto);
+        if (imgIdentityPhoto != null && photos != null && !photos.isEmpty()) {
+            String firstPhotoPath = photos.get(0);
+            File imgFile = new File(firstPhotoPath);
+            if (imgFile.exists()) {
+                imgIdentityPhoto.setVisibility(View.VISIBLE);
+                Glide.with(requireContext())
+                        .load(imgFile)
+                        .placeholder(R.drawable.placeholder_image)
+                        .error(R.drawable.ic_error_outline)
+                        .into(imgIdentityPhoto);
+            } else {
+                imgIdentityPhoto.setVisibility(View.GONE);
+            }
+        } else if (imgIdentityPhoto != null) {
             imgIdentityPhoto.setVisibility(View.GONE);
         }
-    } else if (imgIdentityPhoto != null) {
-        imgIdentityPhoto.setVisibility(View.GONE);
-    }
 
-    if (tvIdMetalKarat != null)
-        tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
-    if (tvIdWeight != null)
-        tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
+        if (tvIdMetalKarat != null)
+            tvIdMetalKarat.setText((isArabic ? "عيار " : "Karat ") + karat);
+        if (tvIdWeight != null)
+            tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
 
-    if (tvIdPrice != null && priceManager != null) {
-        tvIdPrice.setText(priceManager.formatPriceDefault(finalPriceUSD));
-    }
-
-    TextView tvIdStonesInfo = view.findViewById(R.id.tvIdStonesInfo);
-    if (tvIdStonesInfo != null) {
-        if (stoneWeightCarats > 0 || stoneValue > 0 || stoneCount > 0) {
-            String stonesText;
-            if (isArabic) {
-                stonesText = "الأحجار: " + (stoneType.isEmpty() ? "غير محدد" : stoneType);
-                if (stoneWeightCarats > 0) stonesText += " | وزن: " + stoneWeightCarats + " قيراط";
-                if (stoneCount > 0) stonesText += " | عدد: " + stoneCount + " حجر";
-                if (stoneValue > 0) stonesText += " | قيمة: " + priceManager.formatPriceDefault(stoneValue) + " " + currency;
-            } else {
-                stonesText = "Stones: " + (stoneType.isEmpty() ? "N/A" : stoneType);
-                if (stoneWeightCarats > 0) stonesText += " | Wt: " + stoneWeightCarats + " ct";
-                if (stoneCount > 0) stonesText += " | Pcs: " + stoneCount;
-                if (stoneValue > 0) stonesText += " | Val: " + priceManager.formatPriceDefault(stoneValue) + " " + currency;
-            }
-            tvIdStonesInfo.setText(stonesText);
-            tvIdStonesInfo.setVisibility(View.VISIBLE);
-        } else {
-            tvIdStonesInfo.setVisibility(View.GONE);
+        if (tvIdPrice != null && priceManager != null) {
+            tvIdPrice.setText(priceManager.formatPriceDefault(finalPriceUSD));
         }
-    }
 
-    miraExecutor.getImageExecutor().execute(() -> {
-        // ✅ نولد الـ DataMatrix بناءً على كود GS1 المصغر
-        Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty())
-                ? BarcodeGenerator.generateGS1DataMatrix(gs1Code, 250, 250)
-                : null;
-        Bitmap qrBitmap = (qrUrl != null && !qrUrl.isEmpty())
-                ? BarcodeGenerator.generateMicroQRCode(qrUrl, 250, 250)
-                : null;
-
-        safeRun(() -> {
-            if (ivGs1DataMatrix != null && dmBitmap != null) {
-                ivGs1DataMatrix.setImageBitmap(dmBitmap);
-                ivGs1DataMatrix.setVisibility(View.VISIBLE);
+        TextView tvIdStonesInfo = view.findViewById(R.id.tvIdStonesInfo);
+        if (tvIdStonesInfo != null) {
+            if (stoneWeightCarats > 0 || stoneValue > 0 || stoneCount > 0) {
+                String stonesText;
+                if (isArabic) {
+                    stonesText = "الأحجار: " + (stoneType.isEmpty() ? "غير محدد" : stoneType);
+                    if (stoneWeightCarats > 0)
+                        stonesText += " | وزن: " + stoneWeightCarats + " قيراط";
+                    if (stoneCount > 0)
+                        stonesText += " | عدد: " + stoneCount + " حجر";
+                    if (stoneValue > 0)
+                        stonesText += " | قيمة: " + priceManager.formatPriceDefault(stoneValue)
+                                + " " + currency;
+                } else {
+                    stonesText = "Stones: " + (stoneType.isEmpty() ? "N/A" : stoneType);
+                    if (stoneWeightCarats > 0) stonesText += " | Wt: " + stoneWeightCarats + " ct";
+                    if (stoneCount > 0) stonesText += " | Pcs: " + stoneCount;
+                    if (stoneValue > 0)
+                        stonesText += " | Val: " + priceManager.formatPriceDefault(stoneValue)
+                                + " " + currency;
+                }
+                tvIdStonesInfo.setText(stonesText);
+                tvIdStonesInfo.setVisibility(View.VISIBLE);
+            } else {
+                tvIdStonesInfo.setVisibility(View.GONE);
             }
-            if (ivQrCode != null && qrBitmap != null) {
-                ivQrCode.setImageBitmap(qrBitmap);
-                ivQrCode.setVisibility(View.VISIBLE);
-            }
+        }
+
+        miraExecutor.getImageExecutor().execute(() -> {
+            Bitmap dmBitmap = (gs1Code != null && !gs1Code.isEmpty())
+                    ? BarcodeGenerator.generateGS1DataMatrix(gs1Code, 250, 250)
+                    : null;
+            Bitmap qrBitmap = (qrUrl != null && !qrUrl.isEmpty())
+                    ? BarcodeGenerator.generateMicroQRCode(qrUrl, 250, 250)
+                    : null;
+
+            safeRun(() -> {
+                if (ivGs1DataMatrix != null && dmBitmap != null) {
+                    ivGs1DataMatrix.setImageBitmap(dmBitmap);
+                    ivGs1DataMatrix.setVisibility(View.VISIBLE);
+                }
+                if (ivQrCode != null && qrBitmap != null) {
+                    ivQrCode.setImageBitmap(qrBitmap);
+                    ivQrCode.setVisibility(View.VISIBLE);
+                }
+            });
         });
-    });
 
-    View printView = view.findViewById(R.id.btnPrintTag);
-    if (printView instanceof MaterialButton) {
-        MaterialButton btnPrintTag = (MaterialButton) printView;
-        btnPrintTag.setVisibility(View.VISIBLE);
-        btnPrintTag.setOnClickListener(v ->
-                miraExecutor.getImageExecutor().execute(() -> {
-                    // ✅ [تعديل] نمرر الـ shortBarcode للطباعة لإنشاء DataMatrix صغير جداً
-                    Bitmap tagToPrint = TagPrinter.generatePhysicalTagBitmap(
-                            shortBarcode, // الباركود القصير
-                            gs1Code,      // كود GS1 المبني عليه
-                            qrUrl);
-                    safeRun(() -> TagPrinter.printTagDirectly(
-                            requireContext(), tagToPrint));
-                }));
+        View printView = view.findViewById(R.id.btnPrintTag);
+        if (printView instanceof MaterialButton) {
+            MaterialButton btnPrintTag = (MaterialButton) printView;
+            btnPrintTag.setVisibility(View.VISIBLE);
+            btnPrintTag.setOnClickListener(v ->
+                    miraExecutor.getImageExecutor().execute(() -> {
+                        Bitmap tagToPrint = TagPrinter.generatePhysicalTagBitmap(
+                                shortBarcode, gs1Code, qrUrl);
+                        safeRun(() -> TagPrinter.printTagDirectly(
+                                requireContext(), tagToPrint));
+                    }));
+        }
+
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> {
+                successDialog.dismiss();
+                safeRun(this::resetFormForNextScan);
+            });
+        }
+
+        successDialog.show();
     }
-
-    if (btnClose != null) {
-        btnClose.setOnClickListener(v -> {
-            successDialog.dismiss();
-            safeRun(this::resetFormForNextScan);
-        });
-    }
-
-    successDialog.show();
-}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Reset for next scan
     // ═══════════════════════════════════════════════════════════════════
-private void resetFormForNextScan() {
-    isEpcBound = false;
-    lastScannedEpc = "";   // ✅ [v8.3] صفّر EPC المحفوظ
-    
-    // ✅ إعادة تعيين قفل المعالجة
-    isProcessingTag.set(false);
+
+    private void resetFormForNextScan() {
+        isEpcBound = false;
+        lastScannedEpc = "";
+        isProcessingTag.set(false);
+        isTriggerDown = false;
+
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post(this::resetFormForNextScan);
             return;
@@ -3012,14 +2773,14 @@ private void resetFormForNextScan() {
             binding.switchHasStones.setChecked(false);
             binding.chipRing.setChecked(true);
             binding.chip21K.setChecked(true);
-            // ✅ [FIX-8] نظّف ملف الكاميرا المؤقت
+
             if (currentPhotoPath != null) {
-    try {
-        File f = new File(currentPhotoPath);
-        if (f.exists()) f.delete();
-    } catch (Exception ignored) {}
-    currentPhotoPath = null;
-}
+                try {
+                    File f = new File(currentPhotoPath);
+                    if (f.exists()) f.delete();
+                } catch (Exception ignored) {}
+                currentPhotoPath = null;
+            }
             binding.etEpc.requestFocus();
 
             if (photoManager != null) {
@@ -3051,7 +2812,6 @@ private void resetFormForNextScan() {
             binding.btnSaveIdentity.setEnabled(canEdit && !isFormLocked);
             binding.btnSaveIdentity.setAlpha((canEdit && !isFormLocked) ? 1.0f : 0.5f);
         }
-
         if (binding.btnScanRfid != null) {
             binding.btnScanRfid.setEnabled(canEdit && !isFormLocked);
         }
@@ -3093,11 +2853,9 @@ private void resetFormForNextScan() {
     private void setEnglishTexts() {
         try {
             if (binding == null) return;
-            binding.tvStepTitle.setText(
-                    "Step 1 of 4: Bind, Classify & Generate Codes");
+            binding.tvStepTitle.setText("Step 1 of 4: Bind, Classify & Generate Codes");
             binding.tilEpc.setHint("EPC / GTIN Code...");
-            binding.btnScanRfid.setText(isRfidScanning
-                    ? "Stop Scan..." : "Scan RFID Tag");
+            binding.btnScanRfid.setText(isRfidScanning ? "Stop Scan..." : "Scan RFID Tag");
             binding.etTitle.setHint("Item Title & Description");
             binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
             binding.btnAddPhotos.setText("📷 Attach Photos");
@@ -3145,8 +2903,7 @@ private void resetFormForNextScan() {
 
         dismissDialog(activeLoadingDialog);
 
-        MaterialAlertDialogBuilder builder =
-                new MaterialAlertDialogBuilder(requireContext());
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
         builder.setTitle(title);
         builder.setMessage(message);
         builder.setCancelable(false);
@@ -3176,10 +2933,8 @@ private void resetFormForNextScan() {
     private void showValidationError(String message) {
         try {
             if (getContext() == null || !isAdded()) return;
-
             new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(isArabic ? "⚠️ تنبيه الحماية"
-                                       : "⚠️ Validation Alert")
+                    .setTitle(isArabic ? "⚠️ تنبيه الحماية" : "⚠️ Validation Alert")
                     .setMessage(message)
                     .setPositiveButton(isArabic ? "حسناً" : "OK", null)
                     .setCancelable(false)
@@ -3230,26 +2985,24 @@ private void resetFormForNextScan() {
             Log.e(TAG, "showToast error: " + e.getMessage());
         }
     }
-// ✅ [SECURITY] تسجيل آمن — فقط في DEBUG builds
-private void secureLog(String message) {
-    if (com.example.uhf.BuildConfig.DEBUG) {
-        Log.d(TAG, message);
-    }
-}
 
-// ✅ [SECURITY] تمويه EPC/TID قبل التسجيل
-private String maskEpc(String epc) {
-    if (epc == null || epc.length() < 8) return "***";
-    return epc.substring(0, 4) + "****" + epc.substring(epc.length() - 4);
-}
+    private void secureLog(String message) {
+        if (com.example.uhf.BuildConfig.DEBUG) {
+            Log.d(TAG, message);
+        }
+    }
+
+    private String maskEpc(String epc) {
+        if (epc == null || epc.length() < 8) return "***";
+        return epc.substring(0, 4) + "****" + epc.substring(epc.length() - 4);
+    }
 
     private void notifyDashboardUpdate(String source) {
         try {
             if (!isAdded() || getContext() == null) return;
 
             Context ctx = getContext();
-            int branchId = (branchesManager != null)
-                    ? branchesManager.getActiveBranchId() : 0;
+            int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 0;
             long timestamp = System.currentTimeMillis();
 
             Intent inventoryIntent = new Intent("com.example.uhf.REFRESH_INVENTORY");
@@ -3281,42 +3034,39 @@ private String maskEpc(String epc) {
     }
 
     private int getCurrentUserId() {
-    try {
-        if (appContext == null && getContext() != null) {
-            appContext = getContext().getApplicationContext();
-        }
-        if (appContext == null) {
-            Log.e(TAG, "getCurrentUserId: appContext null");
+        try {
+            if (appContext == null && getContext() != null) {
+                appContext = getContext().getApplicationContext();
+            }
+            if (appContext == null) {
+                Log.e(TAG, "getCurrentUserId: appContext null");
+                return -1;
+            }
+
+            int userId = com.example.uhf.tools.SecureSessionManager
+                    .getInstance(appContext).getUserId();
+
+            if (userId > 0) {
+                Log.d(TAG, "getCurrentUserId: " + userId + " (SecureSessionManager)");
+                return userId;
+            }
+
+            SharedPreferences oldPrefs = appContext.getSharedPreferences(
+                    "session", Context.MODE_PRIVATE);
+            int legacyId = oldPrefs.getInt("user_id", -1);
+            if (legacyId > 0) {
+                Log.w(TAG, "getCurrentUserId: LEGACY fallback = " + legacyId);
+                return legacyId;
+            }
+
+            Log.e(TAG, "getCurrentUserId: NO USER ID anywhere");
+            return -1;
+
+        } catch (Exception e) {
+            Log.e(TAG, "getCurrentUserId error", e);
             return -1;
         }
-        
-        // ✅ اقرأ من SecureSessionManager (الملف الصحيح)
-        int userId = com.example.uhf.tools.SecureSessionManager
-                .getInstance(appContext)
-                .getUserId();
-        
-        if (userId > 0) {
-            Log.d(TAG, "getCurrentUserId: " + userId + " (SecureSessionManager)");
-            return userId;
-        }
-        
-        // ⚠️ Fallback احتياطي (للجلسات القديمة فقط)
-        SharedPreferences oldPrefs = appContext.getSharedPreferences(
-                "session", Context.MODE_PRIVATE);
-        int legacyId = oldPrefs.getInt("user_id", -1);
-        if (legacyId > 0) {
-            Log.w(TAG, "getCurrentUserId: LEGACY fallback = " + legacyId);
-            return legacyId;
-        }
-        
-        Log.e(TAG, "getCurrentUserId: NO USER ID anywhere");
-        return -1;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "getCurrentUserId error", e);
-        return -1;
     }
-}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Power Management
@@ -3328,12 +3078,11 @@ private String maskEpc(String epc) {
         miraExecutor.getSingleThreadExecutor().execute(() -> {
             try {
                 com.example.uhf.MiraRfid.MiraReaderSettings settings =
-                        com.example.uhf.MiraRfid.MiraReaderSettings
-                                .getInstance(appContext);
+                        com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appContext);
 
                 savedPowerBeforeEncoding = settings.getPowerDbm();
-
                 int encodingPower = settings.getPosPowerDbm();
+
                 if (savedPowerBeforeEncoding == encodingPower) {
                     Log.d(TAG, "⚡ Encoding power already at " + encodingPower);
                     return;
@@ -3342,8 +3091,7 @@ private String maskEpc(String epc) {
                 settings.setPowerDbm(encodingPower);
 
                 com.rscja.deviceapi.RFIDWithUHFUART reader =
-                        com.example.uhf.activity.BaseTabFragmentActivity
-                                .getSharedReader();
+                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
                 if (reader != null) {
                     try {
                         reader.setPower(encodingPower);
@@ -3367,14 +3115,11 @@ private String maskEpc(String epc) {
         miraExecutor.getSingleThreadExecutor().execute(() -> {
             try {
                 com.example.uhf.MiraRfid.MiraReaderSettings settings =
-                        com.example.uhf.MiraRfid.MiraReaderSettings
-                                .getInstance(appContext);
-
+                        com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appContext);
                 settings.setPowerDbm(target);
 
                 com.rscja.deviceapi.RFIDWithUHFUART reader =
-                        com.example.uhf.activity.BaseTabFragmentActivity
-                                .getSharedReader();
+                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
                 if (reader != null) {
                     try {
                         reader.setPower(target);
@@ -3402,11 +3147,8 @@ private String maskEpc(String epc) {
                                 try {
                                     com.rscja.deviceapi.RFIDWithUHFUART reader =
                                             com.example.uhf.activity
-                                                    .BaseTabFragmentActivity
-                                                    .getSharedReader();
-                                    if (reader != null) {
-                                        reader.setPower(newPowerDbm);
-                                    }
+                                                    .BaseTabFragmentActivity.getSharedReader();
+                                    if (reader != null) reader.setPower(newPowerDbm);
                                 } catch (Exception ignored) {}
                             });
                         }
@@ -3426,8 +3168,7 @@ private String maskEpc(String epc) {
 
     private int dp(int value) {
         try {
-            return Math.round(value * getResources()
-                    .getDisplayMetrics().density);
+            return Math.round(value * getResources().getDisplayMetrics().density);
         } catch (Exception e) {
             return value;
         }
@@ -3447,10 +3188,9 @@ private String maskEpc(String epc) {
             overlay.setVisibility(View.GONE);
 
             MaterialCardView card = new MaterialCardView(requireContext());
-            FrameLayout.LayoutParams cardParams =
-                    new FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT);
+            FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
             cardParams.setMargins(dp(16), dp(72), dp(16), 0);
             cardParams.gravity = Gravity.TOP;
             card.setLayoutParams(cardParams);
@@ -3473,8 +3213,7 @@ private String maskEpc(String epc) {
             LinearLayout textCol = new LinearLayout(requireContext());
             textCol.setOrientation(LinearLayout.VERTICAL);
             LinearLayout.LayoutParams textParams =
-                    new LinearLayout.LayoutParams(
-                            0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             textParams.setMargins(dp(14), 0, dp(14), 0);
             textCol.setLayoutParams(textParams);
 
@@ -3515,8 +3254,7 @@ private String maskEpc(String epc) {
 
             View accent = new View(requireContext());
             LinearLayout.LayoutParams accentParams =
-                    new LinearLayout.LayoutParams(
-                            dp(4), ViewGroup.LayoutParams.MATCH_PARENT);
+                    new LinearLayout.LayoutParams(dp(4), ViewGroup.LayoutParams.MATCH_PARENT);
             accent.setLayoutParams(accentParams);
             accent.setBackgroundColor(0xFF22C55E);
             row.addView(accent);
@@ -3590,20 +3328,15 @@ private String maskEpc(String epc) {
                 card.setAlpha(0f);
                 card.setTranslationY(-dp(20));
                 card.animate()
-                        .alpha(1f)
-                        .translationY(0f)
-                        .setDuration(250)
-                        .setInterpolator(
-                                new android.view.animation.DecelerateInterpolator())
+                        .alpha(1f).translationY(0f).setDuration(250)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator())
                         .start();
             }
 
             pendingHideFeedback = () -> {
                 if (card == null || overlay == null) return;
                 card.animate()
-                        .alpha(0f)
-                        .translationY(-dp(20))
-                        .setDuration(200)
+                        .alpha(0f).translationY(-dp(20)).setDuration(200)
                         .withEndAction(() -> {
                             if (overlay != null) overlay.setVisibility(View.GONE);
                         })
@@ -3623,8 +3356,7 @@ private String maskEpc(String epc) {
 
     private void safeRun(Runnable r) {
         try {
-            if (isAdded() && getActivity() != null
-                    && !isRemoving() && !isDetached()) {
+            if (isAdded() && getActivity() != null && !isRemoving() && !isDetached()) {
                 getActivity().runOnUiThread(() -> {
                     if (isAdded() && !isRemoving() && !isDetached()
                             && binding != null && getView() != null) {
@@ -3651,12 +3383,40 @@ private String maskEpc(String epc) {
 
         if (!isAdded() || getActivity() == null) return;
 
+        // ✅ [v6.5 CRITICAL] إعادة تعيين كل الحالة العالقة من جلسة سابقة
+        //    هذا هو المفتاح لحل مشكلة "first press بعد login لا يعمل"
+        boolean wasStuck = isProcessingTag.get();
+        isProcessingTag.set(false);
+        isTriggerDown = false;
+        isRfidScanning = false;
+        tagReceivedThisScan = false;
+        scanGeneration.incrementAndGet();
+
+        if (stoppingReader.get()) {
+            stoppingReader.set(false);
+            Log.w(TAG, "⚠️ Force-reset stoppingReader on resume");
+        }
+        if (wasStuck) {
+            Log.w(TAG, "⚠️ Force-reset isProcessingTag on resume (was stuck)");
+        }
+
+        // ✅ تنظيف timeout المسح المعلق
+        if (handler != null) {
+            if (rfidTimeoutRunnable != null) {
+                handler.removeCallbacks(rfidTimeoutRunnable);
+                rfidTimeoutRunnable = null;
+            }
+            if (pendingHideFeedback != null) {
+                handler.removeCallbacks(pendingHideFeedback);
+                pendingHideFeedback = null;
+            }
+        }
+
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
             ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
         }
 
-        // ✅ [v6.4] قوة منخفضة للتكويد
         applyLowPowerForEncoding();
 
         if (binding == null || getView() == null) {
@@ -3669,7 +3429,6 @@ private String maskEpc(String epc) {
 
         performOnResumeSetup();
 
-        // ✅ [v6.4] لا مسح تلقائي — الزناد الفيزيائي فقط
         Log.d(TAG, "⏸️ Auto-scan disabled — use physical trigger");
     }
 
@@ -3687,12 +3446,9 @@ private String maskEpc(String epc) {
             if (miraExecutor != null && miraExecutor.isHealthy()) {
                 miraExecutor.getBackgroundExecutor().execute(() -> {
                     try {
-                        if (formManager != null) {
-                            formManager.cleanupOldDrafts();
-                        }
+                        if (formManager != null) formManager.cleanupOldDrafts();
                         if (photoManager != null) {
-                            photoManager.cleanupOrphanFiles(
-                                    photoManager.getPhotoPaths());
+                            photoManager.cleanupOrphanFiles(photoManager.getPhotoPaths());
                         }
                     } catch (Exception e) {
                         Log.w(TAG, "onResume cleanup error: " + e.getMessage());
@@ -3705,225 +3461,74 @@ private String maskEpc(String epc) {
     }
 
     @Override
-public void onPause() {
-    super.onPause();
+    public void onPause() {
+        super.onPause();
 
-    if (getActivity() instanceof UHFMainActivity) {
-        ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
-        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
-    }
-
-    // ✅ [FIX-3] استعادة القوة
-    restoreOriginalPowerEncoding();
-
-    // ✅ [FIX-3] نظّف المؤقتات المحددة فقط — لا removeCallbacksAndMessages(null)
-    if (handler != null) {
-        if (rfidTimeoutRunnable != null) {
-            handler.removeCallbacks(rfidTimeoutRunnable);
-            rfidTimeoutRunnable = null;
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
+            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
         }
-        if (pendingHideFeedback != null) {
-            handler.removeCallbacks(pendingHideFeedback);
-            pendingHideFeedback = null;
+
+        restoreOriginalPowerEncoding();
+
+        // ✅ إيقاف نظيف — يشمل كل الحالة
+        isTriggerDown = false;
+        isProcessingTag.set(false);
+
+        if (handler != null) {
+            if (rfidTimeoutRunnable != null) {
+                handler.removeCallbacks(rfidTimeoutRunnable);
+                rfidTimeoutRunnable = null;
+            }
+            if (pendingHideFeedback != null) {
+                handler.removeCallbacks(pendingHideFeedback);
+                pendingHideFeedback = null;
+            }
         }
+
+        stopRfidScanningMode();
+        stopDesktopScannerMode();
+        saveCurrentDraftAsync();
     }
 
-    isProcessingTag.set(false);
-    stopRfidScanningMode();
-    stopDesktopScannerMode();
-    saveCurrentDraftAsync();
-}
-
-@Override
-public void onHiddenChanged(boolean hidden) {
-    super.onHiddenChanged(hidden);
-    if (!hidden) {
-        // ✅ بمجرد عودة الشاشة للظهور، عالج الكود الممسوح
-        processPendingBarcode();
-    }
-}
-
-private void processPendingBarcode() {
-    final String scannedCode = pendingBarcodeFromScanner;
-    if (scannedCode == null || scannedCode.isEmpty()) return;
-
-    // تصفير المتغير
-    pendingBarcodeFromScanner = null;
-
-    // ✅ 1) استخراج المعرّف
-    final String extractedIdentifier = extractIdentifierFromBarcode(scannedCode);
-
-    // ✅ 2) فحص الصحة
-    if (extractedIdentifier.isEmpty()
-            || extractedIdentifier.length() < 2
-            || extractedIdentifier.length() > 128) {
-        playErrorSound();
-        showScanFeedback(
-                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-                isArabic ? "الطول: " + extractedIdentifier.length() + " حرف"
-                         : "Length: " + extractedIdentifier.length() + " chars",
-                null,
-                android.R.drawable.ic_dialog_alert,
-                0xFFDC2626);
-        showErrorDialog(
-                isArabic ? "❌ باركود غير صالح" : "❌ Invalid Barcode",
-                isArabic ? "طول الباركود غير منطقي أو غير معروف"
-                         : "Barcode length unreasonable or unknown");
-        return;
-    }
-
-    // ✅ 3) فحص قاعدة البيانات في الخلفية
-    if (miraExecutor == null) return;
-    miraExecutor.getBackgroundExecutor().execute(() -> {
-        final boolean isDuplicate = syncManager != null
-                && syncManager.isEpcDuplicateLocally(extractedIdentifier);
-
-        safeRun(() -> {
-            if (binding == null || !isAdded()) return;
-
-            // ═════════════════════════════════════════════
-            //  حالة مكررة
-            // ═════════════════════════════════════════════
-            if (isDuplicate) {
-                playErrorSound();
-                showScanFeedback(
-                        isArabic ? "⚠️ باركود مكرر" : "⚠️ Duplicate Barcode",
-                        isArabic ? extractedIdentifier + "\nمسجل بالفعل"
-                                 : extractedIdentifier + "\nAlready registered",
-                        null,
-                        android.R.drawable.ic_dialog_alert,
-                        0xFF3B82F6);
-                showErrorDialog(
-                        isArabic ? "باركود مكرر" : "Duplicate Barcode",
-                        isArabic ? "هذا الكود مسجل بالفعل:\n" + extractedIdentifier
-                                 : "This code is already registered:\n" + extractedIdentifier);
-                return;
-            }
-
-            // ═════════════════════════════════════════════
-            //  ✅ [SECURITY] الباركود لا يكفي للتكويد
-            //  يُملأ الحقل للبحث، لكن isEpcBound يبقى false
-            // ═════════════════════════════════════════════
-
-            // املأ الحقل لعرض البيانات
-            if (binding.etEpc != null) {
-                binding.etEpc.setText(extractedIdentifier);
-                binding.etEpc.setTag(extractedIdentifier);
-            }
-            if (binding.tvStatusBadge != null) {
-                binding.tvStatusBadge.setText(
-                        isArabic ? "⚠️ باركود (للبحث فقط)"
-                                 : "⚠️ Barcode (lookup only)");
-                binding.tvStatusBadge.setTextColor(0xFFF59E0B);  // أصفر
-            }
-
-            // ⚠️ لا نعتبره مربوطاً — الحفظ سيرفضه في validateInputData
-            isEpcBound = false;
-
-            showScanFeedback(
-                    isArabic ? "🔍 باركود للبحث فقط"
-                             : "🔍 Barcode (Lookup)",
-                    isArabic
-                            ? "الباركود يحدد القطعة، لكن يجب مسح شريحة RFID للتكويد"
-                            : "Barcode identifies item, but RFID scan is required to encode",
-                    null,
-                    android.R.drawable.ic_dialog_info,
-                    0xFF3B82F6);
-
-            showErrorDialog(
-                    isArabic ? "⚠️ الباركود لا يكفي" : "⚠️ Barcode is not sufficient",
-                    isArabic
-                            ? "لتكويد القطعة:\n\n" +
-                              "1. استخدم زر مسح RFID\n" +
-                              "2. قرّب الشريحة من القارئ\n" +
-                              "3. اضغط الزناد"
-                            : "To encode:\n\n" +
-                              "1. Use RFID scan button\n" +
-                              "2. Move tag near reader\n" +
-                              "3. Press trigger");
-
-            Log.i(TAG, "🔍 Barcode accepted for lookup only: " + extractedIdentifier);
-        });
-    });
-}
-// ═══════════════════════════════════════════════════════════
-// ✅ دالة مساعدة: استخراج المعرّف (السيريال) من الباركود
-// ═══════════════════════════════════════════════════════════
-private String extractIdentifierFromBarcode(String rawBarcode) {
-    if (rawBarcode == null || rawBarcode.isEmpty()) return "";
-    String clean = rawBarcode.trim();
-    
-    // ✅ [SECURITY] صيغ معروفة فقط — رفض كل ما عداها
-    
-    // 1) URL: https://sa.mirabarcode.com/MIRA-SN-1001
-    if (clean.startsWith("http://") || clean.startsWith("https://")) {
-        try {
-            android.net.Uri uri = android.net.Uri.parse(clean);
-            String lastSegment = uri.getLastPathSegment();
-            if (lastSegment != null && lastSegment.matches("^MIRA-SN-\\d+$")) {
-                return lastSegment;
-            }
-            String serial = uri.getQueryParameter("serial");
-            if (serial == null) serial = uri.getQueryParameter("sn");
-            if (serial != null && serial.matches("^MIRA-SN-\\d+$")) {
-                return serial;
-            }
-            return "";  // ⚠️ URL بصيغة غير معروفة
-        } catch (Exception ignored) {
-            return "";
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (!hidden) {
+            processPendingBarcode();
+        } else {
+            // ✅ عند الإخفاء — أوقف كل شيء فوراً
+            isTriggerDown = false;
+            stopRfidScanningMode();
         }
     }
-    
-    // 2) GS1 DataMatrix: (01)07612345678901(21)MIRA-SN-1001
-    String gs1 = clean.replace('\u001D', '|').replace("(#)", "|");
-    java.util.regex.Matcher mSerial = java.util.regex.Pattern
-            .compile("(?:^|\\|)21(MIRA-SN-\\d+)")
-            .matcher(gs1);
-    if (mSerial.find()) {
-        String serial = mSerial.group(1);
-        if (serial != null && serial.matches("^MIRA-SN-\\d+$")) {
-            return serial;
-        }
-    }
-    
-    // 3) صيغة MIRA-SN-XXXX الصريحة
-    if (clean.matches("^MIRA-SN-\\d+$")) {
-        return clean;
-    }
-    
-    // ✅ رفض كل ما عدا ذلك
-    Log.w(TAG, "[SECURITY] Rejected barcode format: " + 
-            (clean.length() > 20 ? clean.substring(0, 20) + "..." : clean));
-    return "";
-}
 
     @Override
     public void onDestroyView() {
         Log.d(TAG, "onDestroyView: cleaning up");
 
-        // 1) أوقف RFID
+        // 1) إيقاف كامل
+        isTriggerDown = false;
+        isProcessingTag.set(false);
         stopRfidScanningMode();
 
-        // 2) أغلق حوار التحميل
+        // 2) حوارات مفتوحة
         dismissDialog(activeLoadingDialog);
         activeLoadingDialog = null;
 
-        // 3) نظّف handler
+        // 3) handler
         if (handler != null) {
-    if (rfidTimeoutRunnable != null) {
-        handler.removeCallbacks(rfidTimeoutRunnable);
-        rfidTimeoutRunnable = null;
-    }
-    if (pendingHideFeedback != null) {
-        handler.removeCallbacks(pendingHideFeedback);
-        pendingHideFeedback = null;
-    }
-}
-
-        // 4) نظّف Scan Feedback Card
-        if (pendingHideFeedback != null) {
-            pendingHideFeedback = null;
+            if (rfidTimeoutRunnable != null) {
+                handler.removeCallbacks(rfidTimeoutRunnable);
+                rfidTimeoutRunnable = null;
+            }
+            if (pendingHideFeedback != null) {
+                handler.removeCallbacks(pendingHideFeedback);
+                pendingHideFeedback = null;
+            }
         }
+
+        // 4) Scan Feedback Card
         scanFeedbackOverlay = null;
         scanFeedbackCard = null;
         ivFeedbackIcon = null;
@@ -3932,7 +3537,7 @@ private String extractIdentifierFromBarcode(String rawBarcode) {
         tvFeedbackPrice = null;
         vFeedbackAccent = null;
 
-        // 5) افصل مرجع النشاط
+        // 5) فصل النشاط
         if (getActivity() instanceof UHFMainActivity) {
             try {
                 ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
@@ -3941,25 +3546,24 @@ private String extractIdentifierFromBarcode(String rawBarcode) {
             }
         }
 
-        // 6) نظّف RecyclerView
+        // 6) RecyclerView
         if (binding != null && binding.rvPhotosPreview != null) {
             binding.rvPhotosPreview.setAdapter(null);
             binding.rvPhotosPreview.setLayoutManager(null);
             binding.rvPhotosPreview.clearOnScrollListeners();
         }
-
         if (photosAdapter != null) {
             photosAdapter.destroy();
             photosAdapter = null;
         }
-
         if (formManager != null) {
             formManager.setNotificationCallback(null);
         }
 
-        // 7) ألغِ binding
+        // 7) reset
         binding = null;
-        isProcessingTag.set(false); 
+        stoppingReader.set(false);
+
         super.onDestroyView();
     }
 
@@ -3967,7 +3571,7 @@ private String extractIdentifierFromBarcode(String rawBarcode) {
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putBoolean("is_form_locked", isFormLocked);
-        outState.putBoolean("is_rfid_scanning", isRfidScanning);
+        // ✅ لم نعد نحفظ is_rfid_scanning — لأنه يجب أن يبدأ دائماً false
         if (currentPhotoPath != null) {
             outState.putString("camera_photo_path", currentPhotoPath);
         }
