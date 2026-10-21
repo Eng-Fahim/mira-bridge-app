@@ -521,7 +521,6 @@
 
                 <!-- ═══════════════════════════════════════════════════
                      3. INVENTORY BY KARAT — Warm Surface
-                     (كان: INVENTORY METRICS — total items / weight / sold today)
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardInventoryByKarat"
@@ -571,13 +570,18 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_3"
                             android:clipToPadding="false"
-                            android:scrollbars="none">
+                            android:scrollbars="none"
+                            android:layoutDirection="rtl"> <!-- ✅ إجبار الاتجاه للعربية -->
 
                             <LinearLayout
                                 android:id="@+id/llInventoryByKarat"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:orientation="horizontal" />
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:showDividers="middle"
+                                android:divider="@drawable/divider_vertical_gold"
+                                android:dividerPadding="10dp" />
                         </HorizontalScrollView>
 
                         <!-- Empty state -->
