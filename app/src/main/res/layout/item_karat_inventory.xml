@@ -1,69 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_marginEnd="@dimen/space_2"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="@dimen/radius_lg"
-    app:cardElevation="0dp"
-    app:strokeColor="@color/card_stroke_warm"
-    app:strokeWidth="@dimen/stroke_normal">
+    android:orientation="vertical"
+    android:gravity="center"
+    android:minWidth="90dp"
+    android:paddingHorizontal="@dimen/space_4"
+    android:paddingVertical="@dimen/space_2">
 
-    <LinearLayout
+    <!-- اسم العيار بتأثير لوني -->
+    <TextView
+        android:id="@+id/tvKaratLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:minWidth="86dp"
-        android:orientation="vertical"
-        android:paddingHorizontal="@dimen/space_3"
-        android:paddingVertical="@dimen/space_3">
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        tools:text="24K"
+        tools:textColor="#D4AF37" />
 
-        <!-- Karat Label (24K / 21K / 18K) -->
-        <TextView
-            android:id="@+id/tvKaratLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="@style/TextAppearance.App.Title.Small"
-            android:textStyle="bold"
-            tools:text="24K"
-            tools:textColor="#B8860B" />
+    <!-- العدد (البطل) -->
+    <TextView
+        android:id="@+id/tvKaratCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:fontFamily="sans-serif-medium"
+        tools:text="12" />
 
-        <!-- Count + unit -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_1"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+    <!-- كلمة "قطعة" -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/pieces"
+        android:textSize="10sp"
+        android:textColor="#A0A0A0"
+        android:layout_marginTop="-4dp" />
 
-            <TextView
-                android:id="@+id/tvKaratCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textAppearance="@style/TextAppearance.App.Number.Large"
-                android:textColor="?attr/colorOnSurface"
-                tools:text="50" />
+    <!-- خط فاصل ذهبي رفيع -->
+    <View
+        android:layout_width="24dp"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:background="#44D4AF37" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="2dp"
-                android:text="@string/pieces"
-                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
-
-        <!-- Weight -->
-        <TextView
-            android:id="@+id/tvKaratWeight"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textAppearance="@style/TextAppearance.App.Label.Small"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            tools:text="800.0 g" />
-    </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+    <!-- الوزن -->
+    <TextView
+        android:id="@+id/tvKaratWeight"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#E0E0E0"
+        android:fontFamily="sans-serif-light"
+        tools:text="134.0 g" />
+</LinearLayout>
