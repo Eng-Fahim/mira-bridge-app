@@ -616,7 +616,7 @@ public class MiraDashboardFragment extends Fragment {
     } catch (Exception e) {
         logNonFatal("updateHeroBalance", e);
     }
-}.
+}
     private void toggleHeroVisibility() {
         if (!isAdded() || tvHeroBalance == null) return;
         isHeroHidden = !isHeroHidden;
@@ -1051,6 +1051,42 @@ public class MiraDashboardFragment extends Fragment {
             logNonFatal("displayGoldPricesFromCache", e);
         }
     }
+    
+    // ✅ دالة جديدة: تجلب الأسعار المعتمدة من سيرفرك (بدون استهلاك الـ API الخارجي)
+private void fetchApprovedGoldPricesFromServer() {
+    if (apiClient == null || !isAdded() || !isSessionValid()) return;
+    if (!ensureExecutor()) return;
+
+    localExecutor.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getDashboardGoldPrices();
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject prices = response.data.optJSONObject("prices");
+                if (prices != null) {
+                    double price24 = prices.optDouble("24k", 0);
+                    double price21 = prices.optDouble("21k", 0);
+                    double price18 = prices.optDouble("18k", 0);
+                    String source = response.data.optString("source", "server");
+                    
+                    if (price24 > 0) {
+                        GoldPriceData priceData = new GoldPriceData(price24, price21, price18, price24 * OUNCE_TO_GRAM, source);
+                        
+                        mainHandler.post(() -> {
+                            if (isAdded()) {
+                                displayGoldPrices(priceData);
+                                // 💡 اختياري: إذا كان MiraPriceManager يدعم الحفظ المحلي، احفظها هنا
+                                // priceManager.saveLocalGoldPrices(price24, price21, price18);
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logNonFatal("fetchApprovedGoldPricesFromServer", e);
+        }
+    });
+}
 
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
@@ -1620,10 +1656,12 @@ public class MiraDashboardFragment extends Fragment {
                 if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
                     fetchLiveGoldPrices(true);
                 } else {
-                    displayGoldPricesFromCache();
-                    updateLiveStatusText(true);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                }
+    // ✅ الكاشير: يعرض الكاش ثم يجلب المعتمد من سيرفرك
+    displayGoldPricesFromCache();
+    fetchApprovedGoldPricesFromServer();
+    updateLiveStatusText(true);
+    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+}
             } else {
                 displayGoldPricesFromCache();
                 updateLiveStatusText(true);
@@ -1861,16 +1899,16 @@ public class MiraDashboardFragment extends Fragment {
                 }
 
                 // ✅ التحديث التلقائي من الـ API مسموح فقط للمدراء
-                if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
+if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
     mainHandler.postDelayed(() -> {
         if (isAdded() && isResumed()) {
-            fetchLiveGoldPrices(false);
+            fetchLiveGoldPrices(false); // المدير يجلب من الـ API
         }
     }, 1500);
 } else {
-    // المستخدم العادي: يقرأ فقط من مدير الأسعار (الذي يجب أن يكون قد سحب الأسعار من السيرفر)
+    // ✅ الكاشير: يعرض الكاش فوراً، ثم يحدثه من سيرفرك في الخلفية
     displayGoldPricesFromCache();
-    // 💡 ملاحظة: يجب أن تكون دالة displayGoldPricesFromCache تقوم بعمل sync مع السيرفر أولاً إن أمكن
+    fetchApprovedGoldPricesFromServer(); 
 }
             }
             startAutoRefresh();
