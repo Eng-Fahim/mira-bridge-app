@@ -1461,16 +1461,56 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void handleRecentActivityClick(JSONObject activity) {
-        if (activity == null || !isAdded()) return;
-        try {
-            ActivityDetailsBottomSheet sheet =
-                    ActivityDetailsBottomSheet.newInstance(activity, isArabic);
-            sheet.show(getParentFragmentManager(), "ActivityDetails");
-        } catch (Exception e) {
-            logNonFatal("handleRecentActivityClick", e);
-        }
-    }
+    if (activity == null || !isAdded()) return;
+    try {
+        ActivityDetailsBottomSheet sheet =
+                ActivityDetailsBottomSheet.newInstance(activity, isArabic);
 
+        // ✅ ربط الأزرار بالأفعال
+        sheet.setOnActionClickListener(new ActivityDetailsBottomSheet.OnActionClickListener() {
+            
+            @Override
+            public void onPrintInvoice(JSONObject activityData) {
+                if (!isAdded() || getContext() == null) return;
+                
+                // 💡 هنا تضع كود الطباعة الفعلي الخاص بك لاحقاً
+                Toast.makeText(getContext(), "جاري تحضير الفاتورة للطباعة...", Toast.LENGTH_SHORT).show();
+                
+                // مثال: 
+                // Intent intent = new Intent(getActivity(), PrintActivity.class);
+                // intent.putExtra("invoice_data", activityData.toString());
+                // startActivity(intent);
+            }
+
+            @Override
+            public void onOpenRefund(JSONObject activityData) {
+                if (!isAdded() || getActivity() == null) return;
+                
+                try {
+                    // إنشاء واجهة المبيعات
+                    Fragment salesFragment = new MiraSalesFragment(); 
+                    
+                    // تجهيز البيانات لفتح ديالوج الاسترجاع
+                    Bundle bundle = new Bundle();
+                    bundle.putString("refund_data_json", activityData.toString());
+                    bundle.putBoolean("auto_open_refund", true);
+                    salesFragment.setArguments(bundle);
+
+                    // الانتقال للشاشة
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).loadFragment(salesFragment, "Sales"); // تأكد من التاج
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error opening refund", e);
+                }
+            }
+        });
+
+        sheet.show(getParentFragmentManager(), "ActivityDetails");
+    } catch (Exception e) {
+        logNonFatal("handleRecentActivityClick", e);
+    }
+}
     // ═══════════════════════════════════════════════════════
     // Receiver
     // ═══════════════════════════════════════════════════════
