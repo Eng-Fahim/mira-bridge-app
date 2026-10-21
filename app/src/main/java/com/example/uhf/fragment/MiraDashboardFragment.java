@@ -1665,4 +1665,4 @@ public class MiraDashboardFragment extends Fragment {
             || permissionManager.isOrgAdmin()
             || permissionManager.isFinanceManager();
     }
-                    }
+    }
