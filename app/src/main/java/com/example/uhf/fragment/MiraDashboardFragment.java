@@ -1630,49 +1630,54 @@ private void fetchApprovedGoldPricesFromServer() {
 }
 
     private void refreshAllData() {
-        try {
-            if (tvLiveStatusText != null) {
-                tvLiveStatusText.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-                tvLiveStatusText.setTextColor(0xFFF59E0B);
+    try {
+        if (tvLiveStatusText != null) {
+            tvLiveStatusText.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+            tvLiveStatusText.setTextColor(0xFFF59E0B);
+        }
+
+        if (swipeTimeoutRunnable != null) {
+            mainHandler.removeCallbacks(swipeTimeoutRunnable);
+        }
+        swipeTimeoutRunnable = () -> {
+            if (swipeRefresh != null && swipeRefresh.isRefreshing()) {
+                Log.w(TAG, "SwipeRefresh timeout — forcing stop");
+                swipeRefresh.setRefreshing(false);
             }
+        };
+        mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
 
-            if (swipeTimeoutRunnable != null) {
-                mainHandler.removeCallbacks(swipeTimeoutRunnable);
-            }
-            swipeTimeoutRunnable = () -> {
-                if (swipeRefresh != null && swipeRefresh.isRefreshing()) {
-                    Log.w(TAG, "SwipeRefresh timeout — forcing stop");
-                    swipeRefresh.setRefreshing(false);
-                }
-            };
-            mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
+        // جلب بيانات الداشبورد والنشاطات
+        fetchData();
+        fetchRecentActivity();
 
-            fetchData();
-            fetchRecentActivity();
+        long now = System.currentTimeMillis();
 
-            long now = System.currentTimeMillis();
-
-            if (canManuallyRefreshGold()) {
-                if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                    fetchLiveGoldPrices(true);
-                } else {
-    // ✅ الكاشير: يعرض الكاش ثم يجلب المعتمد من سيرفرك
-    displayGoldPricesFromCache();
-    fetchApprovedGoldPricesFromServer();
-    updateLiveStatusText(true);
-    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-}
+        // ═══════════════════════════════════════════════════════
+        // منطق أسعار الذهب بناءً على الصلاحيات
+        // ═══════════════════════════════════════════════════════
+        if (canManuallyRefreshGold()) {
+            // ✅ المدير: يجلب من الـ API الخارجي (إذا انتهت صلاحية الكاش)
+            if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                fetchLiveGoldPrices(true);
             } else {
                 displayGoldPricesFromCache();
                 updateLiveStatusText(true);
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
             }
-        } catch (Exception e) {
-            logNonFatal("refreshAllData", e);
+        } else {
+            // ✅ الكاشير/المستخدم العادي: يعرض الكاش فوراً ثم يجلب الأسعار المعتمدة من سيرفرك
+            displayGoldPricesFromCache();
+            fetchApprovedGoldPricesFromServer();
+            updateLiveStatusText(true);
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         }
+        
+    } catch (Exception e) {
+        logNonFatal("refreshAllData", e);
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
     }
-
+}
     private void showShimmer(boolean show) {
         try {
             if (shimmerLayout != null)
