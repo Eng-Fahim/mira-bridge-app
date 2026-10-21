@@ -54,12 +54,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * MiraDashboardFragment v2.3 — FULL SECURITY & PRIVACY HARDENED
- *
- * ما تم في v2.3:
- *   ✅ إضافة زر إخفاء/إظهار لكرت المخزون حسب العيار (الخصوصية).
- *   ✅ إخفاء أرقام المخزون تلقائياً عند الخروج من التطبيق.
- *   ✅ تنسيق أيقونة العيار (الألماسة) في التصميم.
+ * MiraDashboardFragment v2.4 — FULL SECURITY & PRIVACY HARDENED
+ * 
+ * إصلاحات v2.4:
+ *   ✅ إزالة استدعاء priceManager.clearCache() لأنه غير موجود في MiraPriceManager
+ *   ✅ تصحيح بناء الجمل الشرطية في refreshAllData
  */
 public class MiraDashboardFragment extends Fragment {
 
@@ -89,14 +88,13 @@ public class MiraDashboardFragment extends Fragment {
     private JSONObject lastSalesData = null;
     private boolean isHeroHidden = true;
     private boolean isSalesHidden = true;
-    private boolean isInventoryHidden = true; // ✅ جديد: إخفاء المخزون افتراضياً
+    private boolean isInventoryHidden = true;
 
     // ───── UI Elements ─────
     private ImageButton btnToggleHeroVisibility;
     private ImageButton btnToggleSalesVisibility;
-    private ImageButton btnToggleInventoryVisibility; // ✅ جديد
+    private ImageButton btnToggleInventoryVisibility;
 
-    // ✅ كرت المخزون حسب العيار
     private android.widget.LinearLayout llInventoryByKarat;
     private TextView tvKaratEmptyState;
     private final List<KaratInventory> currentInventoryByKarat = new ArrayList<>();
@@ -272,9 +270,8 @@ public class MiraDashboardFragment extends Fragment {
             if (ownerUserId > 0 && ownerUserId != currentUserId) {
                 if (activityCache != null) activityCache.clear();
                 if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
-                // في دالة ensureCacheOwnerIsCurrentUser
-                if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
-                if (priceManager != null) priceManager.clearCache(); // (إذا كانت هذه الدالة موجودة في MiraPriceManager)
+                
+                // ❌ تم حذف السطر المسبب للخطأ: if (priceManager != null) priceManager.clearCache();
 
                 int oldBranch = prefs.getInt(KEY_PREFIX_LAST_BRANCH + ownerUserId, -1);
                 if (oldBranch > 0) {
@@ -445,7 +442,7 @@ public class MiraDashboardFragment extends Fragment {
 
             btnToggleHeroVisibility  = v.findViewById(R.id.btnToggleHeroVisibility);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
-            btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility); // ✅ جديد
+            btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility);
 
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
@@ -470,8 +467,6 @@ public class MiraDashboardFragment extends Fragment {
                 btnToggleHeroVisibility.setOnClickListener(v2 -> toggleHeroVisibility());
             if (btnToggleSalesVisibility != null)
                 btnToggleSalesVisibility.setOnClickListener(v2 -> toggleSalesVisibility());
-            
-            // ✅ ربط زر إخفاء المخزون
             if (btnToggleInventoryVisibility != null)
                 btnToggleInventoryVisibility.setOnClickListener(v2 -> toggleInventoryVisibility());
 
@@ -491,7 +486,7 @@ public class MiraDashboardFragment extends Fragment {
 
             isHeroHidden = true;
             isSalesHidden = true;
-            isInventoryHidden = true; // ✅ مخفي افتراضياً
+            isInventoryHidden = true;
 
             if (btnToggleHeroVisibility != null)
                 btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
@@ -509,7 +504,6 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void updateHeader() {
-        // Greeting Card محذوف — يمكن إضافته لاحقاً
     }
 
     // ═══════════════════════════════════════════════════════
@@ -530,7 +524,6 @@ public class MiraDashboardFragment extends Fragment {
             if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.GONE);
             llInventoryByKarat.setVisibility(View.VISIBLE);
 
-            // ترتيب تنازلي (24K أولاً)
             List<KaratInventory> sorted = new ArrayList<>(items);
             Collections.sort(sorted, (a, b) -> Integer.compare(b.karat, a.karat));
 
@@ -549,7 +542,6 @@ public class MiraDashboardFragment extends Fragment {
                     } catch (Exception ignored) {}
                 }
 
-                // ✅ تطبيق الخصوصية: إخفاء الأرقام
                 if (tvCount != null) {
                     tvCount.setText(isInventoryHidden ? "••" : String.valueOf(inv.itemCount));
                 }
@@ -578,45 +570,44 @@ public class MiraDashboardFragment extends Fragment {
     // Hero Balance & Toggles
     // ═══════════════════════════════════════════════════════
     private void updateHeroBalance() {
-    try {
-        if (tvHeroBalance == null) return;
+        try {
+            if (tvHeroBalance == null) return;
 
-        double totalValue = currentInventoryValue;
-        int itemCount = currentItemCount;
-        double totalWeight = currentTotalWeight;
+            double totalValue = currentInventoryValue;
+            int itemCount = currentItemCount;
+            double totalWeight = currentTotalWeight;
 
-        if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
-            double price24 = priceManager.getGoldPricePerGram(24);
-            if (price24 > 0) totalValue = totalWeight * price24;
+            if (totalValue <= 0 && priceManager != null && totalWeight > 0) {
+                double price24 = priceManager.getGoldPricePerGram(24);
+                if (price24 > 0) totalValue = totalWeight * price24;
+            }
+
+            if (isHeroHidden) {
+                tvHeroBalance.setText("••••••••");
+                if (tvHeroSubtitle != null) tvHeroSubtitle.setText("••• g");
+                if (tvHeroItemCount != null) tvHeroItemCount.setText("••• قطعة");
+            } else {
+                tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
+                if (tvHeroSubtitle != null)
+                    tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
+                if (tvHeroItemCount != null)
+                    tvHeroItemCount.setText(String.format(Locale.getDefault(), "%d قطعة", itemCount));
+            }
+
+            String usdText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue);
+            if (tvHeroValueUSD != null) tvHeroValueUSD.setText(usdText);
+
+            String sarText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue * 3.75);
+            if (tvHeroValueSAR != null) tvHeroValueSAR.setText(sarText);
+
+            String yerText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.0f", totalValue * 530.0);
+            if (tvHeroValueYER != null) tvHeroValueYER.setText(yerText);
+
+        } catch (Exception e) {
+            logNonFatal("updateHeroBalance", e);
         }
-
-        if (isHeroHidden) {
-            tvHeroBalance.setText("••••••••");
-            // ✅ إخفاء الوزن وعدد القطع لمنع حساب القيمة
-            if (tvHeroSubtitle != null) tvHeroSubtitle.setText("••• g");
-            if (tvHeroItemCount != null) tvHeroItemCount.setText("••• قطعة");
-        } else {
-            tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
-            // ✅ إظهار الوزن وعدد القطع فقط عند إظهار القيمة
-            if (tvHeroSubtitle != null)
-                tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
-            if (tvHeroItemCount != null)
-                tvHeroItemCount.setText(String.format(Locale.getDefault(), "%d قطعة", itemCount));
-        }
-
-        String usdText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue);
-        if (tvHeroValueUSD != null) tvHeroValueUSD.setText(usdText);
-
-        String sarText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue * 3.75);
-        if (tvHeroValueSAR != null) tvHeroValueSAR.setText(sarText);
-
-        String yerText = isHeroHidden ? "••••••" : String.format(Locale.US, "%,.0f", totalValue * 530.0);
-        if (tvHeroValueYER != null) tvHeroValueYER.setText(yerText);
-
-    } catch (Exception e) {
-        logNonFatal("updateHeroBalance", e);
     }
-}
+
     private void toggleHeroVisibility() {
         if (!isAdded() || tvHeroBalance == null) return;
         isHeroHidden = !isHeroHidden;
@@ -637,7 +628,6 @@ public class MiraDashboardFragment extends Fragment {
         applySalesVisibility();
     }
 
-    // ✅ دالة تبديل إخفاء/إظهار المخزون حسب العيار
     private void toggleInventoryVisibility() {
         if (!isAdded()) return;
         isInventoryHidden = !isInventoryHidden;
@@ -842,7 +832,6 @@ public class MiraDashboardFragment extends Fragment {
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
             return;
         }
-            // ✅ التحقق من الصلاحية قبل أي شيء
         if (permissionManager == null || !permissionManager.canAccessFragment("GoldRates")) {
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
             return;
@@ -973,7 +962,6 @@ public class MiraDashboardFragment extends Fragment {
         double price21 = prices.optDouble("21k", 0);
         double price18 = prices.optDouble("18k", 0);
         
-        // ✅ التحقق من صحة الأسعار (لا تقبل الصفر أو القيم السالبة)
         if (price24 <= 0 || price24 > 5000) return null; 
         
         double ouncePrice = data.optDouble("price_per_ounce", price24 * OUNCE_TO_GRAM);
@@ -1052,7 +1040,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
     
-    // ✅ دالة جديدة: تجلب الأسعار المعتمدة من سيرفرك (بدون استهلاك الـ API الخارجي)
 private void fetchApprovedGoldPricesFromServer() {
     if (apiClient == null || !isAdded() || !isSessionValid()) return;
     if (!ensureExecutor()) return;
@@ -1075,8 +1062,6 @@ private void fetchApprovedGoldPricesFromServer() {
                         mainHandler.post(() -> {
                             if (isAdded()) {
                                 displayGoldPrices(priceData);
-                                // 💡 اختياري: إذا كان MiraPriceManager يدعم الحفظ المحلي، احفظها هنا
-                                // priceManager.saveLocalGoldPrices(price24, price21, price18);
                             }
                         });
                     }
@@ -1516,7 +1501,6 @@ private void fetchApprovedGoldPricesFromServer() {
         ActivityDetailsBottomSheet sheet =
                 ActivityDetailsBottomSheet.newInstance(activity, isArabic);
 
-        // ✅ ربط الأزرار بالأفعال
         sheet.setOnActionClickListener(new ActivityDetailsBottomSheet.OnActionClickListener() {
             
             @Override
@@ -1524,10 +1508,8 @@ private void fetchApprovedGoldPricesFromServer() {
     if (!isAdded() || getContext() == null) return;
     
     try {
-        // 💡 نمرر بيانات العملية كـ JSON String إلى واجهة الفاتورة
         String receiptJson = activityData.toString();
         
-        // استدعاء واجهة الفاتورة (نفس الواجهة المستخدمة في شاشة المبيعات)
         com.example.uhf.fragment.MiraReceiptFragment receiptFragment = 
                 com.example.uhf.fragment.MiraReceiptFragment.newInstance(receiptJson);
         
@@ -1546,18 +1528,15 @@ private void fetchApprovedGoldPricesFromServer() {
                 if (!isAdded() || getActivity() == null) return;
                 
                 try {
-                    // إنشاء واجهة المبيعات
                     Fragment salesFragment = new MiraPosFragment(); 
                     
-                    // تجهيز البيانات لفتح ديالوج الاسترجاع
                     Bundle bundle = new Bundle();
                     bundle.putString("refund_data_json", activityData.toString());
                     bundle.putBoolean("auto_open_refund", true);
                     salesFragment.setArguments(bundle);
 
-                    // الانتقال للشاشة
                     if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).loadFragment(salesFragment, "Sales"); // تأكد من التاج
+                        ((UHFMainActivity) getActivity()).loadFragment(salesFragment, "Sales");
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error opening refund", e);
@@ -1613,7 +1592,6 @@ private void fetchApprovedGoldPricesFromServer() {
 
         long now = System.currentTimeMillis();
         
-        // ✅ الأفضل هنا استخدام canManuallyRefreshGold ليكون المنطق واضحاً
         if (canManuallyRefreshGold()) {
             if (lastGoldFetchTime == 0 || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
                 fetchLiveGoldPrices(false);
@@ -1621,8 +1599,8 @@ private void fetchApprovedGoldPricesFromServer() {
                 displayGoldPricesFromCache();
             }
         } else {
-            // المستخدم العادي: يعرض الكاش فوراً
             displayGoldPricesFromCache();
+            fetchApprovedGoldPricesFromServer();
         }
     } catch (Exception e) {
         logNonFatal("refreshInternalData", e);
@@ -1647,17 +1625,12 @@ private void fetchApprovedGoldPricesFromServer() {
         };
         mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
 
-        // جلب بيانات الداشبورد والنشاطات
         fetchData();
         fetchRecentActivity();
 
         long now = System.currentTimeMillis();
 
-        // ═══════════════════════════════════════════════════════
-        // منطق أسعار الذهب بناءً على الصلاحيات
-        // ═══════════════════════════════════════════════════════
         if (canManuallyRefreshGold()) {
-            // ✅ المدير: يجلب من الـ API الخارجي (إذا انتهت صلاحية الكاش)
             if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
                 fetchLiveGoldPrices(true);
             } else {
@@ -1666,7 +1639,6 @@ private void fetchApprovedGoldPricesFromServer() {
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
             }
         } else {
-            // ✅ الكاشير/المستخدم العادي: يعرض الكاش فوراً ثم يجلب الأسعار المعتمدة من سيرفرك
             displayGoldPricesFromCache();
             fetchApprovedGoldPricesFromServer();
             updateLiveStatusText(true);
@@ -1857,7 +1829,7 @@ private void fetchApprovedGoldPricesFromServer() {
 
             isHeroHidden = true;
             isSalesHidden = true;
-            isInventoryHidden = true; // ✅ إعادة الإخفاء عند العودة
+            isInventoryHidden = true;
             
             if (btnToggleHeroVisibility != null)
                 btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
@@ -1903,15 +1875,13 @@ private void fetchApprovedGoldPricesFromServer() {
                     }
                 }
 
-                // ✅ التحديث التلقائي من الـ API مسموح فقط للمدراء
 if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
     mainHandler.postDelayed(() -> {
         if (isAdded() && isResumed()) {
-            fetchLiveGoldPrices(false); // المدير يجلب من الـ API
+            fetchLiveGoldPrices(false);
         }
     }, 1500);
 } else {
-    // ✅ الكاشير: يعرض الكاش فوراً، ثم يحدثه من سيرفرك في الخلفية
     displayGoldPricesFromCache();
     fetchApprovedGoldPricesFromServer(); 
 }
@@ -1946,7 +1916,6 @@ if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
                 if (btnToggleSalesVisibility != null)
                     btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
             }
-            // ✅ إخفاء المخزون فوراً عند الخروج
             if (!isInventoryHidden) {
                 isInventoryHidden = true;
                 if (btnToggleInventoryVisibility != null)
