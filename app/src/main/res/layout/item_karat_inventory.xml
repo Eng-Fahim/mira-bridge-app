@@ -16,13 +16,15 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <!-- الأيقونة: استخدمنا لون الـ Primary الخاص بالتطبيق (الذهبي) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="◈"
             android:textSize="14sp"
-            android:textColor="#D4AF37" />
+            android:textColor="?attr/colorPrimary" />
 
+        <!-- اسم العيار: سيتم تلوينه برمجياً في الجافا حسب العيار، لكن هذا اللون الافتراضي -->
         <TextView
             android:id="@+id/tvKaratLabel"
             android:layout_width="wrap_content"
@@ -31,11 +33,11 @@
             android:textSize="14sp"
             android:textStyle="bold"
             android:letterSpacing="0.1"
-            tools:text="24K"
-            tools:textColor="#D4AF37" />
+            android:textColor="?attr/colorPrimary"
+            tools:text="24K" />
     </LinearLayout>
 
-    <!-- العدد (البطل) -->
+    <!-- العدد (البطل): يتغير تلقائياً (أسود في النهاري، أبيض في الليلي) -->
     <TextView
         android:id="@+id/tvKaratCount"
         android:layout_width="wrap_content"
@@ -43,34 +45,35 @@
         android:layout_marginTop="4dp"
         android:textSize="26sp"
         android:textStyle="bold"
-        android:textColor="#FFFFFF"
+        android:textColor="?attr/colorOnSurface" 
         android:fontFamily="sans-serif-medium"
         tools:text="12" />
 
-    <!-- كلمة "قطعة" -->
+    <!-- كلمة "قطعة": لون ثانوي يتكيف مع الثيم -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/pieces"
         android:textSize="10sp"
-        android:textColor="#A0A0A0"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:layout_marginTop="-4dp" />
 
-    <!-- خط فاصل ذهبي رفيع -->
+    <!-- خط فاصل ذهبي رفيع: نستخدم لون الـ Primary مع شفافية -->
     <View
         android:layout_width="24dp"
         android:layout_height="1dp"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp"
-        android:background="#44D4AF37" />
+        android:alpha="0.3"
+        android:background="?attr/colorPrimary" />
 
-    <!-- الوزن -->
+    <!-- الوزن: لون ثانوي يتكيف مع الثيم -->
     <TextView
         android:id="@+id/tvKaratWeight"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="12sp"
-        android:textColor="#E0E0E0"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:fontFamily="sans-serif-light"
         tools:text="134.0 g" />
 </LinearLayout>
