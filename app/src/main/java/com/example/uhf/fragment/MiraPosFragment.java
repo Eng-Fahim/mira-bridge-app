@@ -383,6 +383,7 @@ public class MiraPosFragment extends MiraBaseFragment {
 
             heroController.setState(PosHeroController.State.IDLE);
             setupBackPressedHandler();
+            checkAutoOpenRefundIntent();
 
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error", e);
@@ -2337,6 +2338,75 @@ private void resetHeroAfterDelay() {
             Log.e(TAG, "showRefundDialog error", e);
         }
     }
+
+// ═══════════════════════════════════════════════════════════════════
+//  ✅ [جديد] استقبال البيانات من لوحة التحكم وفتح الاسترجاع تلقائياً
+// ═══════════════════════════════════════════════════════════════════
+
+private void checkAutoOpenRefundIntent() {
+    if (getArguments() != null && getArguments().getBoolean("auto_open_refund", false)) {
+        String jsonStr = getArguments().getString("refund_data_json");
+        
+        // مسح الـ Arguments حتى لا تتكرر العملية عند عمل Recreate للشاشة
+        getArguments().remove("auto_open_refund");
+        getArguments().remove("refund_data_json");
+
+        if (jsonStr != null && !jsonStr.isEmpty()) {
+            try {
+                JSONObject activityData = new JSONObject(jsonStr);
+                String code = extractCodeForRefund(activityData);
+
+                if (code != null && !code.isEmpty()) {
+                    // تأخير بسيط للتأكد من أن الواجهة جاهزة تماماً
+                    mainHandler.postDelayed(() -> {
+                        if (!isFragmentAlive()) return;
+                        
+                        // 1. فتح الديالوج
+                        showRefundDialog();
+                        
+                        // 2. تعبئة كود القطعة والبحث عنها
+                        if (refundDialog != null && refundDialog.isShowing()) {
+                            refundDialog.setRefundCode(code);
+                            searchItemForRefund(code);
+                        }
+                    }, 500); // نصف ثانية كافية لفتح الديالوج بسلاسة
+                } else {
+                    showToast(isArabic ? "⚠️ لم يتم العثور على رمز القطعة في السجل" : "⚠️ No item code found in record");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error parsing auto refund data", e);
+            }
+        }
+    }
+}
+
+// ✅ دالة لاستخراج الـ EPC أو الـ Serial من بيانات العملية (JSON)
+private String extractCodeForRefund(JSONObject data) {
+    try {
+        // 1. البحث المباشر في الجذر (إذا كانت القطعة مفردة)
+        String epc = data.optString("epc", data.optString("rfid_epc", ""));
+        if (!epc.isEmpty()) return epc;
+
+        String serial = data.optString("serial", data.optString("serial_number", ""));
+        if (!serial.isEmpty()) return serial;
+
+        // 2. البحث داخل مصفوفة "items" (إذا كانت الفاتورة تحتوي على عدة قطع)
+        JSONArray items = data.optJSONArray("items");
+        if (items != null && items.length() > 0) {
+            JSONObject firstItem = items.optJSONObject(0);
+            if (firstItem != null) {
+                String itemEpc = firstItem.optString("epc", firstItem.optString("rfid_epc", ""));
+                if (!itemEpc.isEmpty()) return itemEpc;
+
+                String itemSerial = firstItem.optString("serial", firstItem.optString("serial_number", ""));
+                if (!itemSerial.isEmpty()) return itemSerial;
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "extractCodeForRefund error", e);
+    }
+    return "";
+}
 
     private void openRefundBarcodeScanner() {
         if (!isFragmentAlive()) return;
