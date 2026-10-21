@@ -12,6 +12,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
@@ -22,7 +23,8 @@ import com.google.android.material.tabs.TabLayout;
 import java.util.Stack;
 
 /**
- * ✅ الشاشة الرئيسية للنظام المحاسبي
+ * ✅ الشاشة الرئيسية للنظام المحاسبي - إصدار الإنتاج (Production Ready)
+ * تم إصلاح: فقدان البيانات، تجاوز الصلاحيات، سجل الرجوع، وأخطاء التنقل.
  */
 public class MiraAccountingFragment extends Fragment {
 
@@ -38,6 +40,7 @@ public class MiraAccountingFragment extends Fragment {
     private static final int TAB_GOLD     = 5;
     private static final int TAB_LEDGER   = 6;
     private static final int TAB_ADJUSTING = 7;
+    private static final int MAX_TABS     = 8;
 
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
@@ -48,9 +51,8 @@ public class MiraAccountingFragment extends Fragment {
     private int currentTabIndex = 0;
     private Long pendingLedgerAccountId = null;
 
-    // ✅ 1. إضافة سجل للتبويبات (Stack) لحفظ مسار التنقل
     private final Stack<Integer> tabHistory = new Stack<>();
-    private boolean isNavigatingBack = false; // لمنع تكرار الحفظ عند الرجوع
+    private boolean isNavigatingBack = false;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -66,7 +68,6 @@ public class MiraAccountingFragment extends Fragment {
             isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
         }
 
-        // ✅ 2. استعادة الحالة (التبويب الحالي وسجل التبويبات) عند تدوير الشاشة أو إعادة إنشائها
         if (savedInstanceState != null) {
             currentTabIndex = savedInstanceState.getInt(KEY_CURRENT_TAB, 0);
             int[] historyArray = savedInstanceState.getIntArray(KEY_TAB_HISTORY);
@@ -78,30 +79,25 @@ public class MiraAccountingFragment extends Fragment {
             }
         }
 
-        // ✅ 3. معالجة زر الرجوع بالاعتماد على سجل التبويبات
         requireActivity().getOnBackPressedDispatcher().addCallback(
             this,
             new OnBackPressedCallback(true) {
                 @Override
                 public void handleOnBackPressed() {
-                    // إذا كان هناك تبويبات سابقة في السجل، ارجع إليها
                     if (!tabHistory.isEmpty()) {
                         int previousTab = tabHistory.pop();
                         TabLayout.Tab tab = tabLayout != null ? tabLayout.getTabAt(previousTab) : null;
                         if (tab != null) {
-                            isNavigatingBack = true; // تفعيل وضع الرجوع
+                            isNavigatingBack = true;
                             tab.select();
-                            isNavigatingBack = false; // إيقاف وضع الرجوع
+                            isNavigatingBack = false;
                             return;
                         }
                     }
 
-                    // إذا كان السجل فارغاً (نحن في الجذر)، انتقل للداشبورد
                     if (getActivity() instanceof UHFMainActivity) {
                         UHFMainActivity act = (UHFMainActivity) getActivity();
-                        act.loadFragmentDirectly(
-                            new MiraDashboardFragment(),
-                            "Dashboard");
+                        act.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
                     }
                 }
             });
@@ -112,8 +108,7 @@ public class MiraAccountingFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_mira_accounting_v2,
-                container, false);
+        View view = inflater.inflate(R.layout.fragment_mira_accounting_v2, container, false);
 
         initViews(view);
 
@@ -122,7 +117,11 @@ public class MiraAccountingFragment extends Fragment {
             return view;
         }
 
-        checkPermissions();
+        // ✅ [إصلاح 1]: إيقاف تحميل الشاشة إذا لم يكن مصرحاً له
+        if (!hasPermission()) {
+            return view; 
+        }
+
         setupTabs();
 
         if (savedInstanceState == null) {
@@ -153,7 +152,6 @@ public class MiraAccountingFragment extends Fragment {
         super.onSaveInstanceState(outState);
         outState.putInt(KEY_CURRENT_TAB, currentTabIndex);
         
-        // ✅ 4. حفظ سجل التبويبات عند تدوير الشاشة
         int[] historyArray = new int[tabHistory.size()];
         for (int i = 0; i < tabHistory.size(); i++) {
             historyArray[i] = tabHistory.get(i);
@@ -173,26 +171,28 @@ public class MiraAccountingFragment extends Fragment {
         tabContentContainer = view.findViewById(R.id.tabContentContainer);
     }
 
-    private void checkPermissions() {
-        if (permissionManager == null) return;
+    // ✅ [إصلاح 2]: دالة فحص الصلاحيات تعيد boolean لمنع استكمال الكود
+    private boolean hasPermission() {
+        if (permissionManager == null) return true;
         try {
             boolean hasAccess = permissionManager.canView("accounting")
                 || permissionManager.isAdmin()
                 || permissionManager.isBranchManager()
-                || (sessionManager != null
-                    && "AUDITOR".equals(sessionManager.getRoleString()));
+                || (sessionManager != null && "AUDITOR".equals(sessionManager.getRoleString()));
 
             if (!hasAccess) {
                 Toast.makeText(requireContext(),
-                    isArabic ? "⛔ غير مصرح لك بالوصول للمحاسبة"
-                             : "⛔ Access Denied",
+                    isArabic ? "⛔ غير مصرح لك بالوصول للمحاسبة" : "⛔ Access Denied",
                     Toast.LENGTH_LONG).show();
-                if (getActivity() != null) {
-                    getActivity().onBackPressed();
-                }
+                
+                // استخدام الـ Dispatcher الحديث بدلاً من onBackPressed المهمل
+                requireActivity().getOnBackPressedDispatcher().onBackPressed();
+                return false;
             }
+            return true;
         } catch (Exception e) {
             Log.e(TAG, "checkPermissions error: " + e.getMessage());
+            return true; // في حال حدوث خطأ غير متوقع، نسمح بالمرور لتجنب تجميد التطبيق
         }
     }
 
@@ -217,9 +217,11 @@ public class MiraAccountingFragment extends Fragment {
             public void onTabSelected(TabLayout.Tab tab) {
                 int position = tab.getPosition();
                 if (position != currentTabIndex) {
-                    // ✅ 5. إذا لم نكن في وضع "الرجوع"، قم بحفظ التبويب الحالي في السجل
                     if (!isNavigatingBack) {
-                        tabHistory.push(currentTabIndex); 
+                        // ✅ [إصلاح 3]: منع تكرار التبويبات المتتالية في سجل الرجوع
+                        if (tabHistory.isEmpty() || tabHistory.peek() != currentTabIndex) {
+                            tabHistory.push(currentTabIndex);
+                        }
                     }
                     currentTabIndex = position;
                     loadTab(position);
@@ -227,7 +229,6 @@ public class MiraAccountingFragment extends Fragment {
             }
 
             @Override public void onTabUnselected(TabLayout.Tab tab) {}
-
             @Override
             public void onTabReselected(TabLayout.Tab tab) {
                 loadTab(tab.getPosition());
@@ -242,26 +243,44 @@ public class MiraAccountingFragment extends Fragment {
         tabLayout.addTab(tab);
     }
 
+    // ✅ [إصلاح 4]: استخدام hide/show بدلاً من replace للحفاظ على بيانات المستخدم
     private void loadTab(int tabIndex) {
-        if (tabContentContainer == null) {
-            Log.e(TAG, "tabContentContainer is null");
-            return;
+        if (tabContentContainer == null || !isAdded() || isDetached()) return;
+
+        FragmentTransaction transaction = getChildFragmentManager().beginTransaction();
+        String targetTag = "TAB_" + tabIndex;
+
+        // إخفاء جميع الفريمنتات المفتوحة مسبقاً
+        for (int i = 0; i < MAX_TABS; i++) {
+            if (i == tabIndex) continue;
+            Fragment f = getChildFragmentManager().findFragmentByTag("TAB_" + i);
+            if (f != null) {
+                transaction.hide(f);
+            }
         }
 
-        if (!isAdded() || isDetached()) return;
+        Fragment targetFragment = getChildFragmentManager().findFragmentByTag(targetTag);
 
-        Fragment targetFragment = createFragmentForTab(tabIndex);
-        if (targetFragment == null) return;
+        if (targetFragment == null) {
+            // إنشاء الفريمنت لأول مرة
+            targetFragment = createFragmentForTab(tabIndex);
+            if (targetFragment == null) return;
+            transaction.add(R.id.tabContentContainer, targetFragment, targetTag);
+        } else {
+            // إظهار الفريمنت الموجود مسبقاً (الاحتفاظ بالبيانات)
+            transaction.show(targetFragment);
+
+            // ✅ [إصلاح 5]: تمرير الـ Account ID للفريمنت الموجود مسبقاً في تبويب الأستاذ
+            if (targetFragment instanceof MiraGeneralLedgerFragment && pendingLedgerAccountId != null) {
+                ((MiraGeneralLedgerFragment) targetFragment).setAccountId(pendingLedgerAccountId);
+                pendingLedgerAccountId = null;
+            }
+        }
 
         try {
-            getChildFragmentManager()
-                .beginTransaction()
-                .replace(R.id.tabContentContainer, targetFragment)
-                .commitAllowingStateLoss();
-
-            Log.d(TAG, "✅ Tab " + tabIndex + " loaded: "
-                + targetFragment.getClass().getSimpleName());
-
+            if (!getChildFragmentManager().isStateSaved()) {
+                transaction.commitAllowingStateLoss(); // آمن لأننا نتحقق من isStateSaved
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error loading tab " + tabIndex, e);
         }
@@ -280,9 +299,7 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_LEDGER: {
                     MiraGeneralLedgerFragment f = new MiraGeneralLedgerFragment();
                     if (pendingLedgerAccountId != null && pendingLedgerAccountId > 0) {
-                        Bundle args = new Bundle();
-                        args.putLong("account_id", pendingLedgerAccountId);
-                        f.setArguments(args);
+                        f.setAccountId(pendingLedgerAccountId);
                         pendingLedgerAccountId = null;
                     }
                     return f;
@@ -299,8 +316,7 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     public void navigateToTab(int tabIndex) {
-        if (tabIndex < 0 || tabIndex > TAB_LEDGER) return;
-        if (tabLayout == null) return;
+        if (tabIndex < 0 || tabIndex > TAB_LEDGER || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
@@ -309,6 +325,7 @@ public class MiraAccountingFragment extends Fragment {
         loadTab(currentTabIndex);
     }
 
+    // ✅ [إصلاح 6]: تحديث الفريمنت الحالي إذا كان مفتوحاً، أو تمرير الـ ID عند الفتح
     public void navigateToLedgerWithAccount(long accountId) {
         this.pendingLedgerAccountId = accountId;
 
@@ -318,9 +335,13 @@ public class MiraAccountingFragment extends Fragment {
         if (ledgerTab == null) return;
 
         if (currentTabIndex == TAB_LEDGER) {
-            loadTab(TAB_LEDGER);
+            // إذا كنا في تبويب الأستاذ بالفعل، نمرر الـ ID مباشرة للفريمنت المفتوح
+            Fragment f = getChildFragmentManager().findFragmentByTag("TAB_" + TAB_LEDGER);
+            if (f instanceof MiraGeneralLedgerFragment) {
+                ((MiraGeneralLedgerFragment) f).setAccountId(accountId);
+                pendingLedgerAccountId = null;
+            }
         } else {
-            // هنا سيتم استدعاء onTabSelected وسيقوم بحفظ تبويب "الحسابات" في الـ History تلقائياً
             ledgerTab.select();
         }
     }
