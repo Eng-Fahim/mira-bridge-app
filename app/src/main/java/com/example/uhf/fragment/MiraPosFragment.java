@@ -59,7 +59,7 @@ import com.example.uhf.manager.OfflineSalesSyncer;
 import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.model.CartItem;
 import com.example.uhf.navigation.NavigationManager;
-import com.example.uhf.scanner.MiraBarcodeScannerFragment;
+
 import com.example.uhf.tools.DeviceDetector;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.UIHelper;
