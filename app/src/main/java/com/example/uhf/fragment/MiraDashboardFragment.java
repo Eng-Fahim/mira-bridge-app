@@ -1497,7 +1497,7 @@ public class MiraDashboardFragment extends Fragment {
                 
                 try {
                     // إنشاء واجهة المبيعات
-                    Fragment salesFragment = new MiraSalesFragment(); 
+                    Fragment salesFragment = new MiraPosFragment(); 
                     
                     // تجهيز البيانات لفتح ديالوج الاسترجاع
                     Bundle bundle = new Bundle();
