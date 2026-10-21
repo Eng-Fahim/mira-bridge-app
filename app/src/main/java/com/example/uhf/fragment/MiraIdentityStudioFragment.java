@@ -138,6 +138,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     // ✅ [v6.5 NEW] الحالة الجديدة الحاكمة
     /** هل الزناد الفيزيائي مضغوط حالياً؟ */
     private volatile boolean isTriggerDown = false;
+    /** ✅ [v6.5] قوة القراءة للمسح — أعلى بكثير من POS للسماح بالتقريب التدريجي */
+    private volatile int savedPowerBeforeScan = -1;
+    @Nullable private Runnable scanRetryRunnable;
+    private static final long SCAN_RETRY_INTERVAL_MS = 5000;
+    private static final int SCAN_POWER_DBM = 18;  // قوة مسح معقولة (عادة 5-30)
     /** عدّاد الجيل — يُبطل أي callback قديم */
     private final AtomicInteger scanGeneration = new AtomicInteger(0);
     /** هل القارئ في طور المسح النشط؟ */
@@ -256,7 +261,50 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
         }
     }
+/**
+ * ✅ [FIX-CRITICAL] يُستدعى بعد أن يستعيد Android حالة View (نص etEpc)
+ *    نستخدمه لاستعادة isEpcBound فقط إذا كان الحقل لا يزال يطابق القيمة الممسوحة
+ */
+@Override
+public void onViewStateRestored(@Nullable Bundle savedInstanceState) {
+    super.onViewStateRestored(savedInstanceState);
 
+    if (savedInstanceState == null) return;
+    if (!savedInstanceState.getBoolean("is_epc_bound", false)) return;
+    if (binding == null || binding.etEpc == null) return;
+
+    String savedBoundValue = savedInstanceState.getString("epc_bound_value", null);
+    if (savedBoundValue == null || savedBoundValue.isEmpty()) return;
+
+    // قراءة القيمة الحالية (بعد استعادة Android لها)
+    String currentText = binding.etEpc.getText() != null
+            ? binding.etEpc.getText().toString().trim() : "";
+
+    // ✅ استعد isEpcBound فقط إذا كان الحقل لا يزال يطابق القيمة الأصلية
+    if (currentText.equalsIgnoreCase(savedBoundValue)) {
+        isEpcBound = true;
+        binding.etEpc.setTag(savedBoundValue);
+
+        if (binding.tvStatusBadge != null) {
+            binding.tvStatusBadge.setText(
+                    isArabic ? "✅ موثّق" : "✅ VERIFIED");
+            binding.tvStatusBadge.setTextColor(0xFF22C55E);
+        }
+
+        Log.d(TAG, "♻️ isEpcBound restored from bundle (field matched)");
+    } else {
+        Log.w(TAG, "⚠️ Field mismatch — not restoring bound state. "
+                + "Saved=" + maskEpc(savedBoundValue)
+                + " Current=" + maskEpc(currentText));
+        // الحقل تغيّر — المستخدم يجب أن يعيد المسح
+        isEpcBound = false;
+        if (binding.tvStatusBadge != null) {
+            binding.tvStatusBadge.setText(
+                    isArabic ? "⚠️ أعد المسح" : "⚠️ Rescan");
+            binding.tvStatusBadge.setTextColor(0xFFF59E0B);
+        }
+    }
+}
     private void initializeComponents() {
         if (appContext == null && getContext() != null) {
             appContext = getContext().getApplicationContext();
@@ -379,10 +427,23 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 if (photoManager != null && !photoPaths.isEmpty()) {
                     photoManager.restoreFromSavedPaths(photoPaths, photoCallback);
                 }
-                safeRun(() -> {
-                    if (!isAdded() || binding == null) return;
-                    onPhotosUpdated();
-                });
+                // بعد اكتمال الاستعادة
+safeRun(() -> {
+    if (binding != null && binding.etEpc != null
+            && binding.etEpc.getText() != null
+            && binding.etEpc.getText().length() > 0) {
+        // المسودة قديمة — نطلب إعادة مسح
+        isEpcBound = false;
+        if (binding.tvStatusBadge != null) {
+            binding.tvStatusBadge.setText(
+                    isArabic ? "⚠️ أعد مسح الشريحة" : "⚠️ Rescan tag");
+            binding.tvStatusBadge.setTextColor(0xFFF59E0B);
+        }
+        showToast(isArabic
+                ? "⚠️ المسودة استُعيدت — أعد مسح الشريحة قبل الحفظ"
+                : "⚠️ Draft restored — rescan tag before saving");
+    }
+});
             }
         } catch (Exception e) {
             Log.e(TAG, "restoreDraftIfExists error: " + e.getMessage(), e);
@@ -678,6 +739,9 @@ private void activateRFIDModeForEncoding() {
     final int myGen = scanGeneration.incrementAndGet();
     isRfidScanning = true;
     updateScanningUI(true);
+    
+    // ✅ [v6.5] ارفع القوة للمسح
+applyScanPowerForReading();
 
     if (!mgr.isReady()) {
         Log.i(TAG, "⏳ Reader not ready — waiting...");
@@ -754,22 +818,21 @@ private void startScanWithManager(int gen, RFIDManager mgr) {
     try {
         // إنشاء listener
         encodingRfidListener = new MiraIRFIDReader.OnTagReadListener() {
-            @Override
+        @Override
             public void onTagRead(String epc, int rssi) {
-                if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
+    if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
+    if (!isProcessingTag.compareAndSet(false, true)) return;
 
-                if (!isProcessingTag.compareAndSet(false, true)) {
-                    Log.d(TAG, "⏭️ Ignoring extra tag (already processing): " + maskEpc(epc));
-                    return;
-                }
+    tagReceivedThisScan = true;
+    final String receivedEpc = epc.trim().toUpperCase(Locale.US);
 
-                tagReceivedThisScan = true;
-                final String receivedEpc = epc.trim().toUpperCase(Locale.US);
-                secureLog("📡 EPC received: " + maskEpc(receivedEpc));
+    // ✅ استعادة القوة فوراً — خارج safeRun
+    restorePowerForEncoding();
+    stopRfidScanningMode();
 
-                // أوقف المسح فوراً ثم اقرأ TID
-                safeRun(() -> {
-                    stopRfidScanningMode();
+    safeRun(() -> {
+        
+                    
 
                     if (miraExecutor == null) {
                         isProcessingTag.set(false);
@@ -845,6 +908,8 @@ private void startScanWithManager(int gen, RFIDManager mgr) {
         }
         rfidTimeoutRunnable = this::stopRfidScanningMode;
         handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
+        // ✅ [v6.5] إعادة تشغيل المسح تلقائياً كل 5 ثوانٍ
+scheduleScanRetry(gen, mgr);
 
     } catch (Exception e) {
         Log.e(TAG, "startScanWithManager error: " + e.getMessage(), e);
@@ -853,24 +918,69 @@ private void startScanWithManager(int gen, RFIDManager mgr) {
 }
 
 /**
+ * ✅ [v6.5] بعض القارئات تتوقف بعد دورة inventory واحدة.
+ *    نعيد startScan كل 5 ثوانٍ طالما الزناد مضغوط ولم نقرأ شيئاً.
+ */
+private void scheduleScanRetry(int gen, RFIDManager mgr) {
+    if (scanRetryRunnable != null) {
+        handler.removeCallbacks(scanRetryRunnable);
+        scanRetryRunnable = null;
+    }
+
+    scanRetryRunnable = () -> {
+        // فحوصات: الجيل صحيح؟ الزناد مضغوط؟ لم نقرأ شريحة؟ المسح نشط؟
+        if (scanGeneration.get() != gen) return;
+        if (!isTriggerDown) return;
+        if (tagReceivedThisScan) return;
+        if (!isRfidScanning) return;
+        if (!isAdded() || binding == null) return;
+
+        Log.d(TAG, "🔄 Scan retry tick (5s) — restarting startScan");
+
+        try {
+            mgr.startScan(new RFIDManager.ReadyCallback() {
+                @Override public void onReady(MiraIRFIDReader reader) {
+                    Log.d(TAG, "🔄 Scan retry — started");
+                }
+                @Override public void onError(String reason) {
+                    Log.w(TAG, "🔄 Scan retry error: " + reason);
+                }
+            });
+
+            // جدولة المحاولة القادمة
+            scheduleScanRetry(gen, mgr);
+
+        } catch (Exception e) {
+            Log.w(TAG, "scheduleScanRetry startScan failed", e);
+        }
+    };
+
+    handler.postDelayed(scanRetryRunnable, SCAN_RETRY_INTERVAL_MS);
+}
+
+/**
  * ✅ [v6.5] إيقاف آمن — لا يُغلق نفسه
  * يُصفّر كل الحالة ويلغي callbacks قديمة
  */
+ 
 private void stopRfidScanningMode() {
-    // 1) إلغاء أي callbacks قديمة معلّقة
     scanGeneration.incrementAndGet();
 
     boolean wasScanning = isRfidScanning;
     isRfidScanning = false;
     tagReceivedThisScan = false;
 
-    // 2) إزالة timeout المسح
     if (rfidTimeoutRunnable != null) {
         handler.removeCallbacks(rfidTimeoutRunnable);
         rfidTimeoutRunnable = null;
     }
 
-    // 3) تحديث الواجهة فوراً (حتى لو كان scan غير نشط)
+    // ✅ [v6.5] ألغِ retry
+    if (scanRetryRunnable != null) {
+        handler.removeCallbacks(scanRetryRunnable);
+        scanRetryRunnable = null;
+    }
+
     updateScanningUI(false);
 
     if (!wasScanning) return;
@@ -3104,6 +3214,73 @@ private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, Str
             }
         });
     }
+    
+    /**
+ * ✅ [v6.5] يرفع قوة القراءة أثناء المسح للسماح بتقريب الشريحة تدريجياً
+ */
+private void applyScanPowerForReading() {
+    if (appContext == null || miraExecutor == null) return;
+
+    miraExecutor.getSingleThreadExecutor().execute(() -> {
+        try {
+            com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                    com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appContext);
+
+            savedPowerBeforeScan = settings.getPowerDbm();
+
+            if (savedPowerBeforeScan == SCAN_POWER_DBM) {
+                Log.d(TAG, "⚡ Scan power already at " + SCAN_POWER_DBM);
+                return;
+            }
+
+            settings.setPowerDbm(SCAN_POWER_DBM);
+
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+            if (reader != null) {
+                try {
+                    reader.setPower(SCAN_POWER_DBM);
+                    Log.i(TAG, "⚡ Scan power raised to " + SCAN_POWER_DBM
+                            + " dBm (saved=" + savedPowerBeforeScan + ")");
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyScanPowerForReading error", e);
+        }
+    });
+}
+
+/**
+ * ✅ [v6.5] يخفض القوة إلى POS لبدء الكتابة (بعد قراءة الشريحة)
+ */
+private void restorePowerForEncoding() {
+    if (appContext == null || miraExecutor == null) return;
+    if (savedPowerBeforeScan <= 0) return;
+
+    final int target = savedPowerBeforeScan;
+    savedPowerBeforeScan = -1;
+
+    miraExecutor.getSingleThreadExecutor().execute(() -> {
+        try {
+            com.example.uhf.MiraRfid.MiraReaderSettings settings =
+                    com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appContext);
+
+            int encodingPower = settings.getPosPowerDbm();
+            settings.setPowerDbm(encodingPower);
+
+            com.rscja.deviceapi.RFIDWithUHFUART reader =
+                    com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
+            if (reader != null) {
+                try {
+                    reader.setPower(encodingPower);
+                    Log.i(TAG, "⚡ Power lowered to POS: " + encodingPower + " dBm");
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "restorePowerForEncoding error", e);
+        }
+    });
+}
 
     private void restoreOriginalPowerEncoding() {
         if (savedPowerBeforeEncoding <= 0) return;
@@ -3463,6 +3640,7 @@ private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, Str
     @Override
     public void onPause() {
         super.onPause();
+        restorePowerForEncoding();
 
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
@@ -3568,13 +3746,22 @@ private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, Str
     }
 
     @Override
-    public void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putBoolean("is_form_locked", isFormLocked);
-        // ✅ لم نعد نحفظ is_rfid_scanning — لأنه يجب أن يبدأ دائماً false
-        if (currentPhotoPath != null) {
-            outState.putString("camera_photo_path", currentPhotoPath);
-        }
+public void onSaveInstanceState(@NonNull Bundle outState) {
+    super.onSaveInstanceState(outState);
+    outState.putBoolean("is_form_locked", isFormLocked);
+    // ✅ [FIX] احفظ isEpcBound + القيمة المربوطة
+    outState.putBoolean("is_epc_bound", isEpcBound);
+    String boundValue = null;
+    if (binding != null && binding.etEpc != null) {
+        Object tag = binding.etEpc.getTag();
+        if (tag instanceof String) boundValue = (String) tag;
     }
+    if (boundValue != null && !boundValue.isEmpty()) {
+        outState.putString("epc_bound_value", boundValue);
+    }
+    if (currentPhotoPath != null) {
+        outState.putString("camera_photo_path", currentPhotoPath);
+    }
+}
 
 } // ✅ نهاية الملف
