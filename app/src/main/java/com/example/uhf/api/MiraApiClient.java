@@ -2179,7 +2179,13 @@ public ApiResponse getPaymentMethods() {
             return new ApiResponse(-1, null, e.getMessage());
         }
     }
-
+/**
+ * ✅ حالة الإعداد المحاسبي — تعيش على mira-gate/v1 (وليست mira/v2)
+ * المسار الصحيح: /wp-json/mira-gate/v1/accounting/setup/status
+ */
+public ApiResponse getAccountingSetupStatus() {
+    return getWithAuth("/accounting/setup/status");
+}
     public ApiResponse getAccountingAuditLog() {
         return getWithAuth("/accounting/audit-log?limit=50");
     }
