@@ -40,13 +40,9 @@ import java.util.Locale;
 /**
  * ✅ Bottom Sheet احترافي لعرض تفاصيل العملية
  * 
- * ✅ v3.1 (2026-09-22):
- *  - تحسين الأداء: static cache بدلاً من toString()
- *  - Log مختصر (لا طباعة JSON كامل)
- *  - عرض القطع المباعة مع RFID/EPC/Serial
- *  - عرض العملات (USD + محلي + سعر الصرف)
- *  - إجراءات حقيقية مرتبطة بالشاشات
- *  - احترام كامل للثيمات (فاتح/داكن)
+ * ✅ v3.2 (تحديث):
+ *  - إضافة واجهة (Interface) للتواصل مع الشاشة الرئيسية
+ *  - ربط أزرار "طباعة الفاتورة" و "فتح الاسترجاع" بأحداث حقيقية
  */
 public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
 
@@ -61,6 +57,21 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
 
     private JSONObject activity;
     private boolean isArabic;
+
+    // ✅ 1. تعريف الواجهة للتواصل مع الشاشة التي فتحت النافذة
+    public interface OnActionClickListener {
+        void onPrintInvoice(JSONObject activityData);
+        void onOpenRefund(JSONObject activityData);
+    }
+
+    private OnActionClickListener actionListener;
+
+    /**
+     * ✅ 2. دالة لتعيين المستمع (Listener) من الشاشة الرئيسية
+     */
+    public void setOnActionClickListener(OnActionClickListener listener) {
+        this.actionListener = listener;
+    }
 
     /**
      * ✅ إنشاء BottomSheet بدون serialization
@@ -449,21 +460,31 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
                         "🖨️ " + (isArabic ? "طباعة الفاتورة" : "Print Invoice"),
                         v -> {
                             dismiss();
-                            Toast.makeText(getContext(),
-                                    isArabic ? "🖨️ جاري تحضير الفاتورة..." : "🖨️ Preparing invoice...",
-                                    Toast.LENGTH_SHORT).show();
-                            navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
+                            if (actionListener != null) {
+                                // ✅ استدعاء دالة الطباعة في الشاشة الأصلية
+                                actionListener.onPrintInvoice(activity);
+                            } else {
+                                Toast.makeText(getContext(),
+                                        isArabic ? "🖨️ جاري تحضير الفاتورة..." : "🖨️ Preparing invoice...",
+                                        Toast.LENGTH_SHORT).show();
+                                navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
+                            }
                         });
 
                 addActionButton(container,
                         "↩️ " + (isArabic ? "فتح الاسترجاع" : "Open Refund"),
                         v -> {
                             dismiss();
-                            navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
-                            Toast.makeText(getContext(),
-                                    isArabic ? "↩️ اختر الفاتورة من السجل للاسترجاع"
-                                             : "↩️ Select the invoice from history to refund",
-                                    Toast.LENGTH_LONG).show();
+                            if (actionListener != null) {
+                                // ✅ استدعاء دالة الاسترجاع في الشاشة الأصلية
+                                actionListener.onOpenRefund(activity);
+                            } else {
+                                navigateTo(new MiraSalesHistoryFragment(), "SalesHistory");
+                                Toast.makeText(getContext(),
+                                        isArabic ? "↩️ اختر الفاتورة من السجل للاسترجاع"
+                                                 : "↩️ Select the invoice from history to refund",
+                                        Toast.LENGTH_LONG).show();
+                            }
                         });
                 break;
 
