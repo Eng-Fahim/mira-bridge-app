@@ -22,10 +22,6 @@ import com.google.android.material.tabs.TabLayout;
 
 import java.util.Stack;
 
-/**
- * ✅ الشاشة الرئيسية للنظام المحاسبي - إصدار الإنتاج (Production Ready)
- * تم إصلاح: فقدان البيانات، تجاوز الصلاحيات، سجل الرجوع، وأخطاء التنقل.
- */
 public class MiraAccountingFragment extends Fragment {
 
     private static final String TAG = "MiraAccountingFragment";
@@ -49,7 +45,9 @@ public class MiraAccountingFragment extends Fragment {
     private SessionManager sessionManager;
     private boolean isArabic = true;
     private int currentTabIndex = 0;
-    private Long pendingLedgerAccountId = null;
+    
+    // ✅ [إصلاح البناء]: تحويله إلى long بدلاً من Long لتجنب مشاكل null
+    private long pendingLedgerAccountId = 0;
 
     private final Stack<Integer> tabHistory = new Stack<>();
     private boolean isNavigatingBack = false;
@@ -117,7 +115,6 @@ public class MiraAccountingFragment extends Fragment {
             return view;
         }
 
-        // ✅ [إصلاح 1]: إيقاف تحميل الشاشة إذا لم يكن مصرحاً له
         if (!hasPermission()) {
             return view; 
         }
@@ -171,7 +168,6 @@ public class MiraAccountingFragment extends Fragment {
         tabContentContainer = view.findViewById(R.id.tabContentContainer);
     }
 
-    // ✅ [إصلاح 2]: دالة فحص الصلاحيات تعيد boolean لمنع استكمال الكود
     private boolean hasPermission() {
         if (permissionManager == null) return true;
         try {
@@ -185,14 +181,13 @@ public class MiraAccountingFragment extends Fragment {
                     isArabic ? "⛔ غير مصرح لك بالوصول للمحاسبة" : "⛔ Access Denied",
                     Toast.LENGTH_LONG).show();
                 
-                // استخدام الـ Dispatcher الحديث بدلاً من onBackPressed المهمل
                 requireActivity().getOnBackPressedDispatcher().onBackPressed();
                 return false;
             }
             return true;
         } catch (Exception e) {
             Log.e(TAG, "checkPermissions error: " + e.getMessage());
-            return true; // في حال حدوث خطأ غير متوقع، نسمح بالمرور لتجنب تجميد التطبيق
+            return true; 
         }
     }
 
@@ -218,7 +213,6 @@ public class MiraAccountingFragment extends Fragment {
                 int position = tab.getPosition();
                 if (position != currentTabIndex) {
                     if (!isNavigatingBack) {
-                        // ✅ [إصلاح 3]: منع تكرار التبويبات المتتالية في سجل الرجوع
                         if (tabHistory.isEmpty() || tabHistory.peek() != currentTabIndex) {
                             tabHistory.push(currentTabIndex);
                         }
@@ -243,14 +237,12 @@ public class MiraAccountingFragment extends Fragment {
         tabLayout.addTab(tab);
     }
 
-    // ✅ [إصلاح 4]: استخدام hide/show بدلاً من replace للحفاظ على بيانات المستخدم
     private void loadTab(int tabIndex) {
         if (tabContentContainer == null || !isAdded() || isDetached()) return;
 
         FragmentTransaction transaction = getChildFragmentManager().beginTransaction();
         String targetTag = "TAB_" + tabIndex;
 
-        // إخفاء جميع الفريمنتات المفتوحة مسبقاً
         for (int i = 0; i < MAX_TABS; i++) {
             if (i == tabIndex) continue;
             Fragment f = getChildFragmentManager().findFragmentByTag("TAB_" + i);
@@ -262,24 +254,22 @@ public class MiraAccountingFragment extends Fragment {
         Fragment targetFragment = getChildFragmentManager().findFragmentByTag(targetTag);
 
         if (targetFragment == null) {
-            // إنشاء الفريمنت لأول مرة
             targetFragment = createFragmentForTab(tabIndex);
             if (targetFragment == null) return;
             transaction.add(R.id.tabContentContainer, targetFragment, targetTag);
         } else {
-            // إظهار الفريمنت الموجود مسبقاً (الاحتفاظ بالبيانات)
             transaction.show(targetFragment);
 
-            // ✅ [إصلاح 5]: تمرير الـ Account ID للفريمنت الموجود مسبقاً في تبويب الأستاذ
-            if (targetFragment instanceof MiraGeneralLedgerFragment && pendingLedgerAccountId != null) {
+            // ✅ [إصلاح البناء]: تمرير القيمة long مباشرة
+            if (targetFragment instanceof MiraGeneralLedgerFragment && pendingLedgerAccountId > 0) {
                 ((MiraGeneralLedgerFragment) targetFragment).setAccountId(pendingLedgerAccountId);
-                pendingLedgerAccountId = null;
+                pendingLedgerAccountId = 0;
             }
         }
 
         try {
             if (!getChildFragmentManager().isStateSaved()) {
-                transaction.commitAllowingStateLoss(); // آمن لأننا نتحقق من isStateSaved
+                transaction.commitAllowingStateLoss();
             }
         } catch (Exception e) {
             Log.e(TAG, "Error loading tab " + tabIndex, e);
@@ -298,9 +288,10 @@ public class MiraAccountingFragment extends Fragment {
 
                 case TAB_LEDGER: {
                     MiraGeneralLedgerFragment f = new MiraGeneralLedgerFragment();
-                    if (pendingLedgerAccountId != null && pendingLedgerAccountId > 0) {
+                    // ✅ [إصلاح البناء]: تمرير القيمة long مباشرة
+                    if (pendingLedgerAccountId > 0) {
                         f.setAccountId(pendingLedgerAccountId);
-                        pendingLedgerAccountId = null;
+                        pendingLedgerAccountId = 0;
                     }
                     return f;
                 }
@@ -325,7 +316,6 @@ public class MiraAccountingFragment extends Fragment {
         loadTab(currentTabIndex);
     }
 
-    // ✅ [إصلاح 6]: تحديث الفريمنت الحالي إذا كان مفتوحاً، أو تمرير الـ ID عند الفتح
     public void navigateToLedgerWithAccount(long accountId) {
         this.pendingLedgerAccountId = accountId;
 
@@ -335,11 +325,11 @@ public class MiraAccountingFragment extends Fragment {
         if (ledgerTab == null) return;
 
         if (currentTabIndex == TAB_LEDGER) {
-            // إذا كنا في تبويب الأستاذ بالفعل، نمرر الـ ID مباشرة للفريمنت المفتوح
             Fragment f = getChildFragmentManager().findFragmentByTag("TAB_" + TAB_LEDGER);
             if (f instanceof MiraGeneralLedgerFragment) {
+                // ✅ [إصلاح البناء]: تمرير القيمة long مباشرة
                 ((MiraGeneralLedgerFragment) f).setAccountId(accountId);
-                pendingLedgerAccountId = null;
+                pendingLedgerAccountId = 0;
             }
         } else {
             ledgerTab.select();
