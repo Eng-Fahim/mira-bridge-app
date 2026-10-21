@@ -20,11 +20,10 @@ import javax.crypto.spec.GCMParameterSpec;
 /**
  * SecureSessionManager - إدارة الجلسات الآمنة للتطبيق
  *
- * ✅ v2.1 — إصلاح جذري لمشكلة تكرار شاشة البصمة:
- *   - إبطال التخزين المؤقت (invalidateCache) عند كل تغيير في حالة الجلسة
- *   - دالة restoreBiometricSession لاستعادة الجلسة كاملة بعد البصمة
- *   - logoutUser/createLoginSession يُبطلان الـCache بشكل صريح
- *   - cachedLoggedIn = null (بدلاً من false) لإجبار إعادة القراءة
+ * ✅ v2.2 — تحسينات موثوقية الكتابة:
+ *   - saveAuthToken: commit() بدل apply() (كتابة متزامنة مضمونة)
+ *   - createLoginSession: commit() للتوكن (باقي البيانات apply())
+ *   - فحص نتيجة commit + تسجيل فشل الكتابة
  */
 public class SecureSessionManager {
 
@@ -188,38 +187,34 @@ public class SecureSessionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    // ✅ إبطال التخزين المؤقت — مركز الثقل في الإصلاح
+    // ✅ إبطال التخزين المؤقت
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * يُبطل جميع القيم المخزنة مؤقتاً.
-     * يجب استدعاؤها بعد أي تغيير في حالة الجلسة:
-     *   - login / logout
-     *   - استعادة الجلسة بعد البصمة
-     */
     public void invalidateCache() {
-    cachedAuthToken   = null;
-    tokenCacheTime    = 0;
-    cachedApiKey      = null;
-    apiKeyCacheTime   = 0;
-    cachedLoggedIn    = null;
-    loggedInCacheTime = 0;
-    cachedUsername    = null;
-    usernameCacheTime = 0;
-    cachedServerUrl   = null;
-    serverUrlCacheTime = 0;
-    
-    // ✅ جديد:
-    cachedLastActiveTime = null;
-    cachedSessionLocked  = null;
-    
-    Log.d(TAG, "🗑️ Session cache invalidated");
-}
+        cachedAuthToken   = null;
+        tokenCacheTime    = 0;
+        cachedApiKey      = null;
+        apiKeyCacheTime   = 0;
+        cachedLoggedIn    = null;
+        loggedInCacheTime = 0;
+        cachedUsername    = null;
+        usernameCacheTime = 0;
+        cachedServerUrl   = null;
+        serverUrlCacheTime = 0;
+        cachedLastActiveTime = null;
+        cachedSessionLocked  = null;
+        
+        Log.d(TAG, "🗑️ Session cache invalidated");
+    }
 
     // ═══════════════════════════════════════════════════════
     // إدارة الجلسة
     // ═══════════════════════════════════════════════════════
 
+    /**
+     * ✅ [v2.2] commit() للتوكن (متزامن، مضمون)
+     * apply() لباقي بيانات المستخدم (غير حرجة)
+     */
     public void createLoginSession(String username, String role, String token,
                                    String serverUrl, long expiresInSeconds) {
         try {
@@ -227,10 +222,15 @@ public class SecureSessionManager {
                     ? (System.currentTimeMillis() + (expiresInSeconds * 1000L))
                     : (System.currentTimeMillis() + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L));
 
-            securePrefs.edit()
+            // ✅ commit() — يضمن كتابة التوكن قبل المتابعة
+            boolean tokenOk = securePrefs.edit()
                     .putString(KEY_AUTH_TOKEN, token != null ? token : "")
                     .putLong(KEY_TOKEN_EXPIRY, expiryTime)
-                    .apply();
+                    .commit();
+
+            if (!tokenOk) {
+                Log.e(TAG, "🚨 createLoginSession: token commit FAILED — token NOT persisted!");
+            }
 
             String finalServerUrl = (serverUrl != null && !serverUrl.isEmpty())
                     ? normalizeServerUrl(serverUrl) : DEFAULT_SERVER_URL;
@@ -243,9 +243,9 @@ public class SecureSessionManager {
                     .putString(KEY_SERVER_URL, finalServerUrl)
                     .apply();
 
-            invalidateCache();   // ✅ النقطة الحرجة
+            invalidateCache();
 
-            Log.d(TAG, "Login session created for user: " + username);
+            Log.d(TAG, "✅ Login session created (committed) for: " + username);
         } catch (Exception e) {
             Log.e(TAG, "Error creating login session", e);
         }
@@ -280,6 +280,9 @@ public class SecureSessionManager {
         }
     }
 
+    /**
+     * ✅ [v2.2] commit() — كتابة متزامنة مضمونة
+     */
     public void saveAuthToken(String token, long expiresInSeconds) {
         if (token == null || token.isEmpty()) {
             Log.w(TAG, "⚠️ Attempted to save empty auth token");
@@ -290,27 +293,51 @@ public class SecureSessionManager {
                     ? (System.currentTimeMillis() + (expiresInSeconds * 1000L))
                     : (System.currentTimeMillis() + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L));
 
-            securePrefs.edit()
+            // ✅ commit() — يضمن الكتابة على القرص
+            boolean ok = securePrefs.edit()
                     .putString(KEY_AUTH_TOKEN, token)
                     .putLong(KEY_TOKEN_EXPIRY, expiryTime)
-                    .apply();
+                    .commit();
+
+            if (!ok) {
+                Log.e(TAG, "🚨 saveAuthToken: commit FAILED — token NOT persisted!");
+                return;
+            }
 
             cachedAuthToken = token;
             tokenCacheTime  = System.currentTimeMillis();
-            Log.d(TAG, "✅ Auth token saved with expiry: " + expiresInSeconds + "s");
+            Log.d(TAG, "✅ Auth token saved (commit): " + token.length() + " chars");
         } catch (Exception e) {
-            Log.e(TAG, "saveAuthToken error: " + e.getMessage());
+            Log.e(TAG, "saveAuthToken error: " + e.getMessage(), e);
         }
     }
 
     public String getAuthToken() {
         long now = System.currentTimeMillis();
-        if (cachedAuthToken != null && (now - tokenCacheTime) < CACHE_VALIDITY_MS) {
+        if (cachedAuthToken != null && !cachedAuthToken.isEmpty()
+                && (now - tokenCacheTime) < CACHE_VALIDITY_MS) {
             return cachedAuthToken;
         }
-        cachedAuthToken = securePrefs.getString(KEY_AUTH_TOKEN, "");
-        tokenCacheTime  = now;
-        return cachedAuthToken;
+
+        String token = "";
+        try {
+            token = securePrefs.getString(KEY_AUTH_TOKEN, "");
+            if (token == null) token = "";
+        } catch (Exception e) {
+            Log.e(TAG, "getAuthToken read failed: " + e.getMessage());
+            token = "";
+        }
+
+        // ✅ لا تُخزّن القيمة الفارغة (يُجبر إعادة القراءة)
+        if (!token.isEmpty()) {
+            cachedAuthToken = token;
+            tokenCacheTime  = now;
+        } else {
+            cachedAuthToken = null;
+            tokenCacheTime  = 0;
+        }
+
+        return token;
     }
 
     public boolean hasValidToken() {
@@ -385,7 +412,7 @@ public class SecureSessionManager {
         userEditor.apply();
         secureEditor.apply();
 
-        invalidateCache();   // ✅ النقطة الحرجة
+        invalidateCache();
 
         Log.d(TAG, "User logged out securely");
     }
@@ -398,18 +425,6 @@ public class SecureSessionManager {
     // ✅ استعادة الجلسة بعد المصادقة البيومترية
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * استعادة الجلسة الكاملة بعد نجاح المصادقة البيومترية.
-     *
-     * ⚠️ يجب استدعاء هذه الدالة (وليست saveBiometricUser) بعد نجاح البصمة،
-     * لأنها:
-     *   1) تنقل التوكن من KEY_LAST_BIOMETRIC_TOKEN إلى KEY_AUTH_TOKEN
-     *   2) تُفعّل KEY_IS_LOGGED_IN = true
-     *   3) تستعيد اسم المستخدم والدور والفرع
-     *   4) تُبطل التخزين المؤقت → يختفي الـDialog فورًا
-     *
-     * @return true إذا تمت الاستعادة بنجاح
-     */
     public boolean restoreBiometricSession() {
         try {
             String username    = getLastBiometricUser();
@@ -432,13 +447,16 @@ public class SecureSessionManager {
             long expiryTime = System.currentTimeMillis()
                     + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L);
 
-            // 1) نقل التوكن إلى الموقع الرسمي
-            securePrefs.edit()
+            // ✅ commit() — ضمان الكتابة
+            boolean tokenOk = securePrefs.edit()
                     .putString(KEY_AUTH_TOKEN, token)
                     .putLong(KEY_TOKEN_EXPIRY, expiryTime)
-                    .apply();
+                    .commit();
 
-            // 2) استعادة حالة الجلسة كاملة
+            if (!tokenOk) {
+                Log.e(TAG, "🚨 restoreBiometricSession: token commit FAILED");
+            }
+
             userPrefs.edit()
                     .putBoolean(KEY_IS_LOGGED_IN, true)
                     .putString(KEY_USERNAME, username)
@@ -449,7 +467,6 @@ public class SecureSessionManager {
                     .putString(KEY_BRANCH_NAME, branchName)
                     .apply();
 
-            // 3) ⭐ إبطال التخزين المؤقت — يمنع بقاء الـDialog
             invalidateCache();
 
             Log.d(TAG, "✅ Biometric session restored for: " + username);
@@ -556,11 +573,10 @@ public class SecureSessionManager {
     public boolean isSystemAdmin() {
         return Role.SYSTEM_ADMIN.name().equals(getRoleString());
     }
-    
-    public boolean isOrgAdmin() {
-    return Role.ORG_ADMIN.name().equals(getRoleString());
-}
 
+    public boolean isOrgAdmin() {
+        return Role.ORG_ADMIN.name().equals(getRoleString());
+    }
 
     public boolean isAnyAdmin() {
         String role = getRoleString();
@@ -583,11 +599,11 @@ public class SecureSessionManager {
     }
 
     public boolean isManager() {
-    String role = getRoleString();
-    return isAnyAdmin()
-        || Role.BRANCH_MANAGER.name().equals(role)
-        || Role.INVENTORY_MGR.name().equals(role);
-}
+        String role = getRoleString();
+        return isAnyAdmin()
+                || Role.BRANCH_MANAGER.name().equals(role)
+                || Role.INVENTORY_MGR.name().equals(role);
+    }
 
     public boolean isAccountant() {
         return Role.ACCOUNTANT.name().equals(getRoleString());
@@ -790,10 +806,6 @@ public class SecureSessionManager {
         return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
     }
 
-    /**
-     * حفظ بيانات المستخدم للاستخدام المستقبلي في البصمة.
-     * لا تُفعّل الجلسة — للاستعادة استخدم restoreBiometricSession().
-     */
     public void saveBiometricUser(String username, String role, String displayName, int userId, String token) {
         userPrefs.edit()
                 .putString(KEY_LAST_BIOMETRIC_USER, username)
@@ -941,51 +953,49 @@ public class SecureSessionManager {
     // Auto-Lock
     // ═══════════════════════════════════════════════════════
 
-public void setLastAppActiveTime(long timestamp) {
-    cachedLastActiveTime = timestamp;   // ⭐ فوري في الذاكرة
-    try {
-        userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "setLastAppActiveTime error: " + e.getMessage());
+    public void setLastAppActiveTime(long timestamp) {
+        cachedLastActiveTime = timestamp;
+        try {
+            userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "setLastAppActiveTime error: " + e.getMessage());
+        }
     }
-}
 
-public long getLastAppActiveTime() {
-    if (cachedLastActiveTime != null) return cachedLastActiveTime;  // ⭐ اقرأ من الذاكرة
-    try {
-        long val = userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0);
-        cachedLastActiveTime = val;
-        return val;
-    } catch (Exception e) {
-        return 0;
+    public long getLastAppActiveTime() {
+        if (cachedLastActiveTime != null) return cachedLastActiveTime;
+        try {
+            long val = userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0);
+            cachedLastActiveTime = val;
+            return val;
+        } catch (Exception e) {
+            return 0;
+        }
     }
-}
 
-public void setSessionLocked(boolean locked) {
-    cachedSessionLocked = locked;       // ⭐ فوري في الذاكرة
-    try {
-        userPrefs.edit().putBoolean(KEY_SESSION_LOCKED, locked).apply();
-    } catch (Exception e) {
-        Log.e(TAG, "setSessionLocked error: " + e.getMessage());
+    public void setSessionLocked(boolean locked) {
+        cachedSessionLocked = locked;
+        try {
+            userPrefs.edit().putBoolean(KEY_SESSION_LOCKED, locked).apply();
+        } catch (Exception e) {
+            Log.e(TAG, "setSessionLocked error: " + e.getMessage());
+        }
     }
-}
 
-public boolean isSessionLocked() {
-    if (cachedSessionLocked != null) return cachedSessionLocked;  // ⭐ اقرأ من الذاكرة
-    try {
-        boolean val = userPrefs.getBoolean(KEY_SESSION_LOCKED, false);
-        cachedSessionLocked = val;
-        return val;
-    } catch (Exception e) {
-        return false;
+    public boolean isSessionLocked() {
+        if (cachedSessionLocked != null) return cachedSessionLocked;
+        try {
+            boolean val = userPrefs.getBoolean(KEY_SESSION_LOCKED, false);
+            cachedSessionLocked = val;
+            return val;
+        } catch (Exception e) {
+            return false;
+        }
     }
-}
+
     public void touchActivity() {
         setLastAppActiveTime(System.currentTimeMillis());
     }
-
-    
-    
 
     public boolean isInactivityTimeout(long timeoutMs) {
         try {
