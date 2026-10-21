@@ -46,7 +46,7 @@ public class MiraAccountingFragment extends Fragment {
     private boolean isArabic = true;
     private int currentTabIndex = 0;
     
-    // ✅ [إصلاح البناء]: تحويله إلى long بدلاً من Long لتجنب مشاكل null
+    // long بدلاً من Long لتجنب مشاكل null
     private long pendingLedgerAccountId = 0;
 
     private final Stack<Integer> tabHistory = new Stack<>();
@@ -260,7 +260,6 @@ public class MiraAccountingFragment extends Fragment {
         } else {
             transaction.show(targetFragment);
 
-            // ✅ [إصلاح البناء]: تمرير القيمة long مباشرة
             if (targetFragment instanceof MiraGeneralLedgerFragment && pendingLedgerAccountId > 0) {
                 ((MiraGeneralLedgerFragment) targetFragment).setAccountId(pendingLedgerAccountId);
                 pendingLedgerAccountId = 0;
@@ -288,7 +287,6 @@ public class MiraAccountingFragment extends Fragment {
 
                 case TAB_LEDGER: {
                     MiraGeneralLedgerFragment f = new MiraGeneralLedgerFragment();
-                    // ✅ [إصلاح البناء]: تمرير القيمة long مباشرة
                     if (pendingLedgerAccountId > 0) {
                         f.setAccountId(pendingLedgerAccountId);
                         pendingLedgerAccountId = 0;
@@ -327,7 +325,6 @@ public class MiraAccountingFragment extends Fragment {
         if (currentTabIndex == TAB_LEDGER) {
             Fragment f = getChildFragmentManager().findFragmentByTag("TAB_" + TAB_LEDGER);
             if (f instanceof MiraGeneralLedgerFragment) {
-                // ✅ [إصلاح البناء]: تمرير القيمة long مباشرة
                 ((MiraGeneralLedgerFragment) f).setAccountId(accountId);
                 pendingLedgerAccountId = 0;
             }
