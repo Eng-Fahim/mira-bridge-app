@@ -1292,9 +1292,18 @@ private void startScanNow() {
                 actualTid = tidFromTag.trim().toUpperCase(Locale.US);
             }
             
-            boolean isSim = rfidService.isSimulationMode();
-            // ✅ التحقق باستخدام الـ TID وليس الـ EPC
-            isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+            // ✅ الحل — السيرفر هو المرجع الموثوق (لأن لديه القائمة الحقيقية)
+boolean isSim = rfidService.isSimulationMode();
+boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+
+if (!localAllowed && !isSim) {
+    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid) 
+        + " — server verify in /verify-encoding-tag will decide");
+}
+
+// اسمح بالمرور — السيرفر سيرفض في verifyTagWithServerBeforeEncodingSync
+// إذا كانت الشريحة فعلاً غير معتمدة
+isTagAllowed = true;
             isDuplicate = syncManager.isEpcDuplicateLocally(actualTid);
             
         } catch (Exception e) {
@@ -1454,8 +1463,18 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
             // 2) قارئ يرسل TID (أو قارئ Chainway مع TID ممرر)
             else if (preReadTid != null && !preReadTid.trim().isEmpty()) {
                 actualTid = preReadTid.trim().toUpperCase(Locale.US);
-                boolean isSim = rfidService.isSimulationMode();
-                isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+                // ✅ الحل — السيرفر هو المرجع الموثوق (لأن لديه القائمة الحقيقية)
+boolean isSim = rfidService.isSimulationMode();
+boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+
+if (!localAllowed && !isSim) {
+    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid) 
+        + " — server verify in /verify-encoding-tag will decide");
+}
+
+// اسمح بالمرور — السيرفر سيرفض في verifyTagWithServerBeforeEncodingSync
+// إذا كانت الشريحة فعلاً غير معتمدة
+isTagAllowed = true;
                 idForDuplicateCheck = actualTid; // ✅ افحص التكرار بناءً على الـ TID
                 Log.i(TAG, "✅ Using pre-read TID: " + actualTid);
             } 
@@ -1465,8 +1484,18 @@ private void processReceivedTagWithTid(final String epc, @Nullable final String 
                 if (tidFromTag != null && !tidFromTag.trim().isEmpty()) {
                     actualTid = tidFromTag.trim().toUpperCase(Locale.US);
                 }
-                boolean isSim = rfidService.isSimulationMode();
-                isTagAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+                // ✅ الحل — السيرفر هو المرجع الموثوق (لأن لديه القائمة الحقيقية)
+boolean isSim = rfidService.isSimulationMode();
+boolean localAllowed = isSim || rfidService.verifyTagAllowed(actualTid);
+
+if (!localAllowed && !isSim) {
+    Log.w(TAG, "⚠️ Local whitelist rejected " + maskEpc(actualTid) 
+        + " — server verify in /verify-encoding-tag will decide");
+}
+
+// اسمح بالمرور — السيرفر سيرفض في verifyTagWithServerBeforeEncodingSync
+// إذا كانت الشريحة فعلاً غير معتمدة
+isTagAllowed = true;
                 idForDuplicateCheck = actualTid; // ✅ افحص التكرار بناءً على الـ TID
                 Log.i(TAG, "✅ Read TID from reader: " + actualTid);
             }
@@ -3256,18 +3285,32 @@ private String maskEpc(String epc) {
         if (appContext == null && getContext() != null) {
             appContext = getContext().getApplicationContext();
         }
-        if (appContext == null) return -1;  // ✅ رفض واضح
-        
-        SharedPreferences prefs = appContext.getSharedPreferences(
-                "session", Context.MODE_PRIVATE);
-        int userId = prefs.getInt("user_id", -1);
-        
-        // ✅ [SECURITY] رفض user_id غير صالح
-        if (userId <= 0) {
-            Log.w(TAG, "getCurrentUserId: invalid session (user_id=" + userId + ")");
+        if (appContext == null) {
+            Log.e(TAG, "getCurrentUserId: appContext null");
             return -1;
         }
-        return userId;
+        
+        // ✅ اقرأ من SecureSessionManager (الملف الصحيح)
+        int userId = com.example.uhf.tools.SecureSessionManager
+                .getInstance(appContext)
+                .getUserId();
+        
+        if (userId > 0) {
+            Log.d(TAG, "getCurrentUserId: " + userId + " (SecureSessionManager)");
+            return userId;
+        }
+        
+        // ⚠️ Fallback احتياطي (للجلسات القديمة فقط)
+        SharedPreferences oldPrefs = appContext.getSharedPreferences(
+                "session", Context.MODE_PRIVATE);
+        int legacyId = oldPrefs.getInt("user_id", -1);
+        if (legacyId > 0) {
+            Log.w(TAG, "getCurrentUserId: LEGACY fallback = " + legacyId);
+            return legacyId;
+        }
+        
+        Log.e(TAG, "getCurrentUserId: NO USER ID anywhere");
+        return -1;
         
     } catch (Exception e) {
         Log.e(TAG, "getCurrentUserId error", e);
