@@ -460,62 +460,84 @@ public class MiraBranchesManagementFragment extends Fragment {
 
     // ✅ إصلاح ثغرة: التحقق من صلاحية إدارة مستخدمي الفرع
     private void showBranchUsers(BranchData b) {
-        Context context = getContextSafely();
-        if (context == null) return;
-        
-        if (!canManageBranchUsers(b.id)) {
-            showToast(isArabic()
-                ? "⛔ غير مصرح بإدارة مستخدمي هذا الفرع"
-                : "⛔ Not authorized to manage users of this branch");
-            return;
+    Context context = getContextSafely();
+    if (context == null) return;
+    
+    if (!canManageBranchUsers(b.id)) {
+        showToast(isArabic()
+            ? "⛔ غير مصرح بإدارة مستخدمي هذا الفرع"
+            : "⛔ Not authorized to manage users of this branch");
+        return;
+    }
+    
+    executeTask(() -> {
+        MiraApiClient.ApiResponse response = null;
+        String errorMsg = null;
+        try {
+            // ✅ [FIX] استخدام endpoint /auth/users الموجود والمضمون
+            // ثم الفلترة على العميل بـ branch_id
+            response = apiClient.getUsers();
+        } catch (Exception e) {
+            errorMsg = e.getMessage();
         }
-        
-        executeTask(() -> {
-            try {
-                if (apiClient == null) return;
-                MiraApiClient.ApiResponse response = apiClient.getBranchUsers(b.id);
-                mainHandler.post(() -> {
-                    if (!isAdded() || getContext() == null) return;
-                    
-                    if (response != null && response.isSuccess && response.data != null) {
-                        JSONArray users = response.data.optJSONArray("users");
-                        List<String> userList = new ArrayList<>();
-                        if (users != null) {
-                            for (int i = 0; i < users.length(); i++) {
-                                JSONObject u = users.optJSONObject(i);
-                                if (u != null) {
-                                    userList.add(
-                                        u.optString("display_name", u.optString("username", "مستخدم"))
-                                        + " (" + u.optString("role", "") + ")"
-                                    );
-                                }
-                            }
-                        }
-                        if (userList.isEmpty()) {
-                            userList.add(isArabic()
-                                ? "لا يوجد مستخدمين في هذا الفرع"
-                                : "No users in this branch");
-                        }
-                        new MaterialAlertDialogBuilder(new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
-                            .setTitle("👥 " + b.name)
-                            .setItems(userList.toArray(new String[0]), null)
-                            .setPositiveButton(isArabic() ? "إغلاق" : "Close", null)
-                            .show();
-                    } else {
-                        String err = response != null && response.error != null
-                            ? response.error
-                            : (isArabic() ? "تعذر جلب المستخدمين" : "Failed to fetch users");
-                        showToast("❌ " + err);
+
+        final MiraApiClient.ApiResponse fResponse = response;
+        final String fError = errorMsg;
+
+        mainHandler.post(() -> {
+            if (!isAdded() || getContext() == null) return;
+
+            if (fResponse != null && fResponse.isSuccess && fResponse.data != null) {
+                JSONArray allUsers = fResponse.data.optJSONArray("users");
+                List<String> userList = new ArrayList<>();
+                int matchCount = 0;
+
+                if (allUsers != null) {
+                    for (int i = 0; i < allUsers.length(); i++) {
+                        JSONObject u = allUsers.optJSONObject(i);
+                        if (u == null) continue;
+                        
+                        // ✅ فلترة بـ branch_id
+                        int userBranchId = u.optInt("branch_id", 0);
+                        if (userBranchId != b.id) continue;
+                        
+                        matchCount++;
+                        String displayName = u.optString("display_name",
+                                u.optString("username", "مستخدم"));
+                        String role = u.optString("role", "");
+                        String status = u.optString("status", "active");
+                        String statusIcon = "active".equals(status) ? "🟢" : "🔴";
+                        
+                        userList.add(statusIcon + " " + displayName + " (" + role + ")");
                     }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Users error: " + e.getMessage());
-                mainHandler.post(() -> {
-                    if (isAdded()) showToast("❌ " + e.getMessage());
-                });
+                }
+
+                if (userList.isEmpty()) {
+                    userList.add(isArabic()
+                        ? "لا يوجد مستخدمون في هذا الفرع"
+                        : "No users in this branch");
+                }
+
+                new MaterialAlertDialogBuilder(
+                        new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
+                    .setTitle("👥 " + b.name + " (" + matchCount + ")")
+                    .setItems(userList.toArray(new String[0]), null)
+                    .setPositiveButton(isArabic() ? "إغلاق" : "Close", null)
+                    .show();
+                    
+            } else {
+                // ✅ رسالة خطأ واضحة مع السبب الحقيقي
+                String err = fError != null
+                    ? fError
+                    : (fResponse != null && fResponse.error != null
+                        ? fResponse.error
+                        : (isArabic() ? "تعذر جلب المستخدمين" : "Failed to fetch users"));
+                showToast("❌ " + err);
+                Log.e(TAG, "showBranchUsers failed: " + err);
             }
         });
-    }
+    });
+}
 
     // ✅ إصلاح: حفظ manager_id + manager_name بشكل صحيح
     private void showBranchDialog(@Nullable BranchData existing) {
