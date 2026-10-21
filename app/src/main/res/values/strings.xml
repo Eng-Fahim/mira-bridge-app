@@ -2760,4 +2760,7 @@
 <string name="pending_sales_retry_all">مزامنة الكل</string>
 <string name="pending_sale_retry">إعادة المحاولة</string>
 <string name="pending_sale_delete">حذف</string>
+<string name="inventory_by_karat">📦 المخزون حسب العيار</string>
+<string name="no_data">لا توجد بيانات</string>
+<string name="pieces">قطعة</string>
 </resources>
