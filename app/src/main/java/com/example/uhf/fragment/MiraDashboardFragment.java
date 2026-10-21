@@ -1471,16 +1471,25 @@ public class MiraDashboardFragment extends Fragment {
             
             @Override
             public void onPrintInvoice(JSONObject activityData) {
-                if (!isAdded() || getContext() == null) return;
-                
-                // 💡 هنا تضع كود الطباعة الفعلي الخاص بك لاحقاً
-                Toast.makeText(getContext(), "جاري تحضير الفاتورة للطباعة...", Toast.LENGTH_SHORT).show();
-                
-                // مثال: 
-                // Intent intent = new Intent(getActivity(), PrintActivity.class);
-                // intent.putExtra("invoice_data", activityData.toString());
-                // startActivity(intent);
-            }
+    if (!isAdded() || getContext() == null) return;
+    
+    try {
+        // 💡 نمرر بيانات العملية كـ JSON String إلى واجهة الفاتورة
+        String receiptJson = activityData.toString();
+        
+        // استدعاء واجهة الفاتورة (نفس الواجهة المستخدمة في شاشة المبيعات)
+        com.example.uhf.fragment.MiraReceiptFragment receiptFragment = 
+                com.example.uhf.fragment.MiraReceiptFragment.newInstance(receiptJson);
+        
+        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
+        if (fm != null && !fm.isStateSaved()) {
+            receiptFragment.show(fm, "MiraReceiptFragment");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onPrintInvoice error", e);
+        Toast.makeText(getContext(), "تعذر فتح الفاتورة", Toast.LENGTH_SHORT).show();
+    }
+}
 
             @Override
             public void onOpenRefund(JSONObject activityData) {
