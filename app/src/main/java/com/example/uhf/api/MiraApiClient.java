@@ -1407,6 +1407,7 @@ public ApiResponse addPostApprovalBalance(String type, double amount,
 }
 
     // ==================== لوحة التحكم ====================
+    
     public ApiResponse getDashboardSummary() {
         return getWithAuth("/dashboard/summary");
     }
@@ -1420,6 +1421,11 @@ public ApiResponse addPostApprovalBalance(String type, double amount,
     public ApiResponse getDashboardFull() {
         return getDashboardFull(0);
     }
+    
+    // ✅ جديد: جلب الأسعار المعتمدة من السيرفر (للكاشير وبقية المستخدمين)
+    public ApiResponse getDashboardGoldPrices() {
+    return getWithAuth("/dashboard/gold-prices");
+}
 
     /**
  * ✅ [v4.0] Checkout مع Long Timeout + دعم local_uuid
