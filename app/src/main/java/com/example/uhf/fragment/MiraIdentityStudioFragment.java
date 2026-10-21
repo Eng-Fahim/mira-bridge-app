@@ -819,57 +819,67 @@ private void startScanWithManager(int gen, RFIDManager mgr) {
         // إنشاء listener
         encodingRfidListener = new MiraIRFIDReader.OnTagReadListener() {
         @Override
-            public void onTagRead(String epc, int rssi) {
+public void onTagRead(String epc, int rssi) {
     if (!isRfidScanning || epc == null || epc.trim().isEmpty()) return;
-    if (!isProcessingTag.compareAndSet(false, true)) return;
+
+    // ✅ منع معالجة متعددة
+    if (!isProcessingTag.compareAndSet(false, true)) {
+        Log.d(TAG, "⏭️ Ignoring extra tag — already processing");
+        return;
+    }
 
     tagReceivedThisScan = true;
     final String receivedEpc = epc.trim().toUpperCase(Locale.US);
 
-    // ✅ استعادة القوة فوراً — خارج safeRun
+    Log.i(TAG, "📡 Tag received, stopping scan immediately: " 
+        + maskEpc(receivedEpc));
+
+    // ✅ 1) استعادة القوة (خارج safeRun — مستقل عن UI)
     restorePowerForEncoding();
+
+    // ✅ 2) إيقاف المسح فوراً (خارج safeRun)
     stopRfidScanningMode();
 
-    safeRun(() -> {
-        
-                    
+    // ✅ 3) [CRITICAL FIX] أعد تعيين isTriggerDown — المفتاح!
+    isTriggerDown = false;
 
-                    if (miraExecutor == null) {
-                        isProcessingTag.set(false);
-                        return;
-                    }
+    // ✅ 4) اقرأ TID على الخلفية
+    if (miraExecutor == null) {
+        isProcessingTag.set(false);
+        return;
+    }
 
-                    miraExecutor.getBackgroundExecutor().execute(() -> {
-                        try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+    miraExecutor.getBackgroundExecutor().execute(() -> {
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException ignored) {}
 
-                        String tid = null;
-                        try {
-                            tid = MiraRfidService.getInstance(appContext).readTid(null);
-                        } catch (Exception e) {
-                            Log.w(TAG, "readTid failed", e);
-                        }
+        String tid = null;
+        try {
+            tid = MiraRfidService.getInstance(appContext).readTid(null);
+        } catch (Exception e) {
+            Log.w(TAG, "readTid failed", e);
+        }
 
-                        if (tid == null || tid.trim().isEmpty()) {
-                            Log.e(TAG, "❌ TID read failed");
-                            isProcessingTag.set(false);
-                            safeRun(() -> {
-                                playErrorSound();
-                                showErrorDialog(
-                                        isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
-                                        isArabic
-                                                ? "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
-                                                : "Cannot read tag TID.\n\n💡 Move tag closer and retry.");
-                            });
-                            return;
-                        }
+        if (tid == null || tid.trim().isEmpty()) {
+            Log.e(TAG, "❌ TID read failed");
+            isProcessingTag.set(false);
+            safeRun(() -> {
+                playErrorSound();
+                showErrorDialog(
+                        isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
+                        isArabic
+                                ? "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
+                                : "Cannot read tag TID.\n\n💡 Move tag closer and retry.");
+            });
+            return;
+        }
 
-                        final String finalTid = tid.trim().toUpperCase(Locale.US);
-                        secureLog("✅ TID read: " + maskEpc(finalTid));
-                        safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
-                    });
-                });
-            }
-
+        final String finalTid = tid.trim().toUpperCase(Locale.US);
+        secureLog("✅ TID read: " + maskEpc(finalTid));
+        safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
+    });
+}
             @Override public void onScanStarted() {}
             @Override public void onScanStopped() {}
             @Override public void onConnectionChanged(boolean c) {}
@@ -975,7 +985,6 @@ private void stopRfidScanningMode() {
         rfidTimeoutRunnable = null;
     }
 
-    // ✅ [v6.5] ألغِ retry
     if (scanRetryRunnable != null) {
         handler.removeCallbacks(scanRetryRunnable);
         scanRetryRunnable = null;
@@ -986,16 +995,11 @@ private void stopRfidScanningMode() {
     if (!wasScanning) return;
     if (appContext == null || miraExecutor == null) return;
 
-    // 4) حماية من التكرار + timeout
+    // ✅ [FIX] بدل رفض الإيقاف عند عالق، اسمح به:
+    // إذا stoppingReader عالق من محاولة سابقة، أعد تعيينه فوراً
     if (!stoppingReader.compareAndSet(false, true)) {
-        // ⚠️ عالق من قبل — جدول reset بعد 3 ثوان
-        handler.postDelayed(() -> {
-            if (stoppingReader.get()) {
-                stoppingReader.set(false);
-                Log.w(TAG, "⚠️ stoppingReader force-reset after timeout");
-            }
-        }, STOPPING_READER_TIMEOUT_MS);
-        return;
+        Log.w(TAG, "⚠️ stoppingReader was stuck — force reset and continue");
+        stoppingReader.set(true);  // استمرار رغم العالق
     }
 
     final MiraIRFIDReader.OnTagReadListener toRemove = encodingRfidListener;
@@ -1021,7 +1025,6 @@ private void stopRfidScanningMode() {
             }
         });
     } catch (Exception e) {
-        // If executor rejected (e.g., shutdown), release lock
         stoppingReader.set(false);
         Log.e(TAG, "stopRfidScanningMode execute failed", e);
     }
@@ -3553,29 +3556,36 @@ private void restorePowerForEncoding() {
     // ═══════════════════════════════════════════════════════════════════
     //  Lifecycle — onResume / onPause / onDestroyView / onSaveInstanceState
     // ═══════════════════════════════════════════════════════════════════
+@Override
+public void onResume() {
+    super.onResume();
 
-    @Override
-    public void onResume() {
-        super.onResume();
+    if (!isAdded() || getActivity() == null) return;
 
-        if (!isAdded() || getActivity() == null) return;
+    // ✅ [FIX] إعادة تعيين كل الحالة العالقة
+    boolean wasStuck = isProcessingTag.get();
+    isProcessingTag.set(false);
+    isTriggerDown = false;
+    isRfidScanning = false;
+    tagReceivedThisScan = false;
+    scanGeneration.incrementAndGet();
 
-        // ✅ [v6.5 CRITICAL] إعادة تعيين كل الحالة العالقة من جلسة سابقة
-        //    هذا هو المفتاح لحل مشكلة "first press بعد login لا يعمل"
-        boolean wasStuck = isProcessingTag.get();
-        isProcessingTag.set(false);
-        isTriggerDown = false;
-        isRfidScanning = false;
-        tagReceivedThisScan = false;
-        scanGeneration.incrementAndGet();
+    if (stoppingReader.get()) {
+        stoppingReader.set(false);
+        Log.w(TAG, "⚠️ Force-reset stoppingReader on resume");
+    }
 
-        if (stoppingReader.get()) {
-            stoppingReader.set(false);
-            Log.w(TAG, "⚠️ Force-reset stoppingReader on resume");
-        }
-        if (wasStuck) {
-            Log.w(TAG, "⚠️ Force-reset isProcessingTag on resume (was stuck)");
-        }
+    // ✅ [NEW] نظّف أي listener معلق
+    if (encodingRfidListener != null && rfidManager != null) {
+        try { rfidManager.removeListener(encodingRfidListener); }
+        catch (Exception ignored) {}
+        encodingRfidListener = null;
+    }
+
+    if (wasStuck) {
+        Log.w(TAG, "⚠️ Force-reset isProcessingTag on resume (was stuck)");
+    }
+
 
         // ✅ تنظيف timeout المسح المعلق
         if (handler != null) {
