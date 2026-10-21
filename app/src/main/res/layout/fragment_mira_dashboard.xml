@@ -122,26 +122,22 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content">
 
-                        <!-- Layer 1: Adaptive Gradient -->
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_hero_gold_gradient" />
 
-                        <!-- Layer 2: Adaptive Glow -->
                         <View
                             android:layout_width="200dp"
                             android:layout_height="200dp"
                             android:layout_gravity="top|end"
                             android:background="@drawable/bg_hero_glow" />
 
-                        <!-- Layer 3: Diamond Pattern -->
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_diamond_pattern" />
 
-                        <!-- Layer 4: Watermark -->
                         <ImageView
                             android:layout_width="180dp"
                             android:layout_height="180dp"
@@ -153,7 +149,6 @@
                             android:src="@drawable/ic_diamond"
                             app:tint="@color/hero_title_text" />
 
-                        <!-- Layer 5: Content -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -162,14 +157,12 @@
                             android:paddingTop="@dimen/space_4"
                             android:paddingBottom="@dimen/space_4">
 
-                            <!-- Top Row -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:gravity="center_vertical"
                                 android:orientation="horizontal">
 
-                                <!-- MIRA ID Badge -->
                                 <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
@@ -199,7 +192,6 @@
                                         android:textStyle="bold" />
                                 </LinearLayout>
 
-                                <!-- Title -->
                                 <TextView
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
@@ -209,7 +201,6 @@
                                     android:textColor="@color/hero_title_text"
                                     tools:text="💰 قيمة المخزون" />
 
-                                <!-- Eye Button -->
                                 <ImageButton
                                     android:id="@+id/btnToggleHeroVisibility"
                                     android:layout_width="32dp"
@@ -221,7 +212,6 @@
                                     android:src="@drawable/ic_eye_off"
                                     app:tint="@color/hero_title_text" />
 
-                                <!-- Trend -->
                                 <TextView
                                     android:id="@+id/tvHeroTrend"
                                     android:layout_width="wrap_content"
@@ -236,7 +226,6 @@
                                     tools:visibility="visible" />
                             </LinearLayout>
 
-                            <!-- Hero Value Section -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -263,7 +252,6 @@
                                     android:textColor="@color/hero_value_text"
                                     tools:text="$52,798.66" />
 
-                                <!-- Gold Underline -->
                                 <View
                                     android:layout_width="140dp"
                                     android:layout_height="2dp"
@@ -271,14 +259,12 @@
                                     android:background="@color/hero_underline" />
                             </LinearLayout>
 
-                            <!-- Chips: Weight + Count -->
                             <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_4"
                                 android:orientation="horizontal">
 
-                                <!-- Chip: Weight -->
                                 <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
@@ -306,7 +292,6 @@
                                         tools:text="374.0 g" />
                                 </LinearLayout>
 
-                                <!-- Chip: Item Count -->
                                 <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
@@ -336,7 +321,6 @@
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- Sparkline -->
                             <com.example.uhf.widget.MiraSparklineView
                                 android:id="@+id/heroSparkline"
                                 android:layout_width="match_parent"
@@ -345,7 +329,6 @@
                                 android:visibility="gone"
                                 tools:visibility="visible" />
 
-                            <!-- Divider -->
                             <View
                                 android:layout_width="match_parent"
                                 android:layout_height="1dp"
@@ -353,13 +336,11 @@
                                 android:layout_marginBottom="@dimen/space_4"
                                 android:background="@color/hero_divider" />
 
-                            <!-- Currencies List -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:orientation="vertical">
 
-                                <!-- USD -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
@@ -399,7 +380,6 @@
                                         tools:text="52,798.66" />
                                 </LinearLayout>
 
-                                <!-- SAR -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
@@ -437,7 +417,6 @@
                                         tools:text="197,994.98" />
                                 </LinearLayout>
 
-                                <!-- YER -->
                                 <LinearLayout
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
@@ -476,7 +455,6 @@
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <!-- Footer -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -542,35 +520,32 @@
                 </LinearLayout>
 
                 <!-- ═══════════════════════════════════════════════════
-                     3. INVENTORY METRICS — Warm Surface
+                     3. INVENTORY BY KARAT — Warm Surface
+                     (كان: INVENTORY METRICS — total items / weight / sold today)
                      ═══════════════════════════════════════════════════ -->
-                <LinearLayout
-                    android:id="@+id/inventoryMetrics"
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardInventoryByKarat"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/space_4"
-                    android:orientation="horizontal"
-                    android:baselineAligned="false"
-                    android:weightSum="3">
+                    app:cardBackgroundColor="@color/card_surface_warm"
+                    app:cardCornerRadius="@dimen/radius_xl"
+                    app:cardElevation="@dimen/elevation_1"
+                    app:strokeColor="@color/card_stroke_warm"
+                    app:strokeWidth="@dimen/stroke_normal">
 
-                    <!-- Metric 1 -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="0dp"
-                        android:layout_height="108dp"
-                        android:layout_marginEnd="@dimen/space_1"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="@color/card_surface_warm"
-                        app:cardCornerRadius="@dimen/radius_xl"
-                        app:cardElevation="@dimen/elevation_1"
-                        app:strokeColor="@color/card_stroke_warm"
-                        app:strokeWidth="@dimen/stroke_normal">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="@dimen/space_4">
 
+                        <!-- Header -->
                         <LinearLayout
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_2">
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
                             <ImageView
                                 android:layout_width="@dimen/icon_md"
@@ -580,115 +555,47 @@
                                 app:tint="?attr/colorPrimary" />
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_2"
-                                android:text="@string/total_items"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:gravity="center" />
-
-                            <TextView
-                                android:id="@+id/tvTotalItems"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Number.Large"
-                                tools:text="7" />
+                                android:layout_marginStart="@dimen/space_2"
+                                android:layout_weight="1"
+                                android:text="@string/inventory_by_karat"
+                                android:textAppearance="@style/TextAppearance.App.Title.Small"
+                                android:textColor="?attr/colorOnSurface"
+                                tools:text="📦 المخزون حسب العيار" />
                         </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Metric 2 -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="0dp"
-                        android:layout_height="108dp"
-                        android:layout_marginHorizontal="@dimen/space_1"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="@color/card_surface_warm"
-                        app:cardCornerRadius="@dimen/radius_xl"
-                        app:cardElevation="@dimen/elevation_1"
-                        app:strokeColor="@color/card_stroke_warm"
-                        app:strokeWidth="@dimen/stroke_normal">
-
-                        <LinearLayout
+                        <!-- Horizontal list of karat cards -->
+                        <HorizontalScrollView
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_2">
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_3"
+                            android:clipToPadding="false"
+                            android:scrollbars="none">
 
-                            <ImageView
-                                android:layout_width="@dimen/icon_md"
-                                android:layout_height="@dimen/icon_md"
-                                android:importantForAccessibility="no"
-                                android:src="@drawable/ic_weight_scale"
-                                app:tint="?attr/colorPrimary" />
-
-                            <TextView
+                            <LinearLayout
+                                android:id="@+id/llInventoryByKarat"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_2"
-                                android:text="@string/total_weight"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:gravity="center" />
+                                android:orientation="horizontal" />
+                        </HorizontalScrollView>
 
-                            <TextView
-                                android:id="@+id/tvTotalWeight"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Number.Large"
-                                android:textColor="@color/text_gold_accent"
-                                tools:text="442.0 g" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Metric 3 -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="0dp"
-                        android:layout_height="108dp"
-                        android:layout_marginStart="@dimen/space_1"
-                        android:layout_weight="1"
-                        app:cardBackgroundColor="@color/card_surface_warm"
-                        app:cardCornerRadius="@dimen/radius_xl"
-                        app:cardElevation="@dimen/elevation_1"
-                        app:strokeColor="@color/card_stroke_warm"
-                        app:strokeWidth="@dimen/stroke_normal">
-
-                        <LinearLayout
+                        <!-- Empty state -->
+                        <TextView
+                            android:id="@+id/tvKaratEmptyState"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_3"
                             android:gravity="center"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_2">
-
-                            <ImageView
-                                android:layout_width="@dimen/icon_md"
-                                android:layout_height="@dimen/icon_md"
-                                android:importantForAccessibility="no"
-                                android:src="@drawable/ic_sold_today"
-                                app:tint="?attr/colorPrimary" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_2"
-                                android:text="@string/sold_today"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:gravity="center" />
-
-                            <TextView
-                                android:id="@+id/tvSoldToday"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_1"
-                                android:textAppearance="@style/TextAppearance.App.Number.Large"
-                                tools:text="5" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-                </LinearLayout>
+                            android:paddingVertical="@dimen/space_4"
+                            android:text="@string/no_data"
+                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:visibility="gone"
+                            tools:text="لا توجد بيانات"
+                            tools:visibility="visible" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════
                      4. GOLD PRICES — Warm Surface
