@@ -540,29 +540,40 @@
                         android:padding="@dimen/space_4">
 
                         <!-- Header -->
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
 
-                            <ImageView
-                                android:layout_width="@dimen/icon_md"
-                                android:layout_height="@dimen/icon_md"
-                                android:importantForAccessibility="no"
-                                android:src="@drawable/ic_inventory_items"
-                                app:tint="?attr/colorPrimary" />
+    <ImageView
+        android:layout_width="@dimen/icon_md"
+        android:layout_height="@dimen/icon_md"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_inventory_items"
+        app:tint="?attr/colorPrimary" />
 
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_2"
-                                android:layout_weight="1"
-                                android:text="@string/inventory_by_karat"
-                                android:textAppearance="@style/TextAppearance.App.Title.Small"
-                                android:textColor="?attr/colorOnSurface"
-                                tools:text="📦 المخزون حسب العيار" />
-                        </LinearLayout>
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_2"
+        android:layout_weight="1"
+        android:text="@string/inventory_by_karat"
+        android:textAppearance="@style/TextAppearance.App.Title.Small"
+        android:textColor="?attr/colorOnSurface"
+        tools:text="📦 المخزون حسب العيار" />
+
+    <!-- ✅ زر إخفاء/إظهار المخزون -->
+    <ImageButton
+        android:id="@+id/btnToggleInventoryVisibility"
+        android:layout_width="@dimen/icon_lg"
+        android:layout_height="@dimen/icon_lg"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/toggle_visibility"
+        android:padding="@dimen/space_1"
+        android:src="@drawable/ic_eye_off"
+        app:tint="?attr/colorPrimary" />
+</LinearLayout>
 
                         <!-- Horizontal list of karat cards -->
                         <HorizontalScrollView
