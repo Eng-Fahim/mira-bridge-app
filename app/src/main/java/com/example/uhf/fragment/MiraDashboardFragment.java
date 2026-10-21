@@ -54,16 +54,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * MiraDashboardFragment v2.2 — FULL SECURITY HARDENED
+ * MiraDashboardFragment v2.3 — FULL SECURITY & PRIVACY HARDENED
  *
- * ما تم في v2.2:
- *   ✅ استبدال كرت (إجمالي القطع/الوزن/المبيع اليوم) بكرت "المخزون حسب العيار"
- *   🔴 كاش مربوط بـ user+branch (لا تسريب بين المستخدمين)
- *   🔴 تشفير SharedPreferences عبر EncryptedSharedPreferences
- *   🟡 executor محلي بدل static (لا تسريب threads)
- *   🟡 سجلات آمنة (لا تكشف user IDs)
- *   🟡 رفع نافذة إعادة الجلب في onResume (30s → 2min)
- *   🟢 تحسينات i18n وتحقق جلسة
+ * ما تم في v2.3:
+ *   ✅ إضافة زر إخفاء/إظهار لكرت المخزون حسب العيار (الخصوصية).
+ *   ✅ إخفاء أرقام المخزون تلقائياً عند الخروج من التطبيق.
+ *   ✅ تنسيق أيقونة العيار (الألماسة) في التصميم.
  */
 public class MiraDashboardFragment extends Fragment {
 
@@ -84,7 +80,7 @@ public class MiraDashboardFragment extends Fragment {
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final long SWIPE_REFRESH_TIMEOUT_MS = 15 * 1000;
-    private static final long RESUME_REFETCH_THRESHOLD_MS = 2 * 60 * 1000; // ✅ كان 30s
+    private static final long RESUME_REFETCH_THRESHOLD_MS = 2 * 60 * 1000;
 
     // ═══════════════════════════════════════════════════════
     // State
@@ -93,12 +89,14 @@ public class MiraDashboardFragment extends Fragment {
     private JSONObject lastSalesData = null;
     private boolean isHeroHidden = true;
     private boolean isSalesHidden = true;
+    private boolean isInventoryHidden = true; // ✅ جديد: إخفاء المخزون افتراضياً
 
     // ───── UI Elements ─────
     private ImageButton btnToggleHeroVisibility;
     private ImageButton btnToggleSalesVisibility;
+    private ImageButton btnToggleInventoryVisibility; // ✅ جديد
 
-    // ✅ كرت المخزون حسب العيار (بدل tvTotalItems/tvTotalWeight/tvSoldToday)
+    // ✅ كرت المخزون حسب العيار
     private android.widget.LinearLayout llInventoryByKarat;
     private TextView tvKaratEmptyState;
     private final List<KaratInventory> currentInventoryByKarat = new ArrayList<>();
@@ -135,7 +133,6 @@ public class MiraDashboardFragment extends Fragment {
     private MiraPriceManager priceManager;
     private PermissionManager permissionManager;
 
-    // ✅ executor محلي بدل static
     private ExecutorService localExecutor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Future<?> dataFuture, goldPriceFuture, pingFuture;
@@ -259,10 +256,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    /**
-     * يضمن أن كاش النشاط والفرع يخصّان المستخدم الحالي.
-     * عند تغيير المستخدم: يمسح كل الكاشات الحساسة السابقة.
-     */
     private void ensureCacheOwnerIsCurrentUser() {
         try {
             if (sessionManager == null) return;
@@ -270,20 +263,16 @@ public class MiraDashboardFragment extends Fragment {
             if (ctx == null) return;
 
             int currentUserId = sessionManager.getUserId();
-            if (currentUserId <= 0) return; // لم يسجل دخول بعد
+            if (currentUserId <= 0) return; 
 
             android.content.SharedPreferences prefs =
                     ctx.getSharedPreferences(PREFS_CACHE_OWNER, Context.MODE_PRIVATE);
             int ownerUserId = prefs.getInt(KEY_CACHE_OWNER_USER_ID, 0);
 
             if (ownerUserId > 0 && ownerUserId != currentUserId) {
-                // امسح كاش النشاط
                 if (activityCache != null) activityCache.clear();
-
-                // امسح كاش أسعار الذهب (يحوي last_fetch من مستخدم سابق)
                 if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
 
-                // امسح كاش فرع المستخدم السابق
                 int oldBranch = prefs.getInt(KEY_PREFIX_LAST_BRANCH + ownerUserId, -1);
                 if (oldBranch > 0) {
                     try {
@@ -291,11 +280,7 @@ public class MiraDashboardFragment extends Fragment {
                         createSecurePrefs(ctx, oldName).edit().clear().apply();
                     } catch (Exception ignored) {}
                 }
-
-                // لا تكشف user IDs
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Caches cleared after user switch");
-                }
+                if (BuildConfig.DEBUG) Log.d(TAG, "Caches cleared after user switch");
             }
 
             prefs.edit().putInt(KEY_CACHE_OWNER_USER_ID, currentUserId).apply();
@@ -309,10 +294,6 @@ public class MiraDashboardFragment extends Fragment {
         try { return getContext(); } catch (Exception e) { return null; }
     }
 
-    /**
-     * ينشئ SharedPreferences مشفرة إن كانت مكتبة androidx.security متاحة.
-     * يعمل عبر Reflection حتى لا يكسر البناء إن لم تُضَف المكتبة.
-     */
     private android.content.SharedPreferences createSecurePrefs(Context ctx, String name) {
         android.content.SharedPreferences encrypted = tryCreateEncryptedPrefs(ctx, name);
         if (encrypted != null) return encrypted;
@@ -422,8 +403,6 @@ public class MiraDashboardFragment extends Fragment {
 
     private void initViews(View v) {
         try {
-            // ✅ حذف: tvTotalItems, tvTotalWeight, tvSoldToday
-            // ✅ إضافة: كرت المخزون حسب العيار
             llInventoryByKarat = v.findViewById(R.id.llInventoryByKarat);
             tvKaratEmptyState  = v.findViewById(R.id.tvKaratEmptyState);
 
@@ -463,6 +442,7 @@ public class MiraDashboardFragment extends Fragment {
 
             btnToggleHeroVisibility  = v.findViewById(R.id.btnToggleHeroVisibility);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
+            btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility); // ✅ جديد
 
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
@@ -487,6 +467,10 @@ public class MiraDashboardFragment extends Fragment {
                 btnToggleHeroVisibility.setOnClickListener(v2 -> toggleHeroVisibility());
             if (btnToggleSalesVisibility != null)
                 btnToggleSalesVisibility.setOnClickListener(v2 -> toggleSalesVisibility());
+            
+            // ✅ ربط زر إخفاء المخزون
+            if (btnToggleInventoryVisibility != null)
+                btnToggleInventoryVisibility.setOnClickListener(v2 -> toggleInventoryVisibility());
 
             if (tvAlertAction != null)
                 tvAlertAction.setOnClickListener(v2 ->
@@ -504,11 +488,14 @@ public class MiraDashboardFragment extends Fragment {
 
             isHeroHidden = true;
             isSalesHidden = true;
+            isInventoryHidden = true; // ✅ مخفي افتراضياً
 
             if (btnToggleHeroVisibility != null)
                 btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleSalesVisibility != null)
                 btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
+            if (btnToggleInventoryVisibility != null)
+                btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
 
             updateHeroBalance();
             applySalesVisibility();
@@ -523,53 +510,56 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // Inventory by Karat (الكرت الجديد)
+    // Inventory by Karat
     // ═══════════════════════════════════════════════════════
     private void renderInventoryByKarat(List<KaratInventory> items) {
-    if (llInventoryByKarat == null) return;
-    try {
-        llInventoryByKarat.removeAllViews();
+        if (llInventoryByKarat == null) return;
+        try {
+            llInventoryByKarat.removeAllViews();
 
-        if (items == null || items.isEmpty()) {
-            if (tvKaratEmptyState != null)
-                tvKaratEmptyState.setVisibility(View.VISIBLE);
-            llInventoryByKarat.setVisibility(View.GONE);
-            return;
-        }
-
-        if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.GONE);
-        llInventoryByKarat.setVisibility(View.VISIBLE);
-
-        // ترتيب تنازلي (24K أولاً)
-        List<KaratInventory> sorted = new ArrayList<>(items);
-        Collections.sort(sorted, (a, b) -> Integer.compare(b.karat, a.karat));
-
-        for (KaratInventory inv : sorted) {
-            // ✅ استخدام التصميم الجديد
-            View itemView = getLayoutInflater().inflate(
-                    R.layout.item_karat_inventory, llInventoryByKarat, false);
-
-            TextView tvKarat  = itemView.findViewById(R.id.tvKaratLabel);
-            TextView tvCount  = itemView.findViewById(R.id.tvKaratCount);
-            TextView tvWeight = itemView.findViewById(R.id.tvKaratWeight);
-
-            if (tvKarat != null) {
-                tvKarat.setText(inv.karat + "K");
-                // ✅ تلوين النص حسب العيار
-                try {
-                    int color = getKaratColor(inv.karat);
-                    tvKarat.setTextColor(color);
-                } catch (Exception ignored) {}
+            if (items == null || items.isEmpty()) {
+                if (tvKaratEmptyState != null)
+                    tvKaratEmptyState.setVisibility(View.VISIBLE);
+                llInventoryByKarat.setVisibility(View.GONE);
+                return;
             }
-            if (tvCount != null)  tvCount.setText(String.valueOf(inv.itemCount));
-            if (tvWeight != null) tvWeight.setText(formatWeight(inv.weight));
 
-            llInventoryByKarat.addView(itemView);
+            if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.GONE);
+            llInventoryByKarat.setVisibility(View.VISIBLE);
+
+            // ترتيب تنازلي (24K أولاً)
+            List<KaratInventory> sorted = new ArrayList<>(items);
+            Collections.sort(sorted, (a, b) -> Integer.compare(b.karat, a.karat));
+
+            for (KaratInventory inv : sorted) {
+                View itemView = getLayoutInflater().inflate(
+                        R.layout.item_karat_inventory, llInventoryByKarat, false);
+
+                TextView tvKarat  = itemView.findViewById(R.id.tvKaratLabel);
+                TextView tvCount  = itemView.findViewById(R.id.tvKaratCount);
+                TextView tvWeight = itemView.findViewById(R.id.tvKaratWeight);
+
+                if (tvKarat != null) {
+                    tvKarat.setText(inv.karat + "K");
+                    try {
+                        tvKarat.setTextColor(getKaratColor(inv.karat));
+                    } catch (Exception ignored) {}
+                }
+
+                // ✅ تطبيق الخصوصية: إخفاء الأرقام
+                if (tvCount != null) {
+                    tvCount.setText(isInventoryHidden ? "••" : String.valueOf(inv.itemCount));
+                }
+                if (tvWeight != null) {
+                    tvWeight.setText(isInventoryHidden ? "•• g" : formatWeight(inv.weight));
+                }
+
+                llInventoryByKarat.addView(itemView);
+            }
+        } catch (Exception e) {
+            logNonFatal("renderInventoryByKarat", e);
         }
-    } catch (Exception e) {
-        logNonFatal("renderInventoryByKarat", e);
     }
-}
 
     private int getKaratColor(int karat) {
         switch (karat) {
@@ -582,7 +572,7 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // Hero Balance
+    // Hero Balance & Toggles
     // ═══════════════════════════════════════════════════════
     private void updateHeroBalance() {
         try {
@@ -645,6 +635,17 @@ public class MiraDashboardFragment extends Fragment {
                     isSalesHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
         }
         applySalesVisibility();
+    }
+
+    // ✅ دالة تبديل إخفاء/إظهار المخزون حسب العيار
+    private void toggleInventoryVisibility() {
+        if (!isAdded()) return;
+        isInventoryHidden = !isInventoryHidden;
+        if (btnToggleInventoryVisibility != null) {
+            btnToggleInventoryVisibility.setImageResource(
+                    isInventoryHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
+        renderInventoryByKarat(currentInventoryByKarat);
     }
 
     private void applySalesVisibility() {
@@ -1099,7 +1100,6 @@ public class MiraDashboardFragment extends Fragment {
                 final float inventoryValue = offlineCache.getFloat("inventory_value", 0.0f);
                 final String karatJson = offlineCache.getString("inventory_by_karat", null);
 
-                // استخراج by_karat قبل الوصول للـ UI thread
                 final List<KaratInventory> karatItems = new ArrayList<>();
                 if (karatJson != null) {
                     try {
@@ -1212,7 +1212,6 @@ public class MiraDashboardFragment extends Fragment {
                 finalBranchId = fromSession > 0 ? fromSession : (fromManager > 0 ? fromManager : 1);
             }
 
-            // ✅ حماية من branchId غير صالح
             if (finalBranchId <= 0 && !isGlobalAdmin) {
                 Log.w(TAG, "Skipping fetch — no valid branch");
                 isLoading.set(false);
@@ -1278,7 +1277,6 @@ public class MiraDashboardFragment extends Fragment {
                 currentInventoryValue = value;
                 updateHeroBalance();
 
-                // ✅ قراءة المخزون حسب العيار
                 JSONArray byKarat = inv.optJSONArray("by_karat");
                 List<KaratInventory> karatItems = new ArrayList<>();
                 if (byKarat != null) {
@@ -1593,11 +1591,9 @@ public class MiraDashboardFragment extends Fragment {
             int userId = sessionManager.getUserId();
             if (userId <= 0) return;
 
-            // ✅ اسم الملف يحوي userId + branchId
             String prefsName = OFFLINE_PREFS_BASE + userId + "_b" + branchId;
             offlineCache = createSecurePrefs(requireContext(), prefsName);
 
-            // سجل الفرع الأخير للمستخدم (للتنظيف عند تغييره)
             try {
                 requireContext()
                         .getSharedPreferences(PREFS_CACHE_OWNER, Context.MODE_PRIVATE)
@@ -1748,15 +1744,18 @@ public class MiraDashboardFragment extends Fragment {
     public void onResume() {
         super.onResume();
         try {
-            // تأكد أن الكاش يخص المستخدم الحالي
             ensureCacheOwnerIsCurrentUser();
 
             isHeroHidden = true;
             isSalesHidden = true;
+            isInventoryHidden = true; // ✅ إعادة الإخفاء عند العودة
+            
             if (btnToggleHeroVisibility != null)
                 btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleSalesVisibility != null)
                 btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
+            if (btnToggleInventoryVisibility != null)
+                btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
 
             registerDataRefreshReceiver();
 
@@ -1772,7 +1771,6 @@ public class MiraDashboardFragment extends Fragment {
                 long timeSinceLastGoldFetch = now - lastGoldFetchTime;
                 boolean isCacheValid = activityCache != null && activityCache.isValid();
 
-                // ✅ 2 دقيقة بدل 30 ثانية
                 if (timeSinceLastFetch > RESUME_REFETCH_THRESHOLD_MS) {
                     fetchData();
                 }
@@ -1839,6 +1837,13 @@ public class MiraDashboardFragment extends Fragment {
                 if (btnToggleSalesVisibility != null)
                     btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
             }
+            // ✅ إخفاء المخزون فوراً عند الخروج
+            if (!isInventoryHidden) {
+                isInventoryHidden = true;
+                if (btnToggleInventoryVisibility != null)
+                    btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
+                renderInventoryByKarat(currentInventoryByKarat);
+            }
         } catch (Exception e) {
             logNonFatal("hideSensitiveValuesOnExit", e);
         }
@@ -1881,9 +1886,7 @@ public class MiraDashboardFragment extends Fragment {
                 }
             }
 
-            // ✅ إيقاف executor المحلي
             shutdownExecutor();
-
             isViewInitialized = false;
         } catch (Exception e) {
             logNonFatal("onDestroyView", e);
@@ -1914,7 +1917,6 @@ public class MiraDashboardFragment extends Fragment {
             if (!isAdded()) return;
             Context context = requireContext();
 
-            // ✅ executor محلي أولاً
             if (localExecutor == null || localExecutor.isShutdown()) {
                 localExecutor = Executors.newFixedThreadPool(4);
             }
@@ -1933,7 +1935,6 @@ public class MiraDashboardFragment extends Fragment {
 
             ensureCacheOwnerIsCurrentUser();
 
-            // إصدار الكاش
             try {
                 android.content.SharedPreferences prefs =
                         context.getSharedPreferences("mira_dashboard", Context.MODE_PRIVATE);
