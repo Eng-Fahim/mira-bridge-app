@@ -1567,28 +1567,31 @@ public class MiraDashboardFragment extends Fragment {
     // Refresh entry points
     // ═══════════════════════════════════════════════════════
     public void refreshInternalData() {
-        try {
-            if (!isAdded() || !isSessionValid()) return;
-            isDataLoaded = false;
-            lastDataFetchTime = 0;
-            isLoading.set(false);
-            fetchData();
-            fetchRecentActivity();
+    try {
+        if (!isAdded() || !isSessionValid()) return;
+        isDataLoaded = false;
+        lastDataFetchTime = 0;
+        isLoading.set(false);
+        fetchData();
+        fetchRecentActivity();
 
-            long now = System.currentTimeMillis();
-            if (permissionManager != null
-                    && permissionManager.canAccessFragment("GoldRates")) {
-                if (lastGoldFetchTime == 0
-                        || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                    fetchLiveGoldPrices(false);
-                } else {
-                    displayGoldPricesFromCache();
-                }
+        long now = System.currentTimeMillis();
+        
+        // ✅ الأفضل هنا استخدام canManuallyRefreshGold ليكون المنطق واضحاً
+        if (canManuallyRefreshGold()) {
+            if (lastGoldFetchTime == 0 || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                fetchLiveGoldPrices(false);
+            } else {
+                displayGoldPricesFromCache();
             }
-        } catch (Exception e) {
-            logNonFatal("refreshInternalData", e);
+        } else {
+            // المستخدم العادي: يعرض الكاش فوراً
+            displayGoldPricesFromCache();
         }
+    } catch (Exception e) {
+        logNonFatal("refreshInternalData", e);
     }
+}
 
     private void refreshAllData() {
         try {
