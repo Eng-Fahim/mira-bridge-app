@@ -463,20 +463,12 @@ public class MiraBranchesManagementFragment extends Fragment {
     Context context = getContextSafely();
     if (context == null) return;
     
-    if (!canManageBranchUsers(b.id)) {
-        showToast(isArabic()
-            ? "⛔ غير مصرح بإدارة مستخدمي هذا الفرع"
-            : "⛔ Not authorized to manage users of this branch");
-        return;
-    }
-    
     executeTask(() -> {
         MiraApiClient.ApiResponse response = null;
         String errorMsg = null;
         try {
-            // ✅ [FIX] استخدام endpoint /auth/users الموجود والمضمون
-            // ثم الفلترة على العميل بـ branch_id
-            response = apiClient.getUsers();
+            // ✅ الرجوع للـ endpoint الأصلي الصحيح
+            response = apiClient.getBranchUsers(b.id);
         } catch (Exception e) {
             errorMsg = e.getMessage();
         }
@@ -488,27 +480,28 @@ public class MiraBranchesManagementFragment extends Fragment {
             if (!isAdded() || getContext() == null) return;
 
             if (fResponse != null && fResponse.isSuccess && fResponse.data != null) {
-                JSONArray allUsers = fResponse.data.optJSONArray("users");
+                JSONArray users = fResponse.data.optJSONArray("users");
                 List<String> userList = new ArrayList<>();
-                int matchCount = 0;
-
-                if (allUsers != null) {
-                    for (int i = 0; i < allUsers.length(); i++) {
-                        JSONObject u = allUsers.optJSONObject(i);
+                int total = 0;
+                
+                if (users != null) {
+                    total = users.length();
+                    for (int i = 0; i < users.length(); i++) {
+                        JSONObject u = users.optJSONObject(i);
                         if (u == null) continue;
                         
-                        // ✅ فلترة بـ branch_id
-                        int userBranchId = u.optInt("branch_id", 0);
-                        if (userBranchId != b.id) continue;
-                        
-                        matchCount++;
                         String displayName = u.optString("display_name",
                                 u.optString("username", "مستخدم"));
-                        String role = u.optString("role", "");
+                        String role = u.optString("role_name",
+                                u.optString("role", ""));
+                        String roleAr = u.optString("role_name_ar", role);
                         String status = u.optString("status", "active");
                         String statusIcon = "active".equals(status) ? "🟢" : "🔴";
                         
-                        userList.add(statusIcon + " " + displayName + " (" + role + ")");
+                        // ✅ عرض اسم الدور بالعربي إن وُجد
+                        String roleDisplay = isArabic() && !roleAr.isEmpty() ? roleAr : role;
+                        
+                        userList.add(statusIcon + " " + displayName + " (" + roleDisplay + ")");
                     }
                 }
 
@@ -520,20 +513,21 @@ public class MiraBranchesManagementFragment extends Fragment {
 
                 new MaterialAlertDialogBuilder(
                         new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
-                    .setTitle("👥 " + b.name + " (" + matchCount + ")")
+                    .setTitle("👥 " + b.name + " (" + total + ")")
                     .setItems(userList.toArray(new String[0]), null)
                     .setPositiveButton(isArabic() ? "إغلاق" : "Close", null)
                     .show();
                     
             } else {
-                // ✅ رسالة خطأ واضحة مع السبب الحقيقي
                 String err = fError != null
                     ? fError
                     : (fResponse != null && fResponse.error != null
                         ? fResponse.error
                         : (isArabic() ? "تعذر جلب المستخدمين" : "Failed to fetch users"));
                 showToast("❌ " + err);
-                Log.e(TAG, "showBranchUsers failed: " + err);
+                Log.e(TAG, "showBranchUsers failed: code=" 
+                    + (fResponse != null ? fResponse.code : -1) 
+                    + ", error=" + err);
             }
         });
     });
