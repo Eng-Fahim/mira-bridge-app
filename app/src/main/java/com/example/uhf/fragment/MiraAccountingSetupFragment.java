@@ -154,8 +154,7 @@ public void onDestroyView() {
 
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getAccounting("setup/status");
-
+                MiraApiClient.ApiResponse response = apiClient.getWithAuth("/accounting/setup/status");
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
 
@@ -421,8 +420,7 @@ JSONArray steps = status.optJSONArray("steps");
                 JSONObject payload = new JSONObject();
                 payload.put("reason", isArabic ? "طلب المدير" : "Manager request");
 
-                MiraApiClient.ApiResponse response =
-                        apiClient.postAccounting("setup/reset", payload);
+                MiraApiClient.ApiResponse response = apiClient.postWithAuth("/accounting/setup/reset", payload);
 
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
