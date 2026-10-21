@@ -85,8 +85,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
     private final Handler debounceHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingSearch;
-
-    // ✅ [إصلاح 1]: متغير لمنع تفعيل البحث عند تغيير النص برمجياً
     private boolean isProgrammaticTextChange = false; 
 
     @Nullable
@@ -115,6 +113,26 @@ public class MiraGeneralLedgerFragment extends Fragment {
         return v;
     }
 
+    // ✅ الدالة التي يبحث عنها MiraAccountingFragment
+    public void setAccountId(long accountId) {
+        if (this.selectedAccountId != accountId) {
+            this.selectedAccountId = accountId;
+            if (isAdded() && getView() != null) {
+                for (AccountDto a : accountsList) {
+                    if (a.id == accountId) {
+                        selectedAccountCode = a.accountCode;
+                        selectedAccountName = a.accountNameAr;
+                        isProgrammaticTextChange = true;
+                        spAccount.setText(a.accountCode + " - " + a.accountNameAr, false);
+                        isProgrammaticTextChange = false;
+                        break;
+                    }
+                }
+                loadLedger();
+            }
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -122,7 +140,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
             debounceHandler.removeCallbacks(pendingSearch);
             pendingSearch = null;
         }
-        // ✅ [إصلاح 4]: منع تسريب الذاكرة
         if (rvLedger != null) {
             rvLedger.setAdapter(null);
         }
@@ -182,12 +199,10 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
             @Override
             public void afterTextChanged(Editable s) {
-                // ✅ [إصلاح 1]: تجاهل التغيير إذا كان برمجياً
                 if (isProgrammaticTextChange) return;
 
                 String query = s.toString().trim();
 
-                // ✅ [إصلاح 2]: تصفير الحساب المختار إذا قام المستخدم بمسح أو تعديل النص
                 if (query.isEmpty() || !query.equals(selectedAccountCode + " - " + selectedAccountName)) {
                     selectedAccountId = 0;
                     selectedAccountCode = "";
@@ -214,7 +229,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 selectedAccountCode = selected.accountCode;
                 selectedAccountName = selected.accountNameAr;
                 
-                // ✅ [إصلاح 1]: منع تفعيل البحث عند وضع النص برمجياً
                 isProgrammaticTextChange = true;
                 spAccount.setText(selected.accountCode + " - " + selected.accountNameAr, false);
                 isProgrammaticTextChange = false;
@@ -222,7 +236,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
                 spAccount.dismissDropDown();
                 saveFilters();
                 
-                // ✅ [إصلاح 3]: تحميل دفتر الأستاذ تلقائياً بمجرد اختيار الحساب
                 loadLedger();
             }
         });
@@ -235,7 +248,12 @@ public class MiraGeneralLedgerFragment extends Fragment {
             if (accounts == null) return;
 
             accountsList.clear();
-            accountsList.addAll(accounts);
+            
+            // ✅ إصلاح خطأ addAll (المصفوفة Array لا تقبل addAll مباشرة)
+            for (AccountDto a : accounts) {
+                accountsList.add(a);
+            }
+            
             accountAdapter.notifyDataSetChanged();
 
             if (selectedAccountId > 0 && !accountsList.isEmpty() && spAccount.getText().toString().isEmpty()) {
@@ -505,7 +523,6 @@ public class MiraGeneralLedgerFragment extends Fragment {
 
     private void addKpi(String title, String value, String color) {
         if (!isAdded()) return;
-        // ✅ [إصلاح 5]: استخدام requireContext بدلاً من getContext لتجنب الانهيار
         View card = LayoutInflater.from(requireContext()).inflate(R.layout.kpi_card, kpiContainer, false);
         TextView tvTitle = card.findViewById(R.id.tvKpiTitle);
         TextView tvValue = card.findViewById(R.id.tvKpiValue);
