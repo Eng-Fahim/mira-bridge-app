@@ -3562,7 +3562,7 @@ public void onResume() {
 
     if (!isAdded() || getActivity() == null) return;
 
-    // ✅ [FIX] إعادة تعيين كل الحالة العالقة
+    // ✅ إعادة تعيين كل الحالة العالقة
     boolean wasStuck = isProcessingTag.get();
     isProcessingTag.set(false);
     isTriggerDown = false;
@@ -3573,13 +3573,6 @@ public void onResume() {
     if (stoppingReader.get()) {
         stoppingReader.set(false);
         Log.w(TAG, "⚠️ Force-reset stoppingReader on resume");
-    }
-
-    // ✅ [NEW] نظّف أي listener معلق
-    if (encodingRfidListener != null && rfidManager != null) {
-        try { rfidManager.removeListener(encodingRfidListener); }
-        catch (Exception ignored) {}
-        encodingRfidListener = null;
     }
 
     if (wasStuck) {
