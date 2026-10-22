@@ -40,14 +40,25 @@
                 android:textSize="12sp"
                 android:inputType="text"/>
 
-            <Button
-                android:id="@+id/btnFilterDate"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginStart="4dp"
-                android:text="الفترة 📅"
-                android:textSize="10sp"
-                style="@style/Widget.AppCompat.Button.Colored"/>
+            <!-- زر التاريخ -->
+<Button
+    android:id="@+id/btnFilterDate"
+    android:layout_width="wrap_content"
+    android:layout_height="40dp"
+    android:layout_marginStart="4dp"
+    android:text="الفترة 📅"
+    android:textSize="10sp"
+    style="@style/Widget.AppCompat.Button.Colored"/>
+
+<!-- ✅ زر التصدير الجديد -->
+<Button
+    android:id="@+id/btnExport"
+    android:layout_width="40dp"
+    android:layout_height="40dp"
+    android:layout_marginStart="4dp"
+    android:text="📥"
+    android:textSize="14sp"
+    style="@style/Widget.AppCompat.Button.Colored"/>
         </LinearLayout>
 
         <!-- صف 2: التبويبات + فرعي فقط -->
