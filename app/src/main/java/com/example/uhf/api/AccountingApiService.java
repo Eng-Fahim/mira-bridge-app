@@ -22,33 +22,25 @@ public interface AccountingApiService {
     /**
      * ✅ قائمة القيود مع دعم الصفحات
      */
-    @GET("journal")
-    Call<ApiResponseDto<JournalEntryDto[]>> getJournalEntries(
-        @Query("branch_id") Integer branchId,
-        @Query("from_date") String fromDate,
-        @Query("to_date") String toDate,
-        @Query("status") String status,
-        @Query("per_page") Integer perPage,
-        @Query("page") Integer page
-    );
+    @GET("accounting/journal-entries") // ✅ المسار الذي تم اختباره ويعمل
+Call<ApiResponseDto<JournalEntryDto[]>> getJournalEntries(
+    @Query("branch_id") Integer branchId,
+    @Query("from_date") String fromDate,
+    @Query("to_date") String toDate,
+    @Query("status") String status,
+    @Query("per_page") Integer perPage,
+    @Query("page") Integer page
+);
 
-    /**
-     * ✅ تفاصيل قيد واحد (entry + lines + audit)
-     * هذا هو الـ endpoint المستخدم فعلياً
-     */
-    @GET("journal/{id}")
-    Call<JournalEntryDetailsDto> getJournalEntryDetails(
-        @Path("id") long id
-    );
+@GET("accounting/journal-entries/{id}") // ✅ المسار الجديد
+Call<JournalEntryDetailsDto> getJournalEntryDetails(
+    @Path("id") long id
+);
 
-    /**
-     * ✅ إنشاء قيد جديد
-     */
-    @POST("journal")
-    Call<ApiResponseDto<JournalEntryDto>> createJournalEntry(
-        @Body JournalEntryDto entry
-    );
-
+@POST("accounting/journal-entries/create") // ✅ مسار الإنشاء الجديد
+Call<ApiResponseDto<JournalEntryDto>> createJournalEntry(
+    @Body JournalEntryDto entry
+);
     /**
      * ✅ ترحيل قيد
      */
