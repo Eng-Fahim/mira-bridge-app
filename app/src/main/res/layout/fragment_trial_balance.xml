@@ -14,7 +14,6 @@
         android:padding="8dp"
         android:background="?attr/colorSurfaceVariant">
 
-        <!-- صف البحث -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -27,7 +26,7 @@
                 android:layout_height="40dp"
                 android:layout_weight="1"
                 android:background="@android:drawable/editbox_background"
-                android:hint="🔍 بحث بكود أو اسم الحساب..."
+                android:hint="🔍 بحث..."
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp"
                 android:textSize="12sp"
@@ -43,7 +42,6 @@
                 style="@style/Widget.AppCompat.Button.Colored"/>
         </LinearLayout>
 
-        <!-- أزرار التبديل بين الميزان المالي والمعدني -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"
             android:layout_width="match_parent"
@@ -52,11 +50,8 @@
             app:tabMode="fixed"
             app:tabGravity="fill">
             
-            <com.google.android.material.tab.TabItem
-                android:text="الميزان المالي 💵" />
-            
-            <com.google.android.material.tab.TabItem
-                android:text="ميزان الذهب 🥇" />
+            <com.google.android.material.tabs.TabItem android:text="الميزان المالي 💵" />
+            <com.google.android.material.tabs.TabItem android:text="ميزان الذهب 🥇" />
         </com.google.android.material.tabs.TabLayout>
     </LinearLayout>
 
@@ -74,45 +69,32 @@
             android:padding="8dp"/>
     </HorizontalScrollView>
 
-    <!-- ✅ الجدول بالكامل (العناوين + الصفوف) قابل للسحب أفقياً -->
-    <HorizontalScrollView
+    <!-- ✅ العناوين (بدون Horizontal Scroll) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="?attr/colorPrimaryContainer">
+
+        <TextView android:layout_width="50dp" android:layout_height="wrap_content" android:text="الكود" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="11sp" android:textStyle="bold"/>
+        <TextView android:layout_width="80dp" android:layout_height="wrap_content" android:text="الحساب" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="11sp" android:textStyle="bold"/>
+        
+        <!-- تقسيم الأعمدة الثلاثة لتكون مزدوجة (مدين/دائن) -->
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="أول المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="حركة الفترة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="آخر المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
+    </LinearLayout>
+
+    <!-- ✅ الجدول (عادي ويملأ الشاشة) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvRows"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <!-- Header العناوين -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="10dp"
-                android:background="?attr/colorPrimaryContainer">
-
-                <TextView android:layout_width="60dp" android:layout_height="wrap_content" android:text="الكود" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
-                <TextView android:layout_width="120dp" android:layout_height="wrap_content" android:text="الحساب" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
-                
-                <!-- عناوين الأعمدة الثلاثة الجديدة -->
-                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="أول المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
-                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="حركة الفترة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
-                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="آخر المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
-            </LinearLayout>
-
-            <!-- قائمة الحسابات -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvRows"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:background="?attr/colorSurface"
-                android:clipToPadding="false"
-                android:paddingBottom="16dp"/>
-        </LinearLayout>
-    </HorizontalScrollView>
+        android:background="?attr/colorSurface"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp"/>
 
     <TextView
         android:id="@+id/tvEmpty"
