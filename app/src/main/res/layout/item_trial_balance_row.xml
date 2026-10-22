@@ -1,85 +1,111 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?attr/colorSurface"
-    android:paddingStart="10dp"
-    android:paddingEnd="10dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp"
-    android:layout_marginBottom="1dp">
+    android:background="?attr/colorSurface">
 
+    <!-- شريط الأدوات: البحث والفلاتر -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:background="?attr/colorSurfaceVariant">
 
-        <TextView
-            android:id="@+id/tvRowCode"
-            android:layout_width="60dp"
+        <!-- صف البحث -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="1301"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="12sp"
-            android:textStyle="bold"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/tvRowName"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="مخزون الذهب"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:maxLines="2"
-            android:ellipsize="end"/>
+            <EditText
+                android:id="@+id/etSearch"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@android:drawable/editbox_background"
+                android:hint="🔍 بحث بكود أو اسم الحساب..."
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textSize="12sp"
+                android:inputType="text"/>
 
-        <TextView
-            android:id="@+id/tvRowDebit"
-            android:layout_width="75dp"
-            android:layout_height="wrap_content"
-            android:text="—"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="11sp"
-            android:gravity="end"/>
+            <Button
+                android:id="@+id/btnFilterDate"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:text="الفترة 📅"
+                android:textSize="12sp"
+                style="@style/Widget.AppCompat.Button.Colored"/>
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvRowCredit"
-            android:layout_width="75dp"
+        <!-- أزرار التبديل بين الميزان المالي والمعدني -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="—"
-            android:textColor="?attr/colorError"
-            android:textSize="11sp"
-            android:gravity="end"/>
-
-        <TextView
-            android:id="@+id/tvRowBalance"
-            android:layout_width="75dp"
-            android:layout_height="wrap_content"
-            android:text="0"
-            android:textColor="@color/success_500"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:gravity="end"/>
+            android:layout_marginTop="8dp"
+            app:tabMode="fixed"
+            app:tabGravity="fill">
+            
+            <com.google.android.material.tabs.TabItem
+                android:text="الميزان المالي 💵" />
+            
+            <com.google.android.material.tabs.TabItem
+                android:text="ميزان الذهب 🥇" />
+        </com.google.android.material.tabs.TabLayout>
     </LinearLayout>
 
-    <!-- شريط الذهب (يظهر فقط إذا كان للحساب حركة ذهبية) -->
-    <TextView
-        android:id="@+id/tvRowGold"
+    <!-- KPI Container -->
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:background="#1AD4AF37" 
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
-        android:text="مدين: 0g | دائن: 0g | الرصيد: 0g"
-        android:textColor="@color/mira_gold"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:gravity="end"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/kpiContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"/>
+    </HorizontalScrollView>
+
+    <!-- Header (سيتم تغييره برمجياً بناءً على التبويب) -->
+    <LinearLayout
+        android:id="@+id/headerRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:background="?attr/colorPrimaryContainer">
+
+        <TextView android:layout_width="60dp" android:layout_height="wrap_content" android:text="الكود" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="الحساب" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
+        <TextView android:layout_width="75dp" android:layout_height="wrap_content" android:text="مدين" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="end"/>
+        <TextView android:layout_width="75dp" android:layout_height="wrap_content" android:text="دائن" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="end"/>
+        <TextView android:layout_width="75dp" android:layout_height="wrap_content" android:text="الرصيد" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="end"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvRows"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="?attr/colorSurface"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="📭 لا توجد بيانات"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="16sp"
         android:visibility="gone"/>
 </LinearLayout>
