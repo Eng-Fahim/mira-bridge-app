@@ -2329,9 +2329,9 @@ final String finalServerSerial = serialTemp;
                         if (displayEpc.isEmpty()) displayEpc = finalNewEpc;
 
                         String shortBarcode = finalServerSerial;
-if (shortBarcode.isEmpty() || !shortBarcode.startsWith("MIRA-SN-")) {
-    // توليد رقم مؤقت بدلاً من طباعة الـ EPC
-    shortBarcode = "MIRA-SN-TEMP-" + System.currentTimeMillis(); 
+// ✅ نثق في السيرفر. إذا لم يرجع شيء (نادر جداً)، نضع رقم مؤقت
+if (shortBarcode == null || shortBarcode.trim().isEmpty()) {
+    shortBarcode = "SN-TEMP-" + System.currentTimeMillis(); 
 }
                         String gs1Code = "(21)" + shortBarcode;
                         String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode;
