@@ -2085,27 +2085,45 @@ public class MiraApiClient {
         return getAccounting(url); // ✅ تم التصحيح
     }
 
-    public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
-        try {
-            String cleanType = reportType != null
-                    ? reportType.replace("\"", "").replace("\\", "").replace("'", "").trim()
-                    : "dashboard";
+    // ✅ نسخة محسّنة تدعم الفلاتر
+public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
+    return getReportData(reportType, fromDate, toDate, branchId, null, null, null);
+}
 
-            StringBuilder endpoint = new StringBuilder("/reports-app?type=")
-                    .append(URLEncoder.encode(cleanType, "UTF-8"));
-            if (fromDate != null && !fromDate.isEmpty()) {
-                endpoint.append("&from=").append(URLEncoder.encode(fromDate, "UTF-8"));
-            }
-            if (toDate != null && !toDate.isEmpty()) {
-                endpoint.append("&to=").append(URLEncoder.encode(toDate, "UTF-8"));
-            }
-            if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
+public ApiResponse getReportData(String reportType, String fromDate, String toDate, 
+                                 int branchId, String search, String filter1, String filter2) {
+    try {
+        String cleanType = reportType != null
+                ? reportType.replace("\"", "").replace("\\", "").replace("'", "").trim()
+                : "dashboard";
 
-            return getAccounting(endpoint.toString()); // ✅ تم التصحيح
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
+        StringBuilder endpoint = new StringBuilder("/reports-app?type=")
+                .append(URLEncoder.encode(cleanType, "UTF-8"));
+        
+        if (fromDate != null && !fromDate.isEmpty()) {
+            endpoint.append("&from=").append(URLEncoder.encode(fromDate, "UTF-8"));
         }
+        if (toDate != null && !toDate.isEmpty()) {
+            endpoint.append("&to=").append(URLEncoder.encode(toDate, "UTF-8"));
+        }
+        if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
+        
+        // ✅ دعم الفلاتر المتقدمة
+        if (search != null && !search.trim().isEmpty()) {
+            endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
+        }
+        if (filter1 != null && !filter1.trim().isEmpty()) {
+            endpoint.append("&filter1=").append(URLEncoder.encode(filter1, "UTF-8"));
+        }
+        if (filter2 != null && !filter2.trim().isEmpty()) {
+            endpoint.append("&filter2=").append(URLEncoder.encode(filter2, "UTF-8"));
+        }
+
+        return getWithAuth(endpoint.toString());
+    } catch (Exception e) {
+        return new ApiResponse(-1, null, e.getMessage());
     }
+}
 
     // ==================== الذهب والعملات ====================
     public List<ApiProvider> getActiveProviders() {
