@@ -15,6 +15,7 @@ import com.example.uhf.utils.NumberFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapter.VH> {
 
@@ -39,6 +40,8 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
 
         h.tvCode.setText(r.accountCode != null ? r.accountCode : "—");
         h.tvName.setText(r.accountNameAr != null ? r.accountNameAr : "—");
+        
+        // المبالغ المالية
         h.tvDebit.setText(r.totalDebit > 0 ? NumberFormatter.moneyShort(r.totalDebit) : "—");
         h.tvCredit.setText(r.totalCredit > 0 ? NumberFormatter.moneyShort(r.totalCredit) : "—");
 
@@ -47,11 +50,24 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
         h.tvBalance.setTextColor(balance >= 0
             ? Color.parseColor("#27AE60") : Color.parseColor("#C0392B"));
 
-        // الذهب
-        if (Math.abs(r.goldBalance) > 0.001) {
+        // ✅ أوزان الذهب
+        double gDebit = r.goldDebit;
+        double gCredit = r.goldCredit;
+        double gBalance = r.goldBalance;
+
+        // نتحقق إذا كان هناك أي حركة ذهبية (وارد، صادر، أو رصيد)
+        if (Math.abs(gDebit) > 0.001 || Math.abs(gCredit) > 0.001 || Math.abs(gBalance) > 0.001) {
             h.tvGold.setVisibility(View.VISIBLE);
-            h.tvGold.setText(NumberFormatter.goldSigned(r.goldBalance));
-            h.tvGold.setTextColor(r.goldBalance > 0
+            
+            // تجهيز النصوص (إخفاء الأصفار وإظهار شرطة)
+            String dStr = Math.abs(gDebit) > 0.001 ? String.format(Locale.US, "%.3f", gDebit) : "—";
+            String cStr = Math.abs(gCredit) > 0.001 ? String.format(Locale.US, "%.3f", gCredit) : "—";
+            String bStr = Math.abs(gBalance) > 0.001 ? String.format(Locale.US, "%.3f", gBalance) : "0";
+            
+            h.tvGold.setText("ذهب: مدين " + dStr + "g | دائن " + cStr + "g | الرصيد " + bStr + "g");
+            
+            // تلوين الرصيد الذهبي (أخضر للمدين، أحمر للدائن)
+            h.tvGold.setTextColor(gBalance >= 0
                 ? Color.parseColor("#27AE60") : Color.parseColor("#E74C3C"));
         } else {
             h.tvGold.setVisibility(View.GONE);
