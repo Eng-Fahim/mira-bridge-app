@@ -2296,15 +2296,22 @@ if (isDesktopScan) {
                     final String finalServerEpc = serverEpc;
 
 // ✅ استخراج دقيق للـ Serial من السيرفر
+// ✅ استخراج دقيق للـ Serial من السيرفر (يقرأ من الجذر والفرع)
 String serialTemp = "";
 if (finalResponseData != null) {
-    // نبحث عن serial_number أولاً، ثم mira_id، ثم serial
+    // السيرفر يضع السيريال في جذر الـ data
     serialTemp = finalResponseData.optString("serial_number", "");
+    if (serialTemp.isEmpty()) serialTemp = finalResponseData.optString("mira_id", "");
+    if (serialTemp.isEmpty()) serialTemp = finalResponseData.optString("serial", "");
+    
+    // إذا لم نجده، نبحث داخل كائن "data" إن وجد
     if (serialTemp.isEmpty()) {
-        serialTemp = finalResponseData.optString("mira_id", "");
-    }
-    if (serialTemp.isEmpty()) {
-        serialTemp = finalResponseData.optString("serial", "");
+        JSONObject innerData = finalResponseData.optJSONObject("data");
+        if (innerData != null) {
+            serialTemp = innerData.optString("serial_number", "");
+            if (serialTemp.isEmpty()) serialTemp = innerData.optString("mira_id", "");
+            if (serialTemp.isEmpty()) serialTemp = innerData.optString("serial", "");
+        }
     }
 }
 final String finalServerSerial = serialTemp;
@@ -2328,12 +2335,12 @@ final String finalServerSerial = serialTemp;
 
                         String shortBarcode = finalServerSerial;
 
-// ✅ حماية مطلقة: إذا كان الباركود فارغاً أو يبدأ بـ E2 (وهو TID)، لا نطبعه
 if (shortBarcode == null || shortBarcode.trim().isEmpty() || 
     (shortBarcode.startsWith("E2") && shortBarcode.length() == 24)) {
     
-    // إذا فشل السيرفر في إرجاع السيريال، نولّد رقماً مؤقتاً يبدأ بـ SN-TEMP
-    shortBarcode = "SN-TEMP-" + System.currentTimeMillis(); 
+    // ✅ توليد رقم مؤقت قصير جداً (4 أرقام فقط) لتسهيل الطباعة
+    int randomNum = new java.util.Random().nextInt(9000) + 1000;
+    shortBarcode = "TMP-" + randomNum; 
 }
                         String gs1Code = "(21)" + shortBarcode;
                         String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode;
