@@ -5,13 +5,20 @@
     android:orientation="vertical"
     android:background="?attr/colorSurface">
 
-    <!-- KPI Container -->
-    <LinearLayout
-        android:id="@+id/kpiContainer"
+    <!-- KPI Container - أصبح يدعم التمرير الأفقي ليتسع لبطاقات الذهب -->
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="8dp"/>
+        android:scrollbars="none"
+        android:background="?attr/colorSurfaceVariant">
+
+        <LinearLayout
+            android:id="@+id/kpiContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"/>
+    </HorizontalScrollView>
 
     <!-- Header -->
     <LinearLayout
@@ -22,7 +29,7 @@
         android:background="?attr/colorPrimaryContainer">
 
         <TextView
-            android:layout_width="70dp"
+            android:layout_width="60dp"
             android:layout_height="wrap_content"
             android:text="الكود"
             android:textColor="?attr/colorOnPrimaryContainer"
@@ -39,7 +46,7 @@
             android:textStyle="bold"/>
 
         <TextView
-            android:layout_width="80dp"
+            android:layout_width="75dp"
             android:layout_height="wrap_content"
             android:text="مدين"
             android:textColor="?attr/colorOnPrimaryContainer"
@@ -48,7 +55,7 @@
             android:gravity="end"/>
 
         <TextView
-            android:layout_width="80dp"
+            android:layout_width="75dp"
             android:layout_height="wrap_content"
             android:text="دائن"
             android:textColor="?attr/colorOnPrimaryContainer"
@@ -57,7 +64,7 @@
             android:gravity="end"/>
 
         <TextView
-            android:layout_width="80dp"
+            android:layout_width="75dp"
             android:layout_height="wrap_content"
             android:text="الرصيد"
             android:textColor="?attr/colorOnPrimaryContainer"
@@ -72,7 +79,9 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="?attr/colorSurface"/>
+        android:background="?attr/colorSurface"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp"/>
 
     <!-- Empty -->
     <TextView
