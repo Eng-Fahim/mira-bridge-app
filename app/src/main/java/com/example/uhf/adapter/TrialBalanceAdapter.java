@@ -20,14 +20,13 @@ import java.util.Locale;
 public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapter.VH> {
 
     private List<TrialBalanceDto.TrialBalanceRow> items = new ArrayList<>();
-    
-    // ✅ 1. تعريف الـ Interface والمتغير في مستوى الكلاس (وليس داخل دالة)
+
+    // ✅ 1. تعريف الـ Interface والمتغير
     public interface OnItemClickListener {
         void onItemClick(TrialBalanceDto.TrialBalanceRow row);
     }
     private OnItemClickListener listener;
 
-    // ✅ 2. دالة لتعيين المستمع
     public void setOnItemClickListener(OnItemClickListener listener) {
         this.listener = listener;
     }
@@ -49,43 +48,39 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
     public void onBindViewHolder(@NonNull VH h, int position) {
         TrialBalanceDto.TrialBalanceRow r = items.get(position);
 
-        // ✅ 3. عرض البيانات أولاً
+        // البيانات الأساسية
         h.tvCode.setText(r.accountCode != null ? r.accountCode : "—");
         h.tvName.setText(r.accountNameAr != null ? r.accountNameAr : "—");
         
-        // المبالغ المالية
-        h.tvDebit.setText(r.totalDebit > 0 ? NumberFormatter.moneyShort(r.totalDebit) : "—");
-        h.tvCredit.setText(r.totalCredit > 0 ? NumberFormatter.moneyShort(r.totalCredit) : "—");
-
-        double balance = r.balance;
-        h.tvBalance.setText(NumberFormatter.moneyShort(balance));
-        h.tvBalance.setTextColor(balance >= 0
-            ? Color.parseColor("#27AE60") : Color.parseColor("#C0392B"));
+        // ✅ الأعمدة الستة الجديدة (أول المدة، حركة الفترة، آخر المدة)
+        h.tvOpenDebit.setText(r.openingDebit > 0 ? NumberFormatter.moneyShort(r.openingDebit) : "—");
+        h.tvOpenCredit.setText(r.openingCredit > 0 ? NumberFormatter.moneyShort(r.openingCredit) : "—");
+        
+        h.tvPeriodDebit.setText(r.periodDebit > 0 ? NumberFormatter.moneyShort(r.periodDebit) : "—");
+        h.tvPeriodCredit.setText(r.periodCredit > 0 ? NumberFormatter.moneyShort(r.periodCredit) : "—");
+        
+        h.tvCloseDebit.setText(r.closingDebit > 0 ? NumberFormatter.moneyShort(r.closingDebit) : "—");
+        h.tvCloseCredit.setText(r.closingCredit > 0 ? NumberFormatter.moneyShort(r.closingCredit) : "—");
 
         // ✅ أوزان الذهب
         double gDebit = r.goldDebit;
         double gCredit = r.goldCredit;
         double gBalance = r.goldBalance;
 
-        // نتحقق إذا كان هناك أي حركة ذهبية (وارد، صادر، أو رصيد)
         if (Math.abs(gDebit) > 0.001 || Math.abs(gCredit) > 0.001 || Math.abs(gBalance) > 0.001) {
             h.tvGold.setVisibility(View.VISIBLE);
-            
-            // تجهيز النصوص (إخفاء الأصفار وإظهار شرطة)
             String dStr = Math.abs(gDebit) > 0.001 ? String.format(Locale.US, "%.3f", gDebit) : "—";
             String cStr = Math.abs(gCredit) > 0.001 ? String.format(Locale.US, "%.3f", gCredit) : "—";
             String bStr = Math.abs(gBalance) > 0.001 ? String.format(Locale.US, "%.3f", gBalance) : "0";
-            
             h.tvGold.setText("ذهب: مدين " + dStr + "g | دائن " + cStr + "g | الرصيد " + bStr + "g");
             
-            // تلوين الرصيد الذهبي (أخضر للمدين، أحمر للدائن)
             h.tvGold.setTextColor(gBalance >= 0
                 ? Color.parseColor("#27AE60") : Color.parseColor("#E74C3C"));
         } else {
             h.tvGold.setVisibility(View.GONE);
         }
 
-        // ✅ 4. إضافة حدث الضغط في النهاية
+        // حدث الضغط
         h.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onItemClick(r);
         });
@@ -97,16 +92,22 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView tvCode, tvName, tvDebit, tvCredit, tvBalance, tvGold;
+        TextView tvCode, tvName, tvGold;
+        // ✅ المتغيرات الجديدة فقط بدون المتغيرات القديمة
+        TextView tvOpenDebit, tvOpenCredit, tvPeriodDebit, tvPeriodCredit, tvCloseDebit, tvCloseCredit;
 
         VH(@NonNull View v) {
             super(v);
             tvCode = v.findViewById(R.id.tvRowCode);
             tvName = v.findViewById(R.id.tvRowName);
-            tvDebit = v.findViewById(R.id.tvRowDebit);
-            tvCredit = v.findViewById(R.id.tvRowCredit);
-            tvBalance = v.findViewById(R.id.tvRowBalance);
             tvGold = v.findViewById(R.id.tvRowGold);
+            
+            tvOpenDebit = v.findViewById(R.id.tvOpenDebit);
+            tvOpenCredit = v.findViewById(R.id.tvOpenCredit);
+            tvPeriodDebit = v.findViewById(R.id.tvPeriodDebit);
+            tvPeriodCredit = v.findViewById(R.id.tvPeriodCredit);
+            tvCloseDebit = v.findViewById(R.id.tvCloseDebit);
+            tvCloseCredit = v.findViewById(R.id.tvCloseCredit);
         }
     }
 }
