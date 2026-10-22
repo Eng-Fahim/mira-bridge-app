@@ -35,7 +35,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -48,26 +47,13 @@ import javax.net.ssl.HttpsURLConnection;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 
-/**
- * ✅ MiraApiClient v3.1 — النسخة المُحصّنة والمُصحّحة 100%
- *
- * التحسينات والإصلاحات:
- * 1. إصلاح تهيئة accountingService و gson (كانا null) — CRITICAL
- * 2. pingApiAsync() — لا يُجمّد Main Thread
- * 3. reinitializeWithServerAsync() — آمنة للواجهات
- * 4. Cache للـ Auth Token — تقليل Disk I/O
- * 5. refreshCredentialsAsync على background مع حماية من race
- * 6. invalidateTokenCache عند فشل login
- * 7. تنظيف أفضل للخيوط
- * 8. Brotli decompression اختياري (لا يكسر إن لم تكن المكتبة موجودة)
- * 9. ApiResponse.rawBody لا يُهيَّأ خطأً
- */
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
 
     // ==================== الإعدادات العامة ====================
     private static final String API_PREFIX = "mira-gate/v1";
+    private static final String ACCOUNTING_PREFIX = "mira/v2"; // ✅ مسار المحاسبة الصحيح
     private static final String DEFAULT_BASE_URL = "https://id.ibreg.org/wp-json";
 
     private static final int DEFAULT_CONNECT_TIMEOUT = 10_000;
@@ -77,7 +63,6 @@ public class MiraApiClient {
     private static final int PING_CONNECT_TIMEOUT    = 5_000;
     private static final int PING_READ_TIMEOUT       = 5_000;
 
-    // ✅ Cache للـ Token
     private static final long TOKEN_CACHE_MS = 30_000;
 
     private final AccountingApiService accountingService;
@@ -94,11 +79,9 @@ public class MiraApiClient {
     private volatile String gateId;
     private final Object credentialsLock = new Object();
 
-    // ✅ Cache للـ Auth Token
     private volatile String cachedToken = null;
     private volatile long cachedTokenTimestamp = 0;
 
-    // ✅ حماية من race في refreshCredentialsAsync
     private final AtomicBoolean credentialsRefreshPending = new AtomicBoolean(false);
 
     // ==================== الخيوط ====================
@@ -141,83 +124,76 @@ public class MiraApiClient {
         this.executorService = Executors.newFixedThreadPool(4, new NamedThreadFactory("MiraApi-IO"));
         this.networkExecutor = Executors.newFixedThreadPool(4, new NamedThreadFactory("MiraApi-Net"));
 
-        // ✅ إصلاح CRITICAL: تهيئة Gson
-            // ✅ إصلاح CRITICAL: تهيئة Gson
-    this.gson = new GsonBuilder()
-            .setLenient()
-            .serializeNulls()
-            .create();
+        this.gson = new GsonBuilder()
+                .setLenient()
+                .serializeNulls()
+                .create();
 
-    // ✅ [SECURITY] OkHttpClient مع interceptor نظيف (بدون تسريب مفاتيح)
-    okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .addInterceptor(chain -> {
-                okhttp3.Request original = chain.request();
+        okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor(chain -> {
+                    okhttp3.Request original = chain.request();
 
-                String token = "";
-                String apiKey = "";
-                String gateId = "";
-                try {
-                    token = getAuthToken();
-                    apiKey = getEffectiveApiKey();
-                    gateId = getEffectiveGateId();
-                } catch (Exception e) {
-                    Log.w(TAG, "Auth read error: " + e.getClass().getSimpleName());
-                }
+                    String token = "";
+                    String apiKey = "";
+                    String gateId = "";
+                    try {
+                        token = getAuthToken();
+                        apiKey = getEffectiveApiKey();
+                        gateId = getEffectiveGateId();
+                    } catch (Exception e) {
+                        Log.w(TAG, "Auth read error: " + e.getClass().getSimpleName());
+                    }
 
-                if (com.example.uhf.BuildConfig.DEBUG) {
-                    Log.d(TAG, "Net req: " + original.method() + " "
-                            + original.url().encodedPath()
-                            + " | key=" + (apiKey.isEmpty() ? "empty" : "set")
-                            + " tok=" + (token.isEmpty() ? "empty" : "set"));
-                }
+                    if (com.example.uhf.BuildConfig.DEBUG) {
+                        Log.d(TAG, "Net req: " + original.method() + " "
+                                + original.url().encodedPath()
+                                + " | key=" + (apiKey.isEmpty() ? "empty" : "set")
+                                + " tok=" + (token.isEmpty() ? "empty" : "set"));
+                    }
 
-                okhttp3.Request.Builder builder = original.newBuilder()
-                        .header("Accept", "application/json");
+                    okhttp3.Request.Builder builder = original.newBuilder()
+                            .header("Accept", "application/json");
 
-                if (!apiKey.isEmpty()) {
-                    builder.header("X-MIRA-API-Key", apiKey);
-                }
-                if (!token.isEmpty()) {
-                    builder.header("Authorization", "Bearer " + token);
-                    builder.header("X-MIRA-Auth-Token", token);
-                }
-                if (!gateId.isEmpty()) {
-                    builder.header("X-MIRA-Gate-ID", gateId);
-                }
+                    if (!apiKey.isEmpty()) {
+                        builder.header("X-MIRA-API-Key", apiKey);
+                    }
+                    if (!token.isEmpty()) {
+                        builder.header("Authorization", "Bearer " + token);
+                        builder.header("X-MIRA-Auth-Token", token);
+                    }
+                    if (!gateId.isEmpty()) {
+                        builder.header("X-MIRA-Gate-ID", gateId);
+                    }
 
-                return chain.proceed(builder.build());
-            })
-            .build();
+                    return chain.proceed(builder.build());
+                })
+                .build();
 
-    // ✅ Retrofit مع OkHttpClient المخصص
-    this.accountingService = new retrofit2.Retrofit.Builder()
-            .baseUrl("https://id.ibreg.org/wp-json/mira/v2/")
-            .client(accountingOkHttp)
-            .addConverterFactory(
-                    retrofit2.converter.gson.GsonConverterFactory.create())
-            .build()
-            .create(AccountingApiService.class);
+        this.accountingService = new retrofit2.Retrofit.Builder()
+                .baseUrl(DEFAULT_BASE_URL + "/" + ACCOUNTING_PREFIX + "/")
+                .client(accountingOkHttp)
+                .addConverterFactory(
+                        retrofit2.converter.gson.GsonConverterFactory.create())
+                .build()
+                .create(AccountingApiService.class);
 
-    String savedBaseUrl = sessionManager.getServerUrl();
-    if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
-        savedBaseUrl = serverConfig.getBaseUrl();
+        String savedBaseUrl = sessionManager.getServerUrl();
         if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
-            savedBaseUrl = DEFAULT_BASE_URL;
+            savedBaseUrl = serverConfig.getBaseUrl();
+            if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
+                savedBaseUrl = DEFAULT_BASE_URL;
+            }
+            sessionManager.setServerUrl(savedBaseUrl);
+            serverConfig.setBaseUrl(savedBaseUrl);
         }
-        sessionManager.setServerUrl(savedBaseUrl);
-        serverConfig.setBaseUrl(savedBaseUrl);
+        this.baseUrl = normalizeBaseUrl(savedBaseUrl);
+
+        refreshCredentials();
     }
-    this.baseUrl = normalizeBaseUrl(savedBaseUrl);
 
-    refreshCredentials();
-}
-
-    /**
-     * ✅ إغلاق كل الخيوط
-     */
     public void shutdown() {
         Log.d(TAG, "shutdown() — closing executors");
         safeShutdown(executorService);
@@ -237,45 +213,39 @@ public class MiraApiClient {
         }
     }
 
-    // ==================== إدارة الاعتمادات ====================
     private void refreshCredentials() {
-    synchronized (credentialsLock) {
-        String cleanBaseUrl = normalizeBaseUrl(baseUrl);
-        this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
+        synchronized (credentialsLock) {
+            String cleanBaseUrl = normalizeBaseUrl(baseUrl);
+            this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
 
-        String key = sessionManager.getApiKey();
-        if (key == null || key.isEmpty()) {
-            key = serverConfig.getApiKey();
+            String key = sessionManager.getApiKey();
+            if (key == null || key.isEmpty()) {
+                key = serverConfig.getApiKey();
+            }
+            this.apiKey = key != null ? key : "";
+
+            String gate = sessionManager.getGateId();
+            if (gate == null || gate.isEmpty()) {
+                gate = serverConfig.getGateId();
+            }
+            this.gateId = gate != null ? gate : "";
+
+            String token = sessionManager.getAuthToken();
+            if (token != null && !token.isEmpty()) {
+                this.cachedToken = token;
+                this.cachedTokenTimestamp = System.currentTimeMillis();
+            } else {
+                this.cachedToken = null;
+                this.cachedTokenTimestamp = 0;
+            }
+
+            Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
+                    + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "EXISTS")
+                    + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId)
+                    + ", Token=" + (cachedToken == null ? "EMPTY" : "EXISTS"));
         }
-        this.apiKey = key != null ? key : "";
-
-        String gate = sessionManager.getGateId();
-        if (gate == null || gate.isEmpty()) {
-            gate = serverConfig.getGateId();
-        }
-        this.gateId = gate != null ? gate : "";
-
-        // ✅ [v3.3] حدّث cachedToken من sessionManager فوراً
-        // (بدلاً من مسحها — يسبب race مع login)
-        String token = sessionManager.getAuthToken();
-        if (token != null && !token.isEmpty()) {
-            this.cachedToken = token;
-            this.cachedTokenTimestamp = System.currentTimeMillis();
-        } else {
-            this.cachedToken = null;
-            this.cachedTokenTimestamp = 0;
-        }
-
-        Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
-                + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "EXISTS")
-                + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId)
-                + ", Token=" + (cachedToken == null ? "EMPTY" : "EXISTS"));
     }
-}
 
-    /**
-     * ✅ refreshCredentialsAsync — على background مع حماية race
-     */
     private void refreshCredentialsAsync() {
         if (!credentialsRefreshPending.compareAndSet(false, true)) {
             Log.d(TAG, "refreshCredentialsAsync — already pending, skipped");
@@ -319,14 +289,10 @@ public class MiraApiClient {
         }
     }
 
-    // ==================== ✅ دوال Async ====================
     public interface PingCallback {
         void onResult(boolean isSuccess);
     }
 
-    /**
-     * ✅ Ping غير متزامن — آمن للاستخدام من Main Thread
-     */
     public void pingApiAsync(PingCallback callback) {
         networkExecutor.execute(() -> {
             final boolean result = pingApi();
@@ -342,9 +308,6 @@ public class MiraApiClient {
         });
     }
 
-    /**
-     * ✅ إعادة تهيئة async — لا تُجمّد Main Thread
-     */
     public void reinitializeWithServerAsync(String newServerUrl, PingCallback callback) {
         executorService.execute(() -> {
             boolean success = false;
@@ -382,28 +345,23 @@ public class MiraApiClient {
         });
     }
 
-    // ==================== الدوال الأساسية ===================
     private String getEffectiveApiKey() {
-    String key = apiKey;
-    
-    // ✅ [v3.3] Fallback: اقرأ من SessionManager مباشرة
-    // (حماية إضافية ضد race conditions)
-    if (key == null || key.isEmpty()) {
-        try {
-            key = sessionManager.getApiKey();
-            if (key != null && !key.isEmpty()) {
-                this.apiKey = key;   // cache فوري
-                return key;
-            }
-        } catch (Exception ignored) {}
+        String key = apiKey;
+        if (key == null || key.isEmpty()) {
+            try {
+                key = sessionManager.getApiKey();
+                if (key != null && !key.isEmpty()) {
+                    this.apiKey = key;
+                    return key;
+                }
+            } catch (Exception ignored) {}
+        }
+        if (key == null || key.isEmpty()) {
+            Log.e(TAG, "⛔ API Key is empty! User must login first.");
+            return "";
+        }
+        return key;
     }
-    
-    if (key == null || key.isEmpty()) {
-        Log.e(TAG, "⛔ API Key is empty! User must login first.");
-        return "";
-    }
-    return key;
-}
 
     private String getEffectiveGateId() {
         String gate = gateId;
@@ -414,9 +372,6 @@ public class MiraApiClient {
         return gate;
     }
 
-    /**
-     * ✅ Cache مُحسّن للـ Auth Token
-     */
     private String getAuthToken() {
         long now = System.currentTimeMillis();
         String cached = cachedToken;
@@ -443,9 +398,6 @@ public class MiraApiClient {
         return result;
     }
 
-    /**
-     * ✅ إجبار تحديث Token Cache
-     */
     public void invalidateTokenCache() {
         cachedToken = null;
         cachedTokenTimestamp = 0;
@@ -481,7 +433,6 @@ public class MiraApiClient {
         return sb.toString();
     }
 
-    // ==================== الرؤوس الموحدة ====================
     private void applyStandardHeaders(HttpURLConnection conn, boolean requiresAuth) {
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
         conn.setRequestProperty("Accept", "application/json");
@@ -500,7 +451,6 @@ public class MiraApiClient {
         }
     }
 
-    // ==================== المُنفِّذ الموحَّد للطلبات ====================
     public ApiResponse executeRequest(String method,
                                        String endpoint,
                                        JSONObject payload,
@@ -511,26 +461,25 @@ public class MiraApiClient {
         try {
             String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
             String fullUrl = apiUrl + cleanEndpoint;
-URL url = new URL(fullUrl);
+            URL url = new URL(fullUrl);
 
-// ✅ [SECURITY] ارفض HTTP (يسمح فقط localhost في DEBUG)
-if (!"https".equalsIgnoreCase(url.getProtocol())) {
-    String host = url.getHost();
-    boolean isLocal = "localhost".equals(host) 
-                   || "127.0.0.1".equals(host) 
-                   || "10.0.2.2".equals(host);
-    
-    if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
-        Log.e(TAG, "🚨 SECURITY: Refused non-HTTPS URL: " 
-            + url.getProtocol() + "://" + host);
-        return networkError("يُشترط اتصال HTTPS آمن");
-    }
-    conn = (HttpURLConnection) url.openConnection();
-} else {
-    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-    CertificatePinningManager.applyPinning(httpsConn);
-    conn = httpsConn;
-}
+            if (!"https".equalsIgnoreCase(url.getProtocol())) {
+                String host = url.getHost();
+                boolean isLocal = "localhost".equals(host) 
+                               || "127.0.0.1".equals(host) 
+                               || "10.0.2.2".equals(host);
+                
+                if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
+                    Log.e(TAG, "🚨 SECURITY: Refused non-HTTPS URL: " 
+                        + url.getProtocol() + "://" + host);
+                    return networkError("يُشترط اتصال HTTPS آمن");
+                }
+                conn = (HttpURLConnection) url.openConnection();
+            } else {
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            }
 
             conn.setRequestMethod(method);
             applyStandardHeaders(conn, requiresAuth);
@@ -567,7 +516,6 @@ if (!"https".equalsIgnoreCase(url.getProtocol())) {
         return response;
     }
 
-    // ==================== دوال الشبكة العامة ====================
     public ApiResponse getWithAuth(String endpoint) {
         return executeRequest("GET", endpoint, null, true,
                 DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT);
@@ -598,7 +546,6 @@ if (!"https".equalsIgnoreCase(url.getProtocol())) {
                 DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT);
     }
 
-    // ==================== بناء الاستجابة ====================
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
 
@@ -615,7 +562,6 @@ if (!"https".equalsIgnoreCase(url.getProtocol())) {
             return new ApiResponse(responseCode, null, "Empty response");
         }
 
-        // ✅ فك الترميز
         InputStream is = rawStream;
         String encoding = conn.getContentEncoding();
 
@@ -639,7 +585,6 @@ if (!"https".equalsIgnoreCase(url.getProtocol())) {
             is = rawStream;
         }
 
-        // ✅ قراءة الاستجابة
         StringBuilder response = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(is, StandardCharsets.UTF_8))) {
@@ -657,7 +602,6 @@ if (!"https".equalsIgnoreCase(url.getProtocol())) {
                 ? responseBody.substring(0, 100) + "..." : responseBody));
         Log.d(TAG, "═══════════════════════════════════════════");
 
-        // ✅ تحليل JSON
         JSONObject json = null;
         String serverMessage = null;
 
@@ -684,10 +628,6 @@ if (!"https".equalsIgnoreCase(url.getProtocol())) {
         return apiResponse;
     }
 
-    /**
-     * ✅ Brotli decompression — باستخدام Reflection لتجنب كسر البناء
-     * إذا كانت مكتبة brotli غير موجودة → fallback للسلسلة الأصلية
-     */
     private InputStream wrapBrotli(InputStream rawStream) {
         try {
             Class<?> clazz = Class.forName("org.brotli.dec.BrotliInputStream");
@@ -701,80 +641,73 @@ if (!"https".equalsIgnoreCase(url.getProtocol())) {
     }
     
     // ═══════════════════════════════════════════════════════════
-//  ✅ طلبات mira/v2 (للإعداد المحاسبي)
-// ═══════════════════════════════════════════════════════════
+    //  ✅ طلبات mira/v2 (للإعداد المحاسبي) - تم إصلاح المسار
+    // ═══════════════════════════════════════════════════════════
 
-public ApiResponse getAccounting(String endpoint) {
-    return accountingRequest("GET", endpoint, null);
-}
-
-public ApiResponse postAccounting(String endpoint, JSONObject payload) {
-    return accountingRequest("POST", endpoint, payload);
-}
-
-private ApiResponse accountingRequest(String method, String endpoint,
-                                      JSONObject payload) {
-    HttpURLConnection conn = null;
-    try {
-        String cleanEndpoint = endpoint.startsWith("/")
-                ? endpoint.substring(1) : endpoint;
-        String fullUrl = "https://id.ibreg.org/wp-json/mira/v2/"
-                + cleanEndpoint;
-        URL url = new URL(fullUrl);
-
-        // ✅ [SECURITY] HTTPS إجباري
-        if (!"https".equalsIgnoreCase(url.getProtocol())) {
-            Log.e(TAG, "SECURITY: accounting refused non-HTTPS");
-            return networkError("يُشترط اتصال HTTPS آمن");
-        }
-        HttpsURLConnection httpsConn =
-                (HttpsURLConnection) url.openConnection();
-        CertificatePinningManager.applyPinning(httpsConn);
-        conn = httpsConn;
-
-        conn.setRequestMethod(method);
-        conn.setRequestProperty("Content-Type",
-                "application/json; charset=utf-8");
-        conn.setRequestProperty("Accept", "application/json");
-
-        String apiKey = getEffectiveApiKey();
-        String token = getAuthToken();
-
-        if (!apiKey.isEmpty()) {
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-        }
-        if (!token.isEmpty()) {
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setRequestProperty("X-MIRA-Auth-Token", token);
-        }
-
-        conn.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
-        conn.setReadTimeout(DEFAULT_READ_TIMEOUT);
-
-        if (payload != null) {
-            conn.setDoOutput(true);
-            byte[] input = payload.toString()
-                    .getBytes(StandardCharsets.UTF_8);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(input, 0, input.length);
-            }
-        }
-
-        // ✅ [SECURITY] لا نسجّل URL كاملاً
-        if (com.example.uhf.BuildConfig.DEBUG) {
-            Log.d(TAG, "accounting " + method + ": " + url.getPath());
-        }
-
-        return buildResponse(conn);
-
-    } catch (Exception e) {
-        Log.e(TAG, "accountingRequest error: "
-                + e.getClass().getSimpleName());
-        return networkError(e.getMessage());
-    } finally {
-        if (conn != null) conn.disconnect();
+    public ApiResponse getAccounting(String endpoint) {
+        return accountingRequest("GET", endpoint, null);
     }
-}
+
+    public ApiResponse postAccounting(String endpoint, JSONObject payload) {
+        return accountingRequest("POST", endpoint, payload);
+    }
+
+    private ApiResponse accountingRequest(String method, String endpoint, JSONObject payload) {
+        HttpURLConnection conn = null;
+        try {
+            String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
+            
+            // ✅ [إصلاح هام]: استخدام baseUrl الديناميكي بدلاً من الرابط الثابت
+            String fullUrl = normalizeBaseUrl(baseUrl) + ACCOUNTING_PREFIX + "/" + cleanEndpoint;
+            URL url = new URL(fullUrl);
+
+            if (!"https".equalsIgnoreCase(url.getProtocol())) {
+                Log.e(TAG, "SECURITY: accounting refused non-HTTPS");
+                return networkError("يُشترط اتصال HTTPS آمن");
+            }
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+
+            conn.setRequestMethod(method);
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("Accept", "application/json");
+
+            String apiKey = getEffectiveApiKey();
+            String token = getAuthToken();
+
+            if (!apiKey.isEmpty()) {
+                conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            }
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+                conn.setRequestProperty("X-MIRA-Auth-Token", token);
+            }
+
+            conn.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
+            conn.setReadTimeout(DEFAULT_READ_TIMEOUT);
+
+            if (payload != null) {
+                conn.setDoOutput(true);
+                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(input, 0, input.length);
+                }
+            }
+
+            if (com.example.uhf.BuildConfig.DEBUG) {
+                Log.d(TAG, "accounting " + method + ": " + url.getPath());
+            }
+
+            return buildResponse(conn);
+
+        } catch (Exception e) {
+            Log.e(TAG, "accountingRequest error: " + e.getClass().getSimpleName());
+            return networkError(e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
 
     // ==================== المصادقة ====================
     public ApiResponse login(String username, String password, String deviceId) {
@@ -803,28 +736,23 @@ private ApiResponse accountingRequest(String method, String endpoint,
             String authToken = response.data.optString("token", "");
             long expiresIn = response.data.optLong("expires_in", 0);
 
-            // 1. API Key
             if (!newApiKey.isEmpty()) {
                 sessionManager.saveApiKey(newApiKey);
                 serverConfig.setApiKey(newApiKey);
             }
 
-            // 2. Gate ID
             String effectiveGateId = !newGateId.isEmpty() ? newGateId
                     : (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
             if (!effectiveGateId.isEmpty()) {
-    sessionManager.saveGateId(effectiveGateId);
-    serverConfig.setGateId(effectiveGateId);
+                sessionManager.saveGateId(effectiveGateId);
+                serverConfig.setGateId(effectiveGateId);
 
-    // ✅ [v2.1] احفظ device_gate_id في MiraGatesSettings
-    // يستخدمه MiraSecureGateFragment في السجلات الأمنية
-    try {
-        MiraGatesSettings.getInstance(context)
-                .setDeviceGateId(effectiveGateId);
-    } catch (Exception ignored) {}
-}
+                try {
+                    MiraGatesSettings.getInstance(context)
+                            .setDeviceGateId(effectiveGateId);
+                } catch (Exception ignored) {}
+            }
 
-            // 3. Auth Token
             if (!authToken.isEmpty()) {
                 if (expiresIn > 0) {
                     sessionManager.saveAuthToken(authToken, expiresIn);
@@ -835,7 +763,6 @@ private ApiResponse accountingRequest(String method, String endpoint,
                 Log.d(TAG, "✅ Auth token saved (" + authToken.length() + " chars)");
             }
 
-            // 4. User info
             try {
                 String uname = response.data.optString("username", username);
                 String role = response.data.optString("role", "");
@@ -859,13 +786,9 @@ private ApiResponse accountingRequest(String method, String endpoint,
                 Log.e(TAG, "Save user info error: " + e.getMessage());
             }
 
-           // ✅ [v3.3 CRITICAL] refreshCredentials() SYNC
-           // يضمن أن apiKey + cachedToken جاهزان قبل عودة login()
-           // بدون هذا، UHFMainActivity.onCreate() يُطلق طلبات بـ apiKey فارغ → 401
            refreshCredentials();
 
         } else {
-            // ✅ إصلاح: إبطال Cache عند فشل login
             invalidateTokenCache();
         }
 
@@ -924,7 +847,6 @@ private ApiResponse accountingRequest(String method, String endpoint,
 
         ApiResponse response = postWithAuth("/auth/logout", payload); 
 
-        // ✅ تنظيف Cache
         invalidateTokenCache();
 
         try {
@@ -1278,136 +1200,108 @@ private ApiResponse accountingRequest(String method, String endpoint,
 
     // ==================== التصريح ====================
     public ApiResponse authorize(String epc, String contextType, JSONObject extraParams) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("epc", epc);
-        payload.put("gate_id", getEffectiveGateId());
-        payload.put("context", contextType != null ? contextType : "scan");
-
-        // ✅ [v3.2 SECURITY] اربط القرار بهوية المستخدم
-        try {
-            int userId = sessionManager.getUserId();
-            String username = sessionManager.getUsername();
-            if (userId > 0)  payload.put("user_id", userId);
-            if (username != null && !username.isEmpty()) {
-                payload.put("username", username);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "authorize: could not attach user identity");
-        }
-
-        if (extraParams != null) {
-            Iterator<String> keys = extraParams.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                payload.put(key, extraParams.get(key));
-            }
-        }
-    } catch (Exception ignored) {}
-
-    // ✅ [v3.2] postWithAuth — يرسل Bearer token + API key
-    return postWithAuth("/authorize", payload);
-}
-
-    // ═══════════════════════════════════════════════════════════
-//  📝 قيود التسوية — بعد اعتماد الإعداد
-// ═══════════════════════════════════════════════════════════
-
-/**
- * ✅ إنشاء قيد تسوية مخصص
- * 
- * @param payload {entry_date, reference, description, lines[]}
- */
-public ApiResponse createAdjustingEntry(JSONObject payload) {
-    return postAccounting("setup/adjusting-entry", payload);
-}
-
-/**
- * ✅ إضافة رصيد جديد (واجهة مبسطة)
- * 
- * @param type   cash|bank|gold|receivable|payable|fixed_asset|diamond
- * @param amount المبلغ (أو الوزن للذهب)
- * @param extra  {karat, description, account_id}
- */
-public ApiResponse addPostApprovalBalance(String type, double amount,
-                                          JSONObject extra) {
-    try {
         JSONObject payload = new JSONObject();
-        payload.put("type", type);
-        payload.put("amount", amount);
-        if (extra != null) {
-            if (extra.has("karat")) {
-                payload.put("karat", extra.optString("karat"));
+        try {
+            payload.put("epc", epc);
+            payload.put("gate_id", getEffectiveGateId());
+            payload.put("context", contextType != null ? contextType : "scan");
+
+            try {
+                int userId = sessionManager.getUserId();
+                String username = sessionManager.getUsername();
+                if (userId > 0)  payload.put("user_id", userId);
+                if (username != null && !username.isEmpty()) {
+                    payload.put("username", username);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "authorize: could not attach user identity");
             }
-            if (extra.has("description")) {
-                payload.put("description", extra.optString("description"));
+
+            if (extraParams != null) {
+                Iterator<String> keys = extraParams.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    payload.put(key, extraParams.get(key));
+                }
             }
-            if (extra.has("account_id")) {
-                payload.put("account_id", extra.optInt("account_id"));
-            }
-        }
-        return postAccounting("setup/add-balance", payload);
-    } catch (Exception e) {
-        Log.e(TAG, "addPostApprovalBalance error: " + e.getMessage());
-        return new ApiResponse(-1, null, e.getMessage());
+        } catch (Exception ignored) {}
+
+        return postWithAuth("/authorize", payload);
     }
-}
+
+    public ApiResponse createAdjustingEntry(JSONObject payload) {
+        return postAccounting("setup/adjusting-entry", payload);
+    }
+
+    public ApiResponse addPostApprovalBalance(String type, double amount, JSONObject extra) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("type", type);
+            payload.put("amount", amount);
+            if (extra != null) {
+                if (extra.has("karat")) {
+                    payload.put("karat", extra.optString("karat"));
+                }
+                if (extra.has("description")) {
+                    payload.put("description", extra.optString("description"));
+                }
+                if (extra.has("account_id")) {
+                    payload.put("account_id", extra.optInt("account_id"));
+                }
+            }
+            return postAccounting("setup/add-balance", payload);
+        } catch (Exception e) {
+            Log.e(TAG, "addPostApprovalBalance error: " + e.getMessage());
+            return new ApiResponse(-1, null, e.getMessage());
+        }
+    }
 
     // ==================== Ping ====================
-    /**
-     * ⚠️ Ping — SYNC
-     *
-     * ⚠️⚠️ تحذير: هذه الدالة Synchronous!
-     * - إذا استُدعيت من Main Thread → ANR!
-     * - استخدم pingApiAsync() من الواجهات
-     */
     public boolean pingApi() {
-    HttpURLConnection conn = null;
-    try {
-        String cleanUrl = this.apiUrl;
-        if (cleanUrl == null || cleanUrl.isEmpty()) {
-            return false;
-        }
-        if (cleanUrl.endsWith("/")) {
-            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
-        }
-
-        URL url = new URL(cleanUrl + "/ping");
-
-        // ✅ [SECURITY] HTTPS إجباري (localhost فقط في DEBUG)
-        if (!"https".equalsIgnoreCase(url.getProtocol())) {
-            String host = url.getHost();
-            boolean isLocal = "localhost".equals(host)
-                    || "127.0.0.1".equals(host)
-                    || "10.0.2.2".equals(host);
-            if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
-                Log.e(TAG, "SECURITY: ping refused non-HTTPS: " + host);
+        HttpURLConnection conn = null;
+        try {
+            String cleanUrl = this.apiUrl;
+            if (cleanUrl == null || cleanUrl.isEmpty()) {
                 return false;
             }
-            conn = (HttpURLConnection) url.openConnection();
-        } else {
-            HttpsURLConnection httpsConn =
-                    (HttpsURLConnection) url.openConnection();
-            CertificatePinningManager.applyPinning(httpsConn);
-            conn = httpsConn;
+            if (cleanUrl.endsWith("/")) {
+                cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+            }
+
+            URL url = new URL(cleanUrl + "/ping");
+
+            if (!"https".equalsIgnoreCase(url.getProtocol())) {
+                String host = url.getHost();
+                boolean isLocal = "localhost".equals(host)
+                        || "127.0.0.1".equals(host)
+                        || "10.0.2.2".equals(host);
+                if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
+                    Log.e(TAG, "SECURITY: ping refused non-HTTPS: " + host);
+                    return false;
+                }
+                conn = (HttpURLConnection) url.openConnection();
+            } else {
+                HttpsURLConnection httpsConn =
+                        (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            }
+
+            conn.setRequestMethod("GET");
+            applyStandardHeaders(conn, true);
+            conn.setConnectTimeout(PING_CONNECT_TIMEOUT);
+            conn.setReadTimeout(PING_READ_TIMEOUT);
+
+            int responseCode = conn.getResponseCode();
+            return responseCode >= 200 && responseCode < 400;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-
-        conn.setRequestMethod("GET");
-        applyStandardHeaders(conn, true);
-        conn.setConnectTimeout(PING_CONNECT_TIMEOUT);
-        conn.setReadTimeout(PING_READ_TIMEOUT);
-
-        int responseCode = conn.getResponseCode();
-        return responseCode >= 200 && responseCode < 400;
-    } catch (Exception e) {
-        return false;
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
 
     // ==================== لوحة التحكم ====================
-    
     public ApiResponse getDashboardSummary() {
         return getWithAuth("/dashboard/summary");
     }
@@ -1422,65 +1316,50 @@ public ApiResponse addPostApprovalBalance(String type, double amount,
         return getDashboardFull(0);
     }
     
-    // ✅ جديد: جلب الأسعار المعتمدة من السيرفر (للكاشير وبقية المستخدمين)
     public ApiResponse getDashboardGoldPrices() {
-    return getWithAuth("/dashboard/gold-prices");
-}
-
-    /**
- * ✅ [v4.0] Checkout مع Long Timeout + دعم local_uuid
- * 
- * ⚠️ مهم: لا نُضيف local_uuid عشوائياً هنا!
- *    يجب أن يمرّره المستدعي (MiraPosFragment) ليضمن نفس UUID
- *    عند إعادة المحاولة.
- */
-public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
-    try {
-        if (payload == null) payload = new JSONObject();
-        
-        // ✅ لا نضيف idempotency_key عشوائياً — يُمرَّر من المستدعي كـ local_uuid
-        
-        if (!payload.has("gate_id")) {
-            payload.put("gate_id", getEffectiveGateId());
-        }
-        
-        // ✅ Log للتشخيص (اختياري)
-        String localUuid = payload.optString("local_uuid", "");
-        if (!localUuid.isEmpty()) {
-            Log.d(TAG, "✅ Checkout with local_uuid: " + localUuid);
-        } else {
-            Log.w(TAG, "⚠️ Checkout WITHOUT local_uuid — offline retry غير محمي!");
-        }
-        
-    } catch (Exception e) {
-        Log.e(TAG, "checkout payload prep error: " + e.getMessage());
+        return getWithAuth("/dashboard/gold-prices");
     }
-    return executeRequest("POST", "pos/checkout", payload, true,
-            LONG_CONNECT_TIMEOUT, LONG_READ_TIMEOUT);
-}
 
-    /**
- * ✅ [v4.0] Checkout عادي + دعم local_uuid
- */
-public ApiResponse checkout(JSONObject payload) {
-    try {
-        if (payload == null) payload = new JSONObject();
-        
-        if (!payload.has("gate_id")) {
-            payload.put("gate_id", getEffectiveGateId());
+    public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
+        try {
+            if (payload == null) payload = new JSONObject();
+            
+            if (!payload.has("gate_id")) {
+                payload.put("gate_id", getEffectiveGateId());
+            }
+            
+            String localUuid = payload.optString("local_uuid", "");
+            if (!localUuid.isEmpty()) {
+                Log.d(TAG, "✅ Checkout with local_uuid: " + localUuid);
+            } else {
+                Log.w(TAG, "⚠️ Checkout WITHOUT local_uuid — offline retry غير محمي!");
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "checkout payload prep error: " + e.getMessage());
         }
-        
-        // ✅ لا نضيف local_uuid — يجب أن يمرّره المستدعي
-        String localUuid = payload.optString("local_uuid", "");
-        if (localUuid.isEmpty()) {
-            Log.w(TAG, "⚠️ Checkout without local_uuid");
-        }
-        
-    } catch (Exception e) {
-        Log.e(TAG, "checkout payload prep error: " + e.getMessage());
+        return executeRequest("POST", "pos/checkout", payload, true,
+                LONG_CONNECT_TIMEOUT, LONG_READ_TIMEOUT);
     }
-    return postWithAuth("/pos/checkout", payload);
-}
+
+    public ApiResponse checkout(JSONObject payload) {
+        try {
+            if (payload == null) payload = new JSONObject();
+            
+            if (!payload.has("gate_id")) {
+                payload.put("gate_id", getEffectiveGateId());
+            }
+            
+            String localUuid = payload.optString("local_uuid", "");
+            if (localUuid.isEmpty()) {
+                Log.w(TAG, "⚠️ Checkout without local_uuid");
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "checkout payload prep error: " + e.getMessage());
+        }
+        return postWithAuth("/pos/checkout", payload);
+    }
 
     public ApiResponse checkRefundEligibility(JSONObject payload) {
         try {
@@ -1491,29 +1370,23 @@ public ApiResponse checkout(JSONObject payload) {
         }
     }
 
-    /**
- * ✅ [v4.0] Refund + دعم local_uuid
- */
-public ApiResponse processRefund(JSONObject payload) {
-    try {
-        if (payload == null) payload = new JSONObject();
-        
-        if (!payload.has("gate_id")) {
-            payload.put("gate_id", getEffectiveGateId());
+    public ApiResponse processRefund(JSONObject payload) {
+        try {
+            if (payload == null) payload = new JSONObject();
+            
+            if (!payload.has("gate_id")) {
+                payload.put("gate_id", getEffectiveGateId());
+            }
+            
+            return postWithAuth("/pos/refund", payload);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "processRefund error: " + e.getMessage());
+            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            response.isNetworkError = true;
+            return response;
         }
-        
-        // ✅ لا نضيف idempotency_key — السيرفر يمنع الإرجاع المزدوج
-        //    من خلال UNIQUE(item_id) في جدول refund_items
-        
-        return postWithAuth("/pos/refund", payload);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "processRefund error: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-        response.isNetworkError = true;
-        return response;
     }
-}
 
     public ApiResponse processRefund(String epc, String serialNo, String reason) {
         JSONObject payload = new JSONObject();
@@ -1596,13 +1469,9 @@ public ApiResponse processRefund(JSONObject payload) {
                 + "&payment_method=" + paymentMethod);
     }
     
-    // ═══════════════════════════════════════════════════════════
-//  ✅ طرق الدفع (POS Payment Methods)
-// ═══════════════════════════════════════════════════════════
-
-public ApiResponse getPaymentMethods() {
-    return getWithAuth("/pos/payment-methods");
-}
+    public ApiResponse getPaymentMethods() {
+        return getWithAuth("/pos/payment-methods");
+    }
 
     public ApiResponse getSalesStats() {
         return getWithAuth("/pos/sales/stats");
@@ -1647,84 +1516,77 @@ public ApiResponse getPaymentMethods() {
     }
 
     // ==================== رفع الصور ====================
-    public ApiResponse uploadItemImage(int itemId, File imageFile,
-                                   boolean isPrimary, String altText) {
-    HttpURLConnection conn = null;
-    try {
-        String fullUrl = apiUrl + "items/" + itemId + "/images";
-        URL url = new URL(fullUrl);
+    public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + "items/" + itemId + "/images";
+            URL url = new URL(fullUrl);
 
-        // ✅ [SECURITY] HTTPS إجباري
-        if (!"https".equalsIgnoreCase(url.getProtocol())) {
-            String host = url.getHost();
-            boolean isLocal = "localhost".equals(host)
-                    || "127.0.0.1".equals(host)
-                    || "10.0.2.2".equals(host);
-            if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
-                Log.e(TAG, "SECURITY: uploadItemImage refused non-HTTPS: "
-                        + host);
-                return networkError("يُشترط اتصال HTTPS آمن");
-            }
-            conn = (HttpURLConnection) url.openConnection();
-        } else {
-            HttpsURLConnection httpsConn =
-                    (HttpsURLConnection) url.openConnection();
-            CertificatePinningManager.applyPinning(httpsConn);
-            conn = httpsConn;
-        }
-
-        conn.setRequestMethod("POST");
-        applyStandardHeaders(conn, true);
-        conn.setConnectTimeout(30_000);
-        conn.setReadTimeout(30_000);
-        conn.setDoOutput(true);
-
-        String boundary = "----MiraBoundary" + System.currentTimeMillis();
-        conn.setRequestProperty("Content-Type",
-                "multipart/form-data; boundary=" + boundary);
-
-        try (OutputStream os = conn.getOutputStream()) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("--").append(boundary).append("\r\n");
-            sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
-                    .append(imageFile.getName()).append("\"\r\n");
-            sb.append("Content-Type: image/jpeg\r\n\r\n");
-            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-
-            try (FileInputStream fis = new FileInputStream(imageFile)) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = fis.read(buffer)) != -1) {
-                    os.write(buffer, 0, bytesRead);
+            if (!"https".equalsIgnoreCase(url.getProtocol())) {
+                String host = url.getHost();
+                boolean isLocal = "localhost".equals(host)
+                        || "127.0.0.1".equals(host)
+                        || "10.0.2.2".equals(host);
+                if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
+                    Log.e(TAG, "SECURITY: uploadItemImage refused non-HTTPS: " + host);
+                    return networkError("يُشترط اتصال HTTPS آمن");
                 }
+                conn = (HttpURLConnection) url.openConnection();
+            } else {
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
             }
 
-            sb = new StringBuilder();
-            sb.append("\r\n--").append(boundary).append("\r\n");
-            sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
-            sb.append(isPrimary ? "1" : "0");
-            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+            conn.setRequestMethod("POST");
+            applyStandardHeaders(conn, true);
+            conn.setConnectTimeout(30_000);
+            conn.setReadTimeout(30_000);
+            conn.setDoOutput(true);
 
-            sb = new StringBuilder();
-            sb.append("\r\n--").append(boundary).append("\r\n");
-            sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
-            sb.append(altText != null ? altText : "");
-            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+            String boundary = "----MiraBoundary" + System.currentTimeMillis();
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
-            os.write(("\r\n--" + boundary + "--\r\n")
-                    .getBytes(StandardCharsets.UTF_8));
-            os.flush();
+            try (OutputStream os = conn.getOutputStream()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
+                        .append(imageFile.getName()).append("\"\r\n");
+                sb.append("Content-Type: image/jpeg\r\n\r\n");
+                os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+
+                try (FileInputStream fis = new FileInputStream(imageFile)) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = fis.read(buffer)) != -1) {
+                        os.write(buffer, 0, bytesRead);
+                    }
+                }
+
+                sb = new StringBuilder();
+                sb.append("\r\n--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
+                sb.append(isPrimary ? "1" : "0");
+                os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+
+                sb = new StringBuilder();
+                sb.append("\r\n--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
+                sb.append(altText != null ? altText : "");
+                os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+
+                os.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+                os.flush();
+            }
+
+            return buildResponse(conn);
+        } catch (Exception e) {
+            Log.e(TAG, "uploadItemImage error: " + e.getClass().getSimpleName());
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-
-        return buildResponse(conn);
-    } catch (Exception e) {
-        Log.e(TAG, "uploadItemImage error: "
-                + e.getClass().getSimpleName());
-        return new ApiResponse(-1, null, e.getMessage());
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
 
     // ==================== المخزون ====================
     public ApiResponse getLastSnapshot(String location) {
@@ -1907,7 +1769,7 @@ public ApiResponse getPaymentMethods() {
             payload.put("status", status != null ? status : "online");
             if (battery > 0) payload.put("battery", battery);
         } catch (Exception ignored) {}
-        return postWithAuth("/heartbeat", payload);  // ✅ بعد
+        return postWithAuth("/heartbeat", payload);
     }
 
     public ApiResponse getSettings() {
@@ -2025,9 +1887,6 @@ public ApiResponse getPaymentMethods() {
         return getWithAuth(url);
     }
 
-    /**
-     * ✅ جلب عدد التحويلات الواردة للفرع الحالي فقط
-     */
     public ApiResponse getIncomingTransfersCount() {
         return getWithAuth("/transfers/incoming/count");
     }
@@ -2092,29 +1951,32 @@ public ApiResponse getPaymentMethods() {
         return postWithAuth("/transfers/" + transferId + "/items", payload);
     }
 
-    // ==================== المحاسبة ====================
+    // ═══════════════════════════════════════════════════════════
+    //  ✅ المحاسبة (تم تغييرها لاستخدام accountingRequest بدلاً من getWithAuth)
+    // ═══════════════════════════════════════════════════════════
+    
     public ApiResponse getJournalEntries(String branchId) {
         String url = "/accounting/journal-entries";
         if (branchId != null && !branchId.isEmpty()) {
             url += "?branch_id=" + branchId;
         }
-        return getWithAuth(url);
+        return getAccounting(url); // ✅ تم التصحيح
     }
 
     public ApiResponse getJournalEntryDetail(String entryId) {
-        return getWithAuth("/accounting/journal-entries/" + entryId);
+        return getAccounting("/accounting/journal-entries/" + entryId); // ✅ تم التصحيح
     }
 
     public ApiResponse createJournalEntry(JSONObject payload) {
-        return postWithAuth("/accounting/journal-entries/create", payload);
+        return postAccounting("/accounting/journal-entries/create", payload); // ✅ تم التصحيح
     }
 
     public ApiResponse getChartOfAccounts() {
-        return getWithAuth("/accounting/chart-of-accounts");
+        return getAccounting("/accounting/chart-of-accounts"); // ✅ تم التصحيح
     }
 
     public ApiResponse createAccount(JSONObject payload) {
-        return postWithAuth("/accounting/chart-of-accounts/create", payload);
+        return postAccounting("/accounting/chart-of-accounts/create", payload); // ✅ تم التصحيح
     }
 
     public ApiResponse getTrialBalance(String branchId) {
@@ -2122,7 +1984,7 @@ public ApiResponse getPaymentMethods() {
         if (branchId != null && !branchId.isEmpty()) {
             url += "?branch_id=" + branchId;
         }
-        return getWithAuth(url);
+        return getAccounting(url); // ✅ تم التصحيح
     }
 
     public ApiResponse getAccountingSummary(String branchId) {
@@ -2130,7 +1992,7 @@ public ApiResponse getPaymentMethods() {
         if (branchId != null && !branchId.isEmpty()) {
             url += "?branch_id=" + branchId;
         }
-        return getWithAuth(url);
+        return getAccounting(url); // ✅ تم التصحيح
     }
 
     public AccountingApiService accounting() {
@@ -2151,27 +2013,27 @@ public ApiResponse getPaymentMethods() {
         if (voucherType != null && !voucherType.isEmpty()) {
             url += (hasParam ? "&" : "?") + "voucher_type=" + voucherType;
         }
-        return getWithAuth(url);
+        return getAccounting(url); // ✅ تم التصحيح
     }
 
     public ApiResponse createVoucher(JSONObject payload) {
-        return postWithAuth("/accounting/vouchers/create", payload);
+        return postAccounting("/accounting/vouchers/create", payload); // ✅ تم التصحيح
     }
 
     public ApiResponse getFiscalYears() {
-        return getWithAuth("/accounting/fiscal-years");
+        return getAccounting("/accounting/fiscal-years"); // ✅ تم التصحيح
     }
 
     public ApiResponse createFiscalYear(JSONObject payload) {
-        return postWithAuth("/accounting/fiscal-years/create", payload);
+        return postAccounting("/accounting/fiscal-years/create", payload); // ✅ تم التصحيح
     }
 
     public ApiResponse closeFiscalYear(int yearId) {
-        return postWithAuth("/accounting/fiscal-years/" + yearId + "/close", new JSONObject());
+        return postAccounting("/accounting/fiscal-years/" + yearId + "/close", new JSONObject()); // ✅ تم التصحيح
     }
 
     public ApiResponse getOpeningBalances() {
-        return getWithAuth("/accounting/opening-balances");
+        return getAccounting("/accounting/opening-balances"); // ✅ تم التصحيح
     }
 
     public ApiResponse setOpeningBalance(int accountId, double cashBalance, double goldBalance) {
@@ -2180,20 +2042,18 @@ public ApiResponse getPaymentMethods() {
             payload.put("account_id", accountId);
             payload.put("opening_balance", cashBalance);
             payload.put("opening_gold", goldBalance);
-            return postWithAuth("/accounting/opening-balances/set", payload);
+            return postAccounting("/accounting/opening-balances/set", payload); // ✅ تم التصحيح
         } catch (Exception e) {
             return new ApiResponse(-1, null, e.getMessage());
         }
     }
-/**
- * ✅ حالة الإعداد المحاسبي — تعيش على mira-gate/v1 (وليست mira/v2)
- * المسار الصحيح: /wp-json/mira-gate/v1/accounting/setup/status
- */
-public ApiResponse getAccountingSetupStatus() {
-    return getWithAuth("/accounting/setup/status");
+
+    public ApiResponse getAccountingSetupStatus() {
+    return getAccounting("/setup/status"); // ✅ المسار الصحيح
 }
+
     public ApiResponse getAccountingAuditLog() {
-        return getWithAuth("/accounting/audit-log?limit=50");
+        return getAccounting("/accounting/audit-log?limit=50"); // ✅ تم التصحيح
     }
 
     public ApiResponse getBalanceSheet(String branchId, String asOfDate) {
@@ -2206,7 +2066,7 @@ public ApiResponse getAccountingSetupStatus() {
         if (asOfDate != null && !asOfDate.isEmpty()) {
             url += (hasParam ? "&" : "?") + "as_of=" + asOfDate;
         }
-        return getWithAuth(url);
+        return getAccounting(url); // ✅ تم التصحيح
     }
 
     public ApiResponse getIncomeStatement(String branchId, String fromDate, String toDate) {
@@ -2214,7 +2074,7 @@ public ApiResponse getAccountingSetupStatus() {
         if (branchId != null && !branchId.isEmpty()) {
             url += "&branch_id=" + branchId;
         }
-        return getWithAuth(url);
+        return getAccounting(url); // ✅ تم التصحيح
     }
 
     public ApiResponse getGoldMovementReport(String branchId, String fromDate, String toDate) {
@@ -2222,7 +2082,7 @@ public ApiResponse getAccountingSetupStatus() {
         if (branchId != null && !branchId.isEmpty()) {
             url += "&branch_id=" + branchId;
         }
-        return getWithAuth(url);
+        return getAccounting(url); // ✅ تم التصحيح
     }
 
     public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
@@ -2241,7 +2101,7 @@ public ApiResponse getAccountingSetupStatus() {
             }
             if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
 
-            return getWithAuth(endpoint.toString());
+            return getAccounting(endpoint.toString()); // ✅ تم التصحيح
         } catch (Exception e) {
             return new ApiResponse(-1, null, e.getMessage());
         }
@@ -2391,9 +2251,6 @@ public ApiResponse getAccountingSetupStatus() {
         return postWithAuth("/activity/log", logEntry);
     }
 
-    /**
-     * ✅ إعادة قراءة URL من SessionManager
-     */
     public void refreshUrl() {
         try {
             String savedBaseUrl = sessionManager.getServerUrl();
@@ -2419,7 +2276,6 @@ public ApiResponse getAccountingSetupStatus() {
         return getWithAuth("/activity/logs?user_id=" + userId + "&limit=" + limit);
     }
 
-    // ==================== الدوال التجاوبية ====================
     public interface ApiCallback {
         void onSuccess(ApiResponse response);
         void onFailure(String errorMessage);
@@ -2455,7 +2311,6 @@ public ApiResponse getAccountingSetupStatus() {
         });
     }
 
-    // ==================== كلاس الاستجابة ====================
     public static class ApiResponse {
         public final int code;
         public final JSONObject data;
@@ -2472,7 +2327,6 @@ public ApiResponse getAccountingSetupStatus() {
             this.data = data;
             this.error = error;
             this.isSuccess = code >= 200 && code < 300;
-            // ✅ لا نُهيِّئ rawBody هنا — يُعيَّن صراحةً عند الحاجة عبر setBody()
             this.rawBody = null;
             this.message = (data != null) ? data.optString("message", "") : "";
         }
@@ -2509,7 +2363,6 @@ public ApiResponse getAccountingSetupStatus() {
         }
     }
 
-    // ==================== مصنع خيوط مسمّى ====================
     private static class NamedThreadFactory implements ThreadFactory {
         private final String prefix;
         private final AtomicInteger counter = new AtomicInteger(1);
@@ -2525,4 +2378,4 @@ public ApiResponse getAccountingSetupStatus() {
             return t;
         }
     }
-    }
+}
