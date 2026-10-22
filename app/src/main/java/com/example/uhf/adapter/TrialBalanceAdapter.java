@@ -110,4 +110,8 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
             tvCloseCredit = v.findViewById(R.id.tvCloseCredit);
         }
     }
+    // ✅ أضف هذه الدالة لجلب البيانات المفلترة لتصديرها
+public List<TrialBalanceDto.TrialBalanceRow> getItems() {
+    return items;
+}
 }
