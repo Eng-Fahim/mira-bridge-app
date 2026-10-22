@@ -20,8 +20,9 @@ import com.example.uhf.api.dto.TrialBalanceDto;
 import com.example.uhf.utils.DateHelper;
 import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
-// يجب أن يكون هناك واحد من هذين
 import com.example.uhf.adapter.TrialBalanceAdapter;
+
+import java.util.Locale;
 
 public class MiraTrialBalanceFragment extends Fragment {
 
@@ -59,16 +60,31 @@ public class MiraTrialBalanceFragment extends Fragment {
     private void render(TrialBalanceDto tb) {
         if (tb == null) return;
 
-        // KPIs
+        // ✅ 1. تحديث البطاقات العلوية (KPIs)
         kpiContainer.removeAllViews();
 
-        addKpi("مدين", NumberFormatter.moneyShort(tb.totalDebit), "#3498DB");
-        addKpi("دائن", NumberFormatter.moneyShort(tb.totalCredit), "#E74C3C");
-        addKpi("الحالة", tb.balanced ? "✅ متوازن" : "❌ غير متوازن",
+        // --- بطاقات مالية ---
+        addKpi("مدين (مالي)", NumberFormatter.moneyShort(tb.totalDebit), "#3498DB");
+        addKpi("دائن (مالي)", NumberFormatter.moneyShort(tb.totalCredit), "#E74C3C");
+        addKpi("الحالة المالية", tb.balanced ? "✅ متوازن" : "❌ غير متوازن",
                tb.balanced ? "#27AE60" : "#C0392B");
-        addKpi("الحسابات", String.valueOf(tb.rows != null ? tb.rows.size() : 0), "#9B59B6");
 
-        // الجدول
+        // --- بطاقات الذهب (الجديدة) ---
+        // استخدام دالة مساعدة لتنسيق الأوزان
+        String gDebitStr = String.format(Locale.US, "%.3f g", tb.totalGoldDebit);
+        String gCreditStr = String.format(Locale.US, "%.3f g", tb.totalGoldCredit);
+        
+        // التحقق من توازن الذهب (الفرق أقل من 0.001 جرام)
+        boolean goldBalanced = Math.abs(tb.totalGoldDebit - tb.totalGoldCredit) < 0.001;
+
+        addKpi("ذهب مدين", gDebitStr, "#D4AF37"); // لون ذهبي
+        addKpi("ذهب دائن", gCreditStr, "#D4AF37"); // لون ذهبي
+        addKpi("الحالة الذهبية", goldBalanced ? "✅ متوازن" : "❌ غير متوازن",
+               goldBalanced ? "#27AE60" : "#C0392B");
+
+        addKpi("عدد الحسابات", String.valueOf(tb.rows != null ? tb.rows.size() : 0), "#9B59B6");
+
+        // ✅ 2. الجدول
         if (tb.rows != null && !tb.rows.isEmpty()) {
             adapter.setItems(tb.rows);
             tvEmpty.setVisibility(View.GONE);
