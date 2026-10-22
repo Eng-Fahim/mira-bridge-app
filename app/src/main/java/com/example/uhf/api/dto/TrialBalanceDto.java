@@ -66,7 +66,7 @@ public class TrialBalanceDto {
         @SerializedName("is_leaf")
         public boolean isLeaf;
         
-        // ✅ الحقول الجديدة التي طلبها البروفيسور (أول المدة، حركة الفترة، آخر المدة)
+        // ✅ الحقول الجديدة التي طلبها البروفيسور
         @SerializedName("opening_debit")   public double openingDebit;
         @SerializedName("opening_credit")  public double openingCredit;
         @SerializedName("period_debit")    public double periodDebit;
