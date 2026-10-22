@@ -1426,13 +1426,15 @@ private void parseItemResponse(String code, JSONObject data, String source) {
         }
         cartItem.tid = tid;
 
-        String rfidEpcFromServer = extractString(item, "rfid_epc", "epc_final");
-        if (!rfidEpcFromServer.isEmpty()) {
-            cartItem.rfidEpc = rfidEpcFromServer;
-            cartItem.epc = rfidEpcFromServer;
-        } else {
-            cartItem.rfidEpc = code;
-        }
+        String rfidEpcFromServer = extractString(item, "rfid_epc", "epc_final", "epc");
+if (!rfidEpcFromServer.isEmpty()) {
+    cartItem.rfidEpc = rfidEpcFromServer;
+    cartItem.epc = rfidEpcFromServer;
+} else {
+    // إذا مسحنا الباركود ولا يوجد EPC، نضع الـ Serial كمرجع مؤقت
+    cartItem.rfidEpc = cartItem.serialNo.isEmpty() ? code : cartItem.serialNo;
+    cartItem.epc = cartItem.serialNo.isEmpty() ? code : cartItem.serialNo;
+}
 
         boolean alreadyInCart = cartManager != null
                 && cartManager.containsItem(cartItem.epc, cartItem.serialNo, cartItem.gtin);
@@ -1785,11 +1787,22 @@ private void resetHeroAfterDelay() {
     }
 
     @NonNull
-    private List<String> buildSearchCandidates(@NonNull String code) {
-        List<String> candidates = new ArrayList<>();
-        candidates.add(code);
-        return candidates;
+private List<String> buildSearchCandidates(@NonNull String code) {
+    List<String> candidates = new ArrayList<>();
+    candidates.add(code);
+    
+    // ✅ [FIX] إذا كان الكود عبارة عن أرقام فقط (مثل 1234)، أضف البادئات للبحث عنها
+    if (looksLikePartialSerial(code)) {
+        for (String prefix : SERIAL_PREFIXES) {
+            String candidate = prefix + code;
+            if (!candidates.contains(candidate)) {
+                candidates.add(candidate);
+            }
+        }
     }
+    
+    return candidates;
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  Utilities
@@ -3262,61 +3275,57 @@ private String extractCodeForRefund(JSONObject data) {
     }
 
     private String[] parseGs1OrQr(String raw) {
-        if (raw == null) return new String[]{"", "empty"};
-        String data = raw.trim();
-        if (data.isEmpty()) return new String[]{"", "empty"};
+    if (raw == null) return new String[]{"", "empty"};
+    String data = raw.trim();
+    if (data.isEmpty()) return new String[]{"", "empty"};
 
-        if (data.startsWith("]d") || data.startsWith("]Q")
-                || data.startsWith("]e") || data.startsWith("]C")
-                || data.startsWith("]D") || data.startsWith("]A")) {
-            data = data.substring(3).trim();
-        }
-
-        if (data.startsWith("{")) {
-            try {
-                JSONObject json = new JSONObject(data);
-                String serial = json.optString("serial",
-                        json.optString("serial_number", json.optString("sn", "")));
-                if (!serial.isEmpty()) return new String[]{serial, "qr_json"};
-                String gtin = json.optString("gtin", json.optString("gtin13", ""));
-                if (!gtin.isEmpty()) return new String[]{gtin, "qr_json"};
-            } catch (Exception ignored) {}
-        }
-
-        if (data.startsWith("http://") || data.startsWith("https://")) {
-            try {
-                android.net.Uri uri = android.net.Uri.parse(data);
-                String serial = uri.getQueryParameter("serial");
-                if (serial == null) serial = uri.getQueryParameter("sn");
-                if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
-                String gtin = uri.getQueryParameter("gtin");
-                if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
-                String last = uri.getLastPathSegment();
-                if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
-            } catch (Exception ignored) {}
-        }
-
-        String gs1 = data.replace('\u001D', '|').replace("(#)", "|");
-
-        java.util.regex.Matcher mSerial = java.util.regex.Pattern
-                .compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)")
-                .matcher(gs1);
-        if (mSerial.find()) {
-            String serial = mSerial.group(1);
-            if (serial != null && !serial.isEmpty()) return new String[]{serial, "gs1_serial"};
-        }
-
-        java.util.regex.Matcher mGtin = java.util.regex.Pattern
-                .compile("(?:^|\\|)01(\\d{14})")
-                .matcher(gs1);
-        if (mGtin.find()) {
-            String gtin = mGtin.group(1);
-            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "gs1_gtin"};
-        }
-
-        return new String[]{data, "raw"};
+    // إزالة بادئات الباركود اللاسلكية إن وجدت
+    if (data.startsWith("]d") || data.startsWith("]Q")
+            || data.startsWith("]e") || data.startsWith("]C")
+            || data.startsWith("]D") || data.startsWith("]A")) {
+        data = data.substring(3).trim();
     }
 
+    // التعامل مع روابط QR
+    if (data.startsWith("http://") || data.startsWith("https://")) {
+        try {
+            android.net.Uri uri = android.net.Uri.parse(data);
+            String serial = uri.getQueryParameter("serial");
+            if (serial == null) serial = uri.getQueryParameter("sn");
+            if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
+            String gtin = uri.getQueryParameter("gtin");
+            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
+            String last = uri.getLastPathSegment();
+            if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
+        } catch (Exception ignored) {}
+    }
+
+    // ✅ [FIX] تنظيف الأقواس (21) وتحويلها إلى |21 ليتعرف عليها الـ Regex
+    String gs1 = data.replace('\u001D', '|')
+                     .replace("(#)", "|")
+                     .replace("(21)", "|21") // حل مشكلة الباركود المطبوع بأقواس
+                     .replace("(01)", "|01"); 
+
+    // البحث عن الرقم التسلسلي (AI 21)
+    java.util.regex.Matcher mSerial = java.util.regex.Pattern
+            .compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)")
+            .matcher(gs1);
+    if (mSerial.find()) {
+        String serial = mSerial.group(1);
+        if (serial != null && !serial.isEmpty()) return new String[]{serial, "gs1_serial"};
+    }
+
+    // البحث عن GTIN (AI 01)
+    java.util.regex.Matcher mGtin = java.util.regex.Pattern
+            .compile("(?:^|\\|)01(\\d{14})")
+            .matcher(gs1);
+    if (mGtin.find()) {
+        String gtin = mGtin.group(1);
+        if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "gs1_gtin"};
+    }
+
+    return new String[]{data, "raw"};
+}
     // ═══════════════════════════════════════════════════════════════════
     //  Offline Sync
     // ═══════════════════════════════════════════════════════════════════
