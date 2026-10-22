@@ -144,7 +144,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private volatile int savedPowerBeforeScan = -1;
     @Nullable private Runnable scanRetryRunnable;
     private static final long SCAN_RETRY_INTERVAL_MS = 5000;
-    private static final int SCAN_POWER_DBM = 18;  // قوة مسح معقولة (عادة 5-30)
+    private static final int SCAN_POWER_DBM = 26; // زيادة القوة لضمان القراءة اللحظية
     /** عدّاد الجيل — يُبطل أي callback قديم */
     private final AtomicInteger scanGeneration = new AtomicInteger(0);
     /** هل القارئ في طور المسح النشط؟ */
@@ -831,57 +831,54 @@ public void onTagRead(String epc, int rssi) {
     }
 
     tagReceivedThisScan = true;
-    final String receivedEpc = epc.trim().toUpperCase(Locale.US);
+final String receivedEpc = epc.trim().toUpperCase(Locale.US);
 
-    Log.i(TAG, "📡 Tag received, stopping scan immediately: " 
-        + maskEpc(receivedEpc));
+Log.i(TAG, "📡 Tag received, stopping scan immediately: " 
+    + maskEpc(receivedEpc));
 
-    // ✅ 1) استعادة القوة (خارج safeRun — مستقل عن UI)
+// ✅ 1) أعد تعيين isTriggerDown
+isTriggerDown = false;
+
+// ✅ 2) اقرأ TID أولاً (بينما القوة لا تزال عالية 26dBm والشريحة في مجال القارئ)
+if (miraExecutor == null) {
+    stopRfidScanningMode();
+    restorePowerForEncoding();
+    isProcessingTag.set(false);
+    return;
+}
+
+miraExecutor.getBackgroundExecutor().execute(() -> {
+    String tid = null;
+    try {
+        // تم إزالة Thread.sleep(50) لأنه كان يسبب تأخيراً
+        tid = MiraRfidService.getInstance(appContext).readTid(null);
+    } catch (Exception e) {
+        Log.w(TAG, "readTid failed", e);
+    }
+
+    // ✅ 3) بعد قراءة الـ TID، الآن نوقف المسح ونخفض القوة
+    stopRfidScanningMode();
     restorePowerForEncoding();
 
-    // ✅ 2) إيقاف المسح فوراً (خارج safeRun)
-    stopRfidScanningMode();
-
-    // ✅ 3) [CRITICAL FIX] أعد تعيين isTriggerDown — المفتاح!
-    isTriggerDown = false;
-
-    // ✅ 4) اقرأ TID على الخلفية
-    if (miraExecutor == null) {
+    if (tid == null || tid.trim().isEmpty()) {
+        Log.e(TAG, "❌ TID read failed");
         isProcessingTag.set(false);
+        safeRun(() -> {
+            playErrorSound();
+            showErrorDialog(
+                    isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
+                    isArabic
+                            ? "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
+                            : "Cannot read tag TID.\n\n💡 Move tag closer and retry.");
+        });
         return;
     }
 
-    miraExecutor.getBackgroundExecutor().execute(() -> {
-        try {
-            Thread.sleep(50);
-        } catch (InterruptedException ignored) {}
-
-        String tid = null;
-        try {
-            tid = MiraRfidService.getInstance(appContext).readTid(null);
-        } catch (Exception e) {
-            Log.w(TAG, "readTid failed", e);
-        }
-
-        if (tid == null || tid.trim().isEmpty()) {
-            Log.e(TAG, "❌ TID read failed");
-            isProcessingTag.set(false);
-            safeRun(() -> {
-                playErrorSound();
-                showErrorDialog(
-                        isArabic ? "❌ فشل قراءة TID" : "❌ TID Read Failed",
-                        isArabic
-                                ? "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
-                                : "Cannot read tag TID.\n\n💡 Move tag closer and retry.");
-            });
-            return;
-        }
-
-                final String finalTid = tid.trim().toUpperCase(Locale.US);
-        lastScannedTid = finalTid; // ✅ حفظ الـ TID لاستخدامه لاحقاً دون الحاجة للشريحة
-        secureLog("✅ TID read: " + maskEpc(finalTid));
-        safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
-    });
+    final String finalTid = tid.trim().toUpperCase(Locale.US);
+    lastScannedTid = finalTid; // ✅ حفظ الـ TID
+    secureLog("✅ TID read: " + maskEpc(finalTid));
+    safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
+});
 }
             @Override public void onScanStarted() {}
             @Override public void onScanStopped() {}
