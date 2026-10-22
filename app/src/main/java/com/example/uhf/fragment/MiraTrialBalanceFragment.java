@@ -1,5 +1,6 @@
 package com.example.uhf.fragment;
 
+import android.app.DatePickerDialog;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
@@ -7,6 +8,7 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -28,6 +30,7 @@ import com.example.uhf.adapter.TrialBalanceAdapter;
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
@@ -39,12 +42,16 @@ public class MiraTrialBalanceFragment extends Fragment {
     private RecyclerView rvRows;
     private TextView tvEmpty;
     private EditText etSearch;
+    private Button btnFilterDate;
     private TabLayout tabLayout;
     private TrialBalanceAdapter adapter;
     
-    // لتخزين البيانات الأصلية لفلترتها بالبحث
     private List<TrialBalanceDto.TrialBalanceRow> originalRows = new ArrayList<>();
-    private boolean isGoldView = false; // false = مالي، true = ذهبي
+    private boolean isGoldView = false;
+
+    // متغيرات التاريخ
+    private String currentFromDate;
+    private String currentToDate;
 
     @Nullable
     @Override
@@ -57,25 +64,28 @@ public class MiraTrialBalanceFragment extends Fragment {
         rvRows = v.findViewById(R.id.rvRows);
         tvEmpty = v.findViewById(R.id.tvEmpty);
         etSearch = v.findViewById(R.id.etSearch);
+        btnFilterDate = v.findViewById(R.id.btnFilterDate);
         tabLayout = v.findViewById(R.id.tabLayout);
 
         viewModel = new ViewModelProvider(this).get(AccountingViewModel.class);
 
+        // إعداد التواريخ الافتراضية (بداية السنة حتى اليوم)
+        currentFromDate = DateHelper.startOfYearApi();
+        currentToDate = DateHelper.todayApi();
+        updateDateButtonText();
+
         adapter = new TrialBalanceAdapter();
-        // ✅ إضافة مستمع للنقر على الحساب (Drill-down)
         adapter.setOnItemClickListener(row -> {
             if (getActivity() != null) {
                 Toast.makeText(getContext(), "جاري فتح حركات الحساب: " + row.accountNameAr, Toast.LENGTH_SHORT).show();
-                // هنا يتم الانتقال لشاشة دفتر الأستاذ (General Ledger)
-                // MiraGeneralLedgerFragment ledgerFrag = MiraGeneralLedgerFragment.newInstance(row.accountId);
-                // getActivity().getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, ledgerFrag).addToBackStack(null).commit();
+                // يمكنك تفعيل الانتقال لدفتر الأستاذ هنا لاحقاً
             }
         });
 
         rvRows.setLayoutManager(new LinearLayoutManager(getContext()));
         rvRows.setAdapter(adapter);
 
-        // ✅ مستمع البحث
+        // مستمع البحث
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -84,12 +94,11 @@ public class MiraTrialBalanceFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        // ✅ مستمع تبديل التبويبات (مالي / ذهب)
+        // مستمع تبديل التبويبات
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 isGoldView = (tab.getPosition() == 1);
-                // تغيير ألوان البطاقات أو إخفاء المالية منها حسب التبويب
                 if (viewModel.getTrialBalance().getValue() != null) {
                     renderKPIs(viewModel.getTrialBalance().getValue());
                 }
@@ -98,11 +107,47 @@ public class MiraTrialBalanceFragment extends Fragment {
             @Override public void onTabReselected(TabLayout.Tab tab) {}
         });
 
+        // ✅ مستمع زر الفترة (Date Picker)
+        btnFilterDate.setOnClickListener(v1 -> showDateRangePicker());
+
         viewModel.getTrialBalance().observe(getViewLifecycleOwner(), this::render);
 
-        viewModel.loadTrialBalance(DateHelper.startOfYearApi(), DateHelper.todayApi(), 0);
+        // تحميل البيانات لأول مرة
+        viewModel.loadTrialBalance(currentFromDate, currentToDate, 0);
 
         return v;
+    }
+
+    private void showDateRangePicker() {
+        Calendar cal = Calendar.getInstance();
+        
+        // اختيار تاريخ البداية
+        new DatePickerDialog(requireContext(), (view, year, month, dayOfMonth) -> {
+            Calendar startCal = Calendar.getInstance();
+            startCal.set(year, month, dayOfMonth);
+            
+            // بعد اختيار البداية، نفتح نافذة لاختيار النهاية
+            new DatePickerDialog(requireContext(), (view2, year2, month2, dayOfMonth2) -> {
+                Calendar endCal = Calendar.getInstance();
+                endCal.set(year2, month2, dayOfMonth2);
+
+                // تنسيق التواريخ بصيغة YYYY-MM-DD
+                currentFromDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                currentToDate = String.format(Locale.US, "%04d-%02d-%02d", year2, month2 + 1, dayOfMonth2);
+
+                updateDateButtonText();
+                viewModel.loadTrialBalance(currentFromDate, currentToDate, 0);
+                
+            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void updateDateButtonText() {
+        // عرض التاريخ بشكل مختصر على الزر
+        String shortFrom = currentFromDate.substring(5); // إزالة السنة
+        String shortTo = currentToDate.substring(5);
+        btnFilterDate.setText(shortFrom + " إلى " + shortTo);
     }
 
     private void render(TrialBalanceDto tb) {
@@ -110,23 +155,20 @@ public class MiraTrialBalanceFragment extends Fragment {
 
         originalRows = tb.rows != null ? tb.rows : new ArrayList<>();
         renderKPIs(tb);
-        filterData(etSearch.getText().toString()); // تطبيق فلتر البحث إن وجد
+        filterData(etSearch.getText().toString());
     }
 
     private void renderKPIs(TrialBalanceDto tb) {
         kpiContainer.removeAllViews();
 
-        // بطاقات مشتركة
         addKpi("عدد الحسابات", String.valueOf(tb.rows != null ? tb.rows.size() : 0), "#9B59B6");
 
         if (!isGoldView) {
-            // --- تبويب المالي ---
             addKpi("مدين (مالي)", NumberFormatter.moneyShort(tb.totalDebit), "#3498DB");
             addKpi("دائن (مالي)", NumberFormatter.moneyShort(tb.totalCredit), "#E74C3C");
             addKpi("الحالة المالية", tb.balanced ? "✅ متوازن" : "❌ غير متوازن",
                    tb.balanced ? "#27AE60" : "#C0392B");
         } else {
-            // --- تبويب الذهب ---
             String gDebitStr = String.format(Locale.US, "%.3f g", tb.totalGoldDebit);
             String gCreditStr = String.format(Locale.US, "%.3f g", tb.totalGoldCredit);
             boolean goldBalanced = Math.abs(tb.totalGoldDebit - tb.totalGoldCredit) < 0.001;
