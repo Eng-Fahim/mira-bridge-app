@@ -109,6 +109,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private static final boolean ENABLE_TID_LENGTH_VALIDATION = true;
 
     private DesktopScanHandler desktopScanHandler;
+    
+    private volatile String lastScannedTid = "";
 
     private static final int KEYCODE_TRIGGER_1 = 139;
     private static final int KEYCODE_TRIGGER_2 = 280;
@@ -875,7 +877,8 @@ public void onTagRead(String epc, int rssi) {
             return;
         }
 
-        final String finalTid = tid.trim().toUpperCase(Locale.US);
+                final String finalTid = tid.trim().toUpperCase(Locale.US);
+        lastScannedTid = finalTid; // ✅ حفظ الـ TID لاستخدامه لاحقاً دون الحاجة للشريحة
         secureLog("✅ TID read: " + maskEpc(finalTid));
         safeRun(() -> processReceivedTagWithTid(receivedEpc, finalTid));
     });
@@ -1121,7 +1124,7 @@ private void processReceivedTagWithTid(final String epc,
         }
 
         final String finalTid = actualTid;
-
+        lastScannedTid = finalTid; // ✅ تأكيد حفظ الـ TID
         // فحص طول TID
         if (!isTidSkipped && ENABLE_TID_LENGTH_VALIDATION) {
             if (finalTid.length() < MIN_TID_LENGTH || finalTid.length() > MAX_TID_LENGTH) {
@@ -2045,19 +2048,25 @@ private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, Str
                 try {
                     MiraRfidService rfidSvc = MiraRfidService.getInstance(appContext);
 
-                    if (isDesktopScan) {
-                        tidFromTagWorking = "";
-                        epcFromTagWorking = lastScannedEpc;
-                        isSim = false;
-                        Log.i(TAG, "🖥️ Desktop scan — no TID");
-                    } else {
-                        tidFromTagWorking = rfidSvc.readTid(null);
-                        epcFromTagWorking = lastScannedEpc;
-                        if (epcFromTagWorking == null || epcFromTagWorking.isEmpty()) {
-                            epcFromTagWorking = rfidSvc.readEpc(null);
-                        }
-                        isSim = rfidService_isSimulation(rfidSvc);
-                    }
+                    // استبدل هذا الجزء:
+if (isDesktopScan) {
+    tidFromTagWorking = "";
+    epcFromTagWorking = lastScannedEpc;
+    isSim = false;
+    Log.i(TAG, "🖥️ Desktop scan — no TID");
+} else {
+    // ❌ السطر القديم الذي يسبب المشكلة:
+    // tidFromTagWorking = rfidSvc.readTid(null); 
+    
+    // ✅ السطر الجديد:
+    tidFromTagWorking = lastScannedTid; 
+    
+    epcFromTagWorking = lastScannedEpc;
+    if (epcFromTagWorking == null || epcFromTagWorking.isEmpty()) {
+        epcFromTagWorking = identifier;
+    }
+    isSim = rfidService_isSimulation(rfidSvc);
+}
                 } catch (Exception e) {
                     Log.e(TAG, "Read TID/EPC error", e);
                 }
@@ -2285,8 +2294,21 @@ private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, Str
                     }
 
                     final String finalServerEpc = serverEpc;
-                    final String finalServerSerial = (finalResponseData != null)
-                            ? finalResponseData.optString("serial_number", "") : "";
+                    String serialTemp = "";
+String miraIdTemp = "";
+if (finalResponseData != null) {
+    serialTemp = finalResponseData.optString("serial_number", "");
+    if (serialTemp.isEmpty()) serialTemp = finalResponseData.optString("serial", "");
+    
+    miraIdTemp = finalResponseData.optString("mira_id", "");
+    if (miraIdTemp.isEmpty()) miraIdTemp = finalResponseData.optString("miraId", "");
+    
+    // إذا لم يرجع السيرفر السيريال، نستخدم MIRA ID
+    if (serialTemp.isEmpty() && !miraIdTemp.isEmpty()) {
+        serialTemp = miraIdTemp;
+    }
+}
+final String finalServerSerial = serialTemp;
 
                     safeRun(() -> {
                         dismissDialog(activeLoadingDialog);
@@ -2307,8 +2329,10 @@ private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, Str
                         if (displayEpc.isEmpty()) displayEpc = finalNewEpc;
 
                         String shortBarcode = finalServerSerial;
-                        if (shortBarcode.isEmpty()) shortBarcode = finalIdentifier;
-
+if (shortBarcode.isEmpty() || !shortBarcode.startsWith("MIRA-SN-")) {
+    // توليد رقم مؤقت بدلاً من طباعة الـ EPC
+    shortBarcode = "MIRA-SN-TEMP-" + System.currentTimeMillis(); 
+}
                         String gs1Code = "(21)" + shortBarcode;
                         String qrUrl = "https://sa.mirabarcode.com/" + shortBarcode;
 
@@ -2853,6 +2877,7 @@ private String verifyTagWithServerBeforeEncodingSync(String tid, String epc, Str
     private void resetFormForNextScan() {
         isEpcBound = false;
         lastScannedEpc = "";
+        lastScannedTid = ""; 
         isProcessingTag.set(false);
         isTriggerDown = false;
 
@@ -3569,7 +3594,7 @@ public void onResume() {
     isRfidScanning = false;
     tagReceivedThisScan = false;
     scanGeneration.incrementAndGet();
-
+    lastScannedTid = ""; 
     if (stoppingReader.get()) {
         stoppingReader.set(false);
         Log.w(TAG, "⚠️ Force-reset stoppingReader on resume");
