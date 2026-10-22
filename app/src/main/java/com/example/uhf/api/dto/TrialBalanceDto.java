@@ -62,5 +62,13 @@ public class TrialBalanceDto {
         
         @SerializedName("gold_balance")
         public double goldBalance;
+        
+        // ✅ الحقول الجديدة التي طلبها البروفيسور (أول المدة، حركة الفترة، آخر المدة)
+        @SerializedName("opening_debit")   public double openingDebit;
+        @SerializedName("opening_credit")  public double openingCredit;
+        @SerializedName("period_debit")    public double periodDebit;
+        @SerializedName("period_credit")   public double periodCredit;
+        @SerializedName("closing_debit")   public double closingDebit;
+        @SerializedName("closing_credit")  public double closingCredit;
     }
 }
