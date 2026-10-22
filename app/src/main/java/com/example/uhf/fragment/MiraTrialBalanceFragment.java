@@ -31,6 +31,7 @@ import com.example.uhf.adapter.TrialBalanceAdapter;
 import com.example.uhf.api.dto.TrialBalanceDto;
 import com.example.uhf.utils.DateHelper;
 import com.example.uhf.utils.NumberFormatter;
+import com.example.uhf.utils.TrialBalanceCsvExporter; // ✅ تم إضافة هذا السطر
 import com.example.uhf.viewmodel.AccountingViewModel;
 import com.google.android.material.tabs.TabLayout;
 
@@ -47,13 +48,12 @@ public class MiraTrialBalanceFragment extends Fragment {
     private RecyclerView rvRows;
     private TextView tvEmpty;
     private EditText etSearch;
-    private Button btnFilterDate;
+    private Button btnFilterDate, btnExport;
     private TabLayout tabLayout;
     private CheckBox cbLeafOnly;
     private Spinner spinnerBranch;
     private ProgressBar pbLoading;
     private TrialBalanceAdapter adapter;
-    private Button btnExport;
     
     private List<TrialBalanceDto.TrialBalanceRow> originalRows = new ArrayList<>();
     private boolean isGoldView = false;
@@ -69,6 +69,7 @@ public class MiraTrialBalanceFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_trial_balance, container, false);
 
+        // ربط العناصر
         kpiContainer = v.findViewById(R.id.kpiContainer);
         rvRows = v.findViewById(R.id.rvRows);
         tvEmpty = v.findViewById(R.id.tvEmpty);
@@ -85,7 +86,7 @@ public class MiraTrialBalanceFragment extends Fragment {
         currentFromDate = DateHelper.startOfYearApi();
         currentToDate = DateHelper.todayApi();
         updateDateButtonText();
-        setupBranchSpinner(); // ✅ إعداد قائمة الفروع
+        setupBranchSpinner();
 
         adapter = new TrialBalanceAdapter();
         adapter.setOnItemClickListener(row -> {
@@ -136,18 +137,22 @@ public class MiraTrialBalanceFragment extends Fragment {
         });
 
         btnFilterDate.setOnClickListener(v1 -> showDateRangePicker());
-        
-        btnExport.setOnClickListener(v1 -> {
-        if (adapter != null && adapter.getItemCount() > 0) {
-        // جلب البيانات المفلترة الحالية من الـ Adapter
-        List<TrialBalanceDto.TrialBalanceRow> currentDisplayedRows = adapter.getItems();
-        TrialBalanceCsvExporter.exportAndShare(requireContext(), currentDisplayedRows, currentFromDate, currentToDate);
-    } else {
-        Toast.makeText(getContext(), "لا توجد بيانات لتصديرها", Toast.LENGTH_SHORT).show();
-    }
-    });
 
-        // ✅ مراقبة حالة التحميل
+        // ✅ برمجة زر التصدير
+        btnExport.setOnClickListener(v1 -> {
+            List<TrialBalanceDto.TrialBalanceRow> currentDisplayedRows = adapter.getItems();
+            if (currentDisplayedRows != null && !currentDisplayedRows.isEmpty()) {
+                TrialBalanceCsvExporter.exportAndShare(
+                    requireContext(), 
+                    currentDisplayedRows, 
+                    currentFromDate, 
+                    currentToDate
+                );
+            } else {
+                Toast.makeText(getContext(), "لا توجد بيانات لتصديرها", Toast.LENGTH_SHORT).show();
+            }
+        });
+
         viewModel.getLoading().observe(getViewLifecycleOwner(), isLoading -> {
             if (pbLoading != null) {
                 pbLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
@@ -162,12 +167,9 @@ public class MiraTrialBalanceFragment extends Fragment {
     }
 
     private void setupBranchSpinner() {
-        // هنا نفترض أن لديك دالة تجلب الفروع، أو سنضع خيار "كل الفروع" فقط مؤقتاً
-        // إذا كان لديك MiraBranchesManager، يمكنك جلب الفروع منه ووضعها في القائمة
         List<String> branches = new ArrayList<>();
         branches.add("كل الفروع");
-        branches.add("الفرع الرئيسي"); // مثال
-        // branches.add("فرع تعز"); // مثال
+        branches.add("الفرع الرئيسي"); 
 
         ArrayAdapter<String> branchAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, branches);
         branchAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -176,9 +178,8 @@ public class MiraTrialBalanceFragment extends Fragment {
         spinnerBranch.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                // إذا كان لديك معرفات حقيقية للفروع، نضعها هنا. نفترض أن 0 هو كل الفروع.
-                currentBranchId = (position == 0) ? 0 : position; // مجرد مثال
-                loadData(); // إعادة التحميل عند تغيير الفرع
+                currentBranchId = (position == 0) ? 0 : position; 
+                loadData(); 
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
