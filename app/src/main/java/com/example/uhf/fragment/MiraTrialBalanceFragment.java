@@ -53,6 +53,7 @@ public class MiraTrialBalanceFragment extends Fragment {
     private Spinner spinnerBranch;
     private ProgressBar pbLoading;
     private TrialBalanceAdapter adapter;
+    private Button btnExport;
     
     private List<TrialBalanceDto.TrialBalanceRow> originalRows = new ArrayList<>();
     private boolean isGoldView = false;
@@ -73,6 +74,7 @@ public class MiraTrialBalanceFragment extends Fragment {
         tvEmpty = v.findViewById(R.id.tvEmpty);
         etSearch = v.findViewById(R.id.etSearch);
         btnFilterDate = v.findViewById(R.id.btnFilterDate);
+        btnExport = v.findViewById(R.id.btnExport);
         tabLayout = v.findViewById(R.id.tabLayout);
         cbLeafOnly = v.findViewById(R.id.cbLeafOnly);
         spinnerBranch = v.findViewById(R.id.spinnerBranch);
@@ -134,6 +136,16 @@ public class MiraTrialBalanceFragment extends Fragment {
         });
 
         btnFilterDate.setOnClickListener(v1 -> showDateRangePicker());
+        
+        btnExport.setOnClickListener(v1 -> {
+        if (adapter != null && adapter.getItemCount() > 0) {
+        // جلب البيانات المفلترة الحالية من الـ Adapter
+        List<TrialBalanceDto.TrialBalanceRow> currentDisplayedRows = adapter.getItems();
+        TrialBalanceCsvExporter.exportAndShare(requireContext(), currentDisplayedRows, currentFromDate, currentToDate);
+    } else {
+        Toast.makeText(getContext(), "لا توجد بيانات لتصديرها", Toast.LENGTH_SHORT).show();
+    }
+    });
 
         // ✅ مراقبة حالة التحميل
         viewModel.getLoading().observe(getViewLifecycleOwner(), isLoading -> {
