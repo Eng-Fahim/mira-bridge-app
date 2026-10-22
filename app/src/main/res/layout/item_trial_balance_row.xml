@@ -18,7 +18,7 @@
 
         <TextView
             android:id="@+id/tvRowCode"
-            android:layout_width="70dp"
+            android:layout_width="60dp"
             android:layout_height="wrap_content"
             android:text="1301"
             android:textColor="?attr/colorOnSurface"
@@ -38,7 +38,7 @@
 
         <TextView
             android:id="@+id/tvRowDebit"
-            android:layout_width="80dp"
+            android:layout_width="75dp"
             android:layout_height="wrap_content"
             android:text="—"
             android:textColor="?attr/colorPrimary"
@@ -47,7 +47,7 @@
 
         <TextView
             android:id="@+id/tvRowCredit"
-            android:layout_width="80dp"
+            android:layout_width="75dp"
             android:layout_height="wrap_content"
             android:text="—"
             android:textColor="?attr/colorError"
@@ -56,7 +56,7 @@
 
         <TextView
             android:id="@+id/tvRowBalance"
-            android:layout_width="80dp"
+            android:layout_width="75dp"
             android:layout_height="wrap_content"
             android:text="0"
             android:textColor="@color/success_500"
@@ -65,14 +65,21 @@
             android:gravity="end"/>
     </LinearLayout>
 
+    <!-- شريط الذهب (يظهر فقط إذا كان للحساب حركة ذهبية) -->
     <TextView
         android:id="@+id/tvRowGold"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="+10.500 g"
+        android:layout_marginTop="4dp"
+        android:background="#1AD4AF37" 
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
+        android:text="مدين: 0g | دائن: 0g | الرصيد: 0g"
         android:textColor="@color/mira_gold"
         android:textSize="11sp"
         android:textStyle="bold"
-        android:visibility="gone"
-        android:layout_marginTop="2dp"/>
+        android:gravity="end"
+        android:visibility="gone"/>
 </LinearLayout>
