@@ -1,16 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="?attr/colorSurface">
 
-    <!-- KPI Container - أصبح يدعم التمرير الأفقي ليتسع لبطاقات الذهب -->
+    <!-- شريط الأدوات: البحث والفلاتر -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <!-- صف البحث -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <EditText
+                android:id="@+id/etSearch"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@android:drawable/editbox_background"
+                android:hint="🔍 بحث بكود أو اسم الحساب..."
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textSize="12sp"
+                android:inputType="text"/>
+
+            <Button
+                android:id="@+id/btnFilterDate"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:text="الفترة 📅"
+                android:textSize="12sp"
+                style="@style/Widget.AppCompat.Button.Colored"/>
+        </LinearLayout>
+
+        <!-- أزرار التبديل بين الميزان المالي والمعدني -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:tabMode="fixed"
+            app:tabGravity="fill">
+            
+            <com.google.android.material.tab.TabItem
+                android:text="الميزان المالي 💵" />
+            
+            <com.google.android.material.tab.TabItem
+                android:text="ميزان الذهب 🥇" />
+        </com.google.android.material.tabs.TabLayout>
+    </LinearLayout>
+
+    <!-- KPI Container -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:background="?attr/colorSurfaceVariant">
+        android:scrollbars="none">
 
         <LinearLayout
             android:id="@+id/kpiContainer"
@@ -20,70 +74,46 @@
             android:padding="8dp"/>
     </HorizontalScrollView>
 
-    <!-- Header -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="10dp"
-        android:background="?attr/colorPrimaryContainer">
-
-        <TextView
-            android:layout_width="60dp"
-            android:layout_height="wrap_content"
-            android:text="الكود"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textSize="12sp"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="الحساب"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textSize="12sp"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:layout_width="75dp"
-            android:layout_height="wrap_content"
-            android:text="مدين"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:gravity="end"/>
-
-        <TextView
-            android:layout_width="75dp"
-            android:layout_height="wrap_content"
-            android:text="دائن"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:gravity="end"/>
-
-        <TextView
-            android:layout_width="75dp"
-            android:layout_height="wrap_content"
-            android:text="الرصيد"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:gravity="end"/>
-    </LinearLayout>
-
-    <!-- RecyclerView -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvRows"
+    <!-- ✅ الجدول بالكامل (العناوين + الصفوف) قابل للسحب أفقياً -->
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="?attr/colorSurface"
-        android:clipToPadding="false"
-        android:paddingBottom="16dp"/>
+        android:fillViewport="true">
 
-    <!-- Empty -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Header العناوين -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="10dp"
+                android:background="?attr/colorPrimaryContainer">
+
+                <TextView android:layout_width="60dp" android:layout_height="wrap_content" android:text="الكود" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
+                <TextView android:layout_width="120dp" android:layout_height="wrap_content" android:text="الحساب" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
+                
+                <!-- عناوين الأعمدة الثلاثة الجديدة -->
+                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="أول المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
+                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="حركة الفترة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
+                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="آخر المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
+            </LinearLayout>
+
+            <!-- قائمة الحسابات -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvRows"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="?attr/colorSurface"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp"/>
+        </LinearLayout>
+    </HorizontalScrollView>
+
     <TextView
         android:id="@+id/tvEmpty"
         android:layout_width="match_parent"
