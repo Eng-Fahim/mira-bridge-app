@@ -2294,22 +2294,20 @@ if (isDesktopScan) {
                     }
 
                     final String finalServerEpc = serverEpc;
-                    String serialTemp = "";
-String miraIdTemp = "";
+
+// ✅ استخراج دقيق للـ Serial من السيرفر
+String serialTemp = "";
 if (finalResponseData != null) {
+    // نبحث عن serial_number أولاً، ثم mira_id، ثم serial
     serialTemp = finalResponseData.optString("serial_number", "");
-    if (serialTemp.isEmpty()) serialTemp = finalResponseData.optString("serial", "");
-    
-    miraIdTemp = finalResponseData.optString("mira_id", "");
-    if (miraIdTemp.isEmpty()) miraIdTemp = finalResponseData.optString("miraId", "");
-    
-    // إذا لم يرجع السيرفر السيريال، نستخدم MIRA ID
-    if (serialTemp.isEmpty() && !miraIdTemp.isEmpty()) {
-        serialTemp = miraIdTemp;
+    if (serialTemp.isEmpty()) {
+        serialTemp = finalResponseData.optString("mira_id", "");
+    }
+    if (serialTemp.isEmpty()) {
+        serialTemp = finalResponseData.optString("serial", "");
     }
 }
 final String finalServerSerial = serialTemp;
-
                     safeRun(() -> {
                         dismissDialog(activeLoadingDialog);
                         activeLoadingDialog = null;
@@ -2329,8 +2327,12 @@ final String finalServerSerial = serialTemp;
                         if (displayEpc.isEmpty()) displayEpc = finalNewEpc;
 
                         String shortBarcode = finalServerSerial;
-// ✅ نثق في السيرفر. إذا لم يرجع شيء (نادر جداً)، نضع رقم مؤقت
-if (shortBarcode == null || shortBarcode.trim().isEmpty()) {
+
+// ✅ حماية مطلقة: إذا كان الباركود فارغاً أو يبدأ بـ E2 (وهو TID)، لا نطبعه
+if (shortBarcode == null || shortBarcode.trim().isEmpty() || 
+    (shortBarcode.startsWith("E2") && shortBarcode.length() == 24)) {
+    
+    // إذا فشل السيرفر في إرجاع السيريال، نولّد رقماً مؤقتاً يبدأ بـ SN-TEMP
     shortBarcode = "SN-TEMP-" + System.currentTimeMillis(); 
 }
                         String gs1Code = "(21)" + shortBarcode;
