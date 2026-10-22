@@ -8,10 +8,13 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,15 +49,17 @@ public class MiraTrialBalanceFragment extends Fragment {
     private EditText etSearch;
     private Button btnFilterDate;
     private TabLayout tabLayout;
-    private CheckBox cbLeafOnly; // ✅ فلتر عرض الحسابات الفرعية
+    private CheckBox cbLeafOnly;
+    private Spinner spinnerBranch;
+    private ProgressBar pbLoading;
     private TrialBalanceAdapter adapter;
     
     private List<TrialBalanceDto.TrialBalanceRow> originalRows = new ArrayList<>();
     private boolean isGoldView = false;
 
-    // متغيرات التاريخ
     private String currentFromDate;
     private String currentToDate;
+    private int currentBranchId = 0;
 
     @Nullable
     @Override
@@ -63,34 +68,31 @@ public class MiraTrialBalanceFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_trial_balance, container, false);
 
-        // ربط العناصر
         kpiContainer = v.findViewById(R.id.kpiContainer);
         rvRows = v.findViewById(R.id.rvRows);
         tvEmpty = v.findViewById(R.id.tvEmpty);
         etSearch = v.findViewById(R.id.etSearch);
         btnFilterDate = v.findViewById(R.id.btnFilterDate);
         tabLayout = v.findViewById(R.id.tabLayout);
-        cbLeafOnly = v.findViewById(R.id.cbLeafOnly); // يجب إضافة هذا العنصر في الـ XML
+        cbLeafOnly = v.findViewById(R.id.cbLeafOnly);
+        spinnerBranch = v.findViewById(R.id.spinnerBranch);
+        pbLoading = v.findViewById(R.id.pbLoading);
 
         viewModel = new ViewModelProvider(this).get(AccountingViewModel.class);
 
-        // إعداد التواريخ الافتراضية (بداية السنة حتى اليوم)
         currentFromDate = DateHelper.startOfYearApi();
         currentToDate = DateHelper.todayApi();
         updateDateButtonText();
+        setupBranchSpinner(); // ✅ إعداد قائمة الفروع
 
         adapter = new TrialBalanceAdapter();
-        
-        // ✅ الانتقال إلى دفتر الأستاذ عند النقر على الحساب
         adapter.setOnItemClickListener(row -> {
             if (getActivity() != null) {
-                // تجهيز شاشة دفتر الأستاذ
                 MiraGeneralLedgerFragment ledgerFragment = new MiraGeneralLedgerFragment();
                 Bundle args = new Bundle();
-                args.putLong("account_id", row.accountId); // تمرير معرف الحساب
+                args.putLong("account_id", row.accountId);
                 ledgerFragment.setArguments(args);
 
-                // الانتقال للشاشة
                 if (getActivity() instanceof UHFMainActivity) {
                     ((UHFMainActivity) getActivity()).loadFragment(ledgerFragment, "GeneralLedger");
                 } else {
@@ -105,7 +107,6 @@ public class MiraTrialBalanceFragment extends Fragment {
         rvRows.setLayoutManager(new LinearLayoutManager(getContext()));
         rvRows.setAdapter(adapter);
 
-        // مستمع البحث
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -114,14 +115,12 @@ public class MiraTrialBalanceFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        // ✅ مستمع فلتر الحسابات الفرعية
         if (cbLeafOnly != null) {
             cbLeafOnly.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 filterData(etSearch.getText().toString());
             });
         }
 
-        // مستمع تبديل التبويبات
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
@@ -134,51 +133,69 @@ public class MiraTrialBalanceFragment extends Fragment {
             @Override public void onTabReselected(TabLayout.Tab tab) {}
         });
 
-        // مستمع زر الفترة (Date Picker)
         btnFilterDate.setOnClickListener(v1 -> showDateRangePicker());
+
+        // ✅ مراقبة حالة التحميل
+        viewModel.getLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            if (pbLoading != null) {
+                pbLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            }
+        });
 
         viewModel.getTrialBalance().observe(getViewLifecycleOwner(), this::render);
 
-        // تحميل البيانات لأول مرة
-        viewModel.loadTrialBalance(currentFromDate, currentToDate, 0);
+        loadData();
 
         return v;
     }
 
+    private void setupBranchSpinner() {
+        // هنا نفترض أن لديك دالة تجلب الفروع، أو سنضع خيار "كل الفروع" فقط مؤقتاً
+        // إذا كان لديك MiraBranchesManager، يمكنك جلب الفروع منه ووضعها في القائمة
+        List<String> branches = new ArrayList<>();
+        branches.add("كل الفروع");
+        branches.add("الفرع الرئيسي"); // مثال
+        // branches.add("فرع تعز"); // مثال
+
+        ArrayAdapter<String> branchAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, branches);
+        branchAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerBranch.setAdapter(branchAdapter);
+
+        spinnerBranch.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                // إذا كان لديك معرفات حقيقية للفروع، نضعها هنا. نفترض أن 0 هو كل الفروع.
+                currentBranchId = (position == 0) ? 0 : position; // مجرد مثال
+                loadData(); // إعادة التحميل عند تغيير الفرع
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+    }
+
+    private void loadData() {
+        viewModel.loadTrialBalance(currentFromDate, currentToDate, currentBranchId);
+    }
+
     private void showDateRangePicker() {
         Calendar cal = Calendar.getInstance();
-        
-        // اختيار تاريخ البداية
         new DatePickerDialog(requireContext(), (view, year, month, dayOfMonth) -> {
-            Calendar startCal = Calendar.getInstance();
-            startCal.set(year, month, dayOfMonth);
-            
-            // بعد اختيار البداية، نفتح نافذة لاختيار النهاية
             new DatePickerDialog(requireContext(), (view2, year2, month2, dayOfMonth2) -> {
-                Calendar endCal = Calendar.getInstance();
-                endCal.set(year2, month2, dayOfMonth2);
-
-                // تنسيق التواريخ بصيغة YYYY-MM-DD
                 currentFromDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
                 currentToDate = String.format(Locale.US, "%04d-%02d-%02d", year2, month2 + 1, dayOfMonth2);
-
                 updateDateButtonText();
-                viewModel.loadTrialBalance(currentFromDate, currentToDate, 0);
-                
+                loadData();
             }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
-
         }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
     }
 
     private void updateDateButtonText() {
-        String shortFrom = currentFromDate.substring(5); // إزالة السنة
+        String shortFrom = currentFromDate.substring(5);
         String shortTo = currentToDate.substring(5);
         btnFilterDate.setText(shortFrom + " إلى " + shortTo);
     }
 
     private void render(TrialBalanceDto tb) {
         if (tb == null) return;
-
         originalRows = tb.rows != null ? tb.rows : new ArrayList<>();
         renderKPIs(tb);
         filterData(etSearch.getText().toString());
@@ -186,7 +203,6 @@ public class MiraTrialBalanceFragment extends Fragment {
 
     private void renderKPIs(TrialBalanceDto tb) {
         kpiContainer.removeAllViews();
-
         addKpi("عدد الحسابات", String.valueOf(tb.rows != null ? tb.rows.size() : 0), "#9B59B6");
 
         if (!isGoldView) {
@@ -208,27 +224,17 @@ public class MiraTrialBalanceFragment extends Fragment {
 
     private void filterData(String query) {
         if (originalRows == null) return;
-        
         List<TrialBalanceDto.TrialBalanceRow> filtered = new ArrayList<>();
         boolean leafOnly = cbLeafOnly != null && cbLeafOnly.isChecked();
         
         for (TrialBalanceDto.TrialBalanceRow row : originalRows) {
-            // ✅ 1. فلتر الحسابات الفرعية فقط (Leaf Only)
-            if (leafOnly && !row.isLeaf) {
-                continue;
-            }
-            
-            // ✅ 2. فلتر البحث
+            if (leafOnly && !row.isLeaf) continue;
             if (!query.isEmpty()) {
                 String lowerQuery = query.toLowerCase().trim();
                 boolean matchesCode = row.accountCode != null && row.accountCode.contains(lowerQuery);
                 boolean matchesName = row.accountNameAr != null && row.accountNameAr.toLowerCase().contains(lowerQuery);
-                
-                if (!matchesCode && !matchesName) {
-                    continue;
-                }
+                if (!matchesCode && !matchesName) continue;
             }
-            
             filtered.add(row);
         }
 
@@ -243,9 +249,7 @@ public class MiraTrialBalanceFragment extends Fragment {
     }
 
     private void addKpi(String title, String value, String color) {
-        View card = LayoutInflater.from(getContext())
-            .inflate(R.layout.kpi_card, kpiContainer, false);
-
+        View card = LayoutInflater.from(getContext()).inflate(R.layout.kpi_card, kpiContainer, false);
         TextView tvTitle = card.findViewById(R.id.tvKpiTitle);
         TextView tvValue = card.findViewById(R.id.tvKpiValue);
         View indicator = card.findViewById(R.id.kpiIndicator);
@@ -254,7 +258,6 @@ public class MiraTrialBalanceFragment extends Fragment {
         tvValue.setText(value);
         tvValue.setTextColor(Color.parseColor(color));
         indicator.setBackgroundColor(Color.parseColor(color));
-
         kpiContainer.addView(card);
     }
 }
