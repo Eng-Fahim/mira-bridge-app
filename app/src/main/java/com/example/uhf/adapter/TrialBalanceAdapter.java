@@ -20,6 +20,17 @@ import java.util.Locale;
 public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapter.VH> {
 
     private List<TrialBalanceDto.TrialBalanceRow> items = new ArrayList<>();
+    
+    // ✅ 1. تعريف الـ Interface والمتغير في مستوى الكلاس (وليس داخل دالة)
+    public interface OnItemClickListener {
+        void onItemClick(TrialBalanceDto.TrialBalanceRow row);
+    }
+    private OnItemClickListener listener;
+
+    // ✅ 2. دالة لتعيين المستمع
+    public void setOnItemClickListener(OnItemClickListener listener) {
+        this.listener = listener;
+    }
 
     public void setItems(List<TrialBalanceDto.TrialBalanceRow> newItems) {
         this.items = newItems != null ? newItems : new ArrayList<>();
@@ -38,6 +49,7 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
     public void onBindViewHolder(@NonNull VH h, int position) {
         TrialBalanceDto.TrialBalanceRow r = items.get(position);
 
+        // ✅ 3. عرض البيانات أولاً
         h.tvCode.setText(r.accountCode != null ? r.accountCode : "—");
         h.tvName.setText(r.accountNameAr != null ? r.accountNameAr : "—");
         
@@ -72,6 +84,11 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
         } else {
             h.tvGold.setVisibility(View.GONE);
         }
+
+        // ✅ 4. إضافة حدث الضغط في النهاية
+        h.itemView.setOnClickListener(v -> {
+            if (listener != null) listener.onItemClick(r);
+        });
     }
 
     @Override
