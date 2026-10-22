@@ -1,127 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="?attr/colorSurface">
+    android:background="?attr/colorSurface"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:layout_marginBottom="1dp">
 
-    <!-- شريط الأدوات: البحث والفلاتر -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="8dp"
-        android:background="?attr/colorSurfaceVariant">
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-        <!-- صف البحث -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tvRowCode"
+            android:layout_width="60dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:text="1301"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="12sp"
+            android:textStyle="bold"/>
 
-            <EditText
-                android:id="@+id/etSearch"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:background="@android:drawable/editbox_background"
-                android:hint="🔍 بحث بكود أو اسم الحساب..."
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:textSize="12sp"
-                android:inputType="text"/>
+        <TextView
+            android:id="@+id/tvRowName"
+            android:layout_width="120dp"
+            android:layout_height="wrap_content"
+            android:text="مخزون الذهب"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="12sp"
+            android:maxLines="2"
+            android:ellipsize="end"/>
 
-            <Button
-                android:id="@+id/btnFilterDate"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginStart="8dp"
-                android:text="الفترة 📅"
-                android:textSize="12sp"
-                style="@style/Widget.AppCompat.Button.Colored"/>
+        <!-- عمود 1: أول المدة -->
+        <LinearLayout
+            android:layout_width="90dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvOpenDebit" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textColor="#3498DB" android:textSize="11sp" android:gravity="center"/>
+            <TextView android:id="@+id/tvOpenCredit" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textColor="#E74C3C" android:textSize="11sp" android:gravity="center"/>
         </LinearLayout>
 
-        <!-- أزرار التبديل بين الميزان المالي والمعدني -->
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/tabLayout"
-            android:layout_width="match_parent"
+        <!-- عمود 2: حركة الفترة -->
+        <LinearLayout
+            android:layout_width="90dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:tabMode="fixed"
-            app:tabGravity="fill">
-            
-            <com.google.android.material.tab.TabItem
-                android:text="الميزان المالي 💵" />
-            
-            <com.google.android.material.tab.TabItem
-                android:text="ميزان الذهب 🥇" />
-        </com.google.android.material.tabs.TabLayout>
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvPeriodDebit" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textColor="#3498DB" android:textSize="11sp" android:gravity="center"/>
+            <TextView android:id="@+id/tvPeriodCredit" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textColor="#E74C3C" android:textSize="11sp" android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- عمود 3: آخر المدة -->
+        <LinearLayout
+            android:layout_width="90dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvCloseDebit" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textColor="#27AE60" android:textSize="11sp" android:textStyle="bold" android:gravity="center"/>
+            <TextView android:id="@+id/tvCloseCredit" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textColor="#C0392B" android:textSize="11sp" android:textStyle="bold" android:gravity="center"/>
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- KPI Container -->
-    <HorizontalScrollView
+    <!-- شريط الذهب (يظهر فقط للحسابات الذهبية) -->
+    <TextView
+        android:id="@+id/tvRowGold"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:id="@+id/kpiContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="8dp"/>
-    </HorizontalScrollView>
-
-    <!-- ✅ الجدول بالكامل (العناوين + الصفوف) قابل للسحب أفقياً -->
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <!-- Header العناوين -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="10dp"
-                android:background="?attr/colorPrimaryContainer">
-
-                <TextView android:layout_width="60dp" android:layout_height="wrap_content" android:text="الكود" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
-                <TextView android:layout_width="120dp" android:layout_height="wrap_content" android:text="الحساب" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold"/>
-                
-                <!-- عناوين الأعمدة الثلاثة الجديدة -->
-                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="أول المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
-                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="حركة الفترة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
-                <TextView android:layout_width="90dp" android:layout_height="wrap_content" android:text="آخر المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="12sp" android:textStyle="bold" android:gravity="center"/>
-            </LinearLayout>
-
-            <!-- قائمة الحسابات -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvRows"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:background="?attr/colorSurface"
-                android:clipToPadding="false"
-                android:paddingBottom="16dp"/>
-        </LinearLayout>
-    </HorizontalScrollView>
-
-    <TextView
-        android:id="@+id/tvEmpty"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="📭 لا توجد بيانات"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="16sp"
+        android:layout_marginTop="4dp"
+        android:background="#1AD4AF37" 
+        android:padding="3dp"
+        android:text="ذهب: مدين 0g | دائن 0g | الرصيد 0g"
+        android:textColor="@color/mira_gold"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:gravity="end"
         android:visibility="gone"/>
 </LinearLayout>
