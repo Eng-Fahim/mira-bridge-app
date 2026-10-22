@@ -9,6 +9,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -22,11 +23,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.adapter.TrialBalanceAdapter;
 import com.example.uhf.api.dto.TrialBalanceDto;
 import com.example.uhf.utils.DateHelper;
 import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
-import com.example.uhf.adapter.TrialBalanceAdapter;
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
@@ -44,6 +46,7 @@ public class MiraTrialBalanceFragment extends Fragment {
     private EditText etSearch;
     private Button btnFilterDate;
     private TabLayout tabLayout;
+    private CheckBox cbLeafOnly; // ✅ فلتر عرض الحسابات الفرعية
     private TrialBalanceAdapter adapter;
     
     private List<TrialBalanceDto.TrialBalanceRow> originalRows = new ArrayList<>();
@@ -60,12 +63,14 @@ public class MiraTrialBalanceFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_trial_balance, container, false);
 
+        // ربط العناصر
         kpiContainer = v.findViewById(R.id.kpiContainer);
         rvRows = v.findViewById(R.id.rvRows);
         tvEmpty = v.findViewById(R.id.tvEmpty);
         etSearch = v.findViewById(R.id.etSearch);
         btnFilterDate = v.findViewById(R.id.btnFilterDate);
         tabLayout = v.findViewById(R.id.tabLayout);
+        cbLeafOnly = v.findViewById(R.id.cbLeafOnly); // يجب إضافة هذا العنصر في الـ XML
 
         viewModel = new ViewModelProvider(this).get(AccountingViewModel.class);
 
@@ -75,10 +80,25 @@ public class MiraTrialBalanceFragment extends Fragment {
         updateDateButtonText();
 
         adapter = new TrialBalanceAdapter();
+        
+        // ✅ الانتقال إلى دفتر الأستاذ عند النقر على الحساب
         adapter.setOnItemClickListener(row -> {
             if (getActivity() != null) {
-                Toast.makeText(getContext(), "جاري فتح حركات الحساب: " + row.accountNameAr, Toast.LENGTH_SHORT).show();
-                // يمكنك تفعيل الانتقال لدفتر الأستاذ هنا لاحقاً
+                // تجهيز شاشة دفتر الأستاذ
+                MiraGeneralLedgerFragment ledgerFragment = new MiraGeneralLedgerFragment();
+                Bundle args = new Bundle();
+                args.putLong("account_id", row.accountId); // تمرير معرف الحساب
+                ledgerFragment.setArguments(args);
+
+                // الانتقال للشاشة
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).loadFragment(ledgerFragment, "GeneralLedger");
+                } else {
+                    getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, ledgerFragment)
+                        .addToBackStack("GeneralLedger")
+                        .commit();
+                }
             }
         });
 
@@ -94,6 +114,13 @@ public class MiraTrialBalanceFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) {}
         });
 
+        // ✅ مستمع فلتر الحسابات الفرعية
+        if (cbLeafOnly != null) {
+            cbLeafOnly.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                filterData(etSearch.getText().toString());
+            });
+        }
+
         // مستمع تبديل التبويبات
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
@@ -107,7 +134,7 @@ public class MiraTrialBalanceFragment extends Fragment {
             @Override public void onTabReselected(TabLayout.Tab tab) {}
         });
 
-        // ✅ مستمع زر الفترة (Date Picker)
+        // مستمع زر الفترة (Date Picker)
         btnFilterDate.setOnClickListener(v1 -> showDateRangePicker());
 
         viewModel.getTrialBalance().observe(getViewLifecycleOwner(), this::render);
@@ -144,7 +171,6 @@ public class MiraTrialBalanceFragment extends Fragment {
     }
 
     private void updateDateButtonText() {
-        // عرض التاريخ بشكل مختصر على الزر
         String shortFrom = currentFromDate.substring(5); // إزالة السنة
         String shortTo = currentToDate.substring(5);
         btnFilterDate.setText(shortFrom + " إلى " + shortTo);
@@ -184,17 +210,26 @@ public class MiraTrialBalanceFragment extends Fragment {
         if (originalRows == null) return;
         
         List<TrialBalanceDto.TrialBalanceRow> filtered = new ArrayList<>();
+        boolean leafOnly = cbLeafOnly != null && cbLeafOnly.isChecked();
         
-        if (query.isEmpty()) {
-            filtered.addAll(originalRows);
-        } else {
-            String lowerQuery = query.toLowerCase().trim();
-            for (TrialBalanceDto.TrialBalanceRow row : originalRows) {
-                if ((row.accountCode != null && row.accountCode.contains(lowerQuery)) ||
-                    (row.accountNameAr != null && row.accountNameAr.toLowerCase().contains(lowerQuery))) {
-                    filtered.add(row);
+        for (TrialBalanceDto.TrialBalanceRow row : originalRows) {
+            // ✅ 1. فلتر الحسابات الفرعية فقط (Leaf Only)
+            if (leafOnly && !row.isLeaf) {
+                continue;
+            }
+            
+            // ✅ 2. فلتر البحث
+            if (!query.isEmpty()) {
+                String lowerQuery = query.toLowerCase().trim();
+                boolean matchesCode = row.accountCode != null && row.accountCode.contains(lowerQuery);
+                boolean matchesName = row.accountNameAr != null && row.accountNameAr.toLowerCase().contains(lowerQuery);
+                
+                if (!matchesCode && !matchesName) {
+                    continue;
                 }
             }
+            
+            filtered.add(row);
         }
 
         if (!filtered.isEmpty()) {
