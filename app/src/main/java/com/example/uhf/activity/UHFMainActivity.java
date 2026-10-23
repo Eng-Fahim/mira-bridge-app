@@ -42,6 +42,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraInventoryFragment;
 import com.example.uhf.fragment.MiraPosFragment;
+import com.example.uhf.fragment.MiraScrapGoldBuyFragment;
 import com.example.uhf.fragment.MiraAccountingSetupFragment;
 
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
