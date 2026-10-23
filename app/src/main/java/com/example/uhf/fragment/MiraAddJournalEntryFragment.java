@@ -53,7 +53,6 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
         viewModel = new ViewModelProvider(this).get(AccountingViewModel.class);
 
-        // ربط العناصر
         etDate = v.findViewById(R.id.etDate);
         etReference = v.findViewById(R.id.etReference);
         etDescription = v.findViewById(R.id.etDescription);
@@ -63,38 +62,33 @@ public class MiraAddJournalEntryFragment extends Fragment {
         btnClose = v.findViewById(R.id.btnClose);
         tvTotals = v.findViewById(R.id.tvTotals);
 
-        // إعداد التاريخ
         etDate.setText(DateHelper.todayApi());
         etDate.setOnClickListener(view -> showDatePicker());
 
-        // تحميل الحسابات
+        // ✅ استقبال الأخطاء من السيرفر وإعادة تشغيل الزر
+        viewModel.getError().observe(getViewLifecycleOwner(), error -> {
+            if (error != null && !error.isEmpty()) {
+                Toast.makeText(getContext(), "❌ " + error, Toast.LENGTH_LONG).show();
+                btnSave.setEnabled(true);
+                btnSave.setText("حفظ وترحيل القيد");
+                viewModel.clearError();
+            }
+        });
+
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
             if (accounts != null && accounts.length > 0) {
                 allAccounts.clear();
-                // ✅ إضافة كل الحسابات القادمة من السيرفر بدون أي فلترة محلية
-                for (AccountDto a : accounts) {
-                    allAccounts.add(a);
-                }
-                // تحديث القوائم في الأسطر الحالية
-                for (View lineView : lineViews) {
-                    setupAccountDropdown(lineView);
-                }
-            } else {
-                Toast.makeText(getContext(), "لم يتم استلام حسابات من السيرفر", Toast.LENGTH_SHORT).show();
+                for (AccountDto a : accounts) allAccounts.add(a);
+                for (View lineView : lineViews) setupAccountDropdown(lineView);
             }
         });
-        
-        // طلب الحسابات (الفرعية فقط) من السيرفر
         viewModel.loadAccounts(null, null, true);
 
-        // إضافة سطرين افتراضيين
         addLine();
         addLine();
 
         btnAddLine.setOnClickListener(view -> addLine());
-        
         btnClose.setOnClickListener(view -> getParentFragmentManager().popBackStack());
-
         btnSave.setOnClickListener(view -> saveEntry());
 
         return v;
@@ -144,8 +138,6 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
     private void setupAccountDropdown(View lineView) {
         AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
-        
-        // إنشاء Adapter جديد في كل مرة لضمان تحديث البيانات
         ArrayAdapter<AccountDto> adapter = new ArrayAdapter<AccountDto>(requireContext(),
                 android.R.layout.simple_dropdown_item_1line, allAccounts) {
             @NonNull
@@ -165,23 +157,18 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 return tv;
             }
         };
-        
         acAccount.setAdapter(adapter);
-        
-        // ✅ الحل الجذري: فتح القائمة بمجرد الضغط حتى لو كان الحقل فارغاً
         acAccount.setThreshold(0);
         acAccount.setOnClickListener(v -> acAccount.showDropDown());
         acAccount.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) acAccount.showDropDown();
         });
 
-        // حفظ الحساب المختار
         acAccount.setOnItemClickListener((parent, view, position, id) -> {
             AccountDto selected = (AccountDto) parent.getItemAtPosition(position);
             acAccount.setTag(selected);
         });
 
-        // مسح الحساب إذا عدل المستخدم النص يدوياً
         acAccount.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
