@@ -26,13 +26,9 @@ import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
 import com.google.android.material.button.MaterialButton;
 
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Locale;
 
-/**
- * شاشة حركة الذهب
- */
 public class MiraGoldMovementFragment extends Fragment {
 
     private AccountingViewModel viewModel;
@@ -132,12 +128,20 @@ public class MiraGoldMovementFragment extends Fragment {
     private void render(GoldMovementDto gm) {
         if (gm == null || gm.totals == null) return;
 
-        // KPIs
+        // ✅ KPIs مع الأوزان والقيم المالية
         kpiContainer.removeAllViews();
-        addKpi("افتتاحي", NumberFormatter.gold(gm.totals.openingGold), "#95A5A6");
-        addKpi("📥 وارد", NumberFormatter.gold(gm.totals.goldIn), "#27AE60");
-        addKpi("📤 صادر", NumberFormatter.gold(gm.totals.goldOut), "#E74C3C");
-        addKpi("🥇 الرصيد", NumberFormatter.gold(gm.totals.closingGold), "#D4AF37");
+        
+        String openText = String.format(Locale.US, "%.3fg\n%s", gm.totals.openingGold, NumberFormatter.moneyShort(gm.totals.openingValue));
+        addKpi("افتتاحي", openText, "#95A5A6");
+        
+        String inText = String.format(Locale.US, "%.3fg\n%s", gm.totals.goldIn, NumberFormatter.moneyShort(gm.totals.valueIn));
+        addKpi("📥 وارد", inText, "#27AE60");
+        
+        String outText = String.format(Locale.US, "%.3fg\n%s", gm.totals.goldOut, NumberFormatter.moneyShort(gm.totals.valueOut));
+        addKpi("📤 صادر", outText, "#E74C3C");
+        
+        String closeText = String.format(Locale.US, "%.3fg\n%s", gm.totals.closingGold, NumberFormatter.moneyShort(gm.totals.closingValue));
+        addKpi("🥇 الرصيد", closeText, "#D4AF37");
 
         // الحسابات
         if (gm.accounts != null && !gm.accounts.isEmpty()) {
