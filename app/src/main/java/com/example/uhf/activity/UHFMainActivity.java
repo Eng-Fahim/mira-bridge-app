@@ -2125,72 +2125,77 @@ public void playLocatorBeep(int level) {
     //  التنقل السريع
     // ═══════════════════════════════════════════════════════
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-            if (fabActionCenter != null) {
-                boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
-                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-                fabActionCenter.setEnabled(hasQuickActions);
-                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-                fabActionCenter.setOnLongClickListener(v -> {
-                    Toast.makeText(UHFMainActivity.this,
-                            isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
-                            Toast.LENGTH_SHORT).show();
-                    return true;
-                });
+        if (fabActionCenter != null) {
+            boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
+            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+            fabActionCenter.setEnabled(hasQuickActions);
+            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+            fabActionCenter.setOnLongClickListener(v -> {
+                Toast.makeText(UHFMainActivity.this,
+                        isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
+                        Toast.LENGTH_SHORT).show();
+                return true;
+            });
 
-                if (hasQuickActions) {
-                    pulseFab(fabActionCenter);
-                }
+            if (hasQuickActions) {
+                pulseFab(fabActionCenter);
             }
+        }
 
-            if (quickNav != null) {
+        if (quickNav != null) {
             quickNav.setOnItemSelectedListener(item -> {
                 int id = item.getItemId();
                 String tag = getFragmentTagForNavItem(id);
                 if (tag == null || tag.isEmpty()) return false;
 
-                    if (navigationManager != null
-                            && tag.equals(navigationManager.getCurrentFragmentTag())) {
-                        return true;
-                    }
+                if (navigationManager != null
+                        && tag.equals(navigationManager.getCurrentFragmentTag())) {
+                    return true;
+                }
 
-                    if (navigationLocked || isInventoryActive()) {
-                        new MaterialAlertDialogBuilder(this)
-                                .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل"
-                                        : "⚠️ Inventory Active")
-                                .setMessage(isArabic
-                                        ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
-                                        "هل تريد إيقاف الجرد والانتقال؟"
-                                        : "Cannot navigate during active inventory.\n\n" +
-                                        "Stop inventory and proceed?")
-                                .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
-                                        (d, w) -> {
-                                            stopActiveInventory();
-                                            setNavigationLocked(false);
-                                            mainHandler.postDelayed(() -> {
-                                                Fragment fragment = navigationManager != null
-                                                        ? navigationManager.createFragmentByTag(tag)
-                                                        : FragmentFactory.createFragmentByTag(tag);
-                                                if (fragment != null) {
-                                                    loadFragmentDirectly(fragment, tag);
-                                                }
-                                            }, 500);
-                                        })
-                                .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
-                                        (d, w) -> {
-                                            String currentTag = navigationManager != null
-                                                    ? navigationManager.getCurrentFragmentTag() : "";
-                                            updateBottomNavSelectionByTag(currentTag);
-                                        })
-                                .setCancelable(false)
-                                .show();
-                        return false;
-                    }
+                if (navigationLocked || isInventoryActive()) {
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل"
+                                    : "⚠️ Inventory Active")
+                            .setMessage(isArabic
+                                    ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
+                                    "هل تريد إيقاف الجرد والانتقال؟"
+                                    : "Cannot navigate during active inventory.\n\n" +
+                                    "Stop inventory and proceed?")
+                            .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
+                                    (d, w) -> {
+                                        stopActiveInventory();
+                                        setNavigationLocked(false);
+                                        mainHandler.postDelayed(() -> {
+                                            Fragment f = navigationManager != null
+                                                    ? navigationManager.createFragmentByTag(tag)
+                                                    : FragmentFactory.createFragmentByTag(tag);
+                                            if (f != null) {
+                                                loadFragmentDirectly(f, tag);
+                                            }
+                                        }, 500);
+                                    })
+                            .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
+                                    (d, w) -> {
+                                        String currentTag = navigationManager != null
+                                                ? navigationManager.getCurrentFragmentTag() : "";
+                                        updateBottomNavSelectionByTag(currentTag);
+                                    })
+                            .setCancelable(false)
+                            .show();
+                    return false;
+                }
 
-                    if (fragment != null) {
+                // ✅ الإصلاح الفعلي: تعريف fragment هنا — قبل الاستخدام
+                Fragment fragment = navigationManager != null
+                        ? navigationManager.createFragmentByTag(tag)
+                        : FragmentFactory.createFragmentByTag(tag);
+
+                if (fragment != null) {
                     loadFragmentDirectly(fragment, tag);
                     return true;
                 }
@@ -2201,13 +2206,12 @@ public void playLocatorBeep(int level) {
         Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
 }
-
     private String getFragmentTagForNavItem(int itemId) {
     if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
     if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
     if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
     if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;
-    if (itemId == R.id.nav_scrap) return NavigationManager.TAG_SCRAP_GOLD_BUY; // <-- إضافة جديدة
+    if (itemId == R.id.nav_scrap) return NavigationManager.TAG_SCRAP_GOLD_BUY; 
     return "";
 }
 
@@ -2217,15 +2221,20 @@ public void playLocatorBeep(int level) {
         if (quickNav == null || tag == null) return;
 
         if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
-            quickNav.getMenu().findItem(R.id.nav_home).setChecked(true);
+            MenuItem mi = quickNav.getMenu().findItem(R.id.nav_home);
+            if (mi != null) mi.setChecked(true);
         } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
-            quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
+            MenuItem mi = quickNav.getMenu().findItem(R.id.nav_inventory);
+            if (mi != null) mi.setChecked(true);
         } else if (tag.equals(NavigationManager.TAG_POS)) {
-            quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
-        } else if (tag.equals(NavigationManager.TAG_GATES)) {   
-            quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
-        } else if (tag.equals(NavigationManager.TAG_SCRAP_GOLD_BUY)) { // <-- إضافة جديدة
-            quickNav.getMenu().findItem(R.id.nav_scrap).setChecked(true);
+            MenuItem mi = quickNav.getMenu().findItem(R.id.nav_sales);
+            if (mi != null) mi.setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_GATES)) {
+            MenuItem mi = quickNav.getMenu().findItem(R.id.nav_transfers);
+            if (mi != null) mi.setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_SCRAP_GOLD_BUY)) {
+            MenuItem mi = quickNav.getMenu().findItem(R.id.nav_scrap);
+            if (mi != null) mi.setChecked(true);   // ← حماية NPE
         }
     } catch (Exception e) {
         Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
