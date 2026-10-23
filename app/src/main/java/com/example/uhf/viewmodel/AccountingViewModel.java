@@ -70,45 +70,16 @@ public class AccountingViewModel extends AndroidViewModel {
     //  Getters للـ LiveData
     // ═══════════════════════════════════════════════════════
 
-    public LiveData<JournalEntryDto[]> getJournalEntries() {
-        return journalEntries;
-    }
-
-    public LiveData<JournalEntryDto> getSelectedEntry() {
-        return selectedEntry;
-    }
-
-    public LiveData<JournalEntryDetailsDto> getJournalEntryDetails() {
-        return journalEntryDetails;
-    }
-
-    public LiveData<AccountDto[]> getAccounts() {
-        return accounts;
-    }
-
-    public LiveData<AccountDto[]> getAccountsTree() {
-        return accountsTree;
-    }
-
-    public LiveData<TrialBalanceDto> getTrialBalance() {
-        return trialBalance;
-    }
-
-    public LiveData<BalanceSheetDto> getBalanceSheet() {
-        return balanceSheet;
-    }
-
-    public LiveData<IncomeStatementDto> getIncomeStatement() {
-        return incomeStatement;
-    }
-
-    public LiveData<GoldMovementDto> getGoldMovement() {
-        return goldMovement;
-    }
-
-    public LiveData<GeneralLedgerDto> getGeneralLedger() {
-        return generalLedger;
-    }
+    public LiveData<JournalEntryDto[]> getJournalEntries() { return journalEntries; }
+    public LiveData<JournalEntryDto> getSelectedEntry() { return selectedEntry; }
+    public LiveData<JournalEntryDetailsDto> getJournalEntryDetails() { return journalEntryDetails; }
+    public LiveData<AccountDto[]> getAccounts() { return accounts; }
+    public LiveData<AccountDto[]> getAccountsTree() { return accountsTree; }
+    public LiveData<TrialBalanceDto> getTrialBalance() { return trialBalance; }
+    public LiveData<BalanceSheetDto> getBalanceSheet() { return balanceSheet; }
+    public LiveData<IncomeStatementDto> getIncomeStatement() { return incomeStatement; }
+    public LiveData<GoldMovementDto> getGoldMovement() { return goldMovement; }
+    public LiveData<GeneralLedgerDto> getGeneralLedger() { return generalLedger; }
 
     public LiveData<Boolean> getLoading() { return loading; }
     public LiveData<String> getError()   { return error; }
@@ -124,16 +95,23 @@ public class AccountingViewModel extends AndroidViewModel {
     // ═══════════════════════════════════════════════════════
 
     /**
-     * ✅ تحميل القيود مع دعم الصفحات
+     * ✅ الدالة القديمة (بدون تواريخ) — للتوافق
      */
     public void loadJournalEntries(int page, int perPage, String status) {
+        loadJournalEntriesWithFilters(page, perPage, status, null, null);
+    }
+
+    /**
+     * ✅ الدالة الجديدة (مع التواريخ) — التي تستخدمها الشاشة الآن
+     */
+    public void loadJournalEntriesWithFilters(int page, int perPage, String status, String from, String to) {
         loading.setValue(true);
         error.setValue(null);
 
         api.accounting().getJournalEntries(
             null,        // branch_id
-            null,        // from_date
-            null,        // to_date
+            from,        // from_date
+            to,          // to_date
             status,      // status
             perPage,     // per_page
             page         // page
@@ -154,8 +132,7 @@ public class AccountingViewModel extends AndroidViewModel {
             }
 
             @Override
-            public void onFailure(Call<ApiResponseDto<JournalEntryDto[]>> call,
-                                 Throwable t) {
+            public void onFailure(Call<ApiResponseDto<JournalEntryDto[]>> call, Throwable t) {
                 loading.setValue(false);
                 error.setValue("خطأ في الشبكة: " + t.getMessage());
             }
@@ -163,7 +140,7 @@ public class AccountingViewModel extends AndroidViewModel {
     }
 
     /**
-     * ✅ تحميل تفاصيل قيد كامل (entry + lines + audit)
+     * ✅ تحميل تفاصيل قيد كامل
      */
     public void loadJournalEntryDetails(long entryId) {
         if (entryId <= 0) {
@@ -180,15 +157,13 @@ public class AccountingViewModel extends AndroidViewModel {
                 public void onResponse(Call<JournalEntryDetailsDto> call,
                                       Response<JournalEntryDetailsDto> response) {
                     loading.setValue(false);
-
                     if (response.isSuccessful()
                             && response.body() != null
                             && response.body().success
                             && response.body().entry != null) {
                         journalEntryDetails.setValue(response.body());
                     } else {
-                        String msg = (response.body() != null
-                                && response.body().error != null)
+                        String msg = (response.body() != null && response.body().error != null)
                                 ? response.body().error
                                 : "فشل تحميل تفاصيل القيد: " + response.code();
                         error.setValue(msg);
@@ -196,20 +171,16 @@ public class AccountingViewModel extends AndroidViewModel {
                 }
 
                 @Override
-                public void onFailure(Call<JournalEntryDetailsDto> call,
-                                     Throwable t) {
+                public void onFailure(Call<JournalEntryDetailsDto> call, Throwable t) {
                     loading.setValue(false);
                     error.setValue("خطأ في الشبكة: " + t.getMessage());
                 }
             });
     }
 
-    /**
- * ✅ تحميل قيد مفرد — عبر تفاصيل القيد (نفس endpoint)
- */
-public void loadJournalEntry(long id) {
-    loadJournalEntryDetails(id);
-}
+    public void loadJournalEntry(long id) {
+        loadJournalEntryDetails(id);
+    }
 
     public void postJournalEntry(long id) {
         loading.setValue(true);
@@ -227,8 +198,7 @@ public void loadJournalEntry(long id) {
                 }
 
                 @Override
-                public void onFailure(Call<ApiResponseDto<Object>> call,
-                                     Throwable t) {
+                public void onFailure(Call<ApiResponseDto<Object>> call, Throwable t) {
                     loading.setValue(false);
                     error.setValue(t.getMessage());
                 }
@@ -253,9 +223,7 @@ public void loadJournalEntry(long id) {
                 public void onResponse(Call<ApiResponseDto<AccountDto[]>> call,
                                       Response<ApiResponseDto<AccountDto[]>> response) {
                     loading.setValue(false);
-                    if (response.isSuccessful()
-                            && response.body() != null
-                            && response.body().success) {
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
                         accounts.setValue(response.body().data);
                     } else {
                         error.setValue("فشل تحميل الحسابات: " + response.code());
@@ -263,8 +231,7 @@ public void loadJournalEntry(long id) {
                 }
 
                 @Override
-                public void onFailure(Call<ApiResponseDto<AccountDto[]>> call,
-                                     Throwable t) {
+                public void onFailure(Call<ApiResponseDto<AccountDto[]>> call, Throwable t) {
                     loading.setValue(false);
                     error.setValue("خطأ في الشبكة: " + t.getMessage());
                 }
@@ -279,16 +246,13 @@ public void loadJournalEntry(long id) {
                 public void onResponse(Call<ApiResponseDto<AccountDto[]>> call,
                                       Response<ApiResponseDto<AccountDto[]>> response) {
                     loading.setValue(false);
-                    if (response.isSuccessful()
-                            && response.body() != null
-                            && response.body().success) {
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
                         accountsTree.setValue(response.body().data);
                     }
                 }
 
                 @Override
-                public void onFailure(Call<ApiResponseDto<AccountDto[]>> call,
-                                     Throwable t) {
+                public void onFailure(Call<ApiResponseDto<AccountDto[]>> call, Throwable t) {
                     loading.setValue(false);
                     error.setValue(t.getMessage());
                 }
@@ -305,31 +269,25 @@ public void loadJournalEntry(long id) {
         currentBranchId = branchId;
         loading.setValue(true);
 
-        api.accounting().getTrialBalance(
-            from, to,
-            branchId > 0 ? branchId : null,
-            false
-        ).enqueue(new Callback<ApiResponseDto<TrialBalanceDto>>() {
-            @Override
-            public void onResponse(Call<ApiResponseDto<TrialBalanceDto>> call,
-                                  Response<ApiResponseDto<TrialBalanceDto>> response) {
-                loading.setValue(false);
-                if (response.isSuccessful()
-                        && response.body() != null
-                        && response.body().success) {
-                    trialBalance.setValue(response.body().data);
-                } else {
-                    error.setValue("فشل تحميل ميزان المراجعة");
+        api.accounting().getTrialBalance(from, to, branchId > 0 ? branchId : null, false)
+            .enqueue(new Callback<ApiResponseDto<TrialBalanceDto>>() {
+                @Override
+                public void onResponse(Call<ApiResponseDto<TrialBalanceDto>> call,
+                                      Response<ApiResponseDto<TrialBalanceDto>> response) {
+                    loading.setValue(false);
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
+                        trialBalance.setValue(response.body().data);
+                    } else {
+                        error.setValue("فشل تحميل ميزان المراجعة");
+                    }
                 }
-            }
 
-            @Override
-            public void onFailure(Call<ApiResponseDto<TrialBalanceDto>> call,
-                                 Throwable t) {
-                loading.setValue(false);
-                error.setValue(t.getMessage());
-            }
-        });
+                @Override
+                public void onFailure(Call<ApiResponseDto<TrialBalanceDto>> call, Throwable t) {
+                    loading.setValue(false);
+                    error.setValue(t.getMessage());
+                }
+            });
     }
 
     public void loadBalanceSheet(String asOf) {
@@ -340,16 +298,13 @@ public void loadJournalEntry(long id) {
                 public void onResponse(Call<ApiResponseDto<BalanceSheetDto>> call,
                                       Response<ApiResponseDto<BalanceSheetDto>> response) {
                     loading.setValue(false);
-                    if (response.isSuccessful()
-                            && response.body() != null
-                            && response.body().success) {
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
                         balanceSheet.setValue(response.body().data);
                     }
                 }
 
                 @Override
-                public void onFailure(Call<ApiResponseDto<BalanceSheetDto>> call,
-                                     Throwable t) {
+                public void onFailure(Call<ApiResponseDto<BalanceSheetDto>> call, Throwable t) {
                     loading.setValue(false);
                     error.setValue(t.getMessage());
                 }
@@ -358,23 +313,19 @@ public void loadJournalEntry(long id) {
 
     public void loadIncomeStatement(String from, String to, int branchId) {
         loading.setValue(true);
-        api.accounting().getIncomeStatement(from, to,
-                branchId > 0 ? branchId : null)
+        api.accounting().getIncomeStatement(from, to, branchId > 0 ? branchId : null)
             .enqueue(new Callback<ApiResponseDto<IncomeStatementDto>>() {
                 @Override
                 public void onResponse(Call<ApiResponseDto<IncomeStatementDto>> call,
                                       Response<ApiResponseDto<IncomeStatementDto>> response) {
                     loading.setValue(false);
-                    if (response.isSuccessful()
-                            && response.body() != null
-                            && response.body().success) {
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
                         incomeStatement.setValue(response.body().data);
                     }
                 }
 
                 @Override
-                public void onFailure(Call<ApiResponseDto<IncomeStatementDto>> call,
-                                     Throwable t) {
+                public void onFailure(Call<ApiResponseDto<IncomeStatementDto>> call, Throwable t) {
                     loading.setValue(false);
                     error.setValue(t.getMessage());
                 }
@@ -383,23 +334,19 @@ public void loadJournalEntry(long id) {
 
     public void loadGoldMovement(String from, String to, int branchId) {
         loading.setValue(true);
-        api.accounting().getGoldMovement(from, to,
-                branchId > 0 ? branchId : null)
+        api.accounting().getGoldMovement(from, to, branchId > 0 ? branchId : null)
             .enqueue(new Callback<ApiResponseDto<GoldMovementDto>>() {
                 @Override
                 public void onResponse(Call<ApiResponseDto<GoldMovementDto>> call,
                                       Response<ApiResponseDto<GoldMovementDto>> response) {
                     loading.setValue(false);
-                    if (response.isSuccessful()
-                            && response.body() != null
-                            && response.body().success) {
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
                         goldMovement.setValue(response.body().data);
                     }
                 }
 
                 @Override
-                public void onFailure(Call<ApiResponseDto<GoldMovementDto>> call,
-                                     Throwable t) {
+                public void onFailure(Call<ApiResponseDto<GoldMovementDto>> call, Throwable t) {
                     loading.setValue(false);
                     error.setValue(t.getMessage());
                 }
@@ -410,19 +357,11 @@ public void loadJournalEntry(long id) {
     //  دفتر الأستاذ
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * ✅ الصفحة الأولى (للتوافق)
-     */
-    public void loadGeneralLedger(long accountId, String from, String to,
-                                  int branchId) {
+    public void loadGeneralLedger(long accountId, String from, String to, int branchId) {
         loadGeneralLedger(accountId, from, to, branchId, 1);
     }
 
-    /**
-     * ✅ مع رقم الصفحة
-     */
-    public void loadGeneralLedger(long accountId, String from, String to,
-                                  int branchId, int page) {
+    public void loadGeneralLedger(long accountId, String from, String to, int branchId, int page) {
         if (accountId <= 0) {
             error.setValue("يرجى اختيار حساب");
             return;
@@ -433,57 +372,53 @@ public void loadJournalEntry(long id) {
 
         final int perPage = 100;
 
-        api.accounting().getGeneralLedger(
-            accountId,
-            from,
-            to,
-            branchId > 0 ? branchId : null,
-            page,
-            perPage
-        ).enqueue(new Callback<ApiResponseDto<GeneralLedgerDto>>() {
-            @Override
-            public void onResponse(Call<ApiResponseDto<GeneralLedgerDto>> call,
-                                  Response<ApiResponseDto<GeneralLedgerDto>> response) {
-                loading.setValue(false);
-
-                if (response.isSuccessful()
-                        && response.body() != null
-                        && response.body().success) {
-                    GeneralLedgerDto dto = response.body().data;
-                    if (dto != null) dto.currentPage = page;
-                    generalLedger.setValue(dto);
-                } else {
-                    error.setValue("فشل تحميل دفتر الأستاذ: " + response.code());
+        api.accounting().getGeneralLedger(accountId, from, to, branchId > 0 ? branchId : null, page, perPage)
+            .enqueue(new Callback<ApiResponseDto<GeneralLedgerDto>>() {
+                @Override
+                public void onResponse(Call<ApiResponseDto<GeneralLedgerDto>> call,
+                                      Response<ApiResponseDto<GeneralLedgerDto>> response) {
+                    loading.setValue(false);
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
+                        GeneralLedgerDto dto = response.body().data;
+                        if (dto != null) dto.currentPage = page;
+                        generalLedger.setValue(dto);
+                    } else {
+                        error.setValue("فشل تحميل دفتر الأستاذ: " + response.code());
+                    }
                 }
-            }
 
-            @Override
-            public void onFailure(Call<ApiResponseDto<GeneralLedgerDto>> call,
-                                 Throwable t) {
-                loading.setValue(false);
-                error.setValue("خطأ في الشبكة: " + t.getMessage());
-            }
-        });
+                @Override
+                public void onFailure(Call<ApiResponseDto<GeneralLedgerDto>> call, Throwable t) {
+                    loading.setValue(false);
+                    error.setValue("خطأ في الشبكة: " + t.getMessage());
+                }
+            });
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  إضافة قيد جديد
+    // ═══════════════════════════════════════════════════════
+    
     public void createJournalEntry(org.json.JSONObject payload, Runnable onSuccess) {
-    loading.setValue(true);
-    api.accounting().createJournalEntryPayload(payload)
-        .enqueue(new Callback<ApiResponseDto<JournalEntryDto>>() {
-            @Override
-            public void onResponse(Call<ApiResponseDto<JournalEntryDto>> call, Response<ApiResponseDto<JournalEntryDto>> response) {
-                loading.setValue(false);
-                if (response.isSuccessful() && response.body() != null && response.body().success) {
-                    loadJournalEntries(1, 50, null); // تحديث القائمة
-                    onSuccess.run();
-                } else {
-                    error.setValue("فشل حفظ القيد: " + response.code());
+        loading.setValue(true);
+        api.accounting().createJournalEntryPayload(payload)
+            .enqueue(new Callback<ApiResponseDto<JournalEntryDto>>() {
+                @Override
+                public void onResponse(Call<ApiResponseDto<JournalEntryDto>> call, Response<ApiResponseDto<JournalEntryDto>> response) {
+                    loading.setValue(false);
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
+                        // ✅ استخدام الدالة الجديدة مع التواريخ لتحديث القائمة
+                        loadJournalEntriesWithFilters(1, 50, null, currentFromDate, currentToDate); 
+                        onSuccess.run();
+                    } else {
+                        error.setValue("فشل حفظ القيد: " + response.code());
+                    }
                 }
-            }
-            @Override
-            public void onFailure(Call<ApiResponseDto<JournalEntryDto>> call, Throwable t) {
-                loading.setValue(false);
-                error.setValue(t.getMessage());
-            }
-        });
-}
+                @Override
+                public void onFailure(Call<ApiResponseDto<JournalEntryDto>> call, Throwable t) {
+                    loading.setValue(false);
+                    error.setValue(t.getMessage());
+                }
+            });
+    }
 }
