@@ -2408,8 +2408,7 @@ public ApiResponse saveScrapPurchase(JSONObject payload) {
             payload.put("gate_id", getEffectiveGateId());
         }
         
-        // ملاحظة: تأكد من أن هذا المسار (endpoint) متطابق مع 
-        // المسار الذي ستنشئه في ملف الـ PHP (REST API) على السيرفر
+        // المسار الجديد الذي أنشأناه في ScrapGoldAPI
         return postWithAuth("/scrap/purchase", payload);
         
     } catch (Exception e) {
@@ -2419,4 +2418,5 @@ public ApiResponse saveScrapPurchase(JSONObject payload) {
         return response;
     }
 }
+    
 }
