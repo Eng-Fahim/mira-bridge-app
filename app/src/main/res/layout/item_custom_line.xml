@@ -1,16 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="12dp"
     android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="?attr/colorSurfaceContainer"
     app:cardCornerRadius="8dp"
-    app:cardElevation="0dp"
-    app:strokeColor="?attr/colorOutlineVariant"
-    app:strokeWidth="1dp">
+    app:cardElevation="2dp"
+    app:cardUseCompatPadding="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,12 +14,12 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- Header: Line Number + Remove -->
+        <!-- رأس السطر: رقم السطر وزر الحذف -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/tvLineNumber"
@@ -31,118 +27,138 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="سطر 1"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp"
-                android:textStyle="bold"/>
+                android:textColor="?attr/colorPrimary"
+                android:textStyle="bold"
+                android:textSize="14sp"/>
 
             <ImageButton
                 android:id="@+id/btnRemoveLine"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="حذف"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:src="@android:drawable/ic_menu_delete"
                 app:tint="#E74C3C"/>
         </LinearLayout>
 
-        <!-- Account Picker -->
+        <!-- اختيار الحساب -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardAccount"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="6dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutline"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="4dp"
+            app:cardElevation="1dp"
+            app:strokeColor="#E0E0E0"
             app:strokeWidth="1dp">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvAccountDisplay"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="12dp">
-
-                <TextView
-                    android:id="@+id/tvAccountDisplay"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="اختر الحساب..."
-                    android:textColor="?attr/colorOnSurface"
-                    android:textColorHint="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp"/>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="▼"
-                    android:textColor="?attr/colorPrimary"
-                    android:textSize="12sp"/>
-            </LinearLayout>
+                android:padding="10dp"
+                android:text="اختر الحساب..."
+                android:textColor="#7F8C8D"
+                android:textSize="14sp"/>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Debit / Credit -->
+        <!-- المبالغ المالية -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
-            <!-- Debit -->
             <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilDebit"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:hint="مدين">
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDebit"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:hint="مدين (مالي)"
                     android:inputType="numberDecimal"
-                    android:textDirection="ltr"/>
+                    android:textSize="12sp"
+                    android:textColor="#3498DB"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Credit -->
             <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilCredit"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:hint="دائن">
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etCredit"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:hint="دائن (مالي)"
                     android:inputType="numberDecimal"
-                    android:textDirection="ltr"/>
+                    android:textSize="12sp"
+                    android:textColor="#E74C3C"/>
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
-        <!-- Description -->
+        <!-- ✅ أوزان الذهب الجديدة -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etGoldDebit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="مدين (جرام)"
+                    android:inputType="numberDecimal"
+                    android:textSize="12sp"
+                    android:textColor="@color/mira_gold"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etGoldCredit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="دائن (جرام)"
+                    android:inputType="numberDecimal"
+                    android:textSize="12sp"
+                    android:textColor="@color/mira_gold"/>
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <!-- وصف السطر -->
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="الوصف">
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etLineDescription"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="text"
-                android:maxLines="1"/>
+                android:hint="بيان السطر (اختياري)"
+                android:textSize="12sp"/>
         </com.google.android.material.textfield.TextInputLayout>
+
     </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+</androidx.cardview.widget.CardView>
