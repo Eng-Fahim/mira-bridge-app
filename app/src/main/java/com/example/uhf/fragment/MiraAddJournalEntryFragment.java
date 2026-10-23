@@ -11,7 +11,7 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageButton;
+import android.widget.ImageView; // ✅ تم تغييرها من ImageButton
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,7 +40,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
     private EditText etDate, etReference, etDescription;
     private LinearLayout linesContainer;
     private Button btnAddLine, btnSave;
-    private ImageButton btnClose;
+    private ImageView btnClose; // ✅ تم التصحيح هنا
     private TextView tvTotals;
 
     private List<AccountDto> allAccounts = new ArrayList<>();
@@ -67,16 +67,13 @@ public class MiraAddJournalEntryFragment extends Fragment {
         etDate.setText(DateHelper.todayApi());
         etDate.setOnClickListener(view -> showDatePicker());
 
-        // تحميل الحسابات (الحسابات الفرعية فقط القابلة للترحيل)
+        // تحميل الحسابات
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
             if (accounts != null) {
                 allAccounts.clear();
                 for (AccountDto a : accounts) {
-                    if (a.isLeaf()) { // التأكد من أنها حسابات فرعية
-                        allAccounts.add(a);
-                    }
+                    if (a.isLeaf()) allAccounts.add(a);
                 }
-                // تحديث القوائم في الأسطر الحالية
                 for (View lineView : lineViews) {
                     setupAccountDropdown(lineView);
                 }
@@ -84,16 +81,15 @@ public class MiraAddJournalEntryFragment extends Fragment {
         });
         viewModel.loadAccounts(null, null, true);
 
-        // إضافة أول سطرين افتراضيين (مدين ودائن)
         addLine();
         addLine();
 
         btnAddLine.setOnClickListener(view -> addLine());
         
-        // ✅ زر الإغلاق يعود للشاشة السابقة
-btnClose.setOnClickListener(view -> {
-    getParentFragmentManager().popBackStack();
-});
+        // ✅ إغلاق الشاشة بأمان
+        btnClose.setOnClickListener(view -> {
+            getParentFragmentManager().popBackStack();
+        });
 
         btnSave.setOnClickListener(view -> saveEntry());
 
@@ -114,7 +110,6 @@ btnClose.setOnClickListener(view -> {
 
         setupAccountDropdown(lineView);
 
-        // ربط مستمعات النصوص لحساب الإجماليات فوراً
         EditText etDebit = lineView.findViewById(R.id.etDebit);
         EditText etCredit = lineView.findViewById(R.id.etCredit);
         EditText etGoldDebit = lineView.findViewById(R.id.etGoldDebit);
@@ -131,8 +126,7 @@ btnClose.setOnClickListener(view -> {
         etGoldDebit.addTextChangedListener(watcher);
         etGoldCredit.addTextChangedListener(watcher);
 
-        // زر حذف السطر
-        ImageButton btnRemove = lineView.findViewById(R.id.btnRemoveLine);
+        ImageView btnRemove = lineView.findViewById(R.id.btnRemoveLine);
         btnRemove.setOnClickListener(view -> {
             if (lineViews.size() <= 2) {
                 Toast.makeText(getContext(), "يجب أن يحتوي القيد على سطرين على الأقل", Toast.LENGTH_SHORT).show();
@@ -146,8 +140,10 @@ btnClose.setOnClickListener(view -> {
 
     private void setupAccountDropdown(View lineView) {
         AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
+        
+        // لتفادي مشكلة التكرار، نستخدم قائمة ثابتة
         ArrayAdapter<AccountDto> adapter = new ArrayAdapter<AccountDto>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, allAccounts) {
+                android.R.layout.simple_dropdown_item_1line, new ArrayList<>(allAccounts)) {
             @NonNull
             @Override
             public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
@@ -168,13 +164,11 @@ btnClose.setOnClickListener(view -> {
         acAccount.setAdapter(adapter);
         acAccount.setThreshold(1);
 
-        // ✅ الحفظ المباشر للحساب عند اختياره لتجنب مشاكل تغيير النص
         acAccount.setOnItemClickListener((parent, view, position, id) -> {
             AccountDto selected = (AccountDto) parent.getItemAtPosition(position);
-            acAccount.setTag(selected); // نحفظ الحساب داخل الـ Tag
+            acAccount.setTag(selected);
         });
 
-        // مسح الـ Tag إذا قام المستخدم بتغيير النص يدوياً (لمنع الأخطاء)
         acAccount.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -200,8 +194,6 @@ btnClose.setOnClickListener(view -> {
         }
         
         tvTotals.setText(text);
-
-        // تلوين الإجمالي إذا كان متوازناً (أخضر) أو غير متوازن (أزرق)
         boolean balanced = Math.abs(tDebit - tCredit) < 0.01 && Math.abs(tGoldDebit - tGoldCredit) < 0.001;
         tvTotals.setTextColor(balanced ? 0xFF27AE60 : 0xFF3498DB);
     }
@@ -223,12 +215,10 @@ btnClose.setOnClickListener(view -> {
             for (View lineView : lineViews) {
                 AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
                 
-                // ✅ جلب الحساب من الـ Tag (الطريقة الآمنة)
                 AccountDto selectedAccount = null;
                 if (acAccount.getTag() instanceof AccountDto) {
                     selectedAccount = (AccountDto) acAccount.getTag();
                 } else {
-                    // محاولة احتياطية للبحث بالاسم في حال لم يتم النقر على القائمة
                     for (AccountDto a : allAccounts) {
                         if (acAccount.getText().toString().equals(a.accountCode + " - " + a.accountNameAr)) {
                             selectedAccount = a;
@@ -247,7 +237,6 @@ btnClose.setOnClickListener(view -> {
                 double goldDebit = parseDouble(((EditText) lineView.findViewById(R.id.etGoldDebit)).getText().toString());
                 double goldCredit = parseDouble(((EditText) lineView.findViewById(R.id.etGoldCredit)).getText().toString());
 
-                // تجهيز كائن JSON لكل سطر
                 JSONObject lineObj = new JSONObject();
                 lineObj.put("account_id", selectedAccount.id);
                 lineObj.put("description", desc);
@@ -261,17 +250,15 @@ btnClose.setOnClickListener(view -> {
                 tGoldDebit += goldDebit; tGoldCredit += goldCredit;
             }
 
-            // التحقق النهائي من التوازن قبل الإرسال
             if (Math.abs(tDebit - tCredit) > 0.01) {
-                Toast.makeText(getContext(), "❌ القيد غير متوازن مالياً! (المدين لا يساوي الدائن)", Toast.LENGTH_LONG).show();
+                Toast.makeText(getContext(), "❌ القيد غير متوازن مالياً!", Toast.LENGTH_LONG).show();
                 return;
             }
             if (Math.abs(tGoldDebit - tGoldCredit) > 0.001) {
-                Toast.makeText(getContext(), "❌ القيد غير متوازن وزنياً! (الذهب المدين لا يساوي الدائن)", Toast.LENGTH_LONG).show();
+                Toast.makeText(getContext(), "❌ القيد غير متوازن وزنياً!", Toast.LENGTH_LONG).show();
                 return;
             }
 
-            // تجهيز كائن JSON النهائي للقيد
             JSONObject payload = new JSONObject();
             payload.put("entry_date", date);
             payload.put("reference", ref);
@@ -279,11 +266,9 @@ btnClose.setOnClickListener(view -> {
             payload.put("source_type", "manual");
             payload.put("lines", linesArray);
 
-            // تعطيل الزر لمنع التكرار أثناء الإرسال
             btnSave.setEnabled(false);
             btnSave.setText("جاري الحفظ...");
 
-            // استدعاء دالة الحفظ من الـ ViewModel
             viewModel.createJournalEntry(payload, () -> {
                 Toast.makeText(getContext(), "✅ تم حفظ القيد بنجاح", Toast.LENGTH_SHORT).show();
                 getParentFragmentManager().popBackStack();
