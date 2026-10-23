@@ -21,4 +21,10 @@
         android:icon="@drawable/ic_gate"
         android:title="@string/nav_gates" />
 
+    <!-- ✅ عنصر جديد — سكراب الذهب -->
+    <item
+        android:id="@+id/nav_scrap"
+        android:icon="@drawable/ic_diamond"
+        android:title="سكراب الذهب" />
+
 </menu>
