@@ -21,20 +21,17 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.JournalEntryAdapter;
-import com.example.uhf.api.dto.JournalEntryDto;
 import com.example.uhf.utils.DateHelper;
 import com.example.uhf.viewmodel.AccountingViewModel;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Locale;
 
-/**
- * ✅ شاشة القيود المحاسبية
- */
 public class MiraJournalFragment extends Fragment {
 
     private AccountingViewModel viewModel;
@@ -48,6 +45,7 @@ public class MiraJournalFragment extends Fragment {
     private ProgressBar pbLoading;
     private LinearLayout emptyState;
     private TextView tvEmptyText;
+    private FloatingActionButton fabAddEntry; // ✅ متغير الزر
 
     private String fromDate = DateHelper.startOfYearApi();
     private String toDate   = DateHelper.todayApi();
@@ -71,6 +69,15 @@ public class MiraJournalFragment extends Fragment {
         return view;
     }
 
+    // ✅ تحديث القائمة تلقائياً عند العودة من شاشة إضافة القيد
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (viewModel != null) {
+            loadEntries();
+        }
+    }
+
     private void initViews(View v) {
         btnFromDate     = v.findViewById(R.id.btnFromDate);
         btnToDate       = v.findViewById(R.id.btnToDate);
@@ -84,6 +91,9 @@ public class MiraJournalFragment extends Fragment {
         pbLoading       = v.findViewById(R.id.pbLoading);
         emptyState      = v.findViewById(R.id.emptyState);
         tvEmptyText     = v.findViewById(R.id.tvEmptyText);
+        
+        // ✅ ربط الزر هنا
+        fabAddEntry     = v.findViewById(R.id.fabAddEntry);
     }
 
     private void setupViewModel() {
@@ -122,10 +132,8 @@ public class MiraJournalFragment extends Fragment {
 
     private void setupRecycler() {
         adapter = new JournalEntryAdapter(entry -> {
-            // ✅ فتح تفاصيل القيد
             if (entry.id <= 0) {
-                Toast.makeText(requireContext(),
-                    "معرف القيد مفقود", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "معرف القيد مفقود", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -133,8 +141,7 @@ public class MiraJournalFragment extends Fragment {
                 MiraJournalEntryDetailsFragment.newInstance(entry.id);
 
             if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity())
-                    .loadFragment(details, "JournalEntryDetails");
+                ((UHFMainActivity) getActivity()).loadFragment(details, "JournalEntryDetails");
             } else {
                 requireActivity().getSupportFragmentManager()
                     .beginTransaction()
@@ -165,6 +172,21 @@ public class MiraJournalFragment extends Fragment {
 
             loadEntries();
         });
+
+        // ✅ مستمع زر الإضافة (+)
+        if (fabAddEntry != null) {
+            fabAddEntry.setOnClickListener(v -> {
+                MiraAddJournalEntryFragment addFragment = new MiraAddJournalEntryFragment();
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).loadFragment(addFragment, "AddJournalEntry");
+                } else {
+                    getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, addFragment)
+                        .addToBackStack("AddJournalEntry")
+                        .commit();
+                }
+            });
+        }
     }
 
     private void pickDate(boolean isFrom) {
@@ -172,34 +194,26 @@ public class MiraJournalFragment extends Fragment {
         try {
             String dateStr = isFrom ? fromDate : toDate;
             String[] parts = dateStr.split("-");
-            cal.set(Integer.parseInt(parts[0]),
-                    Integer.parseInt(parts[1]) - 1,
-                    Integer.parseInt(parts[2]));
+            cal.set(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]) - 1, Integer.parseInt(parts[2]));
         } catch (Exception ignored) {}
 
         new DatePickerDialog(requireContext(),
             (view, year, month, dayOfMonth) -> {
-                String date = String.format(Locale.US, "%04d-%02d-%02d",
-                        year, month + 1, dayOfMonth);
-
-                if (isFrom) {
-                    fromDate = date;
-                } else {
-                    toDate = date;
-                }
+                String date = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                if (isFrom) fromDate = date;
+                else toDate = date;
                 updateDateButtons();
                 loadEntries();
             },
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH),
-            cal.get(Calendar.DAY_OF_MONTH)
+            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
         ).show();
     }
 
     private void loadEntries() {
         currentPage = 1;
         updateDateButtons();
-        viewModel.loadJournalEntries(currentPage, PER_PAGE, statusFilter);
+        // ✅ تمرير التواريخ المحددة للـ ViewModel
+        viewModel.loadJournalEntriesWithFilters(currentPage, PER_PAGE, statusFilter, fromDate, toDate);
     }
 
     private void updateDateButtons() {
