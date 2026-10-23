@@ -2418,5 +2418,9 @@ public ApiResponse saveScrapPurchase(JSONObject payload) {
         return response;
     }
 }
+
+    public ApiResponse getScrapSummary(int branchId) {
+    return getWithAuth("/scrap/summary?branch_id=" + branchId);
+    }
     
 }
