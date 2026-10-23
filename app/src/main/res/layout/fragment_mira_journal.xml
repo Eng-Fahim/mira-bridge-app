@@ -1,128 +1,148 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="?attr/colorSurface">
 
-    <!-- ═══════ شريط التاريخ ═══════ -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:background="?attr/colorSurfaceContainer"
-        android:elevation="2dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFromDate"
-            android:layout_width="0dp"
+        <!-- ═══════ شريط التاريخ ═══════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="من: 01/01/2026"
-            style="@style/AppButtonStyle.Outlined"
-            android:textSize="12sp"
-            android:layout_marginEnd="4dp"/>
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:background="?attr/colorSurfaceContainer"
+            android:elevation="2dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnToDate"
-            android:layout_width="0dp"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnFromDate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="من: 01/01/2026"
+                style="@style/AppButtonStyle.Outlined"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToDate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="إلى: 10/02/2026"
+                style="@style/AppButtonStyle.Outlined"
+                android:textSize="12sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+
+        <!-- ═══════ فلاتر الحالة ═══════ -->
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipStatusGroup"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:background="?attr/colorSurface"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipAll"
+                style="@style/AppChipStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الكل"
+                android:checked="true"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPosted"
+                style="@style/AppChipStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="معتمد"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipDraft"
+                style="@style/AppChipStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="مسودة"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipReversed"
+                style="@style/AppChipStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="معكوس"/>
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- ═══════ RecyclerView ═══════ -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvEntries"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="8dp"
+                android:paddingBottom="80dp" 
+                android:clipToPadding="false"
+                android:background="?attr/colorSurface"/>
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <!-- ═══════ Progress ═══════ -->
+        <ProgressBar
+            android:id="@+id/pbLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"/>
+
+        <!-- ═══════ حالة فارغة ═══════ -->
+        <LinearLayout
+            android:id="@+id/emptyState"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1"
-            android:text="إلى: 10/02/2026"
-            style="@style/AppButtonStyle.Outlined"
-            android:textSize="12sp"
-            android:layout_marginStart="4dp"/>
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📭"
+                android:textSize="72sp"/>
+
+            <TextView
+                android:id="@+id/tvEmptyText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="لا توجد قيود في هذه الفترة"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="16sp"
+                android:layout_marginTop="12dp"/>
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- ═══════ فلاتر الحالة ═══════ -->
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/chipStatusGroup"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="8dp"
-        android:background="?attr/colorSurface"
-        app:singleSelection="true"
-        app:selectionRequired="true">
-
-        <com.google.android.material.chip.Chip
-            android:id="@+id/chipAll"
-            style="@style/AppChipStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="الكل"
-            android:checked="true"/>
-
-        <com.google.android.material.chip.Chip
-            android:id="@+id/chipPosted"
-            style="@style/AppChipStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="معتمد"/>
-
-        <com.google.android.material.chip.Chip
-            android:id="@+id/chipDraft"
-            style="@style/AppChipStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="مسودة"/>
-
-        <com.google.android.material.chip.Chip
-            android:id="@+id/chipReversed"
-            style="@style/AppChipStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="معكوس"/>
-    </com.google.android.material.chip.ChipGroup>
-
-    <!-- ═══════ RecyclerView ═══════ -->
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefresh"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvEntries"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="8dp"
-            android:clipToPadding="false"
-            android:background="?attr/colorSurface"/>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-    <!-- ═══════ Progress ═══════ -->
-    <ProgressBar
-        android:id="@+id/pbLoading"
+    <!-- ✅ زر إضافة قيد يدوي عائم -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAddEntry"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:visibility="gone"/>
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:src="@android:drawable/ic_input_add"
+        android:contentDescription="إضافة قيد"
+        app:tint="@android:color/white"
+        android:backgroundTint="@color/mira_gold"/>
 
-    <!-- ═══════ حالة فارغة ═══════ -->
-    <LinearLayout
-        android:id="@+id/emptyState"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📭"
-            android:textSize="72sp"/>
-
-        <TextView
-            android:id="@+id/tvEmptyText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="لا توجد قيود في هذه الفترة"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="16sp"
-            android:layout_marginTop="12dp"/>
-    </LinearLayout>
-</LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
