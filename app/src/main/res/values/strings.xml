@@ -2762,4 +2762,20 @@
 <string name="pending_sale_delete">حذف</string>
 <string name="inventory_by_karat">📦 المخزون حسب العيار</string>
 <string name="no_data">لا توجد بيانات</string>
+
+
+<!-- Scrap Gold Buy -->
+<string name="scrap_gold_title">شراء كسر الذهب (Scrap Gold)</string>
+<string name="customer_data_optional">بيانات العميل (اختياري)</string>
+
+<string name="customer_phone_id">رقم الجوال / الهوية</string>
+<string name="weight_and_price_details">تفاصيل الوزن والسعر</string>
+<string name="weight_grams">الوزن (جرام)</string>
+<string name="karat">العيار</string>
+<string name="market_price_per_gram">سعر الجرام (السوق)</string>
+<string name="deduction_per_gram">خصم الشوائب/المصنعية (للجرام)</string>
+<string name="total_due_to_customer">الصافي المستحق للعميل</string>
+<string name="save_purchase">حفظ عملية الشراء</string>
+<string name="error_enter_weight_price">الرجاء إدخال الوزن وسعر الجرام بشكل صحيح</string>
+<string name="purchase_saved_success">تم حفظ عملية الشراء بنجاح ✅</string>
 </resources>
