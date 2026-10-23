@@ -2123,7 +2123,6 @@ public void playLocatorBeep(int level) {
     // ═══════════════════════════════════════════════════════
     //  التنقل السريع
     // ═══════════════════════════════════════════════════════
-
     private void setupQuickNav() {
         try {
             BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
@@ -2147,10 +2146,10 @@ public void playLocatorBeep(int level) {
             }
 
             if (quickNav != null) {
-                quickNav.setOnItemSelectedListener(item -> {
-                    int id = item.getItemId();
-                    String tag = getFragmentTagForNavItem(id);
-                    if (tag == null || tag.isEmpty()) return false;
+            quickNav.setOnItemSelectedListener(item -> {
+                int id = item.getItemId();
+                String tag = getFragmentTagForNavItem(id);
+                if (tag == null || tag.isEmpty()) return false;
 
                     if (navigationManager != null
                             && tag.equals(navigationManager.getCurrentFragmentTag())) {
@@ -2190,27 +2189,24 @@ public void playLocatorBeep(int level) {
                         return false;
                     }
 
-                    Fragment fragment = navigationManager != null
-                            ? navigationManager.createFragmentByTag(tag)
-                            : FragmentFactory.createFragmentByTag(tag);
-
                     if (fragment != null) {
-                        loadFragmentDirectly(fragment, tag);
-                        return true;
-                    }
-                    return false;
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+                    loadFragmentDirectly(fragment, tag);
+                    return true;
+                }
+                return false;
+            });
         }
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
 
     private String getFragmentTagForNavItem(int itemId) {
     if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
     if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
     if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
     if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;
+    if (itemId == R.id.nav_scrap) return NavigationManager.TAG_SCRAP_GOLD_BUY; // <-- إضافة جديدة
     return "";
 }
 
@@ -2225,8 +2221,10 @@ public void playLocatorBeep(int level) {
             quickNav.getMenu().findItem(R.id.nav_inventory).setChecked(true);
         } else if (tag.equals(NavigationManager.TAG_POS)) {
             quickNav.getMenu().findItem(R.id.nav_sales).setChecked(true);
-        } else if (tag.equals(NavigationManager.TAG_GATES)) {   // ✅ موحّد
+        } else if (tag.equals(NavigationManager.TAG_GATES)) {   
             quickNav.getMenu().findItem(R.id.nav_transfers).setChecked(true);
+        } else if (tag.equals(NavigationManager.TAG_SCRAP_GOLD_BUY)) { // <-- إضافة جديدة
+            quickNav.getMenu().findItem(R.id.nav_scrap).setChecked(true);
         }
     } catch (Exception e) {
         Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
