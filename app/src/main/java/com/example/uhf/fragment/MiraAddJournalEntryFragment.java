@@ -90,13 +90,10 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
         btnAddLine.setOnClickListener(view -> addLine());
         
-        btnClose.setOnClickListener(view -> {
-            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
-                getParentFragmentManager().popBackStack();
-            } else {
-                requireActivity().onBackPressed();
-            }
-        });
+        // ✅ زر الإغلاق يعود للشاشة السابقة
+btnClose.setOnClickListener(view -> {
+    getParentFragmentManager().popBackStack();
+});
 
         btnSave.setOnClickListener(view -> saveEntry());
 
@@ -169,6 +166,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
             }
         };
         acAccount.setAdapter(adapter);
+        acAccount.setThreshold(1);
 
         // ✅ الحفظ المباشر للحساب عند اختياره لتجنب مشاكل تغيير النص
         acAccount.setOnItemClickListener((parent, view, position, id) -> {
