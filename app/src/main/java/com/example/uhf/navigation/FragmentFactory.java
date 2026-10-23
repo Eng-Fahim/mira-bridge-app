@@ -9,37 +9,35 @@ import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 public class FragmentFactory {
 
     public static Fragment createFragmentByTag(String tag) {
-        if (tag == null) return new MiraDashboardFragment();
+    if (tag == null) return new MiraDashboardFragment();
 
-        switch (tag) {
-            case "Dashboard": return new MiraDashboardFragment();
-            case "Scan": return new MiraInventoryProFragment();
-            case "POS": return new MiraPosFragment();
-            case "Transfers": return new MiraTransferFragment();
-            case "IdentityStudio": return new MiraIdentityStudioFragment();
-            case "Radar": return new MiraUHFRadarLocationFragment();
-            case "SecureGate": return new MiraSecureGateFragment();
-            case "Reports": return new MiraReportsProFragment();
-            case "Accounting": return new MiraAccountingFragment();
-            case "AdminHub": return new MiraAdminHubFragment();
-            case "SalesHistory": return new MiraSalesHistoryFragment();
-            case "ServerConfig": return new MiraServerConfigFragment();
-            case "GoldRates": return new MiraGoldCurrencyFragment();
-            case "Profile": return new MiraProfileFragment();
-            case "UsersManagement": return new UsersManagementFragment();
-            case "RFIDWrite": return new MiraUHFReadWriteFragment();
-            case "ReaderSetup": return new MiraReaderSetupFragment();
-            case "GateSettings": return new MiraGateSettingsFragment();
-            case "Gates": return new MiraSecureGateFragment();
-            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
-            case "Branches": return new MiraBranchesManagementFragment();
-            case "RfidBindings": return new MiraRfidBindingsFragment();
-            case "SoundSettings": return new MiraSoundSettingsFragment();
-            // ✅ جديد: شاشة اللقطات
-            case "Snapshots": return new MiraSnapshotsFragment();
-            // ✅ جديد: سكراب الذهب
-            case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();
-            default: return new MiraDashboardFragment();
-        }
+    switch (tag) {
+        case "Dashboard": return new MiraDashboardFragment();
+        case "Scan": return new MiraInventoryProFragment();
+        case "POS": return new MiraPosFragment();
+        case "Transfers": return new MiraTransferFragment();
+        case "IdentityStudio": return new MiraIdentityStudioFragment();
+        case "Radar": return new MiraUHFRadarLocationFragment();
+        case "SecureGate": return new MiraSecureGateFragment();
+        case "Reports": return new MiraReportsProFragment();
+        case "Accounting": return new MiraAccountingFragment();
+        case "AdminHub": return new MiraAdminHubFragment();
+        case "SalesHistory": return new MiraSalesHistoryFragment();
+        case "ServerConfig": return new MiraServerConfigFragment();
+        case "GoldRates": return new MiraGoldCurrencyFragment();
+        case "Profile": return new MiraProfileFragment();
+        case "UsersManagement": return new UsersManagementFragment();
+        case "RFIDWrite": return new MiraUHFReadWriteFragment();
+        case "ReaderSetup": return new MiraReaderSetupFragment();
+        case "GateSettings": return new MiraGateSettingsFragment();
+        case "Gates": return new MiraSecureGateFragment();
+        case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+        case "Branches": return new MiraBranchesManagementFragment();
+        case "RfidBindings": return new MiraRfidBindingsFragment();
+        case "SoundSettings": return new MiraSoundSettingsFragment();
+        case "Snapshots": return new MiraSnapshotsFragment();
+        case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();   // ← ✅ أضف هذا
+        default: return new MiraDashboardFragment();
     }
+}
 }
