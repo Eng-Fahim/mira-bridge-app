@@ -265,8 +265,9 @@ public class MiraCustomAdjustingFragment extends Fragment {
                 line.put("description", l.description);
                 line.put("debit", l.debit);
                 line.put("credit", l.credit);
-                line.put("gold_debit", l.goldDebit);   // ✅ إرسال الوزن
-                line.put("gold_credit", l.goldCredit); // ✅ إرسال الوزن
+                line.put("gold_debit_grams", l.goldDebit);   
+                line.put("gold_credit_grams", l.goldCredit); 
+                
 
                 linesArr.put(line);
 
