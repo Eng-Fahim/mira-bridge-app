@@ -268,6 +268,20 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
             btnSave.setEnabled(false);
             btnSave.setText("جاري الحفظ...");
+            
+            // ✅ شبكة أمان: إلغاء تعليق الزر بعد 15 ثانية إذا لم يستجب السيرفر
+new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+    if (!btnSave.isEnabled()) {
+        btnSave.setEnabled(true);
+        btnSave.setText("حفظ وترحيل القيد");
+        Toast.makeText(getContext(), "⚠️ لم يستجب السيرفر، يرجى المحاولة مرة أخرى", Toast.LENGTH_LONG).show();
+    }
+}, 15000);
+
+viewModel.createJournalEntry(payload, () -> {
+    Toast.makeText(getContext(), "✅ تم حفظ القيد بنجاح", Toast.LENGTH_SHORT).show();
+    getParentFragmentManager().popBackStack();
+});
 
             viewModel.createJournalEntry(payload, () -> {
                 Toast.makeText(getContext(), "✅ تم حفظ القيد بنجاح", Toast.LENGTH_SHORT).show();
