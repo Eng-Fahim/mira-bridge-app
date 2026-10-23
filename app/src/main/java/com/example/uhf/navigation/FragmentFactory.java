@@ -37,6 +37,8 @@ public class FragmentFactory {
             case "SoundSettings": return new MiraSoundSettingsFragment();
             // ✅ جديد: شاشة اللقطات
             case "Snapshots": return new MiraSnapshotsFragment();
+            // ✅ جديد: سكراب الذهب
+            case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();
             default: return new MiraDashboardFragment();
         }
     }
