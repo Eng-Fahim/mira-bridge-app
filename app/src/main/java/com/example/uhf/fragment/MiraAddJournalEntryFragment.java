@@ -11,7 +11,7 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageView; // ✅ تم تغييرها من ImageButton
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,7 +40,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
     private EditText etDate, etReference, etDescription;
     private LinearLayout linesContainer;
     private Button btnAddLine, btnSave;
-    private ImageView btnClose; // ✅ تم التصحيح هنا
+    private ImageView btnClose;
     private TextView tvTotals;
 
     private List<AccountDto> allAccounts = new ArrayList<>();
@@ -141,7 +141,6 @@ public class MiraAddJournalEntryFragment extends Fragment {
     private void setupAccountDropdown(View lineView) {
         AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
         
-        // لتفادي مشكلة التكرار، نستخدم قائمة ثابتة
         ArrayAdapter<AccountDto> adapter = new ArrayAdapter<AccountDto>(requireContext(),
                 android.R.layout.simple_dropdown_item_1line, new ArrayList<>(allAccounts)) {
             @NonNull
@@ -242,8 +241,9 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 lineObj.put("description", desc);
                 lineObj.put("debit", debit);
                 lineObj.put("credit", credit);
-                lineObj.put("gold_debit", goldDebit);
-                lineObj.put("gold_credit", goldCredit);
+                // ✅ التصحيح هنا: إضافة _grams لتطابق السيرفر
+                lineObj.put("gold_debit_grams", goldDebit); 
+                lineObj.put("gold_credit_grams", goldCredit); 
                 linesArray.put(lineObj);
 
                 tDebit += debit; tCredit += credit;
