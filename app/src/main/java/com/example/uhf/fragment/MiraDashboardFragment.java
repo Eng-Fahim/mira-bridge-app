@@ -54,11 +54,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * MiraDashboardFragment v2.4 — FULL SECURITY & PRIVACY HARDENED
- * 
- * إصلاحات v2.4:
- *   ✅ إزالة استدعاء priceManager.clearCache() لأنه غير موجود في MiraPriceManager
- *   ✅ تصحيح بناء الجمل الشرطية في refreshAllData
+ * MiraDashboardFragment v2.5 — FULL SECURITY & PRIVACY HARDENED
+ *
+ * إصلاحات v2.5:
+ *   ✅ إضافة بطاقة "ملخص سكراب الذهب" (Scrap Gold Summary)
+ *   ✅ مزامنة كاملة مع layout fragment_mira_dashboard.xml الجديد
+ *   ✅ دوال: toggleScrapVisibility, updateScrapUI, fetchScrapSummary
  */
 public class MiraDashboardFragment extends Fragment {
 
@@ -89,6 +90,14 @@ public class MiraDashboardFragment extends Fragment {
     private boolean isHeroHidden = true;
     private boolean isSalesHidden = true;
     private boolean isInventoryHidden = true;
+
+    // ═══════════════ [v2.5] Scrap Gold State ═══════════════
+    private boolean isScrapHidden = true;
+    private double currentScrapWeight = 0;
+    private double currentScrapValue = 0;
+    private TextView tvScrapWeight, tvScrapValue;
+    private ImageButton btnToggleScrapVisibility;
+    private View btnOpenScrapHistory;
 
     // ───── UI Elements ─────
     private ImageButton btnToggleHeroVisibility;
@@ -200,6 +209,7 @@ public class MiraDashboardFragment extends Fragment {
                 long now = System.currentTimeMillis();
                 if (now - lastDataFetchTime >= REFRESH_INTERVAL_MS) {
                     fetchData();
+                    if (currentBranchId > 0) fetchScrapSummary(currentBranchId);
                 }
                 mainHandler.postDelayed(this, REFRESH_INTERVAL_MS);
             }
@@ -225,7 +235,10 @@ public class MiraDashboardFragment extends Fragment {
                         isDataLoaded = false;
                         lastDataFetchTime = 0;
                         isLoading.set(false);
-                        if (isResumed()) fetchData();
+                        if (isResumed()) {
+                            fetchData();
+                            if (currentBranchId > 0) fetchScrapSummary(currentBranchId);
+                        }
                     }
                 });
             }
@@ -261,7 +274,7 @@ public class MiraDashboardFragment extends Fragment {
             if (ctx == null) return;
 
             int currentUserId = sessionManager.getUserId();
-            if (currentUserId <= 0) return; 
+            if (currentUserId <= 0) return;
 
             android.content.SharedPreferences prefs =
                     ctx.getSharedPreferences(PREFS_CACHE_OWNER, Context.MODE_PRIVATE);
@@ -270,8 +283,6 @@ public class MiraDashboardFragment extends Fragment {
             if (ownerUserId > 0 && ownerUserId != currentUserId) {
                 if (activityCache != null) activityCache.clear();
                 if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
-                
-                // ❌ تم حذف السطر المسبب للخطأ: if (priceManager != null) priceManager.clearCache();
 
                 int oldBranch = prefs.getInt(KEY_PREFIX_LAST_BRANCH + ownerUserId, -1);
                 if (oldBranch > 0) {
@@ -444,6 +455,21 @@ public class MiraDashboardFragment extends Fragment {
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
             btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility);
 
+            // ═══════════════ [v2.5] SCRAP GOLD ═══════════════
+            tvScrapWeight = v.findViewById(R.id.tvScrapWeight);
+            tvScrapValue = v.findViewById(R.id.tvScrapValue);
+            btnToggleScrapVisibility = v.findViewById(R.id.btnToggleScrapVisibility);
+            btnOpenScrapHistory = v.findViewById(R.id.btnOpenScrapHistory);
+
+            if (btnToggleScrapVisibility != null) {
+                btnToggleScrapVisibility.setOnClickListener(v2 -> toggleScrapVisibility());
+            }
+            if (btnOpenScrapHistory != null) {
+            btnOpenScrapHistory.setOnClickListener(v2 ->
+            navigateToFragment(new MiraScrapHistoryFragment(), "ScrapHistory"));
+            }
+            
+
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
             if (tvViewAllActivity != null) {
@@ -487,6 +513,7 @@ public class MiraDashboardFragment extends Fragment {
             isHeroHidden = true;
             isSalesHidden = true;
             isInventoryHidden = true;
+            isScrapHidden = true;  // [v2.5]
 
             if (btnToggleHeroVisibility != null)
                 btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
@@ -494,9 +521,12 @@ public class MiraDashboardFragment extends Fragment {
                 btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleInventoryVisibility != null)
                 btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
+            if (btnToggleScrapVisibility != null)  // [v2.5]
+                btnToggleScrapVisibility.setImageResource(R.drawable.ic_eye_off);
 
             updateHeroBalance();
             applySalesVisibility();
+            updateScrapUI();  // [v2.5]
 
         } catch (Exception e) {
             logNonFatal("initViews", e);
@@ -636,6 +666,59 @@ public class MiraDashboardFragment extends Fragment {
                     isInventoryHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
         }
         renderInventoryByKarat(currentInventoryByKarat);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // [v2.5] Scrap Gold
+    // ═══════════════════════════════════════════════════════
+    private void toggleScrapVisibility() {
+        if (!isAdded()) return;
+        isScrapHidden = !isScrapHidden;
+        if (btnToggleScrapVisibility != null) {
+            btnToggleScrapVisibility.setImageResource(
+                    isScrapHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        }
+        updateScrapUI();
+    }
+
+    private void updateScrapUI() {
+        if (tvScrapWeight == null || tvScrapValue == null) return;
+
+        if (isScrapHidden) {
+            tvScrapWeight.setText("••••••");
+            tvScrapValue.setText("••••••");
+        } else {
+            tvScrapWeight.setText(String.format(Locale.US, "%.2f g", currentScrapWeight));
+            tvScrapValue.setText(formatCurrency(currentScrapValue));
+        }
+    }
+
+    private void fetchScrapSummary(int branchId) {
+        if (apiClient == null || !ensureExecutor()) return;
+        localExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getScrapSummary(branchId);
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject data = response.data.optJSONObject("data");
+                    if (data == null) data = response.data; // fallback
+                    if (data != null) {
+                        currentScrapWeight = data.optDouble("total_weight", 0);
+                        currentScrapValue = data.optDouble("total_value", 0);
+
+                        mainHandler.post(() -> {
+                            if (isAdded()) {
+                                isScrapHidden = true; // تصفير الحالة عند التحديث
+                                if (btnToggleScrapVisibility != null)
+                                    btnToggleScrapVisibility.setImageResource(R.drawable.ic_eye_off);
+                                updateScrapUI();
+                            }
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                logNonFatal("fetchScrapSummary", e);
+            }
+        });
     }
 
     private void applySalesVisibility() {
@@ -825,22 +908,21 @@ public class MiraDashboardFragment extends Fragment {
     // ═══════════════════════════════════════════════════════
     // Gold prices
     // ═══════════════════════════════════════════════════════
-   
     private void fetchLiveGoldPrices(boolean forceRefresh) {
         try {
             if (!canManuallyRefreshGold()) {
-            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-            return;
-        }
-        if (permissionManager == null || !permissionManager.canAccessFragment("GoldRates")) {
-            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-            return;
-        }
-        
-        if (apiClient == null) {
-            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-            return;
-        }
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
+            if (permissionManager == null || !permissionManager.canAccessFragment("GoldRates")) {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
+
+            if (apiClient == null) {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
             if (isGoldRefreshing.get()) {
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                 return;
@@ -950,29 +1032,29 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-   private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
-    try {
-        if (response == null || !response.isSuccess || response.data == null) return null;
-        JSONObject data = response.data.optJSONObject("data");
-        if (data == null) data = response.data;
-        JSONObject prices = data.optJSONObject("prices");
-        if (prices == null) prices = data;
+    private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
+        try {
+            if (response == null || !response.isSuccess || response.data == null) return null;
+            JSONObject data = response.data.optJSONObject("data");
+            if (data == null) data = response.data;
+            JSONObject prices = data.optJSONObject("prices");
+            if (prices == null) prices = data;
 
-        double price24 = prices.optDouble("24k", 0);
-        double price21 = prices.optDouble("21k", 0);
-        double price18 = prices.optDouble("18k", 0);
-        
-        if (price24 <= 0 || price24 > 5000) return null; 
-        
-        double ouncePrice = data.optDouble("price_per_ounce", price24 * OUNCE_TO_GRAM);
-        String source = data.optString("source", "server");
+            double price24 = prices.optDouble("24k", 0);
+            double price21 = prices.optDouble("21k", 0);
+            double price18 = prices.optDouble("18k", 0);
 
-        return new GoldPriceData(price24, price21, price18, ouncePrice, source);
-    } catch (Exception e) {
-        logNonFatal("parseGoldPriceData", e);
-        return null;
+            if (price24 <= 0 || price24 > 5000) return null;
+
+            double ouncePrice = data.optDouble("price_per_ounce", price24 * OUNCE_TO_GRAM);
+            String source = data.optString("source", "server");
+
+            return new GoldPriceData(price24, price21, price18, ouncePrice, source);
+        } catch (Exception e) {
+            logNonFatal("parseGoldPriceData", e);
+            return null;
+        }
     }
-}
 
     private void displayGoldPrices(GoldPriceData data) {
         try {
@@ -1039,39 +1121,39 @@ public class MiraDashboardFragment extends Fragment {
             logNonFatal("displayGoldPricesFromCache", e);
         }
     }
-    
-private void fetchApprovedGoldPricesFromServer() {
-    if (apiClient == null || !isAdded() || !isSessionValid()) return;
-    if (!ensureExecutor()) return;
 
-    localExecutor.execute(() -> {
-        try {
-            MiraApiClient.ApiResponse response = apiClient.getDashboardGoldPrices();
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONObject prices = response.data.optJSONObject("prices");
-                if (prices != null) {
-                    double price24 = prices.optDouble("24k", 0);
-                    double price21 = prices.optDouble("21k", 0);
-                    double price18 = prices.optDouble("18k", 0);
-                    String source = response.data.optString("source", "server");
-                    
-                    if (price24 > 0) {
-                        GoldPriceData priceData = new GoldPriceData(price24, price21, price18, price24 * OUNCE_TO_GRAM, source);
-                        
-                        mainHandler.post(() -> {
-                            if (isAdded()) {
-                                displayGoldPrices(priceData);
-                            }
-                        });
+    private void fetchApprovedGoldPricesFromServer() {
+        if (apiClient == null || !isAdded() || !isSessionValid()) return;
+        if (!ensureExecutor()) return;
+
+        localExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getDashboardGoldPrices();
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject prices = response.data.optJSONObject("prices");
+                    if (prices != null) {
+                        double price24 = prices.optDouble("24k", 0);
+                        double price21 = prices.optDouble("21k", 0);
+                        double price18 = prices.optDouble("18k", 0);
+                        String source = response.data.optString("source", "server");
+
+                        if (price24 > 0) {
+                            GoldPriceData priceData = new GoldPriceData(price24, price21, price18, price24 * OUNCE_TO_GRAM, source);
+
+                            mainHandler.post(() -> {
+                                if (isAdded()) {
+                                    displayGoldPrices(priceData);
+                                }
+                            });
+                        }
                     }
                 }
+            } catch (Exception e) {
+                logNonFatal("fetchApprovedGoldPricesFromServer", e);
             }
-        } catch (Exception e) {
-            logNonFatal("fetchApprovedGoldPricesFromServer", e);
-        }
-    });
-}
+        });
+    }
 
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
@@ -1496,59 +1578,60 @@ private void fetchApprovedGoldPricesFromServer() {
     }
 
     private void handleRecentActivityClick(JSONObject activity) {
-    if (activity == null || !isAdded()) return;
-    try {
-        ActivityDetailsBottomSheet sheet =
-                ActivityDetailsBottomSheet.newInstance(activity, isArabic);
+        if (activity == null || !isAdded()) return;
+        try {
+            ActivityDetailsBottomSheet sheet =
+                    ActivityDetailsBottomSheet.newInstance(activity, isArabic);
 
-        sheet.setOnActionClickListener(new ActivityDetailsBottomSheet.OnActionClickListener() {
-            
-            @Override
-            public void onPrintInvoice(JSONObject activityData) {
-    if (!isAdded() || getContext() == null) return;
-    
-    try {
-        String receiptJson = activityData.toString();
-        
-        com.example.uhf.fragment.MiraReceiptFragment receiptFragment = 
-                com.example.uhf.fragment.MiraReceiptFragment.newInstance(receiptJson);
-        
-        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
-        if (fm != null && !fm.isStateSaved()) {
-            receiptFragment.show(fm, "MiraReceiptFragment");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "onPrintInvoice error", e);
-        Toast.makeText(getContext(), "تعذر فتح الفاتورة", Toast.LENGTH_SHORT).show();
-    }
-}
+            sheet.setOnActionClickListener(new ActivityDetailsBottomSheet.OnActionClickListener() {
 
-            @Override
-            public void onOpenRefund(JSONObject activityData) {
-                if (!isAdded() || getActivity() == null) return;
-                
-                try {
-                    Fragment salesFragment = new MiraPosFragment(); 
-                    
-                    Bundle bundle = new Bundle();
-                    bundle.putString("refund_data_json", activityData.toString());
-                    bundle.putBoolean("auto_open_refund", true);
-                    salesFragment.setArguments(bundle);
+                @Override
+                public void onPrintInvoice(JSONObject activityData) {
+                    if (!isAdded() || getContext() == null) return;
 
-                    if (getActivity() instanceof UHFMainActivity) {
-                        ((UHFMainActivity) getActivity()).loadFragment(salesFragment, "Sales");
+                    try {
+                        String receiptJson = activityData.toString();
+
+                        com.example.uhf.fragment.MiraReceiptFragment receiptFragment =
+                                com.example.uhf.fragment.MiraReceiptFragment.newInstance(receiptJson);
+
+                        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
+                        if (fm != null && !fm.isStateSaved()) {
+                            receiptFragment.show(fm, "MiraReceiptFragment");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "onPrintInvoice error", e);
+                        Toast.makeText(getContext(), "تعذر فتح الفاتورة", Toast.LENGTH_SHORT).show();
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error opening refund", e);
                 }
-            }
-        });
 
-        sheet.show(getParentFragmentManager(), "ActivityDetails");
-    } catch (Exception e) {
-        logNonFatal("handleRecentActivityClick", e);
+                @Override
+                public void onOpenRefund(JSONObject activityData) {
+                    if (!isAdded() || getActivity() == null) return;
+
+                    try {
+                        Fragment salesFragment = new MiraPosFragment();
+
+                        Bundle bundle = new Bundle();
+                        bundle.putString("refund_data_json", activityData.toString());
+                        bundle.putBoolean("auto_open_refund", true);
+                        salesFragment.setArguments(bundle);
+
+                        if (getActivity() instanceof UHFMainActivity) {
+                            ((UHFMainActivity) getActivity()).loadFragment(salesFragment, "Sales");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error opening refund", e);
+                    }
+                }
+            });
+
+            sheet.show(getParentFragmentManager(), "ActivityDetails");
+        } catch (Exception e) {
+            logNonFatal("handleRecentActivityClick", e);
+        }
     }
-}
+
     // ═══════════════════════════════════════════════════════
     // Receiver
     // ═══════════════════════════════════════════════════════
@@ -1582,74 +1665,77 @@ private void fetchApprovedGoldPricesFromServer() {
     // Refresh entry points
     // ═══════════════════════════════════════════════════════
     public void refreshInternalData() {
-    try {
-        if (!isAdded() || !isSessionValid()) return;
-        isDataLoaded = false;
-        lastDataFetchTime = 0;
-        isLoading.set(false);
-        fetchData();
-        fetchRecentActivity();
+        try {
+            if (!isAdded() || !isSessionValid()) return;
+            isDataLoaded = false;
+            lastDataFetchTime = 0;
+            isLoading.set(false);
+            fetchData();
+            fetchRecentActivity();
+            if (currentBranchId > 0) fetchScrapSummary(currentBranchId); // [v2.5]
 
-        long now = System.currentTimeMillis();
-        
-        if (canManuallyRefreshGold()) {
-            if (lastGoldFetchTime == 0 || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                fetchLiveGoldPrices(false);
+            long now = System.currentTimeMillis();
+
+            if (canManuallyRefreshGold()) {
+                if (lastGoldFetchTime == 0 || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    fetchLiveGoldPrices(false);
+                } else {
+                    displayGoldPricesFromCache();
+                }
             } else {
                 displayGoldPricesFromCache();
+                fetchApprovedGoldPricesFromServer();
             }
-        } else {
-            displayGoldPricesFromCache();
-            fetchApprovedGoldPricesFromServer();
+        } catch (Exception e) {
+            logNonFatal("refreshInternalData", e);
         }
-    } catch (Exception e) {
-        logNonFatal("refreshInternalData", e);
     }
-}
 
     private void refreshAllData() {
-    try {
-        if (tvLiveStatusText != null) {
-            tvLiveStatusText.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-            tvLiveStatusText.setTextColor(0xFFF59E0B);
-        }
-
-        if (swipeTimeoutRunnable != null) {
-            mainHandler.removeCallbacks(swipeTimeoutRunnable);
-        }
-        swipeTimeoutRunnable = () -> {
-            if (swipeRefresh != null && swipeRefresh.isRefreshing()) {
-                Log.w(TAG, "SwipeRefresh timeout — forcing stop");
-                swipeRefresh.setRefreshing(false);
+        try {
+            if (tvLiveStatusText != null) {
+                tvLiveStatusText.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+                tvLiveStatusText.setTextColor(0xFFF59E0B);
             }
-        };
-        mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
 
-        fetchData();
-        fetchRecentActivity();
+            if (swipeTimeoutRunnable != null) {
+                mainHandler.removeCallbacks(swipeTimeoutRunnable);
+            }
+            swipeTimeoutRunnable = () -> {
+                if (swipeRefresh != null && swipeRefresh.isRefreshing()) {
+                    Log.w(TAG, "SwipeRefresh timeout — forcing stop");
+                    swipeRefresh.setRefreshing(false);
+                }
+            };
+            mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
 
-        long now = System.currentTimeMillis();
+            fetchData();
+            fetchRecentActivity();
+            if (currentBranchId > 0) fetchScrapSummary(currentBranchId); // [v2.5]
 
-        if (canManuallyRefreshGold()) {
-            if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                fetchLiveGoldPrices(true);
+            long now = System.currentTimeMillis();
+
+            if (canManuallyRefreshGold()) {
+                if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    fetchLiveGoldPrices(true);
+                } else {
+                    displayGoldPricesFromCache();
+                    updateLiveStatusText(true);
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                }
             } else {
                 displayGoldPricesFromCache();
+                fetchApprovedGoldPricesFromServer();
                 updateLiveStatusText(true);
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
             }
-        } else {
-            displayGoldPricesFromCache();
-            fetchApprovedGoldPricesFromServer();
-            updateLiveStatusText(true);
+
+        } catch (Exception e) {
+            logNonFatal("refreshAllData", e);
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         }
-        
-    } catch (Exception e) {
-        logNonFatal("refreshAllData", e);
-        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
     }
-}
+
     private void showShimmer(boolean show) {
         try {
             if (shimmerLayout != null)
@@ -1812,6 +1898,7 @@ private void fetchApprovedGoldPricesFromServer() {
 
                 fetchData();
                 fetchRecentActivity();
+                if (currentBranchId > 0) fetchScrapSummary(currentBranchId); // [v2.5]
             }
         } catch (Exception e) {
             logNonFatal("onBranchChanged", e);
@@ -1830,13 +1917,18 @@ private void fetchApprovedGoldPricesFromServer() {
             isHeroHidden = true;
             isSalesHidden = true;
             isInventoryHidden = true;
-            
+            isScrapHidden = true; // [v2.5]
+
             if (btnToggleHeroVisibility != null)
                 btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleSalesVisibility != null)
                 btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleInventoryVisibility != null)
                 btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
+            if (btnToggleScrapVisibility != null) // [v2.5]
+                btnToggleScrapVisibility.setImageResource(R.drawable.ic_eye_off);
+
+            updateScrapUI(); // [v2.5]
 
             registerDataRefreshReceiver();
 
@@ -1854,6 +1946,7 @@ private void fetchApprovedGoldPricesFromServer() {
 
                 if (timeSinceLastFetch > RESUME_REFETCH_THRESHOLD_MS) {
                     fetchData();
+                    if (currentBranchId > 0) fetchScrapSummary(currentBranchId); // [v2.5]
                 }
 
                 if (!isCacheValid) {
@@ -1875,16 +1968,16 @@ private void fetchApprovedGoldPricesFromServer() {
                     }
                 }
 
-if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
-    mainHandler.postDelayed(() -> {
-        if (isAdded() && isResumed()) {
-            fetchLiveGoldPrices(false);
-        }
-    }, 1500);
-} else {
-    displayGoldPricesFromCache();
-    fetchApprovedGoldPricesFromServer(); 
-}
+                if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
+                    mainHandler.postDelayed(() -> {
+                        if (isAdded() && isResumed()) {
+                            fetchLiveGoldPrices(false);
+                        }
+                    }, 1500);
+                } else {
+                    displayGoldPricesFromCache();
+                    fetchApprovedGoldPricesFromServer();
+                }
             }
             startAutoRefresh();
         } catch (Exception e) {
@@ -1922,6 +2015,12 @@ if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
                     btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
                 renderInventoryByKarat(currentInventoryByKarat);
             }
+            if (!isScrapHidden) { // [v2.5]
+                isScrapHidden = true;
+                if (btnToggleScrapVisibility != null)
+                    btnToggleScrapVisibility.setImageResource(R.drawable.ic_eye_off);
+                updateScrapUI();
+            }
         } catch (Exception e) {
             logNonFatal("hideSensitiveValuesOnExit", e);
         }
@@ -1943,6 +2042,12 @@ if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
             llRecentActivity = null;
             llInventoryByKarat = null;
             tvKaratEmptyState = null;
+
+            // [v2.5] تنظيف مراجع بطاقة السكراب
+            tvScrapWeight = null;
+            tvScrapValue = null;
+            btnToggleScrapVisibility = null;
+            btnOpenScrapHistory = null;
 
             if (branchesManager != null && branchListener != null) {
                 branchesManager.removeListener(branchListener);
@@ -2041,4 +2146,4 @@ if (timeSinceLastGoldFetch > 30 * 60 * 1000 && canManuallyRefreshGold()) {
             || permissionManager.isOrgAdmin()
             || permissionManager.isFinanceManager();
     }
-}
+                }
