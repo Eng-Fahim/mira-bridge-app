@@ -111,77 +111,75 @@ public class MiraBalanceSheetFragment extends Fragment {
     }
 
     private void render(BalanceSheetDto bs) {
-        if (bs == null) return;
+    if (bs == null) return;
 
-        // KPIs
-        kpiContainer.removeAllViews();
-        addKpi("📊 الأصول", NumberFormatter.moneyShort(bs.totalAssets), "#3498DB");
-        addKpi("📉 الالتزامات", NumberFormatter.moneyShort(bs.totalLiabilities), "#E74C3C");
-        addKpi("💰 حقوق", NumberFormatter.moneyShort(bs.totalEquityWithIncome), "#9B59B6");
-        addKpi("⚖️ الحالة", bs.balanced ? "✅" : "❌",
-               bs.balanced ? "#27AE60" : "#C0392B");
+    // KPIs
+    kpiContainer.removeAllViews();
+    // ✅ إضافة الوزن بجانب الأصول
+    String assetsText = NumberFormatter.moneyShort(bs.totalAssets);
+    if (bs.totalGoldAssets > 0) assetsText += " (" + String.format(Locale.US, "%.1fg", bs.totalGoldAssets) + ")";
+    
+    addKpi("📊 الأصول", assetsText, "#3498DB");
+    addKpi("📉 الالتزامات", NumberFormatter.moneyShort(bs.totalLiabilities), "#E74C3C");
+    addKpi("💰 حقوق", NumberFormatter.moneyShort(bs.totalEquityWithIncome), "#9B59B6");
+    addKpi("⚖️ الحالة", bs.balanced ? "✅" : "❌", bs.balanced ? "#27AE60" : "#C0392B");
 
-        // حالة التوازن
-        tvBalanceStatus.setText(bs.balanced 
-            ? "✅ الميزانية متوازنة" 
-            : "❌ غير متوازنة (فرق: " + NumberFormatter.moneyShort(
-                bs.totalAssets - (bs.totalLiabilities + bs.totalEquityWithIncome)) + ")");
-        tvBalanceStatus.setTextColor(bs.balanced
-            ? Color.parseColor("#27AE60")
-            : Color.parseColor("#C0392B"));
+    tvBalanceStatus.setText(bs.balanced ? "✅ الميزانية متوازنة" : "❌ غير متوازنة");
+    tvBalanceStatus.setTextColor(Color.parseColor(bs.balanced ? "#27AE60" : "#C0392B"));
 
-        // الأصول
-        assetsContainer.removeAllViews();
-        if (bs.assets != null) {
-            for (TrialBalanceDto.TrialBalanceRow r : bs.assets) {
-                addAccountRow(assetsContainer, r, "#3498DB");
-            }
+    // الأصول
+    assetsContainer.removeAllViews();
+    if (bs.assets != null) {
+        for (TrialBalanceDto.TrialBalanceRow r : bs.assets) {
+            addAccountRow(assetsContainer, r, "#3498DB");
         }
-        tvTotalAssets.setText("إجمالي الأصول: " + NumberFormatter.moneyShort(bs.totalAssets));
-        tvTotalAssets.setTextColor(Color.parseColor("#3498DB"));
-
-        // الالتزامات
-        liabilitiesContainer.removeAllViews();
-        if (bs.liabilities != null) {
-            for (TrialBalanceDto.TrialBalanceRow r : bs.liabilities) {
-                addAccountRow(liabilitiesContainer, r, "#E74C3C");
-            }
-        }
-        tvTotalLiabilities.setText("إجمالي الالتزامات: " + NumberFormatter.moneyShort(bs.totalLiabilities));
-        tvTotalLiabilities.setTextColor(Color.parseColor("#E74C3C"));
-
-        // حقوق الملكية
-        equityContainer.removeAllViews();
-        if (bs.equity != null) {
-            for (TrialBalanceDto.TrialBalanceRow r : bs.equity) {
-                addAccountRow(equityContainer, r, "#9B59B6");
-            }
-        }
-        // إضافة صافي الدخل
-        if (Math.abs(bs.netIncomePeriod) > 0.01) {
-            addSpecialRow(equityContainer, "صافي ربح الفترة", bs.netIncomePeriod, "#27AE60");
-        }
-
-        tvTotalEquity.setText("إجمالي حقوق الملكية: " 
-            + NumberFormatter.moneyShort(bs.totalEquityWithIncome));
-        tvTotalEquity.setTextColor(Color.parseColor("#9B59B6"));
     }
+    tvTotalAssets.setText("إجمالي الأصول: " + assetsText);
+    tvTotalAssets.setTextColor(Color.parseColor("#3498DB"));
 
-    private void addAccountRow(LinearLayout container, TrialBalanceDto.TrialBalanceRow r, String color) {
-        View row = LayoutInflater.from(getContext())
-            .inflate(R.layout.item_bs_account, container, false);
-
-        TextView tvName = row.findViewById(R.id.tvAccountName);
-        TextView tvCode = row.findViewById(R.id.tvAccountCode);
-        TextView tvBalance = row.findViewById(R.id.tvBalance);
-
-        tvName.setText(r.accountNameAr);
-        tvCode.setText(r.accountCode);
-        tvBalance.setText(NumberFormatter.moneyShort(r.balance));
-        tvBalance.setTextColor(Color.parseColor(color));
-
-        container.addView(row);
+    // الالتزامات
+    liabilitiesContainer.removeAllViews();
+    if (bs.liabilities != null) {
+        for (TrialBalanceDto.TrialBalanceRow r : bs.liabilities) {
+            addAccountRow(liabilitiesContainer, r, "#E74C3C");
+        }
     }
+    tvTotalLiabilities.setText("إجمالي الالتزامات: " + NumberFormatter.moneyShort(bs.totalLiabilities));
+    
+    // حقوق الملكية
+    equityContainer.removeAllViews();
+    if (bs.equity != null) {
+        for (TrialBalanceDto.TrialBalanceRow r : bs.equity) {
+            addAccountRow(equityContainer, r, "#9B59B6");
+        }
+    }
+    if (Math.abs(bs.netIncomePeriod) > 0.01) {
+        addSpecialRow(equityContainer, "صافي ربح الفترة", bs.netIncomePeriod, "#27AE60");
+    }
+    tvTotalEquity.setText("إجمالي حقوق الملكية: " + NumberFormatter.moneyShort(bs.totalEquityWithIncome));
+}
+
+private void addAccountRow(LinearLayout container, TrialBalanceDto.TrialBalanceRow r, String color) {
+    View row = LayoutInflater.from(getContext()).inflate(R.layout.item_bs_account, container, false);
+    TextView tvName = row.findViewById(R.id.tvAccountName);
+    TextView tvCode = row.findViewById(R.id.tvAccountCode);
+    TextView tvBalance = row.findViewById(R.id.tvBalance);
+
+    tvName.setText(r.accountNameAr);
+    tvCode.setText(r.accountCode);
+    
+    // ✅ إضافة الوزن بجانب الرصيد المالي للحسابات الذهبية
+    String balanceText = NumberFormatter.moneyShort(r.balance);
+    if (Math.abs(r.goldBalance) > 0.001) {
+        balanceText += "\n(" + String.format(Locale.US, "%.3f", r.goldBalance) + " جرام)";
+    }
+    
+    tvBalance.setText(balanceText);
+    tvBalance.setTextColor(Color.parseColor(color));
+    tvBalance.setGravity(android.view.Gravity.END); // لمحاذاة النص
+
+    container.addView(row);
+}
 
     private void addSpecialRow(LinearLayout container, String name, double value, String color) {
         View row = LayoutInflater.from(getContext())
