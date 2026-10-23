@@ -465,4 +465,25 @@ public void loadJournalEntry(long id) {
             }
         });
     }
+    public void createJournalEntry(org.json.JSONObject payload, Runnable onSuccess) {
+    loading.setValue(true);
+    api.accounting().createJournalEntryPayload(payload)
+        .enqueue(new Callback<ApiResponseDto<JournalEntryDto>>() {
+            @Override
+            public void onResponse(Call<ApiResponseDto<JournalEntryDto>> call, Response<ApiResponseDto<JournalEntryDto>> response) {
+                loading.setValue(false);
+                if (response.isSuccessful() && response.body() != null && response.body().success) {
+                    loadJournalEntries(1, 50, null); // تحديث القائمة
+                    onSuccess.run();
+                } else {
+                    error.setValue("فشل حفظ القيد: " + response.code());
+                }
+            }
+            @Override
+            public void onFailure(Call<ApiResponseDto<JournalEntryDto>> call, Throwable t) {
+                loading.setValue(false);
+                error.setValue(t.getMessage());
+            }
+        });
+}
 }
