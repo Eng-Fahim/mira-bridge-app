@@ -400,25 +400,27 @@ public class AccountingViewModel extends AndroidViewModel {
     // ═══════════════════════════════════════════════════════
     
     public void createJournalEntry(org.json.JSONObject payload, Runnable onSuccess) {
-        loading.setValue(true);
-        api.accounting().createJournalEntryPayload(payload)
-            .enqueue(new Callback<ApiResponseDto<JournalEntryDto>>() {
-                @Override
-                public void onResponse(Call<ApiResponseDto<JournalEntryDto>> call, Response<ApiResponseDto<JournalEntryDto>> response) {
-                    loading.setValue(false);
-                    if (response.isSuccessful() && response.body() != null && response.body().success) {
-                        // ✅ استخدام الدالة الجديدة مع التواريخ لتحديث القائمة
-                        loadJournalEntriesWithFilters(1, 50, null, currentFromDate, currentToDate); 
-                        onSuccess.run();
-                    } else {
-                        error.setValue("فشل حفظ القيد: " + response.code());
-                    }
-                }
-                @Override
-                public void onFailure(Call<ApiResponseDto<JournalEntryDto>> call, Throwable t) {
-                    loading.setValue(false);
-                    error.setValue(t.getMessage());
-                }
-            });
-    }
+    loading.setValue(true);
+    
+    // ✅ استخدام postAccounting المباشر لتجنب مشكلة تغليف Gson (nameValuePairs)
+    new Thread(() -> {
+        // استدعاء الدالة التي ترسل JSONObject كنص مباشر
+        MiraApiClient.ApiResponse response = api.postAccounting("accounting/journal-entries/create", payload);
+        
+        // العودة للخيط الرئيسي لتحديث الواجهة
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            loading.setValue(false);
+            
+            if (response != null && response.isSuccess && response.data != null && response.data.optBoolean("success")) {
+                // نجاح الحفظ
+                loadJournalEntriesWithFilters(1, 50, null, currentFromDate, currentToDate); 
+                onSuccess.run();
+            } else {
+                // فشل الحفظ - عرض الخطأ الحقيقي القادم من السيرفر
+                String errorMsg = (response != null && response.error != null) ? response.error : "فشل حفظ القيد";
+                error.setValue("❌ " + errorMsg);
+            }
+        });
+    }).start();
+}
 }
