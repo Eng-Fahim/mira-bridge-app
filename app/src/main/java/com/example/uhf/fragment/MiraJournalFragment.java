@@ -176,13 +176,14 @@ public class MiraJournalFragment extends Fragment {
         // ✅ مستمع زر الإضافة (+)
         // الحل النهائي لفتح الشاشة فوق التبويبات بدون تجميد
 // ✅ مستمع زر الإضافة (+) بطريقة آمنة داخل التبويبات
+// ✅ مستمع زر الإضافة (+) بطريقة آمنة (شاشة كاملة)
 if (fabAddEntry != null) {
     fabAddEntry.setOnClickListener(v -> {
         MiraAddJournalEntryFragment addFragment = new MiraAddJournalEntryFragment();
         
-        // نستخدم getParentFragmentManager لفتح الشاشة داخل الحاوية الخاصة بالتبويبات
-        getParentFragmentManager().beginTransaction()
-            .replace(R.id.tabContentContainer, addFragment, "AddJournalEntry")
+        // نستخدم الـ Activity لفتح الشاشة بشكل كامل فوق كل التبويبات
+        requireActivity().getSupportFragmentManager().beginTransaction()
+            .add(android.R.id.content, addFragment, "AddJournalEntry")
             .addToBackStack("AddJournalEntry")
             .commit();
     });
