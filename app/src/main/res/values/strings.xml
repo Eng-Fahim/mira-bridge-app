@@ -2782,4 +2782,12 @@
 <string name="error_enter_weight_price">الرجاء إدخال الوزن وسعر الجرام بشكل صحيح</string>
 <string name="purchase_saved_success">تم حفظ عملية الشراء بنجاح ✅</string>
 <string name="error_saving_purchase">حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى</string>
+
+<!-- Scrap Gold Dashboard -->
+<string name="scrap_gold_summary">مخزون كسر الذهب</string>
+<string name="net_weight_24k">الوزن الصافي (24K)</string>
+<string name="estimated_value">القيمة التقديرية</string>
+<string name="view_scrap_history">عرض سجل المشتريات</string>
+<string name="scrap_history_title">سجل مشتريات الكسر</string>
+<string name="no_scrap_records">لا توجد عمليات شراء مسجلة</string>
 </resources>
