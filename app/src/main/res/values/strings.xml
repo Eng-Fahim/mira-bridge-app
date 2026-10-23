@@ -619,6 +619,9 @@
 <string name="item_count_label">عدد القطع:</string>
 <string name="total_amount_label">المبلغ الإجمالي:</string>
 <string name="customer_info_section">👤 بيانات العميل</string>
+
+<string name="customer_name">اسم العميل 
+</sting>
 <string name="customer_name_required">اسم العميل * (إلزامي)</string>
 <string name="customer_phone_optional">رقم الهاتف (اختياري)</string>
 <string name="customer_email_optional">البريد الإلكتروني (اختياري)</string>
