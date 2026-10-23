@@ -36,11 +36,8 @@ Call<ApiResponseDto<JournalEntryDto[]>> getJournalEntries(
 Call<JournalEntryDetailsDto> getJournalEntryDetails(
     @Path("id") long id
 );
-
-@POST("accounting/journal-entries/create") // ✅ مسار الإنشاء الجديد
-Call<ApiResponseDto<JournalEntryDto>> createJournalEntry(
-    @Body JournalEntryDto entry
-);
+@POST("accounting/journal-entries/create")
+Call<ApiResponseDto<JournalEntryDto>> createJournalEntryPayload(@Body org.json.JSONObject payload);
     /**
      * ✅ ترحيل قيد
      */
