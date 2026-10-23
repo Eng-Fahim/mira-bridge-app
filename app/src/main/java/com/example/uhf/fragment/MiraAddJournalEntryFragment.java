@@ -67,13 +67,16 @@ public class MiraAddJournalEntryFragment extends Fragment {
         etDate.setText(DateHelper.todayApi());
         etDate.setOnClickListener(view -> showDatePicker());
 
-        // تحميل الحسابات
+        // تحميل الحسابات (الحسابات الفرعية فقط القابلة للترحيل)
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
             if (accounts != null) {
                 allAccounts.clear();
                 for (AccountDto a : accounts) {
-                    if (a.isLeaf()) allAccounts.add(a);
+                    if (a.isLeaf()) { // التأكد من أنها حسابات فرعية
+                        allAccounts.add(a);
+                    }
                 }
+                // تحديث القوائم في الأسطر الحالية
                 for (View lineView : lineViews) {
                     setupAccountDropdown(lineView);
                 }
@@ -81,12 +84,19 @@ public class MiraAddJournalEntryFragment extends Fragment {
         });
         viewModel.loadAccounts(null, null, true);
 
-        // إضافة أول سطرين افتراضيين
+        // إضافة أول سطرين افتراضيين (مدين ودائن)
         addLine();
         addLine();
 
         btnAddLine.setOnClickListener(view -> addLine());
-        btnClose.setOnClickListener(view -> getParentFragmentManager().popBackStack());
+        
+        btnClose.setOnClickListener(view -> {
+            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
+                getParentFragmentManager().popBackStack();
+            } else {
+                requireActivity().onBackPressed();
+            }
+        });
 
         btnSave.setOnClickListener(view -> saveEntry());
 
@@ -107,6 +117,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
         setupAccountDropdown(lineView);
 
+        // ربط مستمعات النصوص لحساب الإجماليات فوراً
         EditText etDebit = lineView.findViewById(R.id.etDebit);
         EditText etCredit = lineView.findViewById(R.id.etCredit);
         EditText etGoldDebit = lineView.findViewById(R.id.etGoldDebit);
@@ -123,6 +134,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
         etGoldDebit.addTextChangedListener(watcher);
         etGoldCredit.addTextChangedListener(watcher);
 
+        // زر حذف السطر
         ImageButton btnRemove = lineView.findViewById(R.id.btnRemoveLine);
         btnRemove.setOnClickListener(view -> {
             if (lineViews.size() <= 2) {
@@ -157,6 +169,21 @@ public class MiraAddJournalEntryFragment extends Fragment {
             }
         };
         acAccount.setAdapter(adapter);
+
+        // ✅ الحفظ المباشر للحساب عند اختياره لتجنب مشاكل تغيير النص
+        acAccount.setOnItemClickListener((parent, view, position, id) -> {
+            AccountDto selected = (AccountDto) parent.getItemAtPosition(position);
+            acAccount.setTag(selected); // نحفظ الحساب داخل الـ Tag
+        });
+
+        // مسح الـ Tag إذا قام المستخدم بتغيير النص يدوياً (لمنع الأخطاء)
+        acAccount.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                acAccount.setTag(null); 
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
     }
 
     private void calculateTotals() {
@@ -176,6 +203,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
         
         tvTotals.setText(text);
 
+        // تلوين الإجمالي إذا كان متوازناً (أخضر) أو غير متوازن (أزرق)
         boolean balanced = Math.abs(tDebit - tCredit) < 0.01 && Math.abs(tGoldDebit - tGoldCredit) < 0.001;
         tvTotals.setTextColor(balanced ? 0xFF27AE60 : 0xFF3498DB);
     }
@@ -196,17 +224,23 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
             for (View lineView : lineViews) {
                 AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
-                AccountDto selectedAccount = null;
                 
-                for (AccountDto a : allAccounts) {
-                    if (acAccount.getText().toString().equals(a.accountCode + " - " + a.accountNameAr)) {
-                        selectedAccount = a;
-                        break;
+                // ✅ جلب الحساب من الـ Tag (الطريقة الآمنة)
+                AccountDto selectedAccount = null;
+                if (acAccount.getTag() instanceof AccountDto) {
+                    selectedAccount = (AccountDto) acAccount.getTag();
+                } else {
+                    // محاولة احتياطية للبحث بالاسم في حال لم يتم النقر على القائمة
+                    for (AccountDto a : allAccounts) {
+                        if (acAccount.getText().toString().equals(a.accountCode + " - " + a.accountNameAr)) {
+                            selectedAccount = a;
+                            break;
+                        }
                     }
                 }
 
                 if (selectedAccount == null) {
-                    Toast.makeText(getContext(), "يرجى اختيار حساب لكل سطر", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "يرجى اختيار حساب صحيح من القائمة لكل سطر", Toast.LENGTH_LONG).show();
                     return;
                 }
 
@@ -215,6 +249,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 double goldDebit = parseDouble(((EditText) lineView.findViewById(R.id.etGoldDebit)).getText().toString());
                 double goldCredit = parseDouble(((EditText) lineView.findViewById(R.id.etGoldCredit)).getText().toString());
 
+                // تجهيز كائن JSON لكل سطر
                 JSONObject lineObj = new JSONObject();
                 lineObj.put("account_id", selectedAccount.id);
                 lineObj.put("description", desc);
@@ -228,15 +263,17 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 tGoldDebit += goldDebit; tGoldCredit += goldCredit;
             }
 
+            // التحقق النهائي من التوازن قبل الإرسال
             if (Math.abs(tDebit - tCredit) > 0.01) {
-                Toast.makeText(getContext(), "القيد غير متوازن مالياً!", Toast.LENGTH_LONG).show();
+                Toast.makeText(getContext(), "❌ القيد غير متوازن مالياً! (المدين لا يساوي الدائن)", Toast.LENGTH_LONG).show();
                 return;
             }
             if (Math.abs(tGoldDebit - tGoldCredit) > 0.001) {
-                Toast.makeText(getContext(), "القيد غير متوازن وزنياً!", Toast.LENGTH_LONG).show();
+                Toast.makeText(getContext(), "❌ القيد غير متوازن وزنياً! (الذهب المدين لا يساوي الدائن)", Toast.LENGTH_LONG).show();
                 return;
             }
 
+            // تجهيز كائن JSON النهائي للقيد
             JSONObject payload = new JSONObject();
             payload.put("entry_date", date);
             payload.put("reference", ref);
@@ -244,10 +281,11 @@ public class MiraAddJournalEntryFragment extends Fragment {
             payload.put("source_type", "manual");
             payload.put("lines", linesArray);
 
+            // تعطيل الزر لمنع التكرار أثناء الإرسال
             btnSave.setEnabled(false);
             btnSave.setText("جاري الحفظ...");
 
-            // ✅ استدعاء دالة الحفظ من الـ ViewModel
+            // استدعاء دالة الحفظ من الـ ViewModel
             viewModel.createJournalEntry(payload, () -> {
                 Toast.makeText(getContext(), "✅ تم حفظ القيد بنجاح", Toast.LENGTH_SHORT).show();
                 getParentFragmentManager().popBackStack();
@@ -255,7 +293,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(getContext(), "حدث خطأ أثناء الحفظ", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "حدث خطأ غير متوقع أثناء الحفظ", Toast.LENGTH_SHORT).show();
             btnSave.setEnabled(true);
             btnSave.setText("حفظ وترحيل القيد");
         }
