@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:layout_marginBottom="8dp"
+    android:background="@android:drawable/editbox_background">
+
+    <!-- اختيار الحساب -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        
+        <AutoCompleteTextView
+            android:id="@+id/acAccount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="اختر الحساب..."
+            android:inputType="text"
+            android:textSize="12sp"/>
+            
+        <ImageButton
+            android:id="@+id/btnRemoveLine"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#E74C3C"/>
+    </LinearLayout>
+
+    <!-- المبالغ المالية -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <EditText
+            android:id="@+id/etDebit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="مدين (مالي)"
+            android:inputType="numberDecimal"
+            android:textSize="12sp"
+            android:textColor="#3498DB"/>
+            
+        <EditText
+            android:id="@+id/etCredit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="دائن (مالي)"
+            android:inputType="numberDecimal"
+            android:textSize="12sp"
+            android:textColor="#E74C3C"/>
+    </LinearLayout>
+
+    <!-- أوزان الذهب -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <EditText
+            android:id="@+id/etGoldDebit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="مدين (جرام)"
+            android:inputType="numberDecimal"
+            android:textSize="12sp"
+            android:textColor="@color/mira_gold"/>
+            
+        <EditText
+            android:id="@+id/etGoldCredit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="دائن (جرام)"
+            android:inputType="numberDecimal"
+            android:textSize="12sp"
+            android:textColor="@color/mira_gold"/>
+    </LinearLayout>
+</LinearLayout>
