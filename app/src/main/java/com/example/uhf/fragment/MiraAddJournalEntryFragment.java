@@ -69,27 +69,31 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
         // تحميل الحسابات
         viewModel.getAccounts().observe(getViewLifecycleOwner(), accounts -> {
-            if (accounts != null) {
+            if (accounts != null && accounts.length > 0) {
                 allAccounts.clear();
+                // ✅ إضافة كل الحسابات القادمة من السيرفر بدون أي فلترة محلية
                 for (AccountDto a : accounts) {
-                    if (a.isLeaf()) allAccounts.add(a);
+                    allAccounts.add(a);
                 }
+                // تحديث القوائم في الأسطر الحالية
                 for (View lineView : lineViews) {
                     setupAccountDropdown(lineView);
                 }
+            } else {
+                Toast.makeText(getContext(), "لم يتم استلام حسابات من السيرفر", Toast.LENGTH_SHORT).show();
             }
         });
+        
+        // طلب الحسابات (الفرعية فقط) من السيرفر
         viewModel.loadAccounts(null, null, true);
 
+        // إضافة سطرين افتراضيين
         addLine();
         addLine();
 
         btnAddLine.setOnClickListener(view -> addLine());
         
-        // ✅ إغلاق الشاشة بأمان
-        btnClose.setOnClickListener(view -> {
-            getParentFragmentManager().popBackStack();
-        });
+        btnClose.setOnClickListener(view -> getParentFragmentManager().popBackStack());
 
         btnSave.setOnClickListener(view -> saveEntry());
 
@@ -141,8 +145,9 @@ public class MiraAddJournalEntryFragment extends Fragment {
     private void setupAccountDropdown(View lineView) {
         AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
         
+        // إنشاء Adapter جديد في كل مرة لضمان تحديث البيانات
         ArrayAdapter<AccountDto> adapter = new ArrayAdapter<AccountDto>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, new ArrayList<>(allAccounts)) {
+                android.R.layout.simple_dropdown_item_1line, allAccounts) {
             @NonNull
             @Override
             public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
@@ -160,14 +165,23 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 return tv;
             }
         };
+        
         acAccount.setAdapter(adapter);
-        acAccount.setThreshold(1);
+        
+        // ✅ الحل الجذري: فتح القائمة بمجرد الضغط حتى لو كان الحقل فارغاً
+        acAccount.setThreshold(0);
+        acAccount.setOnClickListener(v -> acAccount.showDropDown());
+        acAccount.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) acAccount.showDropDown();
+        });
 
+        // حفظ الحساب المختار
         acAccount.setOnItemClickListener((parent, view, position, id) -> {
             AccountDto selected = (AccountDto) parent.getItemAtPosition(position);
             acAccount.setTag(selected);
         });
 
+        // مسح الحساب إذا عدل المستخدم النص يدوياً
         acAccount.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -241,7 +255,6 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 lineObj.put("description", desc);
                 lineObj.put("debit", debit);
                 lineObj.put("credit", credit);
-                // ✅ التصحيح هنا: إضافة _grams لتطابق السيرفر
                 lineObj.put("gold_debit_grams", goldDebit); 
                 lineObj.put("gold_credit_grams", goldCredit); 
                 linesArray.put(lineObj);
