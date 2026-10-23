@@ -2397,4 +2397,26 @@ public ApiResponse getReportData(String reportType, String fromDate, String toDa
             return t;
         }
     }
+    
+    // ==================== شراء كسر الذهب ====================
+public ApiResponse saveScrapPurchase(JSONObject payload) {
+    try {
+        if (payload == null) payload = new JSONObject();
+        
+        // إضافة معرف البوابة (Gate ID) تلقائياً
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
+        }
+        
+        // ملاحظة: تأكد من أن هذا المسار (endpoint) متطابق مع 
+        // المسار الذي ستنشئه في ملف الـ PHP (REST API) على السيرفر
+        return postWithAuth("/scrap/purchase", payload);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "saveScrapPurchase error: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    }
+}
 }
