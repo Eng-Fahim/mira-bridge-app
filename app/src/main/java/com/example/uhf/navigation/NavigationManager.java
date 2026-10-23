@@ -431,6 +431,7 @@ public class NavigationManager {
             case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
             case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
             case TAG_SCRAP_GOLD_BUY:    return new MiraScrapGoldBuyFragment();
+            case "ScrapHistory": return new MiraScrapHistoryFragment();
             default:
                 log("Unknown tag: " + tag + " → Dashboard");
                 return new MiraDashboardFragment();
