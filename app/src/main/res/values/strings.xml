@@ -621,7 +621,7 @@
 <string name="customer_info_section">👤 بيانات العميل</string>
 
 <string name="customer_name">اسم العميل 
-</sting>
+</string>
 <string name="customer_name_required">اسم العميل * (إلزامي)</string>
 <string name="customer_phone_optional">رقم الهاتف (اختياري)</string>
 <string name="customer_email_optional">البريد الإلكتروني (اختياري)</string>
