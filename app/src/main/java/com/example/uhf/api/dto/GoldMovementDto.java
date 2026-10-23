@@ -41,6 +41,12 @@ public class GoldMovementDto {
         
         @SerializedName("movement")
         public double movement;
+        
+        // ✅ القيم المالية للحساب
+        @SerializedName("opening_value") public double openingValue;
+        @SerializedName("value_in")      public double valueIn;
+        @SerializedName("value_out")     public double valueOut;
+        @SerializedName("closing_value") public double closingValue;
     }
     
     public static class Totals {
@@ -55,5 +61,11 @@ public class GoldMovementDto {
         
         @SerializedName("closing_gold")
         public double closingGold;
+        
+        // ✅ القيم المالية الإجمالية
+        @SerializedName("opening_value") public double openingValue;
+        @SerializedName("value_in")      public double valueIn;
+        @SerializedName("value_out")     public double valueOut;
+        @SerializedName("closing_value") public double closingValue;
     }
 }
