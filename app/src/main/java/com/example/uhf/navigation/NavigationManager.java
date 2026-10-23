@@ -73,6 +73,8 @@ public class NavigationManager {
     public static final String TAG_RFID_BINDINGS     = "RfidBindings";
     public static final String TAG_SOUND_SETTINGS    = "SoundSettings";
     public static final String TAG_SNAPSHOTS         = "Snapshots";
+    
+    public static final String TAG_SCRAP_GOLD_BUY = "ScrapGoldBuy";
 
     // ==================== قائمة التبويبات الرئيسية ====================
     private static final String[] ROOT_TAGS = {
@@ -428,6 +430,7 @@ public class NavigationManager {
             case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
             case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
             case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
+            case TAG_SCRAP_GOLD_BUY:    return new MiraScrapGoldBuyFragment();
             default:
                 log("Unknown tag: " + tag + " → Dashboard");
                 return new MiraDashboardFragment();
