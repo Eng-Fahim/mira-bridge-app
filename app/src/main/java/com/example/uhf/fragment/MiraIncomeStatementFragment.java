@@ -113,52 +113,54 @@ public class MiraIncomeStatementFragment extends Fragment {
     }
 
     private void render(IncomeStatementDto is) {
-        if (is == null) return;
+    if (is == null) return;
 
-        // KPIs
-        kpiContainer.removeAllViews();
-        addKpi("📈 الإيرادات", NumberFormatter.moneyShort(is.netRevenue), "#3498DB");
-        addKpi("💵 التكلفة", NumberFormatter.moneyShort(is.cogs), "#E74C3C");
-        addKpi("💰 الربح", NumberFormatter.moneyShort(is.netProfit),
-               is.netProfit >= 0 ? "#27AE60" : "#C0392B");
-        addKpi("📊 الهامش", NumberFormatter.percent(is.netProfitMargin), "#9B59B6");
+    kpiContainer.removeAllViews();
+    addKpi("📈 الإيرادات", NumberFormatter.moneyShort(is.netRevenue), "#3498DB");
+    addKpi("💵 التكلفة", NumberFormatter.moneyShort(is.cogs), "#E74C3C");
+    addKpi("💰 الربح", NumberFormatter.moneyShort(is.netProfit), is.netProfit >= 0 ? "#27AE60" : "#C0392B");
+    addKpi("📊 الهامش", NumberFormatter.percent(is.netProfitMargin), "#9B59B6");
 
-        // القائمة
-        statementContainer.removeAllViews();
+    statementContainer.removeAllViews();
 
-        // الإيرادات
-        addSection(statementContainer, "الإيرادات");
-        addRow(statementContainer, "مبيعات الذهب والمجوهرات", is.salesRevenue, false);
-        if (is.salesDiscounts > 0) {
-            addRow(statementContainer, "(-) مردودات وخصومات", -is.salesDiscounts, true);
-        }
-        addRowBold(statementContainer, "= صافي الإيرادات", is.netRevenue, "#3498DB");
-        addRow(statementContainer, "أجور المصنعية", is.makingCharges, false);
-        addRow(statementContainer, "إيرادات أخرى", is.otherRevenue, false);
-
-        addDivider(statementContainer);
-
-        // التكلفة
-        addSection(statementContainer, "التكلفة");
-        addRow(statementContainer, "(-) تكلفة المبيعات", -is.cogs, true);
-        addRowBold(statementContainer, "= الربح الإجمالي", is.grossProfit, "#27AE60");
-
-        addDivider(statementContainer);
-
-        // المصروفات التشغيلية
-        addSection(statementContainer, "المصروفات التشغيلية");
-        addRow(statementContainer, "(-) مصروفات تشغيلية", -is.operatingExpenses, true);
-        addRow(statementContainer, "(-) إهلاك", -is.depreciation, true);
-        addRowBold(statementContainer, "= الربح التشغيلي", is.operatingProfit, "#27AE60");
-
-        addDivider(statementContainer);
-
-        // الزكاة والصافي
-        addSection(statementContainer, "النتيجة النهائية");
-        addRow(statementContainer, "(-) الزكاة والضرائب", -is.zakat, true);
-        addRowBig(statementContainer, "═ صافي الربح", is.netProfit,
-                  is.netProfit >= 0 ? "#27AE60" : "#C0392B");
+    // الإيرادات
+    addSection(statementContainer, "الإيرادات");
+    addRow(statementContainer, "مبيعات الذهب والمجوهرات", is.salesRevenue, false);
+    addRow(statementContainer, "وزن مبيعات الذهب (جرام)", is.goldSalesRevenue, false); // ✅ الوزن
+    
+    if (is.salesDiscounts > 0) {
+        addRow(statementContainer, "(-) مردودات وخصومات", -is.salesDiscounts, true);
     }
+    addRowBold(statementContainer, "= صافي الإيرادات", is.netRevenue, "#3498DB");
+    addRow(statementContainer, "أجور المصنعية", is.makingCharges, false);
+    
+    addDivider(statementContainer);
+
+    // التكلفة
+    addSection(statementContainer, "التكلفة");
+    addRow(statementContainer, "(-) تكلفة المبيعات", -is.cogs, true);
+    addRow(statementContainer, "وزن تكلفة المبيعات (جرام)", is.goldCogs, true); // ✅ الوزن
+    
+    addRowBold(statementContainer, "= الربح الإجمالي", is.grossProfit, "#27AE60");
+    
+    // ✅ ربح الذهب بالجرام
+    addRowBold(statementContainer, "= صافي ربح الذهب (جرام)", is.goldGrossProfit, "#D4AF37");
+
+    addDivider(statementContainer);
+
+    // المصروفات التشغيلية
+    addSection(statementContainer, "المصروفات التشغيلية");
+    addRow(statementContainer, "(-) مصروفات تشغيلية", -is.operatingExpenses, true);
+    addRow(statementContainer, "(-) إهلاك", -is.depreciation, true);
+    addRowBold(statementContainer, "= الربح التشغيلي", is.operatingProfit, "#27AE60");
+
+    addDivider(statementContainer);
+
+    // الزكاة والصافي
+    addSection(statementContainer, "النتيجة النهائية");
+    addRow(statementContainer, "(-) الزكاة والضرائب", -is.zakat, true);
+    addRowBig(statementContainer, "═ صافي الربح", is.netProfit, is.netProfit >= 0 ? "#27AE60" : "#C0392B");
+}
 
     private void addSection(LinearLayout c, String title) {
         TextView tv = new TextView(getContext());
