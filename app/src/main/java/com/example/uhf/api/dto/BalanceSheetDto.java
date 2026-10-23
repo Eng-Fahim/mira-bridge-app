@@ -34,4 +34,10 @@ public class BalanceSheetDto {
     
     @SerializedName("balanced")
     public boolean balanced;
+
+    @SerializedName("total_gold_assets")
+    public double totalGoldAssets;
+    
+    @SerializedName("total_gold_liabilities")
+    public double totalGoldLiabilities;
 }
