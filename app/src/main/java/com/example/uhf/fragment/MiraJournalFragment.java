@@ -174,19 +174,20 @@ public class MiraJournalFragment extends Fragment {
         });
 
         // ✅ مستمع زر الإضافة (+)
-        if (fabAddEntry != null) {
-            fabAddEntry.setOnClickListener(v -> {
-                MiraAddJournalEntryFragment addFragment = new MiraAddJournalEntryFragment();
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).loadFragment(addFragment, "AddJournalEntry");
-                } else {
-                    getParentFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, addFragment)
-                        .addToBackStack("AddJournalEntry")
-                        .commit();
-                }
-            });
+        // الحل النهائي لفتح الشاشة فوق التبويبات بدون تجميد
+if (fabAddEntry != null) {
+    fabAddEntry.setOnClickListener(v -> {
+        MiraAddJournalEntryFragment addFragment = new MiraAddJournalEntryFragment();
+        
+        // فتح الشاشة في الـ Activity الرئيسي
+        if (getActivity() != null) {
+            getActivity().getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, addFragment, "AddJournalEntry")
+                .addToBackStack("AddJournalEntry")
+                .commit();
         }
+    });
+}
     }
 
     private void pickDate(boolean isFrom) {
