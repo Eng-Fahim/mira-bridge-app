@@ -2771,7 +2771,7 @@
 <string name="customer_phone_id">رقم الجوال / الهوية</string>
 <string name="weight_and_price_details">تفاصيل الوزن والسعر</string>
 <string name="weight_grams">الوزن (جرام)</string>
-<string name="karat">العيار</string>
+
 <string name="market_price_per_gram">سعر الجرام (السوق)</string>
 <string name="deduction_per_gram">خصم الشوائب/المصنعية (للجرام)</string>
 <string name="total_due_to_customer">الصافي المستحق للعميل</string>
