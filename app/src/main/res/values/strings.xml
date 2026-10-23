@@ -2765,7 +2765,7 @@
 <string name="pending_sale_delete">حذف</string>
 <string name="inventory_by_karat">📦 المخزون حسب العيار</string>
 <string name="no_data">لا توجد بيانات</string>
-
+<string name="nav_scrap">سكراب الذهب</string>
 
 <!-- Scrap Gold Buy -->
 <string name="scrap_gold_title">شراء كسر الذهب (Scrap Gold)</string>
