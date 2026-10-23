@@ -57,4 +57,13 @@ public class IncomeStatementDto {
     
     @SerializedName("net_profit_margin")
     public double netProfitMargin;
+
+    @SerializedName("gold_sales_revenue")
+public double goldSalesRevenue;
+
+@SerializedName("gold_cogs")
+public double goldCogs;
+
+@SerializedName("gold_gross_profit")
+public double goldGrossProfit;
 }
