@@ -58,7 +58,7 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
         h.tvName.setText(r.accountNameAr != null ? r.accountNameAr : "—");
 
         if (isGoldView) {
-            // ═══ وضع الذهب (بالجرام) ═══
+            // ═══ وضع الذهب (الجرامات) ═══
             h.tvOpenDebit.setText(formatGold(r.openingGoldDebit));
             h.tvOpenCredit.setText(formatGold(r.openingGoldCredit));
             h.tvPeriodDebit.setText(formatGold(r.periodGoldDebit));
@@ -69,7 +69,7 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
             h.tvGold.setVisibility(View.GONE); // إخفاء شريط الذهب السفلي
 
         } else {
-            // ═══ وضع المال (بالريال) ═══
+            // ═══ وضع المال (الريالات) ═══
             h.tvOpenDebit.setText(r.openingDebit > 0 ? NumberFormatter.moneyShort(r.openingDebit) : "—");
             h.tvOpenCredit.setText(r.openingCredit > 0 ? NumberFormatter.moneyShort(r.openingCredit) : "—");
             h.tvPeriodDebit.setText(r.periodDebit > 0 ? NumberFormatter.moneyShort(r.periodDebit) : "—");
@@ -77,11 +77,11 @@ public class TrialBalanceAdapter extends RecyclerView.Adapter<TrialBalanceAdapte
             h.tvCloseDebit.setText(r.closingDebit > 0 ? NumberFormatter.moneyShort(r.closingDebit) : "—");
             h.tvCloseCredit.setText(r.closingCredit > 0 ? NumberFormatter.moneyShort(r.closingCredit) : "—");
 
-            // إظهار شريط الذهب الصغير في وضع المال
+            // إظهار شريط الذهب الصغير (في حال كانت القطعة تتبع حساباً ذهبياً)
             if (Math.abs(r.periodGoldDebit) > 0.001 || Math.abs(r.periodGoldCredit) > 0.001) {
                 h.tvGold.setVisibility(View.VISIBLE);
-                h.tvGold.setText(String.format(Locale.US, "ذهب: مدين %.3fg | دائن %.3fg", r.periodGoldDebit, r.periodGoldCredit));
-                h.tvGold.setTextColor(Color.parseColor("#B08D57")); // لون ذهبي
+                h.tvGold.setText(String.format(Locale.US, "وزن: مدين %.3fg | دائن %.3fg", r.periodGoldDebit, r.periodGoldCredit));
+                h.tvGold.setTextColor(Color.parseColor("#B08D57"));
             } else {
                 h.tvGold.setVisibility(View.GONE);
             }
