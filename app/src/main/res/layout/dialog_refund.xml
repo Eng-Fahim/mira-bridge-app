@@ -52,7 +52,7 @@
         android:layout_height="wrap_content"
         android:hint="سبب الإرجاع (اختياري)"
         app:boxStrokeColor="?attr/colorPrimary"
-        android:layout_marginBottom="20dp">
+        android:layout_marginBottom="12dp">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etRefundReason"
@@ -63,6 +63,23 @@
             android:textSize="14sp"
             android:padding="12dp" />
     </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- ✅ قائمة اختيار طريقة الإرجاع (تم إخراجها لتكون مستقلة وصحيحة) -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="طريقة الإرجاع (كيف سيستلم العميل أمواله؟)"
+        android:textSize="12sp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"/>
+
+    <Spinner
+        android:id="@+id/spRefundMethod"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@android:drawable/btn_dropdown"
+        android:layout_marginBottom="20dp"/>
 
     <!-- معلومات القطعة -->
     <com.google.android.material.card.MaterialCardView
