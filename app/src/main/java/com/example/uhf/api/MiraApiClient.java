@@ -2451,4 +2451,8 @@ public ApiResponse getScrapProfitReport(int branchId, String fromDate, String to
 public ApiResponse closeCashier(JSONObject payload) {
     return postWithAuth("/cash-reconciliation/close", payload);
 }
+    // ==================== إيصال شراء الكسر ====================
+public ApiResponse getScrapPurchaseReceipt(int purchaseId) {
+    return getWithAuth("/scrap/purchase/" + purchaseId + "/receipt");
+}
 }
