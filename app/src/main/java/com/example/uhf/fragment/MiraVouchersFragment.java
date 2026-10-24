@@ -394,12 +394,24 @@ public class MiraVouchersFragment extends Fragment {
     holder.tvAmount.setTextColor(isReceipt ? 0xFF16A34A : 0xFFDC2626);
     
     // ✅ [جديد] فتح السند عند الضغط
-    holder.itemView.setOnClickListener(v -> {
-        if (item.id > 0) {
-            MiraVoucherReceiptFragment receipt = MiraVoucherReceiptFragment.newInstance(item.id);
-            receipt.show(getParentFragmentManager(), "VoucherReceipt");
-        }
-    });
+    // ✅ فتح الإيصال عند الضغط العادي
+holder.itemView.setOnClickListener(v -> {
+    if (item.id > 0) {
+        MiraVoucherReceiptFragment receipt = MiraVoucherReceiptFragment.newInstance(item.id);
+        receipt.show(getParentFragmentManager(), "VoucherReceipt");
+    }
+});
+
+// ✅ فتح التفاصيل المحاسبية عند الضغط المطول
+holder.itemView.setOnLongClickListener(v -> {
+    if (item.id > 0) {
+        MiraVoucherDetailFragment detail = 
+            MiraVoucherDetailFragment.newInstance(item.id, item.voucherType);
+        detail.show(getParentFragmentManager(), "VoucherDetail");
+        return true;
+    }
+    return false;
+});
 }
 
         @Override public int getItemCount() { return items.size(); }
