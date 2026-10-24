@@ -2527,4 +2527,19 @@ public ApiResponse getScrapPurchaseReceipt(int purchaseId) {
     public ApiResponse getVoucherDetail(int voucherId) {
     return getWithAuth("/vouchers/" + voucherId);
 }
+    // ==================== العملاء والموردين ====================
+public ApiResponse getPartiesList(String type, String search) {
+    String url = "/parties/list?";
+    if (type != null && !type.isEmpty()) url += "type=" + type + "&";
+    if (search != null && !search.isEmpty()) url += "search=" + search;
+    return getWithAuth(url);
+}
+
+public ApiResponse createParty(JSONObject payload) {
+    return postWithAuth("/parties/create", payload);
+}
+
+public ApiResponse getPartyStatement(int partyId) {
+    return getWithAuth("/parties/" + partyId + "/statement");
+}
 }
