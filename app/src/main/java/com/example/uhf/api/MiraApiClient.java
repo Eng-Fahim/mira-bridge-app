@@ -2437,5 +2437,8 @@ public ApiResponse sendScrapBatch(int batchId) {
 public ApiResponse receiveScrapBatch(int batchId, JSONObject payload) {
     return postWithAuth("/scrap/batches/" + batchId + "/receive", payload);
 }
-    
+public ApiResponse getScrapProfitReport(int branchId, String fromDate, String toDate) {
+    return getWithAuth("/scrap/profit-report?branch_id=" + branchId 
+        + "&from=" + fromDate + "&to=" + toDate);
+}    
 }
