@@ -191,6 +191,25 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- ✅ رأس الجدول + وضع العرض الحالي -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- شارة الوضع -->
+    <TextView
+        android:id="@+id/tvViewMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="4dp"
+        android:text="الوضع: مالي 💵"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        android:gravity="center"
+        android:background="?attr/colorSurfaceVariant"/>
+
     <!-- Header العناوين -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -205,6 +224,7 @@
         <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="حركة الفترة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
         <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="آخر المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
     </LinearLayout>
+</LinearLayout>
 
     <ProgressBar
         android:id="@+id/pbLoading"
