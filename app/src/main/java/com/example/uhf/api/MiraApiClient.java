@@ -2549,4 +2549,9 @@ public ApiResponse getPartyStatement(int partyId) {
 public ApiResponse getScrapAgingSummary(int branchId) {
     return getWithAuth("/scrap/aging/summary?branch_id=" + branchId);
 }
+public ApiResponse getCashFlowStatement(String date, int branchId) {
+    String url = "/accounting/cash-flow?date=" + date;
+    if (branchId > 0) url += "&branch_id=" + branchId;
+    return getAccounting(url);
+}
 }
