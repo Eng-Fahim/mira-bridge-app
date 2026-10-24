@@ -1,26 +1,33 @@
 package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.api.dto.CashFlowDto;
 import com.example.uhf.api.dto.CashFlowItemDto;
+import com.example.uhf.utils.MiraPdfExporter;
 import com.google.gson.Gson;
 
-import org.json.JSONObject; // ✅ تم إضافة هذا السطر
+import org.json.JSONObject;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
@@ -29,7 +36,9 @@ public class MiraCashFlowFragment extends Fragment {
 
     private TextView tvDate, tvNetCashFlow, tvTotalInflow, tvTotalOutflow;
     private LinearLayout llInflowContainer, llOutflowContainer;
+    private Button btnExportCashFlowPdf;
     private String selectedDate;
+    private CashFlowDto currentDto; // لحفظ البيانات لتصديرها
 
     @Nullable
     @Override
@@ -42,17 +51,43 @@ public class MiraCashFlowFragment extends Fragment {
         tvTotalOutflow = view.findViewById(R.id.tvTotalOutflow);
         llInflowContainer = view.findViewById(R.id.llInflowContainer);
         llOutflowContainer = view.findViewById(R.id.llOutflowContainer);
+        btnExportCashFlowPdf = view.findViewById(R.id.btnExportCashFlowPdf); // ✅ الزر الجديد
 
-        // تعيين تاريخ اليوم كافتراضي
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         selectedDate = sdf.format(Calendar.getInstance().getTime());
         tvDate.setText("📅 " + selectedDate);
 
         view.findViewById(R.id.btnPickDate).setOnClickListener(v -> showDatePicker());
 
-        loadCashFlow(selectedDate);
+        // ✅ حدث زر التصدير
+        btnExportCashFlowPdf.setOnClickListener(v -> exportToPdf());
 
+        loadCashFlow(selectedDate);
         return view;
+    }
+
+    private void exportToPdf() {
+        if (currentDto == null) {
+            Toast.makeText(getContext(), "لا توجد بيانات للتصدير", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        try {
+            File pdfFile = MiraPdfExporter.exportCashFlowToPdf(requireContext(), currentDto, "الفرع الرئيسي");
+            
+            // فتح الملف باستخدام FileProvider
+            Uri pdfUri = FileProvider.getUriForFile(requireContext(), 
+                requireContext().getPackageName() + ".provider", pdfFile);
+            
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(pdfUri, "application/pdf");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            startActivity(Intent.createChooser(intent, "فتح التقرير"));
+            
+        } catch (Exception e) {
+            Toast.makeText(getContext(), "حدث خطأ أثناء التصدير: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void showDatePicker() {
@@ -71,17 +106,16 @@ public class MiraCashFlowFragment extends Fragment {
         new Thread(() -> {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = client.getCashFlowStatement(date, 0); // 0 = كل الفروع
+                MiraApiClient.ApiResponse response = client.getCashFlowStatement(date, 0);
 
                 if (response != null && response.isSuccess && response.data != null) {
                     Gson gson = new Gson();
-                    
-                    // ✅ التصحيح: استخدام getJSONObject
                     JSONObject jsonData = response.data.getJSONObject("data");
                     CashFlowDto dto = gson.fromJson(jsonData.toString(), CashFlowDto.class);
                     
                     requireActivity().runOnUiThread(() -> {
                         if (dto != null) {
+                            currentDto = dto; // ✅ حفظ البيانات
                             updateUI(dto);
                         }
                     });
@@ -100,14 +134,12 @@ public class MiraCashFlowFragment extends Fragment {
         tvTotalInflow.setText(String.format(Locale.US, "إجمالي الداخل: %,.2f", dto.total_inflow));
         tvTotalOutflow.setText(String.format(Locale.US, "إجمالي الخارج: %,.2f", dto.total_outflow));
 
-        // تغيير لون صافي الحركة إذا كان سالباً
         if (dto.net_cash_flow < 0) {
-            tvNetCashFlow.setTextColor(0xFFDC2626); // أحمر
+            tvNetCashFlow.setTextColor(0xFFDC2626); 
         } else {
-            tvNetCashFlow.setTextColor(0xFFFFFFFF); // أبيض
+            tvNetCashFlow.setTextColor(0xFFFFFFFF); 
         }
 
-        // تعبئة قائمة الداخل
         llInflowContainer.removeAllViews();
         if (dto.inflow != null) {
             for (CashFlowItemDto item : dto.inflow) {
@@ -115,7 +147,6 @@ public class MiraCashFlowFragment extends Fragment {
             }
         }
 
-        // تعبئة قائمة الخارج
         llOutflowContainer.removeAllViews();
         if (dto.outflow != null) {
             for (CashFlowItemDto item : dto.outflow) {
@@ -131,8 +162,6 @@ public class MiraCashFlowFragment extends Fragment {
 
         tvTitle.setText(item.label + (item.account != null && item.account.contains("بنك") ? " (بنك)" : " (نقدي)"));
         tvAmount.setText(String.format(Locale.US, "%s%,.2f", isInflow ? "+" : "-", item.amount));
-        
-        // تلوين المبلغ
         tvAmount.setTextColor(isInflow ? 0xFF16A34A : 0xFFDC2626);
 
         container.addView(row);
