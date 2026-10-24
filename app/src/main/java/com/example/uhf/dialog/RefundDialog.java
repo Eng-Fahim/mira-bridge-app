@@ -14,7 +14,9 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,31 +24,24 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
+import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.api.dto.PaymentMethodDto;
 import com.google.android.material.button.MaterialButton;
+import com.google.gson.Gson;
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- *  RefundDialog v2.1 — Partial Serial + RFID Hardware Trigger + Barcode Support
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * إصلاحات v2.1:
- *   ✅ [NEW] اعتراض زناد الـ RFID (139, 280, 293) وتمريره للـ Fragment.
- *            (لأن الـ Dialog يأخذ التركيز فلا يصل الزناد للـ Fragment تلقائياً)
- *   ✅ [NEW] دالة setOnHardwareKeyListener لربط الزناد بـ myOnKeyDwon.
- *   ✅ [NEW] تنظيف hardwareKeyListener عند dismiss.
- *
- * إصلاحات v2.0 (سابقة):
- *   ✅ Debounce على TextWatcher (700ms) — بدل إرسال طلب لكل حرف
- *   ✅ setRefundCode(code) — لاستقبال RFID/باركود من الخارج
- *   ✅ suppressWatcher flag — يمنع double-search عند setText برمجياً
- *   ✅ تنظيف pendingSearch عند dismiss
- */
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+
 public class RefundDialog extends Dialog {
 
     private static final String TAG = "RefundDialog";
 
+    // ✅ تحديث الواجهة لتستقبل طريقة الإرجاع
     public interface RefundCallback {
-        void onRefundConfirm(String code, String reason);
+        void onRefundConfirm(String code, String reason, String refundMethodCode);
         void onBarcodeScan();
         void onCodeChanged(String code);
     }
@@ -54,13 +49,13 @@ public class RefundDialog extends Dialog {
     private static final long SEARCH_DEBOUNCE_MS = 700L;
     private static final int  MIN_SEARCH_LEN = 4;
 
-    // أكواد أزرار الزناد في قارئ RFID
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
     private static final int KEYCODE_RFID_TRIGGER_3 = 293;
 
     private EditText etRefundCode;
     private EditText etReason;
+    private Spinner spRefundMethod; // ✅ تمت الإضافة
     private TextView tvRefundItemTitle;
     private TextView tvRefundItemStatus;
     private android.view.View cardRefundItemInfo;
@@ -72,8 +67,10 @@ public class RefundDialog extends Dialog {
     @Nullable private Runnable pendingSearch = null;
     private boolean suppressWatcher = false;
 
-    // ✅ [v2.1] مستمع أزرار الزناد (يُمرَّر للـ Fragment)
     @Nullable private DialogInterface.OnKeyListener hardwareKeyListener;
+
+    // ✅ قائمة طرق الدفع
+    private final List<PaymentMethodDto> paymentMethods = new ArrayList<>();
 
     public RefundDialog(@NonNull Context context, RefundCallback callback) {
         super(context);
@@ -96,12 +93,14 @@ public class RefundDialog extends Dialog {
         }
 
         initViews();
+        loadPaymentMethods(); // ✅ جلب طرق الدفع
         setupListeners();
     }
 
     private void initViews() {
         etRefundCode = findViewById(R.id.etRefundScanCode);
         etReason = findViewById(R.id.etRefundReason);
+        spRefundMethod = findViewById(R.id.spRefundMethod); // ✅
         tvRefundItemTitle = findViewById(R.id.tvRefundItemTitle);
         tvRefundItemStatus = findViewById(R.id.tvRefundItemStatus);
         cardRefundItemInfo = findViewById(R.id.cardRefundItemInfo);
@@ -120,28 +119,29 @@ public class RefundDialog extends Dialog {
             String reason = etReason.getText().toString().trim();
 
             if (code.isEmpty()) {
-                Toast.makeText(getContext(),
-                        isArabic ? "⚠️ أدخل رمز القطعة" : "⚠️ Enter item code",
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), isArabic ? "⚠️ أدخل رمز القطعة" : "⚠️ Enter item code", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             if (!isRefundable) {
-                Toast.makeText(getContext(),
-                        isArabic ? "⚠️ لا يمكن إرجاع هذه القطعة"
-                                : "⚠️ Item not refundable",
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), isArabic ? "⚠️ لا يمكن إرجاع هذه القطعة" : "⚠️ Item not refundable", Toast.LENGTH_SHORT).show();
                 return;
             }
 
+            // ✅ استخراج كود طريقة الإرجاع
+            String methodCode = "CASH";
+            if (!paymentMethods.isEmpty()) {
+                int pos = spRefundMethod.getSelectedItemPosition();
+                if (pos >= 0 && pos < paymentMethods.size()) {
+                    methodCode = paymentMethods.get(pos).code;
+                }
+            }
+
             if (callback != null) {
-                callback.onRefundConfirm(code, reason.isEmpty()
-                        ? (isArabic ? "مرتجع مبيعات" : "Sales Refund")
-                        : reason);
+                callback.onRefundConfirm(code, reason.isEmpty() ? (isArabic ? "مرتجع مبيعات" : "Sales Refund") : reason, methodCode);
             }
         });
 
-        // ✅ TextWatcher مع Debounce (700ms)
         etRefundCode.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
@@ -149,32 +149,66 @@ public class RefundDialog extends Dialog {
             @Override
             public void afterTextChanged(Editable s) {
                 if (suppressWatcher) return;
-
-                // إلغاء أي بحث معلّق
                 if (pendingSearch != null) {
                     handler.removeCallbacks(pendingSearch);
                     pendingSearch = null;
                 }
-
                 final String text = s != null ? s.toString().trim() : "";
-
                 if (text.length() < MIN_SEARCH_LEN) {
                     hideRefundItemInfo();
                     return;
                 }
-
-                // ✅ Debounce
                 pendingSearch = () -> {
                     pendingSearch = null;
-                    if (callback != null && etRefundCode != null
-                            && text.equals(etRefundCode.getText().toString().trim())) {
-                        Log.d(TAG, "🔍 Debounced search: " + text);
+                    if (callback != null && etRefundCode != null && text.equals(etRefundCode.getText().toString().trim())) {
                         callback.onCodeChanged(text);
                     }
                 };
                 handler.postDelayed(pendingSearch, SEARCH_DEBOUNCE_MS);
             }
         });
+    }
+
+    // ✅ دالة جلب طرق الدفع ديناميكياً من السيرفر
+    private void loadPaymentMethods() {
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(getContext().getApplicationContext());
+                MiraApiClient.ApiResponse response = client.getPaymentMethods();
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray arr = response.data.optJSONArray("data");
+                    if (arr == null) arr = response.data.optJSONArray("methods");
+
+                    if (arr != null) {
+                        Gson gson = new Gson();
+                        for (int i = 0; i < arr.length(); i++) {
+                            PaymentMethodDto m = gson.fromJson(arr.getJSONObject(i).toString(), PaymentMethodDto.class);
+                            if (m != null && m.code != null) paymentMethods.add(m);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            // احتياطي
+            if (paymentMethods.isEmpty()) {
+                PaymentMethodDto cash = new PaymentMethodDto();
+                cash.code = "CASH"; cash.nameAr = "نقداً"; cash.icon = "💵";
+                paymentMethods.add(cash);
+            }
+
+            handler.post(() -> {
+                if (spRefundMethod != null) {
+                    List<String> names = new ArrayList<>();
+                    for (PaymentMethodDto m : paymentMethods) {
+                        names.add((m.icon != null ? m.icon : "") + " " + m.getDisplayName(isArabic));
+                    }
+                    ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, names);
+                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    spRefundMethod.setAdapter(adapter);
+                }
+            });
+        }).start();
     }
 
     private void setupListeners() {
@@ -189,38 +223,23 @@ public class RefundDialog extends Dialog {
             cardRefundItemInfo = null;
             isRefundable = false;
             suppressWatcher = false;
-            hardwareKeyListener = null; // ✅ [v2.1]
+            hardwareKeyListener = null;
         });
 
         setCancelable(true);
         setCanceledOnTouchOutside(true);
     }
 
-    /**
-     * ✅ [v2.1] ربط أزرار الزناد الخاصة بالقارئ (RFID).
-     *    الـ Dialog يأخذ التركيز، لذا نعترض الأزرار هنا ونمرّرها للـ Fragment.
-     *    الاستخدام من MiraPosFragment:
-     *      refundDialog.setOnHardwareKeyListener((d, k, e) -> myOnKeyDwon(k, e));
-     */
     public void setOnHardwareKeyListener(@Nullable DialogInterface.OnKeyListener listener) {
         this.hardwareKeyListener = listener;
     }
 
-    /**
-     * ✅ [v2.1] اعتراض أزرار الزناد قبل توزيعها على عناصر الـ Dialog.
-     */
     @Override
     public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
         try {
             int code = event.getKeyCode();
-            boolean isTriggerKey =
-                    (code == KEYCODE_RFID_TRIGGER_1
-                            || code == KEYCODE_RFID_TRIGGER_2
-                            || code == KEYCODE_RFID_TRIGGER_3);
-
+            boolean isTriggerKey = (code == KEYCODE_RFID_TRIGGER_1 || code == KEYCODE_RFID_TRIGGER_2 || code == KEYCODE_RFID_TRIGGER_3);
             if (isTriggerKey && hardwareKeyListener != null) {
-                Log.d(TAG, "🎯 [v2.1] Hardware trigger intercepted: " + code
-                        + " action=" + event.getAction());
                 return hardwareKeyListener.onKey(this, code, event);
             }
         } catch (Exception e) {
@@ -229,13 +248,8 @@ public class RefundDialog extends Dialog {
         return super.dispatchKeyEvent(event);
     }
 
-    /**
-     * ✅ [v2.0] تعيين الكود برمجياً (من RFID أو باركود) — بدون تفعيل watcher
-     *    المتصل (Fragment) سيتولى استدعاء البحث مباشرة.
-     */
     public void setRefundCode(@Nullable String code) {
         if (etRefundCode == null || code == null) return;
-
         suppressWatcher = true;
         try {
             etRefundCode.setText(code);
@@ -243,42 +257,31 @@ public class RefundDialog extends Dialog {
         } finally {
             suppressWatcher = false;
         }
-
-        // امسح أي حالة سابقة
         hideRefundItemInfo();
-        Log.d(TAG, "📥 setRefundCode: " + code);
     }
 
     public void showRefundItemInfo(String title, String price) {
-        if (cardRefundItemInfo != null)
-            cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
-        if (tvRefundItemTitle != null)
-            tvRefundItemTitle.setText(title + " (" + price + ")");
+        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
+        if (tvRefundItemTitle != null) tvRefundItemTitle.setText(title + " (" + price + ")");
         if (tvRefundItemStatus != null) {
-            tvRefundItemStatus.setText(isArabic
-                    ? "✅ القطعة مباعة وقابلة للإرجاع"
-                    : "✅ Item sold and refundable");
+            tvRefundItemStatus.setText(isArabic ? "✅ القطعة مباعة وقابلة للإرجاع" : "✅ Item sold and refundable");
             tvRefundItemStatus.setTextColor(Color.parseColor("#2ECC71"));
         }
         isRefundable = true;
     }
 
     public void showRefundItemError(String message) {
-        if (cardRefundItemInfo != null)
-            cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
-        if (tvRefundItemTitle != null)
-            tvRefundItemTitle.setText(message);
+        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
+        if (tvRefundItemTitle != null) tvRefundItemTitle.setText(message);
         if (tvRefundItemStatus != null) {
-            tvRefundItemStatus.setText(isArabic
-                    ? "غير قابلة للإرجاع ❌" : "Not Refundable ❌");
+            tvRefundItemStatus.setText(isArabic ? "غير قابلة للإرجاع ❌" : "Not Refundable ❌");
             tvRefundItemStatus.setTextColor(Color.parseColor("#E74C3C"));
         }
         isRefundable = false;
     }
 
     private void hideRefundItemInfo() {
-        if (cardRefundItemInfo != null)
-            cardRefundItemInfo.setVisibility(android.view.View.GONE);
+        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(android.view.View.GONE);
         isRefundable = false;
     }
 }
