@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -52,7 +53,7 @@ public class MiraVouchersFragment extends Fragment {
     private MaterialButton btnNewVoucher;
     private TabLayout tabVoucherTypes;
 
-    private String currentType = ""; // all, receipt, payment
+    private String currentType = "";
     private final List<VoucherItem> voucherList = new ArrayList<>();
     private VoucherAdapter adapter;
     private boolean isArabic = true;
@@ -106,7 +107,6 @@ public class MiraVouchersFragment extends Fragment {
                 @Override public void onTabReselected(TabLayout.Tab tab) {}
             });
         }
-
         btnNewVoucher.setOnClickListener(v -> showCreateVoucherDialog());
     }
 
@@ -141,6 +141,7 @@ public class MiraVouchersFragment extends Fragment {
                     item.amountMoney = obj.optString("amount_money", "0");
                     item.amountGold = obj.optString("amount_gold_grams", "0");
                     item.paymentMethod = obj.optString("payment_method", "");
+                    item.accountName = obj.optString("account_name_ar", "");
                     item.date = obj.optString("created_at", "");
                     voucherList.add(item);
                 }
@@ -159,6 +160,9 @@ public class MiraVouchersFragment extends Fragment {
         }
     }
 
+    // ═══════════════════════════════════════════════════
+    //  إنشاء سند جديد مع اختيار الحساب
+    // ═══════════════════════════════════════════════════
     private void showCreateVoucherDialog() {
         if (getContext() == null) return;
         
@@ -172,6 +176,7 @@ public class MiraVouchersFragment extends Fragment {
         }
         
         Spinner spType = dialog.findViewById(R.id.spVoucherType);
+        AutoCompleteTextView ddAccount = dialog.findViewById(R.id.ddVoucherAccount);
         Spinner spKarat = dialog.findViewById(R.id.spVoucherKarat);
         Spinner spPayment = dialog.findViewById(R.id.spVoucherPaymentMethod);
         EditText etCash = dialog.findViewById(R.id.etVoucherCashAmount);
@@ -180,15 +185,35 @@ public class MiraVouchersFragment extends Fragment {
         MaterialButton btnCancel = dialog.findViewById(R.id.btnVoucherCancel);
         MaterialButton btnSave = dialog.findViewById(R.id.btnVoucherSave);
         
-        // تعبئة Spinners
         String[] types = {isArabic ? "قبض" : "Receipt", isArabic ? "صرف" : "Payment"};
         spType.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, types));
         
         String[] karats = {"24K", "22K", "21K", "18K"};
         spKarat.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, karats));
         
-        String[] payments = {isArabic ? "نقدي" : "Cash", isArabic ? "تحويل" : "Transfer", isArabic ? "شبكة" : "Network"};
+        String[] payments = {isArabic ? "نقدي" : "cash", isArabic ? "تحويل" : "bank_transfer", isArabic ? "شبكة" : "e_wallet"};
         spPayment.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, payments));
+        
+        // ✅ جلب الحسابات
+        final List<Integer> accountIds = new ArrayList<>();
+        final List<String> accountNames = new ArrayList<>();
+        
+        executor.execute(() -> {
+            MiraApiClient.ApiResponse res = apiClient.getVoucherAccounts();
+            if (res.isSuccess && res.data != null) {
+                JSONArray data = res.data.optJSONArray("data");
+                if (data != null) {
+                    for (int i = 0; i < data.length(); i++) {
+                        JSONObject acc = data.optJSONObject(i);
+                        accountIds.add(acc.optInt("id"));
+                        accountNames.add(acc.optString("account_code") + " - " + acc.optString("account_name_ar"));
+                    }
+                    mainHandler.post(() -> {
+                        ddAccount.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_dropdown_item_1line, accountNames));
+                    });
+                }
+            }
+        });
         
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         
@@ -203,12 +228,22 @@ public class MiraVouchersFragment extends Fragment {
                 Toast.makeText(getContext(), isArabic ? "أدخل مبلغاً أو وزناً" : "Enter amount or weight", Toast.LENGTH_SHORT).show();
                 return;
             }
+
+            int accIndex = accountNames.indexOf(ddAccount.getText().toString());
+            if (accIndex < 0) {
+                Toast.makeText(getContext(), isArabic ? "اختر الحساب" : "Select Account", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int accountId = accountIds.get(accIndex);
             
-            createVoucher(spType.getSelectedItemPosition() == 0 ? "receipt" : "payment",
+            createVoucher(
+                spType.getSelectedItemPosition() == 0 ? "receipt" : "payment",
                 cashAmount, goldWeight, 
                 karats[spKarat.getSelectedItemPosition()],
                 payments[spPayment.getSelectedItemPosition()],
-                etNotes.getText().toString().trim());
+                etNotes.getText().toString().trim(),
+                accountId
+            );
             
             dialog.dismiss();
         });
@@ -216,12 +251,14 @@ public class MiraVouchersFragment extends Fragment {
         dialog.show();
     }
 
-    private void createVoucher(String type, double cash, double gold, String karat, String payment, String notes) {
+    private void createVoucher(String type, double cash, double gold, String karat, 
+                               String payment, String notes, int accountId) {
         executor.execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("voucher_type", type);
                 payload.put("branch_id", branchesManager.getActiveBranchId());
+                payload.put("account_id", accountId);
                 payload.put("amount_money", cash);
                 payload.put("amount_gold_grams", gold);
                 payload.put("gold_karat", karat);
@@ -235,7 +272,8 @@ public class MiraVouchersFragment extends Fragment {
                         Toast.makeText(getContext(), isArabic ? "✅ تم إنشاء السند" : "✅ Voucher created", Toast.LENGTH_SHORT).show();
                         loadVouchers();
                     } else {
-                        Toast.makeText(getContext(), isArabic ? "❌ فشل الإنشاء" : "❌ Failed", Toast.LENGTH_SHORT).show();
+                        String err = response != null && response.error != null ? response.error : "فشل";
+                        Toast.makeText(getContext(), "❌ " + err, Toast.LENGTH_LONG).show();
                     }
                 });
             } catch (Exception e) {
@@ -252,28 +290,19 @@ public class MiraVouchersFragment extends Fragment {
         }
     }
 
-    // ==================== MODEL ====================
     private static class VoucherItem {
         int id;
-        String voucherNumber;
-        String voucherType;
-        String amountMoney;
-        String amountGold;
-        String paymentMethod;
-        String date;
+        String voucherNumber, voucherType, amountMoney, amountGold, paymentMethod, accountName, date;
     }
 
-    // ==================== ADAPTER ====================
     private class VoucherAdapter extends RecyclerView.Adapter<VoucherAdapter.ViewHolder> {
         private List<VoucherItem> items;
-        
         VoucherAdapter(List<VoucherItem> items) { this.items = items; }
         
-        @NonNull
-        @Override
+        @NonNull @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(android.R.layout.simple_list_item_2, parent, false);
+                .inflate(R.layout.item_voucher, parent, false);
             return new ViewHolder(view);
         }
         
@@ -281,24 +310,29 @@ public class MiraVouchersFragment extends Fragment {
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             VoucherItem item = items.get(position);
             
-            String typeLabel = item.voucherType.equals("receipt") ? 
-                (isArabic ? "قبض" : "Receipt") : (isArabic ? "صرف" : "Payment");
+            boolean isReceipt = item.voucherType.equals("receipt");
+            String typeLabel = isReceipt ? (isArabic ? "📥 قبض" : "📥 Receipt") : (isArabic ? "📤 صرف" : "📤 Payment");
             
             holder.tvTitle.setText(item.voucherNumber + " - " + typeLabel);
-            holder.tvSubtitle.setText((isArabic ? "نقد: " : "Cash: ") + item.amountMoney + 
-                " | " + (isArabic ? "ذهب: " : "Gold: ") + item.amountGold + "g" +
-                " | " + item.date);
+            holder.tvAccount.setText(item.accountName);
+            
+            String amountText = String.format(Locale.US, "%,.2f YER", Double.parseDouble(item.amountMoney));
+            if (Double.parseDouble(item.amountGold) > 0) {
+                amountText += " | " + String.format(Locale.US, "%.2f g", Double.parseDouble(item.amountGold));
+            }
+            holder.tvAmount.setText(amountText);
+            holder.tvAmount.setTextColor(isReceipt ? 0xFF16A34A : 0xFFDC2626);
         }
         
-        @Override
-        public int getItemCount() { return items.size(); }
+        @Override public int getItemCount() { return items.size(); }
         
         class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvTitle, tvSubtitle;
-            ViewHolder(View itemView) {
-                super(itemView);
-                tvTitle = itemView.findViewById(android.R.id.text1);
-                tvSubtitle = itemView.findViewById(android.R.id.text2);
+            TextView tvTitle, tvAccount, tvAmount;
+            ViewHolder(View v) {
+                super(v);
+                tvTitle = v.findViewById(R.id.tvVoucherNumber);
+                tvAccount = v.findViewById(R.id.tvVoucherAccount);
+                tvAmount = v.findViewById(R.id.tvVoucherAmount);
             }
         }
     }
