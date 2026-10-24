@@ -459,15 +459,33 @@ public class MiraDashboardFragment extends Fragment {
             tvScrapWeight = v.findViewById(R.id.tvScrapWeight);
             tvScrapValue = v.findViewById(R.id.tvScrapValue);
             btnToggleScrapVisibility = v.findViewById(R.id.btnToggleScrapVisibility);
-            btnOpenScrapHistory = v.findViewById(R.id.btnOpenScrapHistory);
+            
+            View btnOpenScrapBuy = v.findViewById(R.id.btnOpenScrapBuy);
+            View btnOpenScrapHistory = v.findViewById(R.id.btnOpenScrapHistory);
+            View btnOpenScrapBatches = v.findViewById(R.id.btnOpenScrapBatches);
 
             if (btnToggleScrapVisibility != null) {
                 btnToggleScrapVisibility.setOnClickListener(v2 -> toggleScrapVisibility());
             }
-            if (btnOpenScrapHistory != null) {
-            btnOpenScrapHistory.setOnClickListener(v2 ->
-            navigateToFragment(new MiraScrapHistoryFragment(), "ScrapHistory"));
-            }
+            if (btnOpenScrapBuy != null) {
+    btnOpenScrapBuy.setOnClickListener(v2 -> {
+        navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
+    });
+}
+
+// ✅ ربط زر "السجل"
+if (btnOpenScrapHistory != null) {
+    btnOpenScrapHistory.setOnClickListener(v2 -> {
+        navigateToFragment(new MiraScrapHistoryFragment(), NavigationManager.TAG_SCRAP_HISTORY);
+    });
+}
+
+// ✅ ربط زر "الدفعات"
+if (btnOpenScrapBatches != null) {
+    btnOpenScrapBatches.setOnClickListener(v2 -> {
+        navigateToFragment(new MiraScrapBatchesFragment(), NavigationManager.TAG_SCRAP_BATCHES);
+    });
+}
             
 
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
