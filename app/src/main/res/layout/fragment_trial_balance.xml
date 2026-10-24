@@ -112,34 +112,45 @@
             </LinearLayout>
         </HorizontalScrollView>
 
-        <!-- صف 3: التبويبات + فرعي فقط -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="6dp">
+       <!-- صف 3: التبويبات + فرعي فقط + إخفاء الأصفار -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginTop="6dp">
 
-            <com.google.android.material.tabs.TabLayout
-                android:id="@+id/tabLayout"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                app:tabMode="fixed"
-                app:tabGravity="fill">
-                <com.google.android.material.tabs.TabItem android:text="مالي 💵" />
-                <com.google.android.material.tabs.TabItem android:text="ذهب 🥇" />
-            </com.google.android.material.tabs.TabLayout>
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        app:tabMode="fixed"
+        app:tabGravity="fill">
+        <com.google.android.material.tabs.TabItem android:text="مالي 💵" />
+        <com.google.android.material.tabs.TabItem android:text="ذهب 🥇" />
+    </com.google.android.material.tabs.TabLayout>
 
-            <CheckBox
-                android:id="@+id/cbLeafOnly"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="فرعي"
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurface"/>
-        </LinearLayout>
+    <CheckBox
+        android:id="@+id/cbLeafOnly"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="فرعي"
+        android:textSize="11sp"
+        android:textColor="?attr/colorOnSurface"/>
+
+    <!-- ✅ جديد: زر إخفاء الحسابات الصفرية -->
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switchHideZero"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="إخفاء الأصفار"
+        android:textSize="11sp"
+        android:textColor="?attr/colorOnSurface"
+        android:checked="true" /> <!-- مفعل افتراضياً لشاشة نظيفة -->
+</LinearLayout>
     </LinearLayout>
 
     <!-- KPI Container -->
