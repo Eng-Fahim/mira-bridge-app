@@ -6,9 +6,6 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.net.Uri;
 import android.os.Bundle;
-import android.print.PrintAttributes;
-import android.print.PrintManager;
-import android.print.PrintHelper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,6 +16,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
+import androidx.print.PrintHelper; // ✅ المسار الصحيح للكلاس
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
@@ -220,7 +218,7 @@ public class MiraScrapReceiptFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  طباعة PDF
+    //  طباعة PDF (تم تصحيحها)
     // ═══════════════════════════════════════════════════════
     private void printReceipt() {
         try {
@@ -230,23 +228,16 @@ public class MiraScrapReceiptFragment extends BottomSheetDialogFragment {
                 return;
             }
 
-            PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-            if (printManager == null) {
-                Toast.makeText(requireContext(), "خدمة الطباعة غير متوفرة", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            String jobName = "SCRAP-" + tvReceiptNumber.getText();
+            // ✅ استخدام PrintHelper من AndroidX مباشرة (الطريقة الصحيحة)
+            PrintHelper printHelper = new PrintHelper(requireContext());
+            printHelper.setScaleMode(PrintHelper.SCALE_MODE_FIT);
+            printHelper.setColorMode(PrintHelper.COLOR_MODE_COLOR);
             
-            printManager.print(jobName, 
-                new PrintHelper(requireContext()).getPrintDocumentAdapter(jobName, bitmap),
-                new PrintAttributes.Builder()
-                    .setMediaSize(PrintAttributes.MediaSize.ISO_A5)
-                    .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
-                    .build());
+            String jobName = "SCRAP-" + tvReceiptNumber.getText();
+            printHelper.printBitmap(jobName, bitmap);
                 
         } catch (Exception e) {
-            Toast.makeText(requireContext(), "خطأ: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "خطأ في الطباعة: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
