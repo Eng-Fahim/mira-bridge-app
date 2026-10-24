@@ -1,4 +1,4 @@
-package com.example.uhf.fragment;
+packagepackage com.example.uhf.fragment;
 
 import android.app.Dialog;
 import android.graphics.Color;
@@ -381,18 +381,26 @@ public class MiraVouchersFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            VoucherItem item = items.get(position);
-            boolean isReceipt = item.voucherType.equals("receipt");
-            String typeLabel = isReceipt ? "📥 قبض" : "📤 صرف";
-            holder.tvTitle.setText(item.voucherNumber + " - " + typeLabel);
-            holder.tvAccount.setText(item.accountName);
-            String amountText = String.format(Locale.US, "%,.2f YER", Double.parseDouble(item.amountMoney));
-            if (Double.parseDouble(item.amountGold) > 0) {
-                amountText += " | " + String.format(Locale.US, "%.2f g", Double.parseDouble(item.amountGold));
-            }
-            holder.tvAmount.setText(amountText);
-            holder.tvAmount.setTextColor(isReceipt ? 0xFF16A34A : 0xFFDC2626);
+    VoucherItem item = items.get(position);
+    boolean isReceipt = item.voucherType.equals("receipt");
+    String typeLabel = isReceipt ? "📥 قبض" : "📤 صرف";
+    holder.tvTitle.setText(item.voucherNumber + " - " + typeLabel);
+    holder.tvAccount.setText(item.accountName);
+    String amountText = String.format(Locale.US, "%,.2f YER", Double.parseDouble(item.amountMoney));
+    if (Double.parseDouble(item.amountGold) > 0) {
+        amountText += " | " + String.format(Locale.US, "%.2f g", Double.parseDouble(item.amountGold));
+    }
+    holder.tvAmount.setText(amountText);
+    holder.tvAmount.setTextColor(isReceipt ? 0xFF16A34A : 0xFFDC2626);
+    
+    // ✅ [جديد] فتح السند عند الضغط
+    holder.itemView.setOnClickListener(v -> {
+        if (item.id > 0) {
+            MiraVoucherReceiptFragment receipt = MiraVoucherReceiptFragment.newInstance(item.id);
+            receipt.show(getParentFragmentManager(), "VoucherReceipt");
         }
+    });
+}
 
         @Override public int getItemCount() { return items.size(); }
 
