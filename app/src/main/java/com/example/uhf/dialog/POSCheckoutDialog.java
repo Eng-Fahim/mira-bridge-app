@@ -52,10 +52,6 @@ public class POSCheckoutDialog extends DialogFragment {
 
     private static final String TAG = "POSCheckoutDialog";
 
-    // ═══════════════════════════════════════════════════════════
-    //  Callbacks
-    // ═══════════════════════════════════════════════════════════
-
     public interface OnCheckoutListener {
         void onCheckout(POSCheckoutData data);
     }
@@ -64,40 +60,26 @@ public class POSCheckoutDialog extends DialogFragment {
         void onDialogDismissed();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Data Model
-    // ═══════════════════════════════════════════════════════════
-
     public static class POSCheckoutData {
-    public String customerName = "";
-    public String customerPhone = "";
-    public String customerEmail = "";
-    public String customerAddress = "";
-    public String customerNotes = "";
-    public String paymentMethod = "CASH";
-    public String accountCode = "1101";
-    public String currency = "USD";
-    public double originalTotal = 0.0;
-    public double discount = 0.0;
-    public double discountAmount = 0.0;
-    public double finalAmount = 0.0;
-    
-    public JSONArray payments = new JSONArray(); 
-    
-    // ✅ ضع هذا السطر هنا فقط
-    public String localUuid = ""; 
-}
-
-    // ═══════════════════════════════════════════════════════════
-    //  Arguments
-    // ═══════════════════════════════════════════════════════════
+        public String customerName = "";
+        public String customerPhone = "";
+        public String customerEmail = "";
+        public String customerAddress = "";
+        public String customerNotes = "";
+        public String paymentMethod = "CASH";
+        public String accountCode = "1101";
+        public String currency = "USD";
+        public double originalTotal = 0.0;
+        public double discount = 0.0;
+        public double discountAmount = 0.0;
+        public double finalAmount = 0.0;
+        
+        public JSONArray payments = new JSONArray(); 
+        public String localUuid = ""; 
+    }
 
     private static final String ARG_TOTAL_AMOUNT = "total_amount";
     private static final String ARG_ITEM_COUNT = "item_count";
-
-    // ═══════════════════════════════════════════════════════════
-    //  State
-    // ═══════════════════════════════════════════════════════════
 
     private double totalAmount = 0.0;
     private int itemCount = 0;
@@ -107,10 +89,6 @@ public class POSCheckoutDialog extends DialogFragment {
     private MiraOrgProfileManager orgProfile;
     private MiraPriceManager priceManager;
 
-    // ═══════════════════════════════════════════════════════════
-    //  Views
-    // ═══════════════════════════════════════════════════════════
-
     private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount,
             tvFinalTotal, tvAccountNumber;
     private EditText etCustomerName, etCustomerPhone, etCustomerEmail,
@@ -119,63 +97,38 @@ public class POSCheckoutDialog extends DialogFragment {
     private MaterialAutoCompleteTextView spPaymentMethod;
     private Button btnConfirmCheckout, btnCancelCheckout;
 
-    // ✅ Views جديدة للدفع المتعدد
     private LinearLayout llPaymentsContainer;
     private Button btnAddPayment;
     private TextView tvRemaining;
-
-    // ═══════════════════════════════════════════════════════════
-    //  Payment Methods & Logic
-    // ═══════════════════════════════════════════════════════════
 
     private final List<PaymentMethodDto> paymentMethods = new ArrayList<>();
     private PaymentMethodDto selectedMethod = null;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean paymentWatcherAttached = false;
 
-    // ✅ متغيرات الدفع المتعدد
     private final List<View> paymentRows = new ArrayList<>();
     private final String[] CURRENCIES = {"YER", "SAR", "USD"};
-    private double currentTotalWithDiscount = 0.0;
-
-    // ═══════════════════════════════════════════════════════════
-    //  Factory
-    // ═══════════════════════════════════════════════════════════
+    private double currentTotalWithDiscountUsd = 0.0;
 
     public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
-        DiagTracer.mark("D.newInstance START", "total=" + totalAmount + ", count=" + itemCount);
         POSCheckoutDialog dialog = new POSCheckoutDialog();
         Bundle args = new Bundle();
         args.putDouble(ARG_TOTAL_AMOUNT, totalAmount);
         args.putInt(ARG_ITEM_COUNT, itemCount);
         dialog.setArguments(args);
-        DiagTracer.mark("D.newInstance END");
         return dialog;
     }
 
-    public void setCheckoutListener(OnCheckoutListener listener) {
-        this.listener = listener;
-    }
-
-    public void setOnDismissListener(OnDialogDismissListener listener) {
-        this.dismissListener = listener;
-    }
+    public void setCheckoutListener(OnCheckoutListener listener) { this.listener = listener; }
+    public void setOnDismissListener(OnDialogDismissListener listener) { this.dismissListener = listener; }
 
     @Override
     public void onDismiss(@NonNull DialogInterface dialog) {
         super.onDismiss(dialog);
         if (dismissListener != null) {
-            try {
-                dismissListener.onDialogDismissed();
-            } catch (Exception e) {
-                DiagTracer.markException("onDismiss listener", e);
-            }
+            try { dismissListener.onDialogDismissed(); } catch (Exception ignored) {}
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════════
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -187,17 +140,13 @@ public class POSCheckoutDialog extends DialogFragment {
 
         try {
             isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-        } catch (Exception e) {
-            isArabic = false;
-        }
+        } catch (Exception e) { isArabic = false; }
 
         if (getContext() != null) {
             try {
                 orgProfile = MiraOrgProfileManager.getInstance(getContext());
                 priceManager = MiraPriceManager.getInstance(getContext());
-            } catch (Exception e) {
-                DiagTracer.markException("managers", e);
-            }
+            } catch (Exception e) { DiagTracer.markException("managers", e); }
         }
     }
 
@@ -223,9 +172,7 @@ public class POSCheckoutDialog extends DialogFragment {
                 );
                 getDialog().getWindow().setDimAmount(0.5f);
             }
-        } catch (Exception e) {
-            DiagTracer.markException("onStart window", e);
-        }
+        } catch (Exception ignored) {}
     }
 
     @Nullable
@@ -243,14 +190,8 @@ public class POSCheckoutDialog extends DialogFragment {
             setupSpinner();
             setupData();
             setupListeners();
-        } catch (Exception e) {
-            DiagTracer.markException("onViewCreated", e);
-        }
+        } catch (Exception e) { DiagTracer.markException("onViewCreated", e); }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Views Binding
-    // ═══════════════════════════════════════════════════════════
 
     private void bindViews(View view) {
         tvDialogTitle    = view.findViewById(R.id.tvDialogTitle);
@@ -274,7 +215,6 @@ public class POSCheckoutDialog extends DialogFragment {
         btnCancelCheckout  = view.findViewById(R.id.btnCancelCheckout);
         btnConfirmCheckout = view.findViewById(R.id.btnConfirmCheckout);
 
-        // ✅ ربط عناصر الدفع المتعدد
         llPaymentsContainer = view.findViewById(R.id.llPaymentsContainer);
         btnAddPayment       = view.findViewById(R.id.btnAddPayment);
         tvRemaining         = view.findViewById(R.id.tvRemaining);
@@ -290,13 +230,8 @@ public class POSCheckoutDialog extends DialogFragment {
         if (etDiscount != null) etDiscount.setHint(isArabic ? "نسبة الخصم" : "Discount");
         if (btnCancelCheckout != null) btnCancelCheckout.setText(isArabic ? "إلغاء" : "Cancel");
         if (btnConfirmCheckout != null) btnConfirmCheckout.setText(isArabic ? "تأكيد البيع ✓" : "Confirm Sale ✓");
-        
         if (btnAddPayment != null) btnAddPayment.setText(isArabic ? "+ إضافة عملة أخرى" : "+ Add Currency");
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Payment Methods Spinner (Original Code)
-    // ═══════════════════════════════════════════════════════════
 
     private void setupSpinner() {
         if (spPaymentMethod == null || getContext() == null) return;
@@ -327,23 +262,16 @@ public class POSCheckoutDialog extends DialogFragment {
                                 try {
                                     JSONObject obj = arr.getJSONObject(i);
                                     PaymentMethodDto m = gson.fromJson(obj.toString(), PaymentMethodDto.class);
-                                    if (m != null && m.code != null && !m.code.isEmpty()) {
-                                        loaded.add(m);
-                                    }
-                                } catch (Exception e) {
-                                    Log.e(TAG, "item parse error: " + e.getMessage());
-                                }
+                                    if (m != null && m.code != null && !m.code.isEmpty()) loaded.add(m);
+                                } catch (Exception ignored) {}
                             }
                         }
                     }
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "loadPaymentMethodsFromServer error: " + e.getMessage(), e);
-            }
+            } catch (Exception e) { Log.e(TAG, "loadPaymentMethods error", e); }
 
             final List<PaymentMethodDto> finalList = (loaded != null && !loaded.isEmpty()) ? loaded : getFallbackMethods();
-            final boolean isFallback = (loaded == null || loaded.isEmpty());
-            mainHandler.post(() -> applyPaymentMethods(finalList, isFallback));
+            mainHandler.post(() -> applyPaymentMethods(finalList));
         }).start();
     }
 
@@ -352,7 +280,6 @@ public class POSCheckoutDialog extends DialogFragment {
         list.add(makeMethod("CASH", "نقداً", "Cash", "💵", "1101", "الصناديق والنقدية", "Cash Box"));
         list.add(makeMethod("BANK_TRANSFER", "تحويل بنكي", "Bank Transfer", "🏦", "1102", "البنوك والمصاريف", "Bank Account"));
         list.add(makeMethod("E_WALLET", "محفظة إلكترونية", "E-Wallet", "📱", "1103", "المحافظ الإلكترونية", "E-Wallets"));
-        list.add(makeMethod("CHECK", "شيك", "Check", "📝", "1104", "شيكات تحت التحصيل", "Checks"));
         return list;
     }
 
@@ -363,7 +290,7 @@ public class POSCheckoutDialog extends DialogFragment {
         return m;
     }
 
-    private void applyPaymentMethods(List<PaymentMethodDto> methods, boolean isFallback) {
+    private void applyPaymentMethods(List<PaymentMethodDto> methods) {
         if (spPaymentMethod == null || !isAdded()) return;
         paymentMethods.clear();
         paymentMethods.addAll(methods);
@@ -399,6 +326,14 @@ public class POSCheckoutDialog extends DialogFragment {
             selectedMethod = methods.get(0);
             updateAccountNumberFromMethod(selectedMethod);
         }
+        
+        // ✅ تحديث قوائم طرق الدفع للسطور التي تمت إضافتها قبل التحميل
+        for (View row : paymentRows) {
+            Spinner spMethod = row.findViewById(R.id.spMethod);
+            if (spMethod != null && spMethod.getAdapter() == null) {
+                setupMethodSpinner(spMethod);
+            }
+        }
     }
 
     private void updateAccountNumberFromMethod(PaymentMethodDto method) {
@@ -416,32 +351,34 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
-    private String getCurrentPaymentMethod() {
-        if (selectedMethod != null && selectedMethod.code != null && !selectedMethod.code.isEmpty()) return selectedMethod.code;
-        if (spPaymentMethod == null || spPaymentMethod.getText() == null) return "CASH";
-        String text = spPaymentMethod.getText().toString();
-        if (text.contains("تحويل") || text.contains("Bank")) return "BANK_TRANSFER";
-        if (text.contains("بطاق") || text.contains("Card")) return "CARD";
-        if (text.contains("محفظ") || text.contains("Wallet")) return "E_WALLET";
-        if (text.contains("شيك") || text.contains("Check")) return "CHECK";
-        return "CASH";
-    }
-
-    private String getCurrentAccountCode() {
-        if (selectedMethod != null && selectedMethod.accountCode != null && !selectedMethod.accountCode.isEmpty()) return selectedMethod.accountCode;
-        return "1101";
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Split Payment Logic (New Code)
-    // ═══════════════════════════════════════════════════════════
-
     private void setupData() {
         if (tvItemCount != null) {
             tvItemCount.setText(isArabic ? String.format(Locale.getDefault(), "%d قطعة", itemCount) : String.format(Locale.getDefault(), "%d items", itemCount));
         }
         updateFinalAmount();
-        addPaymentRow(CURRENCIES[0], 0.0); // Default row
+        addPaymentRow(CURRENCIES[0], 0.0);
+    }
+
+    // ✅ دالة جلب سعر الصرف الصحيحة (من العملة إلى الريال اليمني)
+    private double getRateToYER(String currency) {
+        if ("YER".equalsIgnoreCase(currency)) return 1.0;
+        
+        if (priceManager != null) {
+            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER); // 530
+            double currencyRate = priceManager.getExchangeRate(currency); // USD = 1.0, SAR = 3.75
+            
+            // إذا كان السعر المحفوظ مقابل اليمني مباشرة
+            if (currencyRate > 10) return currencyRate;
+            
+            // تحويل من مقابل الدولار إلى مقابل اليمني
+            if (yerRate > 0 && currencyRate > 0) {
+                return yerRate / currencyRate; 
+            }
+        }
+        
+        if ("SAR".equalsIgnoreCase(currency)) return 141.33;
+        if ("USD".equalsIgnoreCase(currency)) return 530.0;
+        return 1.0;
     }
 
     private void addPaymentRow(String defaultCurrency, double amount) {
@@ -449,7 +386,9 @@ public class POSCheckoutDialog extends DialogFragment {
         
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
         Spinner spCurrency = row.findViewById(R.id.spCurrency);
+        Spinner spMethod = row.findViewById(R.id.spMethod); // ✅ سبينر طريقة الدفع لكل سطر
         EditText etAmount = row.findViewById(R.id.etAmount);
+        TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
         ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, CURRENCIES);
@@ -459,15 +398,39 @@ public class POSCheckoutDialog extends DialogFragment {
         int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
         spCurrency.setSelection(index >= 0 ? index : 0);
 
-        TextWatcher watcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateRemainingBalance(); }
-            @Override public void afterTextChanged(Editable s) {}
+        // ✅ تهيئة سبينر طريقة الدفع
+        if (spMethod != null) {
+            setupMethodSpinner(spMethod);
+        }
+
+        Runnable updateEquivalent = () -> {
+            try {
+                int pos = spCurrency.getSelectedItemPosition();
+                if (pos >= 0 && tvEquivalent != null) {
+                    String curr = CURRENCIES[pos];
+                    double rate = getRateToYER(curr);
+                    double amt = 0;
+                    try { amt = Double.parseDouble(etAmount.getText().toString()); } catch (Exception ignored) {}
+                    double base = amt * rate;
+                    tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
+                }
+            } catch (Exception ignored) {}
         };
-        etAmount.addTextChangedListener(watcher);
+
+        etAmount.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
+                updateEquivalent.run();
+                updateRemainingBalance(); 
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
         
         spCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { updateRemainingBalance(); }
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { 
+                updateEquivalent.run();
+                updateRemainingBalance(); 
+            }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
@@ -484,77 +447,70 @@ public class POSCheckoutDialog extends DialogFragment {
         paymentRows.add(row);
         llPaymentsContainer.addView(row);
         if (amount > 0) etAmount.setText(String.valueOf(amount));
+        updateEquivalent.run();
     }
 
-    private double getExchangeRate(String currency) {
-    if (priceManager != null) {
-        double rate = priceManager.getExchangeRate(currency);
-        if (rate > 0) return rate;
+    // ✅ دالة تعبئة سبينر طرق الدفع (تُستدعى عند إضافة سطر أو عند تحميل البيانات)
+    private void setupMethodSpinner(Spinner spMethod) {
+        List<String> methodNames = new ArrayList<>();
+        if (!paymentMethods.isEmpty()) {
+            for (PaymentMethodDto m : paymentMethods) {
+                methodNames.add(m.getDisplayName(isArabic));
+            }
+        } else {
+            methodNames.add(isArabic ? "نقداً" : "Cash");
+            methodNames.add(isArabic ? "بطاقة" : "Card");
+        }
+        ArrayAdapter<String> methodAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, methodNames);
+        methodAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spMethod.setAdapter(methodAdapter);
     }
-    // ✅ أسعار صرف احتياطية صحيحة (1 دولار = 530 يمني، 1 دولار = 3.75 سعودي)
-    if (currency.equals("YER")) return 1.0;
-    if (currency.equals("SAR")) return 141.33; // 530 / 3.75
-    if (currency.equals("USD")) return 530.0;
-    return 1.0;
-}
+
     private void updateRemainingBalance() {
         if (tvRemaining == null) return;
         
-        double totalPaidBase = 0;
+        double totalPaidInYer = 0;
         for (View row : paymentRows) {
-            Spinner sp = row.findViewById(R.id.spCurrency);
+            Spinner spCurrency = row.findViewById(R.id.spCurrency);
             EditText et = row.findViewById(R.id.etAmount);
-            int pos = sp.getSelectedItemPosition();
+            int pos = spCurrency.getSelectedItemPosition();
             if (pos >= 0) {
                 String currency = CURRENCIES[pos];
-                double rate = getExchangeRate(currency);
+                double rate = getRateToYER(currency);
                 double amount = 0;
                 try { amount = Double.parseDouble(et.getText().toString()); } catch (Exception ignored) {}
-                totalPaidBase += (amount * rate);
+                totalPaidInYer += (amount * rate);
             }
         }
         
-        // العملة الأساسية هي العملة الأولى في القائمة (YER)
-        double baseCurrencyRate = getExchangeRate(CURRENCIES[0]); 
-        double requiredBase = currentTotalWithDiscount * baseCurrencyRate;
-        double remaining = requiredBase - totalPaidBase;
+        // ✅ تحويل إجمالي الفاتورة (بالدولار) إلى الريال اليمني للمقارنة
+        double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
+        double remaining = requiredTotalInYer - totalPaidInYer;
         
         if (Math.abs(remaining) < 1) {
-            tvRemaining.setText("0.00 " + CURRENCIES[0]);
+            tvRemaining.setText("0.00 YER");
             tvRemaining.setTextColor(Color.parseColor("#16A34A")); // أخضر
         } else if (remaining > 0) {
-            tvRemaining.setText(String.format(Locale.US, "%,.2f %s", remaining, CURRENCIES[0]));
+            tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
             tvRemaining.setTextColor(Color.parseColor("#DC2626")); // أحمر
         } else {
-            tvRemaining.setText(String.format(Locale.US, "+ %,.2f %s", Math.abs(remaining), CURRENCIES[0]));
+            tvRemaining.setText(String.format(Locale.US, "+ %,.2f YER", Math.abs(remaining)));
             tvRemaining.setTextColor(Color.parseColor("#F59E0B")); // برتقالي
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Validation & Listeners
-    // ═══════════════════════════════════════════════════════════
-
     private boolean validateInputs() {
         boolean isValid = true;
-        if (etCustomerName != null) {
-            String name = etCustomerName.getText().toString().trim();
-            if (name.isEmpty()) {
-                if (tilCustomerName != null) tilCustomerName.setError(isArabic ? "اسم العميل مطلوب" : "Required");
-                isValid = false;
-            } else {
-                if (tilCustomerName != null) tilCustomerName.setError(null);
-            }
-        }
-        if (etCustomerPhone != null) {
-            String phone = etCustomerPhone.getText().toString().trim();
-            if (phone.isEmpty()) {
-                if (tilCustomerPhone != null) tilCustomerPhone.setError(isArabic ? "رقم الهاتف مطلوب" : "Required");
-                isValid = false;
-            } else {
-                if (tilCustomerPhone != null) tilCustomerPhone.setError(null);
-            }
-        }
+        if (etCustomerName != null && etCustomerName.getText().toString().trim().isEmpty()) {
+            if (tilCustomerName != null) tilCustomerName.setError(isArabic ? "اسم العميل مطلوب" : "Required");
+            isValid = false;
+        } else if (tilCustomerName != null) tilCustomerName.setError(null);
+
+        if (etCustomerPhone != null && etCustomerPhone.getText().toString().trim().isEmpty()) {
+            if (tilCustomerPhone != null) tilCustomerPhone.setError(isArabic ? "رقم الهاتف مطلوب" : "Required");
+            isValid = false;
+        } else if (tilCustomerPhone != null) tilCustomerPhone.setError(null);
+        
         return isValid;
     }
 
@@ -575,21 +531,29 @@ public class POSCheckoutDialog extends DialogFragment {
             btnConfirmCheckout.setOnClickListener(v -> {
                 if (!validateInputs()) return;
 
-                // ✅ تجميع المدفوعات
                 JSONArray paymentsArray = new JSONArray();
-                double totalPaidBase = 0;
+                double totalPaidInYer = 0;
+                
                 for (View row : paymentRows) {
-                    Spinner sp = row.findViewById(R.id.spCurrency);
+                    Spinner spCurrency = row.findViewById(R.id.spCurrency);
+                    Spinner spMethod = row.findViewById(R.id.spMethod);
                     EditText et = row.findViewById(R.id.etAmount);
-                    int pos = sp.getSelectedItemPosition();
+                    
+                    int posCurr = spCurrency.getSelectedItemPosition();
+                    int posMethod = spMethod != null ? spMethod.getSelectedItemPosition() : 0;
                     double amount = 0;
                     try { amount = Double.parseDouble(et.getText().toString()); } catch (Exception ignored) {}
                     
-                    if (amount > 0 && pos >= 0) {
-                        String currency = CURRENCIES[pos];
-                        double rate = getExchangeRate(currency);
+                    if (amount > 0 && posCurr >= 0) {
+                        String currency = CURRENCIES[posCurr];
+                        double rate = getRateToYER(currency);
                         double base = amount * rate;
-                        totalPaidBase += base;
+                        totalPaidInYer += base;
+                        
+                        String methodCode = "CASH";
+                        if (!paymentMethods.isEmpty() && posMethod >= 0 && posMethod < paymentMethods.size()) {
+                            methodCode = paymentMethods.get(posMethod).code;
+                        }
                         
                         try {
                             JSONObject pObj = new JSONObject();
@@ -597,16 +561,14 @@ public class POSCheckoutDialog extends DialogFragment {
                             pObj.put("amount", amount);
                             pObj.put("exchange_rate", rate);
                             pObj.put("base_amount", base);
-                            pObj.put("method", getCurrentPaymentMethod());
+                            pObj.put("method", methodCode);
                             paymentsArray.put(pObj);
                         } catch (Exception ignored) {}
                     }
                 }
 
-                // ✅ التحقق من أن المدفوع يغطي الإجمالي
-                double baseCurrencyRate = getExchangeRate(CURRENCIES[0]);
-                double requiredBase = currentTotalWithDiscount * baseCurrencyRate;
-                if (Math.abs(totalPaidBase - requiredBase) > 1) {
+                double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
+                if (Math.abs(totalPaidInYer - requiredTotalInYer) > 1) {
                     Toast.makeText(requireContext(), isArabic ? "⚠️ إجمالي المدفوعات لا يطابق الفاتورة" : "⚠️ Payment total mismatch", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -620,7 +582,7 @@ public class POSCheckoutDialog extends DialogFragment {
 
                 data.paymentMethod = getCurrentPaymentMethod();
                 data.accountCode = getCurrentAccountCode();
-                data.currency = "MIX"; // أو priceManager.getDefaultCurrency() إذا كان الدفع بعملة واحدة
+                data.currency = "MIX"; 
 
                 String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
                 try { data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr); } catch (Exception e) { data.discount = 0; }
@@ -628,17 +590,13 @@ public class POSCheckoutDialog extends DialogFragment {
                 data.originalTotal = totalAmount;
                 data.discountAmount = totalAmount * (data.discount / 100.0);
                 data.finalAmount = totalAmount - data.discountAmount;
-                data.payments = paymentsArray; // ✅ المصفوفة الجديدة
+                data.payments = paymentsArray; 
 
                 dismissAllowingStateLoss();
                 if (listener != null) listener.onCheckout(data);
             });
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Total Calculation
-    // ═══════════════════════════════════════════════════════════
 
     private void updateFinalAmount() {
         if (priceManager == null) return;
@@ -650,15 +608,24 @@ public class POSCheckoutDialog extends DialogFragment {
 
         double discountAmount = totalAmount * (discountPercent / 100.0);
         double finalAmount = totalAmount - discountAmount;
-        currentTotalWithDiscount = finalAmount; // ✅ تحديث المتغير
+        currentTotalWithDiscountUsd = finalAmount;
 
         try {
             if (tvSubtotal != null) tvSubtotal.setText(priceManager.formatPriceDefault(totalAmount));
             if (tvDiscountAmount != null) tvDiscountAmount.setText(priceManager.formatPriceDefault(discountAmount));
             if (tvFinalTotal != null) tvFinalTotal.setText(priceManager.formatPriceDefault(finalAmount));
-        } catch (Exception e) {
-            DiagTracer.markException("updateFinalAmount format", e);
-        }
-        updateRemainingBalance(); // ✅ تحديث المتبقي
+        } catch (Exception ignored) {}
+        
+        updateRemainingBalance(); 
+    }
+    
+    private String getCurrentPaymentMethod() {
+        if (selectedMethod != null && selectedMethod.code != null) return selectedMethod.code;
+        return "CASH";
+    }
+    
+    private String getCurrentAccountCode() {
+        if (selectedMethod != null && selectedMethod.accountCode != null) return selectedMethod.accountCode;
+        return "1101";
     }
 }
