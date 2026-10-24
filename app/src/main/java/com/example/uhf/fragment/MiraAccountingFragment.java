@@ -36,7 +36,8 @@ public class MiraAccountingFragment extends Fragment {
     private static final int TAB_GOLD     = 5;
     private static final int TAB_LEDGER   = 6;
     private static final int TAB_ADJUSTING = 7;
-    private static final int MAX_TABS     = 8;
+    private static final int TAB_CASH     = 8; // ✅ تبويب الخزينة الجديد
+    private static final int MAX_TABS     = 9;
 
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
@@ -46,7 +47,6 @@ public class MiraAccountingFragment extends Fragment {
     private boolean isArabic = true;
     private int currentTabIndex = 0;
     
-    // long بدلاً من Long لتجنب مشاكل null
     private long pendingLedgerAccountId = 0;
 
     private final Stack<Integer> tabHistory = new Stack<>();
@@ -203,6 +203,7 @@ public class MiraAccountingFragment extends Fragment {
         addTab("🥇 الذهب",      "🥇 Gold");
         addTab("📖 الأستاذ",    "📖 Ledger");
         addTab("📝 التسويات",   "📝 Adjust");
+        addTab("💵 الخزينة",    "💵 Cash"); // ✅ التبويب الجديد
 
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
@@ -296,6 +297,9 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_ADJUSTING:
                     return new MiraAdjustingEntryFragment();
 
+                case TAB_CASH: // ✅ الشاشة الجديدة
+                    return new MiraCashReconciliationFragment();
+
                 default: return new MiraJournalFragment();
             }
         } catch (Exception e) {
@@ -305,7 +309,8 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     public void navigateToTab(int tabIndex) {
-        if (tabIndex < 0 || tabIndex > TAB_LEDGER || tabLayout == null) return;
+        // ✅ السماح بالوصول حتى تبويب الخزينة
+        if (tabIndex < 0 || tabIndex > TAB_CASH || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
