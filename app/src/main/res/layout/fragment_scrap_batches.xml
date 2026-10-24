@@ -12,13 +12,43 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView
+        <!-- ✅ الهيدر: العنوان + زر التقرير -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="دفعات تصفية الكسر"
-            android:textAppearance="@style/TextAppearance.App.Title.Large"
-            android:textColor="?attr/colorOnSurface"
-            android:layout_marginBottom="16dp"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="دفعات تصفية الكسر"
+                android:textAppearance="@style/TextAppearance.App.Title.Large"
+                android:textColor="?attr/colorOnSurface"/>
+
+            <!-- ✅ زر تقرير الأرباح -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnViewReport"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📊 تقرير الأرباح"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="12sp"/>
+        </LinearLayout>
+
+        <!-- حالة فارغة -->
+        <TextView
+            android:id="@+id/tvEmptyBatches"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📭 لا توجد دفعات حالياً\nاضغط على الزر أدناه لإنشاء دفعة جديدة"
+            android:gravity="center"
+            android:padding="32dp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:visibility="gone"/>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvBatches"
@@ -38,7 +68,7 @@
         android:text="إنشاء دفعة جديدة"
         android:textColor="?attr/colorOnPrimary"
         app:backgroundTint="?attr/colorPrimary"
-        app:icon="@drawable/ic_add"
+        app:icon="@android:drawable/ic_input_add"
         app:iconTint="?attr/colorOnPrimary"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
