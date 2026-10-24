@@ -158,27 +158,27 @@ public class MiraTrialBalanceFragment extends Fragment {
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                // ✅ إصلاح: تحديد النوع بناءً على اسم التبويب وليس رقمه
-                String tabText = tab.getText() != null ? tab.getText().toString() : "";
-                isGoldView = tabText.contains("ذهب");
+public void onTabSelected(TabLayout.Tab tab) {
+    String tabText = tab.getText() != null ? tab.getText().toString() : "";
+    isGoldView = tabText.contains("ذهب");
 
-                if (adapter != null) {
-                    adapter.setGoldView(isGoldView);
-                }
+    if (adapter != null) {
+        adapter.setGoldView(isGoldView);
+    }
 
-                if (viewModel.getTrialBalance().getValue() != null) {
-                    renderKPIs(viewModel.getTrialBalance().getValue());
-                    updateFooter(viewModel.getTrialBalance().getValue());
-                }
-                
-                TextView tvViewMode = getView().findViewById(R.id.tvViewMode);
-                if (tvViewMode != null) {
-                tvViewMode.setText(isGoldView ? "الوضع: ذهب 🥇" : "الوضع: مالي 💵");
-                }
+    if (viewModel.getTrialBalance().getValue() != null) {
+        renderKPIs(viewModel.getTrialBalance().getValue());
+        updateFooter(viewModel.getTrialBalance().getValue());
+        updateBalanceBanner(viewModel.getTrialBalance().getValue()); // ✅ أضف هذا السطر هنا
+    }
+    
+    TextView tvViewMode = getView().findViewById(R.id.tvViewMode);
+    if (tvViewMode != null) {
+        tvViewMode.setText(isGoldView ? "الوضع: ذهب 🥇" : "الوضع: مالي 💵");
+    }
 
-                filterData(etSearch.getText().toString());
-            }
+    filterData(etSearch.getText().toString());
+}
             @Override public void onTabUnselected(TabLayout.Tab tab) {}
             @Override public void onTabReselected(TabLayout.Tab tab) {}
         });
