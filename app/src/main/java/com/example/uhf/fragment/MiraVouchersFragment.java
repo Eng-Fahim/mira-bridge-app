@@ -38,7 +38,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -88,6 +87,7 @@ public class MiraVouchersFragment extends Fragment {
         rvVouchers.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new VoucherAdapter(voucherList);
         rvVouchers.setAdapter(adapter);
+        
         if (tabVoucherTypes != null) {
             tabVoucherTypes.addTab(tabVoucherTypes.newTab().setText(isArabic ? "الكل" : "All"));
             tabVoucherTypes.addTab(tabVoucherTypes.newTab().setText(isArabic ? "قبض" : "Receipt"));
@@ -112,28 +112,29 @@ public class MiraVouchersFragment extends Fragment {
         }
         btnNewVoucher.setOnClickListener(v -> showCreateVoucherDialog());
     }
+
     private void loadVouchers() {
-    executor.execute(() -> {
-        int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-        
-        // ✅ الترتيب الصحيح: (type, branchId)
-        MiraApiClient.ApiResponse response = apiClient.getVouchers(currentType, branchId);
-        
-        mainHandler.post(() -> {
-            if (response != null && response.isSuccess && response.data != null) {
-                parseVouchers(response.data);
-            } else {
-                tvEmptyVouchers.setVisibility(View.VISIBLE);
-                rvVouchers.setVisibility(View.GONE);
-                
-                // ✅ إظهار الخطأ الحقيقي للمستخدم
-                if (response != null && response.error != null) {
-                    Toast.makeText(getContext(), "خطأ: " + response.error, Toast.LENGTH_LONG).show();
+        executor.execute(() -> {
+            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            
+            // ✅ الترتيب الصحيح: (type, branchId)
+            MiraApiClient.ApiResponse response = apiClient.getVouchers(currentType, branchId);
+            
+            mainHandler.post(() -> {
+                if (response != null && response.isSuccess && response.data != null) {
+                    parseVouchers(response.data);
+                } else {
+                    tvEmptyVouchers.setVisibility(View.VISIBLE);
+                    rvVouchers.setVisibility(View.GONE);
+                    
+                    if (response != null && response.error != null) {
+                        Toast.makeText(getContext(), "خطأ: " + response.error, Toast.LENGTH_LONG).show();
+                    }
                 }
-            }
+            });
         });
-    });
-}
+    }
+
     private void parseVouchers(JSONObject data) {
         try {
             voucherList.clear();
@@ -149,6 +150,7 @@ public class MiraVouchersFragment extends Fragment {
                     item.amountGold = obj.optString("amount_gold_grams", "0");
                     item.paymentMethod = obj.optString("payment_method", "");
                     item.accountName = obj.optString("account_name_ar", "");
+                    item.partyName = obj.optString("party_name", ""); // ✅ استخراج اسم العميل
                     item.date = obj.optString("created_at", "");
                     voucherList.add(item);
                 }
@@ -164,9 +166,6 @@ public class MiraVouchersFragment extends Fragment {
         }
     }
 
-    // ═══════════════════════════════════════════
-    //  دالة تحويل سعر الصرف (من عملة إلى YER)
-    // ═══════════════════════════════════════════
     private double getRateToYER(String currency) {
         if ("YER".equalsIgnoreCase(currency)) return 1.0;
         if (priceManager != null) {
@@ -191,6 +190,7 @@ public class MiraVouchersFragment extends Fragment {
         }
 
         Spinner spType = dialog.findViewById(R.id.spVoucherType);
+        AutoCompleteTextView ddParty = dialog.findViewById(R.id.ddVoucherParty); // ✅ حقل العميل
         AutoCompleteTextView ddAccount = dialog.findViewById(R.id.ddVoucherAccount);
         Spinner spKarat = dialog.findViewById(R.id.spVoucherKarat);
         EditText etGold = dialog.findViewById(R.id.etVoucherGoldWeight);
@@ -209,6 +209,8 @@ public class MiraVouchersFragment extends Fragment {
 
         final List<Integer> accountIds = new ArrayList<>();
         final List<String> accountNames = new ArrayList<>();
+        final List<Integer> partyIds = new ArrayList<>();
+        final List<String> partyNames = new ArrayList<>();
         final List<View> paymentRows = new ArrayList<>();
 
         Runnable updateTotal = () -> {
@@ -268,6 +270,7 @@ public class MiraVouchersFragment extends Fragment {
         addPaymentRow.run();
         btnAdd.setOnClickListener(v -> addPaymentRow.run());
 
+        // جلب الحسابات
         executor.execute(() -> {
             MiraApiClient.ApiResponse res = apiClient.getVoucherAccounts();
             if (res.isSuccess && res.data != null) {
@@ -283,6 +286,31 @@ public class MiraVouchersFragment extends Fragment {
             }
         });
 
+        // جلب العملاء والموردين
+        executor.execute(() -> {
+            MiraApiClient.ApiResponse res = apiClient.getVoucherParties();
+            if (res.isSuccess && res.data != null) {
+                JSONArray data = res.data.optJSONArray("data");
+                if (data != null) {
+                    partyIds.add(0);
+                    partyNames.add("— بدون عميل/مورد —");
+                    for (int i = 0; i < data.length(); i++) {
+                        JSONObject party = data.optJSONObject(i);
+                        int pid = party.optInt("id");
+                        String pname = party.optString("name", "");
+                        String ptype = party.optString("party_type", "");
+                        String typeLabel = "customer".equals(ptype) ? "👤" : "🏭";
+                        partyIds.add(pid);
+                        partyNames.add(typeLabel + " " + pname);
+                    }
+                    mainHandler.post(() -> {
+                        ddParty.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_dropdown_item_1line, partyNames));
+                        ddParty.setText(partyNames.get(0), false);
+                    });
+                }
+            }
+        });
+
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnSave.setOnClickListener(v -> {
@@ -292,6 +320,10 @@ public class MiraVouchersFragment extends Fragment {
                 return;
             }
             int accountId = accountIds.get(accIndex);
+
+            // ✅ استخراج party_id
+            int partyIndex = partyNames.indexOf(ddParty.getText().toString());
+            int partyId = (partyIndex > 0 && partyIndex < partyIds.size()) ? partyIds.get(partyIndex) : 0;
 
             JSONArray paymentsArray = new JSONArray();
             double totalPaid = 0;
@@ -332,7 +364,8 @@ public class MiraVouchersFragment extends Fragment {
                 spType.getSelectedItemPosition() == 0 ? "receipt" : "payment",
                 accountId, paymentsArray, goldWeight,
                 karats[spKarat.getSelectedItemPosition()],
-                etNotes.getText().toString().trim()
+                etNotes.getText().toString().trim(),
+                partyId // ✅ تمرير partyId
             );
             dialog.dismiss();
         });
@@ -341,20 +374,19 @@ public class MiraVouchersFragment extends Fragment {
     }
 
     private void createVoucher(String type, int accountId, JSONArray payments, 
-                               double goldWeight, String karat, String notes) {
+                               double goldWeight, String karat, String notes, int partyId) {
         executor.execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("voucher_type", type);
                 payload.put("branch_id", branchesManager.getActiveBranchId());
                 payload.put("account_id", accountId);
+                payload.put("party_id", partyId); // ✅ إضافة party_id للـ Payload
                 payload.put("payments", payments);
                 payload.put("amount_gold_grams", goldWeight);
                 payload.put("gold_karat", karat);
                 payload.put("notes", notes);
 
-                // ⚠️ تنبيه: إذا كنت تريد استخدام المسار الجديد /vouchers 
-                // قم بتغيير اسم الدالة إلى createVoucherDirect
                 MiraApiClient.ApiResponse response = apiClient.createVoucherDirect(payload);
                 mainHandler.post(() -> {
                     if (response != null && response.isSuccess) {
@@ -378,6 +410,7 @@ public class MiraVouchersFragment extends Fragment {
     private static class VoucherItem {
         int id;
         String voucherNumber, voucherType, amountMoney, amountGold, paymentMethod, accountName, date;
+        String partyName = ""; // ✅ إضافة اسم العميل
     }
 
     private class VoucherAdapter extends RecyclerView.Adapter<VoucherAdapter.ViewHolder> {
@@ -396,7 +429,13 @@ public class MiraVouchersFragment extends Fragment {
             boolean isReceipt = item.voucherType.equals("receipt");
             String typeLabel = isReceipt ? "📥 قبض" : "📤 صرف";
             holder.tvTitle.setText(item.voucherNumber + " - " + typeLabel);
-            holder.tvAccount.setText(item.accountName);
+            
+            // ✅ عرض اسم العميل إذا وجد، وإلا عرض اسم الحساب
+            String subtitle = !item.partyName.isEmpty() 
+                ? "👤 " + item.partyName 
+                : item.accountName;
+            holder.tvAccount.setText(subtitle);
+            
             String amountText = String.format(Locale.US, "%,.2f YER", Double.parseDouble(item.amountMoney));
             if (Double.parseDouble(item.amountGold) > 0) {
                 amountText += " | " + String.format(Locale.US, "%.2f g", Double.parseDouble(item.amountGold));
@@ -404,7 +443,6 @@ public class MiraVouchersFragment extends Fragment {
             holder.tvAmount.setText(amountText);
             holder.tvAmount.setTextColor(isReceipt ? 0xFF16A34A : 0xFFDC2626);
             
-            // ✅ فتح الإيصال عند الضغط العادي
             holder.itemView.setOnClickListener(v -> {
                 if (item.id > 0) {
                     MiraVoucherReceiptFragment receipt = MiraVoucherReceiptFragment.newInstance(item.id);
@@ -412,7 +450,6 @@ public class MiraVouchersFragment extends Fragment {
                 }
             });
 
-            // ✅ فتح التفاصيل المحاسبية عند الضغط المطول
             holder.itemView.setOnLongClickListener(v -> {
                 if (item.id > 0) {
                     MiraVoucherDetailFragment detail = 
