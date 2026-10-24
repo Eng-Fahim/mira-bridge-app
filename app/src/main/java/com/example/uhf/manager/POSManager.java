@@ -12,6 +12,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.List;
+import java.util.UUID;
 
 public class POSManager {
 
@@ -93,49 +94,82 @@ public class POSManager {
     }
 
     private JSONObject createPayload(List<CartItem> cartList,
-                                 POSCheckoutDialog.POSCheckoutData data,
-                                 int branchId) throws Exception {
-    JSONObject payload = new JSONObject();
-    payload.put("action", "COMPLETE_POS_SALE");
-    payload.put("branch_id", branchId);
+                                     POSCheckoutDialog.POSCheckoutData data,
+                                     int branchId) throws Exception {
+        JSONObject payload = new JSONObject();
+        payload.put("action", "COMPLETE_POS_SALE");
+        payload.put("branch_id", branchId);
 
-    // ✅ على الجذر (للتوافق)
-    payload.put("customer_name", data.customerName);
-    payload.put("customer_phone", data.customerPhone);
+        // ✅ إضافة معرف العملية (local_uuid) لمنع التكرار
+        if (data.localUuid == null || data.localUuid.isEmpty()) {
+            data.localUuid = UUID.randomUUID().toString();
+        }
+        payload.put("local_uuid", data.localUuid);
 
-    // ✅ داخل customer object (للفهم الموحد)
-    JSONObject customer = new JSONObject();
-    customer.put("name", data.customerName);
-    customer.put("phone", data.customerPhone);
-    customer.put("email", data.customerEmail != null ? data.customerEmail : "");
-    customer.put("address", data.customerAddress != null ? data.customerAddress : "");
-    customer.put("notes", data.customerNotes != null ? data.customerNotes : "");
-    customer.put("payment_method", data.paymentMethod);
-    payload.put("customer", customer);
+        // ✅ على الجذر (للتوافق مع الكود القديم)
+        payload.put("customer_name", data.customerName);
+        payload.put("customer_phone", data.customerPhone);
 
-    JSONArray itemsArr = new JSONArray();
-    for (CartItem item : cartList) {
-        JSONObject obj = new JSONObject();
-        obj.put("epc", item.epc);
-        obj.put("title", item.name);
-        obj.put("karat", item.karat);
-        obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-        obj.put("price_usd", item.price);
-        obj.put("item_id", item.itemId);
-        obj.put("serial_no", item.serialNo);
-        itemsArr.put(obj);
+        // ✅ داخل customer object (للفهم الموحد)
+        JSONObject customer = new JSONObject();
+        customer.put("name", data.customerName);
+        customer.put("phone", data.customerPhone);
+        customer.put("email", data.customerEmail != null ? data.customerEmail : "");
+        customer.put("address", data.customerAddress != null ? data.customerAddress : "");
+        customer.put("notes", data.customerNotes != null ? data.customerNotes : "");
+        customer.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
+        customer.put("discount_amount_usd", data.discountAmount); // ✅ إضافة الخصم
+        payload.put("customer", customer);
+
+        // ✅ العناصر
+        JSONArray itemsArr = new JSONArray();
+        for (CartItem item : cartList) {
+            JSONObject obj = new JSONObject();
+            obj.put("epc", item.epc);
+            obj.put("title", item.name);
+            obj.put("karat", item.karat);
+            obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+            obj.put("price_usd", item.price);
+            obj.put("item_id", item.itemId);
+            obj.put("serial_no", item.serialNo);
+            itemsArr.put(obj);
+        }
+        payload.put("items", itemsArr);
+
+        // ═══════════════════════════════════════════════════════
+        // ✅ [جديد] إرسال مصفوفة المدفوعات المتعددة (عملات + طرق)
+        // ═══════════════════════════════════════════════════════
+        JSONArray paymentsArray = new JSONArray();
+        if (data.payments != null && data.payments.length() > 0) {
+            paymentsArray = data.payments;
+        } else {
+            // احتياطي: إذا لم يتم إرسال مصفوفة، نرسل دفعة واحدة
+            JSONObject pObj = new JSONObject();
+            pObj.put("currency", "YER");
+            pObj.put("amount", data.finalAmount);
+            pObj.put("exchange_rate", 1.0);
+            pObj.put("base_amount", data.finalAmount);
+            pObj.put("method", data.paymentMethod != null ? data.paymentMethod : "cash");
+            paymentsArray.put(pObj);
+        }
+        payload.put("payments", paymentsArray);
+
+        // ✅ إضافة الحقول القديمة للتوافق مع السيرفر (payment object)
+        JSONObject payment = new JSONObject();
+        payment.put("subtotal_usd", data.originalTotal);
+        payment.put("discount_amount_usd", data.discountAmount);
+        payment.put("final_amount_usd", data.finalAmount);
+        payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
+        // إضافة إجمالي المدفوعات كـ base_amount للتوافق مع التحققات القديمة إن وجدت
+        double totalBase = 0;
+        for (int i = 0; i < paymentsArray.length(); i++) {
+            totalBase += paymentsArray.optJSONObject(i).optDouble("base_amount", 0);
+        }
+        payment.put("total_paid_base", totalBase);
+        payload.put("payment", payment);
+
+        return payload;
     }
-    payload.put("items", itemsArr);
-
-    JSONObject payment = new JSONObject();
-    payment.put("subtotal_usd", data.originalTotal);
-    payment.put("discount_amount_usd", data.discountAmount);
-    payment.put("final_amount_usd", data.finalAmount);
-    payment.put("payment_method", data.paymentMethod);
-    payload.put("payment", payment);
-
-    return payload;
-}
 
     private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckoutData data, 
                                    int itemCount, int branchId) {
