@@ -31,6 +31,15 @@
             android:text="تغيير"
             android:backgroundTint="#B08D57"
             android:textColor="#FFF"/>
+            
+            <Button
+    android:id="@+id/btnExportCashFlowPdf"
+    android:layout_width="wrap_content"
+    android:layout_height="40dp"
+    android:text="تصدير PDF 📄"
+    android:textSize="12sp"
+    android:backgroundTint="#DC2626"
+    android:textColor="#FFF"/>
     </LinearLayout>
 
     <!-- ملخص سريع (Net) -->
