@@ -78,24 +78,11 @@ public class MiraVoucherReceiptFragment extends BottomSheetDialogFragment {
         webView = v.findViewById(R.id.webVoucherReceipt);
         progressBar = v.findViewById(R.id.progressVoucherLoading);
 
+        // ✅ تم تصحيح التكرار هنا وحذف الأسطر الزائدة
         MaterialButton btnPrint = v.findViewById(R.id.btnPrintVoucher);
         MaterialButton btnShare = v.findViewById(R.id.btnShareVoucher);
         MaterialButton btnSave = v.findViewById(R.id.btnSaveVoucherPDF);
-        MaterialButton btnPrint = v.findViewById(R.id.btnPrintVoucher);
-MaterialButton btnShare = v.findViewById(R.id.btnShareVoucher);
-MaterialButton btnSave = v.findViewById(R.id.btnSaveVoucherPDF);
-MaterialButton btnDetail = v.findViewById(R.id.btnViewJournalDetail); // ✅ جديد
-
-btnPrint.setOnClickListener(v2 -> printVoucher());
-btnShare.setOnClickListener(v2 -> shareVoucherPDF());
-btnSave.setOnClickListener(v2 -> saveVoucherPDF());
-
-// ✅ فتح التفاصيل
-btnDetail.setOnClickListener(v2 -> {
-    MiraVoucherDetailFragment detail = MiraVoucherDetailFragment.newInstance(voucherId, "receipt");
-    detail.show(getParentFragmentManager(), "VoucherDetail");
-    dismiss();
-});
+        MaterialButton btnDetail = v.findViewById(R.id.btnViewJournalDetail); // ✅ زر التفاصيل
 
         if (webView != null) {
             WebSettings s = webView.getSettings();
@@ -113,6 +100,13 @@ btnDetail.setOnClickListener(v2 -> {
         btnPrint.setOnClickListener(v2 -> printVoucher());
         btnShare.setOnClickListener(v2 -> shareVoucherPDF());
         btnSave.setOnClickListener(v2 -> saveVoucherPDF());
+
+        // ✅ فتح التفاصيل
+        btnDetail.setOnClickListener(v2 -> {
+            MiraVoucherDetailFragment detail = MiraVoucherDetailFragment.newInstance(voucherId, "receipt");
+            detail.show(getParentFragmentManager(), "VoucherDetail");
+            dismiss();
+        });
 
         loadVoucherData();
         return v;
