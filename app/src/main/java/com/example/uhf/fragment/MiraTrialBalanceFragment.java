@@ -151,26 +151,26 @@ public class MiraTrialBalanceFragment extends Fragment {
         }
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-    @Override
-    public void onTabSelected(TabLayout.Tab tab) {
-        isGoldView = (tab.getPosition() == 1);
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                // ✅ إصلاح: تحديد النوع بناءً على اسم التبويب وليس رقمه
+                String tabText = tab.getText() != null ? tab.getText().toString() : "";
+                isGoldView = tabText.contains("ذهب");
 
-        // ✅ أخبر الـ Adapter بالوضع الجديد
-        if (adapter != null) {
-            adapter.setGoldView(isGoldView);
-        }
+                if (adapter != null) {
+                    adapter.setGoldView(isGoldView);
+                }
 
-        // ✅ أعد حساب الـ KPIs
-        if (viewModel.getTrialBalance().getValue() != null) {
-            renderKPIs(viewModel.getTrialBalance().getValue());
-        }
+                if (viewModel.getTrialBalance().getValue() != null) {
+                    renderKPIs(viewModel.getTrialBalance().getValue());
+                    updateFooter(viewModel.getTrialBalance().getValue());
+                }
 
-        // ✅ أعد فلترة الصفوف
-        filterData(etSearch.getText().toString());
-    }
-    @Override public void onTabUnselected(TabLayout.Tab tab) {}
-    @Override public void onTabReselected(TabLayout.Tab tab) {}
-});
+                filterData(etSearch.getText().toString());
+            }
+            @Override public void onTabUnselected(TabLayout.Tab tab) {}
+            @Override public void onTabReselected(TabLayout.Tab tab) {}
+        });
 
         btnFilterDate.setOnClickListener(v1 -> showDateRangePicker());
 
@@ -183,7 +183,6 @@ public class MiraTrialBalanceFragment extends Fragment {
             }
         });
 
-        // Quick period chips
         chipThisMonth.setOnClickListener(v1 -> applyPreset("month"));
         chipThisQuarter.setOnClickListener(v1 -> applyPreset("quarter"));
         chipThisYear.setOnClickListener(v1 -> applyPreset("year"));
@@ -209,7 +208,6 @@ public class MiraTrialBalanceFragment extends Fragment {
             MiraBranchesManager bm = MiraBranchesManager.getInstance(requireContext());
             org.json.JSONArray branches = null;
             try {
-                // Try to get branches if manager exposes them
                 java.lang.reflect.Method m = bm.getClass().getMethod("getBranches");
                 Object result = m.invoke(bm);
                 if (result instanceof JSONArray) branches = (JSONArray) result;
@@ -224,7 +222,6 @@ public class MiraTrialBalanceFragment extends Fragment {
                     }
                 }
             } else {
-                // Fallback: Active branch only
                 int activeId = bm.getActiveBranchId();
                 String activeName = bm.getActiveBranchDisplayName();
                 if (activeId > 0) {
@@ -314,13 +311,18 @@ public class MiraTrialBalanceFragment extends Fragment {
         originalRows = tb.rows != null ? tb.rows : new ArrayList<>();
         renderKPIs(tb);
         updateBalanceBanner(tb);
-        updateFooter(tb);
+        updateFooter(tb); // ✅ سيتم تحديث التذييل بناءً على التبويب
         filterData(etSearch.getText().toString());
     }
 
     private void updateBalanceBanner(TrialBalanceDto tb) {
         if (cardBalanceStatus == null) return;
-        if (tb.balanced) {
+        
+        boolean isBalanced = isGoldView 
+            ? Math.abs(tb.totalGoldDebit - tb.totalGoldCredit) < 0.001 
+            : tb.balanced;
+            
+        if (isBalanced) {
             cardBalanceStatus.setCardBackgroundColor(0xFFF0FDF4);
             cardBalanceStatus.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF16A34A));
             tvBalanceIcon.setText("✅");
@@ -330,15 +332,24 @@ public class MiraTrialBalanceFragment extends Fragment {
             cardBalanceStatus.setCardBackgroundColor(0xFFFEF2F2);
             cardBalanceStatus.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFFDC2626));
             tvBalanceIcon.setText("⚠️");
-            double diff = Math.abs(tb.totalDebit - tb.totalCredit);
+            double diff = isGoldView 
+                ? Math.abs(tb.totalGoldDebit - tb.totalGoldCredit) 
+                : Math.abs(tb.totalDebit - tb.totalCredit);
             tvBalanceText.setText(String.format(Locale.US, "القيد غير متوازن — الفرق: %,.2f", diff));
             tvBalanceText.setTextColor(0xFFDC2626);
         }
     }
 
+    // ✅ إصلاح دالة التذييل لتتغير حسب التبويب
     private void updateFooter(TrialBalanceDto tb) {
         if (tvFooterPeriod != null) {
-            tvFooterPeriod.setText(String.format(Locale.US, "%,.2f", tb.totalDebit));
+            if (isGoldView) {
+                // إظهار إجمالي الوزن بالجرام
+                tvFooterPeriod.setText(String.format(Locale.US, "%,.3f g", tb.totalGoldDebit));
+            } else {
+                // إظهار إجمالي المال
+                tvFooterPeriod.setText(String.format(Locale.US, "%,.2f", tb.totalDebit));
+            }
         }
     }
 
