@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Header Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/card_surface_warm"
+            app:cardCornerRadius="12dp"
+            app:strokeColor="@color/card_stroke_warm"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvDetailVoucherTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📥 سند قبض"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="20sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tvDetailVoucherNumber"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"/>
+
+                <TextView
+                    android:id="@+id/tvDetailVoucherDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Voucher Info Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/card_surface_warm"
+            app:cardCornerRadius="12dp"
+            app:strokeColor="@color/card_stroke_warm"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📋 معلومات السند"
+                    android:textColor="?attr/colorPrimary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="8dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="4dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="الحساب:"
+                        android:textColor="?attr/colorOnSurfaceVariant"/>
+                    <TextView
+                        android:id="@+id/tvDetailAccount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textStyle="bold"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="4dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="البيان:"
+                        android:textColor="?attr/colorOnSurfaceVariant"/>
+                    <TextView
+                        android:id="@+id/tvDetailNotes"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textStyle="bold"/>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant"
+                    android:alpha="0.3"
+                    android:layout_marginVertical="8dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingVertical="4dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="الإجمالي:"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textStyle="bold"/>
+                    <TextView
+                        android:id="@+id/tvDetailTotal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorPrimary"
+                        android:textStyle="bold"
+                        android:textSize="18sp"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Journal Entry Card (Main Feature) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/card_surface_warm"
+            app:cardCornerRadius="12dp"
+            app:strokeColor="?attr/colorPrimary"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📊 القيد المحاسبي (Double Entry)"
+                    android:textColor="?attr/colorPrimary"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="12dp"/>
+
+                <!-- Header Row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:padding="8dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="3"
+                        android:text="الحساب"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textStyle="bold"
+                        android:textSize="12sp"/>
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="2"
+                        android:text="مدين"
+                        android:textColor="#1976D2"
+                        android:textStyle="bold"
+                        android:textSize="12sp"
+                        android:gravity="end"/>
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="2"
+                        android:text="دائن"
+                        android:textColor="#DC2626"
+                        android:textStyle="bold"
+                        android:textSize="12sp"
+                        android:gravity="end"/>
+                </LinearLayout>
+
+                <!-- Lines Container -->
+                <LinearLayout
+                    android:id="@+id/llJournalLines"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="4dp"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:background="?attr/colorPrimary"
+                    android:layout_marginVertical="8dp"/>
+
+                <!-- Totals Row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="8dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="3"
+                        android:text="الإجمالي"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textStyle="bold"
+                        android:textSize="13sp"/>
+                    <TextView
+                        android:id="@+id/tvTotalDebit"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="2"
+                        android:textColor="#1976D2"
+                        android:textStyle="bold"
+                        android:textSize="13sp"
+                        android:gravity="end"/>
+                    <TextView
+                        android:id="@+id/tvTotalCredit"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="2"
+                        android:textColor="#DC2626"
+                        android:textStyle="bold"
+                        android:textSize="13sp"
+                        android:gravity="end"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Balance Status Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardBalanceStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="12dp"
+            app:strokeWidth="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tvBalanceIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✅"
+                    android:textSize="24sp"/>
+
+                <TextView
+                    android:id="@+id/tvBalanceText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="القيد متوازن"
+                    android:textStyle="bold"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>
