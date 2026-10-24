@@ -121,6 +121,20 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
+            <!-- ═══════ زر عكس القيد ═══════ -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReverseEntry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="4dp"
+                android:text="🔄 عكس هذا القيد"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                app:backgroundTint="#DC2626"
+                app:cornerRadius="8dp"
+                android:visibility="gone"/> <!-- ✅ تم إغلاق التعليق هنا بشكل صحيح -->
+    
             <!-- ═══════ KPIs ═══════ -->
             <LinearLayout
                 android:id="@+id/kpiContainer"
