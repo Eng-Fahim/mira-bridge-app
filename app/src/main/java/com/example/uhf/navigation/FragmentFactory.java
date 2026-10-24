@@ -40,6 +40,7 @@ public class FragmentFactory {
         // في switch داخل دالة createFragmentByTag
         case NavigationManager.TAG_VOUCHERS: return new MiraVouchersFragment();
         case NavigationManager.TAG_PARTIES: return new MiraPartiesListFragment();
+        case NavigationManager.TAG_SCRAP_AGING: return new MiraScrapAgingFragment();
         default: return new MiraDashboardFragment();
     }
 }
