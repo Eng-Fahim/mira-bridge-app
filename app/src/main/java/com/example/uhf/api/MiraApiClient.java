@@ -498,14 +498,14 @@ public class MiraApiClient {
             return buildResponse(conn);
 
         } catch (java.net.UnknownHostException e) {
-            return networkError("الخادم غير موجود");
+            return networkError(getFriendlyErrorMessage(e));
         } catch (java.net.ConnectException e) {
-            return networkError("لا يمكن الاتصال بالخادم");
+            return networkError(getFriendlyErrorMessage(e));
         } catch (java.net.SocketTimeoutException e) {
-            return networkError("انتهت المهلة - السيرفر بطيء");
+            return networkError(getFriendlyErrorMessage(e));
         } catch (Exception e) {
             Log.e(TAG, "executeRequest error: " + e.getMessage(), e);
-            return networkError(e.getMessage());
+            return networkError(getFriendlyErrorMessage(e));
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -704,7 +704,7 @@ public class MiraApiClient {
 
         } catch (Exception e) {
             Log.e(TAG, "accountingRequest error: " + e.getClass().getSimpleName());
-            return networkError(e.getMessage());
+            return networkError(getFriendlyErrorMessage(e));
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -826,7 +826,7 @@ public class MiraApiClient {
             }
             return response;
         } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
 
@@ -951,7 +951,7 @@ public class MiraApiClient {
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                mainHandler.post(() -> callback.onError(getFriendlyErrorMessage(e)));
             }
         });
     }
@@ -978,7 +978,7 @@ public class MiraApiClient {
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                mainHandler.post(() -> callback.onError(getFriendlyErrorMessage(e)));
             }
         });
     }
@@ -1012,7 +1012,7 @@ public class MiraApiClient {
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                mainHandler.post(() -> callback.onError(getFriendlyErrorMessage(e)));
             }
         });
     }
@@ -1031,7 +1031,7 @@ public class MiraApiClient {
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                mainHandler.post(() -> callback.onError(getFriendlyErrorMessage(e)));
             }
         });
     }
@@ -1058,7 +1058,7 @@ public class MiraApiClient {
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                mainHandler.post(() -> callback.onError(getFriendlyErrorMessage(e)));
             }
         });
     }
@@ -1093,7 +1093,7 @@ public class MiraApiClient {
                     mainHandler.post(() -> callback.onError(err));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onError(e.getMessage()));
+                mainHandler.post(() -> callback.onError(getFriendlyErrorMessage(e)));
             }
         });
     }
@@ -1253,7 +1253,7 @@ public class MiraApiClient {
             return postAccounting("setup/add-balance", payload);
         } catch (Exception e) {
             Log.e(TAG, "addPostApprovalBalance error: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
 
@@ -1367,7 +1367,7 @@ public class MiraApiClient {
             return postWithAuth("/pos/check-refund", payload);
         } catch (Exception e) {
             Log.e(TAG, "checkRefundEligibility error: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
 
@@ -1383,7 +1383,7 @@ public class MiraApiClient {
             
         } catch (Exception e) {
             Log.e(TAG, "processRefund error: " + e.getMessage());
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
             response.isNetworkError = true;
             return response;
         }
@@ -1413,7 +1413,7 @@ public class MiraApiClient {
             return postWithAuth("/pos/search-item", payload);
         } catch (Exception e) {
             Log.e(TAG, "searchItem error: " + e.getMessage());
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
             response.isNetworkError = true;
             return response;
         }
@@ -1436,7 +1436,7 @@ public class MiraApiClient {
             return response;
         } catch (Exception e) {
             Log.e(TAG, "searchPosItem error: " + e.getMessage(), e);
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
             response.isNetworkError = true;
             return response;
         }
@@ -1506,7 +1506,7 @@ public class MiraApiClient {
 
             return getWithAuth(endpoint.toString());
         } catch (Exception e) {
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
             response.isNetworkError = true;
             return response;
         }
@@ -1583,7 +1583,7 @@ public class MiraApiClient {
             return buildResponse(conn);
         } catch (Exception e) {
             Log.e(TAG, "uploadItemImage error: " + e.getClass().getSimpleName());
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -1692,7 +1692,7 @@ public class MiraApiClient {
             payload.put("gate_id", getEffectiveGateId());
             return postWithAuth("/inventory/sync-offline", payload);
         } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
 
@@ -2045,7 +2045,7 @@ public class MiraApiClient {
             payload.put("opening_gold", goldBalance);
             return postAccounting("/accounting/opening-balances/set", payload); // ✅ تم التصحيح
         } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
 
@@ -2122,7 +2122,7 @@ public ApiResponse getReportData(String reportType, String fromDate, String toDa
 
         return getWithAuth(endpoint.toString());
     } catch (Exception e) {
-        return new ApiResponse(-1, null, e.getMessage());
+        return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
     }
 }
 
@@ -2189,7 +2189,7 @@ public ApiResponse getReportData(String reportType, String fromDate, String toDa
             }
             return new ApiResponse(-1, null, "Provider not found");
         } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
 
@@ -2413,7 +2413,7 @@ public ApiResponse saveScrapPurchase(JSONObject payload) {
         
     } catch (Exception e) {
         Log.e(TAG, "saveScrapPurchase error: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         response.isNetworkError = true;
         return response;
     }
@@ -2455,4 +2455,54 @@ public ApiResponse closeCashier(JSONObject payload) {
 public ApiResponse getScrapPurchaseReceipt(int purchaseId) {
     return getWithAuth("/scrap/purchase/" + purchaseId + "/receipt");
 }
+
+    // ═══════════════════════════════════════════════════════════
+    //  ✅ [جديد] معالجة الأخطاء المركزية (رسائل احترافية للمستخدم)
+    // ═══════════════════════════════════════════════════════════
+    private String getFriendlyErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return isArabic() ? "حدث خطأ غير متوقع، يرجى المحاولة لاحقاً." : "An unexpected error occurred. Please try again.";
+        }
+
+        // التحقق من عدم وجود إنترنت
+        if (!isNetworkAvailable()) {
+            return isArabic() 
+                ? "لا يوجد اتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مرة أخرى." 
+                : "No internet connection. Please check your network and try again.";
+        }
+
+        if (throwable instanceof java.net.UnknownHostException) {
+            return isArabic() 
+                ? "تعذر الوصول إلى الخادم. يرجى التأكد من اتصالك بالإنترنت." 
+                : "Unable to reach the server. Please check your connection.";
+        } else if (throwable instanceof java.net.SocketTimeoutException) {
+            return isArabic() 
+                ? "انتهت مهلة الاتصال بالخادم. يرجى المحاولة مرة أخرى." 
+                : "Connection timed out. Please try again.";
+        } else if (throwable instanceof java.net.ConnectException) {
+            return isArabic() 
+                ? "فشل الاتصال بالخادم. يرجى المحاولة لاحقاً." 
+                : "Failed to connect to the server. Please try again later.";
+        }
+
+        return isArabic() 
+            ? "حدث خطأ في الاتصال. يرجى المحاولة لاحقاً." 
+            : "A network error occurred. Please try again later.";
+    }
+
+    private boolean isArabic() {
+        return Locale.getDefault().getLanguage().equals("ar");
+    }
+
+    private boolean isNetworkAvailable() {
+        try {
+            if (context == null) return false;
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                android.net.NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                return activeNetwork != null && activeNetwork.isConnected();
+            }
+        } catch (Exception ignored) {}
+        return true; // Assume true if we can't check
+    }
 }
