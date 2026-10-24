@@ -68,6 +68,7 @@ public class NavigationManager {
     public static final String TAG_GOLD_RATES        = "GoldRates";
     public static final String TAG_PROFILE           = "Profile";
     public static final String TAG_USERS_MANAGEMENT  = "UsersManagement";
+    public static final String TAG_CASH_RECONCILIATION = "CashReconciliation";
     public static final String TAG_RFID_WRITE        = "RFIDWrite";
     public static final String TAG_READER_SETUP      = "ReaderSetup";
     public static final String TAG_GATE_SETTINGS     = "GateSettings";
@@ -437,6 +438,7 @@ public class NavigationManager {
             case "ScrapHistory": return new MiraScrapHistoryFragment();
             case TAG_SCRAP_BATCHES: return new MiraScrapBatchesFragment();
             case TAG_SCRAP_PROFIT_REPORT: return new MiraScrapProfitReportFragment();
+            case TAG_CASH_RECONCILIATION: return new MiraCashReconciliationFragment();
             default:
                 log("Unknown tag: " + tag + " → Dashboard");
                 return new MiraDashboardFragment();
