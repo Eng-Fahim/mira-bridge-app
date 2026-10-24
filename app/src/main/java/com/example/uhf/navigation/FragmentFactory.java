@@ -39,6 +39,7 @@ public class FragmentFactory {
         case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();   
         // في switch داخل دالة createFragmentByTag
         case NavigationManager.TAG_VOUCHERS: return new MiraVouchersFragment();
+        case NavigationManager.TAG_PARTIES: return new MiraPartiesListFragment();
         default: return new MiraDashboardFragment();
     }
 }
