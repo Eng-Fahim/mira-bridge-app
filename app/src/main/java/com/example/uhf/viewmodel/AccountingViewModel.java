@@ -291,25 +291,31 @@ public class AccountingViewModel extends AndroidViewModel {
     }
 
     public void loadBalanceSheet(String asOf) {
-        loading.setValue(true);
-        api.accounting().getBalanceSheet(asOf)
-            .enqueue(new Callback<ApiResponseDto<BalanceSheetDto>>() {
-                @Override
-                public void onResponse(Call<ApiResponseDto<BalanceSheetDto>> call,
-                                      Response<ApiResponseDto<BalanceSheetDto>> response) {
-                    loading.setValue(false);
-                    if (response.isSuccessful() && response.body() != null && response.body().success) {
-                        balanceSheet.setValue(response.body().data);
-                    }
-                }
+    loadBalanceSheet(asOf, 0);
+}
 
-                @Override
-                public void onFailure(Call<ApiResponseDto<BalanceSheetDto>> call, Throwable t) {
-                    loading.setValue(false);
-                    error.setValue(t.getMessage());
+public void loadBalanceSheet(String asOf, int branchId) {
+    loading.setValue(true);
+    api.accounting().getBalanceSheet(asOf, branchId > 0 ? branchId : null)
+        .enqueue(new Callback<ApiResponseDto<BalanceSheetDto>>() {
+            @Override
+            public void onResponse(Call<ApiResponseDto<BalanceSheetDto>> call,
+                                  Response<ApiResponseDto<BalanceSheetDto>> response) {
+                loading.setValue(false);
+                if (response.isSuccessful() && response.body() != null && response.body().success) {
+                    balanceSheet.setValue(response.body().data);
+                } else {
+                    error.setValue("فشل تحميل الميزانية");
                 }
-            });
-    }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponseDto<BalanceSheetDto>> call, Throwable t) {
+                loading.setValue(false);
+                error.setValue(t.getMessage());
+            }
+        });
+}
 
     public void loadIncomeStatement(String from, String to, int branchId) {
         loading.setValue(true);
