@@ -74,4 +74,8 @@ public class IncomeStatementDto {
     
     @SerializedName("gold_gross_profit")
     public double goldGrossProfit;
+
+    @SerializedName("total_gold_revenue") public double totalGoldRevenue;
+    @SerializedName("total_gold_expense") public double totalGoldExpense;
+    @SerializedName("net_gold_profit")    public double netGoldProfit;
 }
