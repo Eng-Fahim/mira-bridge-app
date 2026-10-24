@@ -124,24 +124,30 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         }
     }
 
-    // ✅ دالة جلب سعر الصرف الصحيحة (من أي عملة إلى الريال اليمني YER)
-    private double getRateToYER(String currency) {
-        if (priceManager != null) {
-            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
-            double currencyRate = priceManager.getExchangeRate(currency);
-            
-            // بما أن priceManager يعيد السعر مقابل الدولار،
-            // فإن سعر الصرف من العملة إلى اليمني = سعر اليمني / سعر العملة
-            if (yerRate > 0 && currencyRate > 0) {
-                return yerRate / currencyRate;
-            }
-        }
+   // ✅ دالة جلب سعر الصرف الصحيحة (تحسب كم يساوي 1 من العملة بالريال اليمني)
+private double getRateToYER(String currency) {
+    if ("YER".equalsIgnoreCase(currency)) return 1.0;
+    
+    if (priceManager != null) {
+        // جلب سعر صرف اليمني مقابل الدولار (مثلاً 530)
+        double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
+        // جلب سعر صرف العملة الأخرى مقابل الدولار (مثلاً 3.75 للسعودي)
+        double currencyRate = priceManager.getExchangeRate(currency);
         
-        // احتياطي
-        if ("SAR".equalsIgnoreCase(currency)) return 141.33;
-        if ("USD".equalsIgnoreCase(currency)) return 530.0;
-        return 1.0; // YER
+        // إذا كان السعر المحفوظ في التطبيق هو بالفعل (141.33)، نستخدمه مباشرة
+        if (currencyRate > 10) return currencyRate;
+        
+        // إذا كان السعر مقابل الدولار (مثلاً 3.75)، نقوم بعملية القسمة: 530 / 3.75 = 141.33
+        if (yerRate > 0 && currencyRate > 0) {
+            return yerRate / currencyRate; 
+        }
     }
+    
+    // احتياطي في حال فشل جلب الأسعار من مدير الأسعار
+    if ("SAR".equalsIgnoreCase(currency)) return 141.33;
+    if ("USD".equalsIgnoreCase(currency)) return 530.0;
+    return 1.0;
+}
 
     private void addPaymentRow(String defaultCurrency, double amount) {
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
