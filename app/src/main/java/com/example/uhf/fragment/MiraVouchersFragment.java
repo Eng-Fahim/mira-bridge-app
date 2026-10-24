@@ -112,18 +112,28 @@ public class MiraVouchersFragment extends Fragment {
         }
         btnNewVoucher.setOnClickListener(v -> showCreateVoucherDialog());
     }
-
     private void loadVouchers() {
-        executor.execute(() -> {
-            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            MiraApiClient.ApiResponse response = apiClient.getVouchers(String.valueOf(branchId), currentType);
-            mainHandler.post(() -> {
-                if (response != null && response.isSuccess && response.data != null) parseVouchers(response.data);
-                else { tvEmptyVouchers.setVisibility(View.VISIBLE); rvVouchers.setVisibility(View.GONE); }
-            });
+    executor.execute(() -> {
+        int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+        
+        // ✅ الترتيب الصحيح: (type, branchId)
+        MiraApiClient.ApiResponse response = apiClient.getVouchers(currentType, branchId);
+        
+        mainHandler.post(() -> {
+            if (response != null && response.isSuccess && response.data != null) {
+                parseVouchers(response.data);
+            } else {
+                tvEmptyVouchers.setVisibility(View.VISIBLE);
+                rvVouchers.setVisibility(View.GONE);
+                
+                // ✅ إظهار الخطأ الحقيقي للمستخدم
+                if (response != null && response.error != null) {
+                    Toast.makeText(getContext(), "خطأ: " + response.error, Toast.LENGTH_LONG).show();
+                }
+            }
         });
-    }
-
+    });
+}
     private void parseVouchers(JSONObject data) {
         try {
             voucherList.clear();
@@ -345,8 +355,7 @@ public class MiraVouchersFragment extends Fragment {
 
                 // ⚠️ تنبيه: إذا كنت تريد استخدام المسار الجديد /vouchers 
                 // قم بتغيير اسم الدالة إلى createVoucherDirect
-                MiraApiClient.ApiResponse response = apiClient.createVoucher(payload);
-
+                MiraApiClient.ApiResponse response = apiClient.createVoucherDirect(payload);
                 mainHandler.post(() -> {
                     if (response != null && response.isSuccess) {
                         Toast.makeText(getContext(), isArabic ? "✅ تم إنشاء السند" : "✅ Created", Toast.LENGTH_SHORT).show();
