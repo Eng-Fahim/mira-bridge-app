@@ -295,7 +295,11 @@ public class POSCheckoutDialog extends DialogFragment {
         paymentMethods.clear();
         paymentMethods.addAll(methods);
         String[] displayNames = new String[methods.size()];
-        for (int i = 0; i < methods.size(); i++) displayNames[i] = methods.get(i).getDisplayName(isArabic);
+        
+        for (int i = 0; i < methods.size(); i++) {
+            String icon = methods.get(i).icon != null ? methods.get(i).icon : "💳";
+            displayNames[i] = icon + " " + methods.get(i).getDisplayName(isArabic);
+        }
 
         spPaymentMethod.setEnabled(true);
         spPaymentMethod.setHint(isArabic ? "طريقة الدفع" : "Payment Method");
@@ -309,7 +313,9 @@ public class POSCheckoutDialog extends DialogFragment {
                     String text = s != null ? s.toString().trim() : "";
                     if (text.isEmpty()) return;
                     for (PaymentMethodDto m : paymentMethods) {
-                        if (m.getDisplayName(isArabic).equals(text)) {
+                        String icon = m.icon != null ? m.icon : "💳";
+                        String expectedDisplay = icon + " " + m.getDisplayName(isArabic);
+                        if (expectedDisplay.equals(text)) {
                             selectedMethod = m;
                             updateAccountNumberFromMethod(m);
                             break;
@@ -327,10 +333,10 @@ public class POSCheckoutDialog extends DialogFragment {
             updateAccountNumberFromMethod(selectedMethod);
         }
         
-        // ✅ تحديث قوائم طرق الدفع للسطور التي تمت إضافتها قبل التحميل
+        // ✅ [إصلاح]: تحديث قوائم طرق الدفع للسطور التي تمت إضافتها قبل التحميل
         for (View row : paymentRows) {
             Spinner spMethod = row.findViewById(R.id.spMethod);
-            if (spMethod != null && spMethod.getAdapter() == null) {
+            if (spMethod != null) { // تم إزالة شرط getAdapter() == null
                 setupMethodSpinner(spMethod);
             }
         }
@@ -359,7 +365,6 @@ public class POSCheckoutDialog extends DialogFragment {
         addPaymentRow(CURRENCIES[0], 0.0);
     }
 
-    // ✅ دالة جلب سعر الصرف الصحيحة (من العملة إلى الريال اليمني)
     private double getRateToYER(String currency) {
         if ("YER".equalsIgnoreCase(currency)) return 1.0;
         
@@ -367,10 +372,8 @@ public class POSCheckoutDialog extends DialogFragment {
             double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER); // 530
             double currencyRate = priceManager.getExchangeRate(currency); // USD = 1.0, SAR = 3.75
             
-            // إذا كان السعر المحفوظ مقابل اليمني مباشرة
             if (currencyRate > 10) return currencyRate;
             
-            // تحويل من مقابل الدولار إلى مقابل اليمني
             if (yerRate > 0 && currencyRate > 0) {
                 return yerRate / currencyRate; 
             }
@@ -386,7 +389,7 @@ public class POSCheckoutDialog extends DialogFragment {
         
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
         Spinner spCurrency = row.findViewById(R.id.spCurrency);
-        Spinner spMethod = row.findViewById(R.id.spMethod); // ✅ سبينر طريقة الدفع لكل سطر
+        Spinner spMethod = row.findViewById(R.id.spMethod); 
         EditText etAmount = row.findViewById(R.id.etAmount);
         TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
         ImageButton btnRemove = row.findViewById(R.id.btnRemove);
@@ -398,7 +401,6 @@ public class POSCheckoutDialog extends DialogFragment {
         int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
         spCurrency.setSelection(index >= 0 ? index : 0);
 
-        // ✅ تهيئة سبينر طريقة الدفع
         if (spMethod != null) {
             setupMethodSpinner(spMethod);
         }
@@ -450,16 +452,16 @@ public class POSCheckoutDialog extends DialogFragment {
         updateEquivalent.run();
     }
 
-    // ✅ دالة تعبئة سبينر طرق الدفع (تُستدعى عند إضافة سطر أو عند تحميل البيانات)
     private void setupMethodSpinner(Spinner spMethod) {
         List<String> methodNames = new ArrayList<>();
         if (!paymentMethods.isEmpty()) {
             for (PaymentMethodDto m : paymentMethods) {
-                methodNames.add(m.getDisplayName(isArabic));
+                String icon = m.icon != null ? m.icon : "💳";
+                methodNames.add(icon + " " + m.getDisplayName(isArabic));
             }
         } else {
-            methodNames.add(isArabic ? "نقداً" : "Cash");
-            methodNames.add(isArabic ? "بطاقة" : "Card");
+            methodNames.add(isArabic ? "💵 نقداً" : "💵 Cash");
+            methodNames.add(isArabic ? "🏦 بنك" : "🏦 Bank");
         }
         ArrayAdapter<String> methodAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, methodNames);
         methodAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -483,19 +485,18 @@ public class POSCheckoutDialog extends DialogFragment {
             }
         }
         
-        // ✅ تحويل إجمالي الفاتورة (بالدولار) إلى الريال اليمني للمقارنة
         double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
         double remaining = requiredTotalInYer - totalPaidInYer;
         
         if (Math.abs(remaining) < 1) {
             tvRemaining.setText("0.00 YER");
-            tvRemaining.setTextColor(Color.parseColor("#16A34A")); // أخضر
+            tvRemaining.setTextColor(Color.parseColor("#16A34A")); 
         } else if (remaining > 0) {
             tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
-            tvRemaining.setTextColor(Color.parseColor("#DC2626")); // أحمر
+            tvRemaining.setTextColor(Color.parseColor("#DC2626")); 
         } else {
             tvRemaining.setText(String.format(Locale.US, "+ %,.2f YER", Math.abs(remaining)));
-            tvRemaining.setTextColor(Color.parseColor("#F59E0B")); // برتقالي
+            tvRemaining.setTextColor(Color.parseColor("#F59E0B")); 
         }
     }
 
@@ -628,4 +629,4 @@ public class POSCheckoutDialog extends DialogFragment {
         if (selectedMethod != null && selectedMethod.accountCode != null) return selectedMethod.accountCode;
         return "1101";
     }
-}
+    }
