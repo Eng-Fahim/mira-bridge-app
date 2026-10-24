@@ -85,18 +85,18 @@
         </com.google.android.material.appbar.MaterialToolbar>
 
         <!-- ✅ مُخفى — الأزرار نُقلت إلى Toolbar الرئيسي -->
-<com.google.android.material.appbar.MaterialToolbar
-    android:id="@+id/secondaryToolbar"
-    android:layout_width="match_parent"
-    android:layout_height="0dp"
-    android:visibility="gone"
-    android:layoutDirection="locale"
-    app:contentInsetEnd="0dp"
-    app:contentInsetEndWithActions="0dp"
-    app:contentInsetStart="0dp"
-    app:contentInsetStartWithNavigation="0dp"
-    app:paddingEnd="0dp"
-    app:paddingStart="0dp" />
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/secondaryToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            android:layoutDirection="locale"
+            app:contentInsetEnd="0dp"
+            app:contentInsetEndWithActions="0dp"
+            app:contentInsetStart="0dp"
+            app:contentInsetStartWithNavigation="0dp"
+            app:paddingEnd="0dp"
+            app:paddingStart="0dp" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -139,55 +139,57 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- 3+4. FLOATING NAV + FAB -->
-<androidx.constraintlayout.widget.ConstraintLayout
-    android:id="@+id/bottomNavContainer"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_gravity="bottom"
-    android:layoutDirection="locale"
-    android:clipToPadding="false"
-    android:paddingHorizontal="16dp"
-    android:paddingBottom="24dp"> <!-- مسافة سفلية لرفع الكبسولة عن حافة الشاشة -->
-
-    <!-- الشريط بتصميم كبسولة -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNavigationView"
-        android:layout_width="0dp"
-        android:layout_height="72dp"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/bottomNavContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
         android:layoutDirection="locale"
-        android:background="@drawable/bg_floating_bottom_nav_with_shadow"
-        app:elevation="0dp"
-        app:itemBackground="@null"
-        app:itemActiveIndicatorStyle="@style/CustomNavIndicator" 
-        app:itemIconSize="26dp"
-        app:itemIconTint="@color/nav_item_color_selector"
-        app:itemRippleColor="@color/nav_ripple_color"
-        app:itemTextAppearanceActive="@style/NavItemTextActive"
-        app:itemTextAppearanceInactive="@style/NavItemTextInactive"
-        app:itemTextColor="@color/nav_item_color_selector"
-        app:labelVisibilityMode="labeled"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:menu="@menu/bottom_nav_menu" />
+        android:clipToPadding="false"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="24dp">
 
-    <!-- الزر العائم (FAB) -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabActionCenter"
-        android:layout_width="76dp"
-        android:layout_height="76dp"
-        android:src="@drawable/ic_diamond"
-        app:backgroundTint="?attr/colorPrimary"
-        app:borderWidth="6dp" <!-- الحد الأبيض الذي يفصله عن الشريط -->
-        app:borderColor="?attr/colorSurface"
-        app:elevation="12dp"
-        app:fabSize="custom"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigationView"
-        app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
-        app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
-        app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
-        app:maxImageSize="32dp"
-        app:pressedTranslationZ="8dp"
-        app:tint="?attr/colorOnPrimary" />
+        <!-- الشريط بتصميم كبسولة -->
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottomNavigationView"
+            android:layout_width="0dp"
+            android:layout_height="72dp"
+            android:layoutDirection="locale"
+            android:background="@drawable/bg_floating_bottom_nav_with_shadow"
+            app:elevation="0dp"
+            app:itemBackground="@null"
+            app:itemActiveIndicatorStyle="@style/CustomNavIndicator" 
+            app:itemIconSize="26dp"
+            app:itemIconTint="@color/nav_item_color_selector"
+            app:itemRippleColor="@color/nav_ripple_color"
+            app:itemTextAppearanceActive="@style/NavItemTextActive"
+            app:itemTextAppearanceInactive="@style/NavItemTextInactive"
+            app:itemTextColor="@color/nav_item_color_selector"
+            app:labelVisibilityMode="labeled"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:menu="@menu/bottom_nav_menu" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <!-- الزر العائم (FAB) -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabActionCenter"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:src="@drawable/ic_diamond"
+            app:backgroundTint="?attr/colorPrimary"
+            app:borderWidth="6dp"
+            app:borderColor="?attr/colorSurface"
+            app:elevation="12dp"
+            app:fabSize="custom"
+            app:layout_constraintBottom_toTopOf="@id/bottomNavigationView"
+            app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
+            app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
+            app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
+            app:maxImageSize="32dp"
+            app:pressedTranslationZ="8dp"
+            app:tint="?attr/colorOnPrimary" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
