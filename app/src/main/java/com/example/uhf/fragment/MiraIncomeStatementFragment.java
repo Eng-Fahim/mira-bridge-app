@@ -201,16 +201,23 @@ public class MiraIncomeStatementFragment extends Fragment {
         if (is.otherRevenue > 0) addRow(statementContainer, "إيرادات أخرى", is.otherRevenue, false);
         if (is.salesDiscounts > 0) addRow(statementContainer, "(-) مردودات وخصومات", -is.salesDiscounts, true);
         addRowBold(statementContainer, "= صافي الإيرادات", is.netRevenue, "#3498DB");
-        addRow(statementContainer, "⚖️ وزن مبيعات الذهب (جرام)", is.goldSalesRevenue, false);
+        
+        // ✅ استخدام الحقول الجديدة وتنسيق الجرام
+        addRowGold(statementContainer, "⚖️ وزن مبيعات الذهب (جرام)", is.totalGoldRevenue, false);
 
         addDivider(statementContainer);
 
         // ─── التكلفة ───
         addSection(statementContainer, "💵 التكلفة");
         addRow(statementContainer, "(-) تكلفة المبيعات", -is.cogs, true);
-        addRow(statementContainer, "⚖️ وزن تكلفة المبيعات (جرام)", is.goldCogs, true);
+        
+        // ✅ استخدام الحقول الجديدة وتنسيق الجرام
+        addRowGold(statementContainer, "⚖️ وزن تكلفة المبيعات (جرام)", is.totalGoldExpense, true);
+        
         addRowBold(statementContainer, "= الربح الإجمالي", is.grossProfit, "#27AE60");
-        addRow(statementContainer, "⚖️ ربح الذهب (جرام)", is.goldGrossProfit, false);
+        
+        // ✅ استخدام الحقول الجديدة وتنسيق الجرام
+        addRowGold(statementContainer, "⚖️ ربح الذهب (جرام)", is.netGoldProfit, false);
 
         addDivider(statementContainer);
 
@@ -245,6 +252,21 @@ public class MiraIncomeStatementFragment extends Fragment {
         tvLabel.setText(label);
         tvAmount.setText(NumberFormatter.moneyShort(Math.abs(value)));
         tvAmount.setTextColor(Color.parseColor(subtract ? "#E74C3C" : "#2C3E50"));
+        c.addView(row);
+    }
+
+    // ✅ دالة جديدة مخصصة لعرض أوزان الذهب بالجرام
+    private void addRowGold(LinearLayout c, String label, double value, boolean subtract) {
+        View row = LayoutInflater.from(getContext()).inflate(R.layout.item_income_row, c, false);
+        TextView tvLabel = row.findViewById(R.id.tvLabel);
+        TextView tvAmount = row.findViewById(R.id.tvAmount);
+        tvLabel.setText(label);
+        
+        // تنسيق الرقم ليكون 3 خانات عشرية متبوعة بحرف g
+        tvAmount.setText(String.format(Locale.US, "%.3f g", Math.abs(value)));
+        
+        // تلوين الرقم
+        tvAmount.setTextColor(Color.parseColor(subtract ? "#E74C3C" : "#D4AF37")); // ذهبي للمدين، أحمر للدائن
         c.addView(row);
     }
 
