@@ -69,22 +69,24 @@ public class POSCheckoutDialog extends DialogFragment {
     // ═══════════════════════════════════════════════════════════
 
     public static class POSCheckoutData {
-        public String customerName = "";
-        public String customerPhone = "";
-        public String customerEmail = "";
-        public String customerAddress = "";
-        public String customerNotes = "";
-        public String paymentMethod = "CASH";
-        public String accountCode = "1101";
-        public String currency = "USD";
-        public double originalTotal = 0.0;
-        public double discount = 0.0;
-        public double discountAmount = 0.0;
-        public double finalAmount = 0.0;
-        
-        // ✅ إضافة مصفوفة المدفوعات
-        public JSONArray payments = new JSONArray(); 
-    }
+    public String customerName = "";
+    public String customerPhone = "";
+    public String customerEmail = "";
+    public String customerAddress = "";
+    public String customerNotes = "";
+    public String paymentMethod = "CASH";
+    public String accountCode = "1101";
+    public String currency = "USD";
+    public double originalTotal = 0.0;
+    public double discount = 0.0;
+    public double discountAmount = 0.0;
+    public double finalAmount = 0.0;
+    
+    public JSONArray payments = new JSONArray(); 
+    
+    // ✅ ضع هذا السطر هنا فقط
+    public String localUuid = ""; 
+}
 
     // ═══════════════════════════════════════════════════════════
     //  Arguments
