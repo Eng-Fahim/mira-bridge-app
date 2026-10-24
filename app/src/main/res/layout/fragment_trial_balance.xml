@@ -6,7 +6,7 @@
     android:orientation="vertical"
     android:background="?attr/colorSurface">
 
-    <!-- شريط الأدوات: البحث والفلاتر -->
+    <!-- شريط الأدوات -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -14,7 +14,7 @@
         android:padding="8dp"
         android:background="?attr/colorSurfaceVariant">
 
-        <!-- صف 1: الفرع + البحث + التاريخ -->
+        <!-- صف 1: الفرع + البحث + التاريخ + التصدير -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -40,34 +40,85 @@
                 android:textSize="12sp"
                 android:inputType="text"/>
 
-            <!-- زر التاريخ -->
-<Button
-    android:id="@+id/btnFilterDate"
-    android:layout_width="wrap_content"
-    android:layout_height="40dp"
-    android:layout_marginStart="4dp"
-    android:text="الفترة 📅"
-    android:textSize="10sp"
-    style="@style/Widget.AppCompat.Button.Colored"/>
+            <Button
+                android:id="@+id/btnFilterDate"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:text="الفترة 📅"
+                android:textSize="10sp"
+                style="@style/Widget.AppCompat.Button.Colored"/>
 
-<!-- ✅ زر التصدير الجديد -->
-<Button
-    android:id="@+id/btnExport"
-    android:layout_width="40dp"
-    android:layout_height="40dp"
-    android:layout_marginStart="4dp"
-    android:text="📥"
-    android:textSize="14sp"
-    style="@style/Widget.AppCompat.Button.Colored"/>
+            <Button
+                android:id="@+id/btnExport"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:text="📥"
+                android:textSize="14sp"
+                style="@style/Widget.AppCompat.Button.Colored"/>
         </LinearLayout>
 
-        <!-- صف 2: التبويبات + فرعي فقط -->
+        <!-- ✅ صف 2: فترات سريعة -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipThisMonth"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="هذا الشهر"
+                    android:textSize="11sp"
+                    android:checkable="false"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipThisQuarter"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="هذا الربع"
+                    android:textSize="11sp"
+                    android:checkable="false"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipThisYear"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="هذه السنة"
+                    android:textSize="11sp"
+                    android:checkable="false"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipToday"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="اليوم"
+                    android:textSize="11sp"
+                    android:checkable="false"/>
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- صف 3: التبويبات + فرعي فقط -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="6dp">
 
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tabLayout"
@@ -76,9 +127,8 @@
                 android:layout_weight="1"
                 app:tabMode="fixed"
                 app:tabGravity="fill">
-                
-                <com.google.android.material.tabs.TabItem android:text="الميزان المالي 💵" />
-                <com.google.android.material.tabs.TabItem android:text="ميزان الذهب 🥇" />
+                <com.google.android.material.tabs.TabItem android:text="مالي 💵" />
+                <com.google.android.material.tabs.TabItem android:text="ذهب 🥇" />
             </com.google.android.material.tabs.TabLayout>
 
             <CheckBox
@@ -97,7 +147,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:scrollbars="none">
-
         <LinearLayout
             android:id="@+id/kpiContainer"
             android:layout_width="wrap_content"
@@ -105,6 +154,42 @@
             android:orientation="horizontal"
             android:padding="8dp"/>
     </HorizontalScrollView>
+
+    <!-- ✅ بانر التحقق من التوازن -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardBalanceStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginBottom="8dp"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="2dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="10dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvBalanceIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✅"
+                android:textSize="18sp"/>
+
+            <TextView
+                android:id="@+id/tvBalanceText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="القيد متوازن"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Header العناوين -->
     <LinearLayout
@@ -116,13 +201,11 @@
 
         <TextView android:layout_width="50dp" android:layout_height="wrap_content" android:text="الكود" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="11sp" android:textStyle="bold"/>
         <TextView android:layout_width="80dp" android:layout_height="wrap_content" android:text="الحساب" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="11sp" android:textStyle="bold"/>
-        
         <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="أول المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
         <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="حركة الفترة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
         <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="آخر المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
     </LinearLayout>
 
-    <!-- ✅ مؤشر التحميل (يظهر فوق الجدول) -->
     <ProgressBar
         android:id="@+id/pbLoading"
         android:layout_width="wrap_content"
@@ -131,24 +214,82 @@
         android:layout_marginTop="20dp"
         android:visibility="gone" />
 
-    <!-- قائمة الحسابات -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvRows"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="?attr/colorSurface"
-        android:clipToPadding="false"
-        android:paddingBottom="16dp"/>
+        android:layout_weight="1">
 
-    <TextView
-        android:id="@+id/tvEmpty"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvRows"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/colorSurface"
+            android:clipToPadding="false"
+            android:paddingBottom="60dp"/>
+
+        <TextView
+            android:id="@+id/tvEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="📭 لا توجد بيانات"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="16sp"
+            android:visibility="gone"/>
+    </FrameLayout>
+
+    <!-- ✅ صف الإجماليات الثابت في الأسفل -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="📭 لا توجد بيانات"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="16sp"
-        android:visibility="gone"/>
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:elevation="8dp">
+
+        <TextView
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="11sp"/>
+
+        <TextView
+            android:layout_width="80dp"
+            android:layout_height="wrap_content"
+            android:text="الإجمالي"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="11sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tvFooterOpen"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="10sp"
+            android:gravity="center"/>
+
+        <TextView
+            android:id="@+id/tvFooterPeriod"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="0.00"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:gravity="center"/>
+
+        <TextView
+            android:id="@+id/tvFooterClose"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="10sp"
+            android:gravity="center"/>
+    </LinearLayout>
 </LinearLayout>
