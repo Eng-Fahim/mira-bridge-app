@@ -1,4 +1,4 @@
-packagepackage com.example.uhf.fragment;
+package com.example.uhf.fragment;
 
 import android.app.Dialog;
 import android.graphics.Color;
@@ -343,6 +343,8 @@ public class MiraVouchersFragment extends Fragment {
                 payload.put("gold_karat", karat);
                 payload.put("notes", notes);
 
+                // ⚠️ تنبيه: إذا كنت تريد استخدام المسار الجديد /vouchers 
+                // قم بتغيير اسم الدالة إلى createVoucherDirect
                 MiraApiClient.ApiResponse response = apiClient.createVoucher(payload);
 
                 mainHandler.post(() -> {
@@ -381,38 +383,37 @@ public class MiraVouchersFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-    VoucherItem item = items.get(position);
-    boolean isReceipt = item.voucherType.equals("receipt");
-    String typeLabel = isReceipt ? "📥 قبض" : "📤 صرف";
-    holder.tvTitle.setText(item.voucherNumber + " - " + typeLabel);
-    holder.tvAccount.setText(item.accountName);
-    String amountText = String.format(Locale.US, "%,.2f YER", Double.parseDouble(item.amountMoney));
-    if (Double.parseDouble(item.amountGold) > 0) {
-        amountText += " | " + String.format(Locale.US, "%.2f g", Double.parseDouble(item.amountGold));
-    }
-    holder.tvAmount.setText(amountText);
-    holder.tvAmount.setTextColor(isReceipt ? 0xFF16A34A : 0xFFDC2626);
-    
-    // ✅ [جديد] فتح السند عند الضغط
-    // ✅ فتح الإيصال عند الضغط العادي
-holder.itemView.setOnClickListener(v -> {
-    if (item.id > 0) {
-        MiraVoucherReceiptFragment receipt = MiraVoucherReceiptFragment.newInstance(item.id);
-        receipt.show(getParentFragmentManager(), "VoucherReceipt");
-    }
-});
+            VoucherItem item = items.get(position);
+            boolean isReceipt = item.voucherType.equals("receipt");
+            String typeLabel = isReceipt ? "📥 قبض" : "📤 صرف";
+            holder.tvTitle.setText(item.voucherNumber + " - " + typeLabel);
+            holder.tvAccount.setText(item.accountName);
+            String amountText = String.format(Locale.US, "%,.2f YER", Double.parseDouble(item.amountMoney));
+            if (Double.parseDouble(item.amountGold) > 0) {
+                amountText += " | " + String.format(Locale.US, "%.2f g", Double.parseDouble(item.amountGold));
+            }
+            holder.tvAmount.setText(amountText);
+            holder.tvAmount.setTextColor(isReceipt ? 0xFF16A34A : 0xFFDC2626);
+            
+            // ✅ فتح الإيصال عند الضغط العادي
+            holder.itemView.setOnClickListener(v -> {
+                if (item.id > 0) {
+                    MiraVoucherReceiptFragment receipt = MiraVoucherReceiptFragment.newInstance(item.id);
+                    receipt.show(getParentFragmentManager(), "VoucherReceipt");
+                }
+            });
 
-// ✅ فتح التفاصيل المحاسبية عند الضغط المطول
-holder.itemView.setOnLongClickListener(v -> {
-    if (item.id > 0) {
-        MiraVoucherDetailFragment detail = 
-            MiraVoucherDetailFragment.newInstance(item.id, item.voucherType);
-        detail.show(getParentFragmentManager(), "VoucherDetail");
-        return true;
-    }
-    return false;
-});
-}
+            // ✅ فتح التفاصيل المحاسبية عند الضغط المطول
+            holder.itemView.setOnLongClickListener(v -> {
+                if (item.id > 0) {
+                    MiraVoucherDetailFragment detail = 
+                        MiraVoucherDetailFragment.newInstance(item.id, item.voucherType);
+                    detail.show(getParentFragmentManager(), "VoucherDetail");
+                    return true;
+                }
+                return false;
+            });
+        }
 
         @Override public int getItemCount() { return items.size(); }
 
