@@ -73,5 +73,13 @@ public class TrialBalanceDto {
         @SerializedName("period_credit")   public double periodCredit;
         @SerializedName("closing_debit")   public double closingDebit;
         @SerializedName("closing_credit")  public double closingCredit;
+
+        // ✅ الحقول الذهبية المفصلة (جديدة)
+@SerializedName("opening_gold_debit")  public double openingGoldDebit;
+@SerializedName("opening_gold_credit") public double openingGoldCredit;
+@SerializedName("period_gold_debit")   public double periodGoldDebit;
+@SerializedName("period_gold_credit")  public double periodGoldCredit;
+@SerializedName("closing_gold_debit")  public double closingGoldDebit;
+@SerializedName("closing_gold_credit") public double closingGoldCredit;
     }
 }
