@@ -71,6 +71,17 @@ public class MiraScrapBatchesFragment extends Fragment {
                 );
             }
         });
+
+        // ✅ [إضافة جديدة] ربط زر تقرير الأعمار (Aging)
+        MaterialButton btnAging = view.findViewById(R.id.btnViewAging);
+        if (btnAging != null) {
+            btnAging.setOnClickListener(v -> {
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).loadFragment(
+                        new MiraScrapAgingFragment(), NavigationManager.TAG_SCRAP_AGING);
+                }
+            });
+        }
         
         loadBatches();
         return view;
