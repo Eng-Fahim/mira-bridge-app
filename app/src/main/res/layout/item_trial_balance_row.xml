@@ -15,10 +15,9 @@
         <!-- الكود -->
         <TextView
             android:id="@+id/tvRowCode"
-            android:layout_width="50dp"
+            android:layout_width="45dp"
             android:layout_height="wrap_content"
-            android:text="1101"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:gravity="center"
             android:textColor="#64748B" />
 
@@ -28,7 +27,6 @@
             android:layout_width="0dp"
             android:layout_weight="1.5"
             android:layout_height="wrap_content"
-            android:text="الصناديق والنقدية"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#1E293B"
@@ -36,78 +34,24 @@
             android:ellipsize="end" />
 
         <!-- أول المدة -->
-        <TextView
-            android:id="@+id/tvOpenDebit"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="—"
-            android:textSize="11sp"
-            android:gravity="center"
-            android:textColor="#3B82F6" />
-
-        <TextView
-            android:id="@+id/tvOpenCredit"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="—"
-            android:textSize="11sp"
-            android:gravity="center"
-            android:textColor="#EF4444" />
+        <TextView android:id="@+id/tvOpenDebit" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="10sp" android:gravity="center" android:textColor="#3B82F6" />
+        <TextView android:id="@+id/tvOpenCredit" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="10sp" android:gravity="center" android:textColor="#EF4444" />
 
         <!-- حركة الفترة -->
-        <TextView
-            android:id="@+id/tvPeriodDebit"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="—"
-            android:textSize="11sp"
-            android:gravity="center"
-            android:textColor="#3B82F6" />
-
-        <TextView
-            android:id="@+id/tvPeriodCredit"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="—"
-            android:textSize="11sp"
-            android:gravity="center"
-            android:textColor="#EF4444" />
+        <TextView android:id="@+id/tvPeriodDebit" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="10sp" android:gravity="center" android:textColor="#3B82F6" />
+        <TextView android:id="@+id/tvPeriodCredit" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="10sp" android:gravity="center" android:textColor="#EF4444" />
 
         <!-- آخر المدة -->
-        <TextView
-            android:id="@+id/tvCloseDebit"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="—"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:textColor="#2563EB" />
-
-        <TextView
-            android:id="@+id/tvCloseCredit"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="—"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:textColor="#DC2626" />
+        <TextView android:id="@+id/tvCloseDebit" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="10sp" android:textStyle="bold" android:gravity="center" android:textColor="#2563EB" />
+        <TextView android:id="@+id/tvCloseCredit" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="10sp" android:textStyle="bold" android:gravity="center" android:textColor="#DC2626" />
 
     </LinearLayout>
 
-    <!-- شريط الذهب الصغير (يظهر فقط في وضع المال إذا كان هناك وزن) -->
+    <!-- شريط الذهب الصغير (يظهر فقط في وضع المال) -->
     <TextView
         android:id="@+id/tvRowGold"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="وزن: مدين 10.5g | دائن 0g"
         android:textSize="10sp"
         android:gravity="center"
         android:visibility="gone"
