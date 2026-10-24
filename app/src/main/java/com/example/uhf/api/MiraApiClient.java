@@ -2554,4 +2554,14 @@ public ApiResponse getCashFlowStatement(String date, int branchId) {
     if (branchId > 0) url += "&branch_id=" + branchId;
     return getAccounting(url);
 }
+
+public ApiResponse reverseJournalEntry(String entryId) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("reason", "عكس من تطبيق الأندرويد");
+    } catch (Exception ignored) {}
+    
+    // نستخدم postAccounting لاستدعاء مسار mira/v2/accounting/...
+    return postAccounting("/accounting/journal-entries/" + entryId + "/reverse", payload);
+}
 }
