@@ -2422,5 +2422,20 @@ public ApiResponse saveScrapPurchase(JSONObject payload) {
     public ApiResponse getScrapSummary(int branchId) {
     return getWithAuth("/scrap/summary?branch_id=" + branchId);
     }
+    public ApiResponse getAvailableScrapPurchases(int branchId) {
+    return getWithAuth("/scrap/available-purchases?branch_id=" + branchId);
+}
+
+public ApiResponse createScrapBatch(JSONObject payload) {
+    return postWithAuth("/scrap/batches", payload);
+}
+
+public ApiResponse sendScrapBatch(int batchId) {
+    return postWithAuth("/scrap/batches/" + batchId + "/send", new JSONObject());
+}
+
+public ApiResponse receiveScrapBatch(int batchId, JSONObject payload) {
+    return postWithAuth("/scrap/batches/" + batchId + "/receive", payload);
+}
     
 }
