@@ -104,7 +104,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             setupGridAction(view, R.id.cardAccounting, "accounting",
                     NavigationManager.TAG_ACCOUNTING);
-
+            setupGridAction(view, R.id.cardVouchers, "vouchers",
+                    NavigationManager.TAG_VOUCHERS);
             setupGridAction(view, R.id.cardTransfer, "transfers",
                     NavigationManager.TAG_TRANSFERS);
 
