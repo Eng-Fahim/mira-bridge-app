@@ -12,12 +12,36 @@
         android:orientation="vertical"
         android:padding="12dp">
 
+        <!-- ═══════ شريط الأدوات: الفرع + تصدير ═══════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <Spinner
+                android:id="@+id/spinnerBranchIncome"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:background="@android:drawable/btn_dropdown"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnExportIncome"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:text="📥"
+                android:textSize="14sp"/>
+        </LinearLayout>
+
         <!-- ═══════ الفترة ═══════ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="8dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFrom"
@@ -38,13 +62,62 @@
                 android:layout_marginStart="4dp"/>
         </LinearLayout>
 
-        <!-- ═══════ KPIs ═══════ -->
-        <LinearLayout
-            android:id="@+id/kpiContainer"
+        <!-- ═══════ الفترات السريعة ═══════ -->
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp"/>
+            android:layout_marginBottom="8dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipIncomeThisMonth"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="هذا الشهر"
+                    android:textSize="11sp"
+                    android:checkable="false"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipIncomeThisQuarter"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="هذا الربع"
+                    android:textSize="11sp"
+                    android:checkable="false"/>
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipIncomeThisYear"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="هذه السنة"
+                    android:textSize="11sp"
+                    android:checkable="false"/>
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- ═══════ KPIs ═══════ -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:id="@+id/kpiContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"/>
+        </HorizontalScrollView>
 
         <!-- ═══════ قائمة الدخل ═══════ -->
         <androidx.cardview.widget.CardView
