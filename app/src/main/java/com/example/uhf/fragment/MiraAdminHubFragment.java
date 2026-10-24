@@ -17,17 +17,6 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.navigation.NavigationManager;
 import com.google.android.material.card.MaterialCardView;
 
-/**
- * ═══════════════════════════════════════════════════════════════════
- *  MiraAdminHubFragment v2.0 — Permission-Aware
- * ═══════════════════════════════════════════════════════════════════
- *
- *  ✅ كل بطاقة تُخفى/تُظهر حسب صلاحية المستخدم
- *  ✅ كل بطاقة تُربط بالـ Fragment الصحيح (بعد إصلاح الخلط)
- *  ✅ يستخدم PermissionManager v3.0
- *  ✅ يستخدم Tags موحّدة من NavigationManager
- *  ✅ يمر عبر UHFMainActivity.loadFragment() (مع guardSetupAccess)
- */
 public class MiraAdminHubFragment extends Fragment {
 
     private static final String TAG = "MiraAdminHub";
@@ -100,7 +89,15 @@ public class MiraAdminHubFragment extends Fragment {
             bindCard(view, R.id.cardAdminProfile,
                     "Profile",
                     NavigationManager.TAG_PROFILE,
-                    true);   // متاح للجميع
+                    true);
+
+            // 📝 السندات المالية (قبض / صرف) - ✅ هنا في القسم الثاني
+            bindCard(view, R.id.cardAdminVouchers,
+                    "Vouchers",
+                    NavigationManager.TAG_VOUCHERS,
+                    permissionManager.isAdmin()
+                    || permissionManager.isManager()
+                    || permissionManager.isFinanceManager());
 
         } catch (Exception e) {
             Log.e(TAG, "onCreateView error", e);
@@ -113,13 +110,6 @@ public class MiraAdminHubFragment extends Fragment {
     //  bindCard — البوابة الموحّدة
     // ═══════════════════════════════════════════════════════
 
-    /**
-     * @param root            الجذر
-     * @param cardId          معرف البطاقة في XML
-     * @param displayKey      للّوج فقط
-     * @param tag             Tag الشاشة في NavigationManager
-     * @param hasPermission   هل يملك المستخدم الصلاحية؟
-     */
     private void bindCard(View root,
                           int cardId,
                           String displayKey,
@@ -134,9 +124,7 @@ public class MiraAdminHubFragment extends Fragment {
             return;
         }
 
-        // ✅ احترم البوابة الموحّدة أيضاً (whitelist)
-        boolean canAccess = hasPermission
-                && permissionManager.canAccessFragment(tag);
+        boolean canAccess = hasPermission && permissionManager.canAccessFragment(tag);
 
         if (!canAccess) {
             card.setVisibility(View.GONE);
@@ -146,7 +134,6 @@ public class MiraAdminHubFragment extends Fragment {
 
         card.setVisibility(View.VISIBLE);
 
-        // ✅ استخدم MaterialCardView ripple effect
         if (card instanceof MaterialCardView) {
             ((MaterialCardView) card).setClickable(true);
             ((MaterialCardView) card).setFocusable(true);
@@ -156,7 +143,6 @@ public class MiraAdminHubFragment extends Fragment {
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity activity = (UHFMainActivity) getActivity();
 
-                // إنشاء Fragment عبر Factory الموحّد
                 Fragment target = com.example.uhf.navigation.FragmentFactory
                         .createFragmentByTag(tag);
 
@@ -171,10 +157,6 @@ public class MiraAdminHubFragment extends Fragment {
             }
         });
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  HELPERS
-    // ═══════════════════════════════════════════════════════
 
     private String getResourceIdName(int resId) {
         try {
