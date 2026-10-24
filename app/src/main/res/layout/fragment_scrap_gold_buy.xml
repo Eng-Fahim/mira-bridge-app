@@ -78,7 +78,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- حاسبة الكسر -->
+        <!-- حاسبة الكسر وتفاصيل الدفع -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -161,7 +161,7 @@
                     android:hint="@string/deduction_per_gram"
                     app:boxStrokeColor="?attr/colorPrimary"
                     app:hintTextColor="?attr/colorPrimary"
-                    android:layout_marginBottom="8dp">
+                    android:layout_marginBottom="16dp">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etDeduction"
                         android:layout_width="match_parent"
@@ -169,6 +169,63 @@
                         android:inputType="numberDecimal"
                         android:textColor="?attr/colorOnSurface"/>
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant"
+                    android:alpha="0.3"
+                    android:layout_marginBottom="16dp"/>
+
+                <!-- قسم الدفع المتعدد (تم تصحيح مكانه) -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="💵 طرق الدفع (يمكن الدفع بأكثر من عملة)"
+                    android:textColor="?attr/colorPrimary"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
+
+                <LinearLayout
+                    android:id="@+id/llPaymentsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddPayment"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة عملة أخرى"
+                    android:textColor="?attr/colorPrimary"/>
+
+                <!-- شريط المتبقي -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:padding="12dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="المتبقي للعميل:"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textStyle="bold"/>
+                    <TextView
+                        android:id="@+id/tvRemaining"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.00 YER"
+                        android:textColor="#DC2626"
+                        android:textStyle="bold"
+                        android:textSize="18sp"/>
+                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
