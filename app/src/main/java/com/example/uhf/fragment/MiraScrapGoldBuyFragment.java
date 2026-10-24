@@ -25,6 +25,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONArray;
@@ -47,7 +48,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
     // Data
     private String[] karats = {"24", "22", "21", "18", "14"};
     private final String[] CURRENCIES = {"YER", "SAR", "USD"};
-    // أسعار صرف مبدئية (يفضل جلبها من السيرفر لاحقاً)
     private final double[] EXCHANGE_RATES = {1.0, 530.0, 2000.0}; 
     
     private final List<View> paymentRows = new ArrayList<>();
@@ -62,7 +62,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         setupKaratDropdown();
         setupCalculations();
         
-        // إضافة سطر دفع افتراضي
         addPaymentRow("YER", 0.0);
 
         btnSavePurchase.setOnClickListener(v -> savePurchase());
@@ -89,7 +88,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, karats);
         ddKarat.setAdapter(adapter);
         ddKarat.setText("21", false);
-
         ddKarat.setOnItemClickListener((parent, view, position, id) -> calculateTotal());
     }
 
@@ -99,7 +97,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateTotal(); }
             @Override public void afterTextChanged(Editable s) {}
         };
-
         etWeight.addTextChangedListener(watcher);
         etMarketPrice.addTextChangedListener(watcher);
         etDeduction.addTextChangedListener(watcher);
@@ -115,7 +112,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
                 double totalBeforeDeduction = weight * marketPrice;
                 double totalDeduction = weight * deduction;
                 totalGoldValue = totalBeforeDeduction - totalDeduction;
-
                 tvTotalAmount.setText(String.format(Locale.US, "%,.2f YER", totalGoldValue));
             } else {
                 totalGoldValue = 0;
@@ -129,7 +125,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
     private void addPaymentRow(String defaultCurrency, double amount) {
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
-        
         Spinner spCurrency = row.findViewById(R.id.spCurrency);
         TextInputEditText etAmount = row.findViewById(R.id.etAmount);
         ImageButton btnRemove = row.findViewById(R.id.btnRemove);
@@ -165,7 +160,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
         paymentRows.add(row);
         llPaymentsContainer.addView(row);
-        
         if (amount > 0) etAmount.setText(String.valueOf(amount));
     }
 
@@ -175,7 +169,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
             Spinner sp = row.findViewById(R.id.spCurrency);
             TextInputEditText et = row.findViewById(R.id.etAmount);
             int pos = sp.getSelectedItemPosition();
-            
             if (pos >= 0) {
                 double rate = EXCHANGE_RATES[pos];
                 double amount = getDoubleFromEditText(et);
@@ -197,33 +190,43 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         }
     }
 
+    // ✅ دالة تعطيل/تفعيل الحقول لمنع التعديل أثناء الحفظ
+    private void setFormEnabled(boolean enabled) {
+        etCustomerName.setEnabled(enabled);
+        etCustomerPhone.setEnabled(enabled);
+        etWeight.setEnabled(enabled);
+        etMarketPrice.setEnabled(enabled);
+        etDeduction.setEnabled(enabled);
+        ddKarat.setEnabled(enabled);
+        btnAddPayment.setEnabled(enabled);
+        for (View row : paymentRows) {
+            row.findViewById(R.id.spCurrency).setEnabled(enabled);
+            row.findViewById(R.id.etAmount).setEnabled(enabled);
+            row.findViewById(R.id.btnRemove).setEnabled(enabled);
+        }
+    }
+
     private void savePurchase() {
-        String name = etCustomerName.getText() != null ? etCustomerName.getText().toString().trim() : "";
-        String phone = etCustomerPhone.getText() != null ? etCustomerPhone.getText().toString().trim() : "";
+        // ... (نفس التحققات السابقة) ...
         double weight = getDoubleFromEditText(etWeight);
         double marketPrice = getDoubleFromEditText(etMarketPrice);
-        double deduction = getDoubleFromEditText(etDeduction);
-        
         if (weight <= 0 || marketPrice <= 0) {
-            Toast.makeText(requireContext(), getString(R.string.error_enter_weight_price), Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "الرجاء إدخال الوزن والسعر", Toast.LENGTH_SHORT).show();
             return;
         }
 
         JSONArray paymentsArray = new JSONArray();
         double totalPaidBase = 0;
-
         for (View row : paymentRows) {
             Spinner sp = row.findViewById(R.id.spCurrency);
             TextInputEditText et = row.findViewById(R.id.etAmount);
             int pos = sp.getSelectedItemPosition();
             double amount = getDoubleFromEditText(et);
-
             if (amount > 0 && pos >= 0) {
                 try {
                     double rate = EXCHANGE_RATES[pos];
                     double base = amount * rate;
                     totalPaidBase += base;
-
                     JSONObject pObj = new JSONObject();
                     pObj.put("currency", CURRENCIES[pos]);
                     pObj.put("amount", amount);
@@ -241,25 +244,25 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
         JSONObject payload = new JSONObject();
         try {
-            payload.put("customer_name", name);
-            payload.put("customer_phone", phone);
+            payload.put("customer_name", etCustomerName.getText() != null ? etCustomerName.getText().toString().trim() : "");
+            payload.put("customer_phone", etCustomerPhone.getText() != null ? etCustomerPhone.getText().toString().trim() : "");
             payload.put("gross_weight_grams", weight);
             payload.put("gold_karat", ddKarat.getText().toString() + "K");
             payload.put("market_price_per_gram", marketPrice);
-            payload.put("deduction_per_gram", deduction);
+            payload.put("deduction_per_gram", getDoubleFromEditText(etDeduction));
             payload.put("total_amount", totalGoldValue);
-            payload.put("payments", paymentsArray); // ✅ إرسال مصفوفة المدفوعات
+            payload.put("payments", paymentsArray);
 
             MiraBranchesManager branchesManager = MiraBranchesManager.getInstance(requireContext());
             payload.put("branch_id", branchesManager.getActiveBranchId());
-
             SessionManager sessionManager = new SessionManager(requireContext());
             payload.put("user_id", sessionManager.getUserId());
-
         } catch (Exception e) { e.printStackTrace(); }
 
+        // ✅ 1. تعطيل الواجهة وإظهار التحميل
+        setFormEnabled(false);
         btnSavePurchase.setEnabled(false);
-        btnSavePurchase.setText("جاري الحفظ...");
+        btnSavePurchase.setText("⏳ جاري الحفظ...");
 
         new Thread(() -> {
             MiraApiClient api = MiraApiClient.getInstance(requireContext());
@@ -268,18 +271,45 @@ public class MiraScrapGoldBuyFragment extends Fragment {
             if (getActivity() == null || isDetached()) return;
 
             getActivity().runOnUiThread(() -> {
+                // ✅ 2. إعادة تفعيل الواجهة
+                setFormEnabled(true);
                 btnSavePurchase.setEnabled(true);
                 btnSavePurchase.setText(R.string.save_purchase);
 
-                if (response.isSuccess) {
-                    Toast.makeText(requireContext(), getString(R.string.purchase_saved_success), Toast.LENGTH_LONG).show();
-                    clearFields();
+                if (response.isSuccess && response.data != null) {
+                    // ✅ 3. استخراج بيانات العملية لعرضها
+                    int purchaseId = response.data.optInt("purchase_id", 0);
+                    String purchaseNumber = response.data.optString("purchase_number", "");
+                    
+                    // ✅ 4. عرض شاشة النجاح الاحترافية
+                    showSuccessDialog(purchaseId, purchaseNumber);
+                    
                 } else {
                     String errorMsg = response.error != null ? response.error : "فشل الاتصال بالسيرفر";
                     Toast.makeText(requireContext(), errorMsg, Toast.LENGTH_LONG).show();
                 }
             });
         }).start();
+    }
+
+    // ✅ دالة عرض نافذة النجاح
+    private void showSuccessDialog(int purchaseId, String purchaseNumber) {
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle("✅ تم الحفظ بنجاح")
+            .setMessage("تم تسجيل عملية شراء الكسر بنجاح.\n\nرقم العملية: " + purchaseNumber + "\n\nهل تريد طباعة الإيصال للعميل الآن؟")
+            .setPositiveButton("🖨️ عرض وطباعة الإيصال", (dialog, which) -> {
+                // فتح شاشة الإيصال
+                if (purchaseId > 0) {
+                    MiraScrapReceiptFragment receipt = MiraScrapReceiptFragment.newInstance(purchaseId, null);
+                    receipt.show(getParentFragmentManager(), "ScrapReceipt");
+                }
+                clearFields(); // مسح الحقول بعد الطباعة
+            })
+            .setNegativeButton("إغلاق", (dialog, which) -> {
+                clearFields(); // مسح الحقول في حال الإغلاق
+            })
+            .setCancelable(false) // منع الإغلاق بالضغط خارج النافذة
+            .show();
     }
 
     private double getDoubleFromEditText(TextInputEditText editText) {
