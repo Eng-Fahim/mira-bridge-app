@@ -8,32 +8,54 @@
     android:background="?attr/colorSurfaceVariant"
     android:padding="8dp">
 
-    <!-- السطر الأول: العملة والمبلغ -->
+    <!-- السطر الأول: العملة + طريقة الدفع + زر الحذف -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
+        <!-- سبينر العملة -->
         <Spinner
             android:id="@+id/spCurrency"
             android:layout_width="80dp"
             android:layout_height="48dp"
             android:backgroundTint="?attr/colorPrimary"/>
-        <!-- ✅ سبينر طريقة الدفع -->
-<Spinner
-    android:id="@+id/spMethod"
-    android:layout_width="0dp"
-    android:layout_height="wrap_content"
-    android:layout_weight="1"
-    android:layout_marginEnd="4dp"/>
 
+        <!-- سبينر طريقة الدفع (مرة واحدة فقط) -->
+        <Spinner
+            android:id="@+id/spMethod"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="8dp"
+            android:backgroundTint="?attr/colorOnSurfaceVariant"/>
+
+        <!-- زر الحذف -->
+        <ImageButton
+            android:id="@+id/btnRemove"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#DC2626"/>
+    </LinearLayout>
+
+    <!-- السطر الثاني: المبلغ + المعادل باليمني -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+
+        <!-- حقل المبلغ -->
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginHorizontal="8dp"
+            android:layout_marginEnd="8dp"
             android:hint="المبلغ"
             app:boxStrokeColor="?attr/colorPrimary">
             
@@ -45,39 +67,16 @@
                 android:textColor="?attr/colorOnSurface"/>
         </com.google.android.material.textfield.TextInputLayout>
 
-        <ImageButton
-            android:id="@+id/btnRemove"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_delete"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="#DC2626"/>
-    </LinearLayout>
-
-    <!-- السطر الثاني: طريقة الدفع والمعادل -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="4dp">
-
-        <!-- ✅ حقل جديد لطريقة الدفع لكل سطر -->
-        <Spinner
-            android:id="@+id/spMethod"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="40dp"
-            android:backgroundTint="?attr/colorOnSurfaceVariant"/>
-
+        <!-- النص المعادل بالريال -->
         <TextView
             android:id="@+id/tvBaseEquivalent"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="0.00 YER"
-            android:gravity="end"
+            android:gravity="end|center_vertical"
             android:textColor="?attr/colorPrimary"
-            android:textSize="12sp"/>
+            android:textStyle="bold"
+            android:textSize="14sp"/>
     </LinearLayout>
 </LinearLayout>
