@@ -23,7 +23,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.MiraPriceManager; // ✅
+import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -50,7 +50,11 @@ public class MiraScrapGoldBuyFragment extends Fragment {
     
     private final List<View> paymentRows = new ArrayList<>();
     private double totalGoldValue = 0;
-    private MiraPriceManager priceManager; // ✅
+    private MiraPriceManager priceManager;
+
+    // ✅ قائمة ديناميكية لطرق الدفع من السيرفر
+    private List<JSONObject> availableMethods = new ArrayList<>();
+    private boolean isMethodsLoaded = false;
 
     @Nullable
     @Override
@@ -63,7 +67,8 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         setupKaratDropdown();
         setupCalculations();
         
-        addPaymentRow("YER", 0.0);
+        // ✅ جلب طرق الدفع من السيرفر أولاً
+        loadPaymentMethods();
 
         btnSavePurchase.setOnClickListener(v -> savePurchase());
         btnAddPayment.setOnClickListener(v -> addPaymentRow("YER", 0.0));
@@ -83,6 +88,60 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         btnSavePurchase = view.findViewById(R.id.btnSavePurchase);
         btnAddPayment = view.findViewById(R.id.btnAddPayment);
         llPaymentsContainer = view.findViewById(R.id.llPaymentsContainer);
+    }
+
+    // ✅ دالة جلب طرق الدفع من السيرفر
+    private void loadPaymentMethods() {
+        new Thread(() -> {
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(requireContext());
+                MiraApiClient.ApiResponse response = api.getPaymentMethods();
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray arr = response.data.optJSONArray("data");
+                    if (arr == null) arr = response.data.optJSONArray("methods");
+                    
+                    if (arr != null) {
+                        for (int i = 0; i < arr.length(); i++) {
+                            availableMethods.add(arr.getJSONObject(i));
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            // إذا فشل الجلب، نضع قيم افتراضية
+            if (availableMethods.isEmpty()) {
+                try {
+                    JSONObject cash = new JSONObject(); cash.put("code", "CASH"); cash.put("name_ar", "نقداً"); cash.put("icon", "💵");
+                    JSONObject bank = new JSONObject(); bank.put("code", "BANK_TRANSFER"); bank.put("name_ar", "تحويل بنكي"); bank.put("icon", "🏦");
+                    availableMethods.add(cash);
+                    availableMethods.add(bank);
+                } catch (Exception ignored) {}
+            }
+            
+            isMethodsLoaded = true;
+            
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    // إضافة سطر الدفع الأول بعد تحميل البيانات
+                    addPaymentRow("YER", 0.0);
+                });
+            }
+        }).start();
+    }
+
+    // ✅ دالة لتعبئة Spinner طرق الدفع
+    private void setupMethodSpinner(Spinner spMethod) {
+        if (spMethod == null) return;
+        List<String> methodNames = new ArrayList<>();
+        for (JSONObject obj : availableMethods) {
+            String icon = obj.optString("icon", "💳");
+            String name = obj.optString("name_ar", obj.optString("code", "نقداً"));
+            methodNames.add(icon + " " + name); // مثال: "🏦 بنك التضامن"
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, methodNames);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spMethod.setAdapter(adapter);
     }
 
     private void setupKaratDropdown() {
@@ -124,98 +183,88 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         }
     }
 
-   // ✅ دالة جلب سعر الصرف الصحيحة (تحسب كم يساوي 1 من العملة بالريال اليمني)
-private double getRateToYER(String currency) {
-    if ("YER".equalsIgnoreCase(currency)) return 1.0;
-    
-    if (priceManager != null) {
-        // جلب سعر صرف اليمني مقابل الدولار (مثلاً 530)
-        double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
-        // جلب سعر صرف العملة الأخرى مقابل الدولار (مثلاً 3.75 للسعودي)
-        double currencyRate = priceManager.getExchangeRate(currency);
+    private double getRateToYER(String currency) {
+        if ("YER".equalsIgnoreCase(currency)) return 1.0;
         
-        // إذا كان السعر المحفوظ في التطبيق هو بالفعل (141.33)، نستخدمه مباشرة
-        if (currencyRate > 10) return currencyRate;
-        
-        // إذا كان السعر مقابل الدولار (مثلاً 3.75)، نقوم بعملية القسمة: 530 / 3.75 = 141.33
-        if (yerRate > 0 && currencyRate > 0) {
-            return yerRate / currencyRate; 
+        if (priceManager != null) {
+            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
+            double currencyRate = priceManager.getExchangeRate(currency);
+            
+            if (currencyRate > 10) return currencyRate;
+            
+            if (yerRate > 0 && currencyRate > 0) {
+                return yerRate / currencyRate; 
+            }
         }
+        
+        if ("SAR".equalsIgnoreCase(currency)) return 141.33;
+        if ("USD".equalsIgnoreCase(currency)) return 530.0;
+        return 1.0;
     }
-    
-    // احتياطي في حال فشل جلب الأسعار من مدير الأسعار
-    if ("SAR".equalsIgnoreCase(currency)) return 141.33;
-    if ("USD".equalsIgnoreCase(currency)) return 530.0;
-    return 1.0;
-}
 
     private void addPaymentRow(String defaultCurrency, double amount) {
-    View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
-    Spinner spCurrency = row.findViewById(R.id.spCurrency);
-    Spinner spMethod = row.findViewById(R.id.spMethod); // ✅ الجديد
-    TextInputEditText etAmount = row.findViewById(R.id.etAmount);
-    TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
-    ImageButton btnRemove = row.findViewById(R.id.btnRemove);
+        View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
+        Spinner spCurrency = row.findViewById(R.id.spCurrency);
+        Spinner spMethod = row.findViewById(R.id.spMethod); 
+        TextInputEditText etAmount = row.findViewById(R.id.etAmount);
+        TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
+        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
-    // إعداد عملة الدفع
-    ArrayAdapter<String> currencyAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, CURRENCIES);
-    currencyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    spCurrency.setAdapter(currencyAdapter);
-    int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
-    spCurrency.setSelection(index >= 0 ? index : 0);
+        // إعداد عملة الدفع
+        ArrayAdapter<String> currencyAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, CURRENCIES);
+        currencyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spCurrency.setAdapter(currencyAdapter);
+        int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
+        spCurrency.setSelection(index >= 0 ? index : 0);
 
-    // ✅ إعداد طريقة الدفع
-    String[] methodsAr = {"نقداً (Cash)", "بنك (Bank)"};
-    String[] methodsEn = {"cash", "bank_transfer"}; // يجب أن تطابق الأكواد في السيرفر
-    ArrayAdapter<String> methodAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, methodsAr);
-    methodAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    spMethod.setAdapter(methodAdapter);
+        // ✅ إعداد طريقة الدفع (من القائمة الديناميكية)
+        setupMethodSpinner(spMethod);
 
-    Runnable updateEquivalent = () -> {
-        try {
-            int pos = spCurrency.getSelectedItemPosition();
-            if (pos >= 0) {
-                String curr = CURRENCIES[pos];
-                double rate = getRateToYER(curr);
-                double amt = getDoubleFromEditText(etAmount);
-                double base = amt * rate;
-                tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
+        Runnable updateEquivalent = () -> {
+            try {
+                int pos = spCurrency.getSelectedItemPosition();
+                if (pos >= 0) {
+                    String curr = CURRENCIES[pos];
+                    double rate = getRateToYER(curr);
+                    double amt = getDoubleFromEditText(etAmount);
+                    double base = amt * rate;
+                    tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
+                }
+            } catch (Exception ignored) {}
+        };
+
+        etAmount.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
+                updateEquivalent.run(); 
+                updateRemainingBalance(); 
             }
-        } catch (Exception ignored) {}
-    };
+            @Override public void afterTextChanged(Editable s) {}
+        });
+        
+        spCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { 
+                updateEquivalent.run(); 
+                updateRemainingBalance(); 
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
 
-    etAmount.addTextChangedListener(new TextWatcher() {
-        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-        @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
-            updateEquivalent.run(); 
-            updateRemainingBalance(); 
-        }
-        @Override public void afterTextChanged(Editable s) {}
-    });
-    
-    spCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-        @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { 
-            updateEquivalent.run(); 
-            updateRemainingBalance(); 
-        }
-        @Override public void onNothingSelected(AdapterView<?> parent) {}
-    });
+        btnRemove.setOnClickListener(v -> {
+            if (llPaymentsContainer.getChildCount() > 1) {
+                llPaymentsContainer.removeView(row);
+                paymentRows.remove(row);
+                updateRemainingBalance();
+            } else {
+                Toast.makeText(requireContext(), "يجب أن يبقى سطر دفع واحد على الأقل", Toast.LENGTH_SHORT).show();
+            }
+        });
 
-    btnRemove.setOnClickListener(v -> {
-        if (llPaymentsContainer.getChildCount() > 1) {
-            llPaymentsContainer.removeView(row);
-            paymentRows.remove(row);
-            updateRemainingBalance();
-        } else {
-            Toast.makeText(requireContext(), "يجب أن يبقى سطر دفع واحد على الأقل", Toast.LENGTH_SHORT).show();
-        }
-    });
-
-    paymentRows.add(row);
-    llPaymentsContainer.addView(row);
-    if (amount > 0) etAmount.setText(String.valueOf(amount));
-    updateEquivalent.run();
-}
+        paymentRows.add(row);
+        llPaymentsContainer.addView(row);
+        if (amount > 0) etAmount.setText(String.valueOf(amount));
+        updateEquivalent.run();
+    }
 
     private void updateRemainingBalance() {
         double totalPaidBase = 0;
@@ -235,13 +284,13 @@ private double getRateToYER(String currency) {
         
         if (Math.abs(remaining) < 1) {
             tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
-            tvRemaining.setTextColor(Color.parseColor("#16A34A")); // أخضر
+            tvRemaining.setTextColor(Color.parseColor("#16A34A"));
         } else if (remaining > 0) {
             tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
-            tvRemaining.setTextColor(Color.parseColor("#DC2626")); // أحمر
+            tvRemaining.setTextColor(Color.parseColor("#DC2626"));
         } else {
             tvRemaining.setText(String.format(Locale.US, "+ %,.2f YER", Math.abs(remaining)));
-            tvRemaining.setTextColor(Color.parseColor("#F59E0B")); // برتقالي
+            tvRemaining.setTextColor(Color.parseColor("#F59E0B"));
         }
     }
 
@@ -255,6 +304,7 @@ private double getRateToYER(String currency) {
         btnAddPayment.setEnabled(enabled);
         for (View row : paymentRows) {
             row.findViewById(R.id.spCurrency).setEnabled(enabled);
+            row.findViewById(R.id.spMethod).setEnabled(enabled);
             row.findViewById(R.id.etAmount).setEnabled(enabled);
             row.findViewById(R.id.btnRemove).setEnabled(enabled);
         }
@@ -272,35 +322,38 @@ private double getRateToYER(String currency) {
         double totalPaidBase = 0;
         
         for (View row : paymentRows) {
-    Spinner sp = row.findViewById(R.id.spCurrency);
-    Spinner spMethod = row.findViewById(R.id.spMethod); // ✅ الجديد
-    TextInputEditText et = row.findViewById(R.id.etAmount);
-    
-    int pos = sp.getSelectedItemPosition();
-    int posMethod = spMethod.getSelectedItemPosition(); // ✅ الجديد
-    double amount = getDoubleFromEditText(et);
-    
-    if (amount > 0 && pos >= 0) {
-        try {
-            String curr = CURRENCIES[pos];
-            double rate = getRateToYER(curr);
-            double base = amount * rate;
-            totalPaidBase += base;
+            Spinner sp = row.findViewById(R.id.spCurrency);
+            Spinner spMethod = row.findViewById(R.id.spMethod); 
+            TextInputEditText et = row.findViewById(R.id.etAmount);
             
-            JSONObject pObj = new JSONObject();
-            pObj.put("currency", curr);
-            pObj.put("amount", amount);
-            pObj.put("exchange_rate", rate);
-            pObj.put("base_amount", base);
+            int pos = sp.getSelectedItemPosition();
+            int posMethod = spMethod.getSelectedItemPosition();
+            double amount = getDoubleFromEditText(et);
             
-            // ✅ إضافة طريقة الدفع
-            String[] methodsEn = {"cash", "bank_transfer"};
-            pObj.put("method", methodsEn[posMethod >= 0 ? posMethod : 0]); 
-            
-            paymentsArray.put(pObj);
-        } catch (Exception e) { e.printStackTrace(); }
-    }
-}
+            if (amount > 0 && pos >= 0) {
+                try {
+                    String curr = CURRENCIES[pos];
+                    double rate = getRateToYER(curr);
+                    double base = amount * rate;
+                    totalPaidBase += base;
+                    
+                    JSONObject pObj = new JSONObject();
+                    pObj.put("currency", curr);
+                    pObj.put("amount", amount);
+                    pObj.put("exchange_rate", rate);
+                    pObj.put("base_amount", base);
+                    
+                    // ✅ إرسال كود طريقة الدفع الحقيقي (مثلاً WALLET_JAIB)
+                    if (posMethod >= 0 && posMethod < availableMethods.size()) {
+                        pObj.put("method", availableMethods.get(posMethod).optString("code", "CASH"));
+                    } else {
+                        pObj.put("method", "CASH");
+                    }
+                    
+                    paymentsArray.put(pObj);
+                } catch (Exception e) { e.printStackTrace(); }
+            }
+        }
 
         if (Math.abs(totalPaidBase - totalGoldValue) > 1) {
             Toast.makeText(requireContext(), "⚠️ إجمالي المدفوعات لا يطابق قيمة الذهب", Toast.LENGTH_LONG).show();
