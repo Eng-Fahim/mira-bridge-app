@@ -2506,21 +2506,22 @@ public ApiResponse getScrapPurchaseReceipt(int purchaseId) {
         return true; // Assume true if we can't check
     }
 
-    public ApiResponse getVouchers(String type, int branchId) {
-    String url = "/vouchers?branch_id=" + branchId;
-    if (type != null && !type.isEmpty()) url += "&type=" + type;
-    return getWithAuth(url);
-}
+        public ApiResponse getVouchers(String type, int branchId) {
+        String url = "/vouchers?branch_id=" + branchId;
+        if (type != null && !type.isEmpty()) url += "&type=" + type;
+        return getWithAuth(url);
+    }
 
-public ApiResponse createVoucher(JSONObject payload) {
-    return postWithAuth("/vouchers", payload);
-}
+    // ✅ تم تغيير الاسم إلى createVoucherDirect لتجنب التكرار مع الدالة السابقة
+    public ApiResponse createVoucherDirect(JSONObject payload) {
+        return postWithAuth("/vouchers", payload);
+    }
 
-public ApiResponse getVoucherAccounts() {
-    return getWithAuth("/vouchers/accounts");
-}
+    public ApiResponse getVoucherAccounts() {
+        return getWithAuth("/vouchers/accounts");
+    }
 
-public ApiResponse getVoucherParties() {
-    return getWithAuth("/vouchers/parties");
-}
+    public ApiResponse getVoucherParties() {
+        return getWithAuth("/vouchers/parties");
+    }
 }
