@@ -171,6 +171,11 @@ public class MiraTrialBalanceFragment extends Fragment {
                     renderKPIs(viewModel.getTrialBalance().getValue());
                     updateFooter(viewModel.getTrialBalance().getValue());
                 }
+                
+                TextView tvViewMode = getView().findViewById(R.id.tvViewMode);
+                if (tvViewMode != null) {
+                tvViewMode.setText(isGoldView ? "الوضع: ذهب 🥇" : "الوضع: مالي 💵");
+                }
 
                 filterData(etSearch.getText().toString());
             }
