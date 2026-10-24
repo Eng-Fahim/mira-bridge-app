@@ -2171,105 +2171,123 @@ private List<String> buildSearchCandidates(@NonNull String code) {
     }
 
     private JSONObject buildCheckoutPayload(MiraApiClient client,
-                                            POSCheckoutDialog.POSCheckoutData data)
-            throws Exception {
+                                        POSCheckoutDialog.POSCheckoutData data)
+        throws Exception {
 
-        JSONObject payload = new JSONObject();
+    JSONObject payload = new JSONObject();
 
-        payload.put("action", "COMPLETE_POS_SALE");
-        payload.put("gate_id", client != null ? client.getGateId() : "");
-        payload.put("branch_id", getActiveBranchId());
-        payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
+    payload.put("action", "COMPLETE_POS_SALE");
+    payload.put("gate_id", client != null ? client.getGateId() : "");
+    payload.put("branch_id", getActiveBranchId());
+    payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
 
-        // ✅ [FIX-UUID] إجباري دائماً
-        if (currentSaleUuid == null || currentSaleUuid.isEmpty()) {
-            currentSaleUuid = UUID.randomUUID().toString();
-        }
-        payload.put("local_uuid", currentSaleUuid);
-
-        payload.put("username", sessionManager != null
-                ? sessionManager.getUsername() : "");
-
-        String customerName = (data.customerName != null
-                && !data.customerName.trim().isEmpty())
-                ? data.customerName.trim()
-                : (isArabic ? "عميل نقدي" : "Cash Customer");
-
-        String customerPhone = (data.customerPhone != null
-                && !data.customerPhone.trim().isEmpty()
-                && !"—".equals(data.customerPhone.trim()))
-                ? data.customerPhone.trim() : "";
-
-        payload.put("customer_name", customerName);
-        payload.put("customer_phone", customerPhone);
-
-        JSONObject customerObj = new JSONObject();
-        customerObj.put("name", customerName);
-        customerObj.put("phone", customerPhone);
-        customerObj.put("email", data.customerEmail != null ? data.customerEmail : "");
-        customerObj.put("address", data.customerAddress != null ? data.customerAddress : "");
-        customerObj.put("notes", data.customerNotes != null ? data.customerNotes : "");
-        customerObj.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
-        payload.put("customer", customerObj);
-
-        JSONArray itemsArr = new JSONArray();
-        for (CartItem item : cartManager.getItems()) {
-            if (item == null) continue;
-
-            JSONObject obj = item.toJson();
-            if (obj.optString("serial_no", "").isEmpty()) {
-                String fallback = !item.tid.isEmpty() ? item.tid
-                        : !item.rfidEpc.isEmpty() ? item.rfidEpc
-                        : item.epc;
-                obj.put("serial_no", fallback != null ? fallback : "");
-            }
-            itemsArr.put(obj);
-        }
-        payload.put("items", itemsArr);
-        payload.put("item_count", cartManager.size());
-
-        String currencyCode = priceManager.getDefaultCurrency();
-        double exchangeRate = priceManager.getExchangeRate(currencyCode);
-
-        double subtotalUsd = data.originalTotal;
-        double discountUsd = data.discountAmount;
-        double finalUsd    = data.finalAmount;
-
-        double subtotalLocal = priceManager.convertFromUSD(subtotalUsd, currencyCode);
-        double discountLocal = priceManager.convertFromUSD(discountUsd, currencyCode);
-        double finalLocal    = priceManager.convertFromUSD(finalUsd, currencyCode);
-
-        if (exchangeRate <= 0) {
-            exchangeRate = 530.0;
-            subtotalLocal = subtotalUsd * exchangeRate;
-            discountLocal = discountUsd * exchangeRate;
-            finalLocal    = finalUsd * exchangeRate;
-        }
-
-        payload.put("subtotal_usd", subtotalUsd);
-        payload.put("discount_usd", discountUsd);
-        payload.put("total_usd", finalUsd);
-        payload.put("total_amount_usd", finalUsd);
-        payload.put("subtotal", subtotalLocal);
-        payload.put("discount", discountLocal);
-        payload.put("total", finalLocal);
-        payload.put("total_amount", finalLocal);
-
-        JSONObject payment = new JSONObject();
-        payment.put("subtotal_usd", subtotalUsd);
-        payment.put("discount_amount_usd", discountUsd);
-        payment.put("final_amount_usd", finalUsd);
-        payment.put("subtotal", subtotalLocal);
-        payment.put("discount_amount", discountLocal);
-        payment.put("final_amount", finalLocal);
-        payment.put("exchange_rate", exchangeRate);
-        payment.put("currency_code", currencyCode);
-        payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
-        payload.put("payment", payment);
-
-        payload.put("notes", isArabic ? "بيع POS" : "POS Sale");
-        return payload;
+    // ✅ [FIX-UUID] إجباري دائماً
+    if (currentSaleUuid == null || currentSaleUuid.isEmpty()) {
+        currentSaleUuid = UUID.randomUUID().toString();
     }
+    payload.put("local_uuid", currentSaleUuid);
+
+    payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
+
+    String customerName = (data.customerName != null && !data.customerName.trim().isEmpty())
+            ? data.customerName.trim()
+            : (isArabic ? "عميل نقدي" : "Cash Customer");
+
+    String customerPhone = (data.customerPhone != null && !data.customerPhone.trim().isEmpty()
+            && !"—".equals(data.customerPhone.trim()))
+            ? data.customerPhone.trim() : "";
+
+    payload.put("customer_name", customerName);
+    payload.put("customer_phone", customerPhone);
+
+    JSONObject customerObj = new JSONObject();
+    customerObj.put("name", customerName);
+    customerObj.put("phone", customerPhone);
+    customerObj.put("email", data.customerEmail != null ? data.customerEmail : "");
+    customerObj.put("address", data.customerAddress != null ? data.customerAddress : "");
+    customerObj.put("notes", data.customerNotes != null ? data.customerNotes : "");
+    customerObj.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
+    // ✅ [جديد] الخصم داخل بيانات العميل (يقرأه السيرفر)
+    customerObj.put("discount_amount_usd", data.discountAmount);
+    payload.put("customer", customerObj);
+
+    // ═══════════════════════════════════════════════════════
+    //  العناصر
+    // ═══════════════════════════════════════════════════════
+    JSONArray itemsArr = new JSONArray();
+    for (CartItem item : cartManager.getItems()) {
+        if (item == null) continue;
+
+        JSONObject obj = item.toJson();
+        if (obj.optString("serial_no", "").isEmpty()) {
+            String fallback = !item.tid.isEmpty() ? item.tid
+                    : !item.rfidEpc.isEmpty() ? item.rfidEpc
+                    : item.epc;
+            obj.put("serial_no", fallback != null ? fallback : "");
+        }
+        itemsArr.put(obj);
+    }
+    payload.put("items", itemsArr);
+    payload.put("item_count", cartManager.size());
+
+    // ═══════════════════════════════════════════════════════
+    //  المبالغ (بالدولار واليمني)
+    // ═══════════════════════════════════════════════════════
+    double subtotalUsd = data.originalTotal;
+    double discountUsd = data.discountAmount;
+    double finalUsd    = data.finalAmount;
+
+    // سعر صرف YER (العملة الأساسية للسيرفر)
+    double yerRate = priceManager.getExchangeRate("YER");
+    if (yerRate <= 0) yerRate = 530.0;
+
+    payload.put("subtotal_usd", subtotalUsd);
+    payload.put("discount_usd", discountUsd);
+    payload.put("total_usd", finalUsd);
+    payload.put("total_amount_usd", finalUsd);
+    payload.put("subtotal", subtotalUsd * yerRate);
+    payload.put("discount", discountUsd * yerRate);
+    payload.put("total", finalUsd * yerRate);
+    payload.put("total_amount", finalUsd * yerRate);
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ [جديد] مصفوفة المدفوعات المتعددة
+    // ═══════════════════════════════════════════════════════
+    JSONArray paymentsArray = new JSONArray();
+    if (data.payments != null && data.payments.length() > 0) {
+        paymentsArray = data.payments;
+    } else {
+        // Fallback: إذا لم تصل مصفوفة من الحوار، استخدم الدفع بعملة واحدة
+        String defaultCurrency = priceManager.getDefaultCurrency();
+        double defaultRate = priceManager.getExchangeRate(defaultCurrency);
+        if (defaultRate <= 0) defaultRate = yerRate;
+
+        JSONObject pObj = new JSONObject();
+        pObj.put("currency", defaultCurrency);
+        pObj.put("amount", finalUsd * yerRate / defaultRate);
+        pObj.put("exchange_rate", defaultRate);
+        pObj.put("base_amount", finalUsd * yerRate);
+        pObj.put("method", data.paymentMethod != null ? data.paymentMethod : "cash");
+        paymentsArray.put(pObj);
+    }
+    payload.put("payments", paymentsArray);
+
+    // ✅ الحفاظ على payment object القديم للتوافق
+    JSONObject payment = new JSONObject();
+    payment.put("subtotal_usd", subtotalUsd);
+    payment.put("discount_amount_usd", discountUsd);
+    payment.put("final_amount_usd", finalUsd);
+    payment.put("subtotal", subtotalUsd * yerRate);
+    payment.put("discount_amount", discountUsd * yerRate);
+    payment.put("final_amount", finalUsd * yerRate);
+    payment.put("exchange_rate", yerRate);
+    payment.put("currency_code", "YER");
+    payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
+    payload.put("payment", payment);
+
+    payload.put("notes", isArabic ? "بيع POS" : "POS Sale");
+    return payload;
+}
 
     private void showReceipt(MiraApiClient.ApiResponse response) {
         try {
@@ -2978,7 +2996,7 @@ private String extractCodeForRefund(JSONObject data) {
                 }
                 openBarcodeScanner();
                 break;
-            case RFID:
+                                            case RFID:
                 if (heroController != null) {
                     heroController.setState(PosHeroController.State.RFID_LISTENING);
                     heroController.resetRfidCount();
