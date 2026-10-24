@@ -2429,7 +2429,10 @@ public ApiResponse saveScrapPurchase(JSONObject payload) {
 public ApiResponse createScrapBatch(JSONObject payload) {
     return postWithAuth("/scrap/batches", payload);
 }
-
+// ==================== دفعات تصفية الكسر ====================
+public ApiResponse getScrapBatches(int branchId) {
+    return getWithAuth("/scrap/batches?branch_id=" + branchId);
+}
 public ApiResponse sendScrapBatch(int batchId) {
     return postWithAuth("/scrap/batches/" + batchId + "/send", new JSONObject());
 }
