@@ -36,7 +36,7 @@ import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.RecentActivityCache;
 import com.example.uhf.dialog.ActivityDetailsBottomSheet;
-
+import com.example.uhf.navigation.NavigationManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
