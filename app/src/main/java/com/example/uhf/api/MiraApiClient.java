@@ -2444,4 +2444,11 @@ public ApiResponse getScrapProfitReport(int branchId, String fromDate, String to
     return getWithAuth("/scrap/profit-report?branch_id=" + branchId 
         + "&from=" + fromDate + "&to=" + toDate);
 }    
+    public ApiResponse getCashReconciliationSummary(int branchId, String date) {
+    return getWithAuth("/cash-reconciliation/daily?branch_id=" + branchId + "&date=" + date);
+}
+
+public ApiResponse closeCashier(JSONObject payload) {
+    return postWithAuth("/cash-reconciliation/close", payload);
+}
 }
