@@ -18,6 +18,7 @@ public class POSManager {
 
     private static final String TAG = "POSManager";
     private static final String PREFS_OFFLINE = "pos_offline_sales_branch_";
+    
     public interface CheckoutCallback {
         void onSuccess(MiraApiClient.ApiResponse response);
         void onOfflineSuccess(String saleId);
@@ -136,10 +137,9 @@ public class POSManager {
         payload.put("items", itemsArr);
 
         // ═══════════════════════════════════════════════════════
-        // ✅ [جديد] إرسال مصفوفة المدفوعات المتعددة (عملات + طرق)
+        // ✅ إرسال مصفوفة المدفوعات المتعددة (عملات + طرق)
         // ═══════════════════════════════════════════════════════
         JSONArray paymentsArray = new JSONArray();
-        public String localUuid = ""; 
         if (data.payments != null && data.payments.length() > 0) {
             paymentsArray = data.payments;
         } else {
@@ -160,7 +160,7 @@ public class POSManager {
         payment.put("discount_amount_usd", data.discountAmount);
         payment.put("final_amount_usd", data.finalAmount);
         payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
-        // إضافة إجمالي المدفوعات كـ base_amount للتوافق مع التحققات القديمة إن وجدت
+        
         double totalBase = 0;
         for (int i = 0; i < paymentsArray.length(); i++) {
             totalBase += paymentsArray.optJSONObject(i).optDouble("base_amount", 0);
