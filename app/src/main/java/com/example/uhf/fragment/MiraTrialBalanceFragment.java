@@ -76,6 +76,8 @@ public class MiraTrialBalanceFragment extends Fragment {
     private String currentFromDate;
     private String currentToDate;
     private int currentBranchId = 0;
+    
+    private SwitchMaterial switchHideZero; // ✅ المتغير الجديد
 
     // Dynamic branches
     private final List<Integer> branchIds = new ArrayList<>();
@@ -96,6 +98,7 @@ public class MiraTrialBalanceFragment extends Fragment {
         btnExport = v.findViewById(R.id.btnExport);
         tabLayout = v.findViewById(R.id.tabLayout);
         cbLeafOnly = v.findViewById(R.id.cbLeafOnly);
+        switchHideZero = v.findViewById(R.id.switchHideZero);
         spinnerBranch = v.findViewById(R.id.spinnerBranch);
         pbLoading = v.findViewById(R.id.pbLoading);
         cardBalanceStatus = v.findViewById(R.id.cardBalanceStatus);
@@ -149,6 +152,9 @@ public class MiraTrialBalanceFragment extends Fragment {
         if (cbLeafOnly != null) {
             cbLeafOnly.setOnCheckedChangeListener((buttonView, isChecked) -> filterData(etSearch.getText().toString()));
         }
+        if (switchHideZero != null) {
+           switchHideZero.setOnCheckedChangeListener((buttonView, isChecked) -> filterData(etSearch.getText().toString()));
+           }
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
@@ -374,30 +380,54 @@ public class MiraTrialBalanceFragment extends Fragment {
     }
 
     private void filterData(String query) {
-        if (originalRows == null) return;
-        List<TrialBalanceDto.TrialBalanceRow> filtered = new ArrayList<>();
-        boolean leafOnly = cbLeafOnly != null && cbLeafOnly.isChecked();
+    if (originalRows == null) return;
+    List<TrialBalanceDto.TrialBalanceRow> filtered = new ArrayList<>();
+    
+    boolean leafOnly = cbLeafOnly != null && cbLeafOnly.isChecked();
+    boolean hideZero = switchHideZero != null && switchHideZero.isChecked(); // ✅ قراءة حالة الزر
 
-        for (TrialBalanceDto.TrialBalanceRow row : originalRows) {
-            if (leafOnly && !row.isLeaf) continue;
-            if (!query.isEmpty()) {
-                String lowerQuery = query.toLowerCase().trim();
-                boolean matchesCode = row.accountCode != null && row.accountCode.toLowerCase().contains(lowerQuery);
-                boolean matchesName = row.accountNameAr != null && row.accountNameAr.toLowerCase().contains(lowerQuery);
-                if (!matchesCode && !matchesName) continue;
+    for (TrialBalanceDto.TrialBalanceRow row : originalRows) {
+        if (leafOnly && !row.isLeaf) continue;
+        
+        // ✅ منطق إخفاء الحسابات الصفرية
+        if (hideZero) {
+            // فحص هل هناك أي حركة مالية أو وزنية (نتجاهل الكسور الصغيرة جداً)
+            boolean hasMoney = 
+                Math.abs(row.openingDebit) > 0.01 || Math.abs(row.openingCredit) > 0.01 ||
+                Math.abs(row.periodDebit) > 0.01 || Math.abs(row.periodCredit) > 0.01 ||
+                Math.abs(row.closingDebit) > 0.01 || Math.abs(row.closingCredit) > 0.01;
+                
+            boolean hasGold = 
+                Math.abs(row.openingGoldDebit) > 0.001 || Math.abs(row.openingGoldCredit) > 0.001 ||
+                Math.abs(row.periodGoldDebit) > 0.001 || Math.abs(row.periodGoldCredit) > 0.001 ||
+                Math.abs(row.closingGoldDebit) > 0.001 || Math.abs(row.closingGoldCredit) > 0.001;
+
+            // إذا لم يكن هناك نقود ولا ذهب، نتجاهل هذا السطر
+            if (!hasMoney && !hasGold) {
+                continue; 
             }
-            filtered.add(row);
         }
 
-        if (!filtered.isEmpty()) {
-            adapter.setItems(filtered);
-            tvEmpty.setVisibility(View.GONE);
-            rvRows.setVisibility(View.VISIBLE);
-        } else {
-            tvEmpty.setVisibility(View.VISIBLE);
-            rvRows.setVisibility(View.GONE);
+        // فلترة البحث بالاسم أو الكود
+        if (!query.isEmpty()) {
+            String lowerQuery = query.toLowerCase().trim();
+            boolean matchesCode = row.accountCode != null && row.accountCode.toLowerCase().contains(lowerQuery);
+            boolean matchesName = row.accountNameAr != null && row.accountNameAr.toLowerCase().contains(lowerQuery);
+            if (!matchesCode && !matchesName) continue;
         }
+        
+        filtered.add(row);
     }
+
+    if (!filtered.isEmpty()) {
+        adapter.setItems(filtered);
+        tvEmpty.setVisibility(View.GONE);
+        rvRows.setVisibility(View.VISIBLE);
+    } else {
+        tvEmpty.setVisibility(View.VISIBLE);
+        rvRows.setVisibility(View.GONE);
+    }
+}
 
     private void addKpi(String title, String value, String color) {
         View card = LayoutInflater.from(getContext()).inflate(R.layout.kpi_card, kpiContainer, false);
