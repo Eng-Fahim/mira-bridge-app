@@ -2333,42 +2333,43 @@ private List<String> buildSearchCandidates(@NonNull String code) {
     // ═══════════════════════════════════════════════════════════════════
 
     private void showRefundDialog() {
-        if (!isFragmentAlive()) return;
-        if (!canPerformRefund()) {
-            showToast(isArabic ? "⛔ غير مصرح بالاسترجاع" : "⛔ Not authorized to refund");
-            return;
-        }
-
-        try {
-            selectedRefundItem.set(null);
-            isRefundDialogHiddenForScan = false;
-
-            refundDialog = new RefundDialog(requireContext(),
-                    new RefundDialog.RefundCallback() {
-                @Override
-                public void onRefundConfirm(String code, String reason) {
-                    processRefund(code, reason);
-                }
-
-                @Override
-                public void onBarcodeScan() {
-                    isRefundDialogHiddenForScan = true;
-                    if (refundDialog != null) refundDialog.hide();
-                    openRefundBarcodeScanner();
-                }
-
-                @Override
-                public void onCodeChanged(String code) {
-                    searchItemForRefund(code);
-                }
-            });
-
-            refundDialog.setOnHardwareKeyListener((d, k, e) -> myOnKeyDwon(k, e));
-            refundDialog.show();
-        } catch (Exception e) {
-            Log.e(TAG, "showRefundDialog error", e);
-        }
+    if (!isFragmentAlive()) return;
+    if (!canPerformRefund()) {
+        showToast(isArabic ? "⛔ غير مصرح بالاسترجاع" : "⛔ Not authorized to refund");
+        return;
     }
+
+    try {
+        selectedRefundItem.set(null);
+        isRefundDialogHiddenForScan = false;
+
+        refundDialog = new RefundDialog(requireContext(),
+                new RefundDialog.RefundCallback() {
+            @Override
+            public void onRefundConfirm(String code, String reason, String refundMethodCode) {
+                // ✅ تمرير طريقة الإرجاع للدالة
+                processRefund(code, reason, refundMethodCode);
+            }
+
+            @Override
+            public void onBarcodeScan() {
+                isRefundDialogHiddenForScan = true;
+                if (refundDialog != null) refundDialog.hide();
+                openRefundBarcodeScanner();
+            }
+
+            @Override
+            public void onCodeChanged(String code) {
+                searchItemForRefund(code);
+            }
+        });
+
+        refundDialog.setOnHardwareKeyListener((d, k, e) -> myOnKeyDwon(k, e));
+        refundDialog.show();
+    } catch (Exception e) {
+        Log.e(TAG, "showRefundDialog error", e);
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  ✅ [جديد] استقبال البيانات من لوحة التحكم وفتح الاسترجاع تلقائياً
@@ -2702,107 +2703,111 @@ private String extractCodeForRefund(JSONObject data) {
         }
     }
 
-    private void processRefund(final String code, final String reason) {
-        if (!isFragmentAlive()) return;
-        if (!canPerformRefund()) {
-            showToast(isArabic ? "⛔ غير مصرح بالاسترجاع" : "⛔ Not authorized");
-            return;
-        }
+    private void processRefund(final String code, final String reason, final String refundMethodCode) {
+    if (!isFragmentAlive()) return;
+    if (!canPerformRefund()) {
+        showToast(isArabic ? "⛔ غير مصرح بالاسترجاع" : "⛔ Not authorized");
+        return;
+    }
 
-        if (!isRefundInProgress.compareAndSet(false, true)) return;
+    if (!isRefundInProgress.compareAndSet(false, true)) return;
 
-        final AlertDialog loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic);
-        final RefundItem itemToRefund = selectedRefundItem.get();
+    final AlertDialog loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic);
+    final RefundItem itemToRefund = selectedRefundItem.get();
 
-        try {
-            miraExecutor.getNetworkExecutor().execute(() -> {
-                try {
-                    Context ctx = getSafeAppContext();
-                    if (ctx == null) return;
+    try {
+        miraExecutor.getNetworkExecutor().execute(() -> {
+            try {
+                Context ctx = getSafeAppContext();
+                if (ctx == null) return;
 
-                    JSONObject payload = new JSONObject();
-                    payload.put("code", code != null ? code.trim() : "");
-                    payload.put("epc", itemToRefund != null && itemToRefund.epc != null
-                            ? itemToRefund.epc : code);
-                    payload.put("serial_no", itemToRefund != null && itemToRefund.serialNo != null
-                            ? itemToRefund.serialNo : "");
-                    payload.put("item_id", itemToRefund != null ? itemToRefund.itemId : 0);
-                    payload.put("sale_id", itemToRefund != null ? itemToRefund.saleId : 0);
-                    payload.put("original_price_usd", itemToRefund != null ? itemToRefund.originalPrice : 0);
-                    payload.put("reason", reason != null ? reason : "customer_request");
-                    payload.put("refund_type", "full");
-                    payload.put("branch_id", getActiveBranchId());
-                    payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
-                    payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
-                    payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
-                    payload.put("timestamp", System.currentTimeMillis());
+                JSONObject payload = new JSONObject();
+                payload.put("code", code != null ? code.trim() : "");
+                payload.put("epc", itemToRefund != null && itemToRefund.epc != null
+                        ? itemToRefund.epc : code);
+                payload.put("serial_no", itemToRefund != null && itemToRefund.serialNo != null
+                        ? itemToRefund.serialNo : "");
+                payload.put("item_id", itemToRefund != null ? itemToRefund.itemId : 0);
+                payload.put("sale_id", itemToRefund != null ? itemToRefund.saleId : 0);
+                payload.put("original_price_usd", itemToRefund != null ? itemToRefund.originalPrice : 0);
+                payload.put("reason", reason != null ? reason : "customer_request");
+                payload.put("refund_type", "full");
+                
+                // ✅ إضافة طريقة الإرجاع للسيرفر
+                payload.put("refund_method", refundMethodCode != null ? refundMethodCode : "CASH");
+                
+                payload.put("branch_id", getActiveBranchId());
+                payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
+                payload.put("gate_id", apiClient != null ? apiClient.getGateId() : "");
+                payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
+                payload.put("timestamp", System.currentTimeMillis());
 
-                    MiraApiClient client = MiraApiClient.getInstance(ctx);
-                    MiraApiClient.ApiResponse response = client.processRefund(payload);
+                MiraApiClient client = MiraApiClient.getInstance(ctx);
+                MiraApiClient.ApiResponse response = client.processRefund(payload);
 
-                    safeRun(() -> {
-                        PosUIManager.dismissDialog(loadingDialog);
-                        if (refundDialog != null && refundDialog.isShowing()) refundDialog.dismiss();
+                safeRun(() -> {
+                    PosUIManager.dismissDialog(loadingDialog);
+                    if (refundDialog != null && refundDialog.isShowing()) refundDialog.dismiss();
 
-                        if (response != null && response.isSuccess) {
-                            restoreItemToCache(code, itemToRefund);
-                            final RefundItem refunded = itemToRefund;
-                            Context appCtx = getSafeAppContext();
-                            if (appCtx != null) {
-                                GateSaleBridge.onRefundCompleted(appCtx,
-                                        refunded != null ? refunded.epc : code,
-                                        refunded != null ? refunded.serialNo : null,
-                                        refunded != null ? refunded.saleId : 0L,
-                                        getActiveBranchId(),
-                                        sessionManager != null ? sessionManager.getUserId() : 0,
-                                        reason);
-                            }
-                            PosUIManager.showResultDialog(requireContext(),
-                                    getString(R.string.pos_dialog_refund_success_title),
-                                    getString(R.string.pos_dialog_refund_success_msg), true, isArabic);
-                            PosUIManager.notifyDataChanged(requireContext(), "refund", getActiveBranchId());
-                            selectedRefundItem.set(null);
-                        } else {
-                            String errMsg = "Unknown error";
-                            if (response != null && response.error != null) {
-                                try {
-                                    JSONObject errObj = new JSONObject(response.error);
-                                    JSONObject errorData = errObj.optJSONObject("error");
-                                    if (errorData != null) {
-                                        errMsg = isArabic
-                                                ? errorData.optString("message")
-                                                : errorData.optString("message_en");
-                                    } else {
-                                        errMsg = response.error;
-                                    }
-                                } catch (Exception e) {
+                    if (response != null && response.isSuccess) {
+                        restoreItemToCache(code, itemToRefund);
+                        final RefundItem refunded = itemToRefund;
+                        Context appCtx = getSafeAppContext();
+                        if (appCtx != null) {
+                            GateSaleBridge.onRefundCompleted(appCtx,
+                                    refunded != null ? refunded.epc : code,
+                                    refunded != null ? refunded.serialNo : null,
+                                    refunded != null ? refunded.saleId : 0L,
+                                    getActiveBranchId(),
+                                    sessionManager != null ? sessionManager.getUserId() : 0,
+                                    reason);
+                        }
+                        PosUIManager.showResultDialog(requireContext(),
+                                getString(R.string.pos_dialog_refund_success_title),
+                                getString(R.string.pos_dialog_refund_success_msg), true, isArabic);
+                        PosUIManager.notifyDataChanged(requireContext(), "refund", getActiveBranchId());
+                        selectedRefundItem.set(null);
+                    } else {
+                        String errMsg = "Unknown error";
+                        if (response != null && response.error != null) {
+                            try {
+                                JSONObject errObj = new JSONObject(response.error);
+                                JSONObject errorData = errObj.optJSONObject("error");
+                                if (errorData != null) {
+                                    errMsg = isArabic
+                                            ? errorData.optString("message")
+                                            : errorData.optString("message_en");
+                                } else {
                                     errMsg = response.error;
                                 }
+                            } catch (Exception e) {
+                                errMsg = response.error;
                             }
-                            PosUIManager.showResultDialog(requireContext(),
-                                    getString(R.string.pos_dialog_refund_failed_title),
-                                    errMsg, false, isArabic);
                         }
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "processRefund error", e);
-                    safeRun(() -> {
-                        PosUIManager.dismissDialog(loadingDialog);
-                        if (isFragmentAlive()) {
-                            PosUIManager.showResultDialog(requireContext(),
-                                    getString(R.string.pos_dialog_error_title),
-                                    e.getMessage(), false, isArabic);
-                        }
-                    });
-                } finally {
-                    isRefundInProgress.set(false);
-                }
-            });
-        } catch (Exception e) {
-            isRefundInProgress.set(false);
-            Log.e(TAG, "processRefund submit error", e);
-        }
+                        PosUIManager.showResultDialog(requireContext(),
+                                getString(R.string.pos_dialog_refund_failed_title),
+                                errMsg, false, isArabic);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "processRefund error", e);
+                safeRun(() -> {
+                    PosUIManager.dismissDialog(loadingDialog);
+                    if (isFragmentAlive()) {
+                        PosUIManager.showResultDialog(requireContext(),
+                                getString(R.string.pos_dialog_error_title),
+                                e.getMessage(), false, isArabic);
+                    }
+                });
+            } finally {
+                isRefundInProgress.set(false);
+            }
+        });
+    } catch (Exception e) {
+        isRefundInProgress.set(false);
+        Log.e(TAG, "processRefund submit error", e);
     }
+}
 
     private void restoreItemToCache(String code, RefundItem item) {
         try {
