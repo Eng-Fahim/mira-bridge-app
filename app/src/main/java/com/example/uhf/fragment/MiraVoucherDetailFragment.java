@@ -15,7 +15,7 @@ import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment; // ✅ تم إضافة الاستيراد
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONArray;
@@ -23,7 +23,6 @@ import org.json.JSONObject;
 
 import java.util.Locale;
 
-// ✅ تم تغيير الوراثة هنا
 public class MiraVoucherDetailFragment extends BottomSheetDialogFragment {
 
     private static final String TAG = "VoucherDetail";
@@ -166,12 +165,13 @@ public class MiraVoucherDetailFragment extends BottomSheetDialogFragment {
             TextView tvDebit = row.findViewById(R.id.tvLineDebit);
             TextView tvCredit = row.findViewById(R.id.tvLineCredit);
             
-            // ⚠️ ملاحظة: تأكد من أن ملف item_journal_line.xml يحتوي على TextView بالمعرف tvLineDesc
-            // وإلا قم بتغيير الاسم هنا ليطابق الاسم الموجود في الـ XML (مثلاً tvDescription)
-            TextView tvDesc = row.findViewById(R.id.tvLineDesc); 
+            // ✅ تم تصحيح اسم المعرف هنا ليطابق ملف الـ XML
+            TextView tvDesc = row.findViewById(R.id.tvLineDescription); 
 
             tvAcc.setText(accCode + " - " + accName);
-            if(tvDesc != null) tvDesc.setText(desc);
+            if (tvDesc != null) {
+                tvDesc.setText(desc);
+            }
             
             // Debit
             if (debit > 0) {
