@@ -31,7 +31,7 @@ import java.util.Locale;
 public class MiraCashReconciliationFragment extends Fragment {
 
     private SwipeRefreshLayout swipeRefresh;
-    private TextView tvDate, tvOpening, tvSales, tvScrap, tvExpected, tvDifference;
+    private TextView tvDate, tvOpening, tvSales, tvReceipts, tvScrap, tvPayments, tvExpected, tvDifference;
     private TextInputEditText etActualCash;
     private MaterialCardView cardDifference;
     private MaterialButton btnCloseCashier;
@@ -39,9 +39,7 @@ public class MiraCashReconciliationFragment extends Fragment {
     private double expectedClosing = 0;
     private boolean isClosed = false;
     private String currentDate;
-    
-    // ✅ العملة الافتراضية (يمكنك جلبها من الإعدادات لاحقاً)
-    private final String CURRENCY = "YER"; 
+    private final String CURRENCY = "YER";
 
     @Nullable
     @Override
@@ -62,7 +60,9 @@ public class MiraCashReconciliationFragment extends Fragment {
         tvDate          = v.findViewById(R.id.tvDate);
         tvOpening       = v.findViewById(R.id.tvOpening);
         tvSales         = v.findViewById(R.id.tvSales);
+        tvReceipts      = v.findViewById(R.id.tvReceipts);   // ✅ جديد
         tvScrap         = v.findViewById(R.id.tvScrap);
+        tvPayments      = v.findViewById(R.id.tvPayments);   // ✅ جديد
         tvExpected      = v.findViewById(R.id.tvExpected);
         tvDifference    = v.findViewById(R.id.tvDifference);
         etActualCash    = v.findViewById(R.id.etActualCash);
@@ -84,7 +84,6 @@ public class MiraCashReconciliationFragment extends Fragment {
         btnCloseCashier.setOnClickListener(v -> submitClosure());
     }
 
-    // ✅ دالة مساعدة لتنسيق المبالغ بشكل موحد
     private String formatMoney(double amount) {
         String formatted;
         if (amount < 0) {
@@ -101,27 +100,19 @@ public class MiraCashReconciliationFragment extends Fragment {
         double actual = 0;
         try {
             String input = etActualCash.getText() != null ? etActualCash.getText().toString().trim() : "";
-            if (!input.isEmpty() && !input.equals(".")) {
-                actual = Double.parseDouble(input);
-            }
-        } catch (NumberFormatException e) {
-            // ✅ تجاهل الأخطاء أثناء الكتابة (مثل كتابة نقطة فقط)
-        }
+            if (!input.isEmpty() && !input.equals(".")) actual = Double.parseDouble(input);
+        } catch (NumberFormatException ignored) {}
 
         double diff = actual - expectedClosing;
-
         tvDifference.setText(formatMoney(diff));
         
         int color, bgColor;
         if (Math.abs(diff) < 0.01) { 
-            color = 0xFF16A34A; // أخضر
-            bgColor = 0xFFF0FDF4;
+            color = 0xFF16A34A; bgColor = 0xFFF0FDF4;
         } else if (diff < 0) { 
-            color = 0xFFDC2626; // أحمر
-            bgColor = 0xFFFEF2F2;
+            color = 0xFFDC2626; bgColor = 0xFFFEF2F2;
         } else { 
-            color = 0xFFF59E0B; // برتقالي
-            bgColor = 0xFFFFFBEB;
+            color = 0xFFF59E0B; bgColor = 0xFFFFFBEB;
         }
         
         tvDifference.setTextColor(color);
@@ -148,10 +139,11 @@ public class MiraCashReconciliationFragment extends Fragment {
                         if (data != null) {
                             expectedClosing = data.optDouble("expected_closing", 0);
                             
-                            // ✅ استخدام دالة التنسيق بدلاً من $
                             tvOpening.setText(formatMoney(data.optDouble("opening_balance", 0)));
                             tvSales.setText("+ " + formatMoney(data.optDouble("total_sales_cash", 0)));
+                            tvReceipts.setText("+ " + formatMoney(data.optDouble("total_receipts_cash", 0))); // ✅
                             tvScrap.setText("- " + formatMoney(data.optDouble("total_scrap_cash", 0)));
+                            tvPayments.setText("- " + formatMoney(data.optDouble("total_payments_cash", 0))); // ✅
                             tvExpected.setText(formatMoney(expectedClosing));
                             
                             if (closed) {
@@ -168,9 +160,7 @@ public class MiraCashReconciliationFragment extends Fragment {
                                 tvDifference.setTextColor(diff >= 0 ? 0xFF16A34A : 0xFFDC2626);
                             }
                         }
-                    } catch (Exception e) { 
-                        e.printStackTrace(); 
-                    }
+                    } catch (Exception e) { e.printStackTrace(); }
                 } else {
                     Toast.makeText(requireContext(), "فشل تحميل بيانات الخزينة", Toast.LENGTH_SHORT).show();
                 }
@@ -186,9 +176,8 @@ public class MiraCashReconciliationFragment extends Fragment {
         }
 
         double actual;
-        try {
-            actual = Double.parseDouble(input);
-        } catch (NumberFormatException e) {
+        try { actual = Double.parseDouble(input); } 
+        catch (NumberFormatException e) {
             Toast.makeText(requireContext(), "الرجاء إدخال رقم صحيح", Toast.LENGTH_SHORT).show();
             return;
         }
