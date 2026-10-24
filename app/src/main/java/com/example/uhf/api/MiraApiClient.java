@@ -2524,4 +2524,7 @@ public ApiResponse getScrapPurchaseReceipt(int purchaseId) {
     public ApiResponse getVoucherParties() {
         return getWithAuth("/vouchers/parties");
     }
+    public ApiResponse getVoucherDetail(int voucherId) {
+    return getWithAuth("/vouchers/" + voucherId);
+}
 }
