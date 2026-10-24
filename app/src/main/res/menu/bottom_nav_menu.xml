@@ -21,10 +21,11 @@
     android:id="@+id/nav_scrap"
     android:icon="@drawable/ic_diamond"
     android:title="@string/nav_scrap" />
-    <item
+    <!--<item
         android:id="@+id/nav_transfers"
         android:icon="@drawable/ic_gate"
-        android:title="@string/nav_gates" />
+        android:title="@string/nav_gates" />-->
+    
 
 
 </menu>
