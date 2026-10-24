@@ -59,7 +59,8 @@ public class NavigationManager {
     public static final String TAG_VOUCHERS = "Vouchers";
     public static final String TAG_PARTIES = "Parties";
     public static final String TAG_SCRAP_HISTORY = "ScrapHistory";
-
+    public static final String TAG_SCRAP_AGING = "ScrapAging";
+    
     public static final String TAG_RADAR             = "Radar";
     public static final String TAG_SECURE_GATE       = "SecureGate";
     public static final String TAG_GATES             = "Gates";
@@ -446,7 +447,7 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_CASH_RECONCILIATION: return new MiraCashReconciliationFragment();
         case TAG_VOUCHERS: return new MiraVouchersFragment();
         case TAG_PARTIES: return new MiraPartiesListFragment();
-
+        case TAG_SCRAP_AGING: return new MiraScrapAgingFragment();
         default:
             log("Unknown tag: " + tag + " → Dashboard");
             return new MiraDashboardFragment();
