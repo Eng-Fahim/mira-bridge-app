@@ -56,6 +56,8 @@ public class NavigationManager {
     public static final String TAG_IDENTITY_STUDIO   = "IdentityStudio";
     public static final String TAG_SCRAP_BATCHES = "ScrapBatches";
     public static final String TAG_SCRAP_PROFIT_REPORT = "ScrapProfitReport";
+    
+    public static final String TAG_SCRAP_HISTORY = "ScrapHistory";
 
     public static final String TAG_RADAR             = "Radar";
     public static final String TAG_SECURE_GATE       = "SecureGate";
@@ -406,44 +408,47 @@ public class NavigationManager {
     // ═══════════════════════════════════════════════════════════════
 
     @NonNull
-    public Fragment createFragmentByTag(@Nullable String tag) {
-        if (tag == null) return new MiraDashboardFragment();
-        tag = normalizeTag(tag);
+public Fragment createFragmentByTag(@Nullable String tag) {
+    if (tag == null) return new MiraDashboardFragment();
+    tag = normalizeTag(tag);
 
-        switch (tag) {
-            case TAG_DASHBOARD:         return new MiraDashboardFragment();
-            case TAG_INVENTORY:         return new MiraInventoryProFragment();
-            case TAG_POS:               return new MiraPosFragment();
-            case TAG_TRANSFERS:         return new MiraTransferFragment();
-            case TAG_IDENTITY_STUDIO:   return new MiraIdentityStudioFragment();
-            case TAG_RADAR:             return new MiraUHFRadarLocationFragment();
-            case TAG_GATES:             return new MiraSecureGateFragment();
-            case TAG_REPORTS:           return new MiraReportsProFragment();
-            case TAG_ACCOUNTING:        return new MiraAccountingFragment();
-            case TAG_ADMIN_HUB:         return new MiraAdminHubFragment();
-            case TAG_SALES_HISTORY:     return new MiraSalesHistoryFragment();
-            case TAG_SERVER_CONFIG:     return new MiraServerConfigFragment();
-            case TAG_GOLD_RATES:        return new MiraGoldCurrencyFragment();
-            case TAG_PROFILE:           return new MiraProfileFragment();
-            case TAG_USERS_MANAGEMENT:  return new UsersManagementFragment();
-            case TAG_RFID_WRITE:        return new MiraUHFReadWriteFragment();
-            case TAG_READER_SETUP:      return new MiraReaderSetupFragment();
-            case TAG_GATE_SETTINGS:     return new MiraGateSettingsFragment();
-            case TAG_QUICK_ACCESS:      return new MiraQuickAccessSettingsFragment();
-            case TAG_BRANCHES:          return new MiraBranchesManagementFragment();
-            case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
-            case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
-            case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
-            case TAG_SCRAP_GOLD_BUY:    return new MiraScrapGoldBuyFragment();
-            case "ScrapHistory": return new MiraScrapHistoryFragment();
-            case TAG_SCRAP_BATCHES: return new MiraScrapBatchesFragment();
-            case TAG_SCRAP_PROFIT_REPORT: return new MiraScrapProfitReportFragment();
-            case TAG_CASH_RECONCILIATION: return new MiraCashReconciliationFragment();
-            default:
-                log("Unknown tag: " + tag + " → Dashboard");
-                return new MiraDashboardFragment();
-        }
+    switch (tag) {
+        case TAG_DASHBOARD:         return new MiraDashboardFragment();
+        case TAG_INVENTORY:         return new MiraInventoryProFragment();
+        case TAG_POS:               return new MiraPosFragment();
+        case TAG_TRANSFERS:         return new MiraTransferFragment();
+        case TAG_IDENTITY_STUDIO:   return new MiraIdentityStudioFragment();
+        case TAG_RADAR:             return new MiraUHFRadarLocationFragment();
+        case TAG_GATES:             return new MiraSecureGateFragment();
+        case TAG_REPORTS:           return new MiraReportsProFragment();
+        case TAG_ACCOUNTING:        return new MiraAccountingFragment();
+        case TAG_ADMIN_HUB:         return new MiraAdminHubFragment();
+        case TAG_SALES_HISTORY:     return new MiraSalesHistoryFragment();
+        case TAG_SERVER_CONFIG:     return new MiraServerConfigFragment();
+        case TAG_GOLD_RATES:        return new MiraGoldCurrencyFragment();
+        case TAG_PROFILE:           return new MiraProfileFragment();
+        case TAG_USERS_MANAGEMENT:  return new UsersManagementFragment();
+        case TAG_RFID_WRITE:        return new MiraUHFReadWriteFragment();
+        case TAG_READER_SETUP:      return new MiraReaderSetupFragment();
+        case TAG_GATE_SETTINGS:     return new MiraGateSettingsFragment();
+        case TAG_QUICK_ACCESS:      return new MiraQuickAccessSettingsFragment();
+        case TAG_BRANCHES:          return new MiraBranchesManagementFragment();
+        case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
+        case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
+        case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
+
+        // ✅ شاشات كسر الذهب (مرة واحدة فقط لكل شاشة)
+        case TAG_SCRAP_GOLD_BUY:      return new MiraScrapGoldBuyFragment();
+        case TAG_SCRAP_HISTORY:       return new MiraScrapHistoryFragment();
+        case TAG_SCRAP_BATCHES:       return new MiraScrapBatchesFragment();
+        case TAG_SCRAP_PROFIT_REPORT: return new MiraScrapProfitReportFragment();
+        case TAG_CASH_RECONCILIATION: return new MiraCashReconciliationFragment();
+
+        default:
+            log("Unknown tag: " + tag + " → Dashboard");
+            return new MiraDashboardFragment();
     }
+}
 
     // ═══════════════════════════════════════════════════════════════
     //  Logging
