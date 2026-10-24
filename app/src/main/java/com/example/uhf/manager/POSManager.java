@@ -18,7 +18,6 @@ public class POSManager {
 
     private static final String TAG = "POSManager";
     private static final String PREFS_OFFLINE = "pos_offline_sales_branch_";
-    public String localUuid = ""; 
     public interface CheckoutCallback {
         void onSuccess(MiraApiClient.ApiResponse response);
         void onOfflineSuccess(String saleId);
@@ -140,6 +139,7 @@ public class POSManager {
         // ✅ [جديد] إرسال مصفوفة المدفوعات المتعددة (عملات + طرق)
         // ═══════════════════════════════════════════════════════
         JSONArray paymentsArray = new JSONArray();
+        public String localUuid = ""; 
         if (data.payments != null && data.payments.length() > 0) {
             paymentsArray = data.payments;
         } else {
