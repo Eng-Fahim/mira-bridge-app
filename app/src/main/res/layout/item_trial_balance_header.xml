@@ -1,92 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:background="#F1F5F9"
-    android:paddingVertical="10dp">
+    android:orientation="vertical"
+    android:background="#F1F5F9">
 
-    <TextView
-        android:layout_width="50dp"
-        android:layout_height="wrap_content"
-        android:text="الكود"
-        android:textStyle="bold"
-        android:textSize="12sp"
-        android:gravity="center" />
-
-    <TextView
-        android:layout_width="0dp"
-        android:layout_weight="1.5"
-        android:layout_height="wrap_content"
-        android:text="الحساب"
-        android:textStyle="bold"
-        android:textSize="12sp"
-        android:paddingStart="8dp" />
-
-    <!-- عناوين أول المدة -->
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_weight="2"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center">
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="أول المدة"
-            android:textStyle="bold"
-            android:textSize="12sp" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="مدين" android:textSize="10sp" android:gravity="center"/>
-            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="دائن" android:textSize="10sp" android:gravity="center"/>
-        </LinearLayout>
-    </LinearLayout>
+        android:orientation="horizontal"
+        android:paddingVertical="8dp">
 
-    <!-- عناوين حركة الفترة -->
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_weight="2"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center">
+        <!-- الكود -->
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="60dp"
             android:layout_height="wrap_content"
-            android:text="حركة الفترة"
+            android:text="الكود"
             android:textStyle="bold"
-            android:textSize="12sp" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="مدين" android:textSize="10sp" android:gravity="center"/>
-            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="دائن" android:textSize="10sp" android:gravity="center"/>
-        </LinearLayout>
-    </LinearLayout>
+            android:textSize="11sp"
+            android:gravity="center" />
 
-    <!-- عناوين آخر المدة -->
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_weight="2"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center">
+        <!-- اسم الحساب -->
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="130dp"
             android:layout_height="wrap_content"
-            android:text="آخر المدة"
+            android:text="الحساب"
             android:textStyle="bold"
-            android:textSize="12sp" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="مدين" android:textSize="10sp" android:gravity="center"/>
-            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="دائن" android:textSize="10sp" android:gravity="center"/>
-        </LinearLayout>
-    </LinearLayout>
+            android:textSize="11sp"
+            android:paddingStart="4dp" />
 
+        <!-- أول المدة -->
+        <LinearLayout
+            android:layout_width="140dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="أول المدة" android:textStyle="bold" android:textSize="11sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="مدين" android:textSize="10sp" android:gravity="center" android:textColor="#3B82F6"/>
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="دائن" android:textSize="10sp" android:gravity="center" android:textColor="#EF4444"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- حركة الفترة -->
+        <LinearLayout
+            android:layout_width="140dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="حركة الفترة" android:textStyle="bold" android:textSize="11sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="مدين" android:textSize="10sp" android:gravity="center" android:textColor="#3B82F6"/>
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="دائن" android:textSize="10sp" android:gravity="center" android:textColor="#EF4444"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- آخر المدة -->
+        <LinearLayout
+            android:layout_width="140dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="آخر المدة" android:textStyle="bold" android:textSize="11sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="مدين" android:textSize="10sp" android:gravity="center" android:textColor="#3B82F6"/>
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="دائن" android:textSize="10sp" android:gravity="center" android:textColor="#EF4444"/>
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+    
+    <!-- خط فاصل -->
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#CBD5E1"/>
 </LinearLayout>
