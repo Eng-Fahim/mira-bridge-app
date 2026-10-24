@@ -2790,4 +2790,17 @@
 <string name="view_scrap_history">عرض سجل المشتريات</string>
 <string name="scrap_history_title">سجل مشتريات الكسر</string>
 <string name="no_scrap_records">لا توجد عمليات شراء مسجلة</string>
+<string name="scrap_profit_report">تقرير أرباح الكسر</string>
+<string name="net_scrap_profit">💰 صافي أرباح الكسر</string>
+<string name="purchase_cost">تكلفة الشراء</string>
+<string name="received_value">القيمة المستلمة</string>
+<string name="loss_value">الفاقد</string>
+<string name="unsold_scrap">مخزون كسر غير مُصفى</string>
+<string name="batches_breakdown">📋 تفصيل الدفعات</string>
+<string name="no_batches_yet">لا توجد دفعات مستلمة في هذه الفترة</string>
+<string name="this_month">هذا الشهر</string>
+<string name="last_month">الشهر الماضي</string>
+<string name="last_3_months">آخر 3 أشهر</string>
+<string name="custom_range">فترة مخصصة</string>
+
 </resources>
