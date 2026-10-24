@@ -12,10 +12,10 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment; // ✅ تم إضافة الاستيراد
 import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONArray;
@@ -23,7 +23,8 @@ import org.json.JSONObject;
 
 import java.util.Locale;
 
-public class MiraVoucherDetailFragment extends Fragment {
+// ✅ تم تغيير الوراثة هنا
+public class MiraVoucherDetailFragment extends BottomSheetDialogFragment {
 
     private static final String TAG = "VoucherDetail";
     private static final String ARG_VOUCHER_ID = "voucher_id";
@@ -164,10 +165,13 @@ public class MiraVoucherDetailFragment extends Fragment {
             TextView tvAcc = row.findViewById(R.id.tvLineAccount);
             TextView tvDebit = row.findViewById(R.id.tvLineDebit);
             TextView tvCredit = row.findViewById(R.id.tvLineCredit);
-            TextView tvDesc = row.findViewById(R.id.tvLineDesc);
+            
+            // ⚠️ ملاحظة: تأكد من أن ملف item_journal_line.xml يحتوي على TextView بالمعرف tvLineDesc
+            // وإلا قم بتغيير الاسم هنا ليطابق الاسم الموجود في الـ XML (مثلاً tvDescription)
+            TextView tvDesc = row.findViewById(R.id.tvLineDesc); 
 
             tvAcc.setText(accCode + " - " + accName);
-            tvDesc.setText(desc);
+            if(tvDesc != null) tvDesc.setText(desc);
             
             // Debit
             if (debit > 0) {
