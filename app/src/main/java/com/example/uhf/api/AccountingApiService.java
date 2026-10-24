@@ -139,4 +139,10 @@ Call<ApiResponseDto<BalanceSheetDto>> getBalanceSheet(
 
     @GET("currencies/rates")
     Call<ApiResponseDto<Object[]>> getExchangeRates();
+
+    @GET("accounting/cash-flow")
+    Call<ApiResponseDto<CashFlowDto>> getCashFlowStatement(
+    @Query("date") String date,
+    @Query("branch_id") Integer branchId
+);
 }
