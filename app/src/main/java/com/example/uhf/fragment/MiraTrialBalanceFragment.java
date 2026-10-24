@@ -151,15 +151,26 @@ public class MiraTrialBalanceFragment extends Fragment {
         }
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override public void onTabSelected(TabLayout.Tab tab) {
-                isGoldView = (tab.getPosition() == 1);
-                if (viewModel.getTrialBalance().getValue() != null) {
-                    renderKPIs(viewModel.getTrialBalance().getValue());
-                }
-            }
-            @Override public void onTabUnselected(TabLayout.Tab tab) {}
-            @Override public void onTabReselected(TabLayout.Tab tab) {}
-        });
+    @Override
+    public void onTabSelected(TabLayout.Tab tab) {
+        isGoldView = (tab.getPosition() == 1);
+
+        // ✅ أخبر الـ Adapter بالوضع الجديد
+        if (adapter != null) {
+            adapter.setGoldView(isGoldView);
+        }
+
+        // ✅ أعد حساب الـ KPIs
+        if (viewModel.getTrialBalance().getValue() != null) {
+            renderKPIs(viewModel.getTrialBalance().getValue());
+        }
+
+        // ✅ أعد فلترة الصفوف
+        filterData(etSearch.getText().toString());
+    }
+    @Override public void onTabUnselected(TabLayout.Tab tab) {}
+    @Override public void onTabReselected(TabLayout.Tab tab) {}
+});
 
         btnFilterDate.setOnClickListener(v1 -> showDateRangePicker());
 
