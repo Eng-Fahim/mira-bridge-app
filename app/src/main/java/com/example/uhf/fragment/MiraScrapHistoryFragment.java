@@ -86,17 +86,27 @@ public class MiraScrapHistoryFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            JSONObject item = items.get(position);
-            holder.tvNumber.setText(item.optString("purchase_number"));
-            holder.tvCustomer.setText(item.optString("customer_name", "عميل نقدي"));
-            
-            double weight = item.optDouble("gross_weight_grams", 0);
-            String karat = item.optString("gold_karat", "21K");
-            holder.tvDetails.setText(String.format(Locale.US, "%s | %.2f g", karat, weight));
-            
-            double amount = item.optDouble("total_amount", 0);
-            holder.tvAmount.setText(String.format(Locale.US, "%,.2f SAR", amount));
+    JSONObject item = items.get(position);
+    holder.tvNumber.setText(item.optString("purchase_number"));
+    holder.tvCustomer.setText(item.optString("customer_name", "عميل نقدي"));
+    
+    double weight = item.optDouble("gross_weight_grams", 0);
+    String karat = item.optString("gold_karat", "21K");
+    holder.tvDetails.setText(String.format(Locale.US, "%s | %.2f g", karat, weight));
+    
+    double amount = item.optDouble("total_amount", 0);
+    holder.tvAmount.setText(String.format(Locale.US, "%,.2f SAR", amount));
+    
+    // ✅ عرض الإيصال عند الضغط
+    holder.itemView.setOnClickListener(v -> {
+        int purchaseId = item.optInt("id", 0);
+        if (purchaseId > 0) {
+            MiraScrapReceiptFragment receipt = 
+                MiraScrapReceiptFragment.newInstance(purchaseId, item.toString());
+            receipt.show(getParentFragmentManager(), "ScrapReceipt");
         }
+    });
+}
 
         @Override
         public int getItemCount() { return items.size(); }
