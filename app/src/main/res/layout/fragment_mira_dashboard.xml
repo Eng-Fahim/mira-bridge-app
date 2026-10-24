@@ -641,18 +641,47 @@
                         </LinearLayout>
 
                         <!-- Action Button -->
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnOpenScrapHistory"
-                            style="@style/Widget.MaterialComponents.Button.TextButton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_3"
-                            android:text="@string/view_scrap_history"
-                            android:textColor="?attr/colorPrimary"
-                            app:icon="@android:drawable/ic_media_play"
-                            app:iconGravity="textEnd"
-                            app:iconTint="?attr/colorPrimary"
-                            app:iconSize="16dp" />
+                       <!-- ✅ شريط أزرار الإجراءات -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginTop="@dimen/space_3"
+    android:weightSum="3">
+
+    <!-- زر شراء جديد -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOpenScrapBuy"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="➕ شراء جديد"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="10sp"/>
+
+    <!-- زر السجل -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOpenScrapHistory"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="📋 السجل"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="10sp"/>
+
+    <!-- زر الدفعات -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOpenScrapBatches"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="📦 الدفعات"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="10sp"/>
+</LinearLayout>
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
