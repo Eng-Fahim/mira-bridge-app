@@ -18,7 +18,7 @@ public class POSManager {
 
     private static final String TAG = "POSManager";
     private static final String PREFS_OFFLINE = "pos_offline_sales_branch_";
-    
+    public String localUuid = ""; 
     public interface CheckoutCallback {
         void onSuccess(MiraApiClient.ApiResponse response);
         void onOfflineSuccess(String saleId);
