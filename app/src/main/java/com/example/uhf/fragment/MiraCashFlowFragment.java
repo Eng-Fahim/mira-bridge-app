@@ -18,11 +18,11 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.api.dto.CashFlowDto;
 import com.example.uhf.api.dto.CashFlowItemDto;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+
+import org.json.JSONObject; // ✅ تم إضافة هذا السطر
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.List;
 import java.util.Locale;
 
 public class MiraCashFlowFragment extends Fragment {
@@ -71,12 +71,14 @@ public class MiraCashFlowFragment extends Fragment {
         new Thread(() -> {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = client.getCashFlowStatement(date, 0); // 0 = كل الفروع المتاحة
+                MiraApiClient.ApiResponse response = client.getCashFlowStatement(date, 0); // 0 = كل الفروع
 
                 if (response != null && response.isSuccess && response.data != null) {
                     Gson gson = new Gson();
-                    // استخراج البيانات من الـ JSON
-                    CashFlowDto dto = gson.fromJson(response.data.getAsJsonObject("data"), CashFlowDto.class);
+                    
+                    // ✅ التصحيح: استخدام getJSONObject
+                    JSONObject jsonData = response.data.getJSONObject("data");
+                    CashFlowDto dto = gson.fromJson(jsonData.toString(), CashFlowDto.class);
                     
                     requireActivity().runOnUiThread(() -> {
                         if (dto != null) {
@@ -87,6 +89,7 @@ public class MiraCashFlowFragment extends Fragment {
                     requireActivity().runOnUiThread(() -> Toast.makeText(getContext(), "لا توجد بيانات لهذا اليوم", Toast.LENGTH_SHORT).show());
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 requireActivity().runOnUiThread(() -> Toast.makeText(getContext(), "حدث خطأ في الاتصال", Toast.LENGTH_SHORT).show());
             }
         }).start();
@@ -126,7 +129,7 @@ public class MiraCashFlowFragment extends Fragment {
         TextView tvTitle = row.findViewById(R.id.tvRowTitle);
         TextView tvAmount = row.findViewById(R.id.tvRowAmount);
 
-        tvTitle.setText(item.label + (item.account.contains("بنك") ? " (بنك)" : " (نقدي)"));
+        tvTitle.setText(item.label + (item.account != null && item.account.contains("بنك") ? " (بنك)" : " (نقدي)"));
         tvAmount.setText(String.format(Locale.US, "%s%,.2f", isInflow ? "+" : "-", item.amount));
         
         // تلوين المبلغ
