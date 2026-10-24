@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -16,10 +15,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.navigation.NavigationManager;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
-import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,17 +32,26 @@ import java.util.Locale;
 public class MiraScrapBatchesFragment extends Fragment {
 
     private RecyclerView rvBatches;
+    private TextView tvEmpty;
     private ExtendedFloatingActionButton fabNewBatch;
+    private MaterialButton btnViewReport;
+    
     private final List<JSONObject> batches = new ArrayList<>();
     private BatchAdapter adapter;
     private int branchId;
+    private boolean isArabic;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_scrap_batches, container, false);
+        
+        isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
+        
         rvBatches = view.findViewById(R.id.rvBatches);
+        tvEmpty = view.findViewById(R.id.tvEmptyBatches);
         fabNewBatch = view.findViewById(R.id.fabNewBatch);
+        btnViewReport = view.findViewById(R.id.btnViewReport);
         
         branchId = MiraBranchesManager.getInstance(requireContext()).getActiveBranchId();
 
@@ -49,19 +59,56 @@ public class MiraScrapBatchesFragment extends Fragment {
         adapter = new BatchAdapter(batches);
         rvBatches.setAdapter(adapter);
 
+        // ✅ ربط زر إنشاء الدفعة
         fabNewBatch.setOnClickListener(v -> openNewBatchDialog());
+        
+        // ✅ ربط زر تقرير الأرباح
+        btnViewReport.setOnClickListener(v -> {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).loadFragment(
+                    new MiraScrapProfitReportFragment(), 
+                    NavigationManager.TAG_SCRAP_PROFIT_REPORT
+                );
+            }
+        });
         
         loadBatches();
         return view;
     }
 
+    // ✅ هذه الدالة كانت فارغة، الآن تم تنفيذها
     private void loadBatches() {
-        // دالة لجلب الدفعات من السيرفر (نفس نمط MiraTransferFragment)
-        // ستحتاج لإضافة دالة getScrapBatches في MiraApiClient أولاً
+        new Thread(() -> {
+            MiraApiClient api = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse response = api.getScrapBatches(branchId);
+            
+            if (getActivity() == null) return;
+            
+            getActivity().runOnUiThread(() -> {
+                batches.clear();
+                
+                if (response.isSuccess && response.data != null) {
+                    JSONArray data = response.data.optJSONArray("data");
+                    if (data != null && data.length() > 0) {
+                        for (int i = 0; i < data.length(); i++) {
+                            batches.add(data.optJSONObject(i));
+                        }
+                        tvEmpty.setVisibility(View.GONE);
+                        rvBatches.setVisibility(View.VISIBLE);
+                    } else {
+                        tvEmpty.setVisibility(View.VISIBLE);
+                        rvBatches.setVisibility(View.GONE);
+                    }
+                } else {
+                    tvEmpty.setVisibility(View.VISIBLE);
+                    rvBatches.setVisibility(View.GONE);
+                }
+                adapter.notifyDataSetChanged();
+            });
+        }).start();
     }
 
     private void openNewBatchDialog() {
-        // 1. جلب الفواتير المتاحة
         new Thread(() -> {
             MiraApiClient api = MiraApiClient.getInstance(requireContext());
             MiraApiClient.ApiResponse response = api.getAvailableScrapPurchases(branchId);
@@ -83,7 +130,6 @@ public class MiraScrapBatchesFragment extends Fragment {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("اختر الفواتير لضمها للدفعة");
 
-        // تصميم بسيط للاختيار (يفضل استخدام RecyclerView متعدد الاختيارات في الإنتاج)
         String[] items = new String[purchases.length()];
         boolean[] checkedItems = new boolean[purchases.length()];
         
@@ -102,7 +148,6 @@ public class MiraScrapBatchesFragment extends Fragment {
                 }
             }
             if (selectedIds.length() > 0) {
-                // حوار إضافي لاختيار الوجهة
                 showDestinationDialog(selectedIds);
             }
         });
@@ -111,7 +156,7 @@ public class MiraScrapBatchesFragment extends Fragment {
     }
 
     private void showDestinationDialog(JSONArray selectedIds) {
-        String[] destinations = {"مصفاة (Refinery)", "ورشة تصنيع (Workshop)", "تاجر جملة (Trader)"};
+        String[] destinations = {"🏭 مصفاة (Refinery)", "🔨 ورشة تصنيع (Workshop)", "🤝 تاجر جملة (Trader)"};
         new AlertDialog.Builder(requireContext())
             .setTitle("إلى أين ستُرسل هذه الدفعة؟")
             .setItems(destinations, (dialog, which) -> {
@@ -143,23 +188,55 @@ public class MiraScrapBatchesFragment extends Fragment {
         }).start();
     }
 
-    // Adapter بسيط (يمكنك تنسيقه بنفس شياكة item_transfer_row)
+    // ✅ تصميم بطاقة الدفعة بشكل احترافي
     private class BatchAdapter extends RecyclerView.Adapter<BatchAdapter.VH> {
         private final List<JSONObject> items;
         BatchAdapter(List<JSONObject> items) { this.items = items; }
 
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new VH(LayoutInflater.from(parent.getContext()).inflate(android.R.layout.simple_list_item_2, parent, false));
+        @NonNull @Override 
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_scrap_batch, parent, false));
         }
-        @Override public void onBindViewHolder(@NonNull VH holder, int position) {
+        
+        @Override 
+        public void onBindViewHolder(@NonNull VH holder, int position) {
             JSONObject b = items.get(position);
-            holder.tv1.setText(b.optString("batch_number") + " - " + b.optString("status"));
-            holder.tv2.setText(b.optDouble("sent_weight_24k") + "g (24K)");
+            
+            String status = b.optString("status", "draft");
+            String statusText = "";
+            int statusColor = 0xFF78909C;
+            
+            switch (status) {
+                case "draft": statusText = "📝 مسودة"; statusColor = 0xFF78909C; break;
+                case "in_transit": statusText = "🚚 في الطريق"; statusColor = 0xFF1976D2; break;
+                case "received": statusText = "📥 مستلمة"; statusColor = 0xFF388E3C; break;
+                case "cancelled": statusText = "❌ ملغاة"; statusColor = 0xFFDC2626; break;
+            }
+            
+            holder.tvNumber.setText(b.optString("batch_number"));
+            holder.tvStatus.setText(statusText);
+            holder.tvStatus.setTextColor(statusColor);
+            
+            String dest = b.optString("destination_type");
+            if (dest.equals("refinery")) dest = "🏭 مصفاة";
+            else if (dest.equals("workshop")) dest = "🔨 ورشة";
+            else if (dest.equals("trader")) dest = "🤝 تاجر";
+            
+            holder.tvDestination.setText(dest);
+            holder.tvWeight.setText(String.format(Locale.US, "%.3f g (24K)", b.optDouble("sent_weight_24k", 0)));
         }
+        
         @Override public int getItemCount() { return items.size(); }
+        
         class VH extends RecyclerView.ViewHolder {
-            TextView tv1, tv2;
-            VH(View v) { super(v); tv1 = v.findViewById(android.R.id.text1); tv2 = v.findViewById(android.R.id.text2); }
+            TextView tvNumber, tvStatus, tvDestination, tvWeight;
+            VH(View v) { 
+                super(v); 
+                tvNumber = v.findViewById(R.id.tvBatchNumber);
+                tvStatus = v.findViewById(R.id.tvBatchStatus);
+                tvDestination = v.findViewById(R.id.tvBatchDestination);
+                tvWeight = v.findViewById(R.id.tvBatchWeight);
+            }
         }
     }
 }
