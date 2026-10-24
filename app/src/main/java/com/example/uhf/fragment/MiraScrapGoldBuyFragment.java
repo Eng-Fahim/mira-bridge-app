@@ -23,6 +23,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraPriceManager; // ✅ استيراد مدير الأسعار
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -48,15 +49,17 @@ public class MiraScrapGoldBuyFragment extends Fragment {
     // Data
     private String[] karats = {"24", "22", "21", "18", "14"};
     private final String[] CURRENCIES = {"YER", "SAR", "USD"};
-    private final double[] EXCHANGE_RATES = {1.0, 530.0, 2000.0}; 
     
     private final List<View> paymentRows = new ArrayList<>();
     private double totalGoldValue = 0;
+    private MiraPriceManager priceManager; // ✅ مدير الأسعار
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_scrap_gold_buy, container, false);
+
+        priceManager = MiraPriceManager.getInstance(requireContext()); // ✅ تهيئة المدير
 
         initViews(view);
         setupKaratDropdown();
@@ -123,10 +126,23 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         }
     }
 
+    // ✅ دالة جلب سعر الصرف من مدير الأسعار
+    private double getExchangeRate(String currency) {
+        if (priceManager != null) {
+            double rate = priceManager.getExchangeRate(currency);
+            if (rate > 0) return rate;
+        }
+        // قيم احتياطية في حال فشل جلب السعر
+        if ("SAR".equalsIgnoreCase(currency)) return 141.33;
+        if ("USD".equalsIgnoreCase(currency)) return 530.0;
+        return 1.0; // YER
+    }
+
     private void addPaymentRow(String defaultCurrency, double amount) {
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
         Spinner spCurrency = row.findViewById(R.id.spCurrency);
         TextInputEditText etAmount = row.findViewById(R.id.etAmount);
+        TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent); // ✅ ربط حقل المعادل
         ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, CURRENCIES);
@@ -136,15 +152,36 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
         spCurrency.setSelection(index >= 0 ? index : 0);
 
-        TextWatcher watcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateRemainingBalance(); }
-            @Override public void afterTextChanged(Editable s) {}
+        // ✅ دالة داخلية لتحديث المبلغ المعادل في هذا السطر
+        Runnable updateEquivalent = () -> {
+            try {
+                int pos = spCurrency.getSelectedItemPosition();
+                if (pos >= 0) {
+                    String curr = CURRENCIES[pos];
+                    double rate = getExchangeRate(curr);
+                    double amt = getDoubleFromEditText(etAmount);
+                    double base = amt * rate;
+                    tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
+                }
+            } catch (Exception ignored) {}
         };
-        etAmount.addTextChangedListener(watcher);
+
+        // مستمع لتحديث المعادل والمتبقي عند الكتابة
+        etAmount.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
+                updateEquivalent.run(); 
+                updateRemainingBalance(); 
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
         
+        // مستمع لتحديث المعادل والمتبقي عند تغيير العملة
         spCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { updateRemainingBalance(); }
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { 
+                updateEquivalent.run(); 
+                updateRemainingBalance(); 
+            }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
@@ -161,6 +198,8 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         paymentRows.add(row);
         llPaymentsContainer.addView(row);
         if (amount > 0) etAmount.setText(String.valueOf(amount));
+        
+        updateEquivalent.run(); // تحديث أولي عند الإضافة
     }
 
     private void updateRemainingBalance() {
@@ -170,7 +209,8 @@ public class MiraScrapGoldBuyFragment extends Fragment {
             TextInputEditText et = row.findViewById(R.id.etAmount);
             int pos = sp.getSelectedItemPosition();
             if (pos >= 0) {
-                double rate = EXCHANGE_RATES[pos];
+                String curr = CURRENCIES[pos];
+                double rate = getExchangeRate(curr); // ✅ استخدام السعر الديناميكي
                 double amount = getDoubleFromEditText(et);
                 totalPaidBase += (amount * rate);
             }
@@ -190,7 +230,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         }
     }
 
-    // ✅ دالة تعطيل/تفعيل الحقول لمنع التعديل أثناء الحفظ
     private void setFormEnabled(boolean enabled) {
         etCustomerName.setEnabled(enabled);
         etCustomerPhone.setEnabled(enabled);
@@ -207,7 +246,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
     }
 
     private void savePurchase() {
-        // ... (نفس التحققات السابقة) ...
         double weight = getDoubleFromEditText(etWeight);
         double marketPrice = getDoubleFromEditText(etMarketPrice);
         if (weight <= 0 || marketPrice <= 0) {
@@ -217,18 +255,22 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
         JSONArray paymentsArray = new JSONArray();
         double totalPaidBase = 0;
+        
         for (View row : paymentRows) {
             Spinner sp = row.findViewById(R.id.spCurrency);
             TextInputEditText et = row.findViewById(R.id.etAmount);
             int pos = sp.getSelectedItemPosition();
             double amount = getDoubleFromEditText(et);
+            
             if (amount > 0 && pos >= 0) {
                 try {
-                    double rate = EXCHANGE_RATES[pos];
+                    String curr = CURRENCIES[pos];
+                    double rate = getExchangeRate(curr); // ✅ استخدام السعر الديناميكي
                     double base = amount * rate;
                     totalPaidBase += base;
+                    
                     JSONObject pObj = new JSONObject();
-                    pObj.put("currency", CURRENCIES[pos]);
+                    pObj.put("currency", curr);
                     pObj.put("amount", amount);
                     pObj.put("exchange_rate", rate);
                     pObj.put("base_amount", base);
@@ -259,7 +301,6 @@ public class MiraScrapGoldBuyFragment extends Fragment {
             payload.put("user_id", sessionManager.getUserId());
         } catch (Exception e) { e.printStackTrace(); }
 
-        // ✅ 1. تعطيل الواجهة وإظهار التحميل
         setFormEnabled(false);
         btnSavePurchase.setEnabled(false);
         btnSavePurchase.setText("⏳ جاري الحفظ...");
@@ -271,19 +312,14 @@ public class MiraScrapGoldBuyFragment extends Fragment {
             if (getActivity() == null || isDetached()) return;
 
             getActivity().runOnUiThread(() -> {
-                // ✅ 2. إعادة تفعيل الواجهة
                 setFormEnabled(true);
                 btnSavePurchase.setEnabled(true);
                 btnSavePurchase.setText(R.string.save_purchase);
 
                 if (response.isSuccess && response.data != null) {
-                    // ✅ 3. استخراج بيانات العملية لعرضها
                     int purchaseId = response.data.optInt("purchase_id", 0);
                     String purchaseNumber = response.data.optString("purchase_number", "");
-                    
-                    // ✅ 4. عرض شاشة النجاح الاحترافية
                     showSuccessDialog(purchaseId, purchaseNumber);
-                    
                 } else {
                     String errorMsg = response.error != null ? response.error : "فشل الاتصال بالسيرفر";
                     Toast.makeText(requireContext(), errorMsg, Toast.LENGTH_LONG).show();
@@ -292,23 +328,21 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         }).start();
     }
 
-    // ✅ دالة عرض نافذة النجاح
     private void showSuccessDialog(int purchaseId, String purchaseNumber) {
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle("✅ تم الحفظ بنجاح")
             .setMessage("تم تسجيل عملية شراء الكسر بنجاح.\n\nرقم العملية: " + purchaseNumber + "\n\nهل تريد طباعة الإيصال للعميل الآن؟")
             .setPositiveButton("🖨️ عرض وطباعة الإيصال", (dialog, which) -> {
-                // فتح شاشة الإيصال
                 if (purchaseId > 0) {
                     MiraScrapReceiptFragment receipt = MiraScrapReceiptFragment.newInstance(purchaseId, null);
                     receipt.show(getParentFragmentManager(), "ScrapReceipt");
                 }
-                clearFields(); // مسح الحقول بعد الطباعة
+                clearFields();
             })
             .setNegativeButton("إغلاق", (dialog, which) -> {
-                clearFields(); // مسح الحقول في حال الإغلاق
+                clearFields();
             })
-            .setCancelable(false) // منع الإغلاق بالضغط خارج النافذة
+            .setCancelable(false)
             .show();
     }
 
