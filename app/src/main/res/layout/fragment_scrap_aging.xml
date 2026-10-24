@@ -121,7 +121,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="< 30 يوم"
+                            android:text="&lt; 30 يوم"
                             android:textColor="#16A34A"
                             android:textSize="9sp"/>
                         <TextView
@@ -227,7 +227,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="> 60 يوم"
+                            android:text="&gt; 60 يوم"
                             android:textColor="#DC2626"
                             android:textSize="9sp"/>
                         <TextView
