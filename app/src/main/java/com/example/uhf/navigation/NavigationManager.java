@@ -55,6 +55,7 @@ public class NavigationManager {
     public static final String TAG_TRANSFERS         = "Transfers";
     public static final String TAG_IDENTITY_STUDIO   = "IdentityStudio";
     public static final String TAG_SCRAP_BATCHES = "ScrapBatches";
+    public static final String TAG_SCRAP_PROFIT_REPORT = "ScrapProfitReport";
 
     public static final String TAG_RADAR             = "Radar";
     public static final String TAG_SECURE_GATE       = "SecureGate";
@@ -435,6 +436,7 @@ public class NavigationManager {
             case TAG_SCRAP_GOLD_BUY:    return new MiraScrapGoldBuyFragment();
             case "ScrapHistory": return new MiraScrapHistoryFragment();
             case TAG_SCRAP_BATCHES: return new MiraScrapBatchesFragment();
+            case TAG_SCRAP_PROFIT_REPORT: return new MiraScrapProfitReportFragment();
             default:
                 log("Unknown tag: " + tag + " → Dashboard");
                 return new MiraDashboardFragment();
