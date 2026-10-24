@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- ✅ الهيدر: العنوان + زر التقرير -->
+        <!-- ✅ الهيدر: العنوان + الأزرار -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -28,13 +28,24 @@
                 android:textAppearance="@style/TextAppearance.App.Title.Large"
                 android:textColor="?attr/colorOnSurface"/>
 
+            <!-- ✅ زر تقرير الأعمار (Aging) [جديد] -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnViewAging"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🕰️ الأعمار"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp"/>
+
             <!-- ✅ زر تقرير الأرباح -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnViewReport"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="📊 تقرير الأرباح"
+                android:text="📊 الأرباح"
                 android:textColor="?attr/colorPrimary"
                 android:textSize="12sp"/>
         </LinearLayout>
