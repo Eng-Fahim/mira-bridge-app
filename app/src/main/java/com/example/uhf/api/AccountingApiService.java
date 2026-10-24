@@ -91,10 +91,11 @@ Call<ApiResponseDto<JournalEntryDto>> createJournalEntryPayload(@Body org.json.J
     /**
      * ✅ الميزانية العمومية
      */
-    @GET("reports/balance-sheet")
-    Call<ApiResponseDto<BalanceSheetDto>> getBalanceSheet(
-        @Query("as_of") String asOf
-    );
+    @GET("accounting/balance-sheet")
+Call<ApiResponseDto<BalanceSheetDto>> getBalanceSheet(
+    @Query("as_of") String asOf,
+    @Query("branch_id") Integer branchId
+);
 
     /**
      * ✅ قائمة الدخل
