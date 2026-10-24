@@ -6,7 +6,7 @@
     android:orientation="vertical"
     android:background="?attr/colorSurface">
 
-    <!-- شريط الأدوات -->
+    <!-- شريط الأدوات العلوي -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -59,7 +59,7 @@
                 style="@style/Widget.AppCompat.Button.Colored"/>
         </LinearLayout>
 
-        <!-- ✅ صف 2: فترات سريعة -->
+        <!-- صف 2: فترات سريعة -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -155,7 +155,7 @@
             android:padding="8dp"/>
     </HorizontalScrollView>
 
-    <!-- ✅ بانر التحقق من التوازن -->
+    <!-- بانر التحقق من التوازن -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardBalanceStatus"
         android:layout_width="match_parent"
@@ -191,12 +191,6 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- ✅ رأس الجدول + وضع العرض الحالي -->
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical">
-
     <!-- شارة الوضع -->
     <TextView
         android:id="@+id/tvViewMode"
@@ -210,22 +204,6 @@
         android:gravity="center"
         android:background="?attr/colorSurfaceVariant"/>
 
-    <!-- Header العناوين -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:background="?attr/colorPrimaryContainer">
-
-        <TextView android:layout_width="50dp" android:layout_height="wrap_content" android:text="الكود" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="11sp" android:textStyle="bold"/>
-        <TextView android:layout_width="80dp" android:layout_height="wrap_content" android:text="الحساب" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="11sp" android:textStyle="bold"/>
-        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="أول المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
-        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="حركة الفترة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
-        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="آخر المدة" android:textColor="?attr/colorOnPrimaryContainer" android:textSize="10sp" android:textStyle="bold" android:gravity="center"/>
-    </LinearLayout>
-</LinearLayout>
-
     <ProgressBar
         android:id="@+id/pbLoading"
         android:layout_width="wrap_content"
@@ -234,31 +212,48 @@
         android:layout_marginTop="20dp"
         android:visibility="gone" />
 
-    <FrameLayout
+    <!-- ✅ الحاوية الرئيسية للجدول (قابلة للسحب أفقياً) -->
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:fillViewport="true">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvRows"
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:background="?attr/colorSurface"
-            android:clipToPadding="false"
-            android:paddingBottom="60dp"/>
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvEmpty"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:text="📭 لا توجد بيانات"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="16sp"
-            android:visibility="gone"/>
-    </FrameLayout>
+            <!-- استدعاء رأس الجدول الذي أصلحناه للتو -->
+            <include layout="@layout/item_trial_balance_header" />
 
-    <!-- ✅ صف الإجماليات الثابت في الأسفل -->
+            <!-- القائمة -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvRows"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="?attr/colorSurface"
+                    android:clipToPadding="false"
+                    android:paddingBottom="60dp"/>
+
+                <TextView
+                    android:id="@+id/tvEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="📭 لا توجد بيانات"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="16sp"
+                    android:visibility="gone"/>
+            </FrameLayout>
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- صف الإجماليات الثابت في الأسفل -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
