@@ -81,6 +81,21 @@ public class MiraVoucherReceiptFragment extends BottomSheetDialogFragment {
         MaterialButton btnPrint = v.findViewById(R.id.btnPrintVoucher);
         MaterialButton btnShare = v.findViewById(R.id.btnShareVoucher);
         MaterialButton btnSave = v.findViewById(R.id.btnSaveVoucherPDF);
+        MaterialButton btnPrint = v.findViewById(R.id.btnPrintVoucher);
+MaterialButton btnShare = v.findViewById(R.id.btnShareVoucher);
+MaterialButton btnSave = v.findViewById(R.id.btnSaveVoucherPDF);
+MaterialButton btnDetail = v.findViewById(R.id.btnViewJournalDetail); // ✅ جديد
+
+btnPrint.setOnClickListener(v2 -> printVoucher());
+btnShare.setOnClickListener(v2 -> shareVoucherPDF());
+btnSave.setOnClickListener(v2 -> saveVoucherPDF());
+
+// ✅ فتح التفاصيل
+btnDetail.setOnClickListener(v2 -> {
+    MiraVoucherDetailFragment detail = MiraVoucherDetailFragment.newInstance(voucherId, "receipt");
+    detail.show(getParentFragmentManager(), "VoucherDetail");
+    dismiss();
+});
 
         if (webView != null) {
             WebSettings s = webView.getSettings();
