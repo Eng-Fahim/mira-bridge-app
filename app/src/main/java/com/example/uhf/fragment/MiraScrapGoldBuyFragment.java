@@ -150,65 +150,72 @@ private double getRateToYER(String currency) {
 }
 
     private void addPaymentRow(String defaultCurrency, double amount) {
-        View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
-        Spinner spCurrency = row.findViewById(R.id.spCurrency);
-        TextInputEditText etAmount = row.findViewById(R.id.etAmount);
-        TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
-        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
+    View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
+    Spinner spCurrency = row.findViewById(R.id.spCurrency);
+    Spinner spMethod = row.findViewById(R.id.spMethod); // ✅ الجديد
+    TextInputEditText etAmount = row.findViewById(R.id.etAmount);
+    TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
+    ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, CURRENCIES);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spCurrency.setAdapter(adapter);
-        
-        int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
-        spCurrency.setSelection(index >= 0 ? index : 0);
+    // إعداد عملة الدفع
+    ArrayAdapter<String> currencyAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, CURRENCIES);
+    currencyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spCurrency.setAdapter(currencyAdapter);
+    int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
+    spCurrency.setSelection(index >= 0 ? index : 0);
 
-        Runnable updateEquivalent = () -> {
-            try {
-                int pos = spCurrency.getSelectedItemPosition();
-                if (pos >= 0) {
-                    String curr = CURRENCIES[pos];
-                    double rate = getRateToYER(curr);
-                    double amt = getDoubleFromEditText(etAmount);
-                    double base = amt * rate;
-                    tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
-                }
-            } catch (Exception ignored) {}
-        };
+    // ✅ إعداد طريقة الدفع
+    String[] methodsAr = {"نقداً (Cash)", "بنك (Bank)"};
+    String[] methodsEn = {"cash", "bank_transfer"}; // يجب أن تطابق الأكواد في السيرفر
+    ArrayAdapter<String> methodAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, methodsAr);
+    methodAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spMethod.setAdapter(methodAdapter);
 
-        etAmount.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
-                updateEquivalent.run(); 
-                updateRemainingBalance(); 
+    Runnable updateEquivalent = () -> {
+        try {
+            int pos = spCurrency.getSelectedItemPosition();
+            if (pos >= 0) {
+                String curr = CURRENCIES[pos];
+                double rate = getRateToYER(curr);
+                double amt = getDoubleFromEditText(etAmount);
+                double base = amt * rate;
+                tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
             }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-        
-        spCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { 
-                updateEquivalent.run(); 
-                updateRemainingBalance(); 
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
-        });
+        } catch (Exception ignored) {}
+    };
 
-        btnRemove.setOnClickListener(v -> {
-            if (llPaymentsContainer.getChildCount() > 1) {
-                llPaymentsContainer.removeView(row);
-                paymentRows.remove(row);
-                updateRemainingBalance();
-            } else {
-                Toast.makeText(requireContext(), "يجب أن يبقى سطر دفع واحد على الأقل", Toast.LENGTH_SHORT).show();
-            }
-        });
+    etAmount.addTextChangedListener(new TextWatcher() {
+        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
+            updateEquivalent.run(); 
+            updateRemainingBalance(); 
+        }
+        @Override public void afterTextChanged(Editable s) {}
+    });
+    
+    spCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { 
+            updateEquivalent.run(); 
+            updateRemainingBalance(); 
+        }
+        @Override public void onNothingSelected(AdapterView<?> parent) {}
+    });
 
-        paymentRows.add(row);
-        llPaymentsContainer.addView(row);
-        if (amount > 0) etAmount.setText(String.valueOf(amount));
-        
-        updateEquivalent.run();
-    }
+    btnRemove.setOnClickListener(v -> {
+        if (llPaymentsContainer.getChildCount() > 1) {
+            llPaymentsContainer.removeView(row);
+            paymentRows.remove(row);
+            updateRemainingBalance();
+        } else {
+            Toast.makeText(requireContext(), "يجب أن يبقى سطر دفع واحد على الأقل", Toast.LENGTH_SHORT).show();
+        }
+    });
+
+    paymentRows.add(row);
+    llPaymentsContainer.addView(row);
+    if (amount > 0) etAmount.setText(String.valueOf(amount));
+    updateEquivalent.run();
+}
 
     private void updateRemainingBalance() {
         double totalPaidBase = 0;
@@ -265,27 +272,35 @@ private double getRateToYER(String currency) {
         double totalPaidBase = 0;
         
         for (View row : paymentRows) {
-            Spinner sp = row.findViewById(R.id.spCurrency);
-            TextInputEditText et = row.findViewById(R.id.etAmount);
-            int pos = sp.getSelectedItemPosition();
-            double amount = getDoubleFromEditText(et);
+    Spinner sp = row.findViewById(R.id.spCurrency);
+    Spinner spMethod = row.findViewById(R.id.spMethod); // ✅ الجديد
+    TextInputEditText et = row.findViewById(R.id.etAmount);
+    
+    int pos = sp.getSelectedItemPosition();
+    int posMethod = spMethod.getSelectedItemPosition(); // ✅ الجديد
+    double amount = getDoubleFromEditText(et);
+    
+    if (amount > 0 && pos >= 0) {
+        try {
+            String curr = CURRENCIES[pos];
+            double rate = getRateToYER(curr);
+            double base = amount * rate;
+            totalPaidBase += base;
             
-            if (amount > 0 && pos >= 0) {
-                try {
-                    String curr = CURRENCIES[pos];
-                    double rate = getRateToYER(curr);
-                    double base = amount * rate;
-                    totalPaidBase += base;
-                    
-                    JSONObject pObj = new JSONObject();
-                    pObj.put("currency", curr);
-                    pObj.put("amount", amount);
-                    pObj.put("exchange_rate", rate);
-                    pObj.put("base_amount", base);
-                    paymentsArray.put(pObj);
-                } catch (Exception e) { e.printStackTrace(); }
-            }
-        }
+            JSONObject pObj = new JSONObject();
+            pObj.put("currency", curr);
+            pObj.put("amount", amount);
+            pObj.put("exchange_rate", rate);
+            pObj.put("base_amount", base);
+            
+            // ✅ إضافة طريقة الدفع
+            String[] methodsEn = {"cash", "bank_transfer"};
+            pObj.put("method", methodsEn[posMethod >= 0 ? posMethod : 0]); 
+            
+            paymentsArray.put(pObj);
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+}
 
         if (Math.abs(totalPaidBase - totalGoldValue) > 1) {
             Toast.makeText(requireContext(), "⚠️ إجمالي المدفوعات لا يطابق قيمة الذهب", Toast.LENGTH_LONG).show();
