@@ -10,6 +10,10 @@ public class IncomeStatementDto {
     @SerializedName("to_date")
     public String toDate;
     
+    @SerializedName("branch_id")
+    public int branchId;
+    
+    // ═══ الإيرادات ═══
     @SerializedName("sales_revenue")
     public double salesRevenue;
     
@@ -25,6 +29,7 @@ public class IncomeStatementDto {
     @SerializedName("other_revenue")
     public double otherRevenue;
     
+    // ═══ التكلفة ═══
     @SerializedName("cogs")
     public double cogs;
     
@@ -34,6 +39,7 @@ public class IncomeStatementDto {
     @SerializedName("gross_profit_margin")
     public double grossProfitMargin;
     
+    // ═══ المصروفات التشغيلية ═══
     @SerializedName("operating_expenses")
     public double operatingExpenses;
     
@@ -46,6 +52,7 @@ public class IncomeStatementDto {
     @SerializedName("operating_profit")
     public double operatingProfit;
     
+    // ═══ النتيجة النهائية ═══
     @SerializedName("profit_before_zakat")
     public double profitBeforeZakat;
     
@@ -57,13 +64,14 @@ public class IncomeStatementDto {
     
     @SerializedName("net_profit_margin")
     public double netProfitMargin;
-
+    
+    // ═══ الذهب ═══
     @SerializedName("gold_sales_revenue")
-public double goldSalesRevenue;
-
-@SerializedName("gold_cogs")
-public double goldCogs;
-
-@SerializedName("gold_gross_profit")
-public double goldGrossProfit;
+    public double goldSalesRevenue;
+    
+    @SerializedName("gold_cogs")
+    public double goldCogs;
+    
+    @SerializedName("gold_gross_profit")
+    public double goldGrossProfit;
 }
