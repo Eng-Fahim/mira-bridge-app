@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.adapter.JournalLineAdapter;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.api.dto.JournalAuditDto;
 import com.example.uhf.api.dto.JournalEntryDetailsDto;
 import com.example.uhf.api.dto.JournalEntryDto;
@@ -28,6 +29,8 @@ import com.example.uhf.utils.JournalPdfExporter;
 import com.example.uhf.utils.NumberFormatter;
 import com.example.uhf.viewmodel.AccountingViewModel;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 
 import java.util.ArrayList;
@@ -37,7 +40,7 @@ import java.util.List;
 /**
  * ✅ شاشة تفاصيل القيد المحاسبي
  * - رأس القيد + مبلغ الفاتورة + KPIs + السطور + Audit
- * - زر PDF احترافي
+ * - زر PDF احترافي + زر عكس القيد
  */
 public class MiraJournalEntryDetailsFragment extends Fragment {
 
@@ -53,6 +56,9 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     private LinearLayout auditContainer;
     private ProgressBar pbLoading;
     private ExtendedFloatingActionButton fabActions;
+    
+    // ✅ المتغير الخاص بزر العكس
+    private MaterialButton btnReverseEntry; 
 
     private long entryId = 0;
     private AccountingViewModel viewModel;
@@ -123,6 +129,9 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
         auditContainer  = v.findViewById(R.id.auditContainer);
         pbLoading       = v.findViewById(R.id.pbLoading);
         fabActions      = v.findViewById(R.id.fabActions);
+        
+        // ✅ ربط زر العكس
+        btnReverseEntry = v.findViewById(R.id.btnReverseEntry);
     }
 
     private void setupToolbar() {
@@ -232,6 +241,9 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
 
         // ─── زر PDF ───
         setupPdfButton(entry, details.lines);
+
+        // ✅ إعداد زر العكس
+        setupReverseButton();
     }
 
     private void renderKpis(JournalEntryDto entry) {
@@ -324,6 +336,76 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
+    //  ✅ دوال عكس القيد (مصححة)
+    // ═══════════════════════════════════════════════════════════
+
+    private void setupReverseButton() {
+        if (btnReverseEntry == null) return;
+
+        // إخفاء الزر إذا كان القيد معكوساً مسبقاً أو كان هو نفسه قيداً عكسياً أو مسودة
+        if (currentEntry != null) {
+            boolean isReversed = "reversed".equalsIgnoreCase(currentEntry.status);
+            boolean isReversal = "reversal".equalsIgnoreCase(currentEntry.sourceType);
+            boolean isDraft = "draft".equalsIgnoreCase(currentEntry.status);
+
+            if (isReversed || isReversal || isDraft) {
+                btnReverseEntry.setVisibility(View.GONE);
+            } else {
+                btnReverseEntry.setVisibility(View.VISIBLE);
+                btnReverseEntry.setEnabled(true);
+                btnReverseEntry.setText("🔄 عكس هذا القيد");
+            }
+        } else {
+            btnReverseEntry.setVisibility(View.GONE);
+        }
+
+        btnReverseEntry.setOnClickListener(v -> {
+            new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("⚠️ تأكيد عكس القيد")
+                .setMessage("سيتم إنشاء قيد عكسي جديد لإلغاء تأثير هذا القيد على الحسابات وأوزان الذهب. هل أنت متأكد؟")
+                .setPositiveButton("نعم، اعكس القيد", (dialog, which) -> {
+                    executeReverse();
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
+        });
+    }
+
+    private void executeReverse() {
+        if (currentEntry == null || currentEntry.id <= 0) return;
+
+        btnReverseEntry.setEnabled(false);
+        btnReverseEntry.setText("⏳ جاري العكس...");
+
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(requireContext());
+                // ✅ استخدمنا currentEntry.id بدلاً من currentEntryId
+                MiraApiClient.ApiResponse response = client.reverseJournalEntry(String.valueOf(currentEntry.id));
+
+                requireActivity().runOnUiThread(() -> {
+                    if (response != null && response.isSuccess) {
+                        Toast.makeText(requireContext(), "✅ تم إنشاء القيد العكسي بنجاح", Toast.LENGTH_LONG).show();
+                        // العودة إلى الشاشة السابقة
+                        getParentFragmentManager().popBackStack();
+                    } else {
+                        btnReverseEntry.setEnabled(true);
+                        btnReverseEntry.setText("🔄 عكس هذا القيد");
+                        String err = (response != null && response.error != null) ? response.error : "فشل العكس";
+                        Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                requireActivity().runOnUiThread(() -> {
+                    btnReverseEntry.setEnabled(true);
+                    btnReverseEntry.setText("🔄 عكس هذا القيد");
+                    Toast.makeText(requireContext(), "❌ حدث خطأ في الاتصال", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
+    }
+
+    // ═══════════════════════════════════════════════════════════
     //  PDF Button
     // ═══════════════════════════════════════════════════════════
 
@@ -354,22 +436,22 @@ public class MiraJournalEntryDetailsFragment extends Fragment {
     }
     
     @Override
-public void onStart() {
-    super.onStart();
-    // ✅ إخفاء BottomNav في شاشة التفاصيل
-    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
-        ((com.example.uhf.activity.UHFMainActivity) getActivity())
-            .setBottomNavVisible(false);
+    public void onStart() {
+        super.onStart();
+        // ✅ إخفاء BottomNav في شاشة التفاصيل
+        if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+            ((com.example.uhf.activity.UHFMainActivity) getActivity())
+                .setBottomNavVisible(false);
+        }
     }
-}
 
-@Override
-public void onStop() {
-    super.onStop();
-    // ✅ إظهار BottomNav عند المغادرة
-    if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
-        ((com.example.uhf.activity.UHFMainActivity) getActivity())
-            .setBottomNavVisible(true);
+    @Override
+    public void onStop() {
+        super.onStop();
+        // ✅ إظهار BottomNav عند المغادرة
+        if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+            ((com.example.uhf.activity.UHFMainActivity) getActivity())
+                .setBottomNavVisible(true);
+        }
     }
-}
 }
