@@ -60,22 +60,63 @@
                     android:inputType="none"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- المبلغ النقدي -->
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            <!-- قسم المدفوعات -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💵 المدفوعات (يمكن إضافة أكثر من عملة وطريقة)"
+                android:textColor="?attr/colorPrimary"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:id="@+id/llVoucherPaymentsContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="المبلغ النقدي (YER)"
-                android:layout_marginBottom="8dp"
-                app:boxStrokeColor="?attr/colorPrimary">
-                <EditText
-                    android:id="@+id/etVoucherCashAmount"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                android:orientation="vertical"/>
 
-            <!-- الوزن الذهبي -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddVoucherPayment"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+ إضافة عملة أخرى"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="إجمالي المدفوعات (YER):"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textStyle="bold"/>
+                <TextView
+                    android:id="@+id/tvVoucherTotalPaid"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0.00 YER"
+                    android:textColor="?attr/colorPrimary"
+                    android:textStyle="bold"
+                    android:textSize="16sp"/>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?attr/colorOutlineVariant"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- الوزن الذهبي (اختياري) -->
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
@@ -90,7 +131,6 @@
                     android:inputType="numberDecimal"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- العيار -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -99,19 +139,6 @@
                 android:textSize="12sp"/>
             <Spinner
                 android:id="@+id/spVoucherKarat"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginBottom="12dp"/>
-
-            <!-- طريقة الدفع -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="طريقة الدفع"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"/>
-            <Spinner
-                android:id="@+id/spVoucherPaymentMethod"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:layout_marginBottom="12dp"/>
@@ -137,7 +164,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnVoucherCancel"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -146,7 +172,6 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"
                     android:text="إلغاء"/>
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnVoucherSave"
                     android:layout_width="0dp"
