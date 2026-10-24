@@ -36,7 +36,9 @@ public class FragmentFactory {
         case "RfidBindings": return new MiraRfidBindingsFragment();
         case "SoundSettings": return new MiraSoundSettingsFragment();
         case "Snapshots": return new MiraSnapshotsFragment();
-        case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();   // ← ✅ أضف هذا
+        case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();   
+        // في switch داخل دالة createFragmentByTag
+        case NavigationManager.TAG_VOUCHERS: return new MiraVouchersFragment();
         default: return new MiraDashboardFragment();
     }
 }
