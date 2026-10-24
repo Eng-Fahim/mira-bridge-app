@@ -113,6 +113,9 @@ public class MiraQuickAccessSettings {
                 "server_config", "إعدادات السيرفر", "Server Config",
                 true, R.drawable.ic_server_config));
 
+        actions.add(new QuickAction(
+        "vouchers", "السندات المالية", "Vouchers",
+        true, R.drawable.ic_accounting)); // يمكنك تغيير الأيقونة لاحقاً
         // ═══════════════════════════════════════════════════════
         // ✅ إجراءات إضافية (بدون أيقونة مخصصة)
         // ═══════════════════════════════════════════════════════
