@@ -1,5 +1,6 @@
 package com.example.uhf.fragment;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -38,6 +39,9 @@ public class MiraCashReconciliationFragment extends Fragment {
     private double expectedClosing = 0;
     private boolean isClosed = false;
     private String currentDate;
+    
+    // ✅ العملة الافتراضية (يمكنك جلبها من الإعدادات لاحقاً)
+    private final String CURRENCY = "YER"; 
 
     @Nullable
     @Override
@@ -69,7 +73,6 @@ public class MiraCashReconciliationFragment extends Fragment {
     private void setupListeners() {
         swipeRefresh.setOnRefreshListener(this::loadSummary);
         
-        // حساب الفرق فورياً عند كتابة المبلغ
         etActualCash.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -81,25 +84,43 @@ public class MiraCashReconciliationFragment extends Fragment {
         btnCloseCashier.setOnClickListener(v -> submitClosure());
     }
 
+    // ✅ دالة مساعدة لتنسيق المبالغ بشكل موحد
+    private String formatMoney(double amount) {
+        String formatted;
+        if (amount < 0) {
+            formatted = "-" + String.format(Locale.US, "%,.2f", Math.abs(amount));
+        } else {
+            formatted = String.format(Locale.US, "%,.2f", amount);
+        }
+        return formatted + " " + CURRENCY;
+    }
+
     private void calculateDifference() {
         if (isClosed) return;
         
-        String input = etActualCash.getText() != null ? etActualCash.getText().toString().trim() : "";
-        double actual = input.isEmpty() ? 0 : Double.parseDouble(input);
+        double actual = 0;
+        try {
+            String input = etActualCash.getText() != null ? etActualCash.getText().toString().trim() : "";
+            if (!input.isEmpty() && !input.equals(".")) {
+                actual = Double.parseDouble(input);
+            }
+        } catch (NumberFormatException e) {
+            // ✅ تجاهل الأخطاء أثناء الكتابة (مثل كتابة نقطة فقط)
+        }
+
         double diff = actual - expectedClosing;
 
-        tvDifference.setText(String.format(Locale.US, "%s%.2f", diff >= 0 ? "+" : "", diff));
+        tvDifference.setText(formatMoney(diff));
         
-        // تلوين البطاقة حسب النتيجة
         int color, bgColor;
-        if (Math.abs(diff) < 0.01) { // مطابق تماماً
+        if (Math.abs(diff) < 0.01) { 
             color = 0xFF16A34A; // أخضر
             bgColor = 0xFFF0FDF4;
-        } else if (diff < 0) { // عجز
+        } else if (diff < 0) { 
             color = 0xFFDC2626; // أحمر
             bgColor = 0xFFFEF2F2;
-        } else { // زيادة
-            color = 0xFFF59E0B; // برتقالي (تحذير)
+        } else { 
+            color = 0xFFF59E0B; // برتقالي
             bgColor = 0xFFFFFBEB;
         }
         
@@ -126,10 +147,12 @@ public class MiraCashReconciliationFragment extends Fragment {
                         
                         if (data != null) {
                             expectedClosing = data.optDouble("expected_closing", 0);
-                            tvOpening.setText(String.format(Locale.US, "$%,.2f", data.optDouble("opening_balance", 0)));
-                            tvSales.setText(String.format(Locale.US, "+ $%,.2f", data.optDouble("total_sales_cash", 0)));
-                            tvScrap.setText(String.format(Locale.US, "- $%,.2f", data.optDouble("total_scrap_cash", 0)));
-                            tvExpected.setText(String.format(Locale.US, "$%,.2f", expectedClosing));
+                            
+                            // ✅ استخدام دالة التنسيق بدلاً من $
+                            tvOpening.setText(formatMoney(data.optDouble("opening_balance", 0)));
+                            tvSales.setText("+ " + formatMoney(data.optDouble("total_sales_cash", 0)));
+                            tvScrap.setText("- " + formatMoney(data.optDouble("total_scrap_cash", 0)));
+                            tvExpected.setText(formatMoney(expectedClosing));
                             
                             if (closed) {
                                 isClosed = true;
@@ -140,11 +163,14 @@ public class MiraCashReconciliationFragment extends Fragment {
                                 etActualCash.setEnabled(false);
                                 btnCloseCashier.setEnabled(false);
                                 btnCloseCashier.setText("✅ تم تقفيل هذا اليوم مسبقاً");
-                                tvDifference.setText(String.format(Locale.US, "%s%.2f", diff >= 0 ? "+" : "", diff));
+                                
+                                tvDifference.setText(formatMoney(diff));
                                 tvDifference.setTextColor(diff >= 0 ? 0xFF16A34A : 0xFFDC2626);
                             }
                         }
-                    } catch (Exception e) { e.printStackTrace(); }
+                    } catch (Exception e) { 
+                        e.printStackTrace(); 
+                    }
                 } else {
                     Toast.makeText(requireContext(), "فشل تحميل بيانات الخزينة", Toast.LENGTH_SHORT).show();
                 }
@@ -154,12 +180,18 @@ public class MiraCashReconciliationFragment extends Fragment {
 
     private void submitClosure() {
         String input = etActualCash.getText() != null ? etActualCash.getText().toString().trim() : "";
-        if (input.isEmpty()) {
+        if (input.isEmpty() || input.equals(".")) {
             Toast.makeText(requireContext(), "الرجاء إدخال النقدية الفعلية", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        double actual = Double.parseDouble(input);
+        double actual;
+        try {
+            actual = Double.parseDouble(input);
+        } catch (NumberFormatException e) {
+            Toast.makeText(requireContext(), "الرجاء إدخال رقم صحيح", Toast.LENGTH_SHORT).show();
+            return;
+        }
         
         new androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle("تأكيد التقفيل")
@@ -191,7 +223,13 @@ public class MiraCashReconciliationFragment extends Fragment {
                                 Toast.makeText(requireContext(), "فشل: " + response.error, Toast.LENGTH_SHORT).show();
                             }
                         });
-                    } catch (Exception e) { e.printStackTrace(); }
+                    } catch (Exception e) { 
+                        e.printStackTrace();
+                        getActivity().runOnUiThread(() -> {
+                            btnCloseCashier.setEnabled(true);
+                            btnCloseCashier.setText("🔒 إتمام تقفيل الخزينة");
+                        });
+                    }
                 }).start();
             })
             .setNegativeButton("إلغاء", null)
