@@ -2542,4 +2542,11 @@ public ApiResponse createParty(JSONObject payload) {
 public ApiResponse getPartyStatement(int partyId) {
     return getWithAuth("/parties/" + partyId + "/statement");
 }
+    public ApiResponse getScrapAgingReport(int branchId) {
+    return getWithAuth("/scrap/aging?branch_id=" + branchId);
+}
+
+public ApiResponse getScrapAgingSummary(int branchId) {
+    return getWithAuth("/scrap/aging/summary?branch_id=" + branchId);
+}
 }
