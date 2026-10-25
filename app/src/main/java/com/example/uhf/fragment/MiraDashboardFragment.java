@@ -495,7 +495,6 @@ public class MiraDashboardFragment extends Fragment {
             if (btnToggleScrapVisibility != null) btnToggleScrapVisibility.setImageResource(R.drawable.ic_eye_off);
 
             // ✅ تطبيق الثيم على الرسوم البيانية عند إنشاء الواجهة
-            applyCarouselLayout();
             applyChartTheme();
 
             updateHeroBalance();
@@ -1444,76 +1443,21 @@ public class MiraDashboardFragment extends Fragment {
 
     // ✅ معالجة تغيير الثيم (Dark/Light) أثناء التشغيل دون الحاجة لإعادة إنشاء الشاشة
     @Override
-    public void onConfigurationChanged(@NonNull Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        try {
-            isArabic = newConfig.getLocales().get(0).getLanguage().equals("ar");
-            mainHandler.post(() -> {
-                if (isAdded() && isViewInitialized) {
-                    applyChartTheme();
-                    if (lineChartSales != null) lineChartSales.invalidate();
-                    if (pieChartKarat != null) pieChartKarat.invalidate();
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("onConfigurationChanged", e);
-        }
-    }
-    
-    /**
- * ✅ يحسب عرض البطاقات ديناميكياً بناءً على حجم الشاشة
- * - البطاقة تشغل ~78% من عرض الشاشة
- * - الحد الأدنى 260dp، الأقصى 340dp
- * - يضبط paddingHorizontal للـ ScrollView بحيث تكون البطاقة الوسطى متمركزة
- */
-private void applyCarouselLayout() {
-    if (!isAdded() || getContext() == null) return;
-    if (hsvCarousel == null) return;
-
-    View cardsContainer = hsvCarousel.findViewById(R.id.cardsContainer);
-    if (cardsContainer == null || !(cardsContainer instanceof ViewGroup)) return;
-    ViewGroup container = (ViewGroup) cardsContainer;
-
-    float density = getResources().getDisplayMetrics().density;
-    int screenWidth = getResources().getDisplayMetrics().widthPixels;
-
-    // عرض البطاقة = 78% من الشاشة، بين 260dp و 340dp
-    int cardWidthPx = (int) (screenWidth * 0.78f);
-    int minWidth = (int) (260 * density);
-    int maxWidth = (int) (340 * density);
-    if (cardWidthPx < minWidth) cardWidthPx = minWidth;
-    if (cardWidthPx > maxWidth) cardWidthPx = maxWidth;
-
-    // الهامش الجانبي = (عرض الشاشة - عرض البطاقة) / 2
-    int sidePadding = (screenWidth - cardWidthPx) / 2;
-    if (sidePadding < (int) (24 * density)) sidePadding = (int) (24 * density);
-
-    hsvCarousel.setClipToPadding(false);
-    hsvCarousel.setPadding(sidePadding, 0, sidePadding, 0);
-
-    // تطبيق العرض على البطاقات
-    for (int i = 0; i < container.getChildCount(); i++) {
-        View child = container.getChildAt(i);
-        ViewGroup.LayoutParams lp = child.getLayoutParams();
-        if (lp.width != cardWidthPx) {
-            lp.width = cardWidthPx;
-            child.setLayoutParams(lp);
-        }
-    }
-
-    // إعادة تمركز البطاقة الوسطى
-    hsvCarousel.post(() -> {
-        if (!isAdded() || getContext() == null) return;
-        if (container.getChildCount() > 1) {
-            View middleCard = container.getChildAt(1);
-            if (middleCard != null) {
-                int scrollToX = middleCard.getLeft()
-                        - (screenWidth / 2)
-                        + (middleCard.getWidth() / 2);
-                hsvCarousel.smoothScrollTo(scrollToX, 0);
+public void onConfigurationChanged(@NonNull Configuration newConfig) {
+    super.onConfigurationChanged(newConfig);
+    try {
+        isArabic = newConfig.getLocales().get(0).getLanguage().equals("ar");
+        mainHandler.post(() -> {
+            if (isAdded() && isViewInitialized) {
+                applyCarouselLayout();  // ✅ لإعادة الحساب عند الدوران
+                applyChartTheme();
+                if (lineChartSales != null) lineChartSales.invalidate();
+                if (pieChartKarat != null) pieChartKarat.invalidate();
             }
-        }
-    });
+        });
+    } catch (Exception e) {
+        logNonFatal("onConfigurationChanged", e);
+    }
 }
 
     @Override
@@ -1554,4 +1498,4 @@ private void applyCarouselLayout() {
         if (permissionManager == null) return false;
         return permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin() || permissionManager.isFinanceManager();
     }
-                            }
+                                      }
