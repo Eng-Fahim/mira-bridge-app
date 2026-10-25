@@ -45,8 +45,9 @@ public class MiraAccountingFragment extends Fragment {
     private static final int TAB_PROFIT      = 11; // ✅ تبويب تحليل الأرباح الجديد
     
     private static final int TAB_REVALUATION = 12; // ✅ تبويب إعادة تقييم المخزون الجديد
-    private static final int TAB_PERIOD_LOCK = 13; // ✅ تبويب قفل الفترات الجديد
-    private static final int MAX_TABS        = 14;
+    private static final int TAB_PERIOD_LOCK = 13;
+    private static final int TAB_CHEQUES     = 14; // ✅ تبويب الشيكات الجديد
+    private static final int MAX_TABS        = 15;
 
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
@@ -218,6 +219,7 @@ public class MiraAccountingFragment extends Fragment {
         addTab("📊 الأرباح",    "📊 Profit");     // ✅ التبويب الجديد
         addTab("⚖️ التقييم",    "⚖️ Revaluation"); // ✅ التبويب الجديد
         addTab("🔐 الفترات",    "🔐 Periods");
+        addTab("📑 الشيكات",    "📑 Cheques"); // ✅ إضافة التبويب
         
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
@@ -299,7 +301,6 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_INCOME:   return new MiraIncomeStatementFragment();
                 case TAB_BALANCE:  return new MiraBalanceSheetFragment();
                 case TAB_GOLD:     return new MiraGoldMovementFragment();
-
                 case TAB_LEDGER: {
                     MiraGeneralLedgerFragment f = new MiraGeneralLedgerFragment();
                     if (pendingLedgerAccountId > 0) {
@@ -326,8 +327,8 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_REVALUATION: // ✅ ربط تبويب إعادة التقييم
                     return new MiraInventoryRevaluationFragment();
                 
-                case TAB_PERIOD_LOCK:
-                    return new MiraPeriodLockFragment();
+                case TAB_PERIOD_LOCK:return new MiraPeriodLockFragment();
+                case TAB_CHEQUES:return new MiraChequeFragment(); // ✅ ربط الشاشة
                 default: return new MiraJournalFragment();
             }
         } catch (Exception e) {
@@ -338,7 +339,7 @@ public class MiraAccountingFragment extends Fragment {
 
     public void navigateToTab(int tabIndex) {
         // ✅ السماح بالوصول حتى آخر تبويب (التقييم)
-        if (tabIndex < 0 || tabIndex > TAB_PERIOD_LOCK || tabLayout == null) return;
+        if (tabIndex < 0 || tabIndex > TAB_CHEQUES || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
