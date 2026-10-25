@@ -14,17 +14,16 @@
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="#FDFBF7" <!-- لون مطابق لبداية النقشة -->
         android:stateListAnimator="@null"
         app:elevation="0dp"
         app:liftOnScroll="false">
 
-        <!-- ✅ تطبيق النقشة الذهبية هنا -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@drawable/bg_header_gold_pattern"
+            android:background="@drawable/bg_header_gold_pattern" <!-- النقشة هنا -->
             android:paddingHorizontal="8dp"
             app:contentInsetStartWithNavigation="0dp"
             app:menu="@menu/main_menu">
@@ -46,7 +45,6 @@
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:text="منظومة الذهب الدولية" />
-                    <!-- ملاحظة: قمت بتغيير اللون إلى الأسود ليتناسب مع الخلفية الذهبية الفاتحة -->
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -83,10 +81,8 @@
                         android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
-
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- ✅ مُخفى — الأزرار نُقلت إلى Toolbar الرئيسي -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
@@ -99,7 +95,6 @@
             app:contentInsetStartWithNavigation="0dp"
             app:paddingEnd="0dp"
             app:paddingStart="0dp" />
-
     </com.google.android.material.appbar.AppBarLayout>
 
     <!-- 2. MAIN CONTENT -->
@@ -129,7 +124,6 @@
             android:clickable="true"
             android:focusable="true"
             android:visibility="gone">
-
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -137,7 +131,6 @@
                 android:indeterminate="true"
                 app:indicatorColor="?attr/colorPrimary" />
         </FrameLayout>
-
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- 3+4. FLOATING NAV + FAB -->
@@ -151,7 +144,6 @@
         android:paddingHorizontal="16dp"
         android:paddingBottom="24dp">
 
-        <!-- الشريط بتصميم كبسولة -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
@@ -173,7 +165,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- الزر العائم (FAB) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="76dp"
@@ -190,7 +181,5 @@
             app:maxImageSize="32dp"
             app:pressedTranslationZ="8dp"
             app:tint="?attr/colorOnPrimary" />
-
     </androidx.constraintlayout.widget.ConstraintLayout>
-
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
