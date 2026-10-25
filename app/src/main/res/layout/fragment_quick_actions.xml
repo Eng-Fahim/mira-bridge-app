@@ -286,35 +286,37 @@
                 android:textSize="11sp"
                 tools:text="مالية" />
         </LinearLayout>
-        <!-- ✅ جديد: السندات المالية -->
-<LinearLayout
-    android:id="@+id/cardVouchers"
-    android:layout_width="0dp"
-    android:layout_height="wrap_content"
-    android:layout_columnWeight="1"
-    android:layout_margin="4dp"
-    android:background="?attr/selectableItemBackground"
-    android:clickable="true"
-    android:focusable="true"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:paddingVertical="12dp">
-    <ImageView
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:importantForAccessibility="no"
-        android:src="@drawable/ic_accounting"
-        app:tint="?attr/colorPrimary" />
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center"
-        android:maxLines="2"
-        android:text="سندات"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="11sp" />
-</LinearLayout>
+        
+        <!-- ✅ السندات المالية -->
+        <LinearLayout
+            android:id="@+id/cardVouchers"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="12dp">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_accounting"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:text="سندات"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="11sp" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/cardTransfer"
             android:layout_width="0dp"
@@ -345,6 +347,7 @@
                 tools:text="تحويلات" />
         </LinearLayout>
 
+        <!-- ═══ ROW 3 ═══ -->
         <LinearLayout
             android:id="@+id/cardSalesHistory"
             android:layout_width="0dp"
@@ -375,7 +378,36 @@
                 tools:text="مبيعات" />
         </LinearLayout>
 
-        <!-- ═══ ROW 3 ═══ -->
+        <!-- ✅ أمر صياغة -->
+        <LinearLayout
+            android:id="@+id/cardGoldConversion"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="12dp">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_gold_scrap"
+                app:tint="?attr/colorPrimary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:text="أمر صياغة"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="11sp" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/cardAdminHub"
             android:layout_width="0dp"
@@ -436,7 +468,7 @@
                 tools:text="سيرفر" />
         </LinearLayout>
 
-        <!-- ✨ جديد: إدارة المستخدمين -->
+        <!-- ✨ إدارة المستخدمين -->
         <LinearLayout
             android:id="@+id/cardAdminUsers"
             android:layout_width="0dp"
@@ -467,7 +499,7 @@
                 tools:text="مستخدمين" />
         </LinearLayout>
 
-        <!-- ✨ جديد: إدارة الفروع -->
+        <!-- ✨ إدارة الفروع -->
         <LinearLayout
             android:id="@+id/cardAdminBranches"
             android:layout_width="0dp"
