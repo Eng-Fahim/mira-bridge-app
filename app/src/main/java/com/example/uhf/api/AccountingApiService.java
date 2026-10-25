@@ -145,7 +145,11 @@ Call<ApiResponseDto<BalanceSheetDto>> getBalanceSheet(
     @Query("date") String date,
     @Query("branch_id") Integer branchId
 );
-
+@GET("accounting/aging-report")
+Call<ApiResponseDto<Object>> getAgingReport(
+    @Query("as_of") String asOfDate,
+    @Query("type") String type
+);
     @POST("accounting/fiscal-years/close")
 Call<ApiResponseDto<Object>> closeFiscalYear(@Body org.json.JSONObject payload);
 }
