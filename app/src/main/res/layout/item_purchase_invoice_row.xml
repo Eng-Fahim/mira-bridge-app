@@ -34,7 +34,8 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginStart="8dp"
-            android:src="@android:drawable/ic_menu_delete"
+            android:src="@drawable/ic_delete"
+            android:contentDescription="حذف"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="#DC2626"/>
     </LinearLayout>
