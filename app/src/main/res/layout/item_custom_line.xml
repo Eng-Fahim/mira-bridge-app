@@ -58,7 +58,7 @@
                 android:layout_height="wrap_content"
                 android:padding="10dp"
                 android:text="اختر الحساب..."
-                android:textColor="#7F8C8D"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp"/>
         </com.google.android.material.card.MaterialCardView>
 
@@ -68,21 +68,23 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
+            <!-- ✅ تم نقل الـ hint إلى TextInputLayout -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
+                android:hint="مدين (مالي)"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDebit"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="مدين (مالي)"
                     android:inputType="numberDecimal"
-                    android:textSize="12sp"
-                    android:textColor="#3498DB"/>
+                    android:digits="0123456789." 
+                    android:textSize="14sp"
+                    android:textColor="?attr/colorOnSurface"/>
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
@@ -90,20 +92,21 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
+                android:hint="دائن (مالي)"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etCredit"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="دائن (مالي)"
                     android:inputType="numberDecimal"
-                    android:textSize="12sp"
-                    android:textColor="#E74C3C"/>
+                    android:digits="0123456789."
+                    android:textSize="14sp"
+                    android:textColor="?attr/colorOnSurface"/>
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
-        <!-- ✅ أوزان الذهب الجديدة -->
+        <!-- ✅ أوزان الذهب -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -115,15 +118,16 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
+                android:hint="مدين (جرام)"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etGoldDebit"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="مدين (جرام)"
                     android:inputType="numberDecimal"
-                    android:textSize="12sp"
+                    android:digits="0123456789."
+                    android:textSize="14sp"
                     android:textColor="@color/mira_gold"/>
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -132,15 +136,16 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
+                android:hint="دائن (جرام)"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etGoldCredit"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="دائن (جرام)"
                     android:inputType="numberDecimal"
-                    android:textSize="12sp"
+                    android:digits="0123456789."
+                    android:textSize="14sp"
                     android:textColor="@color/mira_gold"/>
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
@@ -150,14 +155,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:hint="بيان السطر (اختياري)"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etLineDescription"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="بيان السطر (اختياري)"
-                android:textSize="12sp"/>
+                android:textSize="14sp"
+                android:textColor="?attr/colorOnSurface"/>
         </com.google.android.material.textfield.TextInputLayout>
 
     </LinearLayout>
