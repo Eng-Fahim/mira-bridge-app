@@ -2588,4 +2588,10 @@ public ApiResponse reverseJournalEntry(String entryId) {
     }
     return getAccounting(url);
     }
+    public ApiResponse previewInventoryRevaluation(int branchId) {
+    return getAccounting("/accounting/inventory-revaluation/preview?branch_id=" + branchId);
+}
+public ApiResponse postInventoryRevaluation(JSONObject payload) {
+    return postAccounting("/accounting/inventory-revaluation/post", payload);
+}
 }
