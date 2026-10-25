@@ -149,19 +149,21 @@ public class MiraGoldConversionFragment extends Fragment {
         try {
             payload.put("customer_name", customer);
             
-            // بيانات الداخل
+            // بيانات الداخل (نرسل السعر الأصلي للجرام كما يطلبه السيرفر الآن)
             payload.put("in_weight", getDouble(etInWeight));
             payload.put("in_karat", ddInKarat.getText().toString().replace("K", ""));
             payload.put("in_wastage", getDouble(etInWastage));
-            payload.put("in_value", inTotalValue);
+            payload.put("in_price", getDouble(etInPrice)); // ✅ التعديل: السيرفر يحتاج السعر
             
-            // بيانات الخارج
+            // بيانات الخارج (نرسل السعر الأصلي والمصنعية للجرام)
             payload.put("out_weight", getDouble(etOutWeight));
             payload.put("out_karat", ddOutKarat.getText().toString().replace("K", ""));
-            payload.put("out_value", outTotalValue);
-            payload.put("making_charge", getDouble(etOutWeight) * getDouble(etMakingCharge));
+            payload.put("out_price", getDouble(etOutPrice)); // ✅ التعديل: السيرفر يحتاج السعر
+            payload.put("making_charge_per_gram", getDouble(etMakingCharge)); // ✅ التعديل: السيرفر يحتاج مصنعية الجرام
             
-            // التسوية
+            // التسوية (نرسل القيمة التي سيدفعها/يستلمها العميل)
+            // إذا كانت settlementAmount سالبة (العميل مدين لنا)، نرسلها موجبة للسيرفر
+            // إذا كانت موجبة (نحن مدينون له)، نرسلها سالبة للسيرفر
             payload.put("settlement_amount", -settlementAmount); 
             payload.put("payment_method", "cash"); 
         } catch (Exception ignored) {}
