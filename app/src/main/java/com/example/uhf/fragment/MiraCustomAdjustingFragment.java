@@ -1,5 +1,6 @@
 package com.example.uhf.fragment;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,15 +17,14 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.api.dto.AccountDto;
 import com.example.uhf.dialog.AccountPickerBottomSheet;
-import com.example.uhf.utils.NumberFormatter;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
@@ -37,15 +37,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * ✅ شاشة قيد تسوية مخصص — متعدد السطور
- * - تدعم المبالغ المالية وأوزان الذهب
- */
 public class MiraCustomAdjustingFragment extends Fragment {
 
     private static final String TAG = "CustomAdjusting";
 
-    // Views
     private com.google.android.material.appbar.MaterialToolbar toolbar;
     private TextInputEditText etEntryDescription, etReference;
     private TextView tvTotalDebit, tvTotalCredit, tvDifference, tvBalanceStatus;
@@ -53,34 +48,26 @@ public class MiraCustomAdjustingFragment extends Fragment {
     private ExtendedFloatingActionButton fabSave;
     private RecyclerView rvLines;
     private ProgressBar pbLoading;
-    private MaterialCardView cardSummary;
 
-    // State
     private final List<LineModel> lines = new ArrayList<>();
     private LineAdapter adapter;
     private MiraApiClient apiClient;
 
-    /**
-     * نموذج السطر (تمت إضافة أوزان الذهب)
-     */
     public static class LineModel {
         public long accountId = 0;
         public String accountCode = "";
         public String accountName = "";
         public double debit = 0;
         public double credit = 0;
-        public double goldDebit = 0;  // ✅ وزن الذهب المدين
-        public double goldCredit = 0; // ✅ وزن الذهب الدائن
+        public double goldDebit = 0;
+        public double goldCredit = 0;
         public String description = "";
     }
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_custom_adjusting,
-            container, false);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View v = inflater.inflate(R.layout.fragment_custom_adjusting, container, false);
 
         apiClient = MiraApiClient.getInstance(requireContext().getApplicationContext());
 
@@ -89,7 +76,6 @@ public class MiraCustomAdjustingFragment extends Fragment {
         setupRecycler();
         setupListeners();
 
-        // ابدأ بسطرين: مدين + دائن
         addLine();
         addLine();
 
@@ -108,7 +94,6 @@ public class MiraCustomAdjustingFragment extends Fragment {
         fabSave              = v.findViewById(R.id.fabSave);
         rvLines              = v.findViewById(R.id.rvLines);
         pbLoading            = v.findViewById(R.id.pbLoading);
-        cardSummary          = v.findViewById(R.id.cardSummary);
     }
 
     private void setupToolbar() {
@@ -152,10 +137,6 @@ public class MiraCustomAdjustingFragment extends Fragment {
         fabSave.setOnClickListener(v -> saveEntry());
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Line Management
-    // ═══════════════════════════════════════════════════════════
-
     private void addLine() {
         lines.add(new LineModel());
         adapter.notifyItemInserted(lines.size() - 1);
@@ -165,8 +146,7 @@ public class MiraCustomAdjustingFragment extends Fragment {
 
     private void removeLine(int position) {
         if (lines.size() <= 2) {
-            Toast.makeText(requireContext(),
-                "⚠️ يجب أن يبقى سطران على الأقل", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "⚠️ يجب أن يبقى سطران على الأقل", Toast.LENGTH_SHORT).show();
             return;
         }
         lines.remove(position);
@@ -174,10 +154,6 @@ public class MiraCustomAdjustingFragment extends Fragment {
         adapter.notifyItemRangeChanged(position, lines.size() - position);
         updateTotals();
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Totals
-    // ═══════════════════════════════════════════════════════════
 
     private void updateTotals() {
         double totalDebit = 0;
@@ -203,37 +179,32 @@ public class MiraCustomAdjustingFragment extends Fragment {
         boolean goldBalanced = Math.abs(goldDiff) < 0.001;
 
         if (moneyBalanced && goldBalanced) {
-            tvDifference.setTextColor(0xFF27AE60); // أخضر
+            tvDifference.setTextColor(Color.parseColor("#27AE60"));
             tvBalanceStatus.setText("✅ القيد متوازن — جاهز للحفظ");
-            tvBalanceStatus.setTextColor(0xFF27AE60);
+            tvBalanceStatus.setTextColor(Color.parseColor("#27AE60"));
             fabSave.setEnabled(true);
             fabSave.setAlpha(1f);
         } else if (totalDebit == 0 && totalCredit == 0 && totalGoldDebit == 0) {
-            tvDifference.setTextColor(0xFF7F8C8D);
+            tvDifference.setTextColor(Color.parseColor("#7F8C8D"));
             tvBalanceStatus.setText("⚪ لم تُدخل بيانات بعد");
-            tvBalanceStatus.setTextColor(0xFF7F8C8D);
+            tvBalanceStatus.setTextColor(Color.parseColor("#7F8C8D"));
             fabSave.setEnabled(false);
             fabSave.setAlpha(0.5f);
         } else {
-            tvDifference.setTextColor(0xFFE74C3C); // أحمر
+            tvDifference.setTextColor(Color.parseColor("#E74C3C"));
             if (!moneyBalanced) {
                 tvBalanceStatus.setText("⚠️ غير متوازن مالياً — الفرق: " + String.format(Locale.US, "%,.2f", Math.abs(diff)));
             } else if (!goldBalanced) {
                 tvBalanceStatus.setText("⚠️ غير متوازن وزنياً — الفرق: " + String.format(Locale.US, "%.3f", Math.abs(goldDiff)) + "g");
             }
-            tvBalanceStatus.setTextColor(0xFFE74C3C);
+            tvBalanceStatus.setTextColor(Color.parseColor("#E74C3C"));
             fabSave.setEnabled(false);
             fabSave.setAlpha(0.5f);
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Save
-    // ═══════════════════════════════════════════════════════════
-
     private void saveEntry() {
-        String desc = etEntryDescription.getText() != null
-            ? etEntryDescription.getText().toString().trim() : "";
+        String desc = etEntryDescription.getText() != null ? etEntryDescription.getText().toString().trim() : "";
         if (desc.isEmpty()) {
             Toast.makeText(requireContext(), "⚠️ أدخل وصف القيد", Toast.LENGTH_SHORT).show();
             etEntryDescription.requestFocus();
@@ -265,9 +236,8 @@ public class MiraCustomAdjustingFragment extends Fragment {
                 line.put("description", l.description);
                 line.put("debit", l.debit);
                 line.put("credit", l.credit);
-                line.put("gold_debit_grams", l.goldDebit);   
-                line.put("gold_credit_grams", l.goldCredit); 
-                
+                line.put("gold_debit_grams", l.goldDebit);
+                line.put("gold_credit_grams", l.goldCredit);
 
                 linesArr.put(line);
 
@@ -355,8 +325,7 @@ public class MiraCustomAdjustingFragment extends Fragment {
         @NonNull
         @Override
         public LineVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_custom_line, parent, false);
+            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_custom_line, parent, false);
             return new LineVH(v);
         }
 
@@ -368,19 +337,31 @@ public class MiraCustomAdjustingFragment extends Fragment {
 
             if (line.accountId > 0) {
                 h.tvAccountDisplay.setText(line.accountCode + " - " + line.accountName);
-                h.tvAccountDisplay.setTextColor(h.itemView.getResources().getColor(android.R.color.primary_text_dark, null));
+                // ✅ إصلاح اللون: استخدام لون النص المناسب للثيم
+                int colorOnSurface = com.google.android.material.color.MaterialColors.getColor(h.itemView, com.google.android.material.R.attr.colorOnSurface);
+                h.tvAccountDisplay.setTextColor(colorOnSurface);
             } else {
                 h.tvAccountDisplay.setText("اختر الحساب...");
-                h.tvAccountDisplay.setTextColor(0xFF7F8C8D);
+                int colorOnSurfaceVariant = com.google.android.material.color.MaterialColors.getColor(h.itemView, com.google.android.material.R.attr.colorOnSurfaceVariant);
+                h.tvAccountDisplay.setTextColor(colorOnSurfaceVariant);
             }
 
-            // Amounts (بدون triggering watcher)
-            h.etDebit.setText(line.debit > 0 ? String.format(Locale.US, "%.2f", line.debit) : "");
-            h.etCredit.setText(line.credit > 0 ? String.format(Locale.US, "%.2f", line.credit) : "");
-            h.etGoldDebit.setText(line.goldDebit > 0 ? String.format(Locale.US, "%.3f", line.goldDebit) : "");
-            h.etGoldCredit.setText(line.goldCredit > 0 ? String.format(Locale.US, "%.3f", line.goldCredit) : "");
-            
-            h.etLineDescription.setText(line.description);
+            // ✅ إصلاح الكتابة: تحديث النصوص فقط إذا لم تكن في حالة تحرير (لتجنب مسح النص)
+            if (!h.etDebit.hasFocus()) {
+                h.etDebit.setText(line.debit != 0 ? String.format(Locale.US, "%.2f", line.debit) : "");
+            }
+            if (!h.etCredit.hasFocus()) {
+                h.etCredit.setText(line.credit != 0 ? String.format(Locale.US, "%.2f", line.credit) : "");
+            }
+            if (!h.etGoldDebit.hasFocus()) {
+                h.etGoldDebit.setText(line.goldDebit != 0 ? String.format(Locale.US, "%.3f", line.goldDebit) : "");
+            }
+            if (!h.etGoldCredit.hasFocus()) {
+                h.etGoldCredit.setText(line.goldCredit != 0 ? String.format(Locale.US, "%.3f", line.goldCredit) : "");
+            }
+            if (!h.etLineDescription.hasFocus()) {
+                h.etLineDescription.setText(line.description);
+            }
 
             h.cardAccount.setOnClickListener(v -> openAccountPicker(line, h));
             h.btnRemoveLine.setOnClickListener(v -> removeLine(h.getAdapterPosition()));
@@ -391,7 +372,12 @@ public class MiraCustomAdjustingFragment extends Fragment {
                 @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
                 @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
                 @Override public void afterTextChanged(Editable s) {
-                    try { line.debit = s.toString().trim().isEmpty() ? 0 : Double.parseDouble(s.toString()); } catch (Exception e) { line.debit = 0; }
+                    String text = s.toString().trim();
+                    if (text.isEmpty()) {
+                        line.debit = 0;
+                    } else {
+                        try { line.debit = Double.parseDouble(text); } catch (Exception ignored) {}
+                    }
                     updateTotals();
                 }
             };
@@ -403,31 +389,46 @@ public class MiraCustomAdjustingFragment extends Fragment {
                 @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
                 @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
                 @Override public void afterTextChanged(Editable s) {
-                    try { line.credit = s.toString().trim().isEmpty() ? 0 : Double.parseDouble(s.toString()); } catch (Exception e) { line.credit = 0; }
+                    String text = s.toString().trim();
+                    if (text.isEmpty()) {
+                        line.credit = 0;
+                    } else {
+                        try { line.credit = Double.parseDouble(text); } catch (Exception ignored) {}
+                    }
                     updateTotals();
                 }
             };
             h.etCredit.addTextChangedListener(h.creditWatcher);
 
-            // ✅ Gold Debit watcher
+            // Gold Debit watcher
             if (h.goldDebitWatcher != null) h.etGoldDebit.removeTextChangedListener(h.goldDebitWatcher);
             h.goldDebitWatcher = new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
                 @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
                 @Override public void afterTextChanged(Editable s) {
-                    try { line.goldDebit = s.toString().trim().isEmpty() ? 0 : Double.parseDouble(s.toString()); } catch (Exception e) { line.goldDebit = 0; }
+                    String text = s.toString().trim();
+                    if (text.isEmpty()) {
+                        line.goldDebit = 0;
+                    } else {
+                        try { line.goldDebit = Double.parseDouble(text); } catch (Exception ignored) {}
+                    }
                     updateTotals();
                 }
             };
             h.etGoldDebit.addTextChangedListener(h.goldDebitWatcher);
 
-            // ✅ Gold Credit watcher
+            // Gold Credit watcher
             if (h.goldCreditWatcher != null) h.etGoldCredit.removeTextChangedListener(h.goldCreditWatcher);
             h.goldCreditWatcher = new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
                 @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
                 @Override public void afterTextChanged(Editable s) {
-                    try { line.goldCredit = s.toString().trim().isEmpty() ? 0 : Double.parseDouble(s.toString()); } catch (Exception e) { line.goldCredit = 0; }
+                    String text = s.toString().trim();
+                    if (text.isEmpty()) {
+                        line.goldCredit = 0;
+                    } else {
+                        try { line.goldCredit = Double.parseDouble(text); } catch (Exception ignored) {}
+                    }
                     updateTotals();
                 }
             };
@@ -438,7 +439,9 @@ public class MiraCustomAdjustingFragment extends Fragment {
             h.descWatcher = new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
                 @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
-                @Override public void afterTextChanged(Editable s) { line.description = s.toString(); }
+                @Override public void afterTextChanged(Editable s) {
+                    line.description = s.toString();
+                }
             };
             h.etLineDescription.addTextChangedListener(h.descWatcher);
         }
@@ -456,23 +459,21 @@ public class MiraCustomAdjustingFragment extends Fragment {
             line.accountCode = account.accountCode != null ? account.accountCode : "";
             line.accountName = account.accountNameAr != null ? account.accountNameAr : "";
             holder.tvAccountDisplay.setText(line.accountCode + " - " + line.accountName);
-            holder.tvAccountDisplay.setTextColor(0xFF000000);
+            // ✅ إصلاح اللون هنا أيضاً
+            int colorOnSurface = com.google.android.material.color.MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorOnSurface);
+            holder.tvAccountDisplay.setTextColor(colorOnSurface);
         });
         picker.show(getParentFragmentManager(), "AccountPicker");
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  ViewHolder
-    // ═══════════════════════════════════════════════════════════
 
     static class LineVH extends RecyclerView.ViewHolder {
         TextView tvLineNumber, tvAccountDisplay;
         ImageButton btnRemoveLine;
         MaterialCardView cardAccount;
         TextInputEditText etDebit, etCredit, etLineDescription;
-        TextInputEditText etGoldDebit, etGoldCredit; // ✅ الحقول الجديدة
+        TextInputEditText etGoldDebit, etGoldCredit;
         TextWatcher debitWatcher, creditWatcher, descWatcher;
-        TextWatcher goldDebitWatcher, goldCreditWatcher; // ✅ المستمعات الجديدة
+        TextWatcher goldDebitWatcher, goldCreditWatcher;
 
         LineVH(@NonNull View v) {
             super(v);
@@ -483,8 +484,8 @@ public class MiraCustomAdjustingFragment extends Fragment {
             etDebit            = v.findViewById(R.id.etDebit);
             etCredit           = v.findViewById(R.id.etCredit);
             etLineDescription  = v.findViewById(R.id.etLineDescription);
-            etGoldDebit        = v.findViewById(R.id.etGoldDebit);  // ✅
-            etGoldCredit       = v.findViewById(R.id.etGoldCredit); // ✅
+            etGoldDebit        = v.findViewById(R.id.etGoldDebit);
+            etGoldCredit       = v.findViewById(R.id.etGoldCredit);
         }
     }
 }
