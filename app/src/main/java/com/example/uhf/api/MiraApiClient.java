@@ -2613,4 +2613,13 @@ public ApiResponse postInventoryRevaluation(JSONObject payload) {
     if (action != null && !action.isEmpty()) url += "&action=" + action;
     return getAccounting(url);
     }
+
+    // ==================== قفل الفترات المالية ====================
+public ApiResponse togglePeriodLock(JSONObject payload) {
+    return postAccounting("/accounting/lock-period", payload);
+}
+
+public ApiResponse getLockedPeriods() {
+    return getAccounting("/accounting/locked-periods");
+}
 }
