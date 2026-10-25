@@ -2805,9 +2805,8 @@
 
 
 <!-- Carousel Gold Card -->
-<string name="gold_prices_title">🥇 أسعار الذهب المباشرة</string>
+
 <string name="gold_ounce_label">سعر الأونصة العالمي</string>
-<string name="refresh_gold_prices">تحديث أسعار الذهب</string>
 
 <!-- Hero Card -->
 <string name="hero_badge">MIRA ID™</string>
@@ -2815,10 +2814,7 @@
 <string name="hero_current_value_label">القيمة الحالية</string>
 
 <!-- Sales Card -->
-<string name="sales_summary_title">📈 ملخص المبيعات</string>
-<string name="sales_today">مبيعات اليوم</string>
-<string name="sales_month">مبيعات الشهر</string>
-<string name="sales_year">مبيعات السنة</string>
+<string name="sales_summary_title">📈 ملخص المبيعات</string>>
 
 <!-- Scrap Gold -->
 <string name="scrap_buy_new">➕ شراء جديد</string>
