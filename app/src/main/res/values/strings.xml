@@ -2803,4 +2803,45 @@
 <string name="last_3_months">آخر 3 أشهر</string>
 <string name="custom_range">فترة مخصصة</string>
 
+
+<!-- Carousel Gold Card -->
+<string name="gold_prices_title">🥇 أسعار الذهب المباشرة</string>
+<string name="gold_ounce_label">سعر الأونصة العالمي</string>
+<string name="refresh_gold_prices">تحديث أسعار الذهب</string>
+
+<!-- Hero Card -->
+<string name="hero_badge">MIRA ID™</string>
+<string name="hero_total_label">إجمالي قيمة المخزون</string>
+<string name="hero_current_value_label">القيمة الحالية</string>
+
+<!-- Sales Card -->
+<string name="sales_summary_title">📈 ملخص المبيعات</string>
+<string name="sales_today">مبيعات اليوم</string>
+<string name="sales_month">مبيعات الشهر</string>
+<string name="sales_year">مبيعات السنة</string>
+
+<!-- Scrap Gold -->
+<string name="scrap_buy_new">➕ شراء جديد</string>
+<string name="scrap_history">📋 السجل</string>
+<string name="scrap_batches">📦 الدفعات</string>
+
+<!-- Scrap Aging -->
+<string name="scrap_aging_title">🕰️ أعمار مخزون الكسر</string>
+<string name="scrap_unfiltered_weight">الوزن غير المُصفّى</string>
+<string name="scrap_invoice_count">عدد الفواتير</string>
+<string name="scrap_aging_report">📊 عرض التقرير الكامل</string>
+<string name="status_healthy">سليم</string>
+<string name="aging_alert_default">يوجد كسر قديم</string>
+
+<!-- Charts -->
+<string name="chart_sales_trend_title">📈 حركة المبيعات (7 أيام)</string>
+<string name="chart_sales_by_karat_title">🥧 توزيع المبيعات حسب العيار (30 يوم)</string>
+
+<!-- Recent Activity -->
+<string name="recent_activity_title">⚡ آخر العمليات</string>
+<string name="view_all_arrow">عرض الكل →</string>
+<string name="view_arrow">عرض →</string>
+
+<!-- General -->
+<string name="toggle_visibility">إظهار/إخفاء</string>
 </resources>
