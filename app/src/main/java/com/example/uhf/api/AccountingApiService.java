@@ -169,4 +169,9 @@ public interface AccountingApiService {
 
     @GET("currencies/rates")
     Call<ApiResponseDto<Object[]>> getExchangeRates();
+    @POST("accounting/lock-period")
+    Call<ApiResponseDto<Object>> togglePeriodLock(@Body org.json.JSONObject payload);
+    
+    @GET("accounting/locked-periods")
+    Call<ApiResponseDto<Object[]>> getLockedPeriods();
 }
