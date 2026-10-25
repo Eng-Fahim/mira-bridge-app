@@ -31,18 +31,20 @@ public class MiraAccountingFragment extends Fragment {
     // ═══════════════════════════════════════════════════════
     //  تعريف التبويبات
     // ═══════════════════════════════════════════════════════
-    private static final int TAB_JOURNAL   = 0;
-    private static final int TAB_TRIAL     = 1;
-    private static final int TAB_ACCOUNTS  = 2;
-    private static final int TAB_INCOME    = 3;
-    private static final int TAB_BALANCE   = 4;
-    private static final int TAB_GOLD      = 5;
-    private static final int TAB_LEDGER    = 6;
-    private static final int TAB_ADJUSTING = 7;
-    private static final int TAB_CASH      = 8;
-    private static final int TAB_AGING     = 9;  // ✅ تبويب أعمار الديون الجديد
-    private static final int TAB_FISCAL    = 10; // ✅ تبويب إقفال السنة الجديد
-    private static final int MAX_TABS      = 11;
+    private static final int TAB_JOURNAL     = 0;
+    private static final int TAB_TRIAL       = 1;
+    private static final int TAB_ACCOUNTS    = 2;
+    private static final int TAB_INCOME      = 3;
+    private static final int TAB_BALANCE     = 4;
+    private static final int TAB_GOLD        = 5;
+    private static final int TAB_LEDGER      = 6;
+    private static final int TAB_ADJUSTING   = 7;
+    private static final int TAB_CASH        = 8;
+    private static final int TAB_AGING       = 9;
+    private static final int TAB_FISCAL      = 10;
+    private static final int TAB_PROFIT      = 11; // ✅ تبويب تحليل الأرباح الجديد
+    private static final int TAB_REVALUATION = 12; // ✅ تبويب إعادة تقييم المخزون الجديد
+    private static final int MAX_TABS        = 13;
 
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
@@ -209,8 +211,10 @@ public class MiraAccountingFragment extends Fragment {
         addTab("📖 الأستاذ",    "📖 Ledger");
         addTab("📝 التسويات",   "📝 Adjust");
         addTab("💵 الخزينة",    "💵 Cash");
-        addTab("⏳ الديون",     "⏳ Aging");   // ✅ التبويب الجديد
-        addTab("🔒 الإقفال",    "🔒 Closing"); // ✅ التبويب الجديد
+        addTab("⏳ الديون",     "⏳ Aging");
+        addTab("🔒 الإقفال",    "🔒 Closing");
+        addTab("📊 الأرباح",    "📊 Profit");     // ✅ التبويب الجديد
+        addTab("⚖️ التقييم",    "⚖️ Revaluation"); // ✅ التبويب الجديد
 
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
@@ -307,11 +311,17 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_CASH: 
                     return new MiraCashReconciliationFragment();
 
-                case TAB_AGING: // ✅ ربط تبويب الديون
+                case TAB_AGING: 
                     return new MiraAgingReportFragment();
 
-                case TAB_FISCAL: // ✅ ربط تبويب الإقفال
+                case TAB_FISCAL: 
                     return new MiraFiscalClosingFragment();
+
+                case TAB_PROFIT: // ✅ ربط تبويب تحليل الأرباح
+                    return new MiraProfitAnalysisFragment();
+
+                case TAB_REVALUATION: // ✅ ربط تبويب إعادة التقييم
+                    return new MiraInventoryRevaluationFragment();
 
                 default: return new MiraJournalFragment();
             }
@@ -322,8 +332,8 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     public void navigateToTab(int tabIndex) {
-        // ✅ السماح بالوصول حتى تبويب الإقفال
-        if (tabIndex < 0 || tabIndex > TAB_FISCAL || tabLayout == null) return;
+        // ✅ السماح بالوصول حتى آخر تبويب (التقييم)
+        if (tabIndex < 0 || tabIndex > TAB_REVALUATION || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
