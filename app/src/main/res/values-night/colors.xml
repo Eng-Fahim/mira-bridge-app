@@ -479,7 +479,12 @@
 <color name="qa_primary_cta_text">#F5F5F5</color>
 
 <color name="qa_primary_cta_subtext">#C9B896</color>
-
+<!-- Card Theme Colors (Night) -->
+<color name="gold_card_bg">#121212</color>
+<color name="gold_card_stroke">#D4AF37</color>
+<color name="gold_text_accent">#FDE047</color>
+<color name="gold_ounce_box_bg">#1AFFFFFF</color>
+<color name="gold_ounce_box_stroke">#D4AF37</color>
 <color name="chart_grid">#33FFFFFF</color>
 <color name="chart_axis_text">#BBBBBB</color>
 🌙 CARDS — Dark Mode
