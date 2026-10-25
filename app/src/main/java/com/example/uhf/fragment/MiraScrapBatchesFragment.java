@@ -59,10 +59,10 @@ public class MiraScrapBatchesFragment extends Fragment {
         adapter = new BatchAdapter(batches);
         rvBatches.setAdapter(adapter);
 
-        // ✅ ربط زر إنشاء الدفعة
+        // ربط زر إنشاء الدفعة
         fabNewBatch.setOnClickListener(v -> openNewBatchDialog());
         
-        // ✅ ربط زر تقرير الأرباح
+        // ربط زر تقرير الأرباح
         btnViewReport.setOnClickListener(v -> {
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).loadFragment(
@@ -72,7 +72,7 @@ public class MiraScrapBatchesFragment extends Fragment {
             }
         });
 
-        // ✅ [إضافة جديدة] ربط زر تقرير الأعمار (Aging)
+        // ربط زر تقرير الأعمار (Aging)
         MaterialButton btnAging = view.findViewById(R.id.btnViewAging);
         if (btnAging != null) {
             btnAging.setOnClickListener(v -> {
@@ -87,7 +87,6 @@ public class MiraScrapBatchesFragment extends Fragment {
         return view;
     }
 
-    // ✅ هذه الدالة كانت فارغة، الآن تم تنفيذها
     private void loadBatches() {
         new Thread(() -> {
             MiraApiClient api = MiraApiClient.getInstance(requireContext());
@@ -98,7 +97,7 @@ public class MiraScrapBatchesFragment extends Fragment {
             getActivity().runOnUiThread(() -> {
                 batches.clear();
                 
-                if (response.isSuccess && response.data != null) {
+                if (response != null && response.isSuccess && response.data != null) {
                     JSONArray data = response.data.optJSONArray("data");
                     if (data != null && data.length() > 0) {
                         for (int i = 0; i < data.length(); i++) {
@@ -120,20 +119,25 @@ public class MiraScrapBatchesFragment extends Fragment {
     }
 
     private void openNewBatchDialog() {
+        Toast.makeText(requireContext(), "جاري جلب الفواتير المتاحة...", Toast.LENGTH_SHORT).show();
+        
         new Thread(() -> {
             MiraApiClient api = MiraApiClient.getInstance(requireContext());
             MiraApiClient.ApiResponse response = api.getAvailableScrapPurchases(branchId);
             
-            if (response.isSuccess && response.data != null) {
-                JSONArray purchases = response.data.optJSONArray("data");
-                if (purchases == null || purchases.length() == 0) {
-                    requireActivity().runOnUiThread(() -> 
-                        Toast.makeText(requireContext(), "لا توجد فواتير كسر متاحة للتصفية", Toast.LENGTH_SHORT).show());
-                    return;
+            requireActivity().runOnUiThread(() -> {
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray purchases = response.data.optJSONArray("data");
+                    if (purchases == null || purchases.length() == 0) {
+                        Toast.makeText(requireContext(), "لا توجد فواتير كسر متاحة للتصفية", Toast.LENGTH_LONG).show();
+                    } else {
+                        showSelectionDialog(purchases);
+                    }
+                } else {
+                    String err = (response != null && response.error != null) ? response.error : "فشل الاتصال بالسيرفر";
+                    Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
                 }
-
-                requireActivity().runOnUiThread(() -> showSelectionDialog(purchases));
-            }
+            });
         }).start();
     }
 
@@ -146,7 +150,9 @@ public class MiraScrapBatchesFragment extends Fragment {
         
         for (int i = 0; i < purchases.length(); i++) {
             JSONObject p = purchases.optJSONObject(i);
-            items[i] = p.optString("purchase_number") + " | " + p.optString("gold_karat") + " | " + p.optDouble("net_pure_weight_24k") + "g";
+            if (p != null) {
+                items[i] = p.optString("purchase_number") + " | " + p.optString("gold_karat") + " | " + p.optDouble("net_pure_weight_24k") + "g";
+            }
         }
 
         builder.setMultiChoiceItems(items, checkedItems, (dialog, which, isChecked) -> checkedItems[which] = isChecked);
@@ -155,11 +161,14 @@ public class MiraScrapBatchesFragment extends Fragment {
             JSONArray selectedIds = new JSONArray();
             for (int i = 0; i < checkedItems.length; i++) {
                 if (checkedItems[i]) {
-                    selectedIds.put(purchases.optJSONObject(i).optInt("id"));
+                    JSONObject p = purchases.optJSONObject(i);
+                    if (p != null) selectedIds.put(p.optInt("id"));
                 }
             }
             if (selectedIds.length() > 0) {
                 showDestinationDialog(selectedIds);
+            } else {
+                Toast.makeText(requireContext(), "لم يتم اختيار أي فاتورة", Toast.LENGTH_SHORT).show();
             }
         });
         builder.setNegativeButton("إلغاء", null);
@@ -188,18 +197,21 @@ public class MiraScrapBatchesFragment extends Fragment {
                 MiraApiClient.ApiResponse response = api.createScrapBatch(payload);
 
                 requireActivity().runOnUiThread(() -> {
-                    if (response.isSuccess) {
-                        Toast.makeText(requireContext(), "تم إنشاء الدفعة بنجاح", Toast.LENGTH_SHORT).show();
+                    if (response != null && response.isSuccess) {
+                        Toast.makeText(requireContext(), "✅ تم إنشاء الدفعة بنجاح", Toast.LENGTH_SHORT).show();
                         loadBatches();
                     } else {
-                        Toast.makeText(requireContext(), "فشل الإنشاء: " + response.error, Toast.LENGTH_SHORT).show();
+                        String err = (response != null && response.error != null) ? response.error : "خطأ غير معروف";
+                        Toast.makeText(requireContext(), "❌ فشل الإنشاء: " + err, Toast.LENGTH_LONG).show();
                     }
                 });
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) { 
+                e.printStackTrace(); 
+                requireActivity().runOnUiThread(() -> Toast.makeText(requireContext(), "❌ خطأ برمجي", Toast.LENGTH_SHORT).show());
+            }
         }).start();
     }
 
-    // ✅ تصميم بطاقة الدفعة بشكل احترافي
     private class BatchAdapter extends RecyclerView.Adapter<BatchAdapter.VH> {
         private final List<JSONObject> items;
         BatchAdapter(List<JSONObject> items) { this.items = items; }
