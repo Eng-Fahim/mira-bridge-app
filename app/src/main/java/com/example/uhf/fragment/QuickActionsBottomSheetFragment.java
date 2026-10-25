@@ -32,15 +32,8 @@ import java.util.Locale;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  QuickActionsBottomSheetFragment v7.1 — Permission-Driven
+ *  QuickActionsBottomSheetFragment v7.2 — Gold Conversion Added
  * ═══════════════════════════════════════════════════════════════════
- *
- *  ✅ كل زر يمر عبر canAccessFragment(tag) — مصدر واحد للحقيقة
- *  ✅ 13 عنصراً محتملاً + Primary CTA
- *  ✅ يشمل: المستخدمين + الفروع
- *  ✅ يحترم MiraQuickAccessSettings (تخصيص المستخدم)
- *  ✅ Stagger animation + Haptic feedback
- *  ✅ Navigation آمن بعد dismiss
  */
 public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
@@ -104,13 +97,19 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             setupGridAction(view, R.id.cardAccounting, "accounting",
                     NavigationManager.TAG_ACCOUNTING);
+            
             setupGridAction(view, R.id.cardVouchers, "vouchers",
                     NavigationManager.TAG_VOUCHERS);
+            
             setupGridAction(view, R.id.cardTransfer, "transfers",
                     NavigationManager.TAG_TRANSFERS);
 
             setupGridAction(view, R.id.cardSalesHistory, "sales_history",
                     NavigationManager.TAG_SALES_HISTORY);
+
+            // ✅ [جديد] زر أمر الصياغة
+            setupGridAction(view, R.id.cardGoldConversion, "gold_conversion", 
+                    NavigationManager.TAG_GOLD_CONVERSION);
 
             // ═══════════════════════════════════════════════════
             //  ROW 3
@@ -192,7 +191,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  GRID ACTION — البوابة الموحّدة لكل الأزرار
+    //  GRID ACTION
     // ═══════════════════════════════════════════════════════
 
     private void setupGridAction(View root, int cardId, String actionKey, String tag) {
