@@ -1044,7 +1044,6 @@
                             android:textAppearance="@style/TextAppearance.App.Title.Small"
                             android:textColor="?attr/colorOnSurface" />
 
-                        <com.github.mikephil.CardView... (PieChart) -->
                         <com.github.mikephil.charting.charts.PieChart
                             android:id="@+id/pieChartKarat"
                             android:layout_width="match_parent"
