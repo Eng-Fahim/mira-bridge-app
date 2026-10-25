@@ -117,6 +117,11 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             setupGridAction(view, R.id.cardQuickAccess, "quick_access", NavigationManager.TAG_QUICK_ACCESS);
 
             // ═══════════════════════════════════════════════════
+            //  ROW 7: المشتريات
+            // ═══════════════════════════════════════════════════
+            setupGridAction(view, R.id.cardPurchaseInvoice, "purchase_invoice", NavigationManager.TAG_PURCHASE_INVOICE);
+
+            // ═══════════════════════════════════════════════════
             //  CLOSE BUTTON
             // ═══════════════════════════════════════════════════
             View btnClose = view.findViewById(R.id.btnClose);
@@ -175,8 +180,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             boolean hasPermission = permissionManager.canAccessFragment(tag);
             boolean quickAccessAllowed = quickAccessSettings == null || quickAccessSettings.isActionEnabled(actionKey);
 
-            // ✅ [إصلاح مؤقت]: إجبار شاشة أمر الصياغة على الظهور للتجربة
-            if (NavigationManager.TAG_GOLD_CONVERSION.equals(tag)) {
+            // ✅ [إصلاح مؤقت]: إجبار الشاشات الجديدة على الظهور للتجربة
+            if (NavigationManager.TAG_GOLD_CONVERSION.equals(tag) || 
+                NavigationManager.TAG_PURCHASE_INVOICE.equals(tag)) {
                 hasPermission = true;
                 quickAccessAllowed = true;
             }
@@ -262,7 +268,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         try {
             View bottomSheet = getDialog() != null ? getDialog().findViewById(com.google.android.material.R.id.design_bottom_sheet) : null;
             if (bottomSheet != null) {
-                // زيادة الارتفاع إلى 90% لاستيعاب القائمة الطويلة
                 bottomSheet.getLayoutParams().height = (int) (getResources().getDisplayMetrics().heightPixels * 0.90);
                 bottomSheet.requestLayout();
             }
