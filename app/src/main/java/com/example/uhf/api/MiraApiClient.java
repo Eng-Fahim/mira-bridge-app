@@ -2607,4 +2607,10 @@ public ApiResponse postInventoryRevaluation(JSONObject payload) {
         return response;
     }
     }
+    public ApiResponse getAuditLogs(String status, String action, int limit) {
+    String url = "/audit-logs?limit=" + limit;
+    if (status != null && !status.isEmpty()) url += "&status=" + status;
+    if (action != null && !action.isEmpty()) url += "&action=" + action;
+    return getAccounting(url);
+    }
 }
