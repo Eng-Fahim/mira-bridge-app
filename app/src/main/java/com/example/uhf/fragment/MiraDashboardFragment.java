@@ -53,6 +53,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.charts.PieChart;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.data.PieData;
+import com.github.mikephil.charting.data.PieDataSet;
+import com.github.mikephil.charting.data.PieEntry;
+import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.github.mikephil.charting.components.XAxis;
+import android.graphics.Color;
+
 /**
  * MiraDashboardFragment v2.6 — Scrap Aging Integrated
  */
@@ -64,6 +77,8 @@ public class MiraDashboardFragment extends Fragment {
     private static final String PREFS_CACHE_OWNER = "mira_dashboard_cache_owner";
     private static final String KEY_CACHE_OWNER_USER_ID = "cache_owner_user_id";
     private static final String KEY_PREFIX_LAST_BRANCH = "last_branch_id_";
+    private LineChart lineChartSales;
+    private PieChart pieChartKarat;
 
     private static final double OUNCE_TO_GRAM = 31.1035;
     private static final long CACHE_VALIDITY_MS = 2 * 60 * 1000;
@@ -314,6 +329,8 @@ public class MiraDashboardFragment extends Fragment {
 
     private void initViews(View v) {
         try {
+            lineChartSales = v.findViewById(R.id.lineChartSales);
+            pieChartKarat = v.findViewById(R.id.pieChartKarat);
             llInventoryByKarat = v.findViewById(R.id.llInventoryByKarat);
             tvKaratEmptyState  = v.findViewById(R.id.tvKaratEmptyState);
             tvSalesToday = v.findViewById(R.id.tvSalesToday);
@@ -420,7 +437,98 @@ public class MiraDashboardFragment extends Fragment {
             updateScrapUI();
         } catch (Exception e) { logNonFatal("initViews", e); }
     }
+private void fetchDashboardCharts() {
+    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+    localExecutor.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject data = response.data.optJSONObject("data");
+                if (data != null) {
+                    mainHandler.post(() -> {
+                        if (isAdded()) renderCharts(data);
+                    });
+                }
+            }
+        } catch (Exception e) {
+            logNonFatal("fetchDashboardCharts", e);
+        }
+    });
+}
 
+private void renderCharts(JSONObject data) {
+    try {
+        // 1. Line Chart
+        JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
+        if (sales7Days != null && lineChartSales != null) {
+            List<Entry> entries = new ArrayList<>();
+            final List<String> labels = new ArrayList<>();
+            for (int i = 0; i < sales7Days.length(); i++) {
+                JSONObject day = sales7Days.getJSONObject(i);
+                entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
+                labels.add(day.optString("date", ""));
+            }
+
+            LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+            dataSet.setColor(Color.parseColor("#D4AF37"));
+            dataSet.setCircleColor(Color.parseColor("#D4AF37"));
+            dataSet.setLineWidth(2.5f);
+            dataSet.setCircleRadius(4f);
+            dataSet.setDrawValues(false);
+            dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+            
+            LineData lineData = new LineData(dataSet);
+            lineChartSales.setData(lineData);
+            
+            XAxis xAxis = lineChartSales.getXAxis();
+            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+            xAxis.setGranularity(1f);
+            xAxis.setDrawGridLines(false);
+            
+            lineChartSales.getAxisRight().setEnabled(false);
+            lineChartSales.getAxisLeft().setDrawGridLines(true);
+            lineChartSales.getDescription().setEnabled(false);
+            lineChartSales.getLegend().setEnabled(false);
+            lineChartSales.animateX(1000);
+            lineChartSales.invalidate();
+        }
+
+        // 2. Pie Chart
+        JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
+        if (salesByKarat != null && pieChartKarat != null) {
+            List<PieEntry> entries = new ArrayList<>();
+            for (int i = 0; i < salesByKarat.length(); i++) {
+                JSONObject k = salesByKarat.getJSONObject(i);
+                entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
+            }
+            
+            if (!entries.isEmpty()) {
+                PieDataSet dataSet = new PieDataSet(entries, "");
+                List<Integer> colors = new ArrayList<>();
+                colors.add(Color.parseColor("#D4AF37")); // 24K
+                colors.add(Color.parseColor("#E6B800")); // 21K
+                colors.add(Color.parseColor("#CD853F")); // 18K
+                colors.add(Color.parseColor("#A0522D")); // Others
+                dataSet.setColors(colors);
+                dataSet.setValueTextSize(12f);
+                dataSet.setValueTextColor(Color.WHITE);
+                
+                PieData pieData = new PieData(dataSet);
+                pieChartKarat.setData(pieData);
+                pieChartKarat.getDescription().setEnabled(false);
+                pieChartKarat.setUsePercentValues(true);
+                pieChartKarat.setEntryLabelColor(Color.BLACK);
+                pieChartKarat.setHoleRadius(40f);
+                pieChartKarat.setTransparentCircleRadius(45f);
+                pieChartKarat.animateY(1000);
+                pieChartKarat.invalidate();
+            }
+        }
+    } catch (Exception e) {
+        logNonFatal("renderCharts", e);
+    }
+}
     private void updateHeader() {}
 
     private void renderInventoryByKarat(List<KaratInventory> items) {
@@ -962,6 +1070,7 @@ public class MiraDashboardFragment extends Fragment {
                     mainHandler.post(() -> { isLoading.set(false); loadOfflineData(); showShimmer(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
                 }
             });
+            fetchDashboardCharts();
         } catch (Exception e) { logNonFatal("fetchData", e); isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
     }
 
@@ -1124,6 +1233,7 @@ public class MiraDashboardFragment extends Fragment {
 
             fetchData(); fetchRecentActivity();
             if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
+            fetchDashboardCharts();
 
             long now = System.currentTimeMillis();
             if (canManuallyRefreshGold()) {
