@@ -63,6 +63,8 @@ public class NavigationManager {
     public static final String TAG_GOLD_CONVERSION = "GoldConversion";
     public static final String TAG_PROFIT_ANALYSIS = "ProfitAnalysis";
     public static final String TAG_INVENTORY_REVALUATION = "InventoryRevaluation";
+    public static final String TAG_PURCHASE_INVOICE = "PurchaseInvoice";
+
     
     public static final String TAG_RADAR             = "Radar";
     public static final String TAG_SECURE_GATE       = "SecureGate";
@@ -441,7 +443,8 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
         case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
         case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
-
+        
+        case TAG_PURCHASE_INVOICE: return new MiraPurchaseInvoiceFragment();
         // ✅ شاشات كسر الذهب (مرة واحدة فقط لكل شاشة)
         case TAG_SCRAP_GOLD_BUY:      return new MiraScrapGoldBuyFragment();
         case TAG_SCRAP_HISTORY:       return new MiraScrapHistoryFragment();
