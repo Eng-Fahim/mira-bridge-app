@@ -90,6 +90,76 @@
                 android:paddingTop="@dimen/space_4"
                 android:paddingBottom="@dimen/space_6">
 
+
+<!-- ═══════════════════════════════════════════════════
+     8. SALES TREND CHART (Line)
+     ═══════════════════════════════════════════════════ -->
+<com.google.android.material.card.MaterialCardView
+    android:id="@+id/cardSalesTrend"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/space_4"
+    app:cardBackgroundColor="@color/card_surface_warm"
+    app:cardCornerRadius="@dimen/radius_xl"
+    app:cardElevation="@dimen/elevation_1"
+    app:strokeColor="@color/card_stroke_warm"
+    app:strokeWidth="@dimen/stroke_normal">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/space_4">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📈 حركة المبيعات (7 أيام)"
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="?attr/colorOnSurface" />
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/lineChartSales"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginTop="@dimen/space_3" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
+
+<!-- ═══════════════════════════════════════════════════
+     9. SALES BY KARAT CHART (Pie)
+     ═══════════════════════════════════════════════════ -->
+<com.google.android.material.card.MaterialCardView
+    android:id="@+id/cardSalesByKarat"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/space_4"
+    app:cardBackgroundColor="@color/card_surface_warm"
+    app:cardCornerRadius="@dimen/radius_xl"
+    app:cardElevation="@dimen/elevation_1"
+    app:strokeColor="@color/card_stroke_warm"
+    app:strokeWidth="@dimen/stroke_normal">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/space_4">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🥧 توزيع المبيعات حسب العيار (30 يوم)"
+            android:textAppearance="@style/TextAppearance.App.Title.Small"
+            android:textColor="?attr/colorOnSurface" />
+
+        <com.github.mikephil.charting.charts.PieChart
+            android:id="@+id/pieChartKarat"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginTop="@dimen/space_3" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
                 <!-- ═══════════════════════════════════════════════════
                      1. HERO BALANCE CARD
                      ═══════════════════════════════════════════════════ -->
