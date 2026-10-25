@@ -155,10 +155,11 @@ public class MiraScrapProfitReportFragment extends Fragment {
             if (getActivity() == null) return;
             getActivity().runOnUiThread(() -> {
                 swipeRefresh.setRefreshing(false);
-                if (response.isSuccess && response.data != null) {
+                if (response != null && response.isSuccess && response.data != null) {
                     renderReport(response.data);
                 } else {
-                    Toast.makeText(requireContext(), "فشل تحميل التقرير", Toast.LENGTH_SHORT).show();
+                    String errorMsg = (response != null && response.error != null) ? response.error : "فشل الاتصال بالسيرفر";
+                    Toast.makeText(requireContext(), "❌ " + errorMsg, Toast.LENGTH_LONG).show();
                 }
             });
         }).start();
@@ -189,7 +190,8 @@ public class MiraScrapProfitReportFragment extends Fragment {
             batchesList.clear();
             if (batches != null && batches.length() > 0) {
                 for (int i = 0; i < batches.length(); i++) {
-                    batchesList.add(batches.optJSONObject(i));
+                    JSONObject b = batches.optJSONObject(i);
+                    if (b != null) batchesList.add(b);
                 }
                 tvNoBatches.setVisibility(View.GONE);
                 rvBatches.setVisibility(View.VISIBLE);
@@ -201,12 +203,10 @@ public class MiraScrapProfitReportFragment extends Fragment {
             
         } catch (Exception e) {
             e.printStackTrace();
+            Toast.makeText(requireContext(), "❌ خطأ في قراءة بيانات التقرير", Toast.LENGTH_SHORT).show();
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Adapter
-    // ═══════════════════════════════════════════════════════
     private class BatchProfitAdapter extends RecyclerView.Adapter<BatchProfitAdapter.VH> {
         private final List<JSONObject> items;
         BatchProfitAdapter(List<JSONObject> items) { this.items = items; }
