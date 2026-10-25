@@ -480,7 +480,8 @@
 
 <color name="qa_primary_cta_subtext">#C9B896</color>
 
-
+<color name="chart_grid">#33FFFFFF</color>
+<color name="chart_axis_text">#BBBBBB</color>
 🌙 CARDS — Dark Mode
          ═══════════════════════════════════════════════════════ -->
     <color name="card_surface_warm">#1E1C1A</color>
