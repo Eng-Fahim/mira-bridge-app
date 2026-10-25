@@ -1,23 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- الطبقة 1: التدرج الذهبي الخفيف -->
+    <!-- 1. الخلفية الأساسية: تدرج ذهبي فاخر من اليمين لليسار -->
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:angle="270"
+                android:angle="135"
                 android:startColor="#FDFBF7"
                 android:centerColor="#F5EFE6"
                 android:endColor="#E8DCC8"
                 android:type="linear" />
         </shape>
     </item>
-
-    <!-- الطبقة 2: النقشة (تكرار الماسة) -->
+    
+    <!-- 2. لمسة فنية: لمعان دائري خفيف جداً في الزاوية العلوية (يعطي إحساس بالنقشة) -->
     <item>
-        <bitmap 
-            android:src="@drawable/pattern_tile" 
-            android:tileMode="repeat" />
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="250dp"
+                android:centerX="0.8"
+                android:centerY="0.2"
+                android:startColor="#22D4AF37" 
+                android:endColor="#00D4AF37" />
+        </shape>
     </item>
     
+    <!-- 3. خط ذهبي رفيع جداً في الأسفل للفصل -->
+    <item android:top="-2dp" android:left="-2dp" android:right="-2dp">
+        <shape android:shape="rectangle">
+            <stroke android:width="1dp" android:color="#33D4AF37" />
+        </shape>
+    </item>
 </layer-list>
