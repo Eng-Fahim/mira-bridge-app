@@ -2029,9 +2029,14 @@ public class MiraApiClient {
         return postAccounting("/accounting/fiscal-years/create", payload); // ✅ تم التصحيح
     }
 
-    public ApiResponse closeFiscalYear(int yearId) {
-        return postAccounting("/accounting/fiscal-years/" + yearId + "/close", new JSONObject()); // ✅ تم التصحيح
-    }
+    
+    public ApiResponse closeFiscalYear(int year) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("year", year);
+    } catch (Exception ignored) {}
+    return postAccounting("/accounting/fiscal-years/close", payload);
+}
 
     public ApiResponse getOpeningBalances() {
         return getAccounting("/accounting/opening-balances"); // ✅ تم التصحيح
