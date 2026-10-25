@@ -64,6 +64,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import android.widget.LinearLayout;
+
 /**
  * MiraDashboardFragment v3.0 — Carousel Edition & Charts
  */
