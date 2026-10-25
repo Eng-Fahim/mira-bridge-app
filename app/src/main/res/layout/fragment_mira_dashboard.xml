@@ -14,19 +14,19 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="vertical"
-        android:padding="@dimen/screen_padding_h"
+        android:padding="16dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <View android:layout_width="match_parent" android:layout_height="@dimen/space_12"
-            android:layout_marginBottom="@dimen/space_4" android:background="@drawable/shimmer_background" />
-        <View android:layout_width="match_parent" android:layout_height="100dp"
-            android:layout_marginBottom="@dimen/space_4" android:background="@drawable/shimmer_background" />
-        <View android:layout_width="match_parent" android:layout_height="160dp"
-            android:layout_marginBottom="@dimen/space_4" android:background="@drawable/shimmer_background" />
+        <View android:layout_width="match_parent" android:layout_height="12dp"
+            android:layout_marginBottom="16dp" android:background="@drawable/shimmer_background" />
+        <View android:layout_width="match_parent" android:layout_height="180dp"
+            android:layout_marginBottom="16dp" android:background="@drawable/shimmer_background" />
+        <View android:layout_width="match_parent" android:layout_height="120dp"
+            android:background="@drawable/shimmer_background" />
     </LinearLayout>
 
     <!-- LOADING OVERLAY -->
@@ -56,7 +56,7 @@
             android:text="@string/loading_data"
             android:textAppearance="@style/TextAppearance.App.Body.Medium"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginTop="@dimen/space_4" />
+            android:layout_marginTop="12dp" />
     </LinearLayout>
 
     <!-- MAIN CONTENT -->
@@ -78,18 +78,17 @@
             android:clipToPadding="false"
             android:fillViewport="true"
             android:overScrollMode="never"
-            android:paddingBottom="@dimen/space_16">
+            android:paddingBottom="24dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:paddingHorizontal="16dp"
-                android:paddingTop="12dp"
-                android:paddingBottom="24dp">
+                android:paddingTop="12dp">
 
                 <!-- ═══════════════════════════════════════════════════
-                     1. HERO BALANCE CARD (الملك الفاخر للواجهة)
+                     1. HERO BALANCE CARD (البطاقة المالية البارزة في الأعلى)
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
@@ -97,8 +96,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     app:cardBackgroundColor="@android:color/transparent"
-                    app:cardCornerRadius="22dp"
-                    app:cardElevation="4dp"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="6dp"
                     app:strokeColor="@color/hero_stroke"
                     app:strokeWidth="1dp">
 
@@ -108,7 +107,7 @@
 
                         <View android:layout_width="match_parent" android:layout_height="match_parent"
                             android:background="@drawable/bg_hero_gold_gradient" />
-                        <View android:layout_width="180dp" android:layout_height="180dp"
+                        <View android:layout_width="200dp" android:layout_height="200dp"
                             android:layout_gravity="top|end" android:background="@drawable/bg_hero_glow" />
                         <View android:layout_width="match_parent" android:layout_height="match_parent"
                             android:background="@drawable/bg_diamond_pattern" />
@@ -117,9 +116,9 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="vertical"
-                            android:padding="20dp">
+                            android:padding="22dp">
 
-                            <!-- Header Badge & Visibility -->
+                            <!-- Top Bar inside Card -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -221,7 +220,7 @@
                             </LinearLayout>
 
                             <View android:layout_width="match_parent" android:layout_height="1dp"
-                                android:layout_marginTop="14dp" android:layout_marginBottom="12dp"
+                                android:layout_marginTop="16dp" android:layout_marginBottom="12dp"
                                 android:background="@color/hero_divider" />
 
                             <!-- Multi-Currency Row -->
@@ -231,19 +230,16 @@
                                 android:orientation="horizontal"
                                 android:weightSum="3">
 
-                                <!-- USD -->
                                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
                                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🇺🇸 USD" android:textColor="@color/hero_secondary_text" android:textSize="10sp" android:textStyle="bold"/>
                                     <TextView android:id="@+id/tvHeroValueUSD" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="••••••" android:textColor="@color/hero_value_text" android:textSize="12sp" android:textStyle="bold" tools:text="52,798" />
                                 </LinearLayout>
 
-                                <!-- SAR -->
                                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
                                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🇸🇦 SAR" android:textColor="@color/hero_secondary_text" android:textSize="10sp" android:textStyle="bold"/>
                                     <TextView android:id="@+id/tvHeroValueSAR" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="••••••" android:textColor="@color/hero_secondary_text" android:textSize="12sp" tools:text="197,994" />
                                 </LinearLayout>
 
-                                <!-- YER -->
                                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
                                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🇾🇪 YER" android:textColor="@color/hero_secondary_text" android:textSize="10sp" android:textStyle="bold"/>
                                     <TextView android:id="@+id/tvHeroValueYER" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="••••••" android:textColor="@color/hero_secondary_text" android:textSize="12sp" tools:text="27,983,290" />
@@ -255,7 +251,7 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════
-                     2. LIVE GOLD PRICES (نبض السوق الفوري)
+                     2. LIVE GOLD PRICES (سعر الذهب الفوري بنسق نظيف)
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGoldPrices"
@@ -263,7 +259,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     app:cardBackgroundColor="@color/card_surface_warm"
-                    app:cardCornerRadius="18dp"
+                    app:cardCornerRadius="20dp"
                     app:cardElevation="1dp"
                     app:strokeColor="@color/card_stroke_warm"
                     app:strokeWidth="1dp">
@@ -277,7 +273,7 @@
                         <RelativeLayout
                             android:layout_width="match_parent" 
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="10dp">
+                            android:layout_marginBottom="12dp">
 
                             <TextView 
                                 android:layout_width="wrap_content" 
@@ -323,7 +319,7 @@
                             android:background="@drawable/bg_luxury_card" 
                             android:gravity="center"
                             android:orientation="vertical" 
-                            android:paddingVertical="12dp">
+                            android:paddingVertical="14dp">
 
                             <TextView 
                                 android:layout_width="wrap_content" 
@@ -426,7 +422,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     app:cardBackgroundColor="@color/card_surface_warm"
-                    app:cardCornerRadius="18dp"
+                    app:cardCornerRadius="20dp"
                     app:cardElevation="1dp"
                     app:strokeColor="@color/card_stroke_warm"
                     app:strokeWidth="1dp">
@@ -486,7 +482,7 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════
-                     5. SCRAP GOLD & AGING (كسر الذهب وأعمار المخزون ببطاقة واحدة منظمة)
+                     5. SCRAP GOLD & AGING (كسر الذهب)
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardScrapGold"
@@ -494,7 +490,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     app:cardBackgroundColor="@color/card_surface_warm"
-                    app:cardCornerRadius="18dp"
+                    app:cardCornerRadius="20dp"
                     app:cardElevation="1dp"
                     app:strokeColor="@color/card_stroke_warm"
                     app:strokeWidth="1dp">
@@ -576,7 +572,6 @@
                             </LinearLayout>
                         </LinearLayout>
 
-                        <!-- Scrap Action Buttons -->
                         <LinearLayout
                             android:layout_width="match_parent" android:layout_height="wrap_content"
                             android:orientation="horizontal" android:layout_marginTop="12dp"
@@ -607,7 +602,7 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════
-                     6. SALES SUMMARY & ANALYTICS (ملخص المبيعات والرسوم)
+                     6. SALES SUMMARY & ANALYTICS
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/salesSummaryCard"
@@ -615,7 +610,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     app:cardBackgroundColor="@color/card_surface_warm"
-                    app:cardCornerRadius="18dp"
+                    app:cardCornerRadius="20dp"
                     app:cardElevation="1dp"
                     app:strokeColor="@color/card_stroke_warm"
                     app:strokeWidth="1dp">
@@ -670,20 +665,19 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Charts Section Container (Compact and Clean) -->
+                <!-- Charts Section Container -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <!-- Sales Trend Chart -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardSalesTrend"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="16dp"
                         app:cardBackgroundColor="@color/card_surface_warm"
-                        app:cardCornerRadius="18dp"
+                        app:cardCornerRadius="20dp"
                         app:cardElevation="1dp"
                         app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="1dp">
@@ -709,14 +703,13 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Sales By Karat Chart -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardSalesByKarat"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="16dp"
                         app:cardBackgroundColor="@color/card_surface_warm"
-                        app:cardCornerRadius="18dp"
+                        app:cardCornerRadius="20dp"
                         app:cardElevation="1dp"
                         app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="1dp">
@@ -744,7 +737,7 @@
                 </LinearLayout>
 
                 <!-- ═══════════════════════════════════════════════════
-                     7. RECENT ACTIVITY (آخر العمليات)
+                     7. RECENT ACTIVITY (آخر العمليات - بتصميم يشبه التطبيقات المالية)
                      ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/recentActivityHeader"
@@ -764,7 +757,7 @@
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:paddingHorizontal="8dp" android:paddingVertical="4dp"
-                        android:text="عرض الكل →"
+                        text="عرض الكل →"
                         android:textAppearance="@style/TextAppearance.App.Label.Large"
                         android:textColor="?attr/colorPrimary" />
                 </LinearLayout>
