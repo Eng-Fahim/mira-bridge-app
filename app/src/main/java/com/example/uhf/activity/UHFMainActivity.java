@@ -296,7 +296,7 @@ private volatile long setupCompletedAt = 0;
         }
     }
 
-    @Override
+   @Override
 protected void onCreate(Bundle savedInstanceState) {
     DiagTracer.init(this);
     applySavedTheme();
@@ -310,49 +310,18 @@ protected void onCreate(Bundle savedInstanceState) {
 
         setContentView(R.layout.activity_main);
 
-        // ═════════════════════════════════════════════════════════════
-        // ✅ [تعديل 1]: تفعيل الرسم خلف شريط الحالة (Edge-to-Edge)
-        // ═════════════════════════════════════════════════════════════
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        
-        // ❌ تم حذف هذا السطر لأنه كان يمنع الخلفية من الامتداد خلف شريط الحالة
-        // findViewById(android.R.id.content).setFitsSystemWindows(true);
-
-        // ✅ جعل شريط الحالة شفافاً
-        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
-
-        // ✅ ضبط لون أيقونات (الوقت والبطارية) حسب الثيم الفاتح أو الداكن
-        androidx.core.view.WindowInsetsControllerCompat controller = 
-            androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        
-        int nightModeFlags = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
-        if (nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES) {
-            controller.setAppearanceLightStatusBars(false); // أيقونات بيضاء (للوضع الليلي)
-        } else {
-            controller.setAppearanceLightStatusBars(true); // أيقونات سوداء (للوضع الفاتح)
-        }
-
-        // ✅ إضافة Padding علوي للشريط (لكي لا تختفي أيقونات التطبيق تحت شريط الحالة)
-        androidx.coordinatorlayout.widget.CoordinatorLayout mainRoot = findViewById(R.id.main);
-        if (mainRoot != null) {
-            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainRoot, (v, insets) -> {
-                androidx.core.graphics.Insets systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars());
-                v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0); // لا نضع padding للسفل هنا
-                return insets;
-            });
-        }
-        // ═════════════════════════════════════════════════════════════
+        // ✅ العودة للسطر الأصلي الذي يمنع التداخل مع شريط الحالة
+        findViewById(android.R.id.content).setFitsSystemWindows(true);
 
         getWindow().setSoftInputMode(
             android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
             | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
         );
 
-        // ملاحظة: قد تحتاج لضبط دالة setupWindowInsets الخاصة بك 
-        // أو تعليقها إذا وجدت أن المساحة العلوية أصبحت كبيرة جداً
-        //setupWindowInsets(); 
+        setupWindowInsets();
         setupKeyboardBehavior();
         setupSecondaryToolbar();
+
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
