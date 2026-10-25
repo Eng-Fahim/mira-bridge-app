@@ -2572,4 +2572,10 @@ public ApiResponse reverseJournalEntry(String entryId) {
     public ApiResponse getAgingReport(String asOfDate, String type) {
     return getAccounting("/accounting/aging-report?as_of=" + asOfDate + "&type=" + type);
 }
+    public ApiResponse getDashboardCharts(int branchId) {
+    // ✅ نستخدم مسار الداشبورد وليس المحاسبة
+    String endpoint = "/dashboard/charts"; 
+    if (branchId > 0) endpoint += "?branch_id=" + branchId;
+    return getWithAuth(endpoint); 
+    }
 }
