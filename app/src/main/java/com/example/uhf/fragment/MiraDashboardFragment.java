@@ -1,4 +1,3 @@
-هكذا؟
 package com.example.uhf.fragment;
 
 import android.content.Context;
