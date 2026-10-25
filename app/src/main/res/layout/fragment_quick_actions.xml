@@ -215,6 +215,36 @@
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تخصيص الوصول" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
             </LinearLayout>
 
+<!-- ═══ ROW 7: المشتريات ═══ -->
+<LinearLayout
+    android:id="@+id/cardPurchaseInvoice"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_columnWeight="1"
+    android:layout_margin="4dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingVertical="12dp">
+    <ImageView
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_inventory_items"
+        app:tint="?attr/colorPrimary" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:maxLines="2"
+        android:text="فاتورة مشتريات"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="11sp" />
+</LinearLayout>
+
         </GridLayout>
     </ScrollView>
 
