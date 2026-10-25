@@ -2581,4 +2581,11 @@ public ApiResponse reverseJournalEntry(String entryId) {
     public ApiResponse processGoldConversion(JSONObject payload) {
     return postAccounting("/accounting/gold-conversion", payload);
 }
+    public ApiResponse getProfitAnalysis(String branchId, String fromDate, String toDate) {
+    String url = "/accounting/profit-analysis?from=" + fromDate + "&to=" + toDate;
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "&branch_id=" + branchId;
+    }
+    return getAccounting(url);
+    }
 }
