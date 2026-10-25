@@ -28,16 +28,21 @@ public class MiraAccountingFragment extends Fragment {
     private static final String KEY_CURRENT_TAB = "current_tab";
     private static final String KEY_TAB_HISTORY = "tab_history";
 
-    private static final int TAB_JOURNAL  = 0;
-    private static final int TAB_TRIAL    = 1;
-    private static final int TAB_ACCOUNTS = 2;
-    private static final int TAB_INCOME   = 3;
-    private static final int TAB_BALANCE  = 4;
-    private static final int TAB_GOLD     = 5;
-    private static final int TAB_LEDGER   = 6;
+    // ═══════════════════════════════════════════════════════
+    //  تعريف التبويبات
+    // ═══════════════════════════════════════════════════════
+    private static final int TAB_JOURNAL   = 0;
+    private static final int TAB_TRIAL     = 1;
+    private static final int TAB_ACCOUNTS  = 2;
+    private static final int TAB_INCOME    = 3;
+    private static final int TAB_BALANCE   = 4;
+    private static final int TAB_GOLD      = 5;
+    private static final int TAB_LEDGER    = 6;
     private static final int TAB_ADJUSTING = 7;
-    private static final int TAB_CASH     = 8; // ✅ تبويب الخزينة الجديد
-    private static final int MAX_TABS     = 9;
+    private static final int TAB_CASH      = 8;
+    private static final int TAB_AGING     = 9;  // ✅ تبويب أعمار الديون الجديد
+    private static final int TAB_FISCAL    = 10; // ✅ تبويب إقفال السنة الجديد
+    private static final int MAX_TABS      = 11;
 
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
@@ -203,7 +208,9 @@ public class MiraAccountingFragment extends Fragment {
         addTab("🥇 الذهب",      "🥇 Gold");
         addTab("📖 الأستاذ",    "📖 Ledger");
         addTab("📝 التسويات",   "📝 Adjust");
-        addTab("💵 الخزينة",    "💵 Cash"); // ✅ التبويب الجديد
+        addTab("💵 الخزينة",    "💵 Cash");
+        addTab("⏳ الديون",     "⏳ Aging");   // ✅ التبويب الجديد
+        addTab("🔒 الإقفال",    "🔒 Closing"); // ✅ التبويب الجديد
 
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
@@ -297,8 +304,14 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_ADJUSTING:
                     return new MiraAdjustingEntryFragment();
 
-                case TAB_CASH: // ✅ الشاشة الجديدة
+                case TAB_CASH: 
                     return new MiraCashReconciliationFragment();
+
+                case TAB_AGING: // ✅ ربط تبويب الديون
+                    return new MiraAgingReportFragment();
+
+                case TAB_FISCAL: // ✅ ربط تبويب الإقفال
+                    return new MiraFiscalClosingFragment();
 
                 default: return new MiraJournalFragment();
             }
@@ -309,8 +322,8 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     public void navigateToTab(int tabIndex) {
-        // ✅ السماح بالوصول حتى تبويب الخزينة
-        if (tabIndex < 0 || tabIndex > TAB_CASH || tabLayout == null) return;
+        // ✅ السماح بالوصول حتى تبويب الإقفال
+        if (tabIndex < 0 || tabIndex > TAB_FISCAL || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
