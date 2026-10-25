@@ -251,7 +251,7 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════
-                     2. LIVE GOLD PRICES (سعر الذهب الفوري بنسق نظيف)
+                     2. LIVE GOLD PRICES
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardGoldPrices"
@@ -414,7 +414,7 @@
                 </LinearLayout>
 
                 <!-- ═══════════════════════════════════════════════════
-                     4. INVENTORY BY KARAT (المخزون حسب العيار)
+                     4. INVENTORY BY KARAT
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardInventoryByKarat"
@@ -482,7 +482,7 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════
-                     5. SCRAP GOLD & AGING (كسر الذهب)
+                     5. SCRAP GOLD SUMMARY CARD
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardScrapGold"
@@ -602,7 +602,159 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ═══════════════════════════════════════════════════
-                     6. SALES SUMMARY & ANALYTICS
+                     6. SCRAP AGING CARD (مهم جداً: متوافقة مع IDs الكود البرمجي)
+                     ═══════════════════════════════════════════════════ -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardScrapAging"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardBackgroundColor="@color/card_surface_warm"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="1dp"
+                    app:strokeColor="@color/card_stroke_warm"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <!-- Header -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tvAgingStatusIcon"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🟢"
+                                android:textSize="18sp" />
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:text="🕰️ أعمار مخزون الكسر"
+                                android:textAppearance="@style/TextAppearance.App.Title.Small"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/tvAgingStatusLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="سليم"
+                                android:textColor="#16A34A"
+                                android:textStyle="bold"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <!-- Content -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="horizontal"
+                            android:baselineAligned="false">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="الوزن غير المُصفّى"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+                                <TextView
+                                    android:id="@+id/tvAgingWeight"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0.000 g"
+                                    android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                    android:textColor="@color/text_gold_accent"
+                                    android:layout_marginTop="2dp" />
+                            </LinearLayout>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="match_parent"
+                                android:background="?attr/colorOutlineVariant"
+                                android:alpha="0.4" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="عدد الفواتير"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
+                                <TextView
+                                    android:id="@+id/tvAgingCount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0"
+                                    android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:layout_marginTop="2dp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- Warning Banner -->
+                        <LinearLayout
+                            android:id="@+id/llAgingAlert"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:background="#FEF2F2"
+                            android:padding="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="⚠️"
+                                android:textSize="14sp" />
+                            <TextView
+                                android:id="@+id/tvAgingAlertText"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="8dp"
+                                android:text="يوجد كسر قديم"
+                                android:textColor="#DC2626"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <!-- Action Button -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnOpenAgingReport"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="📊 عرض التقرير الكامل"
+                            android:textColor="?attr/colorPrimary" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- ═══════════════════════════════════════════════════
+                     7. SALES SUMMARY
                      ═══════════════════════════════════════════════════ -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/salesSummaryCard"
@@ -737,7 +889,7 @@
                 </LinearLayout>
 
                 <!-- ═══════════════════════════════════════════════════
-                     7. RECENT ACTIVITY (آخر العمليات - بتصميم يشبه التطبيقات المالية)
+                     8. RECENT ACTIVITY
                      ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/recentActivityHeader"
@@ -757,7 +909,7 @@
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:paddingHorizontal="8dp" android:paddingVertical="4dp"
-                        text="عرض الكل →"
+                        android:text="عرض الكل →"
                         android:textAppearance="@style/TextAppearance.App.Label.Large"
                         android:textColor="?attr/colorPrimary" />
                 </LinearLayout>
