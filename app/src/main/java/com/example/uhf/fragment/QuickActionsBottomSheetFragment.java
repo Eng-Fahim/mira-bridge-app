@@ -30,11 +30,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * ═══════════════════════════════════════════════════════════════════
- *  QuickActionsBottomSheetFragment v7.3 — Gold Conversion Fix
- * ═══════════════════════════════════════════════════════════════════
- */
 public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
     private static final String TAG = "QuickActionsSheet";
@@ -75,7 +70,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             setupPrimaryCta(view);
 
             // ═══════════════════════════════════════════════════
-            //  ROW 1
+            //  ROW 1: التكويد والأمان
             // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardRfidWrite, "rfid_write", NavigationManager.TAG_RFID_WRITE);
             setupGridAction(view, R.id.cardRadarLocation, "radar", NavigationManager.TAG_RADAR);
@@ -83,22 +78,43 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             setupGridAction(view, R.id.cardSecureGate, "gate", NavigationManager.TAG_GATES);
 
             // ═══════════════════════════════════════════════════
-            //  ROW 2
+            //  ROW 2: المالية والمبيعات
             // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardReports, "reports", NavigationManager.TAG_REPORTS);
             setupGridAction(view, R.id.cardAccounting, "accounting", NavigationManager.TAG_ACCOUNTING);
             setupGridAction(view, R.id.cardVouchers, "vouchers", NavigationManager.TAG_VOUCHERS);
             setupGridAction(view, R.id.cardTransfer, "transfers", NavigationManager.TAG_TRANSFERS);
-            setupGridAction(view, R.id.cardSalesHistory, "sales_history", NavigationManager.TAG_SALES_HISTORY);
-            setupGridAction(view, R.id.cardGoldConversion, "gold_conversion", NavigationManager.TAG_GOLD_CONVERSION);
 
             // ═══════════════════════════════════════════════════
-            //  ROW 3
+            //  ROW 3: المبيعات والذهب
             // ═══════════════════════════════════════════════════
+            setupGridAction(view, R.id.cardSalesHistory, "sales_history", NavigationManager.TAG_SALES_HISTORY);
+            setupGridAction(view, R.id.cardGoldConversion, "gold_conversion", NavigationManager.TAG_GOLD_CONVERSION);
+            setupGridAction(view, R.id.cardGoldRates, "gold_rates", NavigationManager.TAG_GOLD_RATES);
+            setupGridAction(view, R.id.cardScrapBuy, "scrap_buy", NavigationManager.TAG_SCRAP_GOLD_BUY);
+
+            // ═══════════════════════════════════════════════════
+            //  ROW 4: إدارة الكسر والعملاء
+            // ═══════════════════════════════════════════════════
+            setupGridAction(view, R.id.cardScrapHistory, "scrap_history", NavigationManager.TAG_SCRAP_HISTORY);
+            setupGridAction(view, R.id.cardScrapBatches, "scrap_batches", NavigationManager.TAG_SCRAP_BATCHES);
+            setupGridAction(view, R.id.cardScrapAging, "scrap_aging", NavigationManager.TAG_SCRAP_AGING);
+            setupGridAction(view, R.id.cardParties, "parties", NavigationManager.TAG_PARTIES);
+
+            // ═══════════════════════════════════════════════════
+            //  ROW 5: الإدارة والإعدادات
+            // ═══════════════════════════════════════════════════
+            setupGridAction(view, R.id.cardCashReconciliation, "cash_reconciliation", NavigationManager.TAG_CASH_RECONCILIATION);
             setupGridAction(view, R.id.cardAdminHub, "admin_hub", NavigationManager.TAG_ADMIN_HUB);
             setupGridAction(view, R.id.cardServerConfig, "server_config", NavigationManager.TAG_SERVER_CONFIG);
             setupGridAction(view, R.id.cardAdminUsers, "admin_users", NavigationManager.TAG_USERS_MANAGEMENT);
+
+            // ═══════════════════════════════════════════════════
+            //  ROW 6: إعدادات إضافية
+            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardAdminBranches, "admin_branches", NavigationManager.TAG_BRANCHES);
+            setupGridAction(view, R.id.cardReaderSetup, "reader_setup", NavigationManager.TAG_READER_SETUP);
+            setupGridAction(view, R.id.cardQuickAccess, "quick_access", NavigationManager.TAG_QUICK_ACCESS);
 
             // ═══════════════════════════════════════════════════
             //  CLOSE BUTTON
@@ -118,10 +134,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             Log.e(TAG, "onViewCreated error", e);
         }
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  PRIMARY CTA
-    // ═══════════════════════════════════════════════════════
 
     private void setupPrimaryCta(View view) {
         try {
@@ -144,12 +156,10 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             }
 
             cta.setVisibility(View.VISIBLE);
-
             cta.setOnClickListener(v -> {
                 performHaptic();
                 navigateTo(NavigationManager.TAG_IDENTITY_STUDIO, new MiraIdentityStudioFragment());
             });
-
             animatedViews.add(cta);
 
         } catch (Exception e) {
@@ -157,25 +167,15 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  GRID ACTION
-    // ═══════════════════════════════════════════════════════
-
     private void setupGridAction(View root, int cardId, String actionKey, String tag) {
         try {
             View card = root.findViewById(cardId);
-            if (card == null) {
-                Log.w(TAG, "Grid item NOT FOUND: " + actionKey + " (id=" + getResourceIdName(cardId) + ")");
-                return;
-            }
+            if (card == null) return;
 
-            // 1. بوابة الصلاحيات الموحّدة
             boolean hasPermission = permissionManager.canAccessFragment(tag);
-
-            // 2. تخصيص المستخدم
             boolean quickAccessAllowed = quickAccessSettings == null || quickAccessSettings.isActionEnabled(actionKey);
 
-            // ✅ [إصلاح مؤقت]: إجبار شاشة أمر الصياغة على الظهور
+            // ✅ [إصلاح مؤقت]: إجبار شاشة أمر الصياغة على الظهور للتجربة
             if (NavigationManager.TAG_GOLD_CONVERSION.equals(tag)) {
                 hasPermission = true;
                 quickAccessAllowed = true;
@@ -192,9 +192,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             card.setOnClickListener(v -> {
                 performHaptic();
                 Fragment target = FragmentFactory.createFragmentByTag(tag);
-                if (target == null) {
-                    Log.w(TAG, "FragmentFactory returned null for: " + tag);
-                }
                 navigateTo(tag, target);
             });
 
@@ -203,13 +200,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  NAVIGATION
-    // ═══════════════════════════════════════════════════════
-
     private void navigateTo(String tag, @Nullable Fragment fallbackFragment) {
         if (tag == null || tag.isEmpty()) return;
-
         final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity) ? (UHFMainActivity) getActivity() : null;
         if (activity == null) return;
 
@@ -231,10 +223,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             }
         }, NAV_DELAY_MS);
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  HAPTIC & ANIMATION & HELPERS
-    // ═══════════════════════════════════════════════════════
 
     private void performHaptic() {
         try {
@@ -274,7 +262,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         try {
             View bottomSheet = getDialog() != null ? getDialog().findViewById(com.google.android.material.R.id.design_bottom_sheet) : null;
             if (bottomSheet != null) {
-                bottomSheet.getLayoutParams().height = (int) (getResources().getDisplayMetrics().heightPixels * 0.80);
+                // زيادة الارتفاع إلى 90% لاستيعاب القائمة الطويلة
+                bottomSheet.getLayoutParams().height = (int) (getResources().getDisplayMetrics().heightPixels * 0.90);
                 bottomSheet.requestLayout();
             }
         } catch (Exception ignored) {}
@@ -284,9 +273,5 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     public void onDestroyView() {
         super.onDestroyView();
         animatedViews.clear();
-    }
-
-    private String getResourceIdName(int resId) {
-        try { return getResources().getResourceEntryName(resId); } catch (Exception e) { return String.valueOf(resId); }
     }
 }
