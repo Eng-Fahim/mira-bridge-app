@@ -2594,4 +2594,17 @@ public ApiResponse reverseJournalEntry(String entryId) {
 public ApiResponse postInventoryRevaluation(JSONObject payload) {
     return postAccounting("/accounting/inventory-revaluation/post", payload);
 }
+    public ApiResponse savePurchaseInvoice(JSONObject payload) {
+    try {
+        if (!payload.has("branch_id")) {
+            MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
+            payload.put("branch_id", bm.getActiveBranchId());
+        }
+        return postWithAuth("/purchases/create", payload);
+    } catch (Exception e) {
+        ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        response.isNetworkError = true;
+        return response;
+    }
+    }
 }
