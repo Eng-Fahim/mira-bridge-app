@@ -852,6 +852,10 @@
 
     <color name="chart_grid">#33000000</color>
     <color name="chart_axis_text">#666666</color>
+    
+<!-- ألوان التنبيهات -->
+<color name="alert_bg_danger">#FEF2F2</color>
+<color name="alert_text_danger">#DC2626</color>
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
