@@ -46,6 +46,7 @@ public class FragmentFactory {
             // ✅ [جديد] إضافة شاشة أمر الصياغة
             case NavigationManager.TAG_GOLD_CONVERSION: return new MiraGoldConversionFragment();
             case NavigationManager.TAG_INVENTORY_REVALUATION: return new MiraInventoryRevaluationFragment();
+            case NavigationManager.TAG_AUDIT_LOGS: return new MiraAuditLogFragment();
             default: return new MiraDashboardFragment();
         }
     }
