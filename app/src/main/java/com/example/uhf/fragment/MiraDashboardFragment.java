@@ -1,3 +1,4 @@
+هكذا؟
 package com.example.uhf.fragment;
 
 import android.content.Context;
@@ -400,52 +401,73 @@ public class MiraDashboardFragment extends Fragment {
 
            // ═══════ إعداد الأحداث (Listeners) ═══════
 
-hsvCarousel.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-    if (cardsContainer == null) return;
+// ═══════ إعداد الأحداث (Listeners) ═══════
+if (hsvCarousel != null) {
+    final android.widget.LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
     
-    int screenWidth = getResources().getDisplayMetrics().widthPixels;
-    int screenCenter = screenWidth / 2;
-    int activeCardIndex = 0;
-    float minDistance = Float.MAX_VALUE;
+    // 1. التأثير الهندسي عند السحب
+    hsvCarousel.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+        if (cardsContainer == null) return;
+        
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int screenCenter = screenWidth / 2;
+        int activeCardIndex = 0;
+        float minDistance = Float.MAX_VALUE;
 
-    for (int i = 0; i < cardsContainer.getChildCount(); i++) {
-        View card = cardsContainer.getChildAt(i);
-        
-        // حساب مركز البطاقة على الشاشة
-        int cardCenter = card.getLeft() + (card.getWidth() / 2) - scrollX;
-        int distance = cardCenter - screenCenter;
-        
-        // إيجاد البطاقة النشطة (الأقرب للمركز)
-        if (Math.abs(distance) < minDistance) {
-            minDistance = Math.abs(distance);
-            activeCardIndex = i;
+        for (int i = 0; i < cardsContainer.getChildCount(); i++) {
+            View card = cardsContainer.getChildAt(i);
+            
+            int cardCenter = card.getLeft() + (card.getWidth() / 2) - scrollX;
+            int distance = cardCenter - screenCenter;
+            
+            if (Math.abs(distance) < minDistance) {
+                minDistance = Math.abs(distance);
+                activeCardIndex = i;
+            }
+
+            float percent = Math.min(1f, Math.abs((float) distance / (screenWidth / 2.0f)));
+            
+            // تأثير الإمالة
+            float maxRotation = 12f; 
+            float rotation = (distance > 0 ? 1 : -1) * (percent * maxRotation);
+            card.setRotationY(rotation);
+            card.setCameraDistance(8000f); 
+            
+            // ✅ تأثير التصغير بدلاً من الشفافية (ليبدو ممتازاً في الوضع الفاتح)
+            float minScale = 0.85f;
+            float scale = 1f - (percent * (1f - minScale));
+            card.setScaleX(scale);
+            card.setScaleY(scale);
+            
+            card.setAlpha(1f); // إبقاء البطاقات معتمة
         }
 
-        // حساب النسبة المئوية للبعد عن المركز (من 0.0 إلى 1.0)
-        float percent = Math.min(1f, Math.abs((float) distance / (screenWidth / 2.0f)));
-        
-        // 1. تأثير الإمالة (RotationY) - 15 درجة كحد أقصى
-        float maxRotation = 12f; 
-        float rotation = (distance > 0 ? 1 : -1) * (percent * maxRotation);
-        card.setRotationY(rotation);
-        card.setCameraDistance(8000f); 
-        
-        // 2. تأثير التصغير (Scale) بدلاً من الشفافية
-        // البطاقة النشطة 100%، والجانبية تصغر إلى 85%
-        float minScale = 0.85f;
-        float scale = 1f - (percent * (1f - minScale));
-        card.setScaleX(scale);
-        card.setScaleY(scale);
-        
-        // ضمان بقاء البطاقات معتمة تماماً
-        card.setAlpha(1f);
-    }
+        // تحديث النقاط السفلية
+        dot1.setBackgroundResource(activeCardIndex == 0 ? R.drawable.dot_active : R.drawable.dot_inactive);
+        dot2.setBackgroundResource(activeCardIndex == 1 ? R.drawable.dot_active : R.drawable.dot_inactive);
+        dot3.setBackgroundResource(activeCardIndex == 2 ? R.drawable.dot_active : R.drawable.dot_inactive);
+    });
 
-    // تحديث النقاط (Dots)
-    dot1.setBackgroundResource(activeCardIndex == 0 ? R.drawable.dot_active : R.drawable.dot_inactive);
-    dot2.setBackgroundResource(activeCardIndex == 1 ? R.drawable.dot_active : R.drawable.dot_inactive);
-    dot3.setBackgroundResource(activeCardIndex == 2 ? R.drawable.dot_active : R.drawable.dot_inactive);
-});
+    // ✅ 2. التمرير التلقائي للبطاقة الوسطى (المخزون) عند فتح الشاشة
+    hsvCarousel.post(() -> {
+        if (cardsContainer != null && cardsContainer.getChildCount() > 1) {
+            View middleCard = cardsContainer.getChildAt(1); // البطاقة الوسطى
+            if (middleCard != null) {
+                int screenWidth = getResources().getDisplayMetrics().widthPixels;
+                // حساب نقطة المنتصف للبطاقة الوسطى
+                int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
+                
+                // التمرير بسلاسة للمنتصف
+                hsvCarousel.smoothScrollTo(scrollToX, 0);
+                
+                // تحديث النقاط يدوياً فوراً
+                dot1.setBackgroundResource(R.drawable.dot_inactive);
+                dot2.setBackgroundResource(R.drawable.dot_active);
+                dot3.setBackgroundResource(R.drawable.dot_inactive);
+            }
+        }
+    });
+}
 
             if (btnToggleScrapVisibility != null) btnToggleScrapVisibility.setOnClickListener(v2 -> toggleScrapVisibility());
             if (btnOpenScrapBuy != null) btnOpenScrapBuy.setOnClickListener(v2 -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
