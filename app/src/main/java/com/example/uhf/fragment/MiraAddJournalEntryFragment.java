@@ -2,6 +2,8 @@ package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -25,7 +27,7 @@ import com.example.uhf.R;
 import com.example.uhf.api.dto.AccountDto;
 import com.example.uhf.utils.DateHelper;
 import com.example.uhf.viewmodel.AccountingViewModel;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder; // ✅ استيراد المكتبة
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -47,6 +49,10 @@ public class MiraAddJournalEntryFragment extends Fragment {
     private List<AccountDto> allAccounts = new ArrayList<>();
     private List<View> lineViews = new ArrayList<>();
 
+    // ✅ NEW: handler يمكن إلغاؤه في onDestroyView
+    private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
+    private Runnable timeoutRunnable;      // مرجع لإلغائه لاحقاً
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -66,9 +72,9 @@ public class MiraAddJournalEntryFragment extends Fragment {
         etDate.setText(DateHelper.todayApi());
         etDate.setOnClickListener(view -> showDatePicker());
 
-        // ✅ استقبال الأخطاء من السيرفر وعرضها بنافذة احترافية
         viewModel.getError().observe(getViewLifecycleOwner(), error -> {
             if (error != null && !error.isEmpty()) {
+                if (!isAdded()) return;   // ✅ guard
                 new MaterialAlertDialogBuilder(requireContext())
                         .setTitle("⛔ عملية مرفوضة")
                         .setMessage(error)
@@ -77,8 +83,10 @@ public class MiraAddJournalEntryFragment extends Fragment {
                         .setCancelable(false)
                         .show();
 
-                btnSave.setEnabled(true);
-                btnSave.setText("حفظ وترحيل القيد");
+                if (btnSave != null) {
+                    btnSave.setEnabled(true);
+                    btnSave.setText("حفظ وترحيل القيد");
+                }
                 viewModel.clearError();
             }
         });
@@ -96,20 +104,38 @@ public class MiraAddJournalEntryFragment extends Fragment {
         addLine();
 
         btnAddLine.setOnClickListener(view -> addLine());
-        btnClose.setOnClickListener(view -> getParentFragmentManager().popBackStack());
+        btnClose.setOnClickListener(view -> {
+            if (isAdded()) getParentFragmentManager().popBackStack();
+        });
         btnSave.setOnClickListener(view -> saveEntry());
 
         return v;
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // ✅ إلغاء أي timeout معلق — يحل الانهيار الرئيسي
+        if (timeoutRunnable != null) {
+            timeoutHandler.removeCallbacks(timeoutRunnable);
+            timeoutRunnable = null;
+        }
+        // تحرير المراجع لتجنب memory leaks
+        lineViews.clear();
+        allAccounts.clear();
+    }
+
     private void showDatePicker() {
+        if (!isAdded()) return;
         Calendar cal = Calendar.getInstance();
         new DatePickerDialog(requireContext(), (view, year, month, dayOfMonth) -> {
+            if (etDate == null) return;
             etDate.setText(String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth));
         }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
     }
 
     private void addLine() {
+        if (getContext() == null) return;   // ✅ guard
         View lineView = LayoutInflater.from(getContext()).inflate(R.layout.item_entry_line, linesContainer, false);
         linesContainer.addView(lineView);
         lineViews.add(lineView);
@@ -135,7 +161,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
         ImageView btnRemove = lineView.findViewById(R.id.btnRemoveLine);
         btnRemove.setOnClickListener(view -> {
             if (lineViews.size() <= 2) {
-                Toast.makeText(getContext(), "يجب أن يحتوي القيد على سطرين على الأقل", Toast.LENGTH_SHORT).show();
+                safeToast("يجب أن يحتوي القيد على سطرين على الأقل");
                 return;
             }
             linesContainer.removeView(lineView);
@@ -145,6 +171,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
     }
 
     private void setupAccountDropdown(View lineView) {
+        if (!isAdded()) return;   // ✅ guard
         AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
         ArrayAdapter<AccountDto> adapter = new ArrayAdapter<AccountDto>(requireContext(),
                 android.R.layout.simple_dropdown_item_1line, allAccounts) {
@@ -180,13 +207,14 @@ public class MiraAddJournalEntryFragment extends Fragment {
         acAccount.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                acAccount.setTag(null); 
+                acAccount.setTag(null);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
     }
 
     private void calculateTotals() {
+        if (tvTotals == null) return;
         double tDebit = 0, tCredit = 0, tGoldDebit = 0, tGoldCredit = 0;
 
         for (View lineView : lineViews) {
@@ -200,19 +228,26 @@ public class MiraAddJournalEntryFragment extends Fragment {
         if (tGoldDebit > 0 || tGoldCredit > 0) {
             text += String.format(Locale.US, "\nذهب: %.3fg | %.3fg", tGoldDebit, tGoldCredit);
         }
-        
+
         tvTotals.setText(text);
         boolean balanced = Math.abs(tDebit - tCredit) < 0.01 && Math.abs(tGoldDebit - tGoldCredit) < 0.001;
         tvTotals.setTextColor(balanced ? 0xFF27AE60 : 0xFF3498DB);
     }
 
+    /** ✅ مساعد آمن لعرض Toast لا يرمي NPE */
+    private void safeToast(String message) {
+        if (!isAdded() || getContext() == null) return;
+        Toast.makeText(requireContext().getApplicationContext(), message, Toast.LENGTH_SHORT).show();
+    }
+
     private void saveEntry() {
+        if (!isAdded()) return;
         String date = etDate.getText().toString();
         String ref = etReference.getText().toString();
         String desc = etDescription.getText().toString();
 
         if (desc.isEmpty()) {
-            Toast.makeText(getContext(), "يرجى إدخال بيان القيد", Toast.LENGTH_SHORT).show();
+            safeToast("يرجى إدخال بيان القيد");
             return;
         }
 
@@ -222,7 +257,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
             for (View lineView : lineViews) {
                 AutoCompleteTextView acAccount = lineView.findViewById(R.id.acAccount);
-                
+
                 AccountDto selectedAccount = null;
                 if (acAccount.getTag() instanceof AccountDto) {
                     selectedAccount = (AccountDto) acAccount.getTag();
@@ -236,7 +271,7 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 }
 
                 if (selectedAccount == null) {
-                    Toast.makeText(getContext(), "يرجى اختيار حساب صحيح من القائمة لكل سطر", Toast.LENGTH_LONG).show();
+                    safeToast("يرجى اختيار حساب صحيح من القائمة لكل سطر");
                     return;
                 }
 
@@ -250,8 +285,8 @@ public class MiraAddJournalEntryFragment extends Fragment {
                 lineObj.put("description", desc);
                 lineObj.put("debit", debit);
                 lineObj.put("credit", credit);
-                lineObj.put("gold_debit_grams", goldDebit); 
-                lineObj.put("gold_credit_grams", goldCredit); 
+                lineObj.put("gold_debit_grams", goldDebit);
+                lineObj.put("gold_credit_grams", goldCredit);
                 linesArray.put(lineObj);
 
                 tDebit += debit; tCredit += credit;
@@ -259,11 +294,11 @@ public class MiraAddJournalEntryFragment extends Fragment {
             }
 
             if (Math.abs(tDebit - tCredit) > 0.01) {
-                Toast.makeText(getContext(), "❌ القيد غير متوازن مالياً!", Toast.LENGTH_LONG).show();
+                safeToast("❌ القيد غير متوازن مالياً!");
                 return;
             }
             if (Math.abs(tGoldDebit - tGoldCredit) > 0.001) {
-                Toast.makeText(getContext(), "❌ القيد غير متوازن وزنياً!", Toast.LENGTH_LONG).show();
+                safeToast("❌ القيد غير متوازن وزنياً!");
                 return;
             }
 
@@ -276,27 +311,45 @@ public class MiraAddJournalEntryFragment extends Fragment {
 
             btnSave.setEnabled(false);
             btnSave.setText("جاري الحفظ...");
-            
-            // ✅ شبكة أمان: إلغاء تعليق الزر بعد 15 ثانية إذا لم يستجب السيرفر
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+
+            // ✅ [الإصلاح الرئيسي]: Runnable محفوظ في حقل ليُمكن إلغاؤه في onDestroyView
+            timeoutRunnable = () -> {
+                if (!isAdded() || btnSave == null) return;    // ✅ guard مزدوج
                 if (!btnSave.isEnabled()) {
                     btnSave.setEnabled(true);
                     btnSave.setText("حفظ وترحيل القيد");
-                    Toast.makeText(getContext(), "⚠️ لم يستجب السيرفر، يرجى المحاولة مرة أخرى", Toast.LENGTH_LONG).show();
+                    safeToast("⚠️ لم يستجب السيرفر، يرجى المحاولة مرة أخرى");
                 }
-            }, 15000);
+            };
+            timeoutHandler.postDelayed(timeoutRunnable, 15000);
 
-            // ✅ [إصلاح حرج]: حذف الاستدعاء المكرر الذي كان يحفظ القيد مرتين!
             viewModel.createJournalEntry(payload, () -> {
-                Toast.makeText(getContext(), "✅ تم حفظ القيد بنجاح", Toast.LENGTH_SHORT).show();
-                getParentFragmentManager().popBackStack();
+                // ✅ [إصلاح إضافي]: قد يستجيب السيرفر بعد إغلاق الشاشة
+                if (timeoutRunnable != null) {
+                    timeoutHandler.removeCallbacks(timeoutRunnable);
+                    timeoutRunnable = null;
+                }
+                if (!isAdded()) return;   // ← منع الانهيار هنا
+
+                safeToast("✅ تم حفظ القيد بنجاح");
+
+                // popBackStack يرمي IllegalStateException إذا الحالة غير مستقرة
+                if (isAdded() && getParentFragmentManager() != null) {
+                    getParentFragmentManager().popBackStack();
+                }
             });
 
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(getContext(), "حدث خطأ غير متوقع أثناء الحفظ", Toast.LENGTH_SHORT).show();
-            btnSave.setEnabled(true);
-            btnSave.setText("حفظ وترحيل القيد");
+            safeToast("حدث خطأ غير متوقع أثناء الحفظ");
+            if (btnSave != null) {
+                btnSave.setEnabled(true);
+                btnSave.setText("حفظ وترحيل القيد");
+            }
+            if (timeoutRunnable != null) {
+                timeoutHandler.removeCallbacks(timeoutRunnable);
+                timeoutRunnable = null;
+            }
         }
     }
 
