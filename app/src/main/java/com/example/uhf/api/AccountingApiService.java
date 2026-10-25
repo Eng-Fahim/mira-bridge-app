@@ -145,4 +145,7 @@ Call<ApiResponseDto<BalanceSheetDto>> getBalanceSheet(
     @Query("date") String date,
     @Query("branch_id") Integer branchId
 );
+
+    @POST("accounting/fiscal-years/close")
+Call<ApiResponseDto<Object>> closeFiscalYear(@Body org.json.JSONObject payload);
 }
