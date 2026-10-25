@@ -15,7 +15,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="100dp">
+            android:paddingBottom="260dp"> <!-- ✅ زيادة المساحة السفلية هنا -->
 
             <!-- بيانات العميل -->
             <com.google.android.material.textfield.TextInputLayout
@@ -270,7 +270,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="20dp"
-            android:background="#F8FAFC">
+            android:background="?attr/colorSurfaceVariant">
 
             <TextView
                 android:id="@+id/tvSettlementStatus"
@@ -279,7 +279,7 @@
                 android:text="المطلوب تسويته:"
                 android:textSize="14sp"
                 android:gravity="center"
-                android:textColor="#64748B"/>
+                android:textColor="?attr/colorOnSurfaceVariant"/>
 
             <TextView
                 android:id="@+id/tvSettlementAmount"
@@ -288,7 +288,7 @@
                 android:text="0.00"
                 android:textSize="32sp"
                 android:textStyle="bold"
-                android:textColor="#1A1A1A"
+                android:textColor="?attr/colorOnSurface"
                 android:gravity="center"
                 android:layout_marginVertical="8dp"/>
 
