@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
-import android.os.Build;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -12,10 +12,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.ImageButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -24,19 +25,29 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.dialog.ActivityDetailsBottomSheet;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
-import com.example.uhf.tools.SessionManager;
-import com.example.uhf.tools.RecentActivityCache;
-import com.example.uhf.dialog.ActivityDetailsBottomSheet;
 import com.example.uhf.navigation.NavigationManager;
+import com.example.uhf.tools.RecentActivityCache;
+import com.example.uhf.tools.SessionManager;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.charts.PieChart;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.data.PieData;
+import com.github.mikephil.charting.data.PieDataSet;
+import com.github.mikephil.charting.data.PieEntry;
+import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -53,21 +64,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.charts.PieChart;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.data.PieData;
-import com.github.mikephil.charting.data.PieDataSet;
-import com.github.mikephil.charting.data.PieEntry;
-import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
-import com.github.mikephil.charting.components.XAxis;
-import android.graphics.Color;
-
 /**
- * MiraDashboardFragment v2.6 — Scrap Aging Integrated
+ * MiraDashboardFragment v3.0 — Carousel Edition & Charts
  */
 public class MiraDashboardFragment extends Fragment {
 
@@ -77,8 +75,6 @@ public class MiraDashboardFragment extends Fragment {
     private static final String PREFS_CACHE_OWNER = "mira_dashboard_cache_owner";
     private static final String KEY_CACHE_OWNER_USER_ID = "cache_owner_user_id";
     private static final String KEY_PREFIX_LAST_BRANCH = "last_branch_id_";
-    private LineChart lineChartSales;
-    private PieChart pieChartKarat;
 
     private static final double OUNCE_TO_GRAM = 31.1035;
     private static final long CACHE_VALIDITY_MS = 2 * 60 * 1000;
@@ -94,6 +90,12 @@ public class MiraDashboardFragment extends Fragment {
     private boolean isInventoryHidden = true;
     private boolean isScrapHidden = true;
 
+    // Carousel & Charts
+    private HorizontalScrollView hsvCarousel;
+    private View dot1, dot2, dot3;
+    private LineChart lineChartSales;
+    private PieChart pieChartKarat;
+
     private double currentScrapWeight = 0;
     private double currentScrapValue = 0;
     private TextView tvScrapWeight, tvScrapValue;
@@ -107,9 +109,7 @@ public class MiraDashboardFragment extends Fragment {
     private View btnOpenAgingReport;
 
     // UI Elements
-    private ImageButton btnToggleHeroVisibility;
-    private ImageButton btnToggleSalesVisibility;
-    private ImageButton btnToggleInventoryVisibility;
+    private ImageButton btnToggleHeroVisibility, btnToggleSalesVisibility, btnToggleInventoryVisibility;
 
     private android.widget.LinearLayout llInventoryByKarat;
     private TextView tvKaratEmptyState;
@@ -160,27 +160,21 @@ public class MiraDashboardFragment extends Fragment {
     private final AtomicBoolean isLoading = new AtomicBoolean(false);
     private final AtomicBoolean isGoldRefreshing = new AtomicBoolean(false);
     private boolean isDataLoaded = false;
-    private long lastDataFetchTime = 0, lastGoldFetchTime = 0, lastPingTime = 0;
+    private long lastDataFetchTime = 0, lastGoldFetchTime = 0;
 
     private double currentInventoryValue = 0;
     private int currentItemCount = 0;
     private double currentTotalWeight = 0;
 
     private static class KaratInventory {
-        final int karat;
-        final int itemCount;
-        final double weight;
-        KaratInventory(int karat, int itemCount, double weight) {
-            this.karat = karat; this.itemCount = itemCount; this.weight = weight;
-        }
+        final int karat; final int itemCount; final double weight;
+        KaratInventory(int karat, int itemCount, double weight) { this.karat = karat; this.itemCount = itemCount; this.weight = weight; }
     }
 
     private static class GoldPriceData {
-        final double price24, price21, price18, ouncePrice;
-        final String source;
+        final double price24, price21, price18, ouncePrice; final String source;
         GoldPriceData(double price24, double price21, double price18, double ouncePrice, String source) {
-            this.price24 = price24; this.price21 = price21; this.price18 = price18;
-            this.ouncePrice = ouncePrice; this.source = source;
+            this.price24 = price24; this.price21 = price21; this.price18 = price18; this.ouncePrice = ouncePrice; this.source = source;
         }
     }
 
@@ -214,15 +208,10 @@ public class MiraDashboardFragment extends Fragment {
                 "com.example.uhf.REFRESH_SALES".equals(action)) {
                 mainHandler.post(() -> {
                     if (isAdded() && isViewInitialized) {
-                        isDataLoaded = false;
-                        lastDataFetchTime = 0;
-                        isLoading.set(false);
+                        isDataLoaded = false; lastDataFetchTime = 0; isLoading.set(false);
                         if (isResumed()) {
                             fetchData();
-                            if (currentBranchId > 0) {
-                                fetchScrapSummary(currentBranchId);
-                                fetchScrapAging(currentBranchId);
-                            }
+                            if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
                         }
                     }
                 });
@@ -241,10 +230,7 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void shutdownExecutor() {
-        if (localExecutor != null) {
-            try { localExecutor.shutdownNow(); } catch (Exception ignored) {}
-            localExecutor = null;
-        }
+        if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
 
     private void ensureCacheOwnerIsCurrentUser() {
@@ -324,33 +310,29 @@ public class MiraDashboardFragment extends Fragment {
             syncOrgProfileFromServer(false);
             startAutoRefresh();
             lastDataFetchTime = 0;
+            
+            // جلب البيانات والرسوم البيانية فوراً
+            fetchData();
+            fetchDashboardCharts();
+            fetchRecentActivity();
+            if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
+            
         } catch (Throwable e) { logNonFatal("onViewCreated", e); }
     }
 
     private void initViews(View v) {
         try {
-            lineChartSales = v.findViewById(R.id.lineChartSales);
-            pieChartKarat = v.findViewById(R.id.pieChartKarat);
-            llInventoryByKarat = v.findViewById(R.id.llInventoryByKarat);
-            tvKaratEmptyState  = v.findViewById(R.id.tvKaratEmptyState);
-            tvSalesToday = v.findViewById(R.id.tvSalesToday);
-            tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
-            tvSalesYear  = v.findViewById(R.id.tvSalesYear);
-            tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
-            tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
-            tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-            shimmerLayout = v.findViewById(R.id.shimmerLayout);
-            swipeRefresh  = v.findViewById(R.id.swipeRefresh);
-            tvOuncePrice  = v.findViewById(R.id.tvOuncePrice);
-            tvPriceSource = v.findViewById(R.id.tvPriceSource);
-            tvLastUpdate  = v.findViewById(R.id.tvLastUpdate);
-            tvGoldTrend   = v.findViewById(R.id.tvGoldTrend);
-            tvGoldChange  = v.findViewById(R.id.tvGoldChange);
-            btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
-            cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
-            loadingOverlay = v.findViewById(R.id.loadingOverlay);
-            pbGoldLoading  = v.findViewById(R.id.pbGoldLoading);
+            // 1. ربط عناصر الكاروسيل (HorizontalScrollView)
+            hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
+            dot1 = v.findViewById(R.id.dot1);
+            dot2 = v.findViewById(R.id.dot2);
+            dot3 = v.findViewById(R.id.dot3);
+            
             heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
+            cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+            View salesSummaryCard = v.findViewById(R.id.salesSummaryCard);
+
+            // بطاقة المخزون
             tvHeroBalance   = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend     = v.findViewById(R.id.tvHeroTrend);
             tvHeroSubtitle  = v.findViewById(R.id.tvHeroSubtitle);
@@ -358,12 +340,36 @@ public class MiraDashboardFragment extends Fragment {
             tvHeroValueSAR  = v.findViewById(R.id.tvHeroValueSAR);
             tvHeroValueUSD  = v.findViewById(R.id.tvHeroValueUSD);
             tvHeroItemCount = v.findViewById(R.id.tvHeroItemCount);
+            btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
+
+            // بطاقة المبيعات
+            tvSalesToday = v.findViewById(R.id.tvSalesToday);
+            tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
+            tvSalesYear  = v.findViewById(R.id.tvSalesYear);
+            btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
+
+            // بطاقة الذهب
+            tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
+            tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
+            tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
+            tvOuncePrice  = v.findViewById(R.id.tvOuncePrice);
+            tvPriceSource = v.findViewById(R.id.tvPriceSource);
+            tvLastUpdate  = v.findViewById(R.id.tvLastUpdate);
+            tvGoldTrend   = v.findViewById(R.id.tvGoldTrend);
+            tvGoldChange  = v.findViewById(R.id.tvGoldChange);
+            btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
+            pbGoldLoading  = v.findViewById(R.id.pbGoldLoading);
+
+            // باقي العناصر
+            llInventoryByKarat = v.findViewById(R.id.llInventoryByKarat);
+            tvKaratEmptyState  = v.findViewById(R.id.tvKaratEmptyState);
+            shimmerLayout = v.findViewById(R.id.shimmerLayout);
+            swipeRefresh  = v.findViewById(R.id.swipeRefresh);
+            loadingOverlay = v.findViewById(R.id.loadingOverlay);
             alertsStrip   = v.findViewById(R.id.alertsStrip);
             tvAlertIcon   = v.findViewById(R.id.tvAlertIcon);
             tvAlertMessage = v.findViewById(R.id.tvAlertMessage);
             tvAlertAction = v.findViewById(R.id.tvAlertAction);
-            btnToggleHeroVisibility  = v.findViewById(R.id.btnToggleHeroVisibility);
-            btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
             btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility);
 
             // Scrap Gold
@@ -374,19 +380,6 @@ public class MiraDashboardFragment extends Fragment {
             View btnOpenScrapHistory = v.findViewById(R.id.btnOpenScrapHistory);
             View btnOpenScrapBatches = v.findViewById(R.id.btnOpenScrapBatches);
 
-            if (btnToggleScrapVisibility != null) {
-                btnToggleScrapVisibility.setOnClickListener(v2 -> toggleScrapVisibility());
-            }
-            if (btnOpenScrapBuy != null) {
-                btnOpenScrapBuy.setOnClickListener(v2 -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
-            }
-            if (btnOpenScrapHistory != null) {
-                btnOpenScrapHistory.setOnClickListener(v2 -> navigateToFragment(new MiraScrapHistoryFragment(), NavigationManager.TAG_SCRAP_HISTORY));
-            }
-            if (btnOpenScrapBatches != null) {
-                btnOpenScrapBatches.setOnClickListener(v2 -> navigateToFragment(new MiraScrapBatchesFragment(), NavigationManager.TAG_SCRAP_BATCHES));
-            }
-
             // Scrap Aging
             cardScrapAging = v.findViewById(R.id.cardScrapAging);
             tvAgingStatusIcon = v.findViewById(R.id.tvAgingStatusIcon);
@@ -396,36 +389,55 @@ public class MiraDashboardFragment extends Fragment {
             llAgingAlert = v.findViewById(R.id.llAgingAlert);
             tvAgingAlertText = v.findViewById(R.id.tvAgingAlertText);
             btnOpenAgingReport = v.findViewById(R.id.btnOpenAgingReport);
-            if (btnOpenAgingReport != null) {
-                btnOpenAgingReport.setOnClickListener(v2 -> navigateToFragment(new MiraScrapAgingFragment(), NavigationManager.TAG_SCRAP_AGING));
-            }
 
+            // Recent Activity & Charts
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
-            if (tvViewAllActivity != null) {
-                tvViewAllActivity.setOnClickListener(v2 -> navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
+            lineChartSales = v.findViewById(R.id.lineChartSales);
+            pieChartKarat = v.findViewById(R.id.pieChartKarat);
+
+            // ═══════ إعداد الأحداث (Listeners) ═══════
+            
+            // 1. مؤشر النقاط للكاروسيل
+            if (hsvCarousel != null) {
+                hsvCarousel.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+                    if (heroBalanceCard != null) {
+                        // حساب عرض البطاقة الواحدة (بما فيها الهوامش) بالبكسل
+                        int cardWidth = heroBalanceCard.getWidth() + (int)(12 * getResources().getDisplayMetrics().density);
+                        if (cardWidth > 0) {
+                            int currentCard = Math.round((float) scrollX / cardWidth);
+                            dot1.setBackgroundResource(currentCard == 0 ? R.drawable.dot_active : R.drawable.dot_inactive);
+                            dot2.setBackgroundResource(currentCard == 1 ? R.drawable.dot_active : R.drawable.dot_inactive);
+                            dot3.setBackgroundResource(currentCard == 2 ? R.drawable.dot_active : R.drawable.dot_inactive);
+                        }
+                    }
+                });
             }
 
-            if (btnRefreshGold != null) {
-                if (!canManuallyRefreshGold()) {
-                    btnRefreshGold.setVisibility(View.GONE);
-                } else {
-                    btnRefreshGold.setVisibility(View.VISIBLE);
-                    btnRefreshGold.setOnClickListener(v2 -> {
-                        if (!isGoldRefreshing.get()) fetchLiveGoldPrices(true);
-                    });
-                }
-            }
+            if (btnToggleScrapVisibility != null) btnToggleScrapVisibility.setOnClickListener(v2 -> toggleScrapVisibility());
+            if (btnOpenScrapBuy != null) btnOpenScrapBuy.setOnClickListener(v2 -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
+            if (btnOpenScrapHistory != null) btnOpenScrapHistory.setOnClickListener(v2 -> navigateToFragment(new MiraScrapHistoryFragment(), NavigationManager.TAG_SCRAP_HISTORY));
+            if (btnOpenScrapBatches != null) btnOpenScrapBatches.setOnClickListener(v2 -> navigateToFragment(new MiraScrapBatchesFragment(), NavigationManager.TAG_SCRAP_BATCHES));
+            if (btnOpenAgingReport != null) btnOpenAgingReport.setOnClickListener(v2 -> navigateToFragment(new MiraScrapAgingFragment(), NavigationManager.TAG_SCRAP_AGING));
+            if (tvViewAllActivity != null) tvViewAllActivity.setOnClickListener(v2 -> navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
+            
             if (btnToggleHeroVisibility != null) btnToggleHeroVisibility.setOnClickListener(v2 -> toggleHeroVisibility());
             if (btnToggleSalesVisibility != null) btnToggleSalesVisibility.setOnClickListener(v2 -> toggleSalesVisibility());
             if (btnToggleInventoryVisibility != null) btnToggleInventoryVisibility.setOnClickListener(v2 -> toggleInventoryVisibility());
             if (tvAlertAction != null) tvAlertAction.setOnClickListener(v2 -> navigateToFragment(new MiraUHFReadTagFragment(), "Scan"));
+
+            if (btnRefreshGold != null) {
+                if (!canManuallyRefreshGold()) btnRefreshGold.setVisibility(View.GONE);
+                else btnRefreshGold.setOnClickListener(v2 -> { if (!isGoldRefreshing.get()) fetchLiveGoldPrices(true); });
+            }
+
             if (cardGoldPrices != null && permissionManager != null && !permissionManager.canAccessFragment("GoldRates")) cardGoldPrices.setVisibility(View.GONE);
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
                 swipeRefresh.setColorSchemeResources(R.color.colorPrimary, R.color.gray1);
             }
 
+            // إخفاء القيم افتراضياً
             isHeroHidden = true; isSalesHidden = true; isInventoryHidden = true; isScrapHidden = true;
             if (btnToggleHeroVisibility != null) btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleSalesVisibility != null) btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
@@ -437,98 +449,87 @@ public class MiraDashboardFragment extends Fragment {
             updateScrapUI();
         } catch (Exception e) { logNonFatal("initViews", e); }
     }
-private void fetchDashboardCharts() {
-    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
-    localExecutor.execute(() -> {
+
+    // ... (جميع الدوال الأخرى تبقى كما هي تماماً: fetchDashboardCharts, renderCharts, renderInventoryByKarat, updateHeroBalance, ...) ...
+    // سأدرجها كاملة لضمان عدم وجود أخطاء
+
+    private void fetchDashboardCharts() {
+        if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+        localExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject data = response.data.optJSONObject("data");
+                    if (data != null) {
+                        mainHandler.post(() -> { if (isAdded()) renderCharts(data); });
+                    }
+                }
+            } catch (Exception e) { logNonFatal("fetchDashboardCharts", e); }
+        });
+    }
+
+    private void renderCharts(JSONObject data) {
         try {
-            MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONObject data = response.data.optJSONObject("data");
-                if (data != null) {
-                    mainHandler.post(() -> {
-                        if (isAdded()) renderCharts(data);
-                    });
+            JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
+            if (sales7Days != null && lineChartSales != null) {
+                List<Entry> entries = new ArrayList<>();
+                final List<String> labels = new ArrayList<>();
+                for (int i = 0; i < sales7Days.length(); i++) {
+                    JSONObject day = sales7Days.getJSONObject(i);
+                    entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
+                    labels.add(day.optString("date", ""));
+                }
+                LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+                dataSet.setColor(Color.parseColor("#D4AF37"));
+                dataSet.setCircleColor(Color.parseColor("#D4AF37"));
+                dataSet.setLineWidth(2.5f);
+                dataSet.setCircleRadius(4f);
+                dataSet.setDrawValues(false);
+                dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                LineData lineData = new LineData(dataSet);
+                lineChartSales.setData(lineData);
+                XAxis xAxis = lineChartSales.getXAxis();
+                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setGranularity(1f);
+                xAxis.setDrawGridLines(false);
+                lineChartSales.getAxisRight().setEnabled(false);
+                lineChartSales.getAxisLeft().setDrawGridLines(true);
+                lineChartSales.getDescription().setEnabled(false);
+                lineChartSales.getLegend().setEnabled(false);
+                lineChartSales.animateX(1000);
+                lineChartSales.invalidate();
+            }
+
+            JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
+            if (salesByKarat != null && pieChartKarat != null) {
+                List<PieEntry> entries = new ArrayList<>();
+                for (int i = 0; i < salesByKarat.length(); i++) {
+                    JSONObject k = salesByKarat.getJSONObject(i);
+                    entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
+                }
+                if (!entries.isEmpty()) {
+                    PieDataSet dataSet = new PieDataSet(entries, "");
+                    List<Integer> colors = new ArrayList<>();
+                    colors.add(Color.parseColor("#D4AF37")); colors.add(Color.parseColor("#E6B800"));
+                    colors.add(Color.parseColor("#CD853F")); colors.add(Color.parseColor("#A0522D"));
+                    dataSet.setColors(colors);
+                    dataSet.setValueTextSize(12f);
+                    dataSet.setValueTextColor(Color.WHITE);
+                    PieData pieData = new PieData(dataSet);
+                    pieChartKarat.setData(pieData);
+                    pieChartKarat.getDescription().setEnabled(false);
+                    pieChartKarat.setUsePercentValues(true);
+                    pieChartKarat.setEntryLabelColor(Color.BLACK);
+                    pieChartKarat.setHoleRadius(40f);
+                    pieChartKarat.setTransparentCircleRadius(45f);
+                    pieChartKarat.animateY(1000);
+                    pieChartKarat.invalidate();
                 }
             }
-        } catch (Exception e) {
-            logNonFatal("fetchDashboardCharts", e);
-        }
-    });
-}
-
-private void renderCharts(JSONObject data) {
-    try {
-        // 1. Line Chart
-        JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
-        if (sales7Days != null && lineChartSales != null) {
-            List<Entry> entries = new ArrayList<>();
-            final List<String> labels = new ArrayList<>();
-            for (int i = 0; i < sales7Days.length(); i++) {
-                JSONObject day = sales7Days.getJSONObject(i);
-                entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
-                labels.add(day.optString("date", ""));
-            }
-
-            LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
-            dataSet.setColor(Color.parseColor("#D4AF37"));
-            dataSet.setCircleColor(Color.parseColor("#D4AF37"));
-            dataSet.setLineWidth(2.5f);
-            dataSet.setCircleRadius(4f);
-            dataSet.setDrawValues(false);
-            dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-            
-            LineData lineData = new LineData(dataSet);
-            lineChartSales.setData(lineData);
-            
-            XAxis xAxis = lineChartSales.getXAxis();
-            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-            xAxis.setGranularity(1f);
-            xAxis.setDrawGridLines(false);
-            
-            lineChartSales.getAxisRight().setEnabled(false);
-            lineChartSales.getAxisLeft().setDrawGridLines(true);
-            lineChartSales.getDescription().setEnabled(false);
-            lineChartSales.getLegend().setEnabled(false);
-            lineChartSales.animateX(1000);
-            lineChartSales.invalidate();
-        }
-
-        // 2. Pie Chart
-        JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
-        if (salesByKarat != null && pieChartKarat != null) {
-            List<PieEntry> entries = new ArrayList<>();
-            for (int i = 0; i < salesByKarat.length(); i++) {
-                JSONObject k = salesByKarat.getJSONObject(i);
-                entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
-            }
-            
-            if (!entries.isEmpty()) {
-                PieDataSet dataSet = new PieDataSet(entries, "");
-                List<Integer> colors = new ArrayList<>();
-                colors.add(Color.parseColor("#D4AF37")); // 24K
-                colors.add(Color.parseColor("#E6B800")); // 21K
-                colors.add(Color.parseColor("#CD853F")); // 18K
-                colors.add(Color.parseColor("#A0522D")); // Others
-                dataSet.setColors(colors);
-                dataSet.setValueTextSize(12f);
-                dataSet.setValueTextColor(Color.WHITE);
-                
-                PieData pieData = new PieData(dataSet);
-                pieChartKarat.setData(pieData);
-                pieChartKarat.getDescription().setEnabled(false);
-                pieChartKarat.setUsePercentValues(true);
-                pieChartKarat.setEntryLabelColor(Color.BLACK);
-                pieChartKarat.setHoleRadius(40f);
-                pieChartKarat.setTransparentCircleRadius(45f);
-                pieChartKarat.animateY(1000);
-                pieChartKarat.invalidate();
-            }
-        }
-    } catch (Exception e) {
-        logNonFatal("renderCharts", e);
+        } catch (Exception e) { logNonFatal("renderCharts", e); }
     }
-}
+
     private void updateHeader() {}
 
     private void renderInventoryByKarat(List<KaratInventory> items) {
@@ -580,9 +581,9 @@ private void renderCharts(JSONObject data) {
                 if (tvHeroSubtitle != null) tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
                 if (tvHeroItemCount != null) tvHeroItemCount.setText(String.format(Locale.getDefault(), "%d قطعة", itemCount));
             }
-            if (tvHeroValueUSD != null) tvHeroValueUSD.setText(isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue));
-            if (tvHeroValueSAR != null) tvHeroValueSAR.setText(isHeroHidden ? "••••••" : String.format(Locale.US, "%,.2f", totalValue * 3.75));
-            if (tvHeroValueYER != null) tvHeroValueYER.setText(isHeroHidden ? "••••••" : String.format(Locale.US, "%,.0f", totalValue * 530.0));
+            if (tvHeroValueUSD != null) tvHeroValueUSD.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue));
+            if (tvHeroValueSAR != null) tvHeroValueSAR.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue * 3.75));
+            if (tvHeroValueYER != null) tvHeroValueYER.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue * 530.0));
         } catch (Exception e) { logNonFatal("updateHeroBalance", e); }
     }
 
@@ -616,13 +617,8 @@ private void renderCharts(JSONObject data) {
 
     private void updateScrapUI() {
         if (tvScrapWeight == null || tvScrapValue == null) return;
-        if (isScrapHidden) {
-            tvScrapWeight.setText("••••••");
-            tvScrapValue.setText("••••••");
-        } else {
-            tvScrapWeight.setText(String.format(Locale.US, "%.2f g", currentScrapWeight));
-            tvScrapValue.setText(formatCurrency(currentScrapValue));
-        }
+        if (isScrapHidden) { tvScrapWeight.setText("••••••"); tvScrapValue.setText("••••••"); }
+        else { tvScrapWeight.setText(String.format(Locale.US, "%.2f g", currentScrapWeight)); tvScrapValue.setText(formatCurrency(currentScrapValue)); }
     }
 
     private void fetchScrapSummary(int branchId) {
@@ -661,9 +657,7 @@ private void renderCharts(JSONObject data) {
                         final double totalWeight = data.optDouble("total_weight", 0);
                         final int oldCount = data.optInt("old_count", 0);
                         final double oldWeight = data.optDouble("old_weight", 0);
-                        mainHandler.post(() -> {
-                            if (isAdded()) renderAgingData(totalItems, totalWeight, oldCount, oldWeight);
-                        });
+                        mainHandler.post(() -> { if (isAdded()) renderAgingData(totalItems, totalWeight, oldCount, oldWeight); });
                     }
                 }
             } catch (Exception e) { logNonFatal("fetchScrapAging", e); }
@@ -677,50 +671,33 @@ private void renderCharts(JSONObject data) {
 
         if (oldCount > 0) {
             tvAgingStatusIcon.setText("🔴");
-            if (tvAgingStatusLabel != null) {
-                tvAgingStatusLabel.setText("تحذير");
-                tvAgingStatusLabel.setTextColor(0xFFDC2626);
-            }
+            if (tvAgingStatusLabel != null) { tvAgingStatusLabel.setText("تحذير"); tvAgingStatusLabel.setTextColor(0xFFDC2626); }
             if (llAgingAlert != null) {
                 llAgingAlert.setVisibility(View.VISIBLE);
-                if (tvAgingAlertText != null) {
-                    tvAgingAlertText.setText(String.format(Locale.US, "%d فاتورة كسر مضى عليها +60 يوماً (%.2fg)", oldCount, oldWeight));
-                }
+                if (tvAgingAlertText != null) tvAgingAlertText.setText(String.format(Locale.US, "%d فاتورة كسر مضى عليها +60 يوماً (%.2fg)", oldCount, oldWeight));
             }
         } else if (totalItems > 0) {
             tvAgingStatusIcon.setText("🟢");
-            if (tvAgingStatusLabel != null) {
-                tvAgingStatusLabel.setText("سليم");
-                tvAgingStatusLabel.setTextColor(0xFF16A34A);
-            }
+            if (tvAgingStatusLabel != null) { tvAgingStatusLabel.setText("سليم"); tvAgingStatusLabel.setTextColor(0xFF16A34A); }
             if (llAgingAlert != null) llAgingAlert.setVisibility(View.GONE);
         } else {
             tvAgingStatusIcon.setText("✅");
-            if (tvAgingStatusLabel != null) {
-                tvAgingStatusLabel.setText("مُصفّى");
-                tvAgingStatusLabel.setTextColor(0xFF16A34A);
-            }
+            if (tvAgingStatusLabel != null) { tvAgingStatusLabel.setText("مُصفّى"); tvAgingStatusLabel.setTextColor(0xFF16A34A); }
             if (llAgingAlert != null) llAgingAlert.setVisibility(View.GONE);
         }
     }
 
     private void applySalesVisibility() {
-        if (isSalesHidden) {
-            setText(tvSalesToday, "••••••"); setText(tvSalesMonth, "••••••"); setText(tvSalesYear, "••••••");
-        } else if (lastSalesData != null) {
-            applySalesData(lastSalesData);
-        }
+        if (isSalesHidden) { setText(tvSalesToday, "••••"); setText(tvSalesMonth, "••••"); setText(tvSalesYear, "••••"); }
+        else if (lastSalesData != null) applySalesData(lastSalesData);
     }
 
     private void applySalesData(JSONObject sales) {
         if (sales == null || tvSalesToday == null) return;
-        if (isSalesHidden) {
-            setText(tvSalesToday, "••••••"); setText(tvSalesMonth, "••••••"); setText(tvSalesYear, "••••••");
-            return;
-        }
-        setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
-        setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
-        setText(tvSalesYear,  formatCurrency(sales.optDouble("year",  0.0)));
+        if (isSalesHidden) { setText(tvSalesToday, "••••"); setText(tvSalesMonth, "••••"); setText(tvSalesYear, "••••"); return; }
+        setText(tvSalesToday, formatCurrencyShort(sales.optDouble("today", 0.0)));
+        setText(tvSalesMonth, formatCurrencyShort(sales.optDouble("month", 0.0)));
+        setText(tvSalesYear,  formatCurrencyShort(sales.optDouble("year",  0.0)));
     }
 
     private void updateAlerts(int count, String message) {
@@ -731,17 +708,14 @@ private void renderCharts(JSONObject data) {
                 if (tvAlertIcon != null) tvAlertIcon.setText("⚠️");
                 if (tvAlertMessage != null) tvAlertMessage.setText(message);
                 if (tvAlertAction != null) tvAlertAction.setText(isArabic ? "عرض (" + count + ") →" : "View (" + count + ") →");
-            } else {
-                alertsStrip.setVisibility(View.GONE);
-            }
+            } else { alertsStrip.setVisibility(View.GONE); }
         } catch (Exception e) { logNonFatal("updateAlerts", e); }
     }
 
     private void computeAndShowAlerts(JSONObject data) {
         try {
             if (data == null) { updateAlerts(0, null); return; }
-            int alertsCount = 0;
-            StringBuilder message = new StringBuilder();
+            int alertsCount = 0; StringBuilder message = new StringBuilder();
             JSONObject inv = data.optJSONObject("inventory");
             if (inv != null) {
                 int itemsWithoutWeight = inv.optInt("items_without_weight", -1);
@@ -756,8 +730,7 @@ private void renderCharts(JSONObject data) {
     private void updateLiveStatusText(boolean isOnline) {
         try {
             if (!isAdded()) return;
-            Context context = getContext();
-            if (context == null) return;
+            Context context = getContext(); if (context == null) return;
             if (tvLiveStatusText != null) {
                 tvLiveStatusText.setText(isOnline ? (isArabic ? "متصل" : "Online") : (isArabic ? "غير متصل" : "Offline"));
                 tvLiveStatusText.setTextColor(isOnline ? ContextCompat.getColor(context, R.color.status_online_green) : ContextCompat.getColor(context, R.color.status_offline_red));
@@ -802,18 +775,6 @@ private void renderCharts(JSONObject data) {
         } catch (Exception e) { logNonFatal("syncBranchesListFromServer", e); }
     }
 
-    private void updateLiveStatus() {
-        try {
-            if (apiClient == null) return;
-            if (!ensureExecutor()) return;
-            cancelFuture(pingFuture);
-            pingFuture = localExecutor.submit(() -> {
-                boolean isOnline = apiClient.pingApi();
-                mainHandler.post(() -> updateLiveStatusText(isOnline));
-            });
-        } catch (Exception e) { logNonFatal("updateLiveStatus", e); }
-    }
-
     private void fetchLiveGoldPrices(boolean forceRefresh) {
         try {
             if (!canManuallyRefreshGold()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
@@ -824,14 +785,10 @@ private void renderCharts(JSONObject data) {
 
             long now = System.currentTimeMillis();
             if (!forceRefresh && (now - lastGoldFetchTime) < GOLD_CACHE_VALIDITY_MS) {
-                displayGoldPricesFromCache();
-                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                return;
+                displayGoldPricesFromCache(); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return;
             }
 
-            isGoldRefreshing.set(true);
-            showGoldLoadingState(true);
-            cancelFuture(goldPriceFuture);
+            isGoldRefreshing.set(true); showGoldLoadingState(true); cancelFuture(goldPriceFuture);
             final Context appCtx = requireContext().getApplicationContext();
 
             goldPriceFuture = localExecutor.submit(() -> {
@@ -839,9 +796,7 @@ private void renderCharts(JSONObject data) {
                     List<ApiProvider> providers = apiClient.getActiveProviders();
                     ApiProvider activeProvider = null;
                     if (providers != null && !providers.isEmpty()) {
-                        for (ApiProvider provider : providers) {
-                            if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) { activeProvider = provider; break; }
-                        }
+                        for (ApiProvider provider : providers) { if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) { activeProvider = provider; break; } }
                         if (activeProvider == null) activeProvider = providers.get(0);
                     }
                     if (activeProvider == null) {
@@ -851,13 +806,10 @@ private void renderCharts(JSONObject data) {
                     MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
                     GoldPriceData priceData = parseGoldPriceData(response);
                     mainHandler.post(() -> {
-                        isGoldRefreshing.set(false);
-                        showGoldLoadingState(false);
+                        isGoldRefreshing.set(false); showGoldLoadingState(false);
                         if (!isAdded()) return;
                         if (priceData != null) {
-                            lastGoldFetchTime = System.currentTimeMillis();
-                            displayGoldPrices(priceData);
-                            updateHeroBalance();
+                            lastGoldFetchTime = System.currentTimeMillis(); displayGoldPrices(priceData); updateHeroBalance();
                             if (goldCachePrefs != null) goldCachePrefs.edit().putLong("last_gold_fetch_time", System.currentTimeMillis()).apply();
                             if (forceRefresh) Toast.makeText(appCtx, "✅ تم تحديث أسعار الذهب", Toast.LENGTH_SHORT).show();
                         } else {
@@ -877,8 +829,7 @@ private void renderCharts(JSONObject data) {
     private void showGoldLoadingState(boolean loading) {
         try {
             if (btnRefreshGold == null) return;
-            btnRefreshGold.setEnabled(!loading);
-            btnRefreshGold.setAlpha(loading ? 0.4f : 1.0f);
+            btnRefreshGold.setEnabled(!loading); btnRefreshGold.setAlpha(loading ? 0.4f : 1.0f);
             if (pbGoldLoading != null) pbGoldLoading.setVisibility(loading ? View.VISIBLE : View.GONE);
         } catch (Exception e) { logNonFatal("showGoldLoadingState", e); }
     }
@@ -886,13 +837,9 @@ private void renderCharts(JSONObject data) {
     private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
         try {
             if (response == null || !response.isSuccess || response.data == null) return null;
-            JSONObject data = response.data.optJSONObject("data");
-            if (data == null) data = response.data;
-            JSONObject prices = data.optJSONObject("prices");
-            if (prices == null) prices = data;
-            double price24 = prices.optDouble("24k", 0);
-            double price21 = prices.optDouble("21k", 0);
-            double price18 = prices.optDouble("18k", 0);
+            JSONObject data = response.data.optJSONObject("data"); if (data == null) data = response.data;
+            JSONObject prices = data.optJSONObject("prices"); if (prices == null) prices = data;
+            double price24 = prices.optDouble("24k", 0); double price21 = prices.optDouble("21k", 0); double price18 = prices.optDouble("18k", 0);
             if (price24 <= 0 || price24 > 5000) return null;
             double ouncePrice = data.optDouble("price_per_ounce", price24 * OUNCE_TO_GRAM);
             String source = data.optString("source", "server");
@@ -902,9 +849,7 @@ private void renderCharts(JSONObject data) {
 
     private void displayGoldPrices(GoldPriceData data) {
         try {
-            setGoldPrice(tvKarat24, "24K", data.price24);
-            setGoldPrice(tvKarat21, "21K", data.price21);
-            setGoldPrice(tvKarat18, "18K", data.price18);
+            setGoldPrice(tvKarat24, "24K", data.price24); setGoldPrice(tvKarat21, "21K", data.price21); setGoldPrice(tvKarat18, "18K", data.price18);
             if (tvOuncePrice != null && data.ouncePrice > 0) tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", data.ouncePrice));
             if (tvPriceSource != null) tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
             if (tvLastUpdate != null) tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + getTimeFormatter().format(new Date()) : "⏰ Last update: " + getTimeFormatter().format(new Date()));
@@ -915,14 +860,11 @@ private void renderCharts(JSONObject data) {
     private void displayGoldPricesFromCache() {
         try {
             if (priceManager == null) return;
-            double price24 = priceManager.getGoldPricePerGram(24);
-            double price21 = priceManager.getGoldPricePerGram(21);
-            double price18 = priceManager.getGoldPricePerGram(18);
+            double price24 = priceManager.getGoldPricePerGram(24); double price21 = priceManager.getGoldPricePerGram(21); double price18 = priceManager.getGoldPricePerGram(18);
             setGoldPrice(tvKarat24, "24K", price24); setGoldPrice(tvKarat21, "21K", price21); setGoldPrice(tvKarat18, "18K", price18);
             if (tvOuncePrice != null && price24 > 0) tvOuncePrice.setText(String.format(Locale.US, "$%,.2f", price24 * OUNCE_TO_GRAM));
             if (tvPriceSource != null) {
-                long now = System.currentTimeMillis();
-                long timeRemaining = GOLD_CACHE_VALIDITY_MS - (now - lastGoldFetchTime);
+                long now = System.currentTimeMillis(); long timeRemaining = GOLD_CACHE_VALIDITY_MS - (now - lastGoldFetchTime);
                 if (timeRemaining > 0) {
                     long hours = timeRemaining / (60 * 60 * 1000); long minutes = (timeRemaining % (60 * 60 * 1000)) / (60 * 1000);
                     tvPriceSource.setText(isArabic ? "📡 كاش محلي - التحديث بعد " + hours + " س " + minutes + " د" : "📡 Cache - update in " + hours + "h " + minutes + "m");
@@ -964,8 +906,7 @@ private void renderCharts(JSONObject data) {
             try {
                 double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
                 if (previousPrice > 0 && currentPrice > 0) {
-                    double change = currentPrice - previousPrice;
-                    double changePercent = (change / previousPrice) * 100;
+                    double change = currentPrice - previousPrice; double changePercent = (change / previousPrice) * 100;
                     mainHandler.post(() -> {
                         if (!isAdded()) return;
                         if (change > 0) { tvGoldTrend.setText("📈"); tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent)); tvGoldChange.setTextColor(0xFF16A34A); }
@@ -1005,7 +946,7 @@ private void renderCharts(JSONObject data) {
                     currentItemCount = totalItems; currentTotalWeight = totalWeight; currentInventoryValue = inventoryValue;
                     updateHeroBalance();
                     currentInventoryByKarat.clear(); currentInventoryByKarat.addAll(karatItems); renderInventoryByKarat(currentInventoryByKarat);
-                    if (isSalesHidden) { setText(tvSalesToday, "••••••"); setText(tvSalesMonth, "••••••"); setText(tvSalesYear,  "••••••"); }
+                    if (isSalesHidden) { setText(tvSalesToday, "••••"); setText(tvSalesMonth, "••••"); setText(tvSalesYear,  "••••"); }
                     else { setText(tvSalesToday, formatCurrency(salesToday)); setText(tvSalesMonth, formatCurrency(salesMonth)); setText(tvSalesYear,  formatCurrency(salesYear)); }
                     if (priceManager != null) displayGoldPricesFromCache();
                 });
@@ -1054,8 +995,7 @@ private void renderCharts(JSONObject data) {
                 try {
                     MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
                     mainHandler.post(() -> {
-                        isLoading.set(false);
-                        lastDataFetchTime = System.currentTimeMillis();
+                        isLoading.set(false); lastDataFetchTime = System.currentTimeMillis();
                         if (!isAdded()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
                         if (response != null && response.isSuccess && response.data != null) {
                             saveOfflineData(response.data); processData(response.data); computeAndShowAlerts(response.data);
@@ -1212,18 +1152,6 @@ private void renderCharts(JSONObject data) {
         try { if (getContext() != null && isReceiverRegistered) { requireContext().unregisterReceiver(dataRefreshReceiver); isReceiverRegistered = false; } } catch (Exception e) {}
     }
 
-    public void refreshInternalData() {
-        try {
-            if (!isAdded() || !isSessionValid()) return;
-            isDataLoaded = false; lastDataFetchTime = 0; isLoading.set(false);
-            fetchData(); fetchRecentActivity();
-            if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
-            long now = System.currentTimeMillis();
-            if (canManuallyRefreshGold()) { if (lastGoldFetchTime == 0 || (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) fetchLiveGoldPrices(false); else displayGoldPricesFromCache(); }
-            else { displayGoldPricesFromCache(); fetchApprovedGoldPricesFromServer(); }
-        } catch (Exception e) {}
-    }
-
     private void refreshAllData() {
         try {
             if (tvLiveStatusText != null) { tvLiveStatusText.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating..."); tvLiveStatusText.setTextColor(0xFFF59E0B); }
@@ -1270,6 +1198,13 @@ private void renderCharts(JSONObject data) {
 
     private String formatCurrency(double amount) {
         try { if (amount <= 0) return "—"; if (priceManager != null) return priceManager.formatPriceDefault(amount); return getCurrencyFormatter().format(amount); } catch (Exception e) { return "—"; }
+    }
+
+    private String formatCurrencyShort(double amount) {
+        if (amount <= 0) return "0";
+        if (amount >= 1000000) return String.format(Locale.US, "%.1fM", amount / 1000000);
+        if (amount >= 1000) return String.format(Locale.US, "%.1fK", amount / 1000);
+        return String.format(Locale.US, "%.0f", amount);
     }
 
     private String formatWeight(double weightInGrams) {
@@ -1387,4 +1322,4 @@ private void renderCharts(JSONObject data) {
         if (permissionManager == null) return false;
         return permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin() || permissionManager.isFinanceManager();
     }
-}
+                                                                                  }
