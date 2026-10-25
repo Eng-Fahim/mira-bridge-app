@@ -3,7 +3,34 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@android:color/white">
+    android:padding="16dp"
+    android:background="?attr/colorSurface">
+
+    <!-- العنوان + الوصف -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔐"
+        android:textSize="48sp"
+        android:layout_gravity="center_horizontal" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="قفل الفترات الشهرية"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="بعد قفل الشهر لن يتمكن أي مستخدم (حتى المدير) من إضافة أو تعديل قيود محاسبية فيه. يمكن فتحه لاحقاً عند الحاجة."
+        android:textSize="14sp"
+        android:textAlignment="center"
+        android:layout_marginTop="12dp"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
     <!-- منتقي السنة -->
     <LinearLayout
@@ -12,53 +39,29 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:paddingVertical="12dp" />
-
-    <!-- رأس الصفحة -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingBottom="4dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🔐 قفل الفترات الشهرية"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:textColor="#1E3A8A" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRefresh"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="تحديث" />
-    </LinearLayout>
+        android:layout_marginTop="20dp" />
 
     <!-- شبكة الشهور -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:layout_marginTop="12dp"
+        android:fillViewport="true">
 
         <GridLayout
             android:id="@+id/monthsGrid"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:columnCount="2"
-            android:padding="8dp" />
+            android:columnCount="2" />
     </ScrollView>
 
     <ProgressBar
         android:id="@+id/pbLoading"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp"
+        android:layout_gravity="center"
+        android:layout_marginTop="12dp"
         android:visibility="gone" />
+
 </LinearLayout>
