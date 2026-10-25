@@ -42,7 +42,7 @@ public class FragmentFactory {
             case NavigationManager.TAG_VOUCHERS: return new MiraVouchersFragment();
             case NavigationManager.TAG_PARTIES: return new MiraPartiesListFragment();
             case NavigationManager.TAG_SCRAP_AGING: return new MiraScrapAgingFragment();
-            
+            case NavigationManager.TAG_PURCHASE_INVOICE: return new MiraPurchaseInvoiceFragment();
             // ✅ [جديد] إضافة شاشة أمر الصياغة
             case NavigationManager.TAG_GOLD_CONVERSION: return new MiraGoldConversionFragment();
             case NavigationManager.TAG_INVENTORY_REVALUATION: return new MiraInventoryRevaluationFragment();
