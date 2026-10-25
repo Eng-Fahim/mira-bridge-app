@@ -160,6 +160,17 @@
                                             android:layout_weight="1" android:text="@string/total_inventory_value"
                                             android:textAppearance="@style/TextAppearance.App.Label.Large"
                                             android:textColor="@color/hero_title_text" />
+                                            <!-- ✅ أضف هذا العنصر هنا -->
+<TextView
+    android:id="@+id/tvHeroTrend"
+    android:layout_width="wrap_content" android:layout_height="wrap_content"
+    android:background="@drawable/bg_chip_status"
+    android:paddingHorizontal="@dimen/space_2"
+    android:paddingVertical="4dp"
+    android:layout_marginEnd="4dp"
+    android:textAppearance="@style/TextAppearance.App.Label.Small"
+    android:textColor="@color/hero_title_text"
+    android:visibility="gone" tools:text="📈 +2.4%" tools:visibility="visible" />
 
                                         <ImageButton
                                             android:id="@+id/btnToggleHeroVisibility"
