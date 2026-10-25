@@ -23,7 +23,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@drawable/bg_header_gold_pattern"
+            android:background="?attr/colorPrimaryContainer"
             android:paddingHorizontal="8dp"
             app:contentInsetStartWithNavigation="0dp"
             app:menu="@menu/main_menu">
