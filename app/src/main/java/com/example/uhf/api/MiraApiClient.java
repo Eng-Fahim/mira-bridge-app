@@ -2569,4 +2569,7 @@ public ApiResponse reverseJournalEntry(String entryId) {
     // نستخدم postAccounting لاستدعاء مسار mira/v2/accounting/...
     return postAccounting("/accounting/journal-entries/" + entryId + "/reverse", payload);
 }
+    public ApiResponse getAgingReport(String asOfDate, String type) {
+    return getAccounting("/accounting/aging-report?as_of=" + asOfDate + "&type=" + type);
+}
 }
