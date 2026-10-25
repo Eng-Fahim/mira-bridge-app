@@ -2578,4 +2578,7 @@ public ApiResponse reverseJournalEntry(String entryId) {
     if (branchId > 0) endpoint += "?branch_id=" + branchId;
     return getWithAuth(endpoint); 
     }
+    public ApiResponse processGoldConversion(JSONObject payload) {
+    return postAccounting("/accounting/gold-conversion", payload);
+}
 }
