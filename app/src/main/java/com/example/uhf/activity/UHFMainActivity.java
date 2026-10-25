@@ -297,155 +297,187 @@ private volatile long setupCompletedAt = 0;
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        DiagTracer.init(this);
-        applySavedTheme();
-        super.onCreate(savedInstanceState);
-        try {
-            sessionManager = new SessionManager(getApplicationContext());
-            if (!sessionManager.isLoggedIn()) {
-                navigateToLogin();
-                return;
-            }
-
-            setContentView(R.layout.activity_main);
-
-            findViewById(android.R.id.content).setFitsSystemWindows(true);
-
-            getWindow().setSoftInputMode(
-                android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-                | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
-            );
-
-            setupWindowInsets();
-            setupKeyboardBehavior();
-            setupSecondaryToolbar();
-
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                if (getSupportActionBar() != null) {
-                    getSupportActionBar().setDisplayShowTitleEnabled(false);
-                }
-                updateToolbarTitle();
-            }
-
-            AppWatchdog.getInstance().startMonitoring(() -> {
-                Log.e(TAG, "UI Thread FROZEN! Restarting app...");
-                MiraApplication.getInstance().restartApp();
-            });
-
-            ToastUtil.init(getApplicationContext());
-            initializeLanguageState();
-
-            branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
-            permissionManager = PermissionManager.getInstance(getApplicationContext());
-
-            navigationManager = new NavigationManager(
-                    getSupportFragmentManager(),
-                    permissionManager,
-                    R.id.fragment_container
-            );
-            navigationManager.attachToActivity(this);
-
-            androidx.activity.OnBackPressedCallback backCallback =
-                    navigationManager.createBackPressedCallback();
-            getOnBackPressedDispatcher().addCallback(this, backCallback);
-
-            navigationManager.setBackPressInterceptor(() -> {
-                if (isInventoryActive()) {
-                    checkInventoryLockAndExecute(() -> navigationManager.goToDashboard());
-                    return true;
-                }
-                return false;
-            });
-
-            hardwareManager = new HardwareManager(this, new HardwareManager.HardwareStatusListener() {
-                @Override
-                public void onStatusChanged(HardwareManager.HardwareStatus status) {
-                    if (statusIndicatorManager != null) {
-                        statusIndicatorManager.update();
-                    }
-                }
-
-                @Override
-                public void onTagRead(String epc) {
-                    UHFMainActivity.this.onTagRead(epc);
-                }
-
-                @Override
-                public void onError(String error) {
-                    showToast("RFID Error: " + error);
-                }
-            });
-
-            soundManager = new SoundManager(this);
-            notificationManager = new NotificationManager(this);
-            statusIndicatorManager = new StatusIndicatorManager(
-                    findViewById(android.R.id.content), hardwareManager);
-
-            setupQuickNav();
-            setupOrgProfileListener();
-
-            // 🛡️ تعطيل التنقل مؤقتًا
-            disableNavigationUntilSetupChecked();
-
-            // 🛡️ فحص حالة الإعداد (مع مراعاة savedInstanceState)
-            String cachedSetupStatus = getCachedSetupStatus();
-            boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
-                    || SETUP_LOCKED.equals(cachedSetupStatus);
-
-            if (setupIsComplete) {
-                if (savedInstanceState == null) {
-                    navigateByRole();
-                } else {
-                    String savedTag = savedInstanceState.getString(
-                            "current_fragment", NavigationManager.TAG_DASHBOARD);
-                    Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
-                    if (savedFragment != null) {
-                        enableNavigationAfterSetup();
-                        loadFragmentDirectly(savedFragment, savedTag);
-                    } else {
-                        navigateByRole();
-                    }
-                }
-            } else {
-                Log.d(TAG, "🔒 Setup pending → ignoring savedInstanceState");
-                checkSetupStatusAndNavigate();
-            }
-
-            try {
-                if (sessionManager != null) {
-                    appLifecycleObserver = new AppLifecycleObserver(sessionManager);
-                    ProcessLifecycleOwner.get().getLifecycle().addObserver(appLifecycleObserver);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "AppLifecycleObserver init error: " + e.getMessage());
-            }
-
-            syncUIWithNavigation();
-
-            try {
-                LocalBroadcastManager lbm = LocalBroadcastManager.getInstance(this);
-                IntentFilter filter = new IntentFilter();
-                filter.addAction("com.example.uhf.REFRESH_TRANSFERS");
-                filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
-                lbm.registerReceiver(transfersUpdateReceiver, filter);
-                Log.d(TAG, "✅ Transfers counter receiver registered");
-            } catch (Exception e) {
-                Log.e(TAG, "Register transfers receiver error: " + e.getMessage());
-            }
-
-            int cachedCount = loadTransfersCountLocally();
-            if (cachedCount > 0) {
-                mainHandler.postDelayed(() -> updateTransfersBadge(cachedCount), 500);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+protected void onCreate(Bundle savedInstanceState) {
+    DiagTracer.init(this);
+    applySavedTheme();
+    super.onCreate(savedInstanceState);
+    try {
+        sessionManager = new SessionManager(getApplicationContext());
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
         }
-    }
 
+        setContentView(R.layout.activity_main);
+
+        // ═════════════════════════════════════════════════════════════
+        // ✅ [تعديل 1]: تفعيل الرسم خلف شريط الحالة (Edge-to-Edge)
+        // ═════════════════════════════════════════════════════════════
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        
+        // ❌ تم حذف هذا السطر لأنه كان يمنع الخلفية من الامتداد خلف شريط الحالة
+        // findViewById(android.R.id.content).setFitsSystemWindows(true);
+
+        // ✅ جعل شريط الحالة شفافاً
+        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+
+        // ✅ ضبط لون أيقونات (الوقت والبطارية) حسب الثيم الفاتح أو الداكن
+        androidx.core.view.WindowInsetsControllerCompat controller = 
+            androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        
+        int nightModeFlags = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        if (nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES) {
+            controller.setAppearanceLightStatusBars(false); // أيقونات بيضاء (للوضع الليلي)
+        } else {
+            controller.setAppearanceLightStatusBars(true); // أيقونات سوداء (للوضع الفاتح)
+        }
+
+        // ✅ إضافة Padding علوي للشريط (لكي لا تختفي أيقونات التطبيق تحت شريط الحالة)
+        androidx.coordinatorlayout.widget.CoordinatorLayout mainRoot = findViewById(R.id.main);
+        if (mainRoot != null) {
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainRoot, (v, insets) -> {
+                androidx.core.graphics.Insets systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+                v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0); // لا نضع padding للسفل هنا
+                return insets;
+            });
+        }
+        // ═════════════════════════════════════════════════════════════
+
+        getWindow().setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
+        );
+
+        // ملاحظة: قد تحتاج لضبط دالة setupWindowInsets الخاصة بك 
+        // أو تعليقها إذا وجدت أن المساحة العلوية أصبحت كبيرة جداً
+        //setupWindowInsets(); 
+        setupKeyboardBehavior();
+        setupSecondaryToolbar();
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setDisplayShowTitleEnabled(false);
+            }
+            updateToolbarTitle();
+        }
+
+        AppWatchdog.getInstance().startMonitoring(() -> {
+            Log.e(TAG, "UI Thread FROZEN! Restarting app...");
+            MiraApplication.getInstance().restartApp();
+        });
+
+        ToastUtil.init(getApplicationContext());
+        initializeLanguageState();
+
+        branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
+        permissionManager = PermissionManager.getInstance(getApplicationContext());
+
+        navigationManager = new NavigationManager(
+                getSupportFragmentManager(),
+                permissionManager,
+                R.id.fragment_container
+        );
+        navigationManager.attachToActivity(this);
+
+        androidx.activity.OnBackPressedCallback backCallback =
+                navigationManager.createBackPressedCallback();
+        getOnBackPressedDispatcher().addCallback(this, backCallback);
+
+        navigationManager.setBackPressInterceptor(() -> {
+            if (isInventoryActive()) {
+                checkInventoryLockAndExecute(() -> navigationManager.goToDashboard());
+                return true;
+            }
+            return false;
+        });
+
+        hardwareManager = new HardwareManager(this, new HardwareManager.HardwareStatusListener() {
+            @Override
+            public void onStatusChanged(HardwareManager.HardwareStatus status) {
+                if (statusIndicatorManager != null) {
+                    statusIndicatorManager.update();
+                }
+            }
+
+            @Override
+            public void onTagRead(String epc) {
+                UHFMainActivity.this.onTagRead(epc);
+            }
+
+            @Override
+            public void onError(String error) {
+                showToast("RFID Error: " + error);
+            }
+        });
+
+        soundManager = new SoundManager(this);
+        notificationManager = new NotificationManager(this);
+        statusIndicatorManager = new StatusIndicatorManager(
+                findViewById(android.R.id.content), hardwareManager);
+
+        setupQuickNav();
+        setupOrgProfileListener();
+
+        // 🛡️ تعطيل التنقل مؤقتًا
+        disableNavigationUntilSetupChecked();
+
+        // 🛡️ فحص حالة الإعداد (مع مراعاة savedInstanceState)
+        String cachedSetupStatus = getCachedSetupStatus();
+        boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
+                || SETUP_LOCKED.equals(cachedSetupStatus);
+
+        if (setupIsComplete) {
+            if (savedInstanceState == null) {
+                navigateByRole();
+            } else {
+                String savedTag = savedInstanceState.getString(
+                        "current_fragment", NavigationManager.TAG_DASHBOARD);
+                Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
+                if (savedFragment != null) {
+                    enableNavigationAfterSetup();
+                    loadFragmentDirectly(savedFragment, savedTag);
+                } else {
+                    navigateByRole();
+                }
+            }
+        } else {
+            Log.d(TAG, "🔒 Setup pending → ignoring savedInstanceState");
+            checkSetupStatusAndNavigate();
+        }
+
+        try {
+            if (sessionManager != null) {
+                appLifecycleObserver = new AppLifecycleObserver(sessionManager);
+                ProcessLifecycleOwner.get().getLifecycle().addObserver(appLifecycleObserver);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "AppLifecycleObserver init error: " + e.getMessage());
+        }
+
+        syncUIWithNavigation();
+
+        try {
+            LocalBroadcastManager lbm = LocalBroadcastManager.getInstance(this);
+            IntentFilter filter = new IntentFilter();
+            filter.addAction("com.example.uhf.REFRESH_TRANSFERS");
+            filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
+            lbm.registerReceiver(transfersUpdateReceiver, filter);
+            Log.d(TAG, "✅ Transfers counter receiver registered");
+        } catch (Exception e) {
+            Log.e(TAG, "Register transfers receiver error: " + e.getMessage());
+        }
+
+        int cachedCount = loadTransfersCountLocally();
+        if (cachedCount > 0) {
+            mainHandler.postDelayed(() -> updateTransfersBadge(cachedCount), 500);
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+    }
+}
     private void syncUIWithNavigation() {
         if (navigationManager == null) return;
         String tag = navigationManager.getCurrentFragmentTag();
