@@ -62,6 +62,7 @@ public class NavigationManager {
     public static final String TAG_SCRAP_AGING = "ScrapAging";
     public static final String TAG_GOLD_CONVERSION = "GoldConversion";
     public static final String TAG_PROFIT_ANALYSIS = "ProfitAnalysis";
+    public static final String TAG_INVENTORY_REVALUATION = "InventoryRevaluation";
     
     public static final String TAG_RADAR             = "Radar";
     public static final String TAG_SECURE_GATE       = "SecureGate";
@@ -452,6 +453,8 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_SCRAP_AGING: return new MiraScrapAgingFragment();
         case TAG_GOLD_CONVERSION:   return new MiraGoldConversionFragment();
         case TAG_PROFIT_ANALYSIS: return new MiraProfitAnalysisFragment();
+        case TAG_INVENTORY_REVALUATION: return new MiraInventoryRevaluationFragment();
+
         default:
             log("Unknown tag: " + tag + " → Dashboard");
             return new MiraDashboardFragment();
