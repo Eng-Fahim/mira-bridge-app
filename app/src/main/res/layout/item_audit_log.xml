@@ -3,58 +3,54 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="6dp"
-    app:cardBackgroundColor="?attr/colorSurface"
+    android:layout_margin="8dp"
     app:cardCornerRadius="8dp"
-    app:cardElevation="1dp">
+    app:cardElevation="2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp">
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <View
+            android:id="@+id/vStatusColor"
+            android:layout_width="6dp"
+            android:layout_height="match_parent"
+            android:background="#22C55E"/>
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:layout_marginStart="12dp">
 
             <TextView
-                android:id="@+id/tvAuditAction"
+                android:id="@+id/tvAction"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="✅ إنشاء"
-                android:textColor="?attr/colorPrimary"
+                android:text="ACTION"
                 android:textStyle="bold"
-                android:textSize="13sp" />
+                android:textColor="?attr/colorPrimary"/>
+            
+            <TextView
+                android:id="@+id/tvDetails"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Details"
+                android:textSize="12sp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:layout_marginTop="4dp"/>
 
             <TextView
-                android:id="@+id/tvAuditUser"
-                android:layout_width="0dp"
+                android:id="@+id/tvDate"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="end"
-                android:text="مستخدم"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:text="2026-10-26 10:00"
+                android:textSize="10sp"
+                android:textColor="#94A3B8"
+                android:layout_marginTop="4dp"/>
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvAuditDate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="2026-08-21 10:00:00"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="10sp" />
-
-        <TextView
-            android:id="@+id/tvAuditDetails"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="تفاصيل العملية"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="11sp" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
