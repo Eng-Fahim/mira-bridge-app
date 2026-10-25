@@ -2622,4 +2622,26 @@ public ApiResponse togglePeriodLock(JSONObject payload) {
 public ApiResponse getLockedPeriods() {
     return getAccounting("/accounting/locked-periods");
 }
+    // ═══════════════════════════════════════════════════════════
+//  ✅ إدارة الشيكات (Cheques)
+// ═══════════════════════════════════════════════════════════
+
+public ApiResponse getCheques(String type, String status) {
+    String url = "/cheques?";
+    if (type != null && !type.isEmpty()) url += "type=" + type + "&";
+    if (status != null && !status.isEmpty()) url += "status=" + status;
+    return getAccounting(url); // نستخدم مسار mira/v2
+}
+
+public ApiResponse createCheque(JSONObject payload) {
+    return postAccounting("/cheques", payload);
+}
+
+public ApiResponse depositCheque(int chequeId, JSONObject payload) {
+    return postAccounting("/cheques/" + chequeId + "/deposit", payload);
+}
+
+public ApiResponse returnCheque(int chequeId, JSONObject payload) {
+    return postAccounting("/cheques/" + chequeId + "/return", payload);
+}
 }
