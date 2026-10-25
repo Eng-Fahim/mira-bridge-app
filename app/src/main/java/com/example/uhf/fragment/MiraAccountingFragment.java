@@ -43,8 +43,10 @@ public class MiraAccountingFragment extends Fragment {
     private static final int TAB_AGING       = 9;
     private static final int TAB_FISCAL      = 10;
     private static final int TAB_PROFIT      = 11; // ✅ تبويب تحليل الأرباح الجديد
+    
     private static final int TAB_REVALUATION = 12; // ✅ تبويب إعادة تقييم المخزون الجديد
-    private static final int MAX_TABS        = 13;
+    private static final int TAB_PERIOD_LOCK = 13; // ✅ تبويب قفل الفترات الجديد
+    private static final int MAX_TABS        = 14;
 
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
@@ -215,7 +217,8 @@ public class MiraAccountingFragment extends Fragment {
         addTab("🔒 الإقفال",    "🔒 Closing");
         addTab("📊 الأرباح",    "📊 Profit");     // ✅ التبويب الجديد
         addTab("⚖️ التقييم",    "⚖️ Revaluation"); // ✅ التبويب الجديد
-
+        addTab("🔐 الفترات",    "🔐 Periods");
+        
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
 
@@ -322,7 +325,9 @@ public class MiraAccountingFragment extends Fragment {
 
                 case TAB_REVALUATION: // ✅ ربط تبويب إعادة التقييم
                     return new MiraInventoryRevaluationFragment();
-
+                
+                case TAB_PERIOD_LOCK:
+                    return new MiraPeriodLockFragment();
                 default: return new MiraJournalFragment();
             }
         } catch (Exception e) {
@@ -333,7 +338,7 @@ public class MiraAccountingFragment extends Fragment {
 
     public void navigateToTab(int tabIndex) {
         // ✅ السماح بالوصول حتى آخر تبويب (التقييم)
-        if (tabIndex < 0 || tabIndex > TAB_REVALUATION || tabLayout == null) return;
+        if (tabIndex < 0 || tabIndex > TAB_PERIOD_LOCK || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
