@@ -37,7 +37,7 @@ public class FragmentFactory {
             case "SoundSettings": return new MiraSoundSettingsFragment();
             case "Snapshots": return new MiraSnapshotsFragment();
             case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();   
-            
+            case NavigationManager.TAG_PROFIT_ANALYSIS: return new MiraProfitAnalysisFragment();
             // في switch داخل دالة createFragmentByTag
             case NavigationManager.TAG_VOUCHERS: return new MiraVouchersFragment();
             case NavigationManager.TAG_PARTIES: return new MiraPartiesListFragment();
