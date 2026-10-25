@@ -25,6 +25,7 @@ import com.example.uhf.R;
 import com.example.uhf.api.dto.AccountDto;
 import com.example.uhf.utils.DateHelper;
 import com.example.uhf.viewmodel.AccountingViewModel;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder; // ✅ استيراد المكتبة
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -65,10 +66,17 @@ public class MiraAddJournalEntryFragment extends Fragment {
         etDate.setText(DateHelper.todayApi());
         etDate.setOnClickListener(view -> showDatePicker());
 
-        // ✅ استقبال الأخطاء من السيرفر وإعادة تشغيل الزر
+        // ✅ استقبال الأخطاء من السيرفر وعرضها بنافذة احترافية
         viewModel.getError().observe(getViewLifecycleOwner(), error -> {
             if (error != null && !error.isEmpty()) {
-                Toast.makeText(getContext(), "❌ " + error, Toast.LENGTH_LONG).show();
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle("⛔ عملية مرفوضة")
+                        .setMessage(error)
+                        .setPositiveButton("حسناً، فهمت", (dialog, which) -> dialog.dismiss())
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .setCancelable(false)
+                        .show();
+
                 btnSave.setEnabled(true);
                 btnSave.setText("حفظ وترحيل القيد");
                 viewModel.clearError();
@@ -270,19 +278,15 @@ public class MiraAddJournalEntryFragment extends Fragment {
             btnSave.setText("جاري الحفظ...");
             
             // ✅ شبكة أمان: إلغاء تعليق الزر بعد 15 ثانية إذا لم يستجب السيرفر
-new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-    if (!btnSave.isEnabled()) {
-        btnSave.setEnabled(true);
-        btnSave.setText("حفظ وترحيل القيد");
-        Toast.makeText(getContext(), "⚠️ لم يستجب السيرفر، يرجى المحاولة مرة أخرى", Toast.LENGTH_LONG).show();
-    }
-}, 15000);
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                if (!btnSave.isEnabled()) {
+                    btnSave.setEnabled(true);
+                    btnSave.setText("حفظ وترحيل القيد");
+                    Toast.makeText(getContext(), "⚠️ لم يستجب السيرفر، يرجى المحاولة مرة أخرى", Toast.LENGTH_LONG).show();
+                }
+            }, 15000);
 
-viewModel.createJournalEntry(payload, () -> {
-    Toast.makeText(getContext(), "✅ تم حفظ القيد بنجاح", Toast.LENGTH_SHORT).show();
-    getParentFragmentManager().popBackStack();
-});
-
+            // ✅ [إصلاح حرج]: حذف الاستدعاء المكرر الذي كان يحفظ القيد مرتين!
             viewModel.createJournalEntry(payload, () -> {
                 Toast.makeText(getContext(), "✅ تم حفظ القيد بنجاح", Toast.LENGTH_SHORT).show();
                 getParentFragmentManager().popBackStack();
