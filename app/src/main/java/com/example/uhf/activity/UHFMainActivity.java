@@ -296,11 +296,30 @@ private volatile long setupCompletedAt = 0;
         }
     }
 
-   @Override
+@Override
 protected void onCreate(Bundle savedInstanceState) {
+    // ✅ صياد الأخطاء: سيطبع الخطأ في ملف نصي داخل الهاتف
+    Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+        try {
+            java.io.File file = new java.io.File(getExternalFilesDir(null), "crash_log.txt");
+            java.io.FileWriter writer = new java.io.FileWriter(file, true);
+            writer.write("=== CRASH AT: " + new java.util.Date() + " ===\n");
+            writer.write(android.util.Log.getStackTraceString(throwable));
+            writer.write("\n\n");
+            writer.close();
+        } catch (Exception e) {}
+        
+        // إظهار رسالة خطأ مختصرة
+        android.os.Looper.prepare();
+        android.widget.Toast.makeText(getApplicationContext(), "خطأ: " + throwable.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+        android.os.Looper.loop();
+        android.os.Process.killProcess(android.os.Process.myPid());
+    });
+
     DiagTracer.init(this);
     applySavedTheme();
     super.onCreate(savedInstanceState);
+    
     try {
         sessionManager = new SessionManager(getApplicationContext());
         if (!sessionManager.isLoggedIn()) {
