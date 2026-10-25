@@ -88,6 +88,7 @@ public class NavigationManager {
     public static final String TAG_SNAPSHOTS         = "Snapshots";
     
     public static final String TAG_SCRAP_GOLD_BUY = "ScrapGoldBuy";
+    public static final String TAG_AUDIT_LOGS = "AuditLogs";
 
     // ==================== قائمة التبويبات الرئيسية ====================
     private static final String[] ROOT_TAGS = {
@@ -457,7 +458,7 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_GOLD_CONVERSION:   return new MiraGoldConversionFragment();
         case TAG_PROFIT_ANALYSIS: return new MiraProfitAnalysisFragment();
         case TAG_INVENTORY_REVALUATION: return new MiraInventoryRevaluationFragment();
-
+        case TAG_AUDIT_LOGS: return new MiraAuditLogFragment();
         default:
             log("Unknown tag: " + tag + " → Dashboard");
             return new MiraDashboardFragment();
