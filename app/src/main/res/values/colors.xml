@@ -849,6 +849,9 @@
     <color name="mira_text_secondary">#7F8C8D</color>
     <color name="mira_divider">#E0E0E0</color>
 
+
+    <color name="chart_grid">#33000000</color>
+    <color name="chart_axis_text">#666666</color>
     <!-- ═══════════════════════════════════════════════════════════════
          📋 STRING ARRAY — منتقي الألوان
          ═══════════════════════════════════════════════════════════════ -->
