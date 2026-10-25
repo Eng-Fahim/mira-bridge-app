@@ -406,7 +406,7 @@ if (hsvCarousel != null) {
     
     // 1. التأثير الهندسي عند السحب
     hsvCarousel.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-        if (cardsContainer == null) return;
+    if (!isAdded() || getContext() == null) return; 
         
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         int screenCenter = screenWidth / 2;
@@ -446,26 +446,28 @@ if (hsvCarousel != null) {
         dot2.setBackgroundResource(activeCardIndex == 1 ? R.drawable.dot_active : R.drawable.dot_inactive);
         dot3.setBackgroundResource(activeCardIndex == 2 ? R.drawable.dot_active : R.drawable.dot_inactive);
     });
-
-    // ✅ 2. التمرير التلقائي للبطاقة الوسطى (المخزون) عند فتح الشاشة
-    hsvCarousel.post(() -> {
-        if (cardsContainer != null && cardsContainer.getChildCount() > 1) {
-            View middleCard = cardsContainer.getChildAt(1); // البطاقة الوسطى
-            if (middleCard != null) {
-                int screenWidth = getResources().getDisplayMetrics().widthPixels;
-                // حساب نقطة المنتصف للبطاقة الوسطى
-                int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
-                
-                // التمرير بسلاسة للمنتصف
-                hsvCarousel.smoothScrollTo(scrollToX, 0);
-                
-                // تحديث النقاط يدوياً فوراً
-                dot1.setBackgroundResource(R.drawable.dot_inactive);
-                dot2.setBackgroundResource(R.drawable.dot_active);
-                dot3.setBackgroundResource(R.drawable.dot_inactive);
-            }
+// ✅ 2. التمرير التلقائي للبطاقة الوسطى (المخزون) عند فتح الشاشة
+hsvCarousel.post(() -> {
+    // ✅ [الحماية] التأكد من أن الشاشة لا تزال موجودة قبل تنفيذ الكود
+    if (!isAdded() || getContext() == null) return; 
+    
+    if (cardsContainer != null && cardsContainer.getChildCount() > 1) {
+        View middleCard = cardsContainer.getChildAt(1); // البطاقة الوسطى
+        if (middleCard != null) {
+            int screenWidth = getResources().getDisplayMetrics().widthPixels;
+            // حساب نقطة المنتصف للبطاقة الوسطى
+            int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
+            
+            // التمرير بسلاسة للمنتصف
+            hsvCarousel.smoothScrollTo(scrollToX, 0);
+            
+            // تحديث النقاط يدوياً فوراً
+            if (dot1 != null) dot1.setBackgroundResource(R.drawable.dot_inactive);
+            if (dot2 != null) dot2.setBackgroundResource(R.drawable.dot_active);
+            if (dot3 != null) dot3.setBackgroundResource(R.drawable.dot_inactive);
         }
-    });
+    }
+});
 }
 
             if (btnToggleScrapVisibility != null) btnToggleScrapVisibility.setOnClickListener(v2 -> toggleScrapVisibility());
