@@ -23,7 +23,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimaryContainer"
+            android:background="@drawable/bg_header_gold_pattern"
             android:paddingHorizontal="8dp"
             app:contentInsetStartWithNavigation="0dp"
             app:menu="@menu/main_menu">
@@ -41,7 +41,7 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:textColor="#1A1A1A" 
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:text="منظومة الذهب الدولية" />
@@ -59,7 +59,7 @@
                         android:alpha="0.8"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="#333333"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="10sp"
                         tools:text="📍 Main Branch" />
 
@@ -76,7 +76,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="4dp"
-                        android:textColor="#333333"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="9sp"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -124,6 +124,7 @@
             android:clickable="true"
             android:focusable="true"
             android:visibility="gone">
+
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
