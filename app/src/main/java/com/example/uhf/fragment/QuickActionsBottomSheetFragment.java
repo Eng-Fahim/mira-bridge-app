@@ -115,6 +115,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             setupGridAction(view, R.id.cardAdminBranches, "admin_branches", NavigationManager.TAG_BRANCHES);
             setupGridAction(view, R.id.cardReaderSetup, "reader_setup", NavigationManager.TAG_READER_SETUP);
             setupGridAction(view, R.id.cardQuickAccess, "quick_access", NavigationManager.TAG_QUICK_ACCESS);
+            setupGridAction(view, R.id.cardAuditLogs, "audit_logs", NavigationManager.TAG_AUDIT_LOGS);
 
             // ═══════════════════════════════════════════════════
             //  ROW 7: المشتريات
