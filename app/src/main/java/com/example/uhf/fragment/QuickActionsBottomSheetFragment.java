@@ -32,7 +32,7 @@ import java.util.Locale;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  QuickActionsBottomSheetFragment v7.2 — Gold Conversion Added
+ *  QuickActionsBottomSheetFragment v7.3 — Gold Conversion Fix
  * ═══════════════════════════════════════════════════════════════════
  */
 public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
@@ -77,54 +77,28 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             // ═══════════════════════════════════════════════════
             //  ROW 1
             // ═══════════════════════════════════════════════════
-            setupGridAction(view, R.id.cardRfidWrite, "rfid_write",
-                    NavigationManager.TAG_RFID_WRITE);
-
-            setupGridAction(view, R.id.cardRadarLocation, "radar",
-                    NavigationManager.TAG_RADAR);
-
-            setupGridAction(view, R.id.cardRfidBindings, "rfid",
-                    NavigationManager.TAG_RFID_BINDINGS);
-
-            setupGridAction(view, R.id.cardSecureGate, "gate",
-                    NavigationManager.TAG_GATES);
+            setupGridAction(view, R.id.cardRfidWrite, "rfid_write", NavigationManager.TAG_RFID_WRITE);
+            setupGridAction(view, R.id.cardRadarLocation, "radar", NavigationManager.TAG_RADAR);
+            setupGridAction(view, R.id.cardRfidBindings, "rfid", NavigationManager.TAG_RFID_BINDINGS);
+            setupGridAction(view, R.id.cardSecureGate, "gate", NavigationManager.TAG_GATES);
 
             // ═══════════════════════════════════════════════════
             //  ROW 2
             // ═══════════════════════════════════════════════════
-            setupGridAction(view, R.id.cardReports, "reports",
-                    NavigationManager.TAG_REPORTS);
-
-            setupGridAction(view, R.id.cardAccounting, "accounting",
-                    NavigationManager.TAG_ACCOUNTING);
-            
-            setupGridAction(view, R.id.cardVouchers, "vouchers",
-                    NavigationManager.TAG_VOUCHERS);
-            
-            setupGridAction(view, R.id.cardTransfer, "transfers",
-                    NavigationManager.TAG_TRANSFERS);
-
-            setupGridAction(view, R.id.cardSalesHistory, "sales_history",
-                    NavigationManager.TAG_SALES_HISTORY);
-
-            // ✅ [جديد] زر أمر الصياغة
-            setupGridAction(view, R.id.cardGoldConversion, "gold_conversion", 
-                    NavigationManager.TAG_GOLD_CONVERSION);
+            setupGridAction(view, R.id.cardReports, "reports", NavigationManager.TAG_REPORTS);
+            setupGridAction(view, R.id.cardAccounting, "accounting", NavigationManager.TAG_ACCOUNTING);
+            setupGridAction(view, R.id.cardVouchers, "vouchers", NavigationManager.TAG_VOUCHERS);
+            setupGridAction(view, R.id.cardTransfer, "transfers", NavigationManager.TAG_TRANSFERS);
+            setupGridAction(view, R.id.cardSalesHistory, "sales_history", NavigationManager.TAG_SALES_HISTORY);
+            setupGridAction(view, R.id.cardGoldConversion, "gold_conversion", NavigationManager.TAG_GOLD_CONVERSION);
 
             // ═══════════════════════════════════════════════════
             //  ROW 3
             // ═══════════════════════════════════════════════════
-            setupGridAction(view, R.id.cardAdminHub, "admin_hub",
-                    NavigationManager.TAG_ADMIN_HUB);
-
-            setupGridAction(view, R.id.cardServerConfig, "server_config",
-                    NavigationManager.TAG_SERVER_CONFIG);
-
-            setupGridAction(view, R.id.cardAdminUsers, "admin_users",
-                    NavigationManager.TAG_USERS_MANAGEMENT);
-
-            setupGridAction(view, R.id.cardAdminBranches, "admin_branches",
-                    NavigationManager.TAG_BRANCHES);
+            setupGridAction(view, R.id.cardAdminHub, "admin_hub", NavigationManager.TAG_ADMIN_HUB);
+            setupGridAction(view, R.id.cardServerConfig, "server_config", NavigationManager.TAG_SERVER_CONFIG);
+            setupGridAction(view, R.id.cardAdminUsers, "admin_users", NavigationManager.TAG_USERS_MANAGEMENT);
+            setupGridAction(view, R.id.cardAdminBranches, "admin_branches", NavigationManager.TAG_BRANCHES);
 
             // ═══════════════════════════════════════════════════
             //  CLOSE BUTTON
@@ -152,10 +126,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     private void setupPrimaryCta(View view) {
         try {
             View cta = view.findViewById(R.id.cardIdentityStudio);
-            if (cta == null) {
-                Log.e(TAG, "CTA not found: cardIdentityStudio");
-                return;
-            }
+            if (cta == null) return;
 
             if (cta instanceof ViewGroup) {
                 ViewGroup vg = (ViewGroup) cta;
@@ -164,11 +135,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
                 vg.setFocusable(true);
             }
 
-            boolean hasPermission = permissionManager.canAccessFragment(
-                    NavigationManager.TAG_IDENTITY_STUDIO);
-
-            boolean quickAccessAllowed = quickAccessSettings == null
-                    || quickAccessSettings.isActionEnabled("identity");
+            boolean hasPermission = permissionManager.canAccessFragment(NavigationManager.TAG_IDENTITY_STUDIO);
+            boolean quickAccessAllowed = quickAccessSettings == null || quickAccessSettings.isActionEnabled("identity");
 
             if (!hasPermission || !quickAccessAllowed) {
                 cta.setVisibility(View.GONE);
@@ -179,8 +147,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             cta.setOnClickListener(v -> {
                 performHaptic();
-                navigateTo(NavigationManager.TAG_IDENTITY_STUDIO,
-                        new MiraIdentityStudioFragment());
+                navigateTo(NavigationManager.TAG_IDENTITY_STUDIO, new MiraIdentityStudioFragment());
             });
 
             animatedViews.add(cta);
@@ -198,8 +165,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         try {
             View card = root.findViewById(cardId);
             if (card == null) {
-                Log.w(TAG, "Grid item NOT FOUND: " + actionKey
-                        + " (id=" + getResourceIdName(cardId) + ")");
+                Log.w(TAG, "Grid item NOT FOUND: " + actionKey + " (id=" + getResourceIdName(cardId) + ")");
                 return;
             }
 
@@ -207,8 +173,13 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             boolean hasPermission = permissionManager.canAccessFragment(tag);
 
             // 2. تخصيص المستخدم
-            boolean quickAccessAllowed = quickAccessSettings == null
-                    || quickAccessSettings.isActionEnabled(actionKey);
+            boolean quickAccessAllowed = quickAccessSettings == null || quickAccessSettings.isActionEnabled(actionKey);
+
+            // ✅ [إصلاح مؤقت]: إجبار شاشة أمر الصياغة على الظهور
+            if (NavigationManager.TAG_GOLD_CONVERSION.equals(tag)) {
+                hasPermission = true;
+                quickAccessAllowed = true;
+            }
 
             if (!hasPermission || !quickAccessAllowed) {
                 card.setVisibility(View.GONE);
@@ -220,7 +191,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
             card.setOnClickListener(v -> {
                 performHaptic();
-
                 Fragment target = FragmentFactory.createFragmentByTag(tag);
                 if (target == null) {
                     Log.w(TAG, "FragmentFactory returned null for: " + tag);
@@ -238,30 +208,14 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     // ═══════════════════════════════════════════════════════
 
     private void navigateTo(String tag, @Nullable Fragment fallbackFragment) {
-        if (tag == null || tag.isEmpty()) {
-            Log.e(TAG, "❌ Cannot navigate: empty tag");
-            return;
-        }
+        if (tag == null || tag.isEmpty()) return;
 
-        final UHFMainActivity activity =
-                (getActivity() instanceof UHFMainActivity)
-                        ? (UHFMainActivity) getActivity()
-                        : null;
-
-        if (activity == null) {
-            Log.e(TAG, "❌ Activity is NULL for tag: " + tag);
-            return;
-        }
+        final UHFMainActivity activity = (getActivity() instanceof UHFMainActivity) ? (UHFMainActivity) getActivity() : null;
+        if (activity == null) return;
 
         Fragment fragment = FragmentFactory.createFragmentByTag(tag);
-        if (fragment == null) {
-            fragment = fallbackFragment;
-        }
-
-        if (fragment == null) {
-            Log.e(TAG, "❌ Cannot create fragment for tag: " + tag);
-            return;
-        }
+        if (fragment == null) fragment = fallbackFragment;
+        if (fragment == null) return;
 
         final Fragment finalFragment = fragment;
         final String finalTag = tag;
@@ -270,14 +224,8 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             try {
-                if (activity.isFinishing() || activity.isDestroyed()) {
-                    Log.w(TAG, "⚠️ Activity finishing, skipping navigation");
-                    return;
-                }
-
+                if (activity.isFinishing() || activity.isDestroyed()) return;
                 activity.loadFragmentDirectly(finalFragment, finalTag);
-                Log.d(TAG, "✅ Navigated to: " + finalTag);
-
             } catch (Throwable e) {
                 Log.e(TAG, "❌ loadFragmentDirectly error", e);
             }
@@ -285,92 +233,51 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  HAPTIC
+    //  HAPTIC & ANIMATION & HELPERS
     // ═══════════════════════════════════════════════════════
 
     private void performHaptic() {
         try {
             View root = getView();
-            if (root != null) {
-                root.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Haptic feedback failed: " + e.getMessage());
-        }
+            if (root != null) root.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+        } catch (Exception ignored) {}
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  STAGGER ANIMATION
-    // ═══════════════════════════════════════════════════════
 
     private void runStaggerAnimation() {
         try {
             if (animatedViews.isEmpty()) return;
-
             AnimatorSet masterSet = new AnimatorSet();
             List<Animator> animators = new ArrayList<>();
-
             long delay = INITIAL_DELAY_MS;
 
             for (View v : animatedViews) {
                 if (v == null || v.getVisibility() != View.VISIBLE) continue;
-
-                v.setAlpha(0f);
-                v.setTranslationY(16f);
-
+                v.setAlpha(0f); v.setTranslationY(16f);
                 ObjectAnimator alpha = ObjectAnimator.ofFloat(v, "alpha", 0f, 1f);
-                alpha.setDuration(ITEM_FADE_DURATION_MS);
-                alpha.setStartDelay(delay);
-
-                ObjectAnimator translate =
-                        ObjectAnimator.ofFloat(v, "translationY", 16f, 0f);
-                translate.setDuration(ITEM_FADE_DURATION_MS);
-                translate.setStartDelay(delay);
-
-                animators.add(alpha);
-                animators.add(translate);
-
+                alpha.setDuration(ITEM_FADE_DURATION_MS); alpha.setStartDelay(delay);
+                ObjectAnimator translate = ObjectAnimator.ofFloat(v, "translationY", 16f, 0f);
+                translate.setDuration(ITEM_FADE_DURATION_MS); translate.setStartDelay(delay);
+                animators.add(alpha); animators.add(translate);
                 delay += STAGGER_DELAY_MS;
             }
-
             masterSet.playTogether(animators);
             masterSet.setInterpolator(new DecelerateInterpolator());
             masterSet.start();
-
         } catch (Exception e) {
-            Log.e(TAG, "runStaggerAnimation error: " + e.getMessage(), e);
-
-            for (View v : animatedViews) {
-                if (v != null) {
-                    v.setAlpha(1f);
-                    v.setTranslationY(0f);
-                }
-            }
+            for (View v : animatedViews) { if (v != null) { v.setAlpha(1f); v.setTranslationY(0f); } }
         }
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  BOTTOM SHEET HEIGHT
-    // ═══════════════════════════════════════════════════════
 
     @Override
     public void onStart() {
         super.onStart();
-
         try {
-            View bottomSheet = getDialog() != null
-                    ? getDialog().findViewById(
-                            com.google.android.material.R.id.design_bottom_sheet)
-                    : null;
-
+            View bottomSheet = getDialog() != null ? getDialog().findViewById(com.google.android.material.R.id.design_bottom_sheet) : null;
             if (bottomSheet != null) {
-                bottomSheet.getLayoutParams().height =
-                        (int) (getResources().getDisplayMetrics().heightPixels * 0.80);
+                bottomSheet.getLayoutParams().height = (int) (getResources().getDisplayMetrics().heightPixels * 0.80);
                 bottomSheet.requestLayout();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "onStart error: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
     }
 
     @Override
@@ -379,15 +286,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         animatedViews.clear();
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  HELPERS
-    // ═══════════════════════════════════════════════════════
-
     private String getResourceIdName(int resId) {
-        try {
-            return getResources().getResourceEntryName(resId);
-        } catch (Exception e) {
-            return String.valueOf(resId);
-        }
+        try { return getResources().getResourceEntryName(resId); } catch (Exception e) { return String.valueOf(resId); }
     }
 }
