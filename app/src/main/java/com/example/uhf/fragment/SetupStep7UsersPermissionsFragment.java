@@ -9,7 +9,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -26,21 +25,17 @@ import com.google.android.material.textfield.TextInputEditText;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Step 7 — المستخدمون والصلاحيات (اختياري)
+ * Step 7 — المستخدمون والصلاحيات (v2.1)
  *
- * - يعرض المستخدمين المسجلين
- * - يسمح بتعديل صلاحياتهم المحاسبية:
- *   • ترحيل القيود
- *   • اعتماد القيود
- *   • تعديل الأرصدة الافتتاحية
- *   • الحد الأقصى للقيد
- * - يحفظ عبر POST /setup/step/7
+ * ✅ v2.1:
+ *  - التنقل عبر SetupNavigator (لا popBackStack)
+ *  - ينتقل مباشرة للخطوة 8 (الزكاة)
+ *  - null-safety للأزرار
  */
 public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
 
@@ -79,8 +74,12 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
     }
 
     private void setupListeners() {
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(v -> saveAndNext());
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        }
+        if (btnNext != null) {
+            btnNext.setOnClickListener(v -> saveAndNext());
+        }
     }
 
     private void loadUsers() {
@@ -91,6 +90,7 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
+                    if (container == null) return;
 
                     JSONArray users = null;
                     if (resp != null && resp.isSuccess && resp.data != null) {
@@ -103,10 +103,10 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
                     rows.clear();
 
                     if (users == null || users.length() == 0) {
-                        tvEmpty.setVisibility(View.VISIBLE);
+                        if (tvEmpty != null) tvEmpty.setVisibility(View.VISIBLE);
                         container.setVisibility(View.GONE);
                     } else {
-                        tvEmpty.setVisibility(View.GONE);
+                        if (tvEmpty != null) tvEmpty.setVisibility(View.GONE);
                         container.setVisibility(View.VISIBLE);
                         for (int i = 0; i < users.length(); i++) {
                             JSONObject u = users.optJSONObject(i);
@@ -121,14 +121,16 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
-                    tvEmpty.setVisibility(View.VISIBLE);
-                    container.setVisibility(View.GONE);
+                    if (tvEmpty != null) tvEmpty.setVisibility(View.VISIBLE);
+                    if (container != null) container.setVisibility(View.GONE);
                 });
             }
         }).start();
     }
 
     private void addUserRow(JSONObject user) {
+        if (container == null) return;
+
         View card = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_user_permission, container, false);
 
@@ -174,6 +176,8 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
     }
 
     private void updateSummary() {
+        if (tvSummary == null) return;
+
         int withPost = 0;
         int withApprove = 0;
         int withEditOpen = 0;
@@ -207,8 +211,10 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
             JSONObject payload = new JSONObject();
             payload.put("users", usersArray);
 
-            btnNext.setEnabled(false);
-            btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            if (btnNext != null) {
+                btnNext.setEnabled(false);
+                btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            }
             showLoading(true);
 
             new Thread(() -> {
@@ -217,14 +223,22 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
 
                         if (resp != null && resp.isSuccess) {
                             Toast.makeText(requireContext(),
                                     isArabic ? "✅ تم حفظ الصلاحيات" : "✅ Permissions saved",
                                     Toast.LENGTH_SHORT).show();
-                            requireActivity().getSupportFragmentManager().popBackStack();
+
+                            // ═══════════════════════════════════════════════
+                            // ✅ الانتقال للخطوة 8 (الزكاة)
+                            // ═══════════════════════════════════════════════
+                            SetupNavigator.goToNextStep(
+                                    SetupStep7UsersPermissionsFragment.this, 7);
                         } else {
                             String err = (resp != null && resp.error != null) ? resp.error : "unknown";
                             Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
@@ -235,8 +249,10 @@ public class SetupStep7UsersPermissionsFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
                         Toast.makeText(requireContext(), "❌ " + ex.getMessage(), Toast.LENGTH_LONG).show();
                     });
                 }
