@@ -11,19 +11,22 @@
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface">
+        android:background="?attr/colorBackground">
 
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:fitsSystemWindows="true"
-            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar">
+            android:background="?attr/colorPrimary"
+            app:liftOnScroll="true">
 
             <com.google.android.material.appbar.MaterialToolbar
                 android:id="@+id/accountingToolbar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
+                android:background="?attr/colorPrimary"
                 app:navigationIcon="@drawable/ic_menu_accounting"
+                app:navigationIconTint="?attr/colorOnPrimary"
                 app:title="المحاسبة"
                 app:titleTextColor="?attr/colorOnPrimary"
                 app:menu="@menu/menu_accounting_toolbar" />
@@ -41,13 +44,19 @@
     <!-- ═══════ القائمة الجانبية ═══════ -->
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/navView"
-        android:layout_width="wrap_content"
+        android:layout_width="300dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:fitsSystemWindows="true"
+        android:background="?attr/colorSurface"
         app:headerLayout="@layout/nav_header_accounting"
         app:menu="@menu/menu_accounting_empty"
         app:itemIconTint="?attr/colorOnSurfaceVariant"
-        app:itemTextColor="?attr/colorOnSurface" />
+        app:itemTextColor="?attr/colorOnSurface"
+        app:itemBackground="?attr/selectableItemBackground"
+        app:itemShapeFillColor="?attr/colorSecondaryContainer"
+        app:itemShapeInsetStart="8dp"
+        app:itemShapeInsetEnd="8dp"
+        app:itemShapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
