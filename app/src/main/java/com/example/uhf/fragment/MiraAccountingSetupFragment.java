@@ -50,7 +50,8 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
     // ─── Views ───
     private TextView tvProgressPercent, tvProgressText, tvGroupProgress;
     private ProgressBar pbProgress, pbLoading;
-    private LinearLayout stepsContainer, contentContainer;
+    private LinearLayout stepsContainer;
+    private View contentContainer;
     private MaterialButton btnStart, btnReset, btnGoToSystem;
 
     // ─── State ───
