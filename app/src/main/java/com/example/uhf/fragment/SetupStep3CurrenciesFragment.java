@@ -13,7 +13,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
@@ -26,7 +25,12 @@ import org.json.JSONObject;
 import java.util.Locale;
 
 /**
- * المرحلة 3: العملات وأسعار الصرف
+ * المرحلة 3: العملات وأسعار الصرف (v2.0)
+ *
+ * ✅ v2.0:
+ *  - التنقل عبر SetupNavigator (لا FragmentTransaction يدوي)
+ *  - ينتقل مباشرة للخطوة 4 (أسعار الذهب)
+ *  - null-safety للأزرار
  */
 public class SetupStep3CurrenciesFragment extends BaseSetupStepFragment {
 
@@ -47,12 +51,12 @@ public class SetupStep3CurrenciesFragment extends BaseSetupStepFragment {
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_setup_step3_currencies, container, false);
-        
+
         apiClient = MiraApiClient.getInstance(requireContext());
-        
+
         initViews(view);
         setupListeners();
-        
+
         return view;
     }
 
@@ -63,110 +67,131 @@ public class SetupStep3CurrenciesFragment extends BaseSetupStepFragment {
         etUsdSar = v.findViewById(R.id.etUsdSar);
         btnBack = v.findViewById(R.id.btnBack);
         btnNext = v.findViewById(R.id.btnNext);
-        
+
         // Base currency: YER
         String[] currencies = {"YER", "USD", "SAR"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-            requireContext(),
-            android.R.layout.simple_dropdown_item_1line,
-            currencies
-        );
-        spBaseCurrency.setAdapter(adapter);
-        spBaseCurrency.setText("YER", false);
-        
+        if (spBaseCurrency != null) {
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                    requireContext(),
+                    android.R.layout.simple_dropdown_item_1line,
+                    currencies
+            );
+            spBaseCurrency.setAdapter(adapter);
+            spBaseCurrency.setText("YER", false);
+        }
+
         // قيم افتراضية
-        etUsdYer.setText("535");
-        etSarYer.setText("142.5");
-        etUsdSar.setText("3.75");
+        if (etUsdYer != null) etUsdYer.setText("535");
+        if (etSarYer != null) etSarYer.setText("142.5");
+        if (etUsdSar != null) etUsdSar.setText("3.75");
     }
 
     private void setupListeners() {
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(v -> saveAndNext());
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        }
+        if (btnNext != null) {
+            btnNext.setOnClickListener(v -> saveAndNext());
+        }
     }
 
     private void saveAndNext() {
-        String baseCurrency = spBaseCurrency.getText().toString().trim();
-        double usdYer = parseDouble(etUsdYer.getText().toString(), 535);
-        double sarYer = parseDouble(etSarYer.getText().toString(), 142.5);
-        double usdSar = parseDouble(etUsdSar.getText().toString(), 3.75);
-        
-        btnNext.setEnabled(false);
-        btnNext.setText("جاري الحفظ...");
-        
+        String baseCurrency = spBaseCurrency != null
+                ? spBaseCurrency.getText().toString().trim()
+                : "YER";
+
+        double usdYer = parseDouble(safeText(etUsdYer), 535);
+        double sarYer = parseDouble(safeText(etSarYer), 142.5);
+        double usdSar = parseDouble(safeText(etUsdSar), 3.75);
+
+        if (btnNext != null) {
+            btnNext.setEnabled(false);
+            btnNext.setText("جاري الحفظ...");
+        }
+
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("base_currency", baseCurrency);
-                
+
                 JSONArray rates = new JSONArray();
-                
+
                 JSONObject usdYerRate = new JSONObject();
                 usdYerRate.put("from", "USD");
                 usdYerRate.put("to", "YER");
                 usdYerRate.put("rate", usdYer);
                 usdYerRate.put("type", "parallel");
                 rates.put(usdYerRate);
-                
+
                 JSONObject sarYerRate = new JSONObject();
                 sarYerRate.put("from", "SAR");
                 sarYerRate.put("to", "YER");
                 sarYerRate.put("rate", sarYer);
                 sarYerRate.put("type", "parallel");
                 rates.put(sarYerRate);
-                
+
                 JSONObject usdSarRate = new JSONObject();
                 usdSarRate.put("from", "USD");
                 usdSarRate.put("to", "SAR");
                 usdSarRate.put("rate", usdSar);
                 usdSarRate.put("type", "parallel");
                 rates.put(usdSarRate);
-                
+
                 payload.put("rates", rates);
-                
-                MiraApiClient.ApiResponse response = 
-                    apiClient.postAccounting("setup/step/3", payload);
-                
+
+                MiraApiClient.ApiResponse response =
+                        apiClient.postAccounting("setup/step/3", payload);
+
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    btnNext.setEnabled(true);
-                    btnNext.setText("التالي ←");
-                    
+                    if (!isAdded()) return;
+
+                    if (btnNext != null) {
+                        btnNext.setEnabled(true);
+                        btnNext.setText("التالي ←");
+                    }
+
                     if (response != null && response.isSuccess) {
-                        Toast.makeText(requireContext(), 
-                            "✅ تم حفظ العملات وأسعار الصرف", Toast.LENGTH_SHORT).show();
-                        openNextStep();
+                        Toast.makeText(requireContext(),
+                                "✅ تم حفظ العملات وأسعار الصرف",
+                                Toast.LENGTH_SHORT).show();
+
+                        // ═══════════════════════════════════════════════
+                        // ✅ الانتقال للخطوة 4 (أسعار الذهب)
+                        // ═══════════════════════════════════════════════
+                        SetupNavigator.goToNextStep(SetupStep3CurrenciesFragment.this, 3);
                     } else {
-                        String error = response != null ? response.error : "غير معروف";
-                        Toast.makeText(requireContext(), 
-                            "❌ فشل: " + error, Toast.LENGTH_LONG).show();
+                        String error = (response != null && response.error != null)
+                                ? response.error : "غير معروف";
+                        Toast.makeText(requireContext(),
+                                "❌ فشل: " + error, Toast.LENGTH_LONG).show();
                     }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "save error", e);
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    btnNext.setEnabled(true);
-                    btnNext.setText("التالي ←");
-                    Toast.makeText(requireContext(), 
-                        "❌ " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    if (!isAdded()) return;
+                    if (btnNext != null) {
+                        btnNext.setEnabled(true);
+                        btnNext.setText("التالي ←");
+                    }
+                    Toast.makeText(requireContext(),
+                            "❌ " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
             }
         }).start();
     }
 
+    private String safeText(TextInputEditText et) {
+        if (et == null || et.getText() == null) return "";
+        return et.getText().toString().trim();
+    }
+
     private double parseDouble(String str, double def) {
         try {
-            return Double.parseDouble(str.trim());
+            if (str == null || str.isEmpty()) return def;
+            return Double.parseDouble(str.replace(",", ""));
         } catch (Exception e) {
             return def;
         }
-    }
-
-    private void openNextStep() {
-        SetupStep4OpeningBalancesFragment next = new SetupStep4OpeningBalancesFragment();
-        requireActivity().getSupportFragmentManager()
-            .beginTransaction()
-            .replace(R.id.fragment_container, next)
-            .addToBackStack("SetupStep4")
-            .commit();
     }
 }
