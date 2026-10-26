@@ -18,6 +18,7 @@ import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.utils.AccountingColors;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -29,13 +30,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Step 4 — أسعار الذهب لكل عيار (شراء/بيع/خصم كسر)
+ * Step 4 — أسعار الذهب لكل عيار (v2 — Theme-compliant)
  *
- * - يحمّل الأسعار الحالية من GET /setup/step/4/current
- * - يحفظ عبر POST /setup/step/4
- * - تحقق فوري (live validation)
- * - يحسب الهامش تلقائياً
- * - عربي + إنجليزي
+ * ✅ v2: كل الألوان theme-aware عبر AccountingColors
  */
 public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
 
@@ -65,7 +62,6 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
         setupListeners();
         buildKaratCards();
         loadCurrentPrices();
-
         return view;
     }
 
@@ -129,7 +125,6 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
                     showLoading(false);
 
                     if (resp != null && resp.isSuccess && resp.data != null) {
-                        // فك تغليف data.data إن وُجد
                         JSONObject payload = resp.data.optJSONObject("data");
                         if (payload == null) payload = resp.data;
 
@@ -175,7 +170,7 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
             double sell = parseDouble(row.etSell);
             double disc = parseDouble(row.etDisc);
 
-            if (buy <= 0 && sell <= 0) continue; // سطر فارغ — تجاهل
+            if (buy <= 0 && sell <= 0) continue;
 
             if (buy <= 0 || sell <= 0) {
                 Toast.makeText(requireContext(),
@@ -245,7 +240,6 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
                             Toast.makeText(requireContext(),
                                     isArabic ? "✅ تم حفظ أسعار الذهب" : "✅ Gold prices saved",
                                     Toast.LENGTH_SHORT).show();
-                            // الرجوع لشاشة الإعداد الرئيسية — ستُحدَّث الحالة تلقائياً
                             requireActivity().getSupportFragmentManager().popBackStack();
                         } else {
                             String err = (resp != null && resp.error != null) ? resp.error : "unknown";
@@ -330,13 +324,16 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
             double sell = parseDouble(etSell);
             if (buy <= 0 || sell <= 0) {
                 tvSpread.setText("—");
-                tvSpread.setTextColor(0xFF888888);
+                tvSpread.setTextColor(AccountingColors.text(requireContext(),
+                        AccountingColors.Status.NEUTRAL));
                 return;
             }
             double spread = sell - buy;
             double pct = (spread / buy) * 100;
             tvSpread.setText(String.format(Locale.US, "+%,.0f (%.1f%%)", spread, pct));
-            tvSpread.setTextColor(spread >= 0 ? 0xFF27AE60 : 0xFFE74C3C);
+            tvSpread.setTextColor(AccountingColors.text(requireContext(),
+                    spread >= 0 ? AccountingColors.Status.SUCCESS
+                                : AccountingColors.Status.ERROR));
         }
     }
 }
