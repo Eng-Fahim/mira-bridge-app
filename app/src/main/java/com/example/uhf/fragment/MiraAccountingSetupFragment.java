@@ -14,32 +14,34 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
-import androidx.fragment.app.Fragment;
+import androidx.core.content.ContextCompat;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * MIRA Accounting Setup — v3.3 (Final)
+ * MIRA Accounting Setup — v3.4 (Soft-Lock + Theme-Aware)
  *
- * المزايا:
- *  ✅ 10 خطوات في 5 مجموعات منطقية
- *  ✅ Routing كامل لجميع الشاشات
- *  ✅ BottomNav management (auto hide/show)
- *  ✅ Auto-redirect عند الاكتمال
- *  ✅ Reset مع cache invalidation
- *  ✅ Retry عند فشل API
- *  ✅ Rotation-safe (يحفظ الحالة)
- *  ✅ Arabic + English
- *  ✅ تقدم كل مجموعة على حدة
+ * التحسينات في v3.4:
+ *  ✅ 🔒 أيقونة قفل على الخطوات المحظورة (Soft-Lock)
+ *  ✅ Dialog ناعم عند الدخول لخطوة محظورة (لا يمنع، يوجه)
+ *  ✅ منطق تبعيات دقيق:
+ *      - Step 6 يحتاج Step 4 (أسعار الذهب)
+ *      - Step 8 يحتاج Step 1 (السنة المالية)
+ *      - Step 10 يحتاج كل الخطوات الإلزامية
+ *  ✅ ألوان theme-aware (لا hardcoded)
+ *  ✅ MaterialAlertDialogBuilder بدل AlertDialog.Builder
+ *  ✅ null-safety كامل
  */
 public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
 
@@ -47,14 +49,17 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
     private static final String KEY_NOTIFIED = "setup_completed_notified";
     private static final String KEY_STATUS_JSON = "cached_status_json";
 
-    // ─── Views ───
+    // ═══ الخطوات الإلزامية (للاعتماد) ═══
+    private static final int[] REQUIRED_STEPS = {1, 2, 3, 4, 5, 6, 8, 9};
+
+    // ═══ Views ═══
     private TextView tvProgressPercent, tvProgressText, tvGroupProgress;
     private ProgressBar pbProgress, pbLoading;
     private LinearLayout stepsContainer;
     private View contentContainer;
     private MaterialButton btnStart, btnReset, btnGoToSystem;
 
-    // ─── State ───
+    // ═══ State ═══
     private MiraApiClient apiClient;
     private boolean isArabic;
     private JSONObject currentStatus;
@@ -63,6 +68,12 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
     private boolean isRetryMode = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingRecoveryRunnable;
+
+    // ═══ Colors (theme-aware) ═══
+    private int colorSuccess;
+    private int colorWarning;
+    private int colorNeutral;
+    private int colorError;
 
     // ═══════════════════════════════════════════════════════
     //  Lifecycle
@@ -98,10 +109,10 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
             isManualOpen = getArguments().getBoolean("manual_open", false);
         }
 
+        loadThemeColors();
         initViews(view);
         setupListeners();
 
-        // إذا كانت الحالة محفوظة، اعرضها فوراً
         if (currentStatus != null) {
             renderStatus(currentStatus);
         }
@@ -148,8 +159,15 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Views & Listeners
+    //  Init
     // ═══════════════════════════════════════════════════════
+
+    private void loadThemeColors() {
+        colorSuccess = ContextCompat.getColor(requireContext(), R.color.acct_success);
+        colorWarning = ContextCompat.getColor(requireContext(), R.color.acct_warning);
+        colorNeutral = ContextCompat.getColor(requireContext(), R.color.acct_neutral);
+        colorError   = ContextCompat.getColor(requireContext(), R.color.acct_credit);
+    }
 
     private void initViews(View v) {
         tvProgressPercent = v.findViewById(R.id.tvProgressPercent);
@@ -263,11 +281,11 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
             int totalSteps     = status.optInt("total_steps", 10);
             int completedCount = status.optInt("completed_count", 0);
 
-            pbProgress.setProgress(progress);
-            tvProgressPercent.setText(progress + "%");
+            if (pbProgress != null) pbProgress.setProgress(progress);
+            if (tvProgressPercent != null) tvProgressPercent.setText(progress + "%");
 
             String statusText = statusLabel(setupStatus);
-            tvProgressText.setText(statusText);
+            if (tvProgressText != null) tvProgressText.setText(statusText);
 
             if (tvGroupProgress != null) {
                 tvGroupProgress.setText(String.format(Locale.US,
@@ -278,7 +296,7 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
             boolean completed = "completed".equals(setupStatus)
                     || "locked".equals(setupStatus);
 
-            // ⭐ Auto-redirect
+            // ✅ Auto-redirect
             if (completed && !setupCompletedNotified && !isManualOpen) {
                 setupCompletedNotified = true;
                 if (contentContainer != null) contentContainer.setVisibility(View.GONE);
@@ -293,10 +311,12 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
 
             // Buttons
             if (completed) {
-                btnStart.setVisibility(View.VISIBLE);
-                btnStart.setText(isArabic ? "👁️ مراجعة الإعداد" : "👁️ Review Setup");
-                btnStart.setEnabled(true);
-                btnReset.setVisibility(View.VISIBLE);
+                if (btnStart != null) {
+                    btnStart.setVisibility(View.VISIBLE);
+                    btnStart.setText(isArabic ? "👁️ مراجعة الإعداد" : "👁️ Review Setup");
+                    btnStart.setEnabled(true);
+                }
+                if (btnReset != null) btnReset.setVisibility(View.VISIBLE);
                 if (btnGoToSystem != null) {
                     btnGoToSystem.setVisibility(View.VISIBLE);
                     btnGoToSystem.setText(isArabic
@@ -304,16 +324,18 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
                             : "🚀 Enter System");
                 }
             } else {
-                btnStart.setVisibility(View.VISIBLE);
-                btnStart.setEnabled(true);
-                if (completedCount == 0) {
-                    btnStart.setText(isArabic ? "🚀 بدء الإعداد" : "🚀 Start Setup");
-                } else {
-                    btnStart.setText(isArabic
-                            ? "▶️ المتابعة من الخطوة " + currentStep
-                            : "▶️ Continue from step " + currentStep);
+                if (btnStart != null) {
+                    btnStart.setVisibility(View.VISIBLE);
+                    btnStart.setEnabled(true);
+                    if (completedCount == 0) {
+                        btnStart.setText(isArabic ? "🚀 بدء الإعداد" : "🚀 Start Setup");
+                    } else {
+                        btnStart.setText(isArabic
+                                ? "▶️ المتابعة من الخطوة " + currentStep
+                                : "▶️ Continue from step " + currentStep);
+                    }
                 }
-                btnReset.setVisibility(View.GONE);
+                if (btnReset != null) btnReset.setVisibility(View.GONE);
                 if (btnGoToSystem != null) btnGoToSystem.setVisibility(View.GONE);
             }
 
@@ -333,6 +355,7 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
     }
 
     private void renderGroupsAndSteps(JSONObject status) {
+        if (stepsContainer == null) return;
         stepsContainer.removeAllViews();
 
         JSONArray groups = status.optJSONArray("groups");
@@ -341,22 +364,18 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
         if (groups == null || steps == null) return;
 
         // خريطة step.number → JSONObject
-        java.util.Map<Integer, JSONObject> stepMap = new java.util.HashMap<>();
+        Map<Integer, JSONObject> stepMap = new HashMap<>();
         for (int i = 0; i < steps.length(); i++) {
             JSONObject step = steps.optJSONObject(i);
             if (step == null) continue;
-            // steps array index = step number - 1 (نظراً للترتيب)
-            int stepNum = i + 1;
-            stepMap.put(stepNum, step);
+            stepMap.put(i + 1, step);
         }
 
-        // لكل مجموعة، اطبع header + خطواتها
         int stepCounter = 1;
         for (int g = 0; g < groups.length(); g++) {
             JSONObject group = groups.optJSONObject(g);
             if (group == null) continue;
 
-            int groupId    = group.optInt("group_id", g + 1);
             int gTotal     = group.optInt("total", 0);
             int gCompleted = group.optInt("completed", 0);
             String gTitle  = isArabic
@@ -366,11 +385,10 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
 
             addGroupHeader(gIcon + "  " + gTitle, gCompleted, gTotal);
 
-            // خطوات هذه المجموعة
             for (int s = 0; s < gTotal; s++) {
                 JSONObject step = stepMap.get(stepCounter);
                 if (step != null) {
-                    addStepCard(step, stepCounter);
+                    addStepCard(step, stepCounter, status);
                 }
                 stepCounter++;
             }
@@ -378,27 +396,33 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
     }
 
     private void addGroupHeader(String title, int completed, int total) {
+        if (stepsContainer == null) return;
         View header = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_group_header, stepsContainer, false);
 
         TextView tvTitle = header.findViewById(R.id.tvGroupTitle);
         TextView tvCount = header.findViewById(R.id.tvGroupCount);
 
-        tvTitle.setText(title);
-        tvCount.setText(String.format(Locale.US, "%d/%d", completed, total));
+        if (tvTitle != null) tvTitle.setText(title);
+        if (tvCount != null) {
+            tvCount.setText(String.format(Locale.US, "%d/%d", completed, total));
 
-        if (completed == total && total > 0) {
-            tvCount.setTextColor(0xFF27AE60);
-        } else if (completed > 0) {
-            tvCount.setTextColor(0xFFF39C12);
-        } else {
-            tvCount.setTextColor(0xFF95A5A6);
+            if (completed == total && total > 0) {
+                tvCount.setTextColor(colorSuccess);
+            } else if (completed > 0) {
+                tvCount.setTextColor(colorWarning);
+            } else {
+                tvCount.setTextColor(colorNeutral);
+            }
         }
 
         stepsContainer.addView(header);
     }
 
-    private void addStepCard(JSONObject step, int stepNumber) {
+    /**
+     * ⭐ v3.4 — إضافة بطاقة خطوة مع كشف التبعيات
+     */
+    private void addStepCard(JSONObject step, int stepNumber, JSONObject status) {
         try {
             View card = LayoutInflater.from(requireContext())
                     .inflate(R.layout.item_setup_step, stepsContainer, false);
@@ -418,32 +442,155 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
             boolean isCompleted = step.optBoolean("completed", false);
             boolean isRequired  = step.optBoolean("required", false);
 
-            tvIcon.setText(icon);
-            tvNumber.setText(String.valueOf(stepNumber));
-            tvTitle.setText(title);
-            tvDesc.setText(desc);
+            // ═══ فحص التبعيات ═══
+            BlockInfo blockInfo = isCompleted ? null : getBlockInfo(stepNumber, status);
+            boolean isBlocked = blockInfo != null;
 
+            if (tvIcon != null) tvIcon.setText(icon);
+            if (tvNumber != null) tvNumber.setText(String.valueOf(stepNumber));
+            if (tvTitle != null) tvTitle.setText(title);
+            if (tvDesc != null) tvDesc.setText(desc);
+
+            // ═══ تحديد الحالة + اللون ═══
             if (isCompleted) {
-                tvStatus.setText(isArabic ? "✅ مكتمل" : "✅ Done");
-                tvStatus.setTextColor(0xFF27AE60);
-                statusIndicator.setBackgroundColor(0xFF27AE60);
+                // ✅ مكتمل
+                if (tvStatus != null) {
+                    tvStatus.setText(isArabic ? "✅ مكتمل" : "✅ Done");
+                    tvStatus.setTextColor(colorSuccess);
+                }
+                if (statusIndicator != null) statusIndicator.setBackgroundColor(colorSuccess);
+
+            } else if (isBlocked) {
+                // 🔒 محظور — يحتاج خطوة سابقة
+                if (tvStatus != null) {
+                    tvStatus.setText(isArabic ? "🔒 متطلب سابق" : "🔒 Blocked");
+                    tvStatus.setTextColor(colorWarning);
+                }
+                if (statusIndicator != null) statusIndicator.setBackgroundColor(colorWarning);
+
             } else if (isRequired) {
-                tvStatus.setText(isArabic ? "⏳ مطلوب" : "⏳ Required");
-                tvStatus.setTextColor(0xFFF39C12);
-                statusIndicator.setBackgroundColor(0xFFF39C12);
+                // ⏳ مطلوب (لكن غير محظور)
+                if (tvStatus != null) {
+                    tvStatus.setText(isArabic ? "⏳ مطلوب" : "⏳ Required");
+                    tvStatus.setTextColor(colorWarning);
+                }
+                if (statusIndicator != null) statusIndicator.setBackgroundColor(colorWarning);
+
             } else {
-                tvStatus.setText(isArabic ? "⏳ اختياري" : "⏳ Optional");
-                tvStatus.setTextColor(0xFF95A5A6);
-                statusIndicator.setBackgroundColor(0xFF95A5A6);
+                // ⏳ اختياري
+                if (tvStatus != null) {
+                    tvStatus.setText(isArabic ? "⏳ اختياري" : "⏳ Optional");
+                    tvStatus.setTextColor(colorNeutral);
+                }
+                if (statusIndicator != null) statusIndicator.setBackgroundColor(colorNeutral);
             }
 
+            // ═══ Click handler ═══
             final int stepNum = stepNumber;
-            card.setOnClickListener(v -> openStep(stepNum));
+            final BlockInfo finalBlock = blockInfo;
+            card.setOnClickListener(v -> {
+                if (finalBlock != null) {
+                    showSoftLockDialog(stepNum, finalBlock);
+                } else {
+                    openStep(stepNum);
+                }
+            });
+
             stepsContainer.addView(card);
 
         } catch (Exception e) {
             Log.e(TAG, "addStepCard", e);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Dependency Check (v3.4 — جديد)
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * فحص تبعيات الخطوة
+     * @return null إذا كانت الخطوة جاهزة، وإلا كائن BlockInfo
+     */
+    @Nullable
+    private BlockInfo getBlockInfo(int stepNumber, JSONObject status) {
+        if (status == null) return null;
+
+        // خريطة الحالة المكتملة لكل خطوة
+        Map<Integer, Boolean> completedMap = new HashMap<>();
+        JSONArray steps = status.optJSONArray("steps");
+        if (steps != null) {
+            for (int i = 0; i < steps.length(); i++) {
+                JSONObject s = steps.optJSONObject(i);
+                if (s != null) {
+                    completedMap.put(i + 1, s.optBoolean("completed", false));
+                }
+            }
+        }
+
+        switch (stepNumber) {
+            case 6: // الأرصدة الافتتاحية ← تحتاج Step 4 (أسعار الذهب)
+                if (!Boolean.TRUE.equals(completedMap.get(4))) {
+                    return new BlockInfo(
+                            4,
+                            isArabic
+                                    ? "تحتاج إكمال الخطوة 4 (أسعار الذهب) لحساب قيمة الأوزان تلقائياً"
+                                    : "Complete Step 4 (Gold Prices) to auto-calculate values"
+                    );
+                }
+                break;
+
+            case 8: // الزكاة ← تحتاج Step 1 (السنة المالية)
+                if (!Boolean.TRUE.equals(completedMap.get(1))) {
+                    return new BlockInfo(
+                            1,
+                            isArabic
+                                    ? "تحتاج إكمال الخطوة 1 (السنة المالية) لربط الزكاة بالسنة"
+                                    : "Complete Step 1 (Fiscal Year) to link zakat"
+                    );
+                }
+                break;
+
+            case 10: // المراجعة والاعتماد ← تحتاج كل الخطوات الإلزامية
+                for (int required : REQUIRED_STEPS) {
+                    if (!Boolean.TRUE.equals(completedMap.get(required))) {
+                        return new BlockInfo(
+                                required,
+                                isArabic
+                                        ? "أكمل جميع الخطوات الإلزامية أولاً (المتبقي: الخطوة " + required + ")"
+                                        : "Complete all required steps first (missing: step " + required + ")"
+                        );
+                    }
+                }
+                break;
+        }
+
+        return null;
+    }
+
+    /**
+     * ⭐ Dialog ناعم عند الدخول لخطوة محظورة
+     */
+    private void showSoftLockDialog(int stepNumber, BlockInfo info) {
+        if (!isAdded()) return;
+
+        String message = info.reason + "\n\n"
+                + (isArabic
+                ? "يمكنك فتحها على أي حال، لكن بعض الحقول قد لا تعمل بشكل صحيح."
+                : "You can open it anyway, but some fields may not work correctly.");
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("🔒 " + (isArabic ? "خطوة غير جاهزة" : "Step Not Ready"))
+                .setMessage(message)
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setPositiveButton(
+                        isArabic ? "اذهب للخطوة " + info.blockingStep
+                                : "Go to step " + info.blockingStep,
+                        (d, w) -> openStep(info.blockingStep))
+                .setNeutralButton(
+                        isArabic ? "فتح على أي حال" : "Open Anyway",
+                        (d, w) -> openStep(stepNumber))
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
     }
 
     // ═══════════════════════════════════════════════════════
@@ -461,20 +608,7 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
     }
 
     private void openStep(int stepNumber) {
-        Fragment fragment = null;
-
-        switch (stepNumber) {
-            case 1:  fragment = new SetupStep1FiscalYearFragment(); break;
-            case 2:  fragment = new SetupStep2BranchesFragment(); break;
-            case 3:  fragment = new SetupStep3CurrenciesFragment(); break;
-            case 4:  fragment = new SetupStep4GoldPricesFragment(); break;
-            case 5:  fragment = new SetupStep5MakingChargesFragment(); break;
-            case 6:  fragment = new SetupStep6OpeningBalancesFragment(); break;
-            case 7:  fragment = new SetupStep7UsersPermissionsFragment(); break;
-            case 8:  fragment = new SetupStep8ZakatFragment(); break;
-            case 9:  fragment = new SetupStep9RfidFragment(); break;
-            case 10: fragment = new SetupStep10ReviewFragment(); break;
-        }
+        Fragment fragment = SetupNavigator.getFragmentForStep(stepNumber);
 
         if (fragment == null) {
             Toast.makeText(requireContext(),
@@ -538,7 +672,7 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
 
     private void confirmReset() {
         if (!isAdded()) return;
-        new AlertDialog.Builder(requireContext())
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "⚠️ إعادة تعيين الإعداد" : "⚠️ Reset Setup")
                 .setMessage(isArabic
                         ? "سيتم حذف:\n"
@@ -553,6 +687,7 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
                         + "• All step progress\n\n"
                         + "⚠️ Cannot be undone.\n\n"
                         + "Are you sure?")
+                .setIcon(android.R.drawable.ic_dialog_alert)
                 .setPositiveButton(isArabic ? "نعم، إعادة تعيين" : "Yes, Reset",
                         (d, w) -> performReset())
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
@@ -577,7 +712,6 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
                                 isArabic ? "✅ تم إعادة التعيين" : "✅ Reset complete",
                                 Toast.LENGTH_LONG).show();
 
-                        // إبطال الكاش + إعادة التوجيه
                         if (getActivity() instanceof UHFMainActivity) {
                             try {
                                 ((UHFMainActivity) getActivity()).invalidateSetupCache();
@@ -612,5 +746,22 @@ public class MiraAccountingSetupFragment extends BaseSetupStepFragment {
         if (pbLoading == null || contentContainer == null) return;
         pbLoading.setVisibility(show ? View.VISIBLE : View.GONE);
         contentContainer.setVisibility(show ? View.GONE : View.VISIBLE);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Inner classes
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * معلومات الحظر لخطوة معينة
+     */
+    private static class BlockInfo {
+        final int blockingStep;
+        final String reason;
+
+        BlockInfo(int blockingStep, String reason) {
+            this.blockingStep = blockingStep;
+            this.reason = reason;
+        }
     }
 }
