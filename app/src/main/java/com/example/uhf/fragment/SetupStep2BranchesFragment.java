@@ -280,6 +280,11 @@ public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
         }
         return labels[0];
     }
+    
+    // بعد typeLabel، أضف:
+private String levelLabel(String code, String[] codes, String[] labels) {
+    return typeLabel(code, codes, labels);
+}
 
     private String typeValue(String label, String[] codes, String[] labels) {
         for (int i = 0; i < labels.length; i++) {
