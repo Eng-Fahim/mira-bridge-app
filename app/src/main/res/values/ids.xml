@@ -21,4 +21,7 @@
     <item type="id" name="quit"/>
     <item type="id" name="restart_preview"/>
     <item type="id" name="return_scan_result"/>
+
+    <!-- ✅ سطر MIRA الجديد -->
+    <item type="id" name="accounting_fragment_host"/>
 </resources>
