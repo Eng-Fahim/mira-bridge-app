@@ -460,19 +460,17 @@ public class SetupStep4OpeningBalancesFragment extends BaseSetupStepFragment {
                     apiClient.postAccounting("setup/step/4", payload);
 
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    btnNext.setEnabled(true);
-                    btnNext.setText("التالي ←");
+    btnNext.setEnabled(true);
+    btnNext.setText("التالي ←");
 
-                    if (response != null && response.isSuccess) {
-                        Toast.makeText(requireContext(),
-                            "✅ تم حفظ الأرصدة", Toast.LENGTH_SHORT).show();
-                        openNextStep();
-                    } else {
-                        String err = response != null ? response.error : "غير معروف";
-                        Toast.makeText(requireContext(),
-                            "❌ فشل: " + err, Toast.LENGTH_LONG).show();
-                    }
-                });
+    if (response != null && response.isSuccess) {
+        openNextStep();
+    } else {
+        String err = response != null ? response.error : "غير معروف";
+        Toast.makeText(requireContext(),
+            "❌ فشل الحفظ: " + err, Toast.LENGTH_LONG).show();
+    }
+});
             } catch (Exception e) {
                 Log.e(TAG, "save error", e);
                 new Handler(Looper.getMainLooper()).post(() -> {
