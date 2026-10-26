@@ -11,14 +11,13 @@
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorBackground">
+        android:background="?android:attr/colorBackground">
 
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fitsSystemWindows="true"
             android:background="?attr/colorPrimary"
-            app:liftOnScroll="true">
+            android:fitsSystemWindows="true">
 
             <com.google.android.material.appbar.MaterialToolbar
                 android:id="@+id/accountingToolbar"
@@ -26,7 +25,6 @@
                 android:layout_height="?attr/actionBarSize"
                 android:background="?attr/colorPrimary"
                 app:navigationIcon="@drawable/ic_menu_accounting"
-                app:navigationIconTint="?attr/colorOnPrimary"
                 app:title="المحاسبة"
                 app:titleTextColor="?attr/colorOnPrimary"
                 app:menu="@menu/menu_accounting_toolbar" />
@@ -47,16 +45,12 @@
         android:layout_width="300dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
+        android:background="?android:attr/colorBackground"
         android:fitsSystemWindows="true"
-        android:background="?attr/colorSurface"
         app:headerLayout="@layout/nav_header_accounting"
         app:menu="@menu/menu_accounting_empty"
-        app:itemIconTint="?attr/colorOnSurfaceVariant"
-        app:itemTextColor="?attr/colorOnSurface"
-        app:itemBackground="?attr/selectableItemBackground"
-        app:itemShapeFillColor="?attr/colorSecondaryContainer"
-        app:itemShapeInsetStart="8dp"
-        app:itemShapeInsetEnd="8dp"
-        app:itemShapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium" />
+        app:itemIconTint="?attr/colorPrimary"
+        app:itemTextColor="?android:attr/textColorPrimary"
+        app:itemBackground="?android:attr/selectableItemBackground" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
