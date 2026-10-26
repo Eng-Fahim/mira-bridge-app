@@ -14,7 +14,10 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
+// 🆕 الاستيرادات الجديدة
+import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
+import com.example.uhf.accounting.MiraAccountingFragmentNew;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
@@ -22,14 +25,31 @@ import com.google.android.material.tabs.TabLayout;
 
 import java.util.Stack;
 
+/**
+ * MIRA Accounting — Container (Legacy + New Router)
+ *
+ * هذا الملف أصبح "موجّهاً" (Router) يقرر أي واجهة تُعرض بناءً على
+ * BuildConfig.USE_NEW_ACCOUNTING_UI:
+ *
+ *  • false → السلوك القديم بالكامل (TabLayout بـ 17 تبويب) — كما كان تماماً
+ *  • true  → الواجهة الجديدة (DrawerLayout + NavigationView)
+ *             عبر MiraAccountingFragmentNew كـ child fragment
+ *
+ * الميثودات العامة (navigateToTab / navigateToLedgerWithAccount /
+ * refreshCurrentTab) تبقى متاحة في الوضعين وتفوض تلقائياً للـ child
+ * عند تفعيل الواجهة الجديدة، مما يضمن عدم كسر أي كود آخر يعتمد عليها.
+ */
 public class MiraAccountingFragment extends Fragment {
 
     private static final String TAG = "MiraAccountingFragment";
     private static final String KEY_CURRENT_TAB = "current_tab";
     private static final String KEY_TAB_HISTORY = "tab_history";
 
+    // 🆕 tag الـ fragment الجديد
+    private static final String TAG_NEW_CHILD = "MIRA_ACCT_NEW";
+
     // ═══════════════════════════════════════════════════════
-    //  تعريف التبويبات
+    //  تعريف التبويبات (Legacy)
     // ═══════════════════════════════════════════════════════
     private static final int TAB_JOURNAL     = 0;
     private static final int TAB_TRIAL       = 1;
@@ -43,13 +63,15 @@ public class MiraAccountingFragment extends Fragment {
     private static final int TAB_AGING       = 9;
     private static final int TAB_FISCAL      = 10;
     private static final int TAB_PROFIT      = 11; // ✅ تبويب تحليل الأرباح الجديد
-    
+
     private static final int TAB_REVALUATION = 12; // ✅ تبويب إعادة تقييم المخزون الجديد
     private static final int TAB_PERIOD_LOCK = 13;
     private static final int TAB_CHEQUES     = 14; // ✅ تبويب الشيكات الجديد
     private static final int TAB_RECONCILIATION  = 15; // ✅ تبويب التسوية البنكية الجديد
     private static final int TAB_FIXED_ASSETS    = 16; // ✅ تبويب الأصول الثابتة
     private static final int MAX_TABS            = 17;
+
+    // Legacy views (null في الواجهة الجديدة)
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
 
@@ -57,12 +79,15 @@ public class MiraAccountingFragment extends Fragment {
     private SessionManager sessionManager;
     private boolean isArabic = true;
     private int currentTabIndex = 0;
-    
+
     private long pendingLedgerAccountId = 0;
 
     private final Stack<Integer> tabHistory = new Stack<>();
     private boolean isNavigatingBack = false;
 
+    // ═══════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,28 +113,32 @@ public class MiraAccountingFragment extends Fragment {
             }
         }
 
-        requireActivity().getOnBackPressedDispatcher().addCallback(
-            this,
-            new OnBackPressedCallback(true) {
-                @Override
-                public void handleOnBackPressed() {
-                    if (!tabHistory.isEmpty()) {
-                        int previousTab = tabHistory.pop();
-                        TabLayout.Tab tab = tabLayout != null ? tabLayout.getTabAt(previousTab) : null;
-                        if (tab != null) {
-                            isNavigatingBack = true;
-                            tab.select();
-                            isNavigatingBack = false;
-                            return;
+        // 🆕 الـ back callback القديم لا يُسجَّل في الواجهة الجديدة —
+        //    لأن MiraAccountingFragmentNew يسجّل callback خاصاً به.
+        if (!BuildConfig.USE_NEW_ACCOUNTING_UI) {
+            requireActivity().getOnBackPressedDispatcher().addCallback(
+                this,
+                new OnBackPressedCallback(true) {
+                    @Override
+                    public void handleOnBackPressed() {
+                        if (!tabHistory.isEmpty()) {
+                            int previousTab = tabHistory.pop();
+                            TabLayout.Tab tab = tabLayout != null ? tabLayout.getTabAt(previousTab) : null;
+                            if (tab != null) {
+                                isNavigatingBack = true;
+                                tab.select();
+                                isNavigatingBack = false;
+                                return;
+                            }
+                        }
+
+                        if (getActivity() instanceof UHFMainActivity) {
+                            UHFMainActivity act = (UHFMainActivity) getActivity();
+                            act.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
                         }
                     }
-
-                    if (getActivity() instanceof UHFMainActivity) {
-                        UHFMainActivity act = (UHFMainActivity) getActivity();
-                        act.loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-                    }
-                }
-            });
+                });
+        }
     }
 
     @Nullable
@@ -117,6 +146,40 @@ public class MiraAccountingFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
+
+        // 🆕 فحص الصلاحية قبل الاختيار — ينطبق على الواجهتين
+        if (!hasPermission()) {
+            // hasPermission() تُظهر Toast وتُغلق الشاشة عند الرفض
+            // نعيد FrameLayout فارغاً لتفادي NullPointerException
+            FrameLayout denied = new FrameLayout(inflater.getContext());
+            denied.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+            return denied;
+        }
+
+        // 🆕 بوابة الواجهة الجديدة
+        if (BuildConfig.USE_NEW_ACCOUNTING_UI) {
+            FrameLayout host = new FrameLayout(inflater.getContext());
+            host.setId(R.id.accounting_fragment_host);
+            host.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+
+            // أضف الـ Fragment الجديد مرة واحدة فقط
+            // (FragmentManager يتولى الاستعادة تلقائياً عند savedInstanceState != null)
+            if (savedInstanceState == null) {
+                getChildFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.accounting_fragment_host,
+                                 new MiraAccountingFragmentNew(),
+                                 TAG_NEW_CHILD)
+                        .commitNowAllowingStateLoss();
+            }
+            return host;
+        }
+
+        // ═══ الواجهة القديمة (Legacy) — كما كانت تماماً ═══
         View view = inflater.inflate(R.layout.fragment_mira_accounting_v2, container, false);
 
         initViews(view);
@@ -124,10 +187,6 @@ public class MiraAccountingFragment extends Fragment {
         if (tabLayout == null || tabContentContainer == null) {
             Log.e(TAG, "❌ Critical views not found!");
             return view;
-        }
-
-        if (!hasPermission()) {
-            return view; 
         }
 
         setupTabs();
@@ -159,7 +218,7 @@ public class MiraAccountingFragment extends Fragment {
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(KEY_CURRENT_TAB, currentTabIndex);
-        
+
         int[] historyArray = new int[tabHistory.size()];
         for (int i = 0; i < tabHistory.size(); i++) {
             historyArray[i] = tabHistory.get(i);
@@ -174,6 +233,9 @@ public class MiraAccountingFragment extends Fragment {
         tabContentContainer = null;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Legacy view helpers (تُستدعى فقط في الواجهة القديمة)
+    // ═══════════════════════════════════════════════════════════
     private void initViews(View view) {
         tabLayout           = view.findViewById(R.id.tabAccounting);
         tabContentContainer = view.findViewById(R.id.tabContentContainer);
@@ -191,17 +253,20 @@ public class MiraAccountingFragment extends Fragment {
                 Toast.makeText(requireContext(),
                     isArabic ? "⛔ غير مصرح لك بالوصول للمحاسبة" : "⛔ Access Denied",
                     Toast.LENGTH_LONG).show();
-                
+
                 requireActivity().getOnBackPressedDispatcher().onBackPressed();
                 return false;
             }
             return true;
         } catch (Exception e) {
             Log.e(TAG, "checkPermissions error: " + e.getMessage());
-            return true; 
+            return true;
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Legacy tab machinery (كما كان — لا تغيير)
+    // ═══════════════════════════════════════════════════════════
     private void setupTabs() {
         if (tabLayout == null) return;
 
@@ -217,13 +282,13 @@ public class MiraAccountingFragment extends Fragment {
         addTab("💵 الخزينة",    "💵 Cash");
         addTab("⏳ الديون",     "⏳ Aging");
         addTab("🔒 الإقفال",    "🔒 Closing");
-        addTab("📊 الأرباح",    "📊 Profit");     // ✅ التبويب الجديد
-        addTab("⚖️ التقييم",    "⚖️ Revaluation"); // ✅ التبويب الجديد
+        addTab("📊 الأرباح",    "📊 Profit");
+        addTab("⚖️ التقييم",    "⚖️ Revaluation");
         addTab("🔐 الفترات",    "🔐 Periods");
-        addTab("📑 الشيكات",    "📑 Cheques"); // ✅ إضافة التبويب
+        addTab("📑 الشيكات",    "📑 Cheques");
         addTab("🏦 المطابقة",   "🏦 Reconciliation");
         addTab("🏢 الأصول",     "🏢 Assets");
-            
+
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
 
@@ -315,25 +380,25 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_ADJUSTING:
                     return new MiraAdjustingEntryFragment();
 
-                case TAB_CASH: 
+                case TAB_CASH:
                     return new MiraCashReconciliationFragment();
 
-                case TAB_AGING: 
+                case TAB_AGING:
                     return new MiraAgingReportFragment();
 
-                case TAB_FISCAL: 
+                case TAB_FISCAL:
                     return new MiraFiscalClosingFragment();
 
-                case TAB_PROFIT: // ✅ ربط تبويب تحليل الأرباح
+                case TAB_PROFIT:
                     return new MiraProfitAnalysisFragment();
 
-                case TAB_REVALUATION: // ✅ ربط تبويب إعادة التقييم
+                case TAB_REVALUATION:
                     return new MiraInventoryRevaluationFragment();
-                
+
                 case TAB_PERIOD_LOCK:return new MiraPeriodLockFragment();
-                case TAB_CHEQUES:return new MiraChequeFragment(); // ✅ ربط الشاشة
+                case TAB_CHEQUES:return new MiraChequeFragment();
                 case TAB_RECONCILIATION: return new MiraReconciliationFragment();
-                case TAB_FIXED_ASSETS: return new MiraFixedAssetsFragment(); 
+                case TAB_FIXED_ASSETS: return new MiraFixedAssetsFragment();
                 default: return new MiraJournalFragment();
             }
         } catch (Exception e) {
@@ -342,18 +407,56 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Public API — متوافق مع الواجهتين
+    // ═══════════════════════════════════════════════════════════
+
+    /** جلب الـ Fragment الجديد إن كان نشطاً */
+    @Nullable
+    private MiraAccountingFragmentNew getNewChild() {
+        Fragment f = getChildFragmentManager().findFragmentByTag(TAG_NEW_CHILD);
+        return (f instanceof MiraAccountingFragmentNew)
+                ? (MiraAccountingFragmentNew) f : null;
+    }
+
     public void navigateToTab(int tabIndex) {
-        // ✅ السماح بالوصول حتى آخر تبويب (التقييم)
+        // 🆕 تفويض للواجهة الجديدة إن كانت نشطة
+        if (BuildConfig.USE_NEW_ACCOUNTING_UI) {
+            MiraAccountingFragmentNew child = getNewChild();
+            if (child != null) {
+                child.navigateToTab(tabIndex);
+                return;
+            }
+        }
+        // Legacy behavior (كما كان)
         if (tabIndex < 0 || tabIndex > TAB_FIXED_ASSETS || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
 
     public void refreshCurrentTab() {
+        // 🆕 تفويض للواجهة الجديدة
+        if (BuildConfig.USE_NEW_ACCOUNTING_UI) {
+            MiraAccountingFragmentNew child = getNewChild();
+            if (child != null) {
+                child.refreshCurrentTab();
+                return;
+            }
+        }
+        // Legacy behavior (كما كان)
         loadTab(currentTabIndex);
     }
 
     public void navigateToLedgerWithAccount(long accountId) {
+        // 🆕 تفويض للواجهة الجديدة
+        if (BuildConfig.USE_NEW_ACCOUNTING_UI) {
+            MiraAccountingFragmentNew child = getNewChild();
+            if (child != null) {
+                child.navigateToLedgerWithAccount(accountId);
+                return;
+            }
+        }
+        // Legacy behavior (كما كان)
         this.pendingLedgerAccountId = accountId;
 
         if (tabLayout == null) return;
