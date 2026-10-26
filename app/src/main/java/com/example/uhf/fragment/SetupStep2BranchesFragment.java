@@ -204,10 +204,17 @@ public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
                     apiClient.postAccounting("setup/step/2", payload);
                 
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    btnNext.setEnabled(true);
-                    btnNext.setText("التالي ←");
-                    openNextStep();
-                });
+    btnNext.setEnabled(true);
+    btnNext.setText("التالي ←");
+
+    if (response != null && response.isSuccess) {
+        openNextStep();
+    } else {
+        String err = response != null ? response.error : "غير معروف";
+        Toast.makeText(requireContext(),
+            "❌ فشل الحفظ: " + err, Toast.LENGTH_LONG).show();
+    }
+});
             } catch (Exception e) {
                 Log.e(TAG, "save error", e);
                 new Handler(Looper.getMainLooper()).post(() -> {
