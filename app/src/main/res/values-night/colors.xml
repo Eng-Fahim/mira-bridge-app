@@ -5,6 +5,17 @@
          🌙 LUXURY JEWELRY — Dark Palette v3.0
          ═══════════════════════════════════════════════════ -->
 
+    <!-- ═══ ألوان المحاسبة (Dark Mode) ═══ -->
+<color name="acct_debit">#64B5F6</color>          <!-- أزرق فاتح — مقروء على داكن -->
+<color name="acct_debit_bg">#1A237E</color>       <!-- أزرق داكن جداً للخلفية -->
+<color name="acct_credit">#EF9A9A</color>         <!-- أحمر فاتح -->
+<color name="acct_credit_bg">#B71C1C</color>      <!-- أحمر داكن جداً -->
+<color name="acct_success">#81C784</color>        <!-- أخضر فاتح -->
+<color name="acct_success_bg">#1B5E20</color>
+<color name="acct_warning">#FFB74D</color>        <!-- برتقالي فاتح -->
+<color name="acct_warning_bg">#E65100</color>
+<color name="acct_gold">#FFD54F</color>           <!-- ذهبي فاتح -->
+
     <!-- 🎨 Pure Colors -->
     <color name="pure_white">#FFFFFF</color>
     <color name="pure_black">#000000</color>
