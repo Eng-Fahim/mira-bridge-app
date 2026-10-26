@@ -102,7 +102,7 @@ public class MiraFixedAssetsFragment extends Fragment {
 
         spinnerCat.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, CATEGORIES));
         // أضف هذا السطر بعد إعداد الـ Adapter
-        spinnerCat.setOnClickListener(v -> spinnerCat.showDropDown());
+        spinnerCat.setOnClickListener(view -> spinnerCat.showDropDown());
         spinnerCat.setText(CATEGORIES[0], false);
 
         new MaterialAlertDialogBuilder(requireContext())
