@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:fillViewport="false">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -44,8 +44,11 @@
                 android:layout_gravity="center"
                 android:visibility="gone"/>
 
-            <TextView style="@style/SetupSectionTitle" android:text="📅 السنة الهجرية"/>
-            <View android:layout_width="match_parent" android:layout_height="4dp"/>
+            <!-- ═══ Section 1 ═══ -->
+            <TextView
+                style="@style/SetupSectionTitleVertical"
+                android:text="📅 السنة الهجرية"
+                android:layout_marginTop="0dp"/>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
@@ -96,11 +99,12 @@
                 android:textColor="#E67E22"
                 android:textSize="10sp"
                 android:gravity="center"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginTop="8dp"/>
 
-            <TextView style="@style/SetupSectionTitle" android:text="⚖️ النصاب"/>
-            <View android:layout_width="match_parent" android:layout_height="4dp"/>
+            <!-- ═══ Section 2 ═══ -->
+            <TextView
+                style="@style/SetupSectionTitleVertical"
+                android:text="⚖️ النصاب"/>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
@@ -136,7 +140,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:layout_marginBottom="16dp"
                 android:hint="نسبة الزكاة %">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -147,21 +150,31 @@
                     android:textSize="14sp"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView style="@style/SetupSectionTitle" android:text="📊 نطاق الحساب"/>
-            <View android:layout_width="match_parent" android:layout_height="8dp"/>
+            <!-- ═══ Section 3 ═══ -->
+            <TextView
+                style="@style/SetupSectionTitleVertical"
+                android:text="📊 نطاق الحساب"/>
 
-            <LinearLayout style="@style/SetupSummaryRow" android:paddingVertical="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp">
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical">
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="شمول ذهب الأمانة"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp"/>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -169,24 +182,33 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"/>
                 </LinearLayout>
+
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swIncludeTrust"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </LinearLayout>
 
-            <LinearLayout style="@style/SetupSummaryRow" android:paddingVertical="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp">
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical">
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="إضافة الذمم المدينة"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp"/>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -194,24 +216,33 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"/>
                 </LinearLayout>
+
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swIncludeReceivables"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </LinearLayout>
 
-            <LinearLayout style="@style/SetupSummaryRow" android:paddingVertical="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp">
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical">
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="خصم الذمم الدائنة"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp"/>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -219,13 +250,16 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"/>
                 </LinearLayout>
+
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swDeductPayables"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </LinearLayout>
 
-            <View android:layout_width="match_parent" android:layout_height="40dp"/>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="16dp"/>
         </LinearLayout>
     </ScrollView>
 
