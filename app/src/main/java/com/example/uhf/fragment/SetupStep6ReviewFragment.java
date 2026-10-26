@@ -27,8 +27,7 @@ import java.util.Locale;
 /**
  * المرحلة 6: المراجعة والاعتماد النهائي
  */
-public class SetupStep6ReviewFragment extends Fragment {
-
+public class SetupStep6ReviewFragment extends BaseSetupStepFragment {
     private static final String TAG = "SetupStep6";
 
     private TextView tvEntryDate;
