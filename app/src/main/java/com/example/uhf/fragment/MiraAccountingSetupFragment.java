@@ -29,13 +29,13 @@ import java.util.Locale;
 /**
  * MIRA Accounting Setup Fragment
  *
- * ✅ v3.1 — Stability hardening:
- *  1. setupCompletedNotified يُحفظ في savedInstanceState (rotation-safe)
- *  2. safeAutoRedirect() مع fallback إن لم ينقل onSetupCompleted
- *  3. onStop يُلغي الـ runnable المحدد فقط (لا يحذف الكل)
- *  4. زر "إعادة المحاولة" عند فشل loadStatus
- *  5. navigateToSystem يُعيّن العلم
- *  6. فك تغليف data.data مرة واحدة في loadStatus (وليس في renderStatus)
+ * ✅ v3.2 — Critical endpoint fixes:
+ *  1. getAccounting("setup/status") بدل getWithAuth (namespace الصحيح)
+ *  2. postAccounting("setup/reset") بدل postWithAuth
+ *  3. إبطال كاش UHFMainActivity بعد Reset بنجاح
+ *  4. حفظ setupCompletedNotified في savedInstanceState
+ *  5. safeAutoRedirect مع recovery إن لم يعمل onSetupCompleted
+ *  6. زر "إعادة المحاولة" عند فشل loadStatus
  */
 public class MiraAccountingSetupFragment extends Fragment {
 
@@ -61,17 +61,11 @@ public class MiraAccountingSetupFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingRecoveryRunnable;
 
-    // ═══════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════
-
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // ✅ الإصلاح 1: استرجاع العلم بعد rotation
         if (savedInstanceState != null) {
             setupCompletedNotified = savedInstanceState.getBoolean(KEY_NOTIFIED, false);
-            Log.d(TAG, "onCreate: restored setupCompletedNotified=" + setupCompletedNotified);
         }
     }
 
@@ -97,7 +91,6 @@ public class MiraAccountingSetupFragment extends Fragment {
 
         initViews(view);
         setupListeners();
-        // loadStatus سيُستدعى من onResume
     }
 
     @Override
@@ -111,21 +104,18 @@ public class MiraAccountingSetupFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        Log.d(TAG, "onResume: reloading setup status");
         loadStatus();
     }
 
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        // ✅ الإصلاح 1: حفظ العلم
         outState.putBoolean(KEY_NOTIFIED, setupCompletedNotified);
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        // ✅ الإصلاح 3: احذف الـ runnable المحدد فقط
         if (pendingRecoveryRunnable != null) {
             mainHandler.removeCallbacks(pendingRecoveryRunnable);
             pendingRecoveryRunnable = null;
@@ -138,12 +128,7 @@ public class MiraAccountingSetupFragment extends Fragment {
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
         }
-        Log.d(TAG, "onDestroyView: restored BottomNav");
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  Views & Listeners
-    // ═══════════════════════════════════════════════════════
 
     private void initViews(View v) {
         tvProgressPercent = v.findViewById(R.id.tvProgressPercent);
@@ -168,33 +153,28 @@ public class MiraAccountingSetupFragment extends Fragment {
                 }
             });
         }
-        if (btnReset != null) {
-            btnReset.setOnClickListener(v -> confirmReset());
-        }
-        if (btnGoToSystem != null) {
-            btnGoToSystem.setOnClickListener(v -> navigateToSystem());
-        }
+        if (btnReset != null) btnReset.setOnClickListener(v -> confirmReset());
+        if (btnGoToSystem != null) btnGoToSystem.setOnClickListener(v -> navigateToSystem());
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Load Status
+    //  Load Status — ✅ الإصلاح الأهم
     // ═══════════════════════════════════════════════════════
-
     private void loadStatus() {
         if (!isAdded() || pbLoading == null) return;
         showLoading(true);
 
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response =
-                        apiClient.getWithAuth("/accounting/setup/status");
+                // ✅ [إصلاح 1]: getAccounting بدل getWithAuth
+                MiraApiClient.ApiResponse response = apiClient.getAccounting("setup/status");
 
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
 
                     if (response != null && response.isSuccess && response.data != null) {
-                        // ✅ الإصلاح 7: فك التغليف مرة واحدة هنا
+                        // فك التغليف مرة واحدة
                         JSONObject payload = response.data;
                         JSONObject nested = payload.optJSONObject("data");
                         if (nested != null && nested.has("progress_percent")) {
@@ -205,7 +185,6 @@ public class MiraAccountingSetupFragment extends Fragment {
                     } else {
                         String err = (response != null && response.error != null)
                                 ? response.error : "غير معروف";
-                        // ✅ الإصلاح 4: fallback مع retry
                         onStatusLoadFailed(err);
                     }
                 });
@@ -234,7 +213,6 @@ public class MiraAccountingSetupFragment extends Fragment {
 
     private void renderStatus(JSONObject status) {
         if (status == null) return;
-
         try {
             int progress = status.optInt("progress_percent", 0);
             String setupStatus = status.optString("status", "pending");
@@ -255,7 +233,6 @@ public class MiraAccountingSetupFragment extends Fragment {
             boolean completed = "completed".equals(setupStatus)
                     || "locked".equals(setupStatus);
 
-            // ✅ الإصلاح 2: auto-redirect مع fallback
             if (completed && !setupCompletedNotified && !isManualOpen) {
                 setupCompletedNotified = true;
                 if (contentContainer != null) contentContainer.setVisibility(View.GONE);
@@ -267,13 +244,10 @@ public class MiraAccountingSetupFragment extends Fragment {
 
             stepsContainer.removeAllViews();
             JSONArray steps = status.optJSONArray("steps");
-
             if (steps != null) {
                 for (int i = 0; i < steps.length(); i++) {
                     JSONObject step = steps.optJSONObject(i);
-                    if (step != null) {
-                        addStepCard(step, i + 1);
-                    }
+                    if (step != null) addStepCard(step, i + 1);
                 }
             }
 
@@ -284,8 +258,7 @@ public class MiraAccountingSetupFragment extends Fragment {
                 if (btnGoToSystem != null) {
                     btnGoToSystem.setVisibility(View.VISIBLE);
                     btnGoToSystem.setText(isArabic
-                            ? "🚀 الانتقال إلى النظام"
-                            : "🚀 Enter System");
+                            ? "🚀 الانتقال إلى النظام" : "🚀 Enter System");
                 }
             } else {
                 int completedCount = status.optInt("completed_count", 0);
@@ -298,42 +271,29 @@ public class MiraAccountingSetupFragment extends Fragment {
                 btnReset.setVisibility(View.GONE);
                 if (btnGoToSystem != null) btnGoToSystem.setVisibility(View.GONE);
             }
-
         } catch (Exception e) {
             Log.e(TAG, "renderStatus error", e);
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Auto Redirect with Recovery
-    // ═══════════════════════════════════════════════════════
-
     private void safeAutoRedirect() {
         if (!isAdded()) return;
         notifySetupCompleted();
 
-        // ⏱️ فحص احتياطي: إن لم نُغادر الشاشة بعد 2.5s → استرجع
         pendingRecoveryRunnable = () -> {
             if (!isAdded()) return;
             pendingRecoveryRunnable = null;
-            // هل ما زلنا معلّقين على spinner؟
-            if (pbLoading != null 
-                && pbLoading.getVisibility() == View.VISIBLE
-                && contentContainer != null 
-                && contentContainer.getVisibility() == View.GONE) {
+            if (pbLoading != null && pbLoading.getVisibility() == View.VISIBLE
+                && contentContainer != null && contentContainer.getVisibility() == View.GONE) {
                 Log.w(TAG, "⚠️ Auto-redirect stalled — recovering UI");
                 showLoading(false);
-                // اعرض شاشة review كـ fallback
-                if (currentStatus != null) {
-                    renderReviewFallback();
-                }
+                if (currentStatus != null) renderReviewFallback();
             }
         };
         mainHandler.postDelayed(pendingRecoveryRunnable, 2500);
     }
 
     private void renderReviewFallback() {
-        // أعرض زر "الانتقال للنظام" ليضغطه المستخدم يدوياً
         if (btnStart != null) {
             btnStart.setText(isArabic ? "👁️ مراجعة الإعداد" : "👁️ Review Setup");
             btnStart.setEnabled(true);
@@ -342,14 +302,9 @@ public class MiraAccountingSetupFragment extends Fragment {
         if (btnGoToSystem != null) {
             btnGoToSystem.setVisibility(View.VISIBLE);
             btnGoToSystem.setText(isArabic
-                    ? "🚀 الانتقال إلى النظام"
-                    : "🚀 Enter System");
+                    ? "🚀 الانتقال إلى النظام" : "🚀 Enter System");
         }
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  Steps
-    // ═══════════════════════════════════════════════════════
 
     private void addStepCard(JSONObject step, int stepNumber) {
         try {
@@ -363,11 +318,11 @@ public class MiraAccountingSetupFragment extends Fragment {
             TextView tvStatus       = card.findViewById(R.id.tvStepStatus);
             View statusIndicator    = card.findViewById(R.id.stepStatusIndicator);
 
-            String icon       = step.optString("icon", "📌");
-            String title      = isArabic
+            String icon = step.optString("icon", "📌");
+            String title = isArabic
                     ? step.optString("title_ar", "")
                     : step.optString("title_en", "");
-            String desc       = step.optString("description", "");
+            String desc = step.optString("description", "");
             boolean isCompleted = step.optBoolean("completed", false);
             boolean isRequired  = step.optBoolean("required", false);
 
@@ -392,7 +347,6 @@ public class MiraAccountingSetupFragment extends Fragment {
 
             card.setOnClickListener(v -> openStep(stepNumber));
             stepsContainer.addView(card);
-
         } catch (Exception e) {
             Log.e(TAG, "addStepCard error", e);
         }
@@ -400,7 +354,6 @@ public class MiraAccountingSetupFragment extends Fragment {
 
     private void openStep(int stepNumber) {
         Fragment fragment = null;
-
         switch (stepNumber) {
             case 1: fragment = new SetupStep1FiscalYearFragment(); break;
             case 2: fragment = new SetupStep2BranchesFragment(); break;
@@ -409,11 +362,7 @@ public class MiraAccountingSetupFragment extends Fragment {
             case 5: fragment = new SetupStep5UsersFragment(); break;
             case 6: fragment = new SetupStep6ReviewFragment(); break;
         }
-
-        if (fragment == null) {
-            Log.e(TAG, "openStep: unknown step number " + stepNumber);
-            return;
-        }
+        if (fragment == null) return;
 
         Bundle args = new Bundle();
         args.putInt("setup_step", stepNumber);
@@ -426,25 +375,16 @@ public class MiraAccountingSetupFragment extends Fragment {
                 .commit();
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Notify & Navigation
-    // ═══════════════════════════════════════════════════════
-
     private void notifySetupCompleted() {
         if (!isAdded()) return;
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).onSetupCompleted();
-            Log.d(TAG, "✅ Notified UHFMainActivity: setup completed");
         }
     }
 
     private void navigateToSystem() {
-        Log.d(TAG, "🚀 navigateToSystem called");
         if (!isAdded()) return;
-        
-        // ✅ الإصلاح 5: تعيين العلم لمنع أي auto-redirect مستقبلي
         setupCompletedNotified = true;
-        
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
             activity.setBottomNavVisible(true);
@@ -452,26 +392,17 @@ public class MiraAccountingSetupFragment extends Fragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Actions
-    // ═══════════════════════════════════════════════════════
-
     private void startOrContinue() {
         try {
-            if (currentStatus == null) {
-                openStep(1);
-                return;
-            }
+            if (currentStatus == null) { openStep(1); return; }
             int currentStep    = currentStatus.optInt("current_step", 1);
             String setupStatus = currentStatus.optString("status", "pending");
-
             if ("completed".equals(setupStatus) || "locked".equals(setupStatus)) {
                 openStep(6);
             } else {
                 openStep(currentStep);
             }
         } catch (Exception e) {
-            Log.e(TAG, "startOrContinue error", e);
             openStep(1);
         }
     }
@@ -495,8 +426,9 @@ public class MiraAccountingSetupFragment extends Fragment {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("reason", isArabic ? "طلب المدير" : "Manager request");
-                MiraApiClient.ApiResponse response =
-                        apiClient.postWithAuth("/accounting/setup/reset", payload);
+
+                // ✅ [إصلاح 2]: postAccounting بدل postWithAuth
+                MiraApiClient.ApiResponse response = apiClient.postAccounting("setup/reset", payload);
 
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
@@ -506,6 +438,13 @@ public class MiraAccountingSetupFragment extends Fragment {
                         Toast.makeText(requireContext(),
                                 isArabic ? "✅ تم إعادة التعيين" : "✅ Reset complete",
                                 Toast.LENGTH_LONG).show();
+
+                        // ✅ [إصلاح 3]: إبطال كاش UHFMainActivity
+                        if (getActivity() instanceof UHFMainActivity) {
+                            ((UHFMainActivity) getActivity()).invalidateSetupCache();
+                            Log.d(TAG, "🧹 Cache invalidated after reset");
+                        }
+
                         setupCompletedNotified = false;
                         isRetryMode = false;
                         loadStatus();
@@ -528,10 +467,6 @@ public class MiraAccountingSetupFragment extends Fragment {
             }
         }).start();
     }
-
-    // ═══════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════
 
     private void showLoading(boolean show) {
         if (pbLoading == null || contentContainer == null) return;
