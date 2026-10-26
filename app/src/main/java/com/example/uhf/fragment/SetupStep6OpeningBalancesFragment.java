@@ -36,9 +36,12 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Step 6 — الأرصدة الافتتاحية (v2 — Theme-compliant)
+ * Step 6 — الأرصدة الافتتاحية (v2.1 — Theme-compliant + Fixed)
  *
- * ✅ v2: كل الألوان theme-aware عبر AccountingColors
+ * ✅ v2.1 إصلاحات:
+ *  - استبدال lambda ترجع قيمة بـ method reference
+ *  - إزالة تكرار الكود
+ *  - ألوان theme-aware عبر AccountingColors
  */
 public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
 
@@ -46,6 +49,7 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private static final String[] KARATS = {"24K", "22K", "21K", "18K", "14K"};
     private static final double[] KARAT_FACTORS = {1.0, 0.9166, 0.875, 0.75, 0.5833};
 
+    // ─── Views ───
     private LinearLayout cashContainer, banksContainer, goldContainer,
             trustContainer, scrapContainer, diamondsContainer,
             receivablesContainer, payablesContainer, fixedContainer;
@@ -53,6 +57,7 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private MaterialButton btnBack, btnNext;
     private View pbLoading;
 
+    // ─── Lists ───
     private final List<GenericRow> cashRows        = new ArrayList<>();
     private final List<GenericRow> banksRows       = new ArrayList<>();
     private final Map<String, GoldRow> goldRows    = new HashMap<>();
@@ -63,7 +68,8 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private final List<GenericRow> payRows         = new ArrayList<>();
     private final List<GenericRow> fixedRows       = new ArrayList<>();
 
-    private final Map<String, Double> buyPrices    = new HashMap<>();
+    // ─── Prices ───
+    private final Map<String, Double> buyPrices      = new HashMap<>();
     private final Map<String, Double> scrapDiscounts = new HashMap<>();
 
     private int scrapAccountId = 0;
@@ -71,6 +77,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private MiraApiClient apiClient;
     private boolean isArabic;
     private boolean pricesReady = false;
+
+    // ═══════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════
 
     @Nullable
     @Override
@@ -117,20 +127,34 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         View root = getView();
         if (root == null) return;
 
-        root.findViewById(R.id.btnAddCash).setOnClickListener(x -> addCashRow("", ""));
-        root.findViewById(R.id.btnAddBank).setOnClickListener(x -> addBankRow("", ""));
-        root.findViewById(R.id.btnAddTrust).setOnClickListener(x -> addTrustRow("", "21K", ""));
-        root.findViewById(R.id.btnAddScrap).setOnClickListener(x -> addScrapRow("21K", ""));
-        root.findViewById(R.id.btnAddDiamond).setOnClickListener(x -> addDiamondRow("", ""));
-        root.findViewById(R.id.btnAddReceivable).setOnClickListener(x -> addRecvRow("", ""));
-        root.findViewById(R.id.btnAddPayable).setOnClickListener(x -> addPayRow("", ""));
-        root.findViewById(R.id.btnAddFixed).setOnClickListener(x -> addFixedRow("", ""));
+        View b;
+        if ((b = root.findViewById(R.id.btnAddCash)) != null)
+            b.setOnClickListener(x -> addCashRow("", ""));
+        if ((b = root.findViewById(R.id.btnAddBank)) != null)
+            b.setOnClickListener(x -> addBankRow("", ""));
+        if ((b = root.findViewById(R.id.btnAddTrust)) != null)
+            b.setOnClickListener(x -> addTrustRow("", "21K", ""));
+        if ((b = root.findViewById(R.id.btnAddScrap)) != null)
+            b.setOnClickListener(x -> addScrapRow("21K", ""));
+        if ((b = root.findViewById(R.id.btnAddDiamond)) != null)
+            b.setOnClickListener(x -> addDiamondRow("", ""));
+        if ((b = root.findViewById(R.id.btnAddReceivable)) != null)
+            b.setOnClickListener(x -> addRecvRow("", ""));
+        if ((b = root.findViewById(R.id.btnAddPayable)) != null)
+            b.setOnClickListener(x -> addPayRow("", ""));
+        if ((b = root.findViewById(R.id.btnAddFixed)) != null)
+            b.setOnClickListener(x -> addFixedRow("", ""));
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Load
+    // ═══════════════════════════════════════════════════════
 
     private void loadPricesAndAccounts() {
         showLoading(true);
         new Thread(() -> {
             try {
+                // 1) أسعار الذهب
                 MiraApiClient.ApiResponse pricesResp = apiClient.getAccounting("setup/step/4/current");
                 if (pricesResp != null && pricesResp.isSuccess && pricesResp.data != null) {
                     JSONObject payload = pricesResp.data.optJSONObject("data");
@@ -148,6 +172,7 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                     }
                 }
 
+                // 2) حساب الكسر
                 MiraApiClient.ApiResponse accResp = apiClient.getAccounting("setup/accounts-for-opening");
                 if (accResp != null && accResp.isSuccess && accResp.data != null) {
                     JSONObject payload = accResp.data.optJSONObject("data");
@@ -158,8 +183,7 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                         for (int i = 0; i < accounts.length(); i++) {
                             JSONObject a = accounts.optJSONObject(i);
                             if (a == null) continue;
-                            String code = a.optString("account_code", "");
-                            if ("115106".equals(code)) {
+                            if ("115106".equals(a.optString("account_code", ""))) {
                                 scrapAccountId = a.optInt("id", 0);
                                 break;
                             }
@@ -200,9 +224,16 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         receivablesContainer.removeAllViews();
         payablesContainer.removeAllViews();
         fixedContainer.removeAllViews();
-        cashRows.clear(); banksRows.clear(); goldRows.clear();
-        trustRows.clear(); scrapRows.clear(); diamondRows.clear();
-        recvRows.clear(); payRows.clear(); fixedRows.clear();
+
+        cashRows.clear();
+        banksRows.clear();
+        goldRows.clear();
+        trustRows.clear();
+        scrapRows.clear();
+        diamondRows.clear();
+        recvRows.clear();
+        payRows.clear();
+        fixedRows.clear();
 
         addCashRow("الصندوق الرئيسي", "");
         addBankRow("البنك الرئيسي", "");
@@ -218,6 +249,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
 
         updateSummary();
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Gold Rows
+    // ═══════════════════════════════════════════════════════
 
     private void buildGoldRow(String karat) {
         View row = LayoutInflater.from(requireContext())
@@ -255,45 +290,49 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 value > 0 ? AccountingColors.Status.SUCCESS : AccountingColors.Status.ERROR));
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  Generic Rows (Cash / Bank / Diamond / Receivable / Payable / Fixed)
+    // ═══════════════════════════════════════════════════════
+
     private void addCashRow(String desc, String amount) {
         GenericRow row = buildGenericRow(cashContainer, desc, amount, "اسم/وصف الصندوق",
-                () -> { updateSummary(); return null; },
-                () -> { cashRows.removeIf(r -> r.view.getParent() == null); });
+                this::updateSummary,
+                () -> cashRows.removeIf(r -> r.view.getParent() == null));
         cashRows.add(row);
     }
 
     private void addBankRow(String desc, String amount) {
         GenericRow row = buildGenericRow(banksContainer, desc, amount, "اسم البنك",
-                () -> { updateSummary(); return null; },
-                () -> { banksRows.removeIf(r -> r.view.getParent() == null); });
+                this::updateSummary,
+                () -> banksRows.removeIf(r -> r.view.getParent() == null));
         banksRows.add(row);
     }
 
     private void addDiamondRow(String desc, String amount) {
         GenericRow row = buildGenericRow(diamondsContainer, desc, amount, "وصف",
-                () -> { updateSummary(); return null; },
-                () -> { diamondRows.removeIf(r -> r.view.getParent() == null); });
+                this::updateSummary,
+                () -> diamondRows.removeIf(r -> r.view.getParent() == null));
         diamondRows.add(row);
     }
 
     private void addRecvRow(String desc, String amount) {
         GenericRow row = buildGenericRow(receivablesContainer, desc, amount, "اسم العميل",
-                () -> { updateSummary(); return null; },
-                () -> { recvRows.removeIf(r -> r.view.getParent() == null); });
+                this::updateSummary,
+                () -> recvRows.removeIf(r -> r.view.getParent() == null));
         recvRows.add(row);
     }
 
     private void addPayRow(String desc, String amount) {
         GenericRow row = buildGenericRow(payablesContainer, desc, amount, "اسم المورد",
-                () -> { updateSummary(); return null; },
-                () -> { payRows.removeIf(r -> r.view.getParent() == null); });
+                this::updateSummary,
+                () -> payRows.removeIf(r -> r.view.getParent() == null));
         payRows.add(row);
     }
 
     private void addFixedRow(String desc, String amount) {
         GenericRow row = buildGenericRow(fixedContainer, desc, amount, "اسم الأصل",
-                () -> { updateSummary(); return null; },
-                () -> { fixedRows.removeIf(r -> r.view.getParent() == null); });
+                this::updateSummary,
+                () -> fixedRows.removeIf(r -> r.view.getParent() == null));
         fixedRows.add(row);
     }
 
@@ -324,6 +363,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         return new GenericRow(row, etDesc, etAmount);
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  Trust Gold Rows
+    // ═══════════════════════════════════════════════════════
+
     private void addTrustRow(String desc, String karat, String weight) {
         View row = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_opening_trust_row, trustContainer, false);
@@ -350,7 +393,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         ddKarat.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) { updateTrustValue(tr); updateSummary(); }
+            @Override public void afterTextChanged(Editable s) {
+                updateTrustValue(tr);
+                updateSummary();
+            }
         });
 
         btnRemove.setOnClickListener(v -> {
@@ -371,6 +417,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         tr.tvValue.setTextColor(AccountingColors.text(requireContext(),
                 value > 0 ? AccountingColors.Status.WARNING : AccountingColors.Status.NEUTRAL));
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Scrap Rows
+    // ═══════════════════════════════════════════════════════
 
     private void addScrapRow(String karat, String weight) {
         View row = LayoutInflater.from(requireContext())
@@ -395,7 +445,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         ddKarat.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) { updateScrapValue(sr); updateSummary(); }
+            @Override public void afterTextChanged(Editable s) {
+                updateScrapValue(sr);
+                updateSummary();
+            }
         });
 
         btnRemove.setOnClickListener(v -> {
@@ -420,6 +473,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         sr.tvValue.setTextColor(AccountingColors.text(requireContext(),
                 value > 0 ? AccountingColors.Status.INFO : AccountingColors.Status.NEUTRAL));
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Summary
+    // ═══════════════════════════════════════════════════════
 
     private void updateSummary() {
         double totalAssets = 0;
@@ -477,6 +534,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                     AccountingColors.Status.ERROR));
         }
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Save
+    // ═══════════════════════════════════════════════════════
 
     private void saveAndNext() {
         try {
@@ -653,6 +714,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         }
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  Utils
+    // ═══════════════════════════════════════════════════════
+
     private void showLoading(boolean show) {
         if (pbLoading != null) pbLoading.setVisibility(show ? View.VISIBLE : View.GONE);
     }
@@ -670,7 +735,9 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
             if (et == null || et.getText() == null) return 0;
             String s = et.getText().toString().trim().replace(",", "");
             return s.isEmpty() ? 0 : Double.parseDouble(s);
-        } catch (Exception e) { return 0; }
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private String safeStr(TextInputEditText et) {
@@ -684,13 +751,19 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
             nf.setMinimumFractionDigits(2);
             nf.setMaximumFractionDigits(2);
             return nf.format(v);
-        } catch (Exception e) { return String.valueOf(v); }
+        } catch (Exception e) {
+            return String.valueOf(v);
+        }
     }
 
     private int karatIndex(String karat) {
         for (int i = 0; i < KARATS.length; i++) if (KARATS[i].equals(karat)) return i;
         return -1;
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Row holders
+    // ═══════════════════════════════════════════════════════
 
     private static class GenericRow {
         final View view;
@@ -699,21 +772,27 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
             view = v; etDesc = d; etAmount = a;
         }
     }
+
     private static class GoldRow {
         final String karat;
         final TextInputEditText etWeight;
         final TextView tvValue;
-        GoldRow(String k, TextInputEditText w, TextView v) { karat = k; etWeight = w; tvValue = v; }
+        GoldRow(String k, TextInputEditText w, TextView v) {
+            karat = k; etWeight = w; tvValue = v;
+        }
     }
+
     private static class TrustRow {
         final View view;
         final TextInputEditText etDesc, etWeight;
         final AutoCompleteTextView ddKarat;
         final TextView tvValue;
-        TrustRow(View v, TextInputEditText d, AutoCompleteTextView k, TextInputEditText w, TextView val) {
+        TrustRow(View v, TextInputEditText d, AutoCompleteTextView k,
+                 TextInputEditText w, TextView val) {
             view = v; etDesc = d; ddKarat = k; etWeight = w; tvValue = val;
         }
     }
+
     private static class ScrapRow {
         final View view;
         final TextInputEditText etWeight;
