@@ -1040,16 +1040,21 @@ private void navigateBySetupStatus(String setupStatus) {
 }
 
     public void invalidateSetupCache() {
-        try {
-            getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
-                    .edit()
-                    .clear()
-                    .apply();
-            Log.d(TAG, "✅ Setup cache invalidated");
-        } catch (Exception e) {
-            Log.w(TAG, "invalidateSetupCache error: " + e.getMessage());
-        }
+    try {
+        getSharedPreferences(PREFS_SETUP, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply();
+
+        // ✅ [v3.2]: أزل فترة السماح أيضاً
+        setupCompletedAt = 0;
+        setupCompletedThisSession = false;
+
+        Log.d(TAG, "✅ Setup cache invalidated (cache + grace period reset)");
+    } catch (Exception e) {
+        Log.w(TAG, "invalidateSetupCache error: " + e.getMessage());
     }
+}
 /**
  * ⭐ هل نحن داخل فترة السماح بعد اكتمال الإعداد؟
  * خلال هذه الفترة، نتجاهل أي حالة "pending" من السيرفر
