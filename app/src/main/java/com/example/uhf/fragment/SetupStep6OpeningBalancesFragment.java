@@ -83,18 +83,18 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     // ═══════════════════════════════════════════════════════
 
     @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup viewGroup,
-                             @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_setup_step6_opening_balances, viewGroup, false);
-        apiClient = MiraApiClient.getInstance(requireContext());
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        initViews(view);
-        setupListeners();
-        loadPricesAndAccounts();
-        return view;
-    }
+@Override
+public View onCreateView(@NonNull LayoutInflater inflater,
+                         @Nullable ViewGroup viewGroup,
+                         @Nullable Bundle savedInstanceState) {
+    View view = inflater.inflate(R.layout.fragment_setup_step6_opening_balances, viewGroup, false);
+    apiClient = MiraApiClient.getInstance(requireContext());
+    isArabic = Locale.getDefault().getLanguage().equals("ar");
+    initViews(view);
+    setupListeners(view);   // ← ✅ التعديل هنا
+    loadPricesAndAccounts();
+    return view;
+}
 
     private void initViews(View v) {
         cashContainer        = v.findViewById(R.id.cashContainer);
@@ -117,34 +117,34 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         pbLoading = v.findViewById(R.id.pbLoading);
     }
 
-    private void setupListeners() {
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(v -> saveAndNext());
-        bindAddButtons();
-    }
+    
+    private void setupListeners(View v) {
+    btnBack.setOnClickListener(x -> requireActivity().onBackPressed());
+    btnNext.setOnClickListener(x -> saveAndNext());
+    bindAddButtons(v);   // ← نمرر v
+}
 
-    private void bindAddButtons() {
-        View root = getView();
-        if (root == null) return;
-
-        View b;
-        if ((b = root.findViewById(R.id.btnAddCash)) != null)
-            b.setOnClickListener(x -> addCashRow("", ""));
-        if ((b = root.findViewById(R.id.btnAddBank)) != null)
-            b.setOnClickListener(x -> addBankRow("", ""));
-        if ((b = root.findViewById(R.id.btnAddTrust)) != null)
-            b.setOnClickListener(x -> addTrustRow("", "21K", ""));
-        if ((b = root.findViewById(R.id.btnAddScrap)) != null)
-            b.setOnClickListener(x -> addScrapRow("21K", ""));
-        if ((b = root.findViewById(R.id.btnAddDiamond)) != null)
-            b.setOnClickListener(x -> addDiamondRow("", ""));
-        if ((b = root.findViewById(R.id.btnAddReceivable)) != null)
-            b.setOnClickListener(x -> addRecvRow("", ""));
-        if ((b = root.findViewById(R.id.btnAddPayable)) != null)
-            b.setOnClickListener(x -> addPayRow("", ""));
-        if ((b = root.findViewById(R.id.btnAddFixed)) != null)
-            b.setOnClickListener(x -> addFixedRow("", ""));
-    }
+    private void bindAddButtons(View root) {
+    if (root == null) return;
+    
+    View b;
+    if ((b = root.findViewById(R.id.btnAddCash)) != null)
+        b.setOnClickListener(x -> addCashRow("", ""));
+    if ((b = root.findViewById(R.id.btnAddBank)) != null)
+        b.setOnClickListener(x -> addBankRow("", ""));
+    if ((b = root.findViewById(R.id.btnAddTrust)) != null)
+        b.setOnClickListener(x -> addTrustRow("", "21K", ""));
+    if ((b = root.findViewById(R.id.btnAddScrap)) != null)
+        b.setOnClickListener(x -> addScrapRow("21K", ""));
+    if ((b = root.findViewById(R.id.btnAddDiamond)) != null)
+        b.setOnClickListener(x -> addDiamondRow("", ""));
+    if ((b = root.findViewById(R.id.btnAddReceivable)) != null)
+        b.setOnClickListener(x -> addRecvRow("", ""));
+    if ((b = root.findViewById(R.id.btnAddPayable)) != null)
+        b.setOnClickListener(x -> addPayRow("", ""));
+    if ((b = root.findViewById(R.id.btnAddFixed)) != null)
+        b.setOnClickListener(x -> addFixedRow("", ""));
+}
 
     // ═══════════════════════════════════════════════════════
     //  Load
