@@ -101,6 +101,8 @@ public class MiraFixedAssetsFragment extends Fragment {
         MaterialAutoCompleteTextView spinnerCat = v.findViewById(R.id.spinnerCategory);
 
         spinnerCat.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, CATEGORIES));
+        // أضف هذا السطر بعد إعداد الـ Adapter
+        spinnerCat.setOnClickListener(v -> spinnerCat.showDropDown());
         spinnerCat.setText(CATEGORIES[0], false);
 
         new MaterialAlertDialogBuilder(requireContext())
