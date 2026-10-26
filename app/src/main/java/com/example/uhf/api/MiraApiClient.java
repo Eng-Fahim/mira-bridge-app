@@ -2651,4 +2651,31 @@ public ApiResponse depositCheque(int chequeId, JSONObject payload) {
 public ApiResponse returnCheque(int chequeId, JSONObject payload) {
     return postAccounting("/cheques/" + chequeId + "/return", payload);
 }
+// ═══════════════════════════════════════════════════════════
+//  ✅ التسوية البنكية (Bank Reconciliation)
+// ═══════════════════════════════════════════════════════════
+
+public ApiResponse getReconciliationSummary(int bankAccountId, String date) {
+    return getAccounting("/reconciliation/summary?bank_account_id=" + bankAccountId + "&date=" + date);
+}
+
+public ApiResponse saveReconciliation(JSONObject payload) {
+    return postAccounting("/reconciliation/save", payload);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ✅ الأصول الثابتة (Fixed Assets) - تأكد من وجودها أيضاً
+// ═══════════════════════════════════════════════════════════
+
+public ApiResponse getFixedAssets() {
+    return getAccounting("/fixed-assets");
+}
+
+public ApiResponse createFixedAsset(JSONObject payload) {
+    return postAccounting("/fixed-assets", payload);
+}
+
+public ApiResponse runDepreciation(JSONObject payload) {
+    return postAccounting("/fixed-assets/depreciate", payload);
+}
 }
