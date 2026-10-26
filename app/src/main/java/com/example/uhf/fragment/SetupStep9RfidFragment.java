@@ -28,16 +28,12 @@ import org.json.JSONObject;
 import java.util.Locale;
 
 /**
- * Step 9 — قواعد تكويد القطع (RFID + GS1 + GTIN)
+ * Step 9 — قواعد تكويد القطع (v2.1)
  *
- * - GS1 Company Prefix (6-14 رقم)
- * - صيغة GTIN (13/14/custom)
- * - مخطط EPC (SGTIN-96/198، GID-96)
- * - بادئة HEX لـ EPC
- * - صيغة المسلسل (يجب أن تحتوي {seq})
- * - طول المسلسل (3-12)
- * - طول مرجع القطعة (1-10)
- * - خيارات متقدمة: فرع في EPC، شرائح مبرمجة مسبقاً
+ * ✅ v2.1:
+ *  - التنقل عبر SetupNavigator (لا popBackStack)
+ *  - ينتقل مباشرة للخطوة 10 (المراجعة والاعتماد)
+ *  - null-safety للأزرار
  */
 public class SetupStep9RfidFragment extends BaseSetupStepFragment {
 
@@ -93,36 +89,44 @@ public class SetupStep9RfidFragment extends BaseSetupStepFragment {
         pbLoading       = v.findViewById(R.id.pbLoading);
 
         // Defaults
-        etEpcHeader.setText("30");
-        etSerialFormat.setText("MIR-{prefix}-{seq}");
-        etSerialLength.setText("6");
-        etItemRefLength.setText("5");
+        if (etEpcHeader != null) etEpcHeader.setText("30");
+        if (etSerialFormat != null) etSerialFormat.setText("MIR-{prefix}-{seq}");
+        if (etSerialLength != null) etSerialLength.setText("6");
+        if (etItemRefLength != null) etItemRefLength.setText("5");
 
-        String[] gtinLabels = isArabic ? GTIN_LABELS_AR : GTIN_LABELS_EN;
-        ArrayAdapter<String> gtinAdapter = new ArrayAdapter<>(
-                requireContext(), android.R.layout.simple_dropdown_item_1line, gtinLabels);
-        ddGtinFormat.setAdapter(gtinAdapter);
-        ddGtinFormat.setText(gtinLabels[0], false);
+        if (ddGtinFormat != null) {
+            String[] gtinLabels = isArabic ? GTIN_LABELS_AR : GTIN_LABELS_EN;
+            ArrayAdapter<String> gtinAdapter = new ArrayAdapter<>(
+                    requireContext(), android.R.layout.simple_dropdown_item_1line, gtinLabels);
+            ddGtinFormat.setAdapter(gtinAdapter);
+            ddGtinFormat.setText(gtinLabels[0], false);
+        }
 
-        String[] epcLabels = isArabic ? EPC_LABELS_AR : EPC_LABELS_EN;
-        ArrayAdapter<String> epcAdapter = new ArrayAdapter<>(
-                requireContext(), android.R.layout.simple_dropdown_item_1line, epcLabels);
-        ddEpcScheme.setAdapter(epcAdapter);
-        ddEpcScheme.setText(epcLabels[0], false);
+        if (ddEpcScheme != null) {
+            String[] epcLabels = isArabic ? EPC_LABELS_AR : EPC_LABELS_EN;
+            ArrayAdapter<String> epcAdapter = new ArrayAdapter<>(
+                    requireContext(), android.R.layout.simple_dropdown_item_1line, epcLabels);
+            ddEpcScheme.setAdapter(epcAdapter);
+            ddEpcScheme.setText(epcLabels[0], false);
+        }
     }
 
     private void setupListeners() {
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(v -> saveAndNext());
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        }
+        if (btnNext != null) {
+            btnNext.setOnClickListener(v -> saveAndNext());
+        }
 
         TextWatcher w = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
             @Override public void afterTextChanged(Editable s) { updatePreview(); }
         };
-        etGs1Prefix.addTextChangedListener(w);
-        etSerialFormat.addTextChangedListener(w);
-        etSerialLength.addTextChangedListener(w);
+        if (etGs1Prefix != null) etGs1Prefix.addTextChangedListener(w);
+        if (etSerialFormat != null) etSerialFormat.addTextChangedListener(w);
+        if (etSerialLength != null) etSerialLength.addTextChangedListener(w);
     }
 
     private void loadCurrentRules() {
@@ -162,40 +166,48 @@ public class SetupStep9RfidFragment extends BaseSetupStepFragment {
     private void populateRules(JSONObject r) {
         try {
             String prefix = r.optString("gs1_company_prefix", "");
-            if (!prefix.isEmpty()) etGs1Prefix.setText(prefix);
+            if (!prefix.isEmpty() && etGs1Prefix != null) etGs1Prefix.setText(prefix);
 
             String header = r.optString("epc_header", "30");
-            if (!header.isEmpty()) etEpcHeader.setText(header);
+            if (!header.isEmpty() && etEpcHeader != null) etEpcHeader.setText(header);
 
             String serialFmt = r.optString("serial_format", "");
-            if (!serialFmt.isEmpty()) etSerialFormat.setText(serialFmt);
+            if (!serialFmt.isEmpty() && etSerialFormat != null) etSerialFormat.setText(serialFmt);
 
             int seqLen = r.optInt("serial_sequence_length", 6);
-            if (seqLen > 0) etSerialLength.setText(String.valueOf(seqLen));
+            if (seqLen > 0 && etSerialLength != null) etSerialLength.setText(String.valueOf(seqLen));
 
             int refLen = r.optInt("item_ref_length", 5);
-            if (refLen > 0) etItemRefLength.setText(String.valueOf(refLen));
+            if (refLen > 0 && etItemRefLength != null) etItemRefLength.setText(String.valueOf(refLen));
 
             String gtinFmt = r.optString("gtin_format", "gtin13");
-            String[] gtinLabels = isArabic ? GTIN_LABELS_AR : GTIN_LABELS_EN;
-            for (int i = 0; i < GTIN_FORMATS.length; i++) {
-                if (GTIN_FORMATS[i].equals(gtinFmt)) {
-                    ddGtinFormat.setText(gtinLabels[i], false);
-                    break;
+            if (ddGtinFormat != null) {
+                String[] gtinLabels = isArabic ? GTIN_LABELS_AR : GTIN_LABELS_EN;
+                for (int i = 0; i < GTIN_FORMATS.length; i++) {
+                    if (GTIN_FORMATS[i].equals(gtinFmt)) {
+                        ddGtinFormat.setText(gtinLabels[i], false);
+                        break;
+                    }
                 }
             }
 
             String epcScheme = r.optString("epc_scheme", "sgtin-96");
-            String[] epcLabels = isArabic ? EPC_LABELS_AR : EPC_LABELS_EN;
-            for (int i = 0; i < EPC_SCHEMES.length; i++) {
-                if (EPC_SCHEMES[i].equals(epcScheme)) {
-                    ddEpcScheme.setText(epcLabels[i], false);
-                    break;
+            if (ddEpcScheme != null) {
+                String[] epcLabels = isArabic ? EPC_LABELS_AR : EPC_LABELS_EN;
+                for (int i = 0; i < EPC_SCHEMES.length; i++) {
+                    if (EPC_SCHEMES[i].equals(epcScheme)) {
+                        ddEpcScheme.setText(epcLabels[i], false);
+                        break;
+                    }
                 }
             }
 
-            swIncludeBranch.setChecked(r.optInt("include_branch_in_epc", 0) == 1);
-            swPreEncoded.setChecked(r.optInt("pre_encoded_tags", 0) == 1);
+            if (swIncludeBranch != null) {
+                swIncludeBranch.setChecked(r.optInt("include_branch_in_epc", 0) == 1);
+            }
+            if (swPreEncoded != null) {
+                swPreEncoded.setChecked(r.optInt("pre_encoded_tags", 0) == 1);
+            }
 
             updatePreview();
         } catch (Exception e) {
@@ -204,6 +216,8 @@ public class SetupStep9RfidFragment extends BaseSetupStepFragment {
     }
 
     private void updatePreview() {
+        if (tvPreview == null) return;
+
         try {
             String prefix = safeText(etGs1Prefix);
             String serialFmt = safeText(etSerialFormat);
@@ -282,9 +296,11 @@ public class SetupStep9RfidFragment extends BaseSetupStepFragment {
                 return;
             }
 
-            String gtinFmt = valueFor(ddGtinFormat.getText().toString(),
+            String gtinFmt = valueFor(
+                    ddGtinFormat != null ? ddGtinFormat.getText().toString() : "",
                     isArabic ? GTIN_LABELS_AR : GTIN_LABELS_EN, GTIN_FORMATS, "gtin13");
-            String epcScheme = valueFor(ddEpcScheme.getText().toString(),
+            String epcScheme = valueFor(
+                    ddEpcScheme != null ? ddEpcScheme.getText().toString() : "",
                     isArabic ? EPC_LABELS_AR : EPC_LABELS_EN, EPC_SCHEMES, "sgtin-96");
 
             JSONObject payload = new JSONObject();
@@ -295,11 +311,13 @@ public class SetupStep9RfidFragment extends BaseSetupStepFragment {
             payload.put("serial_format", serialFmt);
             payload.put("serial_sequence_length", seqLen);
             payload.put("item_ref_length", refLen);
-            payload.put("include_branch_in_epc", swIncludeBranch.isChecked());
-            payload.put("pre_encoded_tags", swPreEncoded.isChecked());
+            payload.put("include_branch_in_epc", swIncludeBranch != null && swIncludeBranch.isChecked());
+            payload.put("pre_encoded_tags", swPreEncoded != null && swPreEncoded.isChecked());
 
-            btnNext.setEnabled(false);
-            btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            if (btnNext != null) {
+                btnNext.setEnabled(false);
+                btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            }
             showLoading(true);
 
             new Thread(() -> {
@@ -308,14 +326,21 @@ public class SetupStep9RfidFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
 
                         if (resp != null && resp.isSuccess) {
                             Toast.makeText(requireContext(),
                                     isArabic ? "✅ تم حفظ قواعد التكويد" : "✅ Encoding rules saved",
                                     Toast.LENGTH_SHORT).show();
-                            requireActivity().getSupportFragmentManager().popBackStack();
+
+                            // ═══════════════════════════════════════════════
+                            // ✅ الانتقال للخطوة 10 (المراجعة والاعتماد)
+                            // ═══════════════════════════════════════════════
+                            SetupNavigator.goToNextStep(SetupStep9RfidFragment.this, 9);
                         } else {
                             String err = (resp != null && resp.error != null) ? resp.error : "unknown";
                             Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
@@ -326,8 +351,10 @@ public class SetupStep9RfidFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
                         Toast.makeText(requireContext(), "❌ " + ex.getMessage(), Toast.LENGTH_LONG).show();
                     });
                 }
