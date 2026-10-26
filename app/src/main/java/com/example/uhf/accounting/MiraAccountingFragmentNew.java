@@ -1,10 +1,9 @@
 package com.example.uhf.accounting;
 
-import android.content.res.ColorStateList;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -28,6 +27,7 @@ import com.google.android.material.navigation.NavigationView;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Locale;
 
 /**
  * MIRA Accounting — New Container
@@ -45,6 +45,9 @@ import java.util.Deque;
  * ── للتوافق الخلفي ──
  *  نوفر نفس الـ API العام لـ MiraAccountingFragment القديم:
  *    navigateToTab(int), navigateToLedgerWithAccount(long), refreshCurrentTab()
+ *
+ * @version 1.2.0 — Fixed StackOverflowError on back press, fixed empty screen
+ *                   on initial load, hardened against missing bools.xml
  */
 public class MiraAccountingFragmentNew extends Fragment {
 
@@ -68,6 +71,10 @@ public class MiraAccountingFragmentNew extends Fragment {
     private PermissionManager permissionManager;
     private SessionManager sessionManager;
 
+    // ✅ [إصلاح StackOverflow]: نحتفظ بمرجع للـ callback
+    //    لنتمكن من تعطيله قبل تفويض زر الرجوع للـ activity.
+    private OnBackPressedCallback backCallback;
+
     // ═══════════════════════════════════════════════════════════
     //  Lifecycle
     // ═══════════════════════════════════════════════════════════
@@ -82,14 +89,17 @@ public class MiraAccountingFragmentNew extends Fragment {
             } catch (Exception e) {
                 Log.e(TAG, "deps init: " + e.getMessage());
             }
-            isArabic = "ar".equals(java.util.Locale.getDefault().getLanguage());
+            isArabic = "ar".equals(Locale.getDefault().getLanguage());
         }
 
-        // Back handler
-        requireActivity().getOnBackPressedDispatcher().addCallback(this,
-                new OnBackPressedCallback(true) {
-                    @Override public void handleOnBackPressed() { onBackPressed(); }
-                });
+        // ✅ Back handler — نحفظ المرجع في حقل
+        backCallback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                onBackPressed();
+            }
+        };
+        requireActivity().getOnBackPressedDispatcher().addCallback(this, backCallback);
     }
 
     @Nullable
@@ -104,14 +114,17 @@ public class MiraAccountingFragmentNew extends Fragment {
         toolbar = v.findViewById(R.id.accountingToolbar);
         contentContainer = v.findViewById(R.id.accountingContent);
 
-        if (drawerLayout == null || navView == null || toolbar == null || contentContainer == null) {
+        if (drawerLayout == null || navView == null
+                || toolbar == null || contentContainer == null) {
             Log.e(TAG, "❌ Missing views in fragment_mira_accounting.xml");
             return v;
         }
 
         // Toolbar: hamburger
         toolbar.setNavigationOnClickListener(view -> {
-            if (drawerLayout != null) drawerLayout.openDrawer(GravityCompat.START);
+            if (drawerLayout != null) {
+                drawerLayout.openDrawer(GravityCompat.START);
+            }
         });
 
         // Toolbar: refresh
@@ -128,7 +141,8 @@ public class MiraAccountingFragmentNew extends Fragment {
                 screen -> navigateTo(screen.id, true));
 
         // Responsive — permanent drawer on tablets
-        boolean permanent = getResources().getBoolean(R.bool.accounting_permanent_drawer);
+        // ✅ [حماية]: نقرأ الـ bool بأمان؛ إن لم يكن موجوداً نستخدم false
+        boolean permanent = readPermanentDrawerFlag();
         if (permanent) {
             drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_OPEN);
             drawerLayout.setScrimColor(Color.TRANSPARENT);
@@ -149,10 +163,14 @@ public class MiraAccountingFragmentNew extends Fragment {
             if (arr != null) {
                 history.clear();
                 // push بترتيب معكوس لأن ArrayDeque.push يُضيف في الرأس
-                for (int i = arr.length - 1; i >= 0; i--) history.push(arr[i]);
+                for (int i = arr.length - 1; i >= 0; i--) {
+                    history.push(arr[i]);
+                }
             }
         }
 
+        // ✅ الآن سيعمل: currentScreenId = dashboard, لكن existing = null
+        //    → navigateTo لن يخرج مبكراً وسيضيف الـ fragment فعلياً
         navigateTo(startId, /*pushHistory=*/false);
     }
 
@@ -189,7 +207,14 @@ public class MiraAccountingFragmentNew extends Fragment {
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        if (screenId.equals(currentScreenId)) {
+
+        // ✅ [إصلاح الشاشة الفارغة]:
+        //    نبحث عن الـ fragment أولاً، ثم نقرر إذا كان هناك حاجة للانتقال.
+        //    سابقاً كان الشرط `screenId == currentScreenId` يُرجع دائماً في أول تحميل
+        //    لأن كلاهما = "dashboard" لكن لا يوجد fragment معروض بعد.
+        Fragment existing = getChildFragmentManager()
+                .findFragmentByTag("SCR_" + screenId);
+        if (screenId.equals(currentScreenId) && existing != null) {
             closeDrawerIfOpen();
             return;
         }
@@ -201,16 +226,15 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
             currentScreenId = screenId;
 
-            Fragment existing = getChildFragmentManager()
-                    .findFragmentByTag("SCR_" + screenId);
-
             FragmentTransaction tx = getChildFragmentManager()
                     .beginTransaction()
                     .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out);
 
             // hide كل الشاشات الأخرى دون حذفها
             for (Fragment f : getChildFragmentManager().getFragments()) {
-                if (f != existing && f.isVisible()) tx.hide(f);
+                if (f != existing && f.isVisible()) {
+                    tx.hide(f);
+                }
             }
 
             if (existing != null) {
@@ -254,13 +278,20 @@ public class MiraAccountingFragmentNew extends Fragment {
             navigateTo(prev, /*pushHistory=*/false);
             return;
         }
-        // 3) from dashboard → exit
+        // 3) من dashboard → للـ activity
         if (MiraAccountingScreens.ID_DASHBOARD.equals(currentScreenId)) {
-            // delegate to activity
+            // ✅ [إصلاح StackOverflow]:
+            //    نعطّل الـ callback أولاً قبل استدعاء dispatcher.onBackPressed().
+            //    بدون هذا، الـ dispatcher يُعيد استدعاء نفس الـ callback
+            //    → onBackPressed → dispatcher → callback → ...
+            //    حتى ينفجر الـ stack.
+            if (backCallback != null) {
+                backCallback.setEnabled(false);
+            }
             requireActivity().getOnBackPressedDispatcher().onBackPressed();
             return;
         }
-        // 4) from any screen → dashboard
+        // 4) من أي شاشة أخرى → للوحة التحكم
         navigateTo(MiraAccountingScreens.ID_DASHBOARD, /*pushHistory=*/false);
     }
 
@@ -273,12 +304,30 @@ public class MiraAccountingFragmentNew extends Fragment {
             boolean base = permissionManager.canView(MiraAccountingScreens.BASE_PERMISSION)
                     || permissionManager.isAdmin()
                     || permissionManager.isBranchManager()
-                    || (sessionManager != null && "AUDITOR".equals(sessionManager.getRoleString()));
+                    || (sessionManager != null
+                        && "AUDITOR".equals(sessionManager.getRoleString()));
             if (!base) return false;
             return permissionManager.isAdmin()
                     || permissionManager.canView(screen.permissionKey);
         } catch (Exception e) {
             Log.e(TAG, "canOpen: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * قراءة flag الـ permanent drawer بأمان.
+     * إن لم يُعرَّف المورد (bools.xml مفقود) → false بلا crash.
+     */
+    private boolean readPermanentDrawerFlag() {
+        try {
+            return getResources().getBoolean(R.bool.accounting_permanent_drawer);
+        } catch (Resources.NotFoundException e) {
+            Log.w(TAG, "accounting_permanent_drawer resource missing — defaulting to false");
             return false;
         }
     }
@@ -320,12 +369,15 @@ public class MiraAccountingFragmentNew extends Fragment {
         Fragment current = getChildFragmentManager()
                 .findFragmentByTag("SCR_" + currentScreenId);
         if (current instanceof MiraRefreshable) {
-            try { ((MiraRefreshable) current).refresh(); }
-            catch (Exception e) { Log.e(TAG, "refresh: " + e.getMessage()); }
+            try {
+                ((MiraRefreshable) current).refresh();
+            } catch (Exception e) {
+                Log.e(TAG, "refresh: " + e.getMessage());
+            }
         }
     }
 
-    /** Optional — يتيح للـ Fragments الأخرى الاستعلام عن الشاشة الحالية */
+    /** يتيح للـ Fragments الأخرى الاستعلام عن الشاشة الحالية */
     @NonNull
     public String getCurrentScreenId() {
         return currentScreenId;
