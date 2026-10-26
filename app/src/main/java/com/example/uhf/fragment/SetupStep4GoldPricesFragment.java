@@ -30,9 +30,12 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Step 4 — أسعار الذهب لكل عيار (v2 — Theme-compliant)
+ * Step 4 — أسعار الذهب لكل عيار (v2.1 — Theme-compliant + Navigation Fix)
  *
- * ✅ v2: كل الألوان theme-aware عبر AccountingColors
+ * ✅ v2.1:
+ *  - التنقل عبر SetupNavigator (لا popBackStack)
+ *  - ينتقل مباشرة للخطوة 5 (أجور الصياغة)
+ *  - null-safety للأزرار
  */
 public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
 
@@ -74,11 +77,16 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
     }
 
     private void setupListeners() {
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(v -> saveAndNext());
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        }
+        if (btnNext != null) {
+            btnNext.setOnClickListener(v -> saveAndNext());
+        }
     }
 
     private void buildKaratCards() {
+        if (container == null) return;
         container.removeAllViews();
         rows.clear();
 
@@ -223,8 +231,10 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
             payload.put("branch_id", 1);
             payload.put("source", "manual");
 
-            btnNext.setEnabled(false);
-            btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            if (btnNext != null) {
+                btnNext.setEnabled(false);
+                btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            }
             showLoading(true);
 
             new Thread(() -> {
@@ -233,14 +243,21 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
 
                         if (resp != null && resp.isSuccess) {
                             Toast.makeText(requireContext(),
                                     isArabic ? "✅ تم حفظ أسعار الذهب" : "✅ Gold prices saved",
                                     Toast.LENGTH_SHORT).show();
-                            requireActivity().getSupportFragmentManager().popBackStack();
+
+                            // ═══════════════════════════════════════════════
+                            // ✅ الانتقال للخطوة 5 (أجور الصياغة)
+                            // ═══════════════════════════════════════════════
+                            SetupNavigator.goToNextStep(SetupStep4GoldPricesFragment.this, 4);
                         } else {
                             String err = (resp != null && resp.error != null) ? resp.error : "unknown";
                             Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
@@ -251,8 +268,10 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
                         Toast.makeText(requireContext(), "❌ " + ex.getMessage(), Toast.LENGTH_LONG).show();
                     });
                 }
@@ -265,6 +284,8 @@ public class SetupStep4GoldPricesFragment extends BaseSetupStepFragment {
     }
 
     private void updateSummary() {
+        if (tvSummary == null) return;
+
         int filled = 0;
         double sumSpreadPct = 0;
 
