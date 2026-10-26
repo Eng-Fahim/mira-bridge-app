@@ -838,6 +838,18 @@
     <color name="mira_info">#3498DB</color>
     <color name="mira_purple">#9B59B6</color>
 
+    <!-- أضف داخل <resources> في res/values/colors.xml -->
+
+<!-- ═══ ألوان المحاسبة (Light Mode) ═══ -->
+<color name="acct_debit">#1565C0</color>          <!-- أزرق داكن — مقروء على أبيض -->
+<color name="acct_debit_bg">#E3F2FD</color>       <!-- أزرق فاتح جداً للخلفية -->
+<color name="acct_credit">#C62828</color>         <!-- أحمر داكن -->
+<color name="acct_credit_bg">#FFEBEE</color>      <!-- أحمر فاتح جداً -->
+<color name="acct_success">#2E7D32</color>        <!-- أخضر داكن -->
+<color name="acct_success_bg">#E8F5E9</color>
+<color name="acct_warning">#E65100</color>        <!-- برتقالي داكن -->
+<color name="acct_warning_bg">#FFF3E0</color>
+<color name="acct_gold">#B8860B</color>           <!-- ذهبي داكن -->
     <!-- 🥇 MIRA Brand — Gold -->
     <color name="mira_gold">#D4AF37</color>
     <color name="mira_gold_light">#F4E5B1</color>
