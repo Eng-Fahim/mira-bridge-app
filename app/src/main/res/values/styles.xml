@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:android="http://schemas.android.com/schemas/android">
+<resources xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- ==================== أشكال الحواف الفاخرة ==================== -->
     <style name="CircleImageView">
         <item name="cornerSize">50%</item>
