@@ -211,5 +211,38 @@
         <attr name="image_width" format="dimension" />
         <attr name="image_height" format="dimension" />
     </declare-styleable>
+<!-- ═══════════════════════════════════════════════════════
+ 🧭 Setup Wizard Styles (Opening Balances & other setup steps)
+ ═══════════════════════════════════════════════════════ -->
 
+<!-- رأس قسم في شاشات الإعداد (يُستخدم على LinearLayout أفقي) -->
+<style name="SetupSectionHeader">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:orientation">horizontal</item>
+    <item name="android:gravity">center_vertical</item>
+    <item name="android:layout_marginTop">16dp</item>
+    <item name="android:layout_marginBottom">4dp</item>
+</style>
+
+<!-- عنوان القسم داخل الرأس -->
+<style name="SetupSectionTitle">
+    <item name="android:layout_width">0dp</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_weight">1</item>
+    <item name="android:textSize">15sp</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:textColor">?attr/colorOnSurface</item>
+    <item name="android:fontFamily">@font/cairo</item>
+</style>
+
+<!-- صف في ملخص الأرصدة (Sticky Summary) -->
+<style name="SetupSummaryRow">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:orientation">horizontal</item>
+    <item name="android:gravity">center_vertical</item>
+    <item name="android:paddingTop">2dp</item>
+    <item name="android:paddingBottom">2dp</item>
+</style>
 </resources>
