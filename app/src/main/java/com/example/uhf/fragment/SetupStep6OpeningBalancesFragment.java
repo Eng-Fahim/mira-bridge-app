@@ -687,14 +687,16 @@ public View onCreateView(@NonNull LayoutInflater inflater,
                         btnNext.setText(isArabic ? "التالي ←" : "Next →");
 
                         if (resp != null && resp.isSuccess) {
-                            Toast.makeText(requireContext(),
-                                    isArabic ? "✅ تم حفظ الأرصدة" : "✅ Balances saved",
-                                    Toast.LENGTH_SHORT).show();
-                            requireActivity().getSupportFragmentManager().popBackStack();
-                        } else {
-                            String err = (resp != null && resp.error != null) ? resp.error : "unknown";
-                            Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
-                        }
+    Toast.makeText(requireContext(),
+            isArabic ? "✅ تم حفظ الأرصدة" : "✅ Balances saved",
+            Toast.LENGTH_SHORT).show();
+
+    // ✅ الانتقال للخطوة 7 (المستخدمون والصلاحيات)
+    SetupNavigator.goToNextStep(SetupStep6OpeningBalancesFragment.this, 6);
+} else {
+    String err = (resp != null && resp.error != null) ? resp.error : "unknown";
+    Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
+}
                     });
                 } catch (Exception ex) {
                     Log.e(TAG, "save", ex);
