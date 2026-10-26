@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:fillViewport="false">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -44,8 +44,11 @@
                 android:layout_gravity="center"
                 android:visibility="gone"/>
 
-            <TextView style="@style/SetupSectionTitle" android:text="🔢 معايير GS1"/>
-            <View android:layout_width="match_parent" android:layout_height="4dp"/>
+            <!-- ═══ Section 1: GS1 ═══ -->
+            <TextView
+                style="@style/SetupSectionTitleVertical"
+                android:text="🔢 معايير GS1"
+                android:layout_marginTop="0dp"/>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
@@ -76,10 +79,10 @@
                     android:textSize="14sp"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView style="@style/SetupSectionTitle"
-                android:text="📡 RFID / EPC"
-                android:layout_marginTop="16dp"/>
-            <View android:layout_width="match_parent" android:layout_height="4dp"/>
+            <!-- ═══ Section 2: RFID / EPC ═══ -->
+            <TextView
+                style="@style/SetupSectionTitleVertical"
+                android:text="📡 RFID / EPC"/>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
@@ -110,10 +113,10 @@
                     android:textSize="14sp"/>
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView style="@style/SetupSectionTitle"
-                android:text="🆔 صيغة المسلسل"
-                android:layout_marginTop="16dp"/>
-            <View android:layout_width="match_parent" android:layout_height="4dp"/>
+            <!-- ═══ Section 3: Serial ═══ -->
+            <TextView
+                style="@style/SetupSectionTitleVertical"
+                android:text="🆔 صيغة المسلسل"/>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
@@ -181,23 +184,31 @@
                 android:lineSpacingExtra="2dp"
                 android:text="أدخل بادئة GS1 لعرض مثال التكويد"/>
 
-            <TextView style="@style/SetupSectionTitle"
-                android:text="⚙️ خيارات متقدمة"
-                android:layout_marginTop="16dp"/>
-            <View android:layout_width="match_parent" android:layout_height="4dp"/>
+            <!-- ═══ Section 4: Options ═══ -->
+            <TextView
+                style="@style/SetupSectionTitleVertical"
+                android:text="⚙️ خيارات متقدمة"/>
 
-            <LinearLayout style="@style/SetupSummaryRow" android:paddingVertical="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp">
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical">
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="كود الفرع في EPC"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp"/>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -205,24 +216,33 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"/>
                 </LinearLayout>
+
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swIncludeBranch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </LinearLayout>
 
-            <LinearLayout style="@style/SetupSummaryRow" android:paddingVertical="8dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp">
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical">
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="شرائح مُبرمجة مسبقاً"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp"/>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -230,13 +250,16 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"/>
                 </LinearLayout>
+
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swPreEncoded"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </LinearLayout>
 
-            <View android:layout_width="match_parent" android:layout_height="40dp"/>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="16dp"/>
         </LinearLayout>
     </ScrollView>
 
