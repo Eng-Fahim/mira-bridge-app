@@ -39,11 +39,12 @@ public class MiraReconciliationFragment extends Fragment {
     private MaterialButton btnSave;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // أمثلة للبنوك (يُفضل جلبها من API)
+    // أمثلة للبنوك (يُفضل جلبها من API لاحقاً)
     private static final String[] BANK_NAMES = {"بنك التضامن (112001)", "البنك الأهلي (112003)", "بنك الكريمي (112004)"};
     private static final int[] BANK_IDS = {25, 27, 28};
 
     private double currentBookBalance = 0.0;
+    private int selectedBankId = BANK_IDS[0]; // ✅ متغير آمن لحفظ البنك المختار
 
     @Nullable
     @Override
@@ -63,7 +64,12 @@ public class MiraReconciliationFragment extends Fragment {
         // إعداد القائمة المنسدلة للبنوك
         spinnerBank.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, BANK_NAMES));
         spinnerBank.setText(BANK_NAMES[0], false);
-        spinnerBank.setOnItemClickListener((parent, view, position, id) -> loadData(BANK_IDS[position]));
+        selectedBankId = BANK_IDS[0];
+
+        spinnerBank.setOnItemClickListener((parent, view, position, id) -> {
+            selectedBankId = BANK_IDS[position];
+            loadData(selectedBankId);
+        });
 
         // تاريخ افتراضي
         etDate.setText(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().getTime()));
@@ -71,7 +77,7 @@ public class MiraReconciliationFragment extends Fragment {
             Calendar cal = Calendar.getInstance();
             new DatePickerDialog(requireContext(), (dp, y, m, d) -> {
                 etDate.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
-                loadData(BANK_IDS[spinnerBank.getListSelection()]);
+                loadData(selectedBankId); // ✅ استخدام المتغير الآمن
             }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
         });
 
@@ -92,7 +98,9 @@ public class MiraReconciliationFragment extends Fragment {
         });
 
         btnSave.setOnClickListener(v1 -> saveReconciliation());
-        loadData(BANK_IDS[0]);
+        
+        // تحميل أولي
+        loadData(selectedBankId);
 
         return v;
     }
@@ -120,13 +128,12 @@ public class MiraReconciliationFragment extends Fragment {
 
     private void saveReconciliation() {
         String date = etDate.getText().toString();
-        int bankId = BANK_IDS[spinnerBank.getListSelection()];
         double statementBalance = 0;
         try { statementBalance = Double.parseDouble(etStatementBalance.getText().toString()); } catch (Exception ignored) {}
 
         try {
             JSONObject payload = new JSONObject();
-            payload.put("bank_account_id", bankId);
+            payload.put("bank_account_id", selectedBankId); // ✅ استخدام المتغير الآمن
             payload.put("statement_balance", statementBalance);
             payload.put("book_balance", currentBookBalance);
             payload.put("date", date);
