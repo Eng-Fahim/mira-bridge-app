@@ -63,6 +63,8 @@ public class MiraReconciliationFragment extends Fragment {
 
         // إعداد القائمة المنسدلة للبنوك
         spinnerBank.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, BANK_NAMES));
+        // أضف هذا السطر بعد إعداد الـ Adapter
+        spinnerBank.setOnClickListener(v -> spinnerBank.showDropDown());
         spinnerBank.setText(BANK_NAMES[0], false);
         selectedBankId = BANK_IDS[0];
 
