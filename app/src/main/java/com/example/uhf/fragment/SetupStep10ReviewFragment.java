@@ -13,12 +13,13 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -27,13 +28,13 @@ import java.text.NumberFormat;
 import java.util.Locale;
 
 /**
- * Step 10 — المراجعة والاعتماد النهائي
+ * Step 10 — المراجعة والاعتماد النهائي (v2 — Theme-compliant)
  *
- * - يعرض معاينة القيد الافتتاحي الكامل
- * - يعرض كل سطر (مدين/دائن) مع الحساب
- * - يعرض إجمالي الذهب (24K)
- * - يتحقق من التوازن
- * - يعتمد عبر POST /setup/step/10/approve
+ * ✅ v2 إصلاحات الثيم:
+ *  - استبدال AlertDialog.Builder بـ MaterialAlertDialogBuilder
+ *  - استبدال الألوان hardcoded بـ ContextCompat.getColor() من colors.xml
+ *  - ألوان لها variants (values-night) للـ Dark Mode
+ *  - كل النصوص تستخدم attributes من الثيم
  */
 public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
 
@@ -51,6 +52,14 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
     private boolean isArabic;
     private boolean isBalanced = false;
 
+    // ─── Colors (loaded per-theme) ───
+    private int colorDebit;
+    private int colorDebitBg;
+    private int colorCredit;
+    private int colorCreditBg;
+    private int colorSuccess;
+    private int colorWarning;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -60,10 +69,25 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
         apiClient = MiraApiClient.getInstance(requireContext());
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
+        // ✅ تحميل الألوان من الـ theme الحالي (Light أو Dark)
+        loadThemeColors();
+
         initViews(view);
         setupListeners();
         loadPreview();
         return view;
+    }
+
+    /**
+     * ✅ تحميل الألوان من colors.xml (تتبدل تلقائياً مع theme)
+     */
+    private void loadThemeColors() {
+        colorDebit    = ContextCompat.getColor(requireContext(), R.color.acct_debit);
+        colorDebitBg  = ContextCompat.getColor(requireContext(), R.color.acct_debit_bg);
+        colorCredit   = ContextCompat.getColor(requireContext(), R.color.acct_credit);
+        colorCreditBg = ContextCompat.getColor(requireContext(), R.color.acct_credit_bg);
+        colorSuccess  = ContextCompat.getColor(requireContext(), R.color.acct_success);
+        colorWarning  = ContextCompat.getColor(requireContext(), R.color.acct_warning);
     }
 
     private void initViews(View v) {
@@ -79,6 +103,10 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
         btnBack         = v.findViewById(R.id.btnBack);
         btnApprove      = v.findViewById(R.id.btnApprove);
         pbLoading       = v.findViewById(R.id.pbLoading);
+
+        // ✅ تطبيق الألوان الثابتة على header (theme-aware)
+        if (tvTotalDebit  != null) tvTotalDebit.setTextColor(colorDebit);
+        if (tvTotalCredit != null) tvTotalCredit.setTextColor(colorCredit);
     }
 
     private void setupListeners() {
@@ -130,15 +158,16 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
             tvTotalCredit.setText(formatMoney(totalCredit));
             tvTotalGold.setText(String.format(Locale.US, "%.3f g", totalGold));
 
+            // ✅ ألوان theme-aware
             if (isBalanced) {
                 tvBalanceStatus.setText(isArabic ? "✅ القيد متوازن — جاهز للاعتماد"
                                                 : "✅ Balanced — ready to approve");
-                tvBalanceStatus.setTextColor(0xFF27AE60);
+                tvBalanceStatus.setTextColor(colorSuccess);
                 btnApprove.setEnabled(true);
             } else {
                 tvBalanceStatus.setText(isArabic ? "❌ القيد غير متوازن — راجع الخطوة 6"
                                                 : "❌ Unbalanced — check step 6");
-                tvBalanceStatus.setTextColor(0xFFE74C3C);
+                tvBalanceStatus.setTextColor(colorCredit);
                 btnApprove.setEnabled(false);
             }
 
@@ -182,22 +211,21 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
             double gold    = line.optDouble("gold", 0);
             String karat   = line.optString("karat", "");
 
+            // ✅ badge بألوان theme-aware
             if ("debit".equals(type)) {
                 tvType.setText(isArabic ? "مدين" : "DR");
-                tvType.setTextColor(0xFF3498DB);
-                tvType.setBackgroundColor(0x1A3498DB);
+                tvType.setTextColor(colorDebit);
+                tvType.setBackgroundColor(colorDebitBg);
             } else {
                 tvType.setText(isArabic ? "دائن" : "CR");
-                tvType.setTextColor(0xFFE74C3C);
-                tvType.setBackgroundColor(0x1AE74C3C);
+                tvType.setTextColor(colorCredit);
+                tvType.setBackgroundColor(colorCreditBg);
             }
 
-            // اسم الحساب مع كود
             String accountLabel = code.isEmpty() ? name : code + " — " + name;
             if (!karat.isEmpty()) accountLabel += " (" + karat + ")";
             tvAccount.setText(accountLabel);
 
-            // وصف + ملكية
             String descLabel = desc;
             if ("trust".equals(owner)) {
                 descLabel = (isArabic ? "🏛️ أمانة — " : "🏛️ Trust — ") + descLabel;
@@ -234,7 +262,8 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
             return;
         }
 
-        new AlertDialog.Builder(requireContext())
+        // ✅ MaterialAlertDialogBuilder بدل AlertDialog.Builder
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "⚠️ تأكيد الاعتماد النهائي" : "⚠️ Confirm Final Approval")
                 .setMessage(isArabic
                         ? "سيتم إنشاء القيد الافتتاحي واعتماد النظام المحاسبي.\n\n"
@@ -249,6 +278,7 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
                         + "• Only a full reset is possible\n"
                         + "• All transactions will be tracked\n\n"
                         + "Are you sure?")
+                .setIcon(R.drawable.ic_refresh) // أو أي أيقونة تحذير
                 .setPositiveButton(isArabic ? "نعم، اعتماد نهائي" : "Yes, Approve",
                         (d, w) -> performApprove())
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
@@ -270,7 +300,6 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
                     showLoading(false);
 
                     if (resp != null && resp.isSuccess) {
-                        // إبطال كاش UHFMainActivity
                         if (getActivity() instanceof UHFMainActivity) {
                             try {
                                 ((UHFMainActivity) getActivity()).invalidateSetupCache();
@@ -314,9 +343,11 @@ public class SetupStep10ReviewFragment extends BaseSetupStepFragment {
                 + (entryNumber.isEmpty() ? "" : "Entry: " + entryNumber + "\n\n")
                 + "System is now ready for use";
 
-        new AlertDialog.Builder(requireContext())
+        // ✅ MaterialAlertDialogBuilder
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "🎉 نجاح" : "🎉 Success")
                 .setMessage(msg)
+                .setIcon(android.R.drawable.ic_dialog_info)
                 .setPositiveButton(isArabic ? "فتح المحاسبة" : "Open Accounting",
                         (d, w) -> {
                             if (getActivity() instanceof UHFMainActivity) {
