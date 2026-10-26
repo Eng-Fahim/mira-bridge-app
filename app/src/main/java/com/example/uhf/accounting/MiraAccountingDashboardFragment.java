@@ -401,39 +401,45 @@ public class MiraAccountingDashboardFragment extends Fragment {
                 return;
             }
 
-            // محاولة قراءة cash / receivables / payables
-            double cash        = extractNested(resp.data, "cash");
-            double receivables = extractNested(resp.data, "receivables");
-            double payables    = extractNested(resp.data, "payables");
+           // محاولة قراءة cash / receivables / payables
+double cash        = extractNested(resp.data, "cash");
+double receivables = extractNested(resp.data, "receivables");
+double payables    = extractNested(resp.data, "payables");
 
-            // Cash — يعتمد على total_assets في بعض التطبيقات إذا لم يجد cash محدداً
-            if (cash == 0) {
-                cash = pick(resp.data, "total_cash", "cash_and_equivalents", "cash_balance");
-            }
+// Cash — يعتمد على total_assets في بعض التطبيقات إذا لم يجد cash محدداً
+if (cash == 0) {
+    cash = pick(resp.data, "total_cash", "cash_and_equivalents", "cash_balance");
+}
 
-            postUi(() -> {
-                String suffix = isArabic ? ("كما في " + asOf) : ("as of " + asOf);
-                if (cash != 0) {
-                    updateKpi(AccountingKpi.KEY_CASH,
-                            AccountingKpi.success(AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰",
-                                    cash, fmt(cash), "YER", suffix));
-                } else {
-                    updateKpi(AccountingKpi.KEY_CASH,
-                            AccountingKpi.empty(AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰",
-                                    "لم تُعثر على أرصدة نقدية في الاستجابة"));
-                }
+// ✅ إنشاء نسخ final لاستخدامها في lambda
+final double cashFinal        = cash;
+final double receivablesFinal = receivables;
+final double payablesFinal    = payables;
 
-                if (receivables != 0) {
-                    updateKpi(AccountingKpi.KEY_RECEIVABLES,
-                            AccountingKpi.success(AccountingKpi.KEY_RECEIVABLES, "ذمم مدينة", "👤",
-                                    receivables, fmt(receivables), "YER", suffix));
-                }
-                if (payables != 0) {
-                    updateKpi(AccountingKpi.KEY_PAYABLES,
-                            AccountingKpi.success(AccountingKpi.KEY_PAYABLES, "ذمم دائنة", "🏢",
-                                    payables, fmt(payables), "YER", suffix));
-                }
-            });
+postUi(() -> {
+    String suffix = isArabic ? ("كما في " + asOf) : ("as of " + asOf);
+
+    if (cashFinal != 0) {
+        updateKpi(AccountingKpi.KEY_CASH,
+                AccountingKpi.success(AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰",
+                        cashFinal, fmt(cashFinal), "YER", suffix));
+    } else {
+        updateKpi(AccountingKpi.KEY_CASH,
+                AccountingKpi.empty(AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰",
+                        "لم تُعثر على أرصدة نقدية في الاستجابة"));
+    }
+
+    if (receivablesFinal != 0) {
+        updateKpi(AccountingKpi.KEY_RECEIVABLES,
+                AccountingKpi.success(AccountingKpi.KEY_RECEIVABLES, "ذمم مدينة", "👤",
+                        receivablesFinal, fmt(receivablesFinal), "YER", suffix));
+    }
+    if (payablesFinal != 0) {
+        updateKpi(AccountingKpi.KEY_PAYABLES,
+                AccountingKpi.success(AccountingKpi.KEY_PAYABLES, "ذمم دائنة", "🏢",
+                        payablesFinal, fmt(payablesFinal), "YER", suffix));
+    }
+});
 
             // إذا كانت الذمم لم تُستخرج، استخدم aging كاحتياطي
             if (receivables == 0 || payables == 0) {
@@ -714,4 +720,4 @@ public class MiraAccountingDashboardFragment extends Fragment {
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
-    }
+}
