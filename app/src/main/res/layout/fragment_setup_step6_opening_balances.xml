@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorSurface">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="💰 الأرصدة الافتتاحية"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:layout_marginTop="8dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="أدخل أرصدة الشركة عند بدء المحاسبة"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:layout_marginBottom="20dp"/>
+
+            <ProgressBar
+                android:id="@+id/pbLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone"/>
+
+            <!-- ═══ 1. النقدية ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="💵 النقدية"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddCash"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/cashContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 2. البنوك ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="🏦 البنوك"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddBank"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/banksContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 3. الذهب المملوك ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="🥇 الذهب المملوك"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/goldContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 4. ذهب أمانة ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="🏛️ ذهب أمانة (التزام)"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddTrust"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/trustContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 5. كسر الذهب ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="♻️ كسر الذهب"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddScrap"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/scrapContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 6. الألماس ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="💎 الألماس والأحجار"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddDiamond"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/diamondsContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 7. ذمم مدينة ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="👤 ذمم مدينة"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddReceivable"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/receivablesContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 8. ذمم دائنة ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="🏢 ذمم دائنة (التزام)"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddPayable"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/payablesContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <!-- ═══ 9. أصول ثابتة ═══ -->
+            <LinearLayout style="@style/SetupSectionHeader" android:orientation="horizontal">
+                <TextView style="@style/SetupSectionTitle" android:text="🏗️ أصول ثابتة"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddFixed"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/fixedContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginBottom="12dp"/>
+
+            <View android:layout_width="match_parent" android:layout_height="16dp"/>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ═══ Summary (Sticky) ═══ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:elevation="8dp">
+
+        <LinearLayout style="@style/SetupSummaryRow">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="إجمالي الأصول"
+                android:textSize="12sp" android:textColor="?attr/colorOnSurfaceVariant"/>
+            <TextView android:id="@+id/tvTotalAssets" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="0.00 YER"
+                android:textSize="13sp" android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"/>
+        </LinearLayout>
+
+        <LinearLayout style="@style/SetupSummaryRow">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="إجمالي الالتزامات"
+                android:textSize="12sp" android:textColor="?attr/colorOnSurfaceVariant"/>
+            <TextView android:id="@+id/tvTotalLiabilities" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="0.00 YER"
+                android:textSize="13sp" android:textStyle="bold"
+                android:textColor="#E67E22"/>
+        </LinearLayout>
+
+        <LinearLayout style="@style/SetupSummaryRow">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="رأس المال (صافي)"
+                android:textSize="13sp" android:textStyle="bold"/>
+            <TextView android:id="@+id/tvNetCapital" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="0.00 YER"
+                android:textSize="14sp" android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"/>
+        </LinearLayout>
+
+        <TextView android:id="@+id/tvBalanceStatus"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:gravity="center"
+            android:text="⚠️ لا أرصدة مدخلة"
+            android:textSize="12sp" android:textStyle="bold"/>
+
+        <LinearLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginTop="10dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBack"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="→ السابق"
+                android:layout_marginEnd="8dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnNext"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="2" android:text="حفظ ←"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
