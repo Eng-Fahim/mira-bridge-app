@@ -46,7 +46,7 @@
                 android:gravity="center"
                 android:layout_marginBottom="24dp"/>
 
-            <!-- ═══════ Progress Bar ═══════ -->
+            <!-- ═══════ بطاقة التقدم ═══════ -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -63,6 +63,7 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
+                    <!-- الصف الأول: الحالة + النسبة -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -78,16 +79,7 @@
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="16sp"
                             android:textStyle="bold"/>
-                        <TextView
-                            android:id="@+id/tvGroupProgress"
-                            android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="2dp"
-    android:text="0 / 10 خطوة مكتملة"
-    android:textColor="?attr/colorOnSurfaceVariant"
-    android:textSize="11sp"
-    android:gravity="center"/>
-                        
+
                         <TextView
                             android:id="@+id/tvProgressPercent"
                             android:layout_width="wrap_content"
@@ -98,6 +90,18 @@
                             android:textStyle="bold"/>
                     </LinearLayout>
 
+                    <!-- الصف الثاني: تقدم المجموعة (صف مستقل) -->
+                    <TextView
+                        android:id="@+id/tvGroupProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="0 / 10 خطوة مكتملة"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="11sp"
+                        android:gravity="center"/>
+
+                    <!-- شريط التقدم -->
                     <ProgressBar
                         android:id="@+id/pbProgress"
                         style="?android:attr/progressBarStyleHorizontal"
@@ -110,7 +114,7 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- ═══════ المراحل ═══════ -->
+            <!-- ═══════ عنوان المراحل ═══════ -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -120,6 +124,7 @@
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp"/>
 
+            <!-- ═══════ حاوية الخطوات (تُملأ برمجياً) ═══════ -->
             <LinearLayout
                 android:id="@+id/stepsContainer"
                 android:layout_width="match_parent"
@@ -151,19 +156,20 @@
                 android:visibility="gone"/>
 
             <com.google.android.material.button.MaterialButton
-    android:id="@+id/btnGoToSystem"
-    android:layout_width="match_parent"
-    android:layout_height="56dp"
-    android:layout_marginTop="12dp"
-    android:text="🚀 الانتقال إلى النظام"
-    android:textSize="16sp"
-    android:textStyle="bold"
-    android:textColor="#FFFFFF"
-    android:visibility="gone"
-    app:backgroundTint="#27AE60"
-    app:cornerRadius="14dp"
-    app:icon="@android:drawable/ic_menu_send"
-    app:iconGravity="textStart" />
+                android:id="@+id/btnGoToSystem"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="🚀 الانتقال إلى النظام"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:visibility="gone"
+                app:backgroundTint="#27AE60"
+                app:cornerRadius="14dp"
+                app:icon="@android:drawable/ic_menu_send"
+                app:iconGravity="textStart"/>
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="60dp"/>
