@@ -2627,10 +2627,17 @@ public ApiResponse getLockedPeriods() {
 // ═══════════════════════════════════════════════════════════
 
 public ApiResponse getCheques(String type, String status) {
-    String url = "/cheques?";
-    if (type != null && !type.isEmpty()) url += "type=" + type + "&";
-    if (status != null && !status.isEmpty()) url += "status=" + status;
-    return getAccounting(url); // نستخدم مسار mira/v2
+    String url = "/cheques";
+    boolean hasParam = false;
+    
+    if (type != null && !type.isEmpty()) {
+        url += "?type=" + type;
+        hasParam = true;
+    }
+    if (status != null && !status.isEmpty()) {
+        url += (hasParam ? "&" : "?") + "status=" + status;
+    }
+    return getAccounting(url);
 }
 
 public ApiResponse createCheque(JSONObject payload) {
