@@ -30,8 +30,7 @@ import org.json.JSONObject;
 
 import java.util.Locale;
 
-public class SetupStep4OpeningBalancesFragment extends Fragment {
-
+public class SetupStep4OpeningBalancesFragment extends BaseSetupStepFragment {
     private static final String TAG = "SetupStep4";
 
     // Containers
