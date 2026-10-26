@@ -28,18 +28,16 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 /**
- * Step 5 — أجور الصياغة لكل فئة وعيار
+ * Step 5 — أجور الصياغة لكل فئة وعيار (v2.1)
  *
- * - يحمّل الأجور الحالية أو يضع افتراضية
- * - يسمح بإضافة/تعديل/حذف فئات
- * - أنواع الأجرة: fixed_per_gram | percent_of_gold | fixed_per_piece
- * - يحفظ عبر POST /setup/step/5
+ * ✅ v2.1:
+ *  - التنقل عبر SetupNavigator (لا popBackStack)
+ *  - ينتقل مباشرة للخطوة 6 (الأرصدة الافتتاحية)
+ *  - null-safety للأزرار والـ containers
  */
 public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
 
@@ -106,9 +104,15 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
     }
 
     private void setupListeners() {
-        btnAdd.setOnClickListener(v -> addRow("", null, "fixed_per_gram", "", ""));
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(v -> saveAndNext());
+        if (btnAdd != null) {
+            btnAdd.setOnClickListener(v -> addRow("", null, "fixed_per_gram", "", ""));
+        }
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        }
+        if (btnNext != null) {
+            btnNext.setOnClickListener(v -> saveAndNext());
+        }
     }
 
     private void loadCurrentCharges() {
@@ -119,6 +123,7 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
+                    if (container == null) return;
 
                     JSONArray charges = null;
                     if (resp != null && resp.isSuccess && resp.data != null) {
@@ -143,7 +148,6 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
                             addRow(cat, karat, type, val, min);
                         }
                     } else {
-                        // الافتراضية
                         for (String[] d : DEFAULTS_AR) {
                             addRow(d[0], d[1], "fixed_per_gram", d[2], d[3]);
                         }
@@ -155,7 +159,7 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (!isAdded()) return;
                     showLoading(false);
-                    // fallback
+                    if (container == null) return;
                     for (String[] d : DEFAULTS_AR) {
                         addRow(d[0], d[1], "fixed_per_gram", d[2], d[3]);
                     }
@@ -167,6 +171,8 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
 
     private void addRow(String category, String karat, String type,
                         String value, String minCharge) {
+        if (container == null) return;
+
         View row = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_making_charge, container, false);
 
@@ -298,8 +304,10 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
             payload.put("charges", chargesArray);
             payload.put("branch_id", 1);
 
-            btnNext.setEnabled(false);
-            btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            if (btnNext != null) {
+                btnNext.setEnabled(false);
+                btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+            }
             showLoading(true);
 
             new Thread(() -> {
@@ -308,14 +316,21 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
 
                         if (resp != null && resp.isSuccess) {
                             Toast.makeText(requireContext(),
                                     isArabic ? "✅ تم حفظ أجور الصياغة" : "✅ Making charges saved",
                                     Toast.LENGTH_SHORT).show();
-                            requireActivity().getSupportFragmentManager().popBackStack();
+
+                            // ═══════════════════════════════════════════════
+                            // ✅ الانتقال للخطوة 6 (الأرصدة الافتتاحية)
+                            // ═══════════════════════════════════════════════
+                            SetupNavigator.goToNextStep(SetupStep5MakingChargesFragment.this, 5);
                         } else {
                             String err = (resp != null && resp.error != null) ? resp.error : "unknown";
                             Toast.makeText(requireContext(), "❌ " + err, Toast.LENGTH_LONG).show();
@@ -326,8 +341,10 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (!isAdded()) return;
                         showLoading(false);
-                        btnNext.setEnabled(true);
-                        btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        if (btnNext != null) {
+                            btnNext.setEnabled(true);
+                            btnNext.setText(isArabic ? "التالي ←" : "Next →");
+                        }
                         Toast.makeText(requireContext(), "❌ " + ex.getMessage(), Toast.LENGTH_LONG).show();
                     });
                 }
@@ -340,9 +357,12 @@ public class SetupStep5MakingChargesFragment extends BaseSetupStepFragment {
     }
 
     private void updateSummary() {
+        if (tvSummary == null) return;
+
         int valid = 0;
         for (Row r : rows) {
-            String cat = r.etCategory.getText() != null ? r.etCategory.getText().toString().trim() : "";
+            String cat = r.etCategory.getText() != null
+                    ? r.etCategory.getText().toString().trim() : "";
             double val = parseDouble(r.etValue);
             if (!cat.isEmpty() && val > 0) valid++;
         }
