@@ -3,8 +3,6 @@ package com.example.uhf.fragment;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -33,14 +31,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Step 2 — الفروع والخزائن (v3.0)
+ * Step 2 — الفروع والخزائن (v3.1)
  *
- * هيكل جديد:
- *  1. المرحلة 2/10
- *  2. عرض الفروع الحالية (بـ id، code صحيح)
- *  3. زر "إدارة الفروع" (لإضافة/تعديل)
- *  4. إضافة الخزائن الفعلية
- *  5. إرسال payload صحيح: branches + vaults
+ * ✅ v3.1:
+ *  - التنقل عبر SetupNavigator (لا popBackStack)
+ *  - ينتقل مباشرة للخطوة 3 بعد الحفظ
  */
 public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
 
@@ -97,10 +92,18 @@ public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
     }
 
     private void setupListeners() {
-        btnBack.setOnClickListener(x -> requireActivity().onBackPressed());
-        btnNext.setOnClickListener(x -> saveAndNext());
-        btnManageBranches.setOnClickListener(x -> openBranchManager());
-        btnAddVault.setOnClickListener(x -> addVaultRow("", "main", "medium", ""));
+        if (btnBack != null) {
+            btnBack.setOnClickListener(x -> requireActivity().onBackPressed());
+        }
+        if (btnNext != null) {
+            btnNext.setOnClickListener(x -> saveAndNext());
+        }
+        if (btnManageBranches != null) {
+            btnManageBranches.setOnClickListener(x -> openBranchManager());
+        }
+        if (btnAddVault != null) {
+            btnAddVault.setOnClickListener(x -> addVaultRow("", "main", "medium", ""));
+        }
     }
 
     private void openBranchManager() {
@@ -153,7 +156,6 @@ public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
                                 );
                             }
                         } else {
-                            // إضافة افتراضية
                             addVaultRow("VAULT-MAIN-01", "main", "maximum", "5000");
                         }
                     } else {
@@ -228,27 +230,25 @@ public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
         AutoCompleteTextView ddLevel = row.findViewById(R.id.ddLevel);
         ImageButton btnRemove        = row.findViewById(R.id.btnRemove);
 
-        // Types
-        String[] typeValuesAr = {"رئيسية", "يومية", "آمنة", "عرض", "عبور"};
-        String[] typeValuesEn = {"Main", "Daily", "Safe", "Display", "Transit"};
         String[] typeCodes = {"main", "daily", "safe", "display", "transit"};
-        String[] typeLabels = isArabic ? typeValuesAr : typeValuesEn;
+        String[] typeLabels = isArabic
+                ? new String[]{"رئيسية", "يومية", "آمنة", "عرض", "عبور"}
+                : new String[]{"Main", "Daily", "Safe", "Display", "Transit"};
 
         ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
                 requireContext(), android.R.layout.simple_dropdown_item_1line, typeLabels);
         ddType.setAdapter(typeAdapter);
         ddType.setText(typeLabel(type, typeCodes, typeLabels), false);
 
-        // Levels
-        String[] levelValuesAr = {"منخفض", "متوسط", "عالي", "أقصى"};
-        String[] levelValuesEn = {"Low", "Medium", "High", "Maximum"};
         String[] levelCodes = {"low", "medium", "high", "maximum"};
-        String[] levelLabels = isArabic ? levelValuesAr : levelValuesEn;
+        String[] levelLabels = isArabic
+                ? new String[]{"منخفض", "متوسط", "عالي", "أقصى"}
+                : new String[]{"Low", "Medium", "High", "Maximum"};
 
         ArrayAdapter<String> levelAdapter = new ArrayAdapter<>(
                 requireContext(), android.R.layout.simple_dropdown_item_1line, levelLabels);
         ddLevel.setAdapter(levelAdapter);
-        ddLevel.setText(levelLabel(level, levelCodes, levelLabels), false);
+        ddLevel.setText(typeLabel(level, levelCodes, levelLabels), false);
 
         etCode.setText(code);
         etCapacity.setText(capacity);
@@ -280,11 +280,6 @@ public class SetupStep2BranchesFragment extends BaseSetupStepFragment {
         }
         return labels[0];
     }
-    
-    // بعد typeLabel، أضف:
-private String levelLabel(String code, String[] codes, String[] labels) {
-    return typeLabel(code, codes, labels);
-}
 
     private String typeValue(String label, String[] codes, String[] labels) {
         for (int i = 0; i < labels.length; i++) {
@@ -302,7 +297,6 @@ private String levelLabel(String code, String[] codes, String[] labels) {
     // ═══════════════════════════════════════════════════════
 
     private void saveAndNext() {
-        // 1) التحقق من الفروع
         if (branchesList.isEmpty()) {
             Toast.makeText(requireContext(),
                     isArabic ? "لا توجد فروع — أضف فرعاً أولاً"
@@ -311,7 +305,6 @@ private String levelLabel(String code, String[] codes, String[] labels) {
             return;
         }
 
-        // 2) التحقق من الخزائن
         if (vaultRows.isEmpty()) {
             Toast.makeText(requireContext(),
                     isArabic ? "أضف خزنة واحدة على الأقل"
@@ -321,7 +314,6 @@ private String levelLabel(String code, String[] codes, String[] labels) {
         }
 
         try {
-            // ═══ بناء payload الفروع ═══
             JSONArray branchesArray = new JSONArray();
             for (JSONObject b : branchesList) {
                 JSONObject bo = new JSONObject();
@@ -338,7 +330,6 @@ private String levelLabel(String code, String[] codes, String[] labels) {
                 branchesArray.put(bo);
             }
 
-            // ═══ بناء payload الخزائن ═══
             JSONArray vaultsArray = new JSONArray();
             for (VaultRow vr : vaultRows) {
                 String code = safeText(vr.etCode);
@@ -369,12 +360,10 @@ private String levelLabel(String code, String[] codes, String[] labels) {
                 vaultsArray.put(vo);
             }
 
-            // ═══ إرسال ═══
             btnNext.setEnabled(false);
             btnNext.setText(isArabic ? "جاري الحفظ..." : "Saving...");
             showLoading(true);
 
-            // أولاً: حفظ الفروع
             new Thread(() -> {
                 try {
                     JSONObject branchesPayload = new JSONObject();
@@ -393,7 +382,6 @@ private String levelLabel(String code, String[] codes, String[] labels) {
                         return;
                     }
 
-                    // ثانياً: حفظ الخزائن
                     JSONObject vaultsPayload = new JSONObject();
                     vaultsPayload.put("vaults", vaultsArray);
                     vaultsPayload.put("branch_id", branchesList.get(0).optInt("id", 1));
@@ -410,7 +398,11 @@ private String levelLabel(String code, String[] codes, String[] labels) {
                                     isArabic ? "✅ تم حفظ الفروع والخزائن"
                                             : "✅ Branches & Vaults saved",
                                     Toast.LENGTH_SHORT).show();
-                            requireActivity().getSupportFragmentManager().popBackStack();
+
+                            // ═══════════════════════════════════════════
+                            // ✅ الانتقال للخطوة 3 عبر SetupNavigator
+                            // ═══════════════════════════════════════════
+                            SetupNavigator.goToNextStep(SetupStep2BranchesFragment.this, 2);
                         } else {
                             String err = (vResp != null && vResp.error != null) ? vResp.error : "unknown";
                             Toast.makeText(requireContext(), "❌ خزائن: " + err, Toast.LENGTH_LONG).show();
