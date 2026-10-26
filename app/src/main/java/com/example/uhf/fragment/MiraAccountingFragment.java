@@ -48,8 +48,8 @@ public class MiraAccountingFragment extends Fragment {
     private static final int TAB_PERIOD_LOCK = 13;
     private static final int TAB_CHEQUES     = 14; // ✅ تبويب الشيكات الجديد
     private static final int TAB_RECONCILIATION  = 15; // ✅ تبويب التسوية البنكية الجديد
-    private static final int MAX_TABS            = 16;
-
+    private static final int TAB_FIXED_ASSETS    = 16; // ✅ تبويب الأصول الثابتة
+    private static final int MAX_TABS            = 17;
     private TabLayout tabLayout;
     private FrameLayout tabContentContainer;
 
@@ -222,7 +222,8 @@ public class MiraAccountingFragment extends Fragment {
         addTab("🔐 الفترات",    "🔐 Periods");
         addTab("📑 الشيكات",    "📑 Cheques"); // ✅ إضافة التبويب
         addTab("🏦 المطابقة",   "🏦 Reconciliation");
-        
+        addTab("🏢 الأصول",     "🏢 Assets");
+            
         TabLayout.Tab initialTab = tabLayout.getTabAt(currentTabIndex);
         if (initialTab != null) initialTab.select();
 
@@ -332,6 +333,7 @@ public class MiraAccountingFragment extends Fragment {
                 case TAB_PERIOD_LOCK:return new MiraPeriodLockFragment();
                 case TAB_CHEQUES:return new MiraChequeFragment(); // ✅ ربط الشاشة
                 case TAB_RECONCILIATION: return new MiraReconciliationFragment();
+                case TAB_FIXED_ASSETS: return new MiraFixedAssetsFragment(); 
                 default: return new MiraJournalFragment();
             }
         } catch (Exception e) {
@@ -342,7 +344,7 @@ public class MiraAccountingFragment extends Fragment {
 
     public void navigateToTab(int tabIndex) {
         // ✅ السماح بالوصول حتى آخر تبويب (التقييم)
-        if (tabIndex < 0 || tabIndex > TAB_RECONCILIATION || tabLayout == null) return;
+        if (tabIndex < 0 || tabIndex > TAB_FIXED_ASSETS || tabLayout == null) return;
         TabLayout.Tab tab = tabLayout.getTabAt(tabIndex);
         if (tab != null) tab.select();
     }
